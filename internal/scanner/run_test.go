@@ -165,6 +165,38 @@ func TestScanningATargetProducesFindings(t *testing.T) {
 	})
 }
 
+func TestABuildHoldingNothingButItselfIsScannedWithoutTheScanner(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx := t.Context()
+		scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
+			TargetID: f.target, ContentHash: "hash-root-only",
+			BuiltAt: time.Now().UTC().Add(-time.Minute), ParserVersion: "test",
+		})
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("record scan: %v %v", outcome, err)
+		}
+		if _, err := graph.NewStore(f.db.DB).Apply(ctx, f.target, scan.ID,
+			graph.Snapshot{Root: root}); err != nil {
+			t.Fatal(err)
+		}
+		// What the real scanner does with an inventory of no components.
+		s := &stub{fail: errors.New("exit status 2")}
+		f.waiting(t)
+
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		done, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").Once(ctx)
+		if err != nil {
+			t.Fatalf("a build with nothing in it failed its scan: %v", err)
+		}
+		if done == nil || done.Components != 0 {
+			t.Fatalf("the scan reported %+v, want one of no components", done)
+		}
+		if s.saw != nil {
+			t.Error("the scanner was asked about a build holding nothing")
+		}
+	})
+}
+
 func TestWhatRanIsRecordedAgainstTheRun(t *testing.T) {
 	// A finding that appeared or vanished because the scanner or its data
 	// moved is unexplainable without this.

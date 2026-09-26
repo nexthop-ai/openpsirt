@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // LateBody is a finding running out of time with nobody having decided.
@@ -22,6 +23,8 @@ type LateBody struct {
 	Exploited     bool   `json:"exploited,omitempty"`
 	Component     string `json:"component"`
 	Version       string `json:"version,omitempty" doc:"The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved"`
+	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace     string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName  string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
@@ -101,6 +104,7 @@ func registerDue(api huma.API, in Ingest) {
 			body := LateBody{
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, Component: row.Component, Version: row.Version,
+				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
 				StreamName:  labelBeside(row.StreamName, row.Stream),

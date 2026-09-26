@@ -24,6 +24,8 @@ type UnassignedBody struct {
 	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
 	Component     string `json:"component"`
 	Version       string `json:"version"`
+	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace     string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
@@ -382,6 +384,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
+				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
 				StreamName:  labelBeside(row.StreamName, row.Stream),
@@ -489,6 +492,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
+				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
 				StreamName:  labelBeside(row.StreamName, row.Stream),
@@ -575,6 +579,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
+				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
 				StreamName:  labelBeside(row.StreamName, row.Stream),

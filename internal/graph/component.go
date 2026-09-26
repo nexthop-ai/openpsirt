@@ -456,7 +456,14 @@ type Parts struct {
 	// identifier spells it — "alpine-3.24.1", "debian-12". Absent for
 	// everything that is not a distribution's package, and absent from plenty
 	// that is: it is a qualifier, and a producer need not state it.
+	//
+	// Where the identifier states the distribution as a name and a version
+	// instead — `os_name=debian&os_version=13`, which is how Docker Scout and
+	// BuildKit write it — the two are joined into the same spelling.
 	Distro string
+	// DistroStated is whether the identifier carries the `distro` qualifier
+	// itself, rather than a distribution put together from the other two.
+	DistroStated bool
 }
 
 // PartsOfPurl splits a package identifier into what it says.
@@ -475,12 +482,21 @@ func PartsOfPurl(purl string) Parts {
 	body, qualifiers, _ := strings.Cut(purl, "?")
 
 	var parts Parts
+	var osName, osVersion string
 	for _, pair := range strings.Split(qualifiers, "&") {
 		key, value, found := strings.Cut(pair, "=")
-		if found && strings.EqualFold(key, "distro") {
-			parts.Distro = decoded(value)
-			break
+		switch {
+		case !found:
+		case strings.EqualFold(key, "distro"):
+			parts.Distro, parts.DistroStated = decoded(value), true
+		case strings.EqualFold(key, "os_name"):
+			osName = decoded(value)
+		case strings.EqualFold(key, "os_version"):
+			osVersion = decoded(value)
 		}
+	}
+	if !parts.DistroStated && osName != "" && osVersion != "" {
+		parts.Distro = strings.ToLower(osName) + "-" + osVersion
 	}
 
 	// The scheme is fixed by the specification and is compared without regard

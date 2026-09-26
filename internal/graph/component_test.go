@@ -75,7 +75,7 @@ func TestAPackageIdentifierKeepsWhatIdentityThrowsAway(t *testing.T) {
 	}{
 		{
 			purl: "pkg:apk/alpine/busybox@1.37.0-r31?arch=x86_64&distro=alpine-3.24.1",
-			want: graph.Parts{Type: "apk", Namespace: "alpine", Name: "busybox", Version: "1.37.0-r31", Distro: "alpine-3.24.1"},
+			want: graph.Parts{Type: "apk", Namespace: "alpine", Name: "busybox", Version: "1.37.0-r31", Distro: "alpine-3.24.1", DistroStated: true},
 		},
 		{
 			// A module path is several segments, and all but the last are the
@@ -93,7 +93,23 @@ func TestAPackageIdentifierKeepsWhatIdentityThrowsAway(t *testing.T) {
 		{
 			// A subpath follows the qualifiers and is neither one.
 			purl: "pkg:deb/debian/busybox@1.35.0-4?distro=debian-12#src/main",
-			want: graph.Parts{Type: "deb", Namespace: "debian", Name: "busybox", Version: "1.35.0-4", Distro: "debian-12"},
+			want: graph.Parts{Type: "deb", Namespace: "debian", Name: "busybox", Version: "1.35.0-4", Distro: "debian-12", DistroStated: true},
+		},
+		{
+			// The distribution as Docker Scout and BuildKit state it: a name
+			// and a version, joined into the spelling the qualifier uses.
+			purl: "pkg:deb/debian/acl@2.3.2-2?os_distro=trixie&os_name=debian&os_version=13",
+			want: graph.Parts{Type: "deb", Namespace: "debian", Name: "acl", Version: "2.3.2-2", Distro: "debian-13"},
+		},
+		{
+			// Stated both ways, the qualifier made for it wins.
+			purl: "pkg:deb/debian/acl@2.3.2-2?os_name=debian&os_version=13&distro=debian-13.1",
+			want: graph.Parts{Type: "deb", Namespace: "debian", Name: "acl", Version: "2.3.2-2", Distro: "debian-13.1", DistroStated: true},
+		},
+		{
+			// A name with no version is not a release.
+			purl: "pkg:deb/debian/acl@2.3.2-2?os_name=debian",
+			want: graph.Parts{Type: "deb", Namespace: "debian", Name: "acl", Version: "2.3.2-2"},
 		},
 		{purl: "pkg:cargo/openssl@0.10.55", want: graph.Parts{Type: "cargo", Name: "openssl", Version: "0.10.55"}},
 		{purl: "pkg:apk/busybox", want: graph.Parts{Type: "apk", Name: "busybox"}},

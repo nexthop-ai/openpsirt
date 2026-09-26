@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
+	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -58,7 +60,7 @@ func WriteInventory(w io.Writer, components []graph.Described) error {
 			// Our own identity, so that what comes back can be matched to what
 			// went in without depending on a name being unique.
 			BomRef: c.Identity(), Type: "library",
-			Name: c.Name, Version: c.Version, Purl: c.Purl, CPE: c.CPE,
+			Name: c.Name, Version: c.Version, Purl: withDistro(c.Purl), CPE: c.CPE,
 		})
 	}
 
@@ -66,4 +68,29 @@ func WriteInventory(w io.Writer, components []graph.Described) error {
 		return fmt.Errorf("write the inventory for scanning: %w", err)
 	}
 	return nil
+}
+
+// withDistro is a package identifier with its distribution stated in the one
+// qualifier the scanner reads, where the identifier states it another way.
+//
+// A distribution's package is matched against that distribution's advisories
+// only when the scanner knows which release it is. An identifier spelling the
+// release as `os_name` and `os_version` left the scanner matching a Debian
+// image by its package names alone: 3 matches against 66 for 142 packages of
+// one real image.
+func withDistro(purl string) string {
+	parts := graph.PartsOfPurl(purl)
+	if parts.Distro == "" || parts.DistroStated {
+		return purl
+	}
+	body, subpath, _ := strings.Cut(purl, "#")
+	joiner := "?"
+	if strings.Contains(body, "?") {
+		joiner = "&"
+	}
+	body += joiner + "distro=" + url.QueryEscape(parts.Distro)
+	if subpath != "" {
+		body += "#" + subpath
+	}
+	return body
 }

@@ -150,6 +150,7 @@ contents. Parsing is expensive; refusing is not.
 | An upload taken and not readable is not one we hold | Otherwise the identical bytes can never be sent again, however the reason they could not be read is put right. Such a submission is taken again on the row that already describes it: one row per set of bytes, carrying what became of the live attempt at them, and the documents of the attempt that failed are replaced by the ones arriving now |
 | Equal build times are refused, unless the inventory is the one held | Two different documents claiming one build time is a coin toss over which picture is current. The same inventory at that time with different judgments beside it is not a second picture: it is the one held, with what the build argues about it changed, which is why it was sent again. The later arrival is the one in force |
 | Ordering is by build time, not arrival | A few minutes of clock skew is tolerated, because build machines are seconds out rather than hours |
+| A document stating no build time is dated when it arrives, and the answer says so | Both formats leave the build time optional, and cyclonedx-maven writes none. The arrival is the only order such a build has. Dated as the zero time it would be older than every real one, so the first would be taken and every later scan of that variant refused as not newer |
 | Timestamps are rounded to what the database keeps | Go carries nanoseconds and no supported engine stores them, so without rounding a value written and read back is fractionally *older* than the one in memory: a scan compares as newer than itself, and a second file claiming the same build time is accepted. A latent fault on every engine, exposed by one and passed by the others on timing luck |
 
 ## Document storage
@@ -282,7 +283,7 @@ and one reader is what the seam was for.
 |---|---|
 | **An element announces what it is in a field that may arrive after the fields it governs** | An element is read into one neutral shape and interpreted when it closes. That is what a component read from either other format already does, and it holds one element rather than a document, so the walk stays bounded |
 | **The header is inside the contents** | A document's creation record is one entry of the same array its packages are in. The header read therefore walks the whole graph and builds nothing from it, which is as cheap as this format allows rather than as cheap as the others are |
-| **A document carries several creation records** | Anything it imported brought its own. The one the document points at is the document's; where it points at nothing the first read stands in, because reporting no build time at all has every later scan of that target refused as not newer |
+| **A document carries several creation records** | Anything it imported brought its own. The one the document points at is the document's; where it points at nothing, none stands in and the upload is dated when it arrives. An imported document's time does not move between builds, so standing it in would have every later scan of that target refused as not newer |
 | **One relationship states a list of ends** | The edge bound is charged per end rather than per relationship, as each is read |
 | **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead. So the walk is bounded throughout and the two are still sized the way they differ |
 | **Identifiers are absolute** | Nothing here depends on their shape. Every one but the document's own resolves the document to itself and is discarded, which is what the other formats' in-file identifiers are for too |
@@ -466,6 +467,7 @@ they fill in. A document that is valid and sparse is not a broken one.
 | An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
 | An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
 | A relationship naming what a build is about, stated by anything other than the document | Left out. Taken as a root claim, any element could make itself the build's root and re-parent the whole inventory under it |
+| The third version's version written with the second's prefix, `SPDX-3.0.1` | Read as `3.0.1`. The format states a bare semantic version; a producer carrying the second version's habit over writes the prefix, and it names the format the reader already is. A fourth major version with the prefix is still refused |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
 
 Two things a document states twice are resolved once it has closed rather than
@@ -984,6 +986,7 @@ to retrofit were settled early.
 
 | Limit | Detail |
 |---|---|
+| A build dated on arrival is ordered by when it was sent, not when it was made | An older undated document sent late is taken as the newest. Documents that state a time are ordered by it, so this reaches only producers that state none |
 | The bounds are set from what reading costs, not from what a document looks like | An edge holds about half a kilobyte of heap while being read and a component about one and a third, so round numbers several times the largest real producer — two million edges, a quarter of a million components — accept a document taking about 1.3 GB, past what the chart ships as a limit. Such a file is guaranteed to kill the process, in the background reader that runs after the upload is answered 202. The budget is about 250 MB for one document, which is the server's share of the pod rather than the whole of it — the scanner is a second process in the same cgroup — and a test measures the per-unit cost with a wide bound |
 | The reader's bounds are configuration, not constants | A defaults function every deployment runs unchanged is a constant with extra steps |
 | A component's name is folded on the way in, into a column of its own | The four engines do not fold alike outside ASCII: a VEX statement about a component named with any letter outside it matches on three engines and not the fourth, so which engine a deployment runs decides whether the publisher's judgment reaches the finding. Folding on write also leaves the index usable |

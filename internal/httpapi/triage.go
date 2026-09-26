@@ -87,6 +87,8 @@ type FindingRefBody struct {
 	Vulnerability string  `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
 	Component     string  `json:"component"`
 	Version       string  `json:"version" doc:"The version that ships"`
+	Ecosystem     string  `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace     string  `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Severity      string  `json:"severity,omitempty" doc:"Our rating where one stands, else as published"`
 	Score         float64 `json:"score,omitempty"`
 	ScoreVersion  string  `json:"score_version,omitempty" doc:"The scoring system the number is on"`

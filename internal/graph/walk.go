@@ -13,15 +13,23 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// depth bounds every recursive walk over a build's edges.
+// depth bounds the recursive walk that carries how far it has come: the climb
+// that draws routes.
 //
 // The graphs an inventory describes are containment a few levels deep — the
 // deepest route measured in a real image was three steps — so this is not a
 // bound on a build, it is a bound on a document in a loop. A cycle in the
 // edges would otherwise be walked until the engine gave up, and the engines
-// give up differently: one stops at a thousand steps with an error, the
-// others do not stop. Bounded here, a cycle costs at most this many steps
-// and the component it hides is reported as unplaced, which is what it is.
+// give up differently: PostgreSQL and SQLite do not stop, and the other two
+// stop after their bound on rounds — MySQL with an error, MariaDB returning
+// what it has. Bounded here, a cycle costs at most this many steps and the
+// component it hides is reported as unplaced, which is what it is.
+//
+// The walks down — the count of what is open beneath a component, and the
+// subtree a list is narrowed to — carry no depth, because carrying one
+// multiplies their rows; the union ends their cycles instead. They run as far
+// as the edges go, which is why the connection lifts the bound on rounds on
+// the two engines that have one.
 const depth = 64
 
 // Within is the components at one component and everywhere beneath it in a
@@ -33,8 +41,8 @@ const depth = 64
 // identifiers. The subtree under a build's root is every component in the
 // build, and binding six thousand identifiers into a statement was the cost of
 // asking for it; the engine walking its own edges is the same set with nothing
-// crossing the wire. Bounded on depth and not on rows, and a caller that
-// materializes it has to say what it does past a size. The subtree under a
+// crossing the wire. Not bounded on rows, and a caller that materializes it
+// has to say what it does past a size. The subtree under a
 // build's root is every component in the build, so scanning this into a slice
 // is unbounded by construction; the two callers that pass it into a subquery
 // never hold it.
@@ -49,18 +57,21 @@ func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 // broadly issued tens of thousands of them inside one request. The engine
 // walks from every anchor at once instead.
 func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
+	// No depth in the rows, for the reason the count beneath carries none:
+	// 167,785 rows for 10,045 components under one real product, 0.81 s
+	// against 0.10 s, and the union ends a cycle on its own.
 	return db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT n.id AS "node", 0 AS "depth"
+		SELECT n.id AS "node"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
 		UNION
-		SELECT e.child_id, d.depth + 1
+		SELECT e.child_id
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
-		  AND d.depth < ? AND e.parent_id <> e.child_id
+		  AND e.parent_id <> e.child_id
 	)
 	SELECT DISTINCT n.component_id FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node`,
-		targetID, bun.List(componentIDs), targetID, depth)
+		targetID, bun.List(componentIDs), targetID)
 }
 
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
@@ -110,33 +121,38 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	// components as though from the one adopting them, so the adopter's count
 	// is its own subtree and theirs as one set, in the same statement as
 	// everything else being counted.
-	seeds := `SELECT n.id AS "start", n.id AS "node", 0 AS "depth"
+	seeds := `SELECT n.id AS "start", n.id AS "node"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
 	args := []any{targetID, bun.List(of)}
 	if len(adopt.IDs) > 0 {
 		seeds += `
 		UNION ALL
-		SELECT bn.id, n.id, 1
+		SELECT bn.id, n.id
 		FROM "graph_node" AS "bn"
 		JOIN "graph_node" AS "n" ON n.target_id = bn.target_id
 		WHERE bn.target_id = ? AND bn.closed_scan_id IS NULL AND bn.component_id = ?
 		  AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
 		args = append(args, targetID, adopt.By, bun.List(adopt.IDs))
 	}
-	args = append(args, targetID, depth, productID, targetID, bun.List(visible))
+	args = append(args, targetID, productID, targetID, bun.List(visible))
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
 		Band        string `bun:"band"`
 		Issues      int    `bun:"issues"`
 	}
+	// No depth in the rows. With one, the union keeps a node once per depth
+	// it is reached at, and a node reached along many paths is walked again
+	// from each: 1,612,405 rows for 43,904 pairs under one real product's
+	// root, 9.0 s against 0.19 s. Without one, a pair already reached is not
+	// added again, which is also what ends a cycle.
 	err := s.db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT "seed"."start", "seed"."node", "seed"."depth" FROM (`+seeds+`) AS "seed"
+		SELECT "seed"."start", "seed"."node" FROM (`+seeds+`) AS "seed"
 		UNION
-		SELECT d.start, e.child_id, d.depth + 1
+		SELECT d.start, e.child_id
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
-		  AND d.depth < ? AND e.parent_id <> e.child_id
+		  AND e.parent_id <> e.child_id
 	)
 	SELECT sn.component_id AS "component_id", p.band AS "band",
 	       COUNT(DISTINCT p.vulnerability_id) AS "issues"

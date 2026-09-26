@@ -393,9 +393,12 @@ type Paging struct {
 // "differs between builds" and the spread across variants are statements
 // about a selection.
 type AtOneBuild struct {
-	Beneath        string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused"`
-	Differs        bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
-	AcrossVariants string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
+	Beneath          string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices"`
+	BeneathVersion   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
+	BeneathEcosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+	BeneathNamespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+	Differs          bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
+	AcrossVariants   string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
 
 func registerFindings(api huma.API, in Ingest) {
@@ -603,7 +606,8 @@ func registerComponentFindings(api huma.API, in Ingest) {
 // asked of the store rather than inferred from which levels were named — one
 // rule, in one place, so the endpoint cannot come to disagree with the
 // statement it is narrowing.
-func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string) (*int64, error) {
+func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string,
+	which graph.Choice) (*int64, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -616,11 +620,12 @@ func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string)
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a branch and a variant that name exactly one build")
 	}
-	componentID, err := graph.NewStore(in.DB.DB).ComponentAt(ctx, targets[0], name)
+	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targets[0], name, which)
 	if err != nil {
-		if errors.Is(err, graph.ErrAmbiguous) {
-			return nil, huma.Error422UnprocessableEntity(
-				"this build holds " + name + " as more than one component, so it cannot be narrowed beneath by name alone")
+		var several *graph.Ambiguous
+		if errors.As(err, &several) {
+			return nil, severalComponents(several,
+				"&beneath_version= and, where two share a version, &beneath_ecosystem= and &beneath_namespace=")
 		}
 		return nil, huma.Error422UnprocessableEntity("this build does not hold a component called " + name)
 	}

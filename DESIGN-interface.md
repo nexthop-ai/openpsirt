@@ -874,11 +874,16 @@ it is reached. A finding is one issue at one place, and a library at thirty-six
 places with two issues is seventy-two rows — which is what a parent reads if it
 counts findings, where somebody who drilled down one path is looking at one
 place and expects two. One recursive statement for the row's whole set of
-children: 0.08 s for the root's thirty children on the full-size image.
+children: 0.08 s for the root's thirty children on the full-size image, and
+0.19 s for the walk under 2,140 children of a real product of 12,147
+components. The walk records which components each child reaches and not how
+far, because recording the distance keeps a component once per path to it:
+1,612,405 rows for those 43,904 pairs, and 9.0 s.
 
 | Rule | |
 |---|---|
 | Every row is ordered on the number that describes it | For a branch, what is open beneath it; for a leaf, its own count. What opens still comes before what does not, so the structure of a build is on the first screen |
+| The header says how many components carry neither a package identifier nor a CPE | Such a component is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some, with the reason on hover |
 | What nothing in the build pulls in hangs from the root | The build contains it, and nothing else does. The root's own count is everything beneath it and beneath those, as one set. A real switch image arrives with 60,935 components, 1,358 edges and none from its root; drawn from the root's edges alone, that tree is empty |
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |

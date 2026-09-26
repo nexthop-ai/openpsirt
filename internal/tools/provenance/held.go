@@ -54,6 +54,26 @@ var Held = []Entry{
 	{"internal/sbom/testdata/suse-su-2026_0005-1.json", "CC-BY-4.0",
 		"https://ftp.suse.com/pub/projects/security/csaf/"},
 
+	// Real SBOMs from producers the other fixtures do not cover. Each states
+	// its data license as CC0-1.0, or comes from a repository licensed as
+	// given; internal/sbom/testdata/README.md says what shape each is kept for.
+	{"internal/sbom/testdata/tern-photon-image.spdx.json", "CC0-1.0", "https://github.com/tern-tools/tern"},
+	{"internal/sbom/testdata/sbom-tool-linux.spdx.json", "CC0-1.0",
+		"https://github.com/microsoft/sbom-tool/releases/tag/v4.1.5"},
+	{"internal/sbom/testdata/apko-wolfi-image.spdx.json", "CC0-1.0", "https://images.chainguard.dev/directory/image/python"},
+	{"internal/sbom/testdata/oe-linked.spdx.json", "CC0-1.0",
+		"https://github.com/OpenChain-Project/Telco-WG/tree/main/tools/openchain_telco_sbom_validator/testing/linked-sboms-01"},
+	{"internal/sbom/testdata/sbom-tool-hello.spdx3.json", "CC0-1.0", "https://github.com/spdx/spdx-examples"},
+	{"internal/sbom/testdata/maven-dropwizard.cdx.json", "CC0-1.0", "https://github.com/CycloneDX/bom-examples"},
+	{"internal/sbom/testdata/saasbom-services.cdx.json", "CC0-1.0", "https://github.com/CycloneDX/bom-examples"},
+	{"internal/sbom/testdata/trivy-ubuntu.cdx.json", "BSD-3-Clause",
+		"https://github.com/DefectDojo/django-DefectDojo/blob/master/unittests/scans/cyclonedx/issue_9277.json"},
+	{"internal/sbom/testdata/snyk-juice-shop.cdx.json", "MIT",
+		"https://github.com/pickford-snyk/orca-juice-shop/blob/main/juice-shop-sbom.json"},
+	{"internal/sbom/testdata/scout-python-image.spdx.json.xz", "CC0-1.0", "https://hub.docker.com/_/python"},
+	{"internal/sbom/testdata/github-dependency-graph.spdx.json.xz", "CC0-1.0",
+		"https://api.github.com/repos/grafana/loki/dependency-graph/sbom"},
+
 	// FIRST's reference calculator for CVSS version 4: its table of class
 	// scores transcribed, and the scores it answers for a corpus of vectors.
 	{"internal/finding/cvss4.go", "BSD-2-Clause", "https://github.com/FIRSTdotorg/cvss-v4-calculator"},

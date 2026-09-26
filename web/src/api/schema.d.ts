@@ -6141,7 +6141,11 @@ export interface components {
         BlockingBody: {
             component: string;
             due?: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of places of the build it sits at
@@ -7116,10 +7120,14 @@ export interface components {
             /** @description The consumer that pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             due?: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question */
             met?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             opened: string;
             /** @enum {string} */
             outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -7713,10 +7721,14 @@ export interface components {
             decided: number;
             /** @description The first four hundred characters of what the report says, as plain text */
             description?: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
             /** @enum {string} */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
             fixed_in?: string;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /** @description The part of the product this belongs to */
             owner?: string;
             /** @description The component that directly pulls it in, which is what the decision is about */
@@ -8178,7 +8190,11 @@ export interface components {
             days_left: number;
             /** @description The date it is due */
             due: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of places in that build this sits at
@@ -9945,7 +9961,7 @@ export interface components {
             waiting: boolean;
         };
         ReceiptBody: {
-            /** @description The build time the producer states */
+            /** @description The build time the producer states, or the time the upload arrived where it states none */
             built_at?: string;
             /** @description The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
             caution?: string;
@@ -10438,6 +10454,11 @@ export interface components {
             root?: components["schemas"]["NeighborBody"];
             /** @description The search this answers, where one was asked */
             term?: string;
+            /**
+             * Format: int64
+             * @description The number of those components carrying neither a package identifier nor a platform enumeration
+             */
+            unidentified: number;
         };
         RowsStandingBody: {
             /**
@@ -11307,9 +11328,13 @@ export interface components {
              */
             builds: number;
             component: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
             /** @description This product is recorded as having been exploited through this issue */
             exploited_here?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of findings a judgment here would be recorded against, across every build it is in
@@ -11364,8 +11389,10 @@ export interface components {
              * @example https://example.com/schemas/UploadResult.json
              */
             readonly $schema?: string;
-            /** @description The build time the producer states */
+            /** @description The build time the producer states, or the time the upload arrived where it states none */
             built_at?: string;
+            /** @description Whether the inventory stated no build time, so the time it arrived orders it instead */
+            dated_on_arrival?: boolean;
             /**
              * @description Whether this upload was taken or matched one already held
              * @enum {string}
@@ -11391,11 +11418,15 @@ export interface components {
              * @description The depth below the build's root, so the tree is drawn by indenting
              */
             depth: number;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             /**
              * Format: int64
              * @description Your own open issues on this component itself
              */
             findings: number;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /** @description False for a component the inventory put nowhere. Those sit at the end with no chain */
             placed: boolean;
             version: string;
@@ -15227,8 +15258,14 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
                 beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -15378,8 +15415,14 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
                 beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -15491,8 +15534,14 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
                 beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -15607,8 +15656,14 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
                 beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */

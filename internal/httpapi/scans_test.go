@@ -585,29 +585,43 @@ func TestAnUploadInEitherFormatIsTaken(t *testing.T) {
 	})
 }
 
-func TestAnInventoryWithNoBuildTimeIsRefused(t *testing.T) {
-	// Taking it is worse than refusing it. The zero time is older than every
-	// real one, so the first such upload is accepted and every later scan for
-	// that target is refused as not newer — the target takes nothing further,
-	// ever.
+func TestAnInventoryThatStatesNoBuildTimeIsDatedOnArrival(t *testing.T) {
+	// Both formats leave the build time optional, and cyclonedx-maven writes
+	// none. Dated as the zero time it would be older than every real one, so
+	// the first would be taken and every later scan refused as not newer.
 	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
-		undated := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
-		 "metadata": {"component": {"bom-ref": "root", "name": "p", "version": "1"}},
-		 "components": [{"bom-ref": "a", "name": "libc", "version": "2.41"}]}`
-
-		rec := httptest.NewRecorder()
-		f.handler.ServeHTTP(rec, f.sending(upload(t, f.path, undated)))
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("an inventory with no build time returned %d, want 400", rec.Code)
+		undated := func(version string) string {
+			return `{"bomFormat": "CycloneDX", "specVersion": "1.6",
+			 "metadata": {"component": {"bom-ref": "root", "name": "p", "version": "1"}},
+			 "components": [{"bom-ref": "a", "name": "libc", "version": "` + version + `"}]}`
 		}
-		if !bytes.Contains(rec.Body.Bytes(), []byte("when it was built")) {
-			t.Errorf("the refusal does not say what is missing: %s", rec.Body.String())
-		}
-
-		// And the target is not left wedged: a dated scan still lands.
-		code, _ := f.send(t, upload(t, f.path, inventory(nowish(), "libc6")))
+		before := time.Now().UTC().Truncate(time.Second)
+		code, got := f.send(t, upload(t, f.path, undated("2.41")))
 		if code != http.StatusAccepted {
-			t.Errorf("a dated scan after an undated one returned %d", code)
+			t.Fatalf("an inventory with no build time answered %d: %+v", code, got)
+		}
+		built, err := time.Parse(time.RFC3339, got.BuiltAt)
+		if err != nil {
+			t.Fatalf("the answer's build time %q: %v", got.BuiltAt, err)
+		}
+		if !got.DatedOnArrival || built.Before(before) || built.After(time.Now().Add(time.Second)) {
+			t.Errorf("the answer is %+v, want it dated on arrival", got)
+		}
+
+		// The same bytes sent again are the upload already held, and are
+		// answered with the time that upload was given rather than the
+		// time of the retry: the stored row keeps its first time, and the
+		// answer says what the row says.
+		time.Sleep(1100 * time.Millisecond)
+		if code, again := f.send(t, upload(t, f.path, undated("2.41"))); code != http.StatusOK ||
+			again.BuiltAt != got.BuiltAt {
+			t.Errorf("the same undated bytes again answered %d dated %q, want 200 dated %q",
+				code, again.BuiltAt, got.BuiltAt)
+		}
+
+		// And the target is not left wedged: the next undated build lands.
+		if code, again := f.send(t, upload(t, f.path, undated("2.42"))); code != http.StatusAccepted {
+			t.Errorf("a second undated build answered %d: %+v", code, again)
 		}
 	})
 }
@@ -630,7 +644,7 @@ func TestEveryDoorThatTurnsAnUploadAwayRecordsIt(t *testing.T) {
 		want int
 	}{
 		{"a document nothing can read", "{ not an inventory", http.StatusUnprocessableEntity},
-		{"one that does not say when it was built", inventory(time.Time{}, "libc6"), http.StatusBadRequest},
+		{"one built in the future", inventory(time.Now().Add(48*time.Hour), "libc6"), http.StatusBadRequest},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {

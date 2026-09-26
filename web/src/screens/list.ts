@@ -323,6 +323,15 @@ export function listQuery(params: URLSearchParams) {
       : {}),
     ...(params.get("under") ? { under: params.get("under") ?? "" } : {}),
     ...(params.get("beneath") ? { beneath: params.get("beneath") ?? "" } : {}),
+    ...(params.get("beneath") && params.get("beneath_version")
+      ? { beneath_version: params.get("beneath_version") ?? "" }
+      : {}),
+    ...(params.get("beneath") && params.get("beneath_ecosystem")
+      ? { beneath_ecosystem: params.get("beneath_ecosystem") ?? "" }
+      : {}),
+    ...(params.get("beneath") && params.get("beneath_namespace")
+      ? { beneath_namespace: params.get("beneath_namespace") ?? "" }
+      : {}),
     ...(params.get("under_build") === "yes" ? { under_build: true } : {}),
     ...(states.length > 0
       ? { state: states as ("undecided" | "waiting" | "agreed" | "lapsed")[] }
@@ -377,12 +386,26 @@ export function listQuery(params: URLSearchParams) {
 // left in the address, so switching a product off does not silently narrow by
 // something the reader can no longer see or clear.
 export function acrossProducts(query: ReturnType<typeof listQuery>) {
-  const { beneath, differs, across_variants, ...rest } = query as ReturnType<typeof listQuery> & {
+  const {
+    beneath,
+    beneath_version,
+    beneath_ecosystem,
+    beneath_namespace,
+    differs,
+    across_variants,
+    ...rest
+  } = query as ReturnType<typeof listQuery> & {
     beneath?: string;
+    beneath_version?: string;
+    beneath_ecosystem?: string;
+    beneath_namespace?: string;
     differs?: boolean;
     across_variants?: string;
   };
   void beneath;
+  void beneath_version;
+  void beneath_ecosystem;
+  void beneath_namespace;
   void differs;
   void across_variants;
   return rest;

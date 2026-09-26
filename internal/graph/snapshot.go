@@ -292,11 +292,15 @@ type Choice struct {
 
 // Narrowed is which of these choices a narrowing names, by position.
 //
-// A part left empty matches anything, with one exception. An ecosystem named
-// without a namespace, where both a component with no namespace and one with a
-// namespace match, is the one with none: the choice offered for it carries no
-// namespace, so leaving the part out is the only way to name it, and read as
-// "any" that choice would lead back to the refusal that offered it.
+// A part left empty matches anything, with one exception. Where more than one
+// matches, the part before the first one left empty was named, and exactly one
+// of them has nothing in that part, it is that one: a version named without an
+// ecosystem picks the component with no identifier, and an ecosystem named
+// without a namespace picks the one with no namespace. A name alone still
+// matches every component of that name. The
+// choice offered for such a component carries nothing in that part, so
+// leaving it out is the only way to name it, and read as "any" that choice
+// would lead back to the refusal that offered it.
 func Narrowed(which Choice, choices []Choice) []int {
 	var kept []int
 	for i, choice := range choices {
@@ -306,10 +310,11 @@ func Narrowed(which Choice, choices []Choice) []int {
 			kept = append(kept, i)
 		}
 	}
-	if len(kept) > 1 && which.Ecosystem != "" && which.Namespace == "" {
+	if len(kept) > 1 && which.Namespace == "" {
 		var bare []int
 		for _, i := range kept {
-			if choices[i].Namespace == "" {
+			if which.Version != "" && which.Ecosystem == "" && choices[i].Ecosystem == "" ||
+				which.Ecosystem != "" && choices[i].Namespace == "" {
 				bare = append(bare, i)
 			}
 		}
@@ -977,9 +982,9 @@ type Step struct {
 // much was inventoried, and how much of it was placed. A build with many
 // components and few edges is a document that listed everything and said
 // where almost nothing went.
-func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int64) (int, int, error) {
+func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int64) (Tally, error) {
 	if _, _, err := s.visibleIn(ctx, subject, targetID); err != nil {
-		return 0, 0, err
+		return Tally{}, err
 	}
 	components, err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -991,7 +996,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		Where("n.is_root = ?", false).
 		Count(ctx)
 	if err != nil {
-		return 0, 0, fmt.Errorf("count what this build holds: %w", err)
+		return Tally{}, fmt.Errorf("count what this build holds: %w", err)
 	}
 	edges, err := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
@@ -999,9 +1004,34 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		Where("e.closed_scan_id IS NULL").
 		Count(ctx)
 	if err != nil {
-		return 0, 0, fmt.Errorf("count what this build's edges are: %w", err)
+		return Tally{}, fmt.Errorf("count what this build's edges are: %w", err)
 	}
-	return components, edges, nil
+	// The components carrying neither a package identifier nor a platform
+	// enumeration, which is everything a scanner matches on. They ship and are
+	// tracked, and no scan can say anything about them, so a build of nothing
+	// else reports no findings and reads as clean.
+	unidentified, err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		Where("n.target_id = ?", targetID).
+		Where("n.closed_scan_id IS NULL").
+		Where("n.is_root = ?", false).
+		Where("(c.purl IS NULL OR c.purl = '')").
+		Where("(c.cpe IS NULL OR c.cpe = '')").
+		Count(ctx)
+	if err != nil {
+		return Tally{}, fmt.Errorf("count what this build holds that nothing can match: %w", err)
+	}
+	return Tally{Components: components, Edges: edges, Unidentified: unidentified}, nil
+}
+
+// Tally is how much a build's graph holds.
+type Tally struct {
+	Components int
+	Edges      int
+	// Unidentified is how many of the components carry nothing a scanner can
+	// match them on.
+	Unidentified int
 }
 
 // Search finds components of a build by name.

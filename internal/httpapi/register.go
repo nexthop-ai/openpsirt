@@ -16,6 +16,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
@@ -26,6 +27,8 @@ type DisposedBody struct {
 	Severity      string        `json:"severity,omitempty"`
 	Component     string        `json:"component"`
 	Version       string        `json:"version,omitempty"`
+	Ecosystem     string        `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace     string        `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Place         string        `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
 	Consumer      string        `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state. undecided is the row every other report leaves out and the one an auditor is looking for"`
@@ -320,6 +323,7 @@ func disposedBody(row finding.Disposed) DisposedBody {
 	body := DisposedBody{
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
 		Component: row.Component, Version: row.Version, Place: row.Place,
+		Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 		Consumer: row.Consumer,
 		State:    row.State, Outcome: outcome(row.Outcome),
 		Justification: justification(row.Justification),

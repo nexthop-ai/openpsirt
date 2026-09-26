@@ -196,7 +196,7 @@ function Yours() {
                   <Link
                     className="n hint"
                     title="Your own open issues at or under it"
-                    to={beneathComponent(at, row.component)}
+                    to={beneathComponent(at, row)}
                   >
                     {row.beneath} beneath
                   </Link>
@@ -395,6 +395,12 @@ function Whole() {
         <p>
           {product} · {stream} · {variant} — {(top.data?.components ?? 0).toLocaleString()}{" "}
           components, {(top.data?.edges ?? 0).toLocaleString()} edges
+          {(top.data?.unidentified ?? 0) > 0 && (
+            <span title="No package identifier or CPE, so the scanner has nothing to match them on. They're tracked, but nothing will be found in them.">
+              {" "}
+              · {(top.data?.unidentified ?? 0).toLocaleString()} can't be scanned
+            </span>
+          )}
         </p>
       </div>
 
@@ -574,8 +580,17 @@ function componentPage(at: At, component: string | undefined): string {
   );
 }
 
-function beneathComponent(at: At, component: string | undefined): string {
-  return `${buildPath(at)}/findings?beneath=${encodeURIComponent(component ?? "")}`;
+// The rest of what names the component travels with it, because a name at a
+// version can be two components and the list refuses to guess between them.
+function beneathComponent(
+  at: At,
+  row: { component?: string; version?: string; ecosystem?: string; namespace?: string },
+): string {
+  const query = new URLSearchParams({ beneath: row.component ?? "" });
+  if (row.version) query.set("beneath_version", row.version);
+  if (row.ecosystem) query.set("beneath_ecosystem", row.ecosystem);
+  if (row.namespace) query.set("beneath_namespace", row.namespace);
+  return `${buildPath(at)}/findings?${query}`;
 }
 
 // One flat list of indented rows rather than nested lists, so the rule down the

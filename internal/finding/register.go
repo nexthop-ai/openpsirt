@@ -29,7 +29,10 @@ type Disposed struct {
 	Severity      string
 	Component     string
 	Version       string
-	Place         string
+	// Purl is the component's package identifier, which tells two components
+	// of one name and one version apart.
+	Purl  string
+	Place string
 	// Consumer is what pulls the component in, empty where the build holds it
 	// directly. The place identity is derived from content and is a hash, so
 	// it correlates two rows and tells nobody where anything is; this is the
@@ -237,6 +240,7 @@ type registerRow struct {
 	Severity      string     `bun:"severity"`
 	Component     string     `bun:"component"`
 	Version       string     `bun:"version"`
+	Purl          string     `bun:"purl"`
 	Place         string     `bun:"place_identity"`
 	Consumer      string     `bun:"consumer"`
 	Outcome       string     `bun:"outcome"`
@@ -383,6 +387,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		// A decision counts where it is live or where it lapsed. Lapsed is
@@ -435,7 +440,7 @@ const onTheRecord = `CASE WHEN de.live_key IS NOT NULL OR de.state = 'lapsed' TH
 func disposedFrom(row registerRow) Disposed {
 	one := Disposed{
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
-		Component: row.Component, Version: row.Version, Place: row.Place,
+		Component: row.Component, Version: row.Version, Purl: row.Purl, Place: row.Place,
 		Consumer: row.Consumer,
 		Outcome:  row.Outcome, Justification: row.Justification,
 		ProposedBy: row.ProposedBy, ProposedAt: row.ProposedAt,

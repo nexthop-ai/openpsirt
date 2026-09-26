@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
@@ -74,7 +75,9 @@ func narrowing(ctx context.Context, in Ingest, q ScopeQuery,
 			"across_variants=only needs a variant: name the one to ask what is specific to")
 	}
 	out.Store = finding.NewStore(in.DB.DB)
-	if filter.Beneath, err = beneathIn(ctx, in, scope, at.Beneath); err != nil {
+	if filter.Beneath, err = beneathIn(ctx, in, scope, at.Beneath, graph.Choice{
+		Version: at.BeneathVersion, Ecosystem: at.BeneathEcosystem, Namespace: at.BeneathNamespace,
+	}); err != nil {
 		return out, err
 	}
 	out.Filter = filter

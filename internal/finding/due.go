@@ -215,6 +215,7 @@ type Late struct {
 	// version often enough that a link without it cannot be resolved — and a
 	// screen offering a link that dead-ends is worse than one offering none.
 	Version     string `bun:"version"`
+	Purl        string `bun:"purl"`
 	Severity    string `bun:"severity"`
 	Exploited   bool   `bun:"exploited"`
 	Product     string `bun:"product"`
@@ -388,13 +389,14 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	}
 	// The grouping, which decides what one row is: an issue at a component in
 	// one build, however many places it sits at there.
-	const grouping = "v.identifier, c.name, c.version, f.urgency_exploited, p.name, p.display_name, " +
+	const grouping = "v.identifier, c.name, c.version, c.purl, f.urgency_exploited, p.name, p.display_name, " +
 		"st.name, st.display_name, va.name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
 
 	query := narrow(s.db.NewSelect()).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`p.name AS "product"`).

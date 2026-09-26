@@ -31,6 +31,7 @@ type Described struct {
 	Variant, VariantName string
 	Component            string
 	Version              string
+	Purl                 string
 	FixState             string
 	FixedIn              string
 	// Issue is the vulnerability, with what the report says about it.
@@ -59,6 +60,7 @@ type describedRow struct {
 	ComponentID int64  `bun:"component_id"`
 	Component   string `bun:"component"`
 	Version     string `bun:"version"`
+	Purl        string `bun:"purl"`
 	ConsumerID  *int64 `bun:"consumer_id"`
 	Consumer    string `bun:"consumer"`
 	FixState    string `bun:"fix_state"`
@@ -126,6 +128,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		ColumnExpr(`f.consumer_id AS "consumer_id"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		ColumnExpr(`f.fix_state AS "fix_state"`).
@@ -296,7 +299,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 			Product:  row.Product, ProductName: row.ProductName,
 			Stream: row.Stream, StreamName: row.StreamName,
 			Variant: row.Variant, VariantName: row.VariantName,
-			Component: row.Component, Version: row.Version,
+			Component: row.Component, Version: row.Version, Purl: row.Purl,
 			FixState: row.FixState, FixedIn: row.FixedIn,
 			Issue: byIssue[row.Issue].RatedIn(
 				rated[finding.RatedKey{ProductID: row.ProductID, VulnerabilityID: row.Issue}]),

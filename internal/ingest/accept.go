@@ -243,6 +243,23 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 // The returned scan is the one now current for that variant: for a file we
 // already hold, that is the row we took the first time.
 func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) {
+	// A document stating no build time is ordered by when it arrived. Dated
+	// here rather than at the door, because this is where the bytes already
+	// held are known: sent again, they keep the time their first arrival was
+	// given, so the decision, the row and the answer all use one time. Dated
+	// as the zero time instead, the first would be older than every real
+	// build time, and every later scan of the variant refused as not newer.
+	if a.BuiltAt.IsZero() {
+		held, err := s.byContent(ctx, a.TargetID, a.ContentHash)
+		if err != nil {
+			return nil, Accept, err
+		}
+		if held != nil {
+			a.BuiltAt = held.BuiltAt
+		} else {
+			a.BuiltAt = s.now().UTC()
+		}
+	}
 	outcome, err := s.Decide(ctx, a)
 	if err != nil {
 		return nil, outcome, err

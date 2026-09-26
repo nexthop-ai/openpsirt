@@ -67,6 +67,8 @@ type BlockingBody struct {
 	// Without it they arrive identical: four rows reading "CVE-2026-46595
 	// golang.org/x/crypto", differing only in a count the panel does not draw.
 	Version   string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
+	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Severity  string `json:"severity,omitempty"`
 	Exploited bool   `json:"exploited,omitempty"`
 	Places    int    `json:"places" doc:"The number of places of the build it sits at"`
@@ -166,7 +168,7 @@ func registerReadiness(api huma.API, in Ingest) {
 		for _, group := range groups {
 			one := BlockingBody{
 				Vulnerability: group.Vulnerability, Component: group.Component,
-				Version:  group.Version,
+				Version: group.Version, Ecosystem: group.Ecosystem, Namespace: group.Namespace,
 				Severity: group.Severity, Exploited: group.Exploited,
 				Places: group.Places, State: group.State,
 			}

@@ -27,6 +27,7 @@ import { on } from "../ui/when";
 import { useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
+import { pathTo } from "./list";
 
 // The comparison between a product's two spellings: a name people type is
 // matched without regard to capitals, which is the rule the server applies to
@@ -244,14 +245,20 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
           {" · "}
           <Link
             className="linkish"
-            to={
-              `/products/${encodeURIComponent(claim.finding.product)}` +
-              `/streams/${encodeURIComponent(claim.finding.stream)}` +
-              `/variants/${encodeURIComponent(claim.finding.variant)}` +
-              `/findings/${encodeURIComponent(claim.finding.vulnerability)}` +
-              `/components/${encodeURIComponent(claim.finding.component)}` +
-              (claim.finding.version ? `?version=${encodeURIComponent(claim.finding.version)}` : "")
-            }
+            to={pathTo(
+              {
+                product: claim.finding.product,
+                stream: claim.finding.stream,
+                variant: claim.finding.variant,
+              },
+              {
+                vulnerability: claim.finding.vulnerability,
+                component: claim.finding.component,
+                version: claim.finding.version ?? "",
+                ecosystem: claim.finding.ecosystem,
+                namespace: claim.finding.namespace,
+              },
+            )}
           >
             Open the finding →
           </Link>

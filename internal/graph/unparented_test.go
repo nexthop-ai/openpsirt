@@ -5,6 +5,7 @@ package graph_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -88,6 +89,170 @@ func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 			if _, err := f.store.ComponentAs(ctx, f.targetID, "nginx", choice); err != nil {
 				t.Errorf("the choice %+v did not resolve: %v", choice, err)
 			}
+		}
+	})
+}
+
+func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
+	// Nothing bounds this walk's depth, so the union's refusal to add a pair
+	// it already holds is what ends a cycle. Where it did not, this would not
+	// return on three engines; MariaDB would stop at its bound on rounds and
+	// count the same, so there this pins nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl, zlib},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: curl, Child: zlib},
+				{Parent: zlib, Child: curl},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		f.opens(t, f.anIssue(t, "CVE-2026-LOOP"), f.componentNamed(t, zlib.Name), "under-curl")
+
+		top, kids, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if top == nil || top.Beneath != 1 {
+			t.Errorf("the root counts %+v beneath it, want the one issue", top)
+		}
+		if len(kids) != 1 || kids[0].Beneath != 1 {
+			t.Errorf("curl counts %+v, want the one issue under it counted once", kids)
+		}
+	})
+}
+
+func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl, zlib},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: curl, Child: zlib},
+				{Parent: zlib, Child: curl},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		var ids []int64
+		if err := graph.Within(f.db.DB, f.targetID, f.componentNamed(t, curl.Name)).
+			Scan(ctx, &ids); err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(ids)
+		want := []int64{f.componentNamed(t, curl.Name), f.componentNamed(t, zlib.Name)}
+		slices.Sort(want)
+		if !slices.Equal(ids, want) {
+			t.Errorf("the subtree under curl is %v, want curl and zlib once each (%v)", ids, want)
+		}
+	})
+}
+
+func TestWhatNothingCanMatchIsCounted(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		byName := graph.Described{Name: "bash", Version: "4.4.18-4.ph3"}
+		byPlatform := graph.Described{Name: "busybox", Version: "1.36",
+			CPE: "cpe:2.3:a:busybox:busybox:1.36:*:*:*:*:*:*:*"}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl, byName, byPlatform},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl}, {Parent: root, Child: byName},
+				{Parent: root, Child: byPlatform},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		tally, err := f.store.Counts(ctx, everyone(f), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tally.Components != 3 || tally.Unidentified != 1 {
+			t.Errorf("counted %+v, want 3 components of which bash alone is unidentified", tally)
+		}
+	})
+}
+
+func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
+	// apko describes a package once as an APK and once as a directory with no
+	// identifier, at one name and one version.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bare := graph.Described{Name: "gdbm", Version: "1.26-r6"}
+		named := graph.Described{Purl: "pkg:apk/wolfi/gdbm@1.26-r6", Name: "gdbm", Version: "1.26-r6"}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{bare, named},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: named}, {Parent: named, Child: bare},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, err := f.store.ComponentAs(ctx, f.targetID, "gdbm", graph.Choice{})
+		var several *graph.Ambiguous
+		if !errors.As(err, &several) || len(several.Choices) != 2 {
+			t.Fatalf("a name held twice answered %v, want the two choices", err)
+		}
+		seen := map[int64]bool{}
+		for _, choice := range several.Choices {
+			id, err := f.store.ComponentAs(ctx, f.targetID, "gdbm", choice)
+			if err != nil {
+				t.Errorf("the choice %+v did not resolve: %v", choice, err)
+			}
+			seen[id] = true
+		}
+		if len(seen) != 2 {
+			t.Errorf("the two choices resolved to %d components, want one each", len(seen))
+		}
+	})
+}
+
+func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
+	// The two engines of the MySQL family stop a recursive statement after a
+	// thousand rounds unless told otherwise — one with an error, the other
+	// with a short answer — and the walks down carry no depth to stop them
+	// sooner. A chain this long is a legal document.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		const length = 1100
+		chain := make([]graph.Described, length)
+		deps := make([]graph.Dependency, 0, length)
+		parent := root
+		for i := range chain {
+			chain[i] = at(fmt.Sprintf("link-%04d", i), "1")
+			deps = append(deps, graph.Dependency{Parent: parent, Child: chain[i]})
+			parent = chain[i]
+		}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root: root, Components: chain, Dependencies: deps,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		last := f.componentNamed(t, chain[length-1].Name)
+		f.opens(t, f.anIssue(t, "CVE-2026-FAR"), last, "at-the-end")
+
+		top, _, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if top == nil || top.Beneath != 1 {
+			t.Errorf("the root counts %+v beneath it, want the issue at the end of the chain", top)
+		}
+		var ids []int64
+		if err := graph.Within(f.db.DB, f.targetID, f.componentNamed(t, chain[0].Name)).
+			Scan(ctx, &ids); err != nil {
+			t.Fatal(err)
+		}
+		if len(ids) != length || !slices.Contains(ids, last) {
+			t.Errorf("the subtree under the first link holds %d components, want all %d", len(ids), length)
 		}
 	})
 }

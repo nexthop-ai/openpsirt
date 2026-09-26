@@ -329,10 +329,11 @@ name is not enough.
 |---|---|
 | The four parts are identity without the qualifiers | Every choice a refusal offers resolves exactly one component |
 | A part left empty matches anything | A caller that never meets the ambiguity sends nothing more |
+| Except where the part before it was named and exactly one match has nothing in it | A version with no ecosystem then names the component with no identifier, and an ecosystem with no namespace the one with no namespace. The choice offered for such a component carries nothing in that part, so leaving it out is the only way to name it. apko describes each package once more as a directory with no identifier, at the same name and version. A name alone still matches every component of that name |
 | A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
-| Findings rows, tree nodes, the steps of a way down and component packages carry the ecosystem and namespace | A screen can send back only what it was given |
-| The finding and its reach, decision, assignment and tags, and a component's neighbors, trend, open issues and decision about them, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
+| Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down, component packages, and the unassigned, late, disposed, blocking and claim lists carry the ecosystem and namespace | A screen can send back only what it was given |
+| The finding and its reach, decision, assignment and tags, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
 
 ## Upstream name and version
 
@@ -533,9 +534,14 @@ Precomputing would cost writes on every scan and bound nothing: how many routes
 exist is a property of the producer's graph.
 
 Recursive traversal is portable across all four engines. Every walk is one
-`WITH RECURSIVE` statement bounded at sixty-four steps: upward from the components
-on a page, downward from a component for the set beneath it, and downward from a
-row of the tree's children for the distinct issues under each.
+`WITH RECURSIVE` statement: upward from the components on a page, downward from a
+component for the set beneath it, and downward from a row of the tree's children
+for the distinct issues under each. The walk upward carries how far it has come
+and is bounded at sixty-four steps. The walks down carry no depth: the union
+adds a component once, which ends a cycle, and carrying a depth keeps a
+component once per path to it. A component more than sixty-four steps below the
+root is therefore counted beneath it and found in a list narrowed beneath it,
+and shown on a finding as placed nowhere.
 
 The downward walks are spelled `CROSS JOIN ... WHERE`, which is an inner join
 everywhere and, on SQLite, the instruction to keep the recursion's queue on the
@@ -553,5 +559,4 @@ root, against 0.018 s.
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |
-| The lists linking to a finding from elsewhere name its component by name and version alone | The unassigned, late, disposed and blocking lists, the review queue, a claim, an issue and a disclosure. Where a build holds that name at that version as two components, the link lands on the choice between them |
-| The findings list's `beneath` filter takes a name alone | It refuses a name held as more than one component, and says so |
+| Where an issue sits, and the disclosure queue, link to a finding by name and version alone | The first groups one issue's places by component name, so one row can stand for two components of that name. Where a build holds that name at that version as two, the link lands on the choice between them |

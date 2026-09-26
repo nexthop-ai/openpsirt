@@ -37,6 +37,10 @@ import (
 type Upward struct {
 	Component string
 	Version   string
+	// Purl is the component's package identifier, which its ecosystem and
+	// namespace are read out of: one name at one version can be two
+	// components.
+	Purl string
 	// Depth is how far below the root it sits, so a caller draws the tree by
 	// indenting rather than by holding a structure.
 	Depth int
@@ -85,6 +89,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		ComponentID int64  `bun:"component_id"`
 		Name        string `bun:"name"`
 		Version     string `bun:"version"`
+		Purl        string `bun:"purl"`
 		Issues      int    `bun:"issues"`
 	}
 	held := s.db.NewSelect().
@@ -93,6 +98,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`MIN(c.name) AS "name"`).
 		ColumnExpr(`MIN(c.version) AS "version"`).
+		ColumnExpr(`MIN(c.purl) AS "purl"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.closed_at IS NULL").
@@ -136,7 +142,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		chain := chains[row.ComponentID]
 		if len(chain) == 0 {
 			unplaced = append(unplaced, Upward{
-				Component: row.Name, Version: row.Version,
+				Component: row.Name, Version: row.Version, Purl: row.Purl,
 				Findings: row.Issues, Beneath: row.Issues,
 			})
 			continue
@@ -173,7 +179,9 @@ type node struct {
 }
 
 func (n *node) child(step Step) *node {
-	key := step.Name + "@" + step.Version
+	// All four parts of what names a component, so two components sharing a
+	// name and a version stay two nodes.
+	key := step.Name + "@" + step.Version + "#" + EcosystemOf(step.Purl) + "/" + NamespaceOf(step.Purl)
 	if n.at == nil {
 		n.at = map[string]*node{}
 	}
@@ -206,7 +214,7 @@ func (n *node) total() int {
 func (n *node) emit(out *[]Upward, depth int) {
 	if depth >= 0 {
 		*out = append(*out, Upward{
-			Component: n.step.Name, Version: n.step.Version,
+			Component: n.step.Name, Version: n.step.Version, Purl: n.step.Purl,
 			Depth: depth, Findings: n.findings, Beneath: n.beneath, Placed: true,
 		})
 	}

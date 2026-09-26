@@ -219,7 +219,10 @@ type UploadResult struct {
 	// Outcome says what happened, in the producer's terms rather than ours.
 	Outcome string `json:"outcome" enum:"queued,already_held" doc:"Whether this upload was taken or matched one already held"`
 	Serial  string `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
-	BuiltAt string `json:"built_at,omitempty" doc:"The build time the producer states"`
+	BuiltAt string `json:"built_at,omitempty" doc:"The build time the producer states, or the time the upload arrived where it states none"`
+	// DatedOnArrival says the build time is the arrival time, because the
+	// inventory stated none.
+	DatedOnArrival bool `json:"dated_on_arrival,omitempty" doc:"Whether the inventory stated no build time, so the time it arrived orders it instead"`
 }
 
 func registerScans(api huma.API, in Ingest) {
@@ -440,17 +443,13 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		return nil, refused
 	}
 
-	// A document that does not say when it was built cannot be ordered against
-	// anything, and taking it is worse than refusing it: the zero time is
-	// older than every real one, so the first such upload is accepted and
-	// every later scan for that target is refused as not newer. The target
-	// takes no further scans at all, which is the same wedge the future-clock
-	// check exists to prevent, arriving through a door nobody guarded.
-	if header.BuiltAt.IsZero() {
-		refused := huma.Error400BadRequest(
-			"the inventory does not say when it was built, and that is what orders scans against each other")
-		note(refused.Error(), nil, &contentHash)
-		return nil, refused
+	// A document that does not say when it was built is ordered by when it
+	// arrived, since both formats leave the build time optional. The store
+	// dates it, because the store knows whether these bytes are already held.
+	dated := header.BuiltAt.IsZero()
+	stated := &header.BuiltAt
+	if dated {
+		stated = nil
 	}
 
 	arriving := ingest.Arriving{
@@ -479,10 +478,11 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 			return err
 		}
 		// Through the package's own helper, and unconditionally: an inventory
-		// with no build time is refused above, so a branch here asks a question
-		// already answered.
+		// with no build time is dated on arrival above, so a branch here asks a
+		// question already answered.
 		result = UploadResult{
-			ScanID: scan.ID, Serial: header.Serial, BuiltAt: stamp(header.BuiltAt),
+			ScanID: scan.ID, Serial: header.Serial, BuiltAt: stamp(scan.BuiltAt),
+			DatedOnArrival: dated,
 		}
 		if taken != ingest.Accept && taken != ingest.Retake {
 			return nil
@@ -537,7 +537,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// a pipeline nobody wired up, against one failing nightly and telling
 		// its own log it succeeded.
 		refused := rejection(outcome, err)
-		note(refused.Error(), &header.BuiltAt, &contentHash)
+		note(refused.Error(), stated, &contentHash)
 		return nil, refused
 	case err != nil:
 		return nil, wentWrong(in.Logger, "the upload could not be recorded", err)
@@ -660,7 +660,7 @@ func store(ctx context.Context, documents *ingest.Documents, scanID int64, kind 
 type ReceiptBody struct {
 	ScanID     int64  `json:"scan_id" doc:"The scan this upload became"`
 	Serial     string `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
-	BuiltAt    string `json:"built_at,omitempty" doc:"The build time the producer states"`
+	BuiltAt    string `json:"built_at,omitempty" doc:"The build time the producer states, or the time the upload arrived where it states none"`
 	ReceivedAt string `json:"received_at" doc:"The moment it arrived here"`
 	State      string `json:"state" enum:"reading,scanning,scanned,failed" doc:"The state it has reached"`
 	// Failure is the producer's own text back at them — what could not be read
