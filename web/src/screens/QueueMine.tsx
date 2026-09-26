@@ -1,3 +1,4 @@
+import { pathTo } from "./list";
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -92,13 +93,20 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         <td>
           {row.finding ? (
             <Link
-              to={
-                `/products/${encodeURIComponent(row.finding.product ?? "")}` +
-                `/streams/${encodeURIComponent(row.finding.stream ?? "")}` +
-                `/variants/${encodeURIComponent(row.finding.variant ?? "")}` +
-                `/findings/${encodeURIComponent(row.finding.vulnerability ?? "")}` +
-                `/components/${encodeURIComponent(row.finding.component ?? "")}`
-              }
+              to={pathTo(
+                {
+                  product: row.finding.product ?? "",
+                  stream: row.finding.stream ?? "",
+                  variant: row.finding.variant ?? "",
+                },
+                {
+                  vulnerability: row.finding.vulnerability ?? "",
+                  component: row.finding.component ?? "",
+                  version: row.finding.version ?? "",
+                  ecosystem: row.finding.ecosystem,
+                  namespace: row.finding.namespace,
+                },
+              )}
               className="id"
             >
               {row.place?.vulnerability}

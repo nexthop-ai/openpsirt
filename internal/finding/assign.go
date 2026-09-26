@@ -614,6 +614,9 @@ type Owned struct {
 	Vulnerability string `bun:"vulnerability"`
 	Component     string `bun:"component"`
 	Version       string `bun:"version"`
+	// Purl is the component's package identifier, which what tells it from
+	// another component of the same name and version is read out of.
+	Purl          string `bun:"-"`
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
 	ExploitedHere bool   `bun:"exploited_here"`
@@ -889,7 +892,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 			row.Vulnerability, row.Severity = issue.Identifier, issue.InForce()
 		}
 		if component, held := shipped[head.ComponentID]; held {
-			row.Component, row.Version = component.Name, component.Version
+			row.Component, row.Version, row.Purl = component.Name, component.Version, component.Purl
 		}
 		if build, held := builds[head.TargetID]; held {
 			row.Product, row.Stream, row.Variant = build.Product, build.Stream, build.Variant

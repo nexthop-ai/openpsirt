@@ -11,7 +11,7 @@ import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { UNOWNED_LIST, usePaging } from "./list";
+import { UNOWNED_LIST, usePaging, pathTo } from "./list";
 import { unwrap } from "../api/queries";
 import { claimOf, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
@@ -974,7 +974,7 @@ function Card({
   );
 }
 
-// The address of a claim's finding, with the version the build ships it at.
+// The address of a claim's finding, with everything that picks its component.
 function findingPath(f: {
   product?: string;
   stream?: string;
@@ -982,14 +982,18 @@ function findingPath(f: {
   vulnerability?: string;
   component?: string;
   version?: string;
+  ecosystem?: string;
+  namespace?: string;
 }): string {
-  return (
-    `/products/${encodeURIComponent(f.product ?? "")}` +
-    `/streams/${encodeURIComponent(f.stream ?? "")}` +
-    `/variants/${encodeURIComponent(f.variant ?? "")}` +
-    `/findings/${encodeURIComponent(f.vulnerability ?? "")}` +
-    `/components/${encodeURIComponent(f.component ?? "")}` +
-    (f.version ? `?version=${encodeURIComponent(f.version)}` : "")
+  return pathTo(
+    { product: f.product ?? "", stream: f.stream ?? "", variant: f.variant ?? "" },
+    {
+      vulnerability: f.vulnerability ?? "",
+      component: f.component ?? "",
+      version: f.version ?? "",
+      ecosystem: f.ecosystem,
+      namespace: f.namespace,
+    },
   );
 }
 

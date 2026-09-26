@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -501,6 +502,7 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 		StreamName:    labelBeside(d.StreamName, d.Stream),
 		VariantName:   labelBeside(d.VariantName, d.Variant),
 		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
+		Ecosystem: graph.EcosystemOf(d.Purl), Namespace: graph.NamespaceOf(d.Purl),
 		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: d.FixState, FixedIn: d.FixedIn,
 		Description: excerpt(d.Issue.Description, 400),

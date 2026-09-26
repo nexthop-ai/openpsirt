@@ -209,3 +209,19 @@ func TestAListNarrowedBeneathAComponentTakesTheNamespace(t *testing.T) {
 		}
 	})
 }
+
+func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.shipsUnderTwoNamespaces(t, seededLib, seededTwin)
+		got := asPerson(t, r, "triager", http.MethodGet, "/v1/unassigned?product=mine", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("the unassigned list answered %d: %s", got.Code, got.Body.String())
+		}
+		for _, namespace := range []string{`"namespace":"debian"`, `"namespace":"sonic"`} {
+			if !strings.Contains(got.Body.String(), namespace) {
+				t.Errorf("the unassigned list does not say %s, so its link cannot pick the component: %s",
+					namespace, got.Body.String())
+			}
+		}
+	})
+}

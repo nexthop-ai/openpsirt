@@ -215,6 +215,7 @@ type Late struct {
 	// version often enough that a link without it cannot be resolved — and a
 	// screen offering a link that dead-ends is worse than one offering none.
 	Version     string `bun:"version"`
+	Purl        string `bun:"purl"`
 	Severity    string `bun:"severity"`
 	Exploited   bool   `bun:"exploited"`
 	Product     string `bun:"product"`
@@ -395,6 +396,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`p.name AS "product"`).

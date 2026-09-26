@@ -6141,7 +6141,11 @@ export interface components {
         BlockingBody: {
             component: string;
             due?: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of places of the build it sits at
@@ -7116,10 +7120,14 @@ export interface components {
             /** @description The consumer that pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             due?: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question */
             met?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             opened: string;
             /** @enum {string} */
             outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -7713,10 +7721,14 @@ export interface components {
             decided: number;
             /** @description The first four hundred characters of what the report says, as plain text */
             description?: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
             /** @enum {string} */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
             fixed_in?: string;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /** @description The part of the product this belongs to */
             owner?: string;
             /** @description The component that directly pulls it in, which is what the decision is about */
@@ -8178,7 +8190,11 @@ export interface components {
             days_left: number;
             /** @description The date it is due */
             due: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of places in that build this sits at
@@ -11312,9 +11328,13 @@ export interface components {
              */
             builds: number;
             component: string;
+            /** @description The kind of package, as its identifier spells it */
+            ecosystem?: string;
             exploited?: boolean;
             /** @description This product is recorded as having been exploited through this issue */
             exploited_here?: boolean;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of findings a judgment here would be recorded against, across every build it is in

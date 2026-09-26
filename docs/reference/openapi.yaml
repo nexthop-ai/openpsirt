@@ -875,8 +875,14 @@ components:
           type: string
         due:
           type: string
+        ecosystem:
+          description: The kind of package, as its identifier spells it
+          type: string
         exploited:
           type: boolean
+        namespace:
+          description: The namespace its package identifier names, where it names one
+          type: string
         places:
           description: The number of places of the build it sits at
           format: int64
@@ -2548,6 +2554,9 @@ components:
           type: string
         due:
           type: string
+        ecosystem:
+          description: The kind of package, as its identifier spells it
+          type: string
         justification:
           enum:
             - component_not_present
@@ -2559,6 +2568,9 @@ components:
         met:
           description: Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question
           type: boolean
+        namespace:
+          description: The namespace its package identifier names, where it names one
+          type: string
         opened:
           type: string
         outcome:
@@ -3584,6 +3596,9 @@ components:
         description:
           description: The first four hundred characters of what the report says, as plain text
           type: string
+        ecosystem:
+          description: The kind of package, as its identifier spells it
+          type: string
         exploited:
           type: boolean
         fix_state:
@@ -3595,6 +3610,9 @@ components:
             - mixed
           type: string
         fixed_in:
+          type: string
+        namespace:
+          description: The namespace its package identifier names, where it names one
           type: string
         owner:
           description: The part of the product this belongs to
@@ -4464,8 +4482,14 @@ components:
         due:
           description: The date it is due
           type: string
+        ecosystem:
+          description: The kind of package, as its identifier spells it
+          type: string
         exploited:
           type: boolean
+        namespace:
+          description: The namespace its package identifier names, where it names one
+          type: string
         places:
           description: The number of places in that build this sits at
           format: int64
@@ -9950,11 +9974,17 @@ components:
           type: integer
         component:
           type: string
+        ecosystem:
+          description: The kind of package, as its identifier spells it
+          type: string
         exploited:
           type: boolean
         exploited_here:
           description: This product is recorded as having been exploited through this issue
           type: boolean
+        namespace:
+          description: The namespace its package identifier names, where it names one
+          type: string
         places:
           description: The number of findings a judgment here would be recorded against, across every build it is in
           format: int64
