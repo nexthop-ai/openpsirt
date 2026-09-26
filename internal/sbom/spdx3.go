@@ -329,7 +329,12 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 // dropped before the rest of the graph is walked.
 func (c *reader) spdx3Created(e spdx3Element) error {
 	if e.specVersion != "" {
-		if major, _, _ := strings.Cut(e.specVersion, "."); major != spdx3Major {
+		// The version is a bare semantic version, and a producer carrying
+		// the second format's habit over writes it with that format's prefix:
+		// "SPDX-3.0.1". The prefix names the format this reader already is,
+		// so it is read past rather than taken as a different major version.
+		stated := strings.TrimPrefix(strings.TrimSpace(e.specVersion), "SPDX-")
+		if major, _, _ := strings.Cut(stated, "."); major != spdx3Major {
 			return fmt.Errorf("%s version %q is not one this reads", SPDX, trim(e.specVersion))
 		}
 		c.declared = SPDX

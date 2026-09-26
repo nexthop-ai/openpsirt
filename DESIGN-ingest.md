@@ -466,6 +466,7 @@ they fill in. A document that is valid and sparse is not a broken one.
 | An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
 | An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
 | A relationship naming what a build is about, stated by anything other than the document | Left out. Taken as a root claim, any element could make itself the build's root and re-parent the whole inventory under it |
+| The third version's version written with the second's prefix, `SPDX-3.0.1` | Read as `3.0.1`. The format states a bare semantic version; a producer carrying the second version's habit over writes the prefix, and it names the format the reader already is. A fourth major version with the prefix is still refused |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
 
 Two things a document states twice are resolved once it has closed rather than

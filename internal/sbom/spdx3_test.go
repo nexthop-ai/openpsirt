@@ -132,6 +132,18 @@ func TestTheTypeMayArriveAfterTheFieldsItGoverns(t *testing.T) {
 	}
 }
 
+func TestAThirdVersionWrittenWithTheSecondFormatsPrefixIsRead(t *testing.T) {
+	// go-FuSa 0.25 writes the version this way.
+	doc := read(t, `{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [
+		{"type": "CreationInfo", "spdxId": "_:c", "specVersion": "SPDX-3.0.1",
+		 "created": "2026-06-11T17:19:31Z"},
+		{"type": "software_Package", "spdxId": "https://example.org/p", "name": "otel",
+		 "creationInfo": "_:c", "software_packageVersion": "v1.44.0"}]}`)
+	if len(doc.Components) != 1 {
+		t.Errorf("read %d components, want the one package", len(doc.Components))
+	}
+}
+
 func TestTheThirdVersionIsRefusedWhereItWasNotWrittenAgainst(t *testing.T) {
 	for _, tc := range []struct{ name, body, want string }{{
 		name: "a fourth major version in the context",
@@ -141,6 +153,10 @@ func TestTheThirdVersionIsRefusedWhereItWasNotWrittenAgainst(t *testing.T) {
 		name: "a fourth major version in the graph",
 		body: `{"@graph": [{"@id": "_:c", "type": "CreationInfo", "specVersion": "4.0.0"}]}`,
 		want: `version "4.0.0" is not one this reads`,
+	}, {
+		name: "a fourth major version written with the prefix",
+		body: `{"@graph": [{"@id": "_:c", "type": "CreationInfo", "specVersion": "SPDX-4.0.0"}]}`,
+		want: `version "SPDX-4.0.0" is not one this reads`,
 	}, {
 		name: "a linked document of some other kind",
 		body: `{"@context": "https://example.invalid/other.jsonld", "@graph": [{"type": "Thing"}]}`,
