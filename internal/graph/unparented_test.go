@@ -123,3 +123,31 @@ func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 		}
 	})
 }
+
+func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl, zlib},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: curl, Child: zlib},
+				{Parent: zlib, Child: curl},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		var ids []int64
+		if err := graph.Within(f.db.DB, f.targetID, f.componentNamed(t, curl.Name)).
+			Scan(ctx, &ids); err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(ids)
+		want := []int64{f.componentNamed(t, curl.Name), f.componentNamed(t, zlib.Name)}
+		slices.Sort(want)
+		if !slices.Equal(ids, want) {
+			t.Errorf("the subtree under curl is %v, want curl and zlib once each (%v)", ids, want)
+		}
+	})
+}

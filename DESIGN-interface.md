@@ -1891,7 +1891,7 @@ the one that made it too long.
 
 | | |
 |---|---|
-| On MySQL, the count beneath a component fails for a chain over a thousand deep | That engine stops a recursive statement after a thousand rounds, and the count walks as far as the edges go. The deepest chain among 41 public inventories from 25 producers is sixteen |
+| On MySQL, the count beneath a component, and a list narrowed beneath one, fail for a chain over a thousand deep | That engine stops a recursive statement after a thousand rounds, and both walk as far as the edges go. The deepest chain among 41 public inventories from 25 producers is sixteen |
 | Color and the brand mark resolve through tokens in one place | How an operator overrides them is deliberately unsettled — that gets decided against real screens — but keeping the whole palette in one stylesheet means the answer will be a stylesheet rather than a hunt through components |
 | Dependencies are pinned exactly, not by range | A range resolves at build time and CI stops being reproducible; a caret in a manifest does exactly that. `npm ci` installs the lockfile |
 | A failure shows what the server said | Inventing a friendlier sentence hides the one the server wrote, which names the line to fix or which part of a declaration is missing — and is the more useful of the two |

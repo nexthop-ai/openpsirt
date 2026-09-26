@@ -13,8 +13,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// depth bounds the recursive walks that carry how far they have come: the
-// walk to a subtree for a membership test, and the climb that draws routes.
+// depth bounds the recursive walk that carries how far it has come: the climb
+// that draws routes.
 //
 // The graphs an inventory describes are containment a few levels deep — the
 // deepest route measured in a real image was three steps — so this is not a
@@ -24,8 +24,9 @@ import (
 // others do not stop. Bounded here, a cycle costs at most this many steps
 // and the component it hides is reported as unplaced, which is what it is.
 //
-// The count of what is open beneath a component carries no depth, because
-// carrying one multiplies its rows; the union ends its cycles instead.
+// The walks down — the count of what is open beneath a component, and the
+// subtree a list is narrowed to — carry no depth, because carrying one
+// multiplies their rows; the union ends their cycles instead.
 const depth = 64
 
 // Within is the components at one component and everywhere beneath it in a
@@ -37,8 +38,8 @@ const depth = 64
 // identifiers. The subtree under a build's root is every component in the
 // build, and binding six thousand identifiers into a statement was the cost of
 // asking for it; the engine walking its own edges is the same set with nothing
-// crossing the wire. Bounded on depth and not on rows, and a caller that
-// materializes it has to say what it does past a size. The subtree under a
+// crossing the wire. Not bounded on rows, and a caller that materializes it
+// has to say what it does past a size. The subtree under a
 // build's root is every component in the build, so scanning this into a slice
 // is unbounded by construction; the two callers that pass it into a subquery
 // never hold it.
@@ -53,18 +54,21 @@ func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 // broadly issued tens of thousands of them inside one request. The engine
 // walks from every anchor at once instead.
 func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
+	// No depth in the rows, for the reason the count beneath carries none:
+	// 167,785 rows for 10,045 components under one real product, 0.81 s
+	// against 0.10 s, and the union ends a cycle on its own.
 	return db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT n.id AS "node", 0 AS "depth"
+		SELECT n.id AS "node"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
 		UNION
-		SELECT e.child_id, d.depth + 1
+		SELECT e.child_id
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
-		  AND d.depth < ? AND e.parent_id <> e.child_id
+		  AND e.parent_id <> e.child_id
 	)
 	SELECT DISTINCT n.component_id FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node`,
-		targetID, bun.List(componentIDs), targetID, depth)
+		targetID, bun.List(componentIDs), targetID)
 }
 
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
