@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
@@ -695,6 +696,123 @@ func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
 			"mine", "master", "broadcom")
 		if !errors.Is(err, vex.ErrTooLarge) {
 			t.Fatalf("comparing a build past the ceiling answered %v", err)
+		}
+	})
+}
+
+// patchedKernel is the two-issue build with the first issue patched in the
+// kernel, as the build declares it.
+func (r *reach) patchedKernel(t *testing.T) {
+	t.Helper()
+	r.scannedTwoIssuesArguing(t, "patched", []sbom.Suppression{{
+		Vulnerability: "CVE-2026-9999", Status: sbom.AlreadyFixed,
+		Statement: "resolved by a patch the build carries",
+		Targets:   []sbom.Target{{Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image"}},
+		Origin:    sbom.FromPedigree,
+	}})
+}
+
+// fixedIn reads the document and returns what it says is fixed, by issue.
+func (r *reach) fixedIn(t *testing.T) map[string][]string {
+	t.Helper()
+	var doc struct {
+		Statements []struct {
+			Vulnerability struct {
+				Name string `json:"name"`
+			} `json:"vulnerability"`
+			Status   string `json:"status"`
+			Products []struct {
+				Subcomponents []struct {
+					ID string `json:"@id"`
+				} `json:"subcomponents"`
+			} `json:"products"`
+		} `json:"statements"`
+	}
+	read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+	fixed := map[string][]string{}
+	for _, one := range doc.Statements {
+		if one.Status != "fixed" {
+			t.Errorf("%s is said as %q, and nothing here was agreed to", one.Vulnerability.Name, one.Status)
+			continue
+		}
+		for _, product := range one.Products {
+			for _, inside := range product.Subcomponents {
+				fixed[one.Vulnerability.Name] = append(fixed[one.Vulnerability.Name], inside.ID)
+			}
+		}
+	}
+	return fixed
+}
+
+// patchedRows runs a statement against the rows the patch closed.
+func (r *reach) patchedRows(t *testing.T, statement string) {
+	t.Helper()
+	if _, err := r.db.ExecContext(t.Context(), statement); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAVEXDocumentSaysFixedWhereTheBuildDeclaresAPatch(t *testing.T) {
+	// A build carrying a backport says so in its inventory. The finding closes
+	// as patched, and a customer's scanner still matches the upstream version,
+	// so the document is what tells it the build is fixed. Silence would read
+	// as affected.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.patchedKernel(t)
+		fixed := r.fixedIn(t)
+		if len(fixed) != 1 || len(fixed["CVE-2026-9999"]) != 1 ||
+			fixed["CVE-2026-9999"][0] != "pkg:deb/debian/linux-image@5.10" {
+			t.Fatalf("the document says %v fixed, want CVE-2026-9999 in the kernel", fixed)
+		}
+
+		// A later build without the patch reopens the finding, and the
+		// statement goes with it.
+		r.scannedTwoIssuesArguing(t, "unpatched", nil)
+		if fixed := r.fixedIn(t); len(fixed) != 0 {
+			t.Errorf("a build that dropped the patch still says %v fixed", fixed)
+		}
+	})
+}
+
+func TestAVEXDocumentDropsAPatchTheBuildNoLongerDeclares(t *testing.T) {
+	// Between the inventory arriving and the scan running, the finding is
+	// still closed. The build has already withdrawn the patch, and that is
+	// what the document goes by.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.patchedKernel(t)
+		r.patchedRows(t, `UPDATE "suppression" SET "closed_scan_id" = "opened_scan_id"`)
+		if fixed := r.fixedIn(t); len(fixed) != 0 {
+			t.Errorf("a patch the build withdrew is still said as %v fixed", fixed)
+		}
+	})
+}
+
+func TestAVEXDocumentSaysNothingFixedAboutAComponentNoLongerShipped(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.patchedKernel(t)
+		r.patchedRows(t, `UPDATE "graph_node" SET "closed_scan_id" = "opened_scan_id"
+			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
+		if fixed := r.fixedIn(t); len(fixed) != 0 {
+			t.Errorf("a component this build no longer ships is said as %v fixed", fixed)
+		}
+	})
+}
+
+func TestAVEXDocumentSaysNothingFixedWhileAPlaceIsOpen(t *testing.T) {
+	// A place open against the issue is a place somebody still has to answer,
+	// and "fixed" beside it would contradict the findings list.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.patchedKernel(t)
+		r.patchedRows(t, `INSERT INTO "finding" ("target_id", "kind", "vulnerability_id",
+				"visibility", "component_id", "place_identity", "urgency",
+				"urgency_exploited", "urgency_exploited_here", "urgency_shipped",
+				"opened_at", "last_changed_at")
+			SELECT "target_id", "kind", "vulnerability_id", "visibility", "component_id",
+				"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
+				"urgency_shipped", "opened_at", "last_changed_at"
+			FROM "finding" WHERE "closed_because" = 'patched'`)
+		if fixed := r.fixedIn(t); len(fixed) != 0 {
+			t.Errorf("an issue open at a place is said as %v fixed", fixed)
 		}
 	})
 }

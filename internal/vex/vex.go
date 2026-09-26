@@ -361,6 +361,10 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
 	}
+	fixed, err := s.patched(ctx, target.ID, visible)
+	if err != nil {
+		return nil, err
+	}
 	// Refused rather than truncated. There is no second request for the rest
 	// of a document, and one that stopped at a ceiling would say "nothing is
 	// claimed about this" by omission about everything past it — to every
@@ -372,7 +376,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// not be generated" with a 500, and the sentence saying which build and
 	// what the limit is went to the log instead of to the person who can act
 	// on it.
-	if len(rows) > s.carrying() {
+	if len(rows)+len(fixed) > s.carrying() {
 		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
@@ -416,8 +420,11 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// declaring the field and never filling it answers nobody searching by
 	// the name they have, which is the one search this document exists to
 	// satisfy.
-	issues := make([]int64, 0, len(rows))
+	issues := make([]int64, 0, len(rows)+len(fixed))
 	for _, row := range rows {
+		issues = append(issues, row.VulnerabilityID)
+	}
+	for _, row := range fixed {
 		issues = append(issues, row.VulnerabilityID)
 	}
 	alsoCalled, err := s.namesOf(ctx, issues)
@@ -458,6 +465,20 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
+	for _, row := range fixed {
+		about := row.Purl
+		if about == "" {
+			about = row.Component
+		}
+		doc.Statements = append(doc.Statements, Statement{
+			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
+			Timestamp:     row.PatchedAt.UTC(),
+			Products: []Shipped{{
+				ID: shipped, Subcomponents: []Inside{{ID: about}},
+			}},
+			Status: "fixed",
+		})
+	}
 
 	// Ordered here rather than by the engine, so the document is byte-for-byte
 	// the same whatever engine generated it, which is what lets somebody diff
@@ -470,6 +491,101 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		return a.Products[0].Subcomponents[0].ID < b.Products[0].Subcomponents[0].ID
 	})
 	return doc, nil
+}
+
+// fixedByPatch is an issue a patch the build declares has fixed in one
+// component.
+type fixedByPatch struct {
+	VulnerabilityID int64
+	Identifier      string
+	Component       string
+	Purl            string
+	PatchedAt       time.Time
+}
+
+// patched reads what the build's own patches fix, which is said as fixed.
+//
+// The build's word stands without a decision here, so what it fixes is
+// published beside what this deployment agreed to. A statement is made only
+// while all of these hold:
+//
+//   - the component still ships in this build
+//   - no place of it is open against the issue
+//   - the claim that closed it is one the build still makes
+//
+// A build that drops the patch reopens the finding, and the statement goes
+// with it.
+func (s *Store) patched(ctx context.Context, targetID int64,
+	visible []access.Visibility) ([]fixedByPatch, error) {
+
+	var rows []struct {
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Identifier      string `bun:"identifier"`
+		Component       string `bun:"component"`
+		Purl            string `bun:"purl"`
+		First           int64  `bun:"first"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "suppression" AS "sup" ON sup.id = f.suppressed_by`).
+		ColumnExpr(`v.id AS "vulnerability_id"`).
+		ColumnExpr(`v.identifier AS "identifier"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		// The row the date is read from. A time read through an aggregate
+		// comes back as text on one engine and a time on another.
+		ColumnExpr(`MIN(f.id) AS "first"`).
+		Where("f.target_id = ?", targetID).
+		Where("f.closed_because = ?", finding.Patched).
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where("sup.closed_scan_id IS NULL").
+		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "n"
+			WHERE n.target_id = f.target_id AND n.component_id = f.component_id
+				AND n.closed_scan_id IS NULL)`).
+		Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
+			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
+				AND o.component_id = f.component_id AND o.closed_at IS NULL)`).
+		GroupExpr("v.id, v.identifier, c.name, c.purl").
+		Limit(s.carrying()+1).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read what the build's patches fix: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.First)
+	}
+	var dated []struct {
+		ID       int64     `bun:"id"`
+		ClosedAt time.Time `bun:"closed_at"`
+	}
+	if err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`f.id AS "id"`).
+		ColumnExpr(`f.closed_at AS "closed_at"`).
+		Where("f.id IN (?)", bun.List(ids)).
+		Scan(ctx, &dated); err != nil {
+		return nil, fmt.Errorf("read when the build's patches were seen: %w", err)
+	}
+	when := make(map[int64]time.Time, len(dated))
+	for _, row := range dated {
+		when[row.ID] = row.ClosedAt
+	}
+
+	fixed := make([]fixedByPatch, 0, len(rows))
+	for _, row := range rows {
+		fixed = append(fixed, fixedByPatch{
+			VulnerabilityID: row.VulnerabilityID, Identifier: row.Identifier,
+			Component: row.Component, Purl: row.Purl, PatchedAt: when[row.First],
+		})
+	}
+	return fixed, nil
 }
 
 // statusOf turns an outcome into what the format calls it.

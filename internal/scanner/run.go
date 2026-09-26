@@ -115,6 +115,7 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 				"findings_opened", outcome.Applied.Opened,
 				"findings_closed", outcome.Applied.Closed,
 				"suppressed", outcome.Applied.Suppressed,
+				"patched", outcome.Applied.Patched,
 				"claims_reaching", outcome.Applied.ClaimsReaching,
 				"claims_reaching_nothing", outcome.Applied.ClaimsReachingNothing,
 				"updated", outcome.Applied.Updated,

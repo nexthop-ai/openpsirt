@@ -43,6 +43,12 @@ func (s Status) known() bool {
 // that there is nothing to do.
 func (s Status) Suppresses() bool { return s == NotAffected || s == AlreadyFixed }
 
+// Fixes reports whether a claim says the shipped code no longer carries the
+// vulnerability. That is the effect a version bump has, so a finding it covers
+// closes. A claim that it does not apply is an argument rather than a patch,
+// and the finding it covers stays open and marked.
+func (s Status) Fixes() bool { return s == AlreadyFixed }
+
 // Origin says where a claim was read from, because the two differ in how
 // precisely they point at anything.
 type Origin string

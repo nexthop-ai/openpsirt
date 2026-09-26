@@ -329,7 +329,8 @@ type Changed = Body<"ChangedBody">;
 // release note is being told what happened rather than shown a column.
 const WENT: Record<string, string> = {
   upgraded: "Upgraded",
-  revised: "Patched",
+  revised: "Revised",
+  patched: "Patched",
   removed: "Removed",
   superseded: "Superseded",
   unexplained: "Unexplained",

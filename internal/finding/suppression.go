@@ -57,6 +57,9 @@ func (c Claim) covers(d graph.Described) bool {
 // is information rather than an answer.
 func (c Claim) suppresses() bool { return sbom.Status(c.Status).Suppresses() }
 
+// fixes reports whether the claim closes the findings it covers.
+func (c Claim) fixes() bool { return sbom.Status(c.Status).Fixes() }
+
 // claimIdentity derives a stable key from what a claim says.
 //
 // Everything that makes the claim a different claim is in it, so re-sending

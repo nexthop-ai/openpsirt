@@ -17,7 +17,7 @@ import (
 // upstream: what it covers is marked and kept rather than dropped, and a claim
 // that reached nothing is reported rather than thrown away.
 
-func TestAFindingTheBuildHasAnsweredIsMarkedNotDropped(t *testing.T) {
+func TestAFindingTheBuildArguesDoesNotApplyIsMarkedNotDropped(t *testing.T) {
 	// The whole reason the claims are applied here rather than upstream. A
 	// finding a build has argued about stays visible and says what was
 	// argued; one that simply never arrived is indistinguishable from a
@@ -26,7 +26,7 @@ func TestAFindingTheBuildHasAnsweredIsMarkedNotDropped(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		scanID := f.lastScan
 		if _, err := f.store.RecordClaims(t.Context(), f.target, scanID,
-			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)}, everyOrigin); err != nil {
+			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 
@@ -158,7 +158,11 @@ func TestAClaimAttachedToItsComponentWinsOverOneThatNamedIt(t *testing.T) {
 				attached[claim.ID] = true
 			}
 		}
-		for _, row := range f.open(t) {
+		rows := f.every(t)
+		if len(rows) == 0 {
+			t.Fatal("nothing was recorded, so this checked nothing")
+		}
+		for _, row := range rows {
 			if row.SuppressedBy == nil || !attached[*row.SuppressedBy] {
 				t.Error("a finding recorded the vaguer of two claims that covered it")
 			}

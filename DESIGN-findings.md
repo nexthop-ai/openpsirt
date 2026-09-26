@@ -899,6 +899,7 @@ change" is counted by.
 | Removed | The component is not in the build any more |
 | Upgraded | Its upstream version moved — the version a vulnerability is matched against |
 | Revised | The shipped version changed while the upstream version did not, which is what a carried patch looks like from outside |
+| Patched | The build declares a patch that fixes the issue in the component as it ships (§ Build-declared claims) |
 | Superseded | The upstream version moved and the issue came with it: this row closed and the same issue is open against the new version |
 | Fixed | Somebody declared a recorded flaw fixed here. The only closure a person writes |
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
@@ -942,14 +943,25 @@ Claims are held over intervals, so re-sending them writes nothing; withdrawing
 one closes it rather than deleting it, because what a release argued is a
 question asked years later.
 
-A covered finding is marked, not dropped. This is why claims are applied here
+A covered finding is kept, never dropped. This is why claims are applied here
 rather than upstream: a finding that never arrived is indistinguishable from a
 scanner fault.
 
 | The build says | Effect |
 |---|---|
-| It carries a fix, or the vulnerability does not apply | The finding is marked with the claim and is not work anybody has to do |
+| It carries a fix | The finding closes as patched, on the scan that first sees the claim. A patch has the effect a version bump has: the code no longer carries the flaw (REQ-11) |
+| The vulnerability does not apply | The finding stays open, marked with the claim, and is not work anybody has to do. It is an argument rather than a patch, and only a dismissal agreed here closes it |
 | It is affected, or it has not decided | Nothing is marked. The build is stating that it looked, which is information rather than an answer |
+
+A fix arrives in two forms: a patch on the component naming what it resolves,
+and a statement of its own saying `fixed`. Both close.
+
+| Case | What is recorded |
+|---|---|
+| An open finding a patch now fixes | It closes as patched, naming the claim |
+| A finding first seen already patched | A row recorded closed as patched, so a release comparison and the outbound VEX document have the patch to read |
+| A re-scan of a build still declaring the patch | Nothing. Where the claim was argued again on different grounds, the closed row names the claim that stands now |
+| A build that stops declaring the patch | The claim closes, and the next scan opens the finding again as a new row |
 
 Where two claims cover one finding, the one attached to the component wins over
 one that named something to be matched: the first knows exactly what it is about,
