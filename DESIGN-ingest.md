@@ -42,7 +42,7 @@ A build sends two things, in one request:
 | Part | Contents |
 |---|---|
 | Inventory | Every component that ships, with its dependency edges |
-| Suppressions | Findings the build has already argued are not applicable, usually because it carries a patch |
+| Suppressions | What the build says it fixed with a patch of its own, or argues does not apply |
 
 CycloneDX, SPDX 2.x and SPDX 3.x are the formats read (REQ-05). A document says
 which it is and the reader is chosen from that, so an upload takes any of them

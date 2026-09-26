@@ -138,6 +138,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
+		Where(wasOpen).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {
 				q = q.Where("f.closed_at >= ?", since)
@@ -172,6 +173,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.vulnerability_id").
+		Where(wasOpen).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {
 				q = q.Where("f.opened_at >= ?", since)

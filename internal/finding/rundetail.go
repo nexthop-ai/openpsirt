@@ -132,7 +132,8 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			ColumnExpr(`CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END AS "exploited"`).
 			Where("f.target_id = ?", targetID).
 			Where(string(database.Column(s.db, "f."+string(column)))+" = ?", runID).
-			Where("f.visibility IN (?)", bun.List(visible))
+			Where("f.visibility IN (?)", bun.List(visible)).
+			Where(wasOpen)
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
 			ColumnExpr(`changed.band AS "band"`).

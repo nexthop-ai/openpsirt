@@ -133,14 +133,22 @@ const (
 	Patched Closure = "patched"
 )
 
+// wasOpen is the condition that a row was open at some point.
+//
+// A finding first seen already patched is recorded closed by the run that
+// opened it, so the patch has a row to be read from. It was never open, and
+// it is neither opened nor fixed: what counts what a run opened or closed, or
+// how long a fix took, leaves it out. It carries no deadline, so no deadline
+// can be judged met by it, and it is in no open set a trend or a list reads.
+const wasOpen = `(f.opened_run_id IS NULL OR f.closed_run_id IS NULL
+	OR f.opened_run_id <> f.closed_run_id)`
+
 // Closures are every reason a finding stops being open, in the order they are
 // offered.
 //
 // One list, as the sort orders are one list: the enum a caller sees is built
 // from this rather than written out again, so a closure added here is
-// published and one removed here is gone from the document too. It was a
-// fourth hand-written copy of these seven words, and `Resolving` below records
-// what the last three copies cost.
+// published and one removed here is gone from the document too.
 func Closures() []Closure {
 	return []Closure{Removed, Upgraded, Revised, Patched, Superseded, Unexplained, Invalid, Fixed}
 }

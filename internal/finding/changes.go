@@ -82,7 +82,8 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 			ColumnExpr(`f.component_id AS "component_id"`).
 			Where("f.target_id = ?", targetID).
 			Where("f."+column+" IN (?)", bun.List(runIDs)).
-			Where("f.visibility IN (?)", bun.List(visible))
+			Where("f.visibility IN (?)", bun.List(visible)).
+			Where(wasOpen)
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
 			ColumnExpr(`changed.run_id AS "run_id"`).

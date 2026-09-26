@@ -6,6 +6,7 @@ package finding_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -221,6 +222,169 @@ func TestABuildThatCarriesAPatchComparesAsFixedByIt(t *testing.T) {
 		if notes := finding.Notes(about("master"), comparison); !strings.Contains(notes,
 			"a patch the build declares") {
 			t.Errorf("the note does not say the build's patch fixed it:\n%s", notes)
+		}
+	})
+}
+
+func TestAFindingRecordedClosedOnArrivalIsNeitherOpenedNorFixed(t *testing.T) {
+	// A finding first seen already patched was never open. Counted, every
+	// weekly tag carrying the same patch would add a fix done in no time and
+	// a run that opened and closed the same things.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.claimed(t, aPatch)
+		applied, runID := f.scanned(t)
+		if applied.Patched != 2 {
+			t.Fatalf("patched %d, want 2 recorded closed on arrival", applied.Patched)
+		}
+		who := f.holding(t, access.PublicRead)
+
+		changes, err := f.store.Changes(ctx, who, f.target, []int64{runID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := changes[runID]; got.Opened != 0 || got.Closed != 0 {
+			t.Errorf("the receipt says the run opened %d and closed %d", got.Opened, got.Closed)
+		}
+		ran, err := f.store.Ran(ctx, who, f.target, runID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ran.Opened != 0 || ran.Closed != 0 {
+			t.Errorf("the run's detail says it opened %d and closed %d", ran.Opened, ran.Closed)
+		}
+		rate, err := f.store.Remediation(ctx, who, f.wholeProduct(), time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rate.Fixed != 0 || rate.Opened != 0 {
+			t.Errorf("the remediation rate counts %d fixed and %d opened", rate.Fixed, rate.Opened)
+		}
+		rates, err := f.store.Compliance(ctx, who, f.wholeProduct(), time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rates {
+			if r.Closed != 0 {
+				t.Errorf("%d closed against a deadline, and none was ever due", r.Closed)
+			}
+		}
+	})
+}
+
+func TestTwoReportsOfOneIssueAgreeOnWhetherItIsPatched(t *testing.T) {
+	// One issue reported under two names reaches the same place twice. The
+	// claim names only one of them, so the second report is not covered, and
+	// what decides the finding is the report that stands.
+	each(t, func(t *testing.T, f *fixture) {
+		f.claimed(t, aClaim("GHSA-aaaa-bbbb-cccc", sbom.AlreadyFixed, libnl, sbom.FromPedigree))
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			found("GHSA-aaaa-bbbb-cccc", libnl, "CVE-2026-1"),
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		rows := f.every(t)
+		if len(rows) == 0 {
+			t.Fatal("nothing was recorded, so this checked nothing")
+		}
+		for _, row := range rows {
+			if row.ClosedBecause == finding.Patched && row.SuppressedBy == nil {
+				t.Error("a row closed as patched names no claim")
+			}
+		}
+	})
+}
+
+func TestAFindingWhosePatchWasDroppedInABumpSaysWhereItCameFrom(t *testing.T) {
+	// The detail screen's upgraded-from line explains a patch lost when the
+	// version moved. The patched row is closed, and the version it held is
+	// still what the new finding arrived from.
+	each(t, func(t *testing.T, f *fixture) {
+		f.claimed(t, aPatch)
+		f.scanned(t)
+
+		f.shipped(t, movedTo(libnlNew))
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnlNew)}); err != nil {
+			t.Fatal(err)
+		}
+		open := f.open(t)
+		if len(open) != 2 {
+			t.Fatalf("%d open at the new version, want 2", len(open))
+		}
+		for _, row := range open {
+			if row.ArrivedFrom != libnl.Version {
+				t.Errorf("arrived from %q, want %q", row.ArrivedFrom, libnl.Version)
+			}
+		}
+	})
+}
+
+func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
+	// The version moved and the issue did not come with it: the new version
+	// carries the patch. Superseded would say it is open at the new version.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		f.scanned(t)
+
+		f.shipped(t, movedTo(libnlNew))
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, []sbom.Suppression{
+			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnlNew, sbom.FromPedigree),
+		}, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnlNew)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.Opened != 0 {
+			t.Errorf("opened %d at a version the build patched", applied.Opened)
+		}
+		rows := f.every(t)
+		if len(rows) != 4 {
+			t.Fatalf("%d rows, want the two that closed and the two recorded patched", len(rows))
+		}
+		for _, row := range rows {
+			if row.ClosedBecause != finding.Patched || row.SuppressedBy == nil {
+				t.Errorf("closed as %q naming %v, want patched and the claim",
+					row.ClosedBecause, row.SuppressedBy)
+			}
+		}
+	})
+}
+
+func TestAPatchReturningAfterTheComponentLeftIsRecordedAgain(t *testing.T) {
+	// What is already recorded is the latest row at a place, never any row.
+	// Patched, then dropped, then removed, then back with the patch: the
+	// latest row says removed, so the patch is recorded again.
+	each(t, func(t *testing.T, f *fixture) {
+		f.claimed(t, aPatch)
+		f.scanned(t)
+		f.claimed(t)
+		f.scanned(t)
+		f.shipped(t, withoutLibnl())
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), nil); err != nil {
+			t.Fatal(err)
+		}
+
+		f.claimed(t, aPatch)
+		applied, _ := f.scanned(t)
+		if applied.Patched != 2 {
+			t.Errorf("patched %d when the component came back patched, want 2", applied.Patched)
+		}
+		rows := f.every(t)
+		if len(rows) != 6 {
+			t.Fatalf("%d rows, want two patched, two removed and two patched again", len(rows))
+		}
+		for _, row := range rows[4:] {
+			if row.ClosedBecause != finding.Patched {
+				t.Errorf("the latest rows closed as %q, want %q", row.ClosedBecause, finding.Patched)
+			}
 		}
 	})
 }

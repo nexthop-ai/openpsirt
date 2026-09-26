@@ -360,7 +360,7 @@ function Columns({
         kind="was-fixed"
         title="Fixed"
         rows={fixed}
-        note="Upgraded, patched, removed, or a recorded flaw declared fixed."
+        note="Upgraded, revised, patched, removed, or a recorded flaw declared fixed."
       />
       <Column
         kind="not-fixed"

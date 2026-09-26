@@ -178,10 +178,11 @@ func (s *Store) carrying() int {
 
 // For writes the document for one build.
 //
-// Approved claims only. A proposal is one person's opinion and this
-// document is the deployment's word to a customer — the two-person rule is
-// what makes publishing a dismissal safe, and a document carrying unapproved
-// ones would route around it.
+// Approved claims only, besides the build's own patches. A proposal is one
+// person's opinion and this document is the deployment's word to a customer —
+// the two-person rule is what makes publishing a dismissal safe, and a
+// document carrying unapproved ones would route around it. A patch the build
+// declares is applied without a decision here, and is said as fixed.
 //
 // Public findings only. Every statement names an issue and a component in
 // something we ship, so a document built from undisclosed work would announce
@@ -510,7 +511,8 @@ type fixedByPatch struct {
 // while all of these hold:
 //
 //   - the component still ships in this build
-//   - no place of it is open against the issue
+//   - no place of a component of that name and package identifier is open
+//     against the issue
 //   - the claim that closed it is one the build still makes
 //
 // A build that drops the patch reopens the finding, and the statement goes
@@ -544,9 +546,15 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "n"
 			WHERE n.target_id = f.target_id AND n.component_id = f.component_id
 				AND n.closed_scan_id IS NULL)`).
+		// Asked of the name and package identifier the statement is made
+		// about, which may be several components: one at a version the
+		// patch does not reach is affected, and a statement naming both would
+		// say otherwise.
 		Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
+			JOIN "component" AS "oc" ON oc.id = o.component_id
 			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
-				AND o.component_id = f.component_id AND o.closed_at IS NULL)`).
+				AND o.closed_at IS NULL AND oc.name = c.name
+				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
 		GroupExpr("v.id, v.identifier, c.name, c.purl").
 		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
@@ -565,11 +573,12 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		ID       int64     `bun:"id"`
 		ClosedAt time.Time `bun:"closed_at"`
 	}
+	where, args := database.InAnyOf("f.id", ids)
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.id AS "id"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
-		Where("f.id IN (?)", bun.List(ids)).
+		Where(where, args...).
 		Scan(ctx, &dated); err != nil {
 		return nil, fmt.Errorf("read when the build's patches were seen: %w", err)
 	}

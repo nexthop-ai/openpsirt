@@ -799,20 +799,28 @@ func TestAVEXDocumentSaysNothingFixedAboutAComponentNoLongerShipped(t *testing.T
 }
 
 func TestAVEXDocumentSaysNothingFixedWhileAPlaceIsOpen(t *testing.T) {
-	// A place open against the issue is a place somebody still has to answer,
-	// and "fixed" beside it would contradict the findings list.
+	// A statement names a component by name and package identifier, which can
+	// be more than one component. The kernel at a second version the patch
+	// does not reach is open against the issue, and "fixed" beside it would
+	// contradict the findings list.
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.patchedKernel(t)
+		const hash = "5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e"
+		r.patchedRows(t, `INSERT INTO "component" ("identity", "purl", "name", "version",
+				"fold_key", "first_seen_at")
+			SELECT '`+hash+`', "purl", "name", '5.10-2', '`+hash+`', "first_seen_at"
+			FROM "component" WHERE "name" = 'linux-image'`)
 		r.patchedRows(t, `INSERT INTO "finding" ("target_id", "kind", "vulnerability_id",
 				"visibility", "component_id", "place_identity", "urgency",
 				"urgency_exploited", "urgency_exploited_here", "urgency_shipped",
 				"opened_at", "last_changed_at")
-			SELECT "target_id", "kind", "vulnerability_id", "visibility", "component_id",
+			SELECT "target_id", "kind", "vulnerability_id", "visibility",
+				(SELECT "id" FROM "component" WHERE "identity" = '`+hash+`'),
 				"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
 				"urgency_shipped", "opened_at", "last_changed_at"
 			FROM "finding" WHERE "closed_because" = 'patched'`)
 		if fixed := r.fixedIn(t); len(fixed) != 0 {
-			t.Errorf("an issue open at a place is said as %v fixed", fixed)
+			t.Errorf("an issue open at another version of the component is said as %v fixed", fixed)
 		}
 	})
 }

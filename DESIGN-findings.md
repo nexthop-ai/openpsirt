@@ -959,7 +959,9 @@ and a statement of its own saying `fixed`. Both close.
 | Case | What is recorded |
 |---|---|
 | An open finding a patch now fixes | It closes as patched, naming the claim |
-| A finding first seen already patched | A row recorded closed as patched, so a release comparison and the outbound VEX document have the patch to read |
+| A finding first seen already patched | A row recorded closed as patched, so a release comparison and the outbound VEX document have the patch to read. It carries no deadline, and nothing that counts what a run opened or closed, or how long a fix took, counts it |
+| A version bump onto a build declaring the patch at the new version | The finding at the old version closes as patched, naming the claim, and the new version's is recorded closed as patched |
+| A version bump that drops the patch | The finding opens at the new version and records the version it arrived from, read from the patched row |
 | A re-scan of a build still declaring the patch | Nothing. Where the claim was argued again on different grounds, the closed row names the claim that stands now |
 | A build that stops declaring the patch | The claim closes, and the next scan opens the finding again as a new row |
 

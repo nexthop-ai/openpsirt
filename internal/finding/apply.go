@@ -227,9 +227,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			covering := coveringClaim(claims, r.Issue, component)
 			for _, consumerID := range places.of(component.ID) {
 				at := place{componentID: component.ID, consumerID: consumerID}
-				if covering != nil && fixing[*covering] {
-					patched[key{vulnerabilityID, at}] = true
-				}
+				// Set on every report rather than only when true, because a
+				// later report at the same key replaces the finding below and
+				// the claim it names with it.
+				patched[key{vulnerabilityID, at}] = covering != nil && fixing[*covering]
 				wanted[key{vulnerabilityID, at}] = Finding{
 					TargetID: targetID, Kind: Vulnerable,
 					// A scanner's finding in a shipped component is public
@@ -411,6 +412,41 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			applied.Updated++
 		}
+		// What closed before at each place something opens or arrives patched:
+		// the latest row per component and consumer, which says whether a
+		// patch is already recorded there, and the latest per place name,
+		// which says what version the place held when a patch closed it.
+		var reading []int64
+		for _, f := range opening {
+			reading = append(reading, f.VulnerabilityID)
+		}
+		for _, k := range arrivedPatched {
+			reading = append(reading, k.vulnerabilityID)
+		}
+		latest, latestAt, err := latestClosed(ctx, tx, targetID, reading)
+		if err != nil {
+			return err
+		}
+		// A place whose patch was dropped as its version moved. The patched row
+		// is closed, so the open index above never sees it, and the version the
+		// place held is what the new finding arrived from.
+		var patchedBefore []Finding
+		for _, f := range opening {
+			if was, ok := latestAt[at{f.VulnerabilityID, f.PlaceIdentity}]; ok &&
+				f.ArrivedFrom == "" && was.ClosedBecause == Patched && was.ComponentID != f.ComponentID {
+				patchedBefore = append(patchedBefore, was)
+			}
+		}
+		carried, err := componentsByID(ctx, tx, patchedBefore)
+		if err != nil {
+			return err
+		}
+		for i, f := range opening {
+			if was, ok := latestAt[at{f.VulnerabilityID, f.PlaceIdentity}]; ok &&
+				f.ArrivedFrom == "" && was.ClosedBecause == Patched && was.ComponentID != f.ComponentID {
+				opening[i].ArrivedFrom = upstreamOf(carried[was.ComponentID])
+			}
+		}
 		if len(opening) > 0 {
 			if err := database.InBatches(ctx, tx, opening); err != nil {
 				return fmt.Errorf("open %d findings: %w", len(opening), err)
@@ -423,10 +459,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// lacked it, and in the document saying this build is fixed. Recorded
 		// once. Where the latest row at that place already says patched, a
 		// re-scan writes nothing but the claim it now stands on.
-		latest, err := latestClosed(ctx, tx, targetID, arrivedPatched)
-		if err != nil {
-			return err
-		}
 		var recording []Finding
 		standsOn := map[int64][]int64{}
 		for _, k := range arrivedPatched {
@@ -441,6 +473,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			f.ClosedAt = &startedAt
 			f.ClosedRunID = &runID
 			f.ClosedBecause = Patched
+			// Never open, so never due.
+			f.DueAt = nil
 			recording = append(recording, f)
 		}
 		if len(recording) > 0 {
@@ -460,28 +494,19 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				return fmt.Errorf("point %d patched findings at their claim: %w", len(ids), err)
 			}
 		}
-		for claimID, ids := range patching {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("closed_at = ?", startedAt).
-					Set("closed_run_id = ?", runID).
-					Set("closed_because = ?", Patched).
-					Set("moved_to = ?", "").
-					Set("suppressed_by = ?", claimID).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
-				return fmt.Errorf("close %d patched findings: %w", len(ids), err)
-			}
-		}
 
 		var closing []Finding
 		// With the same issue still wanted at the same place, this row is
 		// being superseded by one against a new version rather than resolved.
 		wantedAt := map[at]bool{}
-		for _, f := range wanted {
+		// And where what is wanted at that place is patched, the row closes as
+		// patched: the version moved and the issue did not come with it.
+		patchedAt := map[at]int64{}
+		for k, f := range wanted {
 			wantedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = true
+			if patched[k] {
+				patchedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = *f.SuppressedBy
+			}
 		}
 		for k, f := range held {
 			if _, still := wanted[k]; still {
@@ -506,6 +531,12 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		}
 		byReason := map[closure][]int64{}
 		for _, f := range closing {
+			if claimID, ok := patchedAt[at{f.VulnerabilityID, f.PlaceIdentity}]; ok {
+				patching[claimID] = append(patching[claimID], f.ID)
+				applied.Closed++
+				applied.Patched++
+				continue
+			}
 			reason, movedTo := present.why(departed[f.ComponentID])
 			// Asked before anything else, because every other explanation is
 			// about a finding that went away and this one did not. Recording
@@ -541,6 +572,21 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				return fmt.Errorf("close %d findings: %w", len(ids), err)
 			}
 		}
+		for claimID, ids := range patching {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set("closed_at = ?", startedAt).
+					Set("closed_run_id = ?", runID).
+					Set("closed_because = ?", Patched).
+					Set("moved_to = ?", "").
+					Set("suppressed_by = ?", claimID).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("close %d patched findings: %w", len(ids), err)
+			}
+		}
 
 		// Last, and over every build rather than this one. Three of the four
 		// signals the order is worked out from are properties of the issue,
@@ -559,27 +605,28 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 	return applied, err
 }
 
-// latestClosed reads the most recent closed row at each of the places named.
-func latestClosed(ctx context.Context, db bun.IDB, targetID int64, keys []key) (map[key]Finding, error) {
-	if len(keys) == 0 {
-		return nil, nil
+// latestClosed reads the most recent closed row of these issues, at each
+// component and consumer and at each place name.
+func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
+	vulnerabilities []int64) (map[key]Finding, map[at]Finding, error) {
+
+	byKey, byAt := map[key]Finding{}, map[at]Finding{}
+	if len(vulnerabilities) == 0 {
+		return byKey, byAt, nil
 	}
-	asked := make(map[key]bool, len(keys))
 	seen := map[int64]bool{}
 	var issues []int64
-	for _, k := range keys {
-		asked[k] = true
-		if !seen[k.vulnerabilityID] {
-			seen[k.vulnerabilityID] = true
-			issues = append(issues, k.vulnerabilityID)
+	for _, id := range vulnerabilities {
+		if !seen[id] {
+			seen[id] = true
+			issues = append(issues, id)
 		}
 	}
-	found := map[key]Finding{}
 	err := database.IDsInBatches(ctx, issues, func(ctx context.Context, batch []int64) error {
 		var rows []Finding
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
-				"closed_because", "suppressed_by").
+				"place_identity", "closed_because", "suppressed_by").
 			Where("target_id = ?", targetID).
 			Where("kind = ?", Vulnerable).
 			Where("closed_at IS NOT NULL").
@@ -591,17 +638,15 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64, keys []key) (
 			return err
 		}
 		for _, row := range rows {
-			k := key{row.VulnerabilityID, place{row.ComponentID, value(row.ConsumerID)}}
-			if asked[k] {
-				found[k] = row
-			}
+			byKey[key{row.VulnerabilityID, place{row.ComponentID, value(row.ConsumerID)}}] = row
+			byAt[at{row.VulnerabilityID, row.PlaceIdentity}] = row
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("read what these places last closed as: %w", err)
+		return nil, nil, fmt.Errorf("read what these places last closed as: %w", err)
 	}
-	return found, nil
+	return byKey, byAt, nil
 }
 
 // same reports whether what a scan found about a finding matches what is
