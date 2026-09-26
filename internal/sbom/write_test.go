@@ -80,3 +80,35 @@ func TestWhatWeStoredCanBeScanned(t *testing.T) {
 		}
 	}
 }
+
+func TestTheScannerIsToldADistributionStatedAsANameAndAVersion(t *testing.T) {
+	held := []graph.Described{
+		{Name: "acl", Version: "2.3.2-2",
+			Purl: "pkg:deb/debian/acl@2.3.2-2?os_distro=trixie&os_name=debian&os_version=13"},
+		{Name: "bash", Version: "5.2", Purl: "pkg:deb/debian/bash@5.2?distro=debian-12"},
+		{Name: "zlib", Version: "1.3", Purl: "pkg:deb/debian/zlib@1.3"},
+	}
+	var out bytes.Buffer
+	if err := sbom.WriteInventory(&out, held); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var written struct {
+		Components []struct {
+			Name string `json:"name"`
+			Purl string `json:"purl"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &written); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"acl":  "pkg:deb/debian/acl@2.3.2-2?os_distro=trixie&os_name=debian&os_version=13&distro=debian-13",
+		"bash": "pkg:deb/debian/bash@5.2?distro=debian-12",
+		"zlib": "pkg:deb/debian/zlib@1.3",
+	}
+	for _, c := range written.Components {
+		if c.Purl != want[c.Name] {
+			t.Errorf("%s went to the scanner as %q, want %q", c.Name, c.Purl, want[c.Name])
+		}
+	}
+}
