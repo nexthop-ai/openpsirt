@@ -10038,8 +10038,11 @@ components:
           readOnly: true
           type: string
         built_at:
-          description: The build time the producer states
+          description: The build time the producer states, or the time the upload arrived where it states none
           type: string
+        dated_on_arrival:
+          description: Whether the inventory stated no build time, so the time it arrived orders it instead
+          type: boolean
         outcome:
           description: Whether this upload was taken or matched one already held
           enum:

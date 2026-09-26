@@ -11364,8 +11364,10 @@ export interface components {
              * @example https://example.com/schemas/UploadResult.json
              */
             readonly $schema?: string;
-            /** @description The build time the producer states */
+            /** @description The build time the producer states, or the time the upload arrived where it states none */
             built_at?: string;
+            /** @description Whether the inventory stated no build time, so the time it arrived orders it instead */
+            dated_on_arrival?: boolean;
             /**
              * @description Whether this upload was taken or matched one already held
              * @enum {string}

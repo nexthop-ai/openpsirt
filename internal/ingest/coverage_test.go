@@ -333,7 +333,7 @@ func TestCoverageSaysWhetherAnybodyIsTrying(t *testing.T) {
 			}
 		}
 
-		why := "the inventory does not say when it was built"
+		why := "the upload could not be read"
 		if err := s.Refused(ctx, reader, ingest.Refusal{TargetID: ours, Reason: why}); err != nil {
 			t.Fatal(err)
 		}
