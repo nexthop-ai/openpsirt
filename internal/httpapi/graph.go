@@ -46,6 +46,8 @@ type RootsBody struct {
 	// and how much of it was placed.
 	Components int `json:"components" doc:"The number of components this build holds"`
 	Edges      int `json:"edges" doc:"The number of edges placing them"`
+	// Unidentified is what no scan can say anything about.
+	Unidentified int `json:"unidentified" doc:"The number of those components carrying neither a package identifier nor a platform enumeration, so that no scanner can match them"`
 	// Searching is the term somebody typed when Items would be thousands
 	// long, and it comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`
@@ -102,7 +104,7 @@ func registerGraph(api huma.API, in Ingest) {
 		// exist, one name at a time. A case collaborator is the reach that
 		// meets it: they hold nothing on the product and may open exactly one
 		// finding.
-		components, edges, err := store.Counts(ctx, subject, target)
+		tally, err := store.Counts(ctx, subject, target)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			return nil, nothingScannedThere()
@@ -110,8 +112,9 @@ func registerGraph(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "the build's contents could not be counted", err)
 		}
 		out := &rootsOutput{}
-		out.Body.Components = components
-		out.Body.Edges = edges
+		out.Body.Components = tally.Components
+		out.Body.Edges = tally.Edges
+		out.Body.Unidentified = tally.Unidentified
 
 		// A search answers with matches and no root. The request is for a set
 		// of components rather than a position, and naming a root

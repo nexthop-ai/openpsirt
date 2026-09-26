@@ -8372,10 +8372,15 @@ components:
         term:
           description: The search this answers, where one was asked
           type: string
+        unidentified:
+          description: The number of those components carrying neither a package identifier nor a platform enumeration, so that no scanner can match them
+          format: int64
+          type: integer
       required:
         - items
         - components
         - edges
+        - unidentified
       type: object
     RowsStandingBody:
       additionalProperties: false

@@ -977,9 +977,9 @@ type Step struct {
 // much was inventoried, and how much of it was placed. A build with many
 // components and few edges is a document that listed everything and said
 // where almost nothing went.
-func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int64) (int, int, error) {
+func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int64) (Tally, error) {
 	if _, _, err := s.visibleIn(ctx, subject, targetID); err != nil {
-		return 0, 0, err
+		return Tally{}, err
 	}
 	components, err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -991,7 +991,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		Where("n.is_root = ?", false).
 		Count(ctx)
 	if err != nil {
-		return 0, 0, fmt.Errorf("count what this build holds: %w", err)
+		return Tally{}, fmt.Errorf("count what this build holds: %w", err)
 	}
 	edges, err := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
@@ -999,9 +999,34 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		Where("e.closed_scan_id IS NULL").
 		Count(ctx)
 	if err != nil {
-		return 0, 0, fmt.Errorf("count what this build's edges are: %w", err)
+		return Tally{}, fmt.Errorf("count what this build's edges are: %w", err)
 	}
-	return components, edges, nil
+	// The components carrying neither a package identifier nor a platform
+	// enumeration, which is everything a scanner matches on. They ship and are
+	// tracked, and no scan can say anything about them, so a build of nothing
+	// else reports no findings and reads as clean.
+	unidentified, err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		Where("n.target_id = ?", targetID).
+		Where("n.closed_scan_id IS NULL").
+		Where("n.is_root = ?", false).
+		Where("(c.purl IS NULL OR c.purl = '')").
+		Where("(c.cpe IS NULL OR c.cpe = '')").
+		Count(ctx)
+	if err != nil {
+		return Tally{}, fmt.Errorf("count what this build holds that nothing can match: %w", err)
+	}
+	return Tally{Components: components, Edges: edges, Unidentified: unidentified}, nil
+}
+
+// Tally is how much a build's graph holds.
+type Tally struct {
+	Components int
+	Edges      int
+	// Unidentified is how many of the components carry nothing a scanner can
+	// match them on.
+	Unidentified int
 }
 
 // Search finds components of a build by name.

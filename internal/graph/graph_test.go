@@ -484,10 +484,11 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 
 		// The count in the header and the list beside it answer about the
 		// same thing.
-		components, _, err := f.store.Counts(ctx, everyone(f), f.targetID)
+		tally, err := f.store.Counts(ctx, everyone(f), f.targetID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		components := tally.Components
 		listed, err := f.store.CurrentComponents(ctx, f.targetID)
 		if err != nil {
 			t.Fatal(err)

@@ -395,6 +395,12 @@ function Whole() {
         <p>
           {product} · {stream} · {variant} — {(top.data?.components ?? 0).toLocaleString()}{" "}
           components, {(top.data?.edges ?? 0).toLocaleString()} edges
+          {(top.data?.unidentified ?? 0) > 0 && (
+            <span title="No package identifier or CPE, so no scanner can match them. They are tracked, but nothing can be found in them.">
+              {" "}
+              · {(top.data?.unidentified ?? 0).toLocaleString()} can't be scanned
+            </span>
+          )}
         </p>
       </div>
 

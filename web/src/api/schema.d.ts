@@ -10438,6 +10438,11 @@ export interface components {
             root?: components["schemas"]["NeighborBody"];
             /** @description The search this answers, where one was asked */
             term?: string;
+            /**
+             * Format: int64
+             * @description The number of those components carrying neither a package identifier nor a platform enumeration, so that no scanner can match them
+             */
+            unidentified: number;
         };
         RowsStandingBody: {
             /**

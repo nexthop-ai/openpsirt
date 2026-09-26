@@ -883,6 +883,7 @@ far, because recording the distance keeps a component once per path to it:
 | Rule | |
 |---|---|
 | Every row is ordered on the number that describes it | For a branch, what is open beneath it; for a leaf, its own count. What opens still comes before what does not, so the structure of a build is on the first screen |
+| The header says how many components no scanner can match | A component with neither a package identifier nor a CPE is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some, with the reason on hover |
 | What nothing in the build pulls in hangs from the root | The build contains it, and nothing else does. The root's own count is everything beneath it and beneath those, as one set. A real switch image arrives with 60,935 components, 1,358 edges and none from its root; drawn from the root's edges alone, that tree is empty |
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |
