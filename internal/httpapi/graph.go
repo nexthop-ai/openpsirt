@@ -156,9 +156,10 @@ func registerGraph(api huma.API, in Ingest) {
 			"A component reached several ways appears once with several parents. It is a graph " +
 			"rather than a tree, so anything drawing it has to expect the same component under " +
 			"many places.\n\n" +
-			"A component name is not unique within a build. Where one ships at several " +
-			"versions, `version` says which — without it, a name that matches more than one is " +
-			"refused with 409, naming the choices, rather than guessed at.",
+			"A component name is not unique within a build. `version` says which where it ships " +
+			"at several, `ecosystem` where two share a version, and `namespace` where two share " +
+			"an ecosystem. A name that still matches more than one is refused with 409, naming " +
+			"the choices.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`

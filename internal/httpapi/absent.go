@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -152,13 +151,11 @@ func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
 		in.logger().Error("which versions carry this issue could not be read",
 			"component", name, "error", second)
 	}
-	// Only the ones the caller's own narrowing admits: a version named and a
+	// Only the ones the caller's own narrowing names: a version named and a
 	// namespace left out is still a version named.
 	var carrying []graph.Choice
-	for _, choice := range all {
-		if admits(which, choice) {
-			carrying = append(carrying, choice)
-		}
+	for _, i := range graph.Narrowed(which, all) {
+		carrying = append(carrying, all[i])
 	}
 	switch {
 	case len(carrying) == 1:
@@ -174,11 +171,14 @@ func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
 	}
 }
 
-// admits is whether a choice fits every part a narrowing names.
-func admits(which, choice graph.Choice) bool {
-	return (which.Version == "" || which.Version == choice.Version) &&
-		(which.Ecosystem == "" || strings.EqualFold(which.Ecosystem, choice.Ecosystem)) &&
-		(which.Namespace == "" || strings.EqualFold(which.Namespace, choice.Namespace))
+// answered is the status a refusal answers with, and zero for anything that is
+// not one.
+func answered(err error) int {
+	var refusal huma.StatusError
+	if errors.As(err, &refusal) {
+		return refusal.GetStatus()
+	}
+	return 0
 }
 
 // ambiguousAmong offers the ways a name could be meant, having narrowed them

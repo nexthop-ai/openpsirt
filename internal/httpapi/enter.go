@@ -74,8 +74,8 @@ func registerEntry(api huma.API, in Ingest) {
 			"`component` names what in the build carries it, as the build calls it. Leave it " +
 			"out for the build itself, which is where a flaw in how the pieces fit together " +
 			"goes. A name the build holds at more than one version is refused with the " +
-			"choices rather than resolved to one; send `version`, and `ecosystem` where two " +
-			"share a version.\n\n" +
+			"choices rather than resolved to one; send `version`, `ecosystem` where two share " +
+			"a version, and `namespace` where two share an ecosystem.\n\n" +
 			"Every flaw is recorded with a vulnerability report. `from_report` records the " +
 			"flaw from one already in this product and accepts it in the same act; it needs " +
 			"private-triage. A report already judged, or under a ruling, is refused with " +

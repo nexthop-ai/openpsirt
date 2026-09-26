@@ -215,7 +215,7 @@ type Evidence struct {
 //
 // No query in it, for the reason evidenceFrom has none.
 func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
-	shipped map[int64]string, scopes map[[2]int64]string) []Sitting {
+	shipped map[int64]graph.Step, scopes map[[2]int64]string) []Sitting {
 
 	places := make([]Sitting, 0, len(rows))
 	at := make(map[string]int, len(rows))
@@ -224,7 +224,8 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 		// pulls the component in directly there is no consumer, and the chain
 		// down to the component itself is the whole of the answer.
 		var walked []graph.Step
-		here := graph.Step{Name: row.Component, Version: shipped[row.ComponentID]}
+		here := shipped[row.ComponentID]
+		here.Name = row.Component
 		if row.ConsumerID != nil {
 			if down, ok := chains[*row.ConsumerID]; ok && len(down) > 0 {
 				walked = append(append([]graph.Step{}, down...), here)
@@ -382,24 +383,26 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 
 // versionsOf reads the version each of these components ships at, in one
 // statement.
-func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]string, error) {
+func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]graph.Step, error) {
 	if len(ids) == 0 {
-		return map[int64]string{}, nil
+		return map[int64]graph.Step{}, nil
 	}
 	var rows []struct {
 		ID      int64  `bun:"id"`
 		Version string `bun:"version"`
+		Purl    string `bun:"purl"`
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		Where("c.id IN (?)", bun.List(ids)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what those ship at: %w", err)
 	}
-	out := make(map[int64]string, len(rows))
+	out := make(map[int64]graph.Step, len(rows))
 	for _, row := range rows {
-		out[row.ID] = row.Version
+		out[row.ID] = graph.Step{Version: row.Version, Purl: row.Purl}
 	}
 	return out, nil
 }

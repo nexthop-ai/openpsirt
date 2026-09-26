@@ -651,6 +651,8 @@ type LinkBody struct {
 type StepBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version,omitempty"`
+	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package the step is, as its identifier spells it"`
+	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 }
 
 // SittingBody is one place a component occupies in this build.
@@ -867,9 +869,10 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			"This is what a triage decision is made from, so it is gathered into one request. " +
 			"Each entry in `places` carries the `place` identity to name when recording a " +
 			"decision about it.\n\n" +
-			"A component name is not unique within a build. Where one ships at several " +
-			"versions, `version` says which — without it, a name that matches more than one is " +
-			"refused rather than guessed at.",
+			"A component name is not unique within a build. `version` says which where it ships " +
+			"at several, `ecosystem` where two share a version, and `namespace` where two share " +
+			"an ecosystem. A name that still matches more than one is refused with 409, naming " +
+			"the choices; where the issue is open at only one of them, that one is answered.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
@@ -1053,6 +1056,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		for _, step := range place.Chain {
 			sitting.Chain = append(sitting.Chain, StepBody{
 				Component: step.Name, Version: step.Version,
+				Ecosystem: graph.EcosystemOf(step.Purl), Namespace: graph.NamespaceOf(step.Purl),
 			})
 		}
 		body.Places = append(body.Places, sitting)

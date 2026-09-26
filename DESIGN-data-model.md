@@ -331,8 +331,8 @@ name is not enough.
 | A part left empty matches anything | A caller that never meets the ambiguity sends nothing more |
 | A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
-| Every row and tree node that names a component carries its ecosystem and namespace | A screen can send back only what it was given |
-| Every route addressing a finding or a component by name takes all four, and each narrows the same way | A route that took fewer answered for the kernel on one screen and refused it on the next: the finding read, and marking, assigning or deciding it did not |
+| Findings rows, tree nodes, the steps of a way down and component packages carry the ecosystem and namespace | A screen can send back only what it was given |
+| The finding and its reach, decision, assignment and tags, and a component's neighbors, trend, open issues and decision about them, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
 
 ## Upstream name and version
 
@@ -473,12 +473,19 @@ no way to tell which is the build's.
 | Every version of a name, on each side | The count says a name moved; which copy of a vendored tree moved is what the versions say |
 | The name as a producer wrote it | Identity is the folded name, and two producers writing one dependency in different capitals are one dependency. Either spelling names the same thing to a reader |
 | Versions are ordered as text | A reader wants the same order twice, and ordering them properly is per-ecosystem work that would answer confidently for a pair it cannot order |
-| A page is cut after the comparison | What is read is the scan's own change — the names it opened or closed a row of — so the cost is what the upload moved rather than what the build contains |
+| A page is cut after the comparison | The names compared are the scan's own change; the rows read are the build's rows standing on either side of it |
 
 Over a year of nightly scans that cost stays flat: listing an upload that moved
 seven names takes 2 to 5 ms on each of the four engines, behind 73 nights of
 history and behind 365, measured on 2026-09-25. Listing the upload that removed
 a file inventory, 54,098 names, takes 0.43 s on PostgreSQL.
+
+Those builds are 700 components. On a real switch image of 6,866, listing an
+upload that moved five names takes 17 ms on SQLite and 10 ms on PostgreSQL. A
+statement reading only the rows of the names moved takes 10 to 15 ms and 4.5 ms
+for the same listing; reading the build's rows costs the difference, and is
+what keeps an upload moving tens of thousands of names to under a second rather
+than one lookup per name.
 
 ### The size a change is against
 
@@ -546,3 +553,5 @@ root, against 0.018 s.
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |
+| The lists linking to a finding from elsewhere name its component by name and version alone | The unassigned, late, disposed and blocking lists, the review queue, a claim, an issue and a disclosure. Where a build holds that name at that version as two components, the link lands on the choice between them |
+| The findings list's `beneath` filter takes a name alone | It refuses a name held as more than one component, and says so |

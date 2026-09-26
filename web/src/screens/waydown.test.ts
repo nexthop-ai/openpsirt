@@ -70,6 +70,28 @@ describe("opening the dependency tree from a finding", () => {
     expect(query.get("version")).toBe("8.14.1");
   });
 
+  it("names each step by the ecosystem and namespace the tree names its row by", () => {
+    const query = new URLSearchParams(
+      intoTheTree([
+        place({
+          chain: [
+            { component: "sonic-broadcom" },
+            {
+              component: "linux-image",
+              version: "6.12.41-1",
+              ecosystem: "deb",
+              namespace: "debian",
+            },
+          ],
+        }),
+      ]),
+    );
+    expect(query.get("path")).toBe(
+      `sonic-broadcom${WITHIN}${WITHIN}${WITHIN}${SEPARATOR}` +
+        `linux-image${WITHIN}6.12.41-1${WITHIN}deb${WITHIN}debian`,
+    );
+  });
+
   it("sends the component alone where no place has one", () => {
     const query = new URLSearchParams(
       intoTheTree([place({ component: "curl", consumer: "opennsl-modules" })]),

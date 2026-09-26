@@ -290,6 +290,36 @@ type Choice struct {
 	Namespace string
 }
 
+// Narrowed is which of these choices a narrowing names, by position.
+//
+// A part left empty matches anything, with one exception. An ecosystem named
+// without a namespace, where both a component with no namespace and one with a
+// namespace match, is the one with none: the choice offered for it carries no
+// namespace, so leaving the part out is the only way to name it, and read as
+// "any" that choice would lead back to the refusal that offered it.
+func Narrowed(which Choice, choices []Choice) []int {
+	var kept []int
+	for i, choice := range choices {
+		if (which.Version == "" || which.Version == choice.Version) &&
+			(which.Ecosystem == "" || strings.EqualFold(which.Ecosystem, choice.Ecosystem)) &&
+			(which.Namespace == "" || strings.EqualFold(which.Namespace, choice.Namespace)) {
+			kept = append(kept, i)
+		}
+	}
+	if len(kept) > 1 && which.Ecosystem != "" && which.Namespace == "" {
+		var bare []int
+		for _, i := range kept {
+			if choices[i].Namespace == "" {
+				bare = append(bare, i)
+			}
+		}
+		if len(bare) == 1 {
+			return bare
+		}
+	}
+	return kept
+}
+
 // ChoiceOf is the choice a component with this identifier and version is.
 func ChoiceOf(version, purl string) Choice {
 	return Choice{Version: version, Ecosystem: EcosystemOf(purl), Namespace: NamespaceOf(purl)}
@@ -398,15 +428,15 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 	// several segments and carries escapes, so a pattern over the stored
 	// identifier matches it only approximately, and the rows left by this point
 	// are the few components sharing one name.
-	if which.Namespace != "" {
-		kept := rows[:0]
-		for _, row := range rows {
-			if strings.EqualFold(NamespaceOf(row.Purl), which.Namespace) {
-				kept = append(kept, row)
-			}
-		}
-		rows = kept
+	found := make([]Choice, len(rows))
+	for i, row := range rows {
+		found[i] = ChoiceOf(row.Version, row.Purl)
 	}
+	kept := rows[:0]
+	for _, i := range Narrowed(which, found) {
+		kept = append(kept, rows[i])
+	}
+	rows = kept
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("%w: %q", ErrNoComponent, name)
 	}
@@ -576,13 +606,12 @@ func (s *Store) filledWith(ctx context.Context, productID, targetID int64,
 //
 // The root comes back with its children because a tree drawn without it is
 // drawn without the thing being explored: every path shown starts one step in,
-// and the indentation has nothing to hang from. It is nil where the document
-// named no root of its own.
+// and the indentation has nothing to hang from. It is nil where nothing has
+// been applied to the build.
 //
 // What the root pulls in directly includes every component nothing else in
 // the build pulls in. The build contains them, and with nothing above them the
-// build is what holds them. Where the document named no root, those are the
-// whole of the list.
+// build is what holds them.
 func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int64) (
 	*Neighbor, []Neighbor, error) {
 
@@ -590,11 +619,6 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	if err != nil {
 		return nil, nil, err
 	}
-	loose, err := s.unparentedIDs(ctx, targetID)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	var rootID int64
 	err = s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -604,24 +628,26 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 		Where("n.is_root = ?", true).
 		Limit(1).Scan(ctx, &rootID)
 	if database.IsNoRows(err) {
-		// A build whose document named no root of its own. Nothing is above
-		// the components, so the list is what nothing pulls in.
-		kids, err := s.topLevel(ctx, readable, targetID)
-		if err != nil {
-			return nil, nil, err
-		}
-		if err := s.filled(ctx, productID, targetID, readable, kids); err != nil {
-			return nil, nil, err
-		}
-		ordered(kids)
-		return nil, kids, nil
+		// Nothing has been applied to this build: every graph applied has a
+		// root, because a snapshot without one is refused.
+		return nil, nil, nil
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("look up what this build is: %w", err)
 	}
+	loose, err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "fn"`).
+		Where("fn.target_id = ?", targetID).
+		Where("fn.closed_scan_id IS NULL").
+		Where("fn.is_root = ?", false).
+		Where(orphaned).
+		Exists(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ask whether anything in the build hangs from nothing: %w", err)
+	}
 
 	var kids []Neighbor
-	if len(loose) == 0 {
+	if !loose {
 		kids, err = s.step(ctx, readable, targetID, rootID, true)
 	} else {
 		kids, err = s.topLevel(ctx, readable, targetID)
@@ -649,7 +675,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	// no edge joins the two, so walking from the root alone reads zero above
 	// children that hold thousands.
 	var adopt adoption
-	if len(loose) > 0 {
+	if loose {
 		// The rows the root holds directly, rather than the orphans alone:
 		// the list does not say which is which, and walking a child of the
 		// root from the root as well reaches nothing it would not reach.
@@ -808,32 +834,14 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 const orphaned = `NOT EXISTS (SELECT 1 FROM "graph_edge" AS "pe"
 	WHERE pe.child_id = fn.id AND pe.closed_scan_id IS NULL)`
 
-// unparentedIDs is every component of the build that nothing in it pulls in,
-// other than the build's own root.
+// topLevel reads what the root pulls in and what nothing pulls in, as one
+// list in one statement: the two are read with the same per-build counts, and
+// read apart each pays for them.
 //
 // A document that states no edge from its root still lists what the build
 // contains, and a component with no parent is contained by nothing else. One
 // real switch image arrived with 60,935 components, 1,358 edges and none of
 // them from the root, and drawn from the root alone its tree was empty.
-func (s *Store) unparentedIDs(ctx context.Context, targetID int64) ([]int64, error) {
-	var ids []int64
-	err := s.db.NewSelect().
-		TableExpr(`"graph_node" AS "fn"`).
-		ColumnExpr("fn.component_id").
-		Where("fn.target_id = ?", targetID).
-		Where("fn.closed_scan_id IS NULL").
-		Where("fn.is_root = ?", false).
-		Where(orphaned).
-		Scan(ctx, &ids)
-	if err != nil {
-		return nil, fmt.Errorf("read what nothing in the build pulls in: %w", err)
-	}
-	return ids, nil
-}
-
-// topLevel reads what the root pulls in and what nothing pulls in, as one
-// list in one statement: the two are read with the same per-build counts, and
-// read apart each pays for them.
 func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 	targetID int64) ([]Neighbor, error) {
 
@@ -957,6 +965,9 @@ func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID 
 type Step struct {
 	Name    string
 	Version string
+	// Purl is the step's package identifier, which its ecosystem and
+	// namespace are read out of: the tree names a row by all four.
+	Purl string
 }
 
 // Counts reports how much the build's graph holds, which is what the screen

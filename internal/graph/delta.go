@@ -45,9 +45,9 @@ type Delta struct {
 // present whatever it changed, so that a caller can tell a rebuild that moved
 // nothing from a scan this does not answer for.
 //
-// Two statements for the whole set, because the surface asking is a page of
-// receipts: a pair per upload would be a hundred round trips to fill three
-// columns.
+// The same statements for the whole set however many uploads it holds,
+// because the surface asking is a page of receipts: a set per upload would be a
+// hundred round trips to fill three columns.
 func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int64,
 	scanIDs []int64) (map[int64]Delta, error) {
 
@@ -219,9 +219,9 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 	// Every row of the build that stood on either side of any of these scans.
 	// Rows that stood on neither count towards none of them, and a year of
 	// nights leaves most of a build's rows closed long before the page being
-	// read. Without this bound the cost grew with the calendar rather than
-	// with the page: on SQLite a page of fifty took 78 ms behind 73 nights of
-	// history and 264 ms behind 365.
+	// read, so this bound is what keeps the cost with the page rather than the
+	// calendar: unbounded, on SQLite, a page of fifty takes 78 ms behind 73
+	// nights of history and 264 ms behind 365.
 	var nodes []struct {
 		Opened  int64  `bun:"opened"`
 		Closed  *int64 `bun:"closed"`
@@ -394,10 +394,9 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, s
 
 // changed folds the rows into what happened to each name, per scan.
 //
-// One statement answers a whole page of receipts, so every name any scan on
-// the page moved comes back against every scan on it. A name that stood on
-// neither side of a scan belongs to another upload and is no change of this
-// one's.
+// Each name comes back against the scans that touched it. A name standing at
+// the same versions on both sides of one of them, or on neither, is no change
+// of that scan's.
 func changed(rows []movedRow) map[int64][]Change {
 	type sides struct {
 		display       string

@@ -189,6 +189,7 @@ type step struct {
 	IsRoot      bool   `bun:"is_root"`
 	Name        string `bun:"name"`
 	Version     string `bun:"version"`
+	Purl        string `bun:"purl"`
 }
 
 // climb reads every way up from each of these components, to the bound, in
@@ -216,7 +217,7 @@ func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64)
 	)
 	SELECT u.start AS "start", u.node AS "node", u.via AS "via", u.depth AS "depth",
 	       n.component_id AS "component_id", n.is_root AS "is_root",
-	       c.name AS "name", c.version AS "version"
+	       c.name AS "name", c.version AS "version", c.purl AS "purl"
 	FROM "up" AS "u"
 	JOIN "graph_node" AS "n" ON n.id = u.node
 	JOIN "component" AS "c" ON c.id = n.component_id`,
@@ -307,7 +308,7 @@ func unwind(rows []step) map[int64][]Step {
 	for start, top := range roots {
 		chain := make([]Step, 0, top.Depth+1)
 		for row, ok := top, true; ok; row, ok = reached[at{start, row.Via, row.Depth - 1}] {
-			chain = append(chain, Step{Name: row.Name, Version: row.Version})
+			chain = append(chain, Step{Name: row.Name, Version: row.Version, Purl: row.Purl})
 			if row.Depth == 0 {
 				break
 			}

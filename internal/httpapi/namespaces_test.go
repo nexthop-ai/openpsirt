@@ -105,30 +105,89 @@ func TestAFindingOpenUnderBothNamespacesOffersBoth(t *testing.T) {
 	})
 }
 
+// namedRoute is a route that addresses a finding or a component by its name,
+// with a request it accepts.
+type namedRoute struct {
+	what, method, path, body string
+	// finding is whether the route narrows to what carries the issue, which
+	// the routes naming only a component do not.
+	finding bool
+}
+
+// namedRoutes is every route addressing a finding or a component by name.
+func namedRoutes() []namedRoute {
+	finding := twoNamespacesAt + "/findings/CVE-2026-9999/components/libnl-3-200"
+	component := twoNamespacesAt + "/components/libnl-3-200"
+	return []namedRoute{
+		{"the finding", http.MethodGet, finding + "?version=3.7.0", "", true},
+		{"the reach", http.MethodGet, finding + "/reach?version=3.7.0", "", true},
+		{"a tag", http.MethodPut, finding + "/tags/waiting-on-vendor?version=3.7.0", "", true},
+		{"an assignment", http.MethodPut, finding + "/assignment?version=3.7.0", `{}`, true},
+		{"a decision", http.MethodPost, finding + "/decision?version=3.7.0",
+			`{"outcome":"wont-fix","reasoning":"Not worth it."}`, true},
+		{"the issues at the component", http.MethodGet, component + "/issues?version=3.7.0", "", false},
+		{"a decision about the component", http.MethodPost, component + "/decisions?version=3.7.0",
+			`{"vulnerabilities":["CVE-2026-9999"],"outcome":"wont-fix",` +
+				`"selected_by":"everything here","reasoning":"Not worth it."}`, false},
+	}
+}
+
+// Each route is asked on a build of its own: the two components share a place,
+// so a decision recorded through one route stands against the next.
 func TestEveryRouteNamingAFindingsComponentTakesTheNamespace(t *testing.T) {
+	for _, route := range namedRoutes() {
+		t.Run(route.what, func(t *testing.T) {
+			twoReach(t, func(t *testing.T, r *reach) {
+				r.shipsUnderTwoNamespaces(t, seededLib, seededTwin)
+				got := asPerson(t, r, "triager", route.method, route.path, route.body)
+				if got.Code != http.StatusConflict {
+					t.Errorf("with no namespace it answered %d, want 409: %s",
+						got.Code, got.Body.String())
+				}
+				got = asPerson(t, r, "triager", route.method,
+					route.path+"&ecosystem=deb&namespace=sonic", route.body)
+				if got.Code >= 300 {
+					t.Errorf("naming the namespace it answered %d: %s", got.Code, got.Body.String())
+				}
+			})
+		})
+	}
+}
+
+func TestARouteNamingAFindingOpenAtOneOfTwoNeedsNoNamespace(t *testing.T) {
+	for _, route := range namedRoutes() {
+		if !route.finding {
+			continue
+		}
+		t.Run(route.what, func(t *testing.T) {
+			twoReach(t, func(t *testing.T, r *reach) {
+				r.shipsUnderTwoNamespaces(t, seededLib)
+				got := asPerson(t, r, "triager", route.method, route.path, route.body)
+				if got.Code >= 300 {
+					t.Errorf("at the one carrying it, it answered %d: %s",
+						got.Code, got.Body.String())
+				}
+			})
+		})
+	}
+}
+
+func TestADecisionReachesABuildThatNamesThePackageUnderAnotherNamespace(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.shipsUnderTwoNamespaces(t, seededLib, seededTwin)
-		finding := twoNamespacesAt + "/findings/CVE-2026-9999/components/libnl-3-200"
-		routes := []struct {
-			what, method, path string
-		}{
-			{"the reach", http.MethodGet, finding + "/reach?version=3.7.0"},
-			{"a tag", http.MethodPut, finding + "/tags/waiting-on-vendor?version=3.7.0"},
-			{"the issues at the component", http.MethodGet,
-				twoNamespacesAt + "/components/libnl-3-200/issues?version=3.7.0"},
+		// Only the distribution's namespace in the other build.
+		r.scannedAlso(t, "mellanox", "3.8.0")
+		got := asPerson(t, r, "triager", http.MethodPost, twoNamespacesAt+
+			"/findings/CVE-2026-9999/components/libnl-3-200/decision"+
+			"?version=3.7.0&ecosystem=deb&namespace=sonic",
+			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
+				`"also":[{"stream":"master","variant":"mellanox","version":"3.8.0"}]}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("deciding across a build naming it under another namespace answered %d: %s",
+				got.Code, got.Body.String())
 		}
-		for _, route := range routes {
-			got := asPerson(t, r, "triager", route.method, route.path, "")
-			if got.Code != http.StatusConflict {
-				t.Errorf("%s with no namespace answered %d, want 409: %s",
-					route.what, got.Code, got.Body.String())
-			}
-			got = asPerson(t, r, "triager", route.method,
-				route.path+"&ecosystem=deb&namespace=sonic", "")
-			if got.Code >= 300 {
-				t.Errorf("%s naming the namespace answered %d: %s",
-					route.what, got.Code, got.Body.String())
-			}
+		if !strings.Contains(got.Body.String(), `"variant":"mellanox"`) {
+			t.Errorf("the other build is missing from what was recorded: %s", got.Body.String())
 		}
 	})
 }

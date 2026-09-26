@@ -4,6 +4,7 @@
 package graph_test
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -59,6 +60,34 @@ func TestWhatNothingPullsInHangsFromTheRoot(t *testing.T) {
 		// Two issues: the shared one is one issue at two components.
 		if top.Beneath != 2 {
 			t.Errorf("the root has %d open beneath it, want 2 counted as one set", top.Beneath)
+		}
+	})
+}
+
+func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bare := graph.Described{Purl: "pkg:docker/nginx@1.25", Name: "nginx", Version: "1.25"}
+		named := graph.Described{Purl: "pkg:docker/library/nginx@1.25", Name: "nginx", Version: "1.25"}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{bare, named},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: bare}, {Parent: root, Child: named},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, err := f.store.ComponentAs(ctx, f.targetID, "nginx", graph.Choice{Version: "1.25"})
+		var several *graph.Ambiguous
+		if !errors.As(err, &several) || len(several.Choices) != 2 {
+			t.Fatalf("a name held twice answered %v, want the two choices", err)
+		}
+		// Each choice offered resolves exactly one component.
+		for _, choice := range several.Choices {
+			if _, err := f.store.ComponentAs(ctx, f.targetID, "nginx", choice); err != nil {
+				t.Errorf("the choice %+v did not resolve: %v", choice, err)
+			}
 		}
 	})
 }

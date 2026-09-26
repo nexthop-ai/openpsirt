@@ -224,14 +224,23 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			if i > 0 {
 				wanted, remaining = nil, true
 			}
-			// A package's ecosystem and namespace are the same in every build
-			// of a product, so the path's travel to the others with each one's
-			// own version.
+			// The path's ecosystem and namespace travel to the others with each
+			// one's own version. Another build can describe the package under a
+			// namespace of its own — one image written by a generator that
+			// named its own packages, another by one that names them as the
+			// distribution's — so where the namespace finds nothing there it is
+			// dropped, and the version and what carries the issue decide.
+			which := graph.Choice{Version: build.Version, Ecosystem: input.Ecosystem,
+				Namespace: input.Namespace}
 			places, all, target, err := placesToDecide(ctx, in, subject, store, input.Product,
 				build.Stream, build.Variant, input.Vulnerability, input.Component,
-				graph.Choice{Version: build.Version, Ecosystem: input.Ecosystem,
-					Namespace: input.Namespace},
-				wanted, remaining)
+				which, wanted, remaining)
+			if i > 0 && which.Namespace != "" && answered(err) == http.StatusNotFound {
+				which.Namespace = ""
+				places, all, target, err = placesToDecide(ctx, in, subject, store, input.Product,
+					build.Stream, build.Variant, input.Vulnerability, input.Component,
+					which, wanted, remaining)
+			}
 			if err != nil {
 				if i == 0 {
 					return nil, err

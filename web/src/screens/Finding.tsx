@@ -22,7 +22,7 @@ import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { at as choicesAt, type Choice, Refused, unwrap, whichOf } from "../api/queries";
+import { at as choicesAt, type Choice, unwrap, whichOf } from "../api/queries";
 import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
@@ -305,9 +305,6 @@ export function Finding() {
           },
         ),
       ),
-    // A 409 is the answer "say which one", which asking again cannot change,
-    // and retried it holds the choices back behind two more round trips.
-    retry: (count, error) => !(error instanceof Refused && error.status === 409) && count < 2,
   });
 
   const it = finding.data;

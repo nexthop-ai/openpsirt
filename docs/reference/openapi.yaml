@@ -9596,6 +9596,12 @@ components:
       properties:
         component:
           type: string
+        ecosystem:
+          description: The kind of package the step is, as its identifier spells it
+          type: string
+        namespace:
+          description: The namespace its package identifier names, where it names one
+          type: string
         version:
           type: string
       required:
@@ -16662,7 +16668,7 @@ paths:
 
         It is filed under an identifier this deployment mints — the product's name, the year and a number. A CVE assigned later becomes another name for the same issue; nothing about the finding, the decisions or the approvals moves.
 
-        `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, and `ecosystem` where two share a version.
+        `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, `ecosystem` where two share a version, and `namespace` where two share an ecosystem.
 
         Every flaw is recorded with a vulnerability report. `from_report` records the flaw from one already in this product and accepts it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409. Without it, a report is written from `reported_by`, `contact`, `credit`, `received` and `found_here`, already accepted as this flaw.
 
@@ -21053,7 +21059,7 @@ paths:
 
         A component reached several ways appears once with several parents. It is a graph rather than a tree, so anything drawing it has to expect the same component under many places.
 
-        A component name is not unique within a build. Where one ships at several versions, `version` says which — without it, a name that matches more than one is refused with 409, naming the choices, rather than guessed at.
+        A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-component-neighbors
@@ -21304,7 +21310,7 @@ paths:
 
         This is what a triage decision is made from, so it is gathered into one request. Each entry in `places` carries the `place` identity to name when recording a decision about it.
 
-        A component name is not unique within a build. Where one ships at several versions, `version` says which — without it, a name that matches more than one is refused rather than guessed at.
+        A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices; where the issue is open at only one of them, that one is answered.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-finding
