@@ -60,9 +60,28 @@ func TestMySQLDSNIsRewrittenForItsDriver(t *testing.T) {
 	}
 	want := "user:secret@tcp(db.example:3306)/openpsirt?parseTime=true&loc=UTC&" +
 		"clientFoundRows=true&tls=preferred&sql_mode=" +
-		url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES')")
+		url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES')") +
+		"&cte_max_recursion_depth=1000000"
 	if got.DSN != want {
 		t.Errorf("DSN\n got %q\nwant %q", got.DSN, want)
+	}
+}
+
+func TestEachEngineOfTheFamilyIsToldItsOwnRecursionBound(t *testing.T) {
+	// The two engines name the setting differently and each refuses the
+	// other's name, so a connection sent the wrong one does not open.
+	for _, c := range []struct{ raw, want, not string }{
+		{"mysql://u:p@h/db", "cte_max_recursion_depth=1000000", "max_recursive_iterations"},
+		{"mariadb://u:p@h/db", "max_recursive_iterations=1000000", "cte_max_recursion_depth"},
+		{"mysql://u:p@h/db?cte_max_recursion_depth=5000", "cte_max_recursion_depth=5000", "=1000000"},
+	} {
+		got, err := ParseURL(c.raw)
+		if err != nil {
+			t.Fatalf("ParseURL(%q): %v", c.raw, err)
+		}
+		if !strings.Contains(got.DSN, c.want) || strings.Contains(got.DSN, c.not) {
+			t.Errorf("%s became %q, want %s and no %s", c.raw, got.DSN, c.want, c.not)
+		}
 	}
 }
 

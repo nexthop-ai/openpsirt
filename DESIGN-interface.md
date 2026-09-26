@@ -883,7 +883,7 @@ far, because recording the distance keeps a component once per path to it:
 | Rule | |
 |---|---|
 | Every row is ordered on the number that describes it | For a branch, what is open beneath it; for a leaf, its own count. What opens still comes before what does not, so the structure of a build is on the first screen |
-| The header says how many components no scanner can match | A component with neither a package identifier nor a CPE is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some, with the reason on hover |
+| The header says how many components carry neither a package identifier nor a CPE | Such a component is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some, with the reason on hover |
 | What nothing in the build pulls in hangs from the root | The build contains it, and nothing else does. The root's own count is everything beneath it and beneath those, as one set. A real switch image arrives with 60,935 components, 1,358 edges and none from its root; drawn from the root's edges alone, that tree is empty |
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |
@@ -1892,7 +1892,6 @@ the one that made it too long.
 
 | | |
 |---|---|
-| On MySQL, the count beneath a component, and a list narrowed beneath one, fail for a chain over a thousand deep | That engine stops a recursive statement after a thousand rounds, and both walk as far as the edges go. The deepest chain among 41 public inventories from 25 producers is sixteen |
 | Color and the brand mark resolve through tokens in one place | How an operator overrides them is deliberately unsettled — that gets decided against real screens — but keeping the whole palette in one stylesheet means the answer will be a stylesheet rather than a hunt through components |
 | Dependencies are pinned exactly, not by range | A range resolves at build time and CI stops being reproducible; a caret in a manifest does exactly that. `npm ci` installs the lockfile |
 | A failure shows what the server said | Inventing a friendlier sentence hides the one the server wrote, which names the line to fix or which part of a declaration is missing — and is the more useful of the two |

@@ -5,6 +5,7 @@ package graph_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -94,8 +95,9 @@ func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 
 func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 	// Nothing bounds this walk's depth, so the union's refusal to add a pair
-	// it already holds is the only thing that ends a cycle. On an engine where
-	// it did not, this would not return.
+	// it already holds is what ends a cycle. Where it did not, this would not
+	// return on three engines; MariaDB would stop at its bound on rounds and
+	// count the same, so there this pins nothing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
@@ -209,6 +211,48 @@ func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
 		}
 		if len(seen) != 2 {
 			t.Errorf("the two choices resolved to %d components, want one each", len(seen))
+		}
+	})
+}
+
+func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
+	// The two engines of the MySQL family stop a recursive statement after a
+	// thousand rounds unless told otherwise — one with an error, the other
+	// with a short answer — and the walks down carry no depth to stop them
+	// sooner. A chain this long is a legal document.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		const length = 1100
+		chain := make([]graph.Described, length)
+		deps := make([]graph.Dependency, 0, length)
+		parent := root
+		for i := range chain {
+			chain[i] = at(fmt.Sprintf("link-%04d", i), "1")
+			deps = append(deps, graph.Dependency{Parent: parent, Child: chain[i]})
+			parent = chain[i]
+		}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root: root, Components: chain, Dependencies: deps,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		last := f.componentNamed(t, chain[length-1].Name)
+		f.opens(t, f.anIssue(t, "CVE-2026-FAR"), last, "at-the-end")
+
+		top, _, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if top == nil || top.Beneath != 1 {
+			t.Errorf("the root counts %+v beneath it, want the issue at the end of the chain", top)
+		}
+		var ids []int64
+		if err := graph.Within(f.db.DB, f.targetID, f.componentNamed(t, chain[0].Name)).
+			Scan(ctx, &ids); err != nil {
+			t.Fatal(err)
+		}
+		if len(ids) != length || !slices.Contains(ids, last) {
+			t.Errorf("the subtree under the first link holds %d components, want all %d", len(ids), length)
 		}
 	})
 }

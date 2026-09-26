@@ -16,6 +16,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Identifier quoting](#identifier-quoting)
 - [Pattern matching](#pattern-matching)
 - [Affected-row counts](#affected-row-counts)
+- [Recursion bound](#recursion-bound)
 - [Absence and failure](#absence-and-failure)
 - [Collation](#collation)
 - [Replica coordination](#replica-coordination)
@@ -662,6 +663,23 @@ that cannot be read is a fault.
 No current driver returns an error there, which is why the helper exists rather
 than the rule. Nothing fails today when a caller gets it wrong, and nothing
 would report it on the day one starts.
+
+## Recursion bound
+
+| Engine | Stops a recursive statement after | Told |
+|---|---|---|
+| MySQL | a thousand rounds, with an error | `cte_max_recursion_depth` of a million |
+| MariaDB | a thousand rounds, returning what it has, with a warning | `max_recursive_iterations` of a million |
+| PostgreSQL, SQLite | nothing | nothing |
+
+The walks down a build's graph carry no depth, so their rounds are the length of
+the longest chain in the build, and a chain past a thousand is a legal document.
+Short of the setting, MySQL fails the count beneath the tree's root and MariaDB
+answers it short without saying so. A walk adds a component once, so no walk
+takes more rounds than a build has components, which a million is past. Set on
+the connection, named per engine because each refuses the other's name, and left
+alone where the database URL sets it. A test walks a chain of 1,100 on all four,
+and fails on those two without the setting.
 
 ## Absence and failure
 

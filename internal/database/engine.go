@@ -194,7 +194,7 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// guarantee, so a deployment that needs certainty asks for tls=true,
 		// which is left alone here.
 		settings := "parseTime=true&loc=UTC&clientFoundRows=true" + transport(u) +
-			"&sql_mode=" + url.QueryEscape(mode(u))
+			"&sql_mode=" + url.QueryEscape(mode(u)) + recursion(engine, u)
 		if query != "" {
 			query += "&" + settings
 		} else {
@@ -255,6 +255,27 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		return path + "?_pragma=" + strings.Join(pragmas, "&_pragma="), nil
 	}
 	return "", fmt.Errorf("unsupported database %q", engine)
+}
+
+// recursion lifts the bound these two engines put on a recursive statement's
+// rounds, which the walks down a build's graph would otherwise reach.
+//
+// Both stop at a thousand rounds by default: MySQL with an error, MariaDB with
+// a short answer and a warning. The walks down carry no depth, so their rounds
+// are the length of the longest chain in a build, and a chain longer than a
+// thousand is a legal document. A walk adds a node once, so no walk takes more
+// rounds than a build has components, and a million is past every bound on
+// that. Each engine names the setting differently and refuses the other's, and
+// one an operator set in the URL is left as it is.
+func recursion(engine Engine, u *url.URL) string {
+	name := "cte_max_recursion_depth"
+	if engine == MariaDB {
+		name = "max_recursive_iterations"
+	}
+	if u.Query().Get(name) != "" {
+		return ""
+	}
+	return "&" + name + "=1000000"
 }
 
 // mode is the sql_mode this connection asks for.

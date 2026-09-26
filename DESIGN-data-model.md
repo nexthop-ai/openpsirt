@@ -534,9 +534,14 @@ Precomputing would cost writes on every scan and bound nothing: how many routes
 exist is a property of the producer's graph.
 
 Recursive traversal is portable across all four engines. Every walk is one
-`WITH RECURSIVE` statement bounded at sixty-four steps: upward from the components
-on a page, downward from a component for the set beneath it, and downward from a
-row of the tree's children for the distinct issues under each.
+`WITH RECURSIVE` statement: upward from the components on a page, downward from a
+component for the set beneath it, and downward from a row of the tree's children
+for the distinct issues under each. The walk upward carries how far it has come
+and is bounded at sixty-four steps. The walks down carry no depth: the union
+adds a component once, which ends a cycle, and carrying a depth keeps a
+component once per path to it. A component more than sixty-four steps below the
+root is therefore counted beneath it and found in a list narrowed beneath it,
+and shown on a finding as placed nowhere.
 
 The downward walks are spelled `CROSS JOIN ... WHERE`, which is an inner join
 everywhere and, on SQLite, the instruction to keep the recursion's queue on the

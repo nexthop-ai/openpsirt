@@ -20,13 +20,16 @@ import (
 // deepest route measured in a real image was three steps — so this is not a
 // bound on a build, it is a bound on a document in a loop. A cycle in the
 // edges would otherwise be walked until the engine gave up, and the engines
-// give up differently: one stops at a thousand steps with an error, the
-// others do not stop. Bounded here, a cycle costs at most this many steps
-// and the component it hides is reported as unplaced, which is what it is.
+// give up differently: PostgreSQL and SQLite do not stop, and the other two
+// stop after their bound on rounds — MySQL with an error, MariaDB returning
+// what it has. Bounded here, a cycle costs at most this many steps and the
+// component it hides is reported as unplaced, which is what it is.
 //
 // The walks down — the count of what is open beneath a component, and the
 // subtree a list is narrowed to — carry no depth, because carrying one
-// multiplies their rows; the union ends their cycles instead.
+// multiplies their rows; the union ends their cycles instead. They run as far
+// as the edges go, which is why the connection lifts the bound on rounds on
+// the two engines that have one.
 const depth = 64
 
 // Within is the components at one component and everywhere beneath it in a
