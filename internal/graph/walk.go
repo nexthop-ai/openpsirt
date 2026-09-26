@@ -13,7 +13,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// depth bounds every recursive walk over a build's edges.
+// depth bounds the recursive walks that carry how far they have come: the
+// walk to a subtree for a membership test, and the climb that draws routes.
 //
 // The graphs an inventory describes are containment a few levels deep — the
 // deepest route measured in a real image was three steps — so this is not a
@@ -22,6 +23,9 @@ import (
 // give up differently: one stops at a thousand steps with an error, the
 // others do not stop. Bounded here, a cycle costs at most this many steps
 // and the component it hides is reported as unplaced, which is what it is.
+//
+// The count of what is open beneath a component carries no depth, because
+// carrying one multiplies its rows; the union ends its cycles instead.
 const depth = 64
 
 // Within is the components at one component and everywhere beneath it in a
@@ -110,33 +114,38 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	// components as though from the one adopting them, so the adopter's count
 	// is its own subtree and theirs as one set, in the same statement as
 	// everything else being counted.
-	seeds := `SELECT n.id AS "start", n.id AS "node", 0 AS "depth"
+	seeds := `SELECT n.id AS "start", n.id AS "node"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
 	args := []any{targetID, bun.List(of)}
 	if len(adopt.IDs) > 0 {
 		seeds += `
 		UNION ALL
-		SELECT bn.id, n.id, 1
+		SELECT bn.id, n.id
 		FROM "graph_node" AS "bn"
 		JOIN "graph_node" AS "n" ON n.target_id = bn.target_id
 		WHERE bn.target_id = ? AND bn.closed_scan_id IS NULL AND bn.component_id = ?
 		  AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
 		args = append(args, targetID, adopt.By, bun.List(adopt.IDs))
 	}
-	args = append(args, targetID, depth, productID, targetID, bun.List(visible))
+	args = append(args, targetID, productID, targetID, bun.List(visible))
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
 		Band        string `bun:"band"`
 		Issues      int    `bun:"issues"`
 	}
+	// No depth in the rows. With one, the union keeps a node once per depth
+	// it is reached at, and a node reached along many paths is walked again
+	// from each: 1,612,405 rows for 43,904 pairs under one real product's
+	// root, 9.0 s against 0.19 s. Without one, a pair already reached is not
+	// added again, which is also what ends a cycle.
 	err := s.db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT "seed"."start", "seed"."node", "seed"."depth" FROM (`+seeds+`) AS "seed"
+		SELECT "seed"."start", "seed"."node" FROM (`+seeds+`) AS "seed"
 		UNION
-		SELECT d.start, e.child_id, d.depth + 1
+		SELECT d.start, e.child_id
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
-		  AND d.depth < ? AND e.parent_id <> e.child_id
+		  AND e.parent_id <> e.child_id
 	)
 	SELECT sn.component_id AS "component_id", p.band AS "band",
 	       COUNT(DISTINCT p.vulnerability_id) AS "issues"

@@ -91,3 +91,35 @@ func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 		}
 	})
 }
+
+func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
+	// Nothing bounds this walk's depth, so the union's refusal to add a pair
+	// it already holds is the only thing that ends a cycle. On an engine where
+	// it did not, this would not return.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl, zlib},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: curl, Child: zlib},
+				{Parent: zlib, Child: curl},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		f.opens(t, f.anIssue(t, "CVE-2026-LOOP"), f.componentNamed(t, zlib.Name), "under-curl")
+
+		top, kids, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if top == nil || top.Beneath != 1 {
+			t.Errorf("the root counts %+v beneath it, want the one issue", top)
+		}
+		if len(kids) != 1 || kids[0].Beneath != 1 {
+			t.Errorf("curl counts %+v, want the one issue under it counted once", kids)
+		}
+	})
+}

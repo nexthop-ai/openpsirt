@@ -874,7 +874,11 @@ it is reached. A finding is one issue at one place, and a library at thirty-six
 places with two issues is seventy-two rows — which is what a parent reads if it
 counts findings, where somebody who drilled down one path is looking at one
 place and expects two. One recursive statement for the row's whole set of
-children: 0.08 s for the root's thirty children on the full-size image.
+children: 0.08 s for the root's thirty children on the full-size image, and
+0.19 s for the walk under 2,140 children of a real product of 12,147
+components. The walk records which components each child reaches and not how
+far, because recording the distance keeps a component once per path to it:
+1,612,405 rows for those 43,904 pairs, and 9.0 s.
 
 | Rule | |
 |---|---|
@@ -1887,6 +1891,7 @@ the one that made it too long.
 
 | | |
 |---|---|
+| On MySQL, the count beneath a component fails for a chain over a thousand deep | That engine stops a recursive statement after a thousand rounds, and the count walks as far as the edges go. The deepest chain among 41 public inventories from 25 producers is sixteen |
 | Color and the brand mark resolve through tokens in one place | How an operator overrides them is deliberately unsettled — that gets decided against real screens — but keeping the whole palette in one stylesheet means the answer will be a stylesheet rather than a hunt through components |
 | Dependencies are pinned exactly, not by range | A range resolves at build time and CI stops being reproducible; a caret in a manifest does exactly that. `npm ci` installs the lockfile |
 | A failure shows what the server said | Inventing a friendlier sentence hides the one the server wrote, which names the line to fix or which part of a declaration is missing — and is the more useful of the two |
