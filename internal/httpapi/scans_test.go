@@ -608,6 +608,17 @@ func TestAnInventoryThatStatesNoBuildTimeIsDatedOnArrival(t *testing.T) {
 			t.Errorf("the answer is %+v, want it dated on arrival", got)
 		}
 
+		// The same bytes sent again are the upload already held, and are
+		// answered with the time that upload was given rather than the
+		// time of the retry: the stored row keeps its first time, and the
+		// answer says what the row says.
+		time.Sleep(1100 * time.Millisecond)
+		if code, again := f.send(t, upload(t, f.path, undated("2.41"))); code != http.StatusOK ||
+			again.BuiltAt != got.BuiltAt {
+			t.Errorf("the same undated bytes again answered %d dated %q, want 200 dated %q",
+				code, again.BuiltAt, got.BuiltAt)
+		}
+
 		// And the target is not left wedged: the next undated build lands.
 		if code, again := f.send(t, upload(t, f.path, undated("2.42"))); code != http.StatusAccepted {
 			t.Errorf("a second undated build answered %d: %+v", code, again)

@@ -444,14 +444,12 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	}
 
 	// A document that does not say when it was built is ordered by when it
-	// arrived. Both formats leave the build time optional, and the arrival is
-	// the only order such a build has. Stored as the zero time instead, it
-	// would be older than every real one: the first such upload accepted and
-	// every later scan for that target refused as not newer.
-	dated := false
-	if header.BuiltAt.IsZero() {
-		header.BuiltAt = time.Now().UTC()
-		dated = true
+	// arrived, since both formats leave the build time optional. The store
+	// dates it, because the store knows whether these bytes are already held.
+	dated := header.BuiltAt.IsZero()
+	stated := &header.BuiltAt
+	if dated {
+		stated = nil
 	}
 
 	arriving := ingest.Arriving{
@@ -483,7 +481,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// with no build time is dated on arrival above, so a branch here asks a
 		// question already answered.
 		result = UploadResult{
-			ScanID: scan.ID, Serial: header.Serial, BuiltAt: stamp(header.BuiltAt),
+			ScanID: scan.ID, Serial: header.Serial, BuiltAt: stamp(scan.BuiltAt),
 			DatedOnArrival: dated,
 		}
 		if taken != ingest.Accept && taken != ingest.Retake {
@@ -539,7 +537,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// a pipeline nobody wired up, against one failing nightly and telling
 		// its own log it succeeded.
 		refused := rejection(outcome, err)
-		note(refused.Error(), &header.BuiltAt, &contentHash)
+		note(refused.Error(), stated, &contentHash)
 		return nil, refused
 	case err != nil:
 		return nil, wentWrong(in.Logger, "the upload could not be recorded", err)
@@ -662,7 +660,7 @@ func store(ctx context.Context, documents *ingest.Documents, scanID int64, kind 
 type ReceiptBody struct {
 	ScanID     int64  `json:"scan_id" doc:"The scan this upload became"`
 	Serial     string `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
-	BuiltAt    string `json:"built_at,omitempty" doc:"The build time the producer states"`
+	BuiltAt    string `json:"built_at,omitempty" doc:"The build time the producer states, or the time the upload arrived where it states none"`
 	ReceivedAt string `json:"received_at" doc:"The moment it arrived here"`
 	State      string `json:"state" enum:"reading,scanning,scanned,failed" doc:"The state it has reached"`
 	// Failure is the producer's own text back at them — what could not be read

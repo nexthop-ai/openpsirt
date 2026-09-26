@@ -312,3 +312,30 @@ func TestAFailureQuotingAProducersOwnTextIsStoredAsText(t *testing.T) {
 		}
 	})
 }
+
+func TestAnUndatedDocumentSentAgainKeepsTheTimeItFirstArrivedWith(t *testing.T) {
+	// Undated A arrives and fails to read; B arrives after it; A is sent
+	// again. A is the upload already held, dated when it first arrived, so it
+	// is older than B and refused as not newer. Dated by the retry instead, it
+	// was taken as newer while its row kept the first time, and the reader
+	// then set it aside as superseded after the producer had been told 202.
+	each(t, func(t *testing.T, s *ingest.Store, v int64) {
+		ctx := t.Context()
+		first, outcome, err := s.Record(ctx, arriving(v, "undated-a", time.Time{}))
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("the first arrival: %v %v", outcome, err)
+		}
+		if err := s.MarkFailed(ctx, first.ID, errors.New("could not be read")); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Millisecond)
+		if _, outcome, err := s.Record(ctx, arriving(v, "dated-b", time.Now().UTC())); err != nil ||
+			outcome != ingest.Accept {
+			t.Fatalf("the newer build: %v %v", outcome, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+		if _, outcome, _ := s.Record(ctx, arriving(v, "undated-a", time.Time{})); outcome != ingest.NotNewer {
+			t.Errorf("the undated document sent again was %v, want not newer than the build after it", outcome)
+		}
+	})
+}
