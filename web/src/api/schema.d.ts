@@ -761,7 +761,7 @@ export interface paths {
          *
          *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
          *
-         *     One act, one approval. Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+         *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the severity has risen since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
          *
          *     Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
          *
@@ -3096,6 +3096,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/reaffirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-affirm many lapsed claims
+         * @description Re-makes every lapsed claim at the findings named, as one act with one reasoning. Name the rows picked from the findings list; the claims behind them are resolved here. A row's claim is one whose decision at any of the row's places lapsed and has not been replaced since.
+         *
+         *     Each claim is re-made whole, exactly as re-affirming it alone does: every lapsed place at the versions it has now, keeping the claim's own outcome, justification and dates, and carrying its earlier agreement.
+         *
+         *     Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
+         *
+         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues, so they can be taken out of the selection.
+         *
+         *     Bounded. At most 2000 rows per request, and every finding the act writes, across every claim, counts against `triage.together-cap`. A promise to upgrade is not counted. `reasoning` is required.
+         *
+         *     Requires: public-triage or private-triage on the product
+         */
+        post: operations["reaffirm-many"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/releases": {
         parameters: {
             query?: never;
@@ -4091,7 +4121,7 @@ export interface paths {
          *
          *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
          *
-         *     It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
+         *     It does need approval again if nothing was ever agreed to, or if the vulnerability's severity has risen since the original was agreed to and the claim is one a severity bears on. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
          *
          *     Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
          *
@@ -8177,6 +8207,22 @@ export interface components {
             /** Format: int64 */
             rows: number;
         };
+        LapsedRowBody: {
+            /** @description The component the row names. Any binary of a source package names all of them */
+            component: string;
+            /** @description The ecosystem, where the build holds one name at one version as two components */
+            ecosystem?: string;
+            /** @description The namespace, where the build holds one name at one version in one ecosystem as two components */
+            namespace?: string;
+            /** @description The branch or tag of the build the row was read in */
+            stream: string;
+            /** @description The variant of that build */
+            variant: string;
+            /** @description The version, where the build ships that name at more than one */
+            version?: string;
+            /** @description The issue, by name */
+            vulnerability: string;
+        };
         LateBody: {
             /** @description The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
@@ -9939,6 +9985,28 @@ export interface components {
             /** @description The reason it still holds, in markdown */
             reasoning: string;
         };
+        "Reaffirm-manyRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaffirm-manyRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The rows picked */
+            findings: components["schemas"]["LapsedRowBody"][] | null;
+            /** @description The reason every one of them still holds, in markdown */
+            reasoning: string;
+        };
+        "Reaffirm-manyResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaffirm-manyResponse.json
+             */
+            readonly $schema?: string;
+            /** @description One entry per claim re-made */
+            claims: components["schemas"]["ReaffirmedBody"][] | null;
+        };
         ReaffirmedBody: {
             /**
              * Format: uri
@@ -9957,6 +10025,11 @@ export interface components {
              * @description The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
              */
             places: number;
+            /**
+             * Format: int64
+             * @description The claim that lapsed
+             */
+            previous_claim_id: number;
             /** @description Whether a second person has to agree */
             waiting: boolean;
         };
@@ -16644,6 +16717,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "reaffirm-many": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reaffirm-manyRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reaffirm-manyResponse"];
+                };
             };
             /** @description Error */
             default: {

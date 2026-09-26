@@ -4466,6 +4466,40 @@ components:
         - outcome
         - rows
       type: object
+    LapsedRowBody:
+      additionalProperties: false
+      properties:
+        component:
+          description: The component the row names. Any binary of a source package names all of them
+          minLength: 1
+          type: string
+        ecosystem:
+          description: The ecosystem, where the build holds one name at one version as two components
+          type: string
+        namespace:
+          description: The namespace, where the build holds one name at one version in one ecosystem as two components
+          type: string
+        stream:
+          description: The branch or tag of the build the row was read in
+          minLength: 1
+          type: string
+        variant:
+          description: The variant of that build
+          minLength: 1
+          type: string
+        version:
+          description: The version, where the build ships that name at more than one
+          type: string
+        vulnerability:
+          description: The issue, by name
+          minLength: 1
+          type: string
+      required:
+        - stream
+        - variant
+        - vulnerability
+        - component
+      type: object
     LateBody:
       additionalProperties: false
       properties:
@@ -7559,6 +7593,53 @@ components:
         - previous
         - reasoning
       type: object
+    Reaffirm-manyRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Reaffirm-manyRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        findings:
+          description: The rows picked
+          items:
+            $ref: "#/components/schemas/LapsedRowBody"
+          maxItems: 2000
+          minItems: 1
+          type:
+            - array
+            - "null"
+        reasoning:
+          description: The reason every one of them still holds, in markdown
+          minLength: 1
+          type: string
+      required:
+        - findings
+        - reasoning
+      type: object
+    Reaffirm-manyResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Reaffirm-manyResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        claims:
+          description: One entry per claim re-made
+          items:
+            $ref: "#/components/schemas/ReaffirmedBody"
+          type:
+            - array
+            - "null"
+      required:
+        - claims
+      type: object
     ReaffirmedBody:
       additionalProperties: false
       properties:
@@ -7584,10 +7665,15 @@ components:
           description: The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
           format: int64
           type: integer
+        previous_claim_id:
+          description: The claim that lapsed
+          format: int64
+          type: integer
         waiting:
           description: Whether a second person has to agree
           type: boolean
       required:
+        - previous_claim_id
         - claim_id
         - decisions
         - places
@@ -12396,7 +12482,7 @@ paths:
 
         Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
 
-        One act, one approval. Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+        One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the severity has risen since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
 
         Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
 
@@ -19672,6 +19758,54 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
+  /v1/products/{product}/reaffirmations:
+    post:
+      description: |-
+        Re-makes every lapsed claim at the findings named, as one act with one reasoning. Name the rows picked from the findings list; the claims behind them are resolved here. A row's claim is one whose decision at any of the row's places lapsed and has not been replaced since.
+
+        Each claim is re-made whole, exactly as re-affirming it alone does: every lapsed place at the versions it has now, keeping the claim's own outcome, justification and dates, and carrying its earlier agreement.
+
+        Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
+
+        Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues, so they can be taken out of the selection.
+
+        Bounded. At most 2000 rows per request, and every finding the act writes, across every claim, counts against `triage.together-cap`. A promise to upgrade is not counted. `reasoning` is required.
+
+        Requires: public-triage or private-triage on the product
+      operationId: reaffirm-many
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reaffirm-manyRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reaffirm-manyResponse"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Re-affirm many lapsed claims
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
   /v1/products/{product}/releases:
     get:
       description: |-
@@ -22083,7 +22217,7 @@ paths:
 
         Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
 
-        It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
+        It does need approval again if nothing was ever agreed to, or if the vulnerability's severity has risen since the original was agreed to and the claim is one a severity bears on. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
 
         Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
 

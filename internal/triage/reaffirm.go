@@ -50,8 +50,10 @@ type Reaffirmation struct {
 // treating a lapse as evidence of agreement would manufacture one.
 //
 // A severity that has risen since means the original judgment was made about a
-// smaller thing. What was agreed to was that this did not matter much; that is
-// not an agreement about what it has become.
+// smaller thing, where the judgment turns on how bad the issue is. What was
+// agreed to was that this did not matter much; that is not an agreement about
+// what it has become. A claim that the code is absent, or never runs, or that
+// the fix already ships, holds however bad the issue is.
 //
 // A count of re-affirmations deliberately does not trigger it. That would fire
 // on nothing having changed, which every other rule here refuses to do.
@@ -167,7 +169,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	full := needsFullApproval(*previous, severityNow, carryable != nil)
+	full := needsFullApproval(*previous, *previous.Claim, severityNow, carryable != nil)
 
 	proposal := Proposal{
 		Place: place, Outcome: previous.Claim.Outcome,
@@ -246,7 +248,7 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 }
 
 // needsFullApproval reports whether a re-affirmation is really a new claim.
-func needsFullApproval(previous Decision, severityNow int, agreed bool) bool {
+func needsFullApproval(previous Decision, claim Claim, severityNow int, agreed bool) bool {
 	// Never carried where nobody agreed in the first place. A claim that was
 	// only ever proposed has nothing to carry, and treating its re-affirmation
 	// as pre-agreed would manufacture an approval out of a version bump.
@@ -260,10 +262,34 @@ func needsFullApproval(previous Decision, severityNow int, agreed bool) bool {
 	if !agreed {
 		return true
 	}
-	if severityNow > previous.SeverityAtApproval() {
+	if turnsOnSeverity(claim) && severityNow > previous.SeverityAtApproval() {
 		return true
 	}
 	return false
+}
+
+// turnsOnSeverity reports whether a claim is a judgment that how bad the issue
+// is could change.
+//
+// Most are. A deferral, a refusal to fix and a promise to act all accept the
+// risk for a while, and the risk is the severity. An argument that nothing an
+// attacker controls reaches the code, or that something already stops it, is
+// weighed against what the issue lets an attacker do, and a higher rating is
+// often a new way in.
+//
+// Three are not. Code that is absent or never runs is not dangerous at any
+// severity, and a fix that already ships is there whatever the rating says.
+func turnsOnSeverity(claim Claim) bool {
+	switch claim.Outcome {
+	case AlreadyFixed:
+		return false
+	case NotApplicable:
+		if claim.Justification == nil {
+			return true
+		}
+		return !Justification(*claim.Justification).IndifferentToSeverity()
+	}
+	return true
 }
 
 // SeverityAtApproval is how bad this was judged to be when it was agreed to.
@@ -854,7 +880,10 @@ type ReaffirmingClaim struct {
 
 // Reaffirmed is what one bulk re-affirmation did.
 type Reaffirmed struct {
-	ClaimID int64
+	// PreviousClaimID is the claim that lapsed, and ClaimID the one that
+	// re-makes it.
+	PreviousClaimID int64
+	ClaimID         int64
 	// Decisions are the rows it wrote, and Places how many distinct places
 	// they cover. A place at two versions in two builds is two rows, because
 	// the versions are what a decision expires on.
@@ -902,64 +931,101 @@ func (s *Store) ReaffirmClaim(ctx context.Context, subject access.Subject,
 }
 
 // reaffirmClaim is the whole of it, in the transaction that writes.
-//
-// Everything it turns on is read in here: which rows lapsed, where they sit
-// now, how bad each issue is judged to be today, and whether there is an
-// agreement to carry. Read outside, every one of them is an answer about a
-// database that has since moved.
 func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 	r ReaffirmingClaim) (Reaffirmed, error) {
 
+	plan, err := s.planReaffirm(ctx, subject, r.PreviousClaimID, r.Reasoning, r.By)
+	if err != nil {
+		return Reaffirmed{}, err
+	}
+	// Bounded unless it is a promise. What decides is the outcome being
+	// re-made rather than the act being a re-affirmation: this path carries
+	// the previous claim's outcome, so a lapsed bulk dismissal re-made here is
+	// a bulk judgment and nothing re-checks it. Unbounded it would write as
+	// many rows as it liked, and with the earlier agreement carried on, nobody
+	// would stand between the request and the rows.
+	if plan.unbounded() {
+		if err := permitted(subject, plan.proposals, s.now()); err != nil {
+			return Reaffirmed{}, err
+		}
+	} else if err := allowed(subject, plan.proposals, r.Cap, s.now()); err != nil {
+		return Reaffirmed{}, err
+	}
+	return s.writeReaffirm(ctx, plan)
+}
+
+// reaffirmPlan is one claim's re-affirmation worked out and not yet written.
+type reaffirmPlan struct {
+	previous  Claim
+	lapsed    []Decision
+	proposals []Proposal
+	places    int
+	full      bool
+}
+
+// unbounded reports whether the claim being re-made is a promise, which the
+// cap on a bulk judgment does not reach (REQ-27).
+func (p reaffirmPlan) unbounded() bool {
+	return p.previous.Outcome == UpgradeNeeded
+}
+
+// planReaffirm works out what re-making one claim writes, reading everything
+// it turns on inside the transaction that writes: which rows lapsed, where
+// they sit now, how bad each issue is judged to be today, and whether there
+// is an agreement to carry. Read outside, every one of them is an answer about
+// a database that has since moved.
+func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
+	previousClaimID int64, reasoning string, by int64) (reaffirmPlan, error) {
+
 	previous := new(Claim)
 	if err := s.db.NewSelect().Model(previous).
-		Where("id = ?", r.PreviousClaimID).Scan(ctx); err != nil {
-		return Reaffirmed{}, ErrNotTheirs
+		Where("id = ?", previousClaimID).Scan(ctx); err != nil {
+		return reaffirmPlan{}, ErrNotTheirs
 	}
 	var lapsed []Decision
-	if err := s.db.NewSelect().Model(&lapsed).
-		Where("de.claim_id = ?", r.PreviousClaimID).
-		Where("de.state = ?", LapsedState).
+	if err := stillLatest(s.db.NewSelect().Model(&lapsed).
+		Where("de.claim_id = ?", previousClaimID).
+		Where("de.state = ?", LapsedState)).
 		Order("de.id ASC").Scan(ctx); err != nil {
-		return Reaffirmed{}, fmt.Errorf("read what lapsed under that claim: %w", err)
+		return reaffirmPlan{}, fmt.Errorf("read what lapsed under that claim: %w", err)
 	}
 	// Authorized against the rows before anything else is said about the
 	// claim, and asked of every one, because a claim covering a disclosed
 	// place and an undisclosed one is not one a public triager may re-make in
 	// part.
 	//
-	// Before the proposer check, not after (REQ-42). Refusing on the
-	// proposer first answered a claim in a product the caller cannot see
-	// differently from one that does not exist — one sentence against a bare
-	// refusal — which turns walking claim identifiers into a directory of
-	// every product in the deployment.
+	// Before the proposer check (REQ-42). Refusing on the proposer first
+	// answers a claim in a product the caller cannot see differently from one
+	// that does not exist, which turns walking claim identifiers into a
+	// directory of every product in the deployment.
 	for _, row := range lapsed {
 		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return Reaffirmed{}, ErrNotTheirs
+			return reaffirmPlan{}, ErrNotTheirs
 		}
 	}
 	if len(lapsed) == 0 {
-		return Reaffirmed{}, ErrNotTheirs
+		return reaffirmPlan{}, ErrNotTheirs
 	}
 	// The same rule the single form applies, asked once because a claim has
 	// one proposer. Without it an approver could re-affirm, becoming proposer
 	// of the new claim while their own earlier agreement is carried onto it.
 	if previous.ProposedBy != subject.ID {
-		return Reaffirmed{}, fmt.Errorf(
+		return reaffirmPlan{}, fmt.Errorf(
 			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
 	}
 
 	where, err := s.whereTheyAreNow(ctx, subject, lapsed)
 	if err != nil {
-		return Reaffirmed{}, err
+		return reaffirmPlan{}, err
 	}
 
-	// The need for a second person, decided over the whole act before
-	// any of it is written. Any row escalating carries the rest with it: an
+	// The need for a second person, decided over the whole claim before any
+	// of it is written. Any row escalating carries the rest with it: an
 	// approver works at the unit the proposer acted at, and splitting the act
 	// would be agreeing to part of an argument they were shown whole.
-	carryable, err := s.approvalToCarry(ctx, r.PreviousClaimID, subject.ID)
+	carryable, err := s.approvalToCarry(ctx, previousClaimID, subject.ID)
 	if err != nil {
-		return Reaffirmed{}, err
+		return reaffirmPlan{}, err
 	}
 	severity := map[[2]int64]int{}
 	full := false
@@ -968,11 +1034,11 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		if _, asked := severity[key]; !asked {
 			now, err := s.severityOf(ctx, row.ProductID, row.VulnerabilityID)
 			if err != nil {
-				return Reaffirmed{}, err
+				return reaffirmPlan{}, err
 			}
 			severity[key] = now
 		}
-		if needsFullApproval(row, severity[key], carryable != nil) {
+		if needsFullApproval(row, *previous, severity[key], carryable != nil) {
 			full = true
 		}
 	}
@@ -1014,54 +1080,70 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 				Mitigation:    mitigation,
 				DeferredUntil: previous.DeferredUntil,
 				FixedVersion:  fixedVersion,
-				Reasoning:     r.Reasoning, By: r.By,
+				Reasoning:     reasoning, By: by,
 				SeverityCenti: severity[[2]int64{row.ProductID, row.VulnerabilityID}],
 				NeedsApproval: full,
 			})
 		}
 	}
 	if len(proposals) == 0 {
-		return Reaffirmed{}, fmt.Errorf(
+		return reaffirmPlan{}, fmt.Errorf(
 			"%w: none of what lapsed is open anywhere any more", ErrNothingOpen)
 	}
-	// Bounded unless it is a promise. What decides is the outcome being
-	// re-made rather than the act being a re-affirmation: this path carries
-	// the previous claim's outcome, so a lapsed bulk dismissal re-made here is
-	// a bulk judgment and nothing re-checks it. Unbounded it would write as
-	// many rows as it liked, and with the earlier agreement carried on, nobody
-	// would stand between the request and the rows.
-	if previous.Outcome == UpgradeNeeded {
-		if err := permitted(subject, proposals, s.now()); err != nil {
-			return Reaffirmed{}, err
-		}
-	} else if err := allowed(subject, proposals, r.Cap, s.now()); err != nil {
-		return Reaffirmed{}, err
-	}
+	return reaffirmPlan{
+		previous: *previous, lapsed: lapsed, proposals: proposals,
+		places: len(places), full: full,
+	}, nil
+}
 
-	// One act, one claim, one argument — the shape every other bulk write
-	// here takes.
-	claim, err := s.newClaim(ctx, FindingClaim, r.By, &r.PreviousClaimID, "", proposals[0])
+// writeReaffirm writes one planned re-affirmation: one act, one claim, one
+// argument — the shape every other bulk write here takes.
+func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirmed, error) {
+	first := plan.proposals[0]
+	claim, err := s.newClaim(ctx, FindingClaim, first.By, &plan.previous.ID, "", first)
 	if err != nil {
 		return Reaffirmed{}, err
 	}
-	written, err := s.proposeAll(ctx, claim, proposals)
+	written, err := s.proposeAll(ctx, claim, plan.proposals)
 	if err != nil {
 		return Reaffirmed{}, err
 	}
-	out := Reaffirmed{ClaimID: claim.ID, Places: len(places), Waiting: full}
+	out := Reaffirmed{
+		PreviousClaimID: plan.previous.ID, ClaimID: claim.ID,
+		Places: plan.places, Waiting: plan.full,
+	}
 	for _, one := range written {
 		out.Decisions = append(out.Decisions, one.ID)
 	}
-	if full {
+	if plan.full {
 		return out, nil
 	}
 	// Carried once, onto the claim, because an approval is an agreement to one
 	// claim's words. Written per row it would be one agreement recorded forty
 	// five times.
-	if err := s.carryApprovalTo(ctx, written, *claim, lapsed[0]); err != nil {
+	if err := s.carryApprovalTo(ctx, written, *claim, plan.lapsed[0]); err != nil {
 		return Reaffirmed{}, err
 	}
 	return out, nil
+}
+
+// stillLatest keeps the lapsed rows nothing has replaced, for a query over
+// decision AS "de".
+//
+// A row is replaced where a later decision of another claim sits at its place.
+// That is the re-affirmation that re-made it, or a fresh judgment, or one
+// somebody made and then withdrew; in every case the later one is what the
+// place last said. Re-making the earlier row would write a second live claim
+// where the later one already stands, or bring back a judgment somebody since
+// took back. Rows of one claim at two versions of one place are the same
+// judgment, so they do not replace each other.
+func stillLatest(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "newer"` +
+		` WHERE newer.product_id = de.product_id` +
+		` AND newer.vulnerability_id = de.vulnerability_id` +
+		` AND newer.place_identity = de.place_identity` +
+		` AND newer.claim_id <> de.claim_id` +
+		` AND newer.id > de.id)`)
 }
 
 // placeKey identifies a lapsed row's place within its product.

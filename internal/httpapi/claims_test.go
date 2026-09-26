@@ -958,9 +958,9 @@ func (r *reach) agreedThenLapsed(t *testing.T) int64 {
 		"/v1/products/mine/streams/master/variants/broadcom"+
 			"/components/libcurl4t64/decisions",
 		`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
-			`"justification":"vulnerable_code_not_in_execute_path",`+
+			`"justification":"vulnerable_code_cannot_be_controlled_by_adversary",`+
 			`"selected_by":"the transfer path",`+
-			`"reasoning":"The transfer path is never reached from this image."}`)
+			`"reasoning":"Nothing an attacker sends reaches the transfer path."}`)
 	if decided.Code != http.StatusCreated {
 		t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
 	}

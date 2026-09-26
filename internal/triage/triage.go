@@ -243,6 +243,12 @@ func (j Justification) AboutIdentity() bool {
 	return j == ComponentNotPresent || j == CodeNotPresent
 }
 
+// IndifferentToSeverity reports whether this reason holds however bad the
+// issue is: the code is not there, or it never runs.
+func (j Justification) IndifferentToSeverity() bool {
+	return j.AboutIdentity() || j == CodeNotInExecutePath
+}
+
 // JustificationsCorrecting are the reasons a correction may state.
 //
 // Named here rather than written out where it is enforced, so that what is
