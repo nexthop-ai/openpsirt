@@ -1,0 +1,134 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "comment": "This document was created by analyzing the source of the Yocto recipe during the build.",
+    "created": "2024-09-19T13:50:32Z",
+    "creators": [
+      "Tool: OpenEmbedded Core create-spdx.bbclass",
+      "Organization: OpenEmbedded ()",
+      "Person: N/A ()"
+    ],
+    "licenseListVersion": "3.14"
+  },
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "http://spdx.org/spdxdoc/image-full-thor-20240919121303-8c87b0cf-e34b-5b56-9700-fb699394432a",
+  "externalDocumentRefs": [
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "0f2c1460eb555b50402c9a2d14719ea2cfe7e667"
+      },
+      "externalDocumentId": "DocumentRef-alarm",
+      "spdxDocument": "http://spdx.org/spdxdoc/alarm-a89a4665-0835-5596-9956-17f2a0fd5562"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "9db8ef443f76453a2d4539958d58362d661374b3"
+      },
+      "externalDocumentId": "DocumentRef-runtime-alarm",
+      "spdxDocument": "http://spdx.org/spdxdoc/runtime-alarm-d99ec519-43f0-5e6f-a178-d50df7c99645"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "e596b87aedf271e7319846cf26fb94ef4c9eb74f"
+      },
+      "externalDocumentId": "DocumentRef-alignmentpavendors",
+      "spdxDocument": "http://spdx.org/spdxdoc/alignmentpavendors-a7cf1096-d17a-5e0a-b3d8-2310355c80a3"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "79944b521186c2ab8ffbc7fc81542d8f2d7cb919"
+      },
+      "externalDocumentId": "DocumentRef-runtime-alignmentpavendors",
+      "spdxDocument": "http://spdx.org/spdxdoc/runtime-alignmentpavendors-90c55062-7c92-5fea-b6f9-fafe2b419839"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "d32061198c7cad06e65e07aebd315d4a03478b32"
+      },
+      "externalDocumentId": "DocumentRef-alps",
+      "spdxDocument": "http://spdx.org/spdxdoc/alps-717e3bbe-606c-55de-a47f-f82c29bce191"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "095263fb1a73332b90ce197421866fb68ddfea39"
+      },
+      "externalDocumentId": "DocumentRef-runtime-alps",
+      "spdxDocument": "http://spdx.org/spdxdoc/runtime-alps-5a729a35-3b9b-5f22-8516-ce0c299cbec1"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "210a99859bb58709beef987a8d0c098bdaea407d"
+      },
+      "externalDocumentId": "DocumentRef-kernel-5.15.155-nokia-r42",
+      "spdxDocument": "http://spdx.org/spdxdoc/kernel-5.15.155-r42-449e38e4-d16a-5c20-b592-d602fdc832df"
+    },
+    {
+      "checksum": {
+        "algorithm": "SHA1",
+        "checksumValue": "57f4565c3392ee4e147ee0c0b4716a06a3cd1a84"
+      },
+      "externalDocumentId": "DocumentRef-runtime-kernel-5.15.155-nokia-r42",
+      "spdxDocument": "http://spdx.org/spdxdoc/runtime-kernel-5.15.155-r42-98fa9061-a335-5876-b6cb-cbb0661d1328"
+    }
+  ],
+  "name": "image-full-thor-20240919121303",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Image-image-full-thor-20240919121303",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "licenseInfoFromFiles": [
+        "NOASSERTION"
+      ],
+      "name": "image-full",
+      "supplier": "Organization: OpenEmbedded ()",
+      "versionInfo": "1.0"
+    }
+  ],
+  "relationships": [
+    {
+      "relatedSpdxElement": "DocumentRef-alarm:SPDXRef-Package-alarm",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Image-image-full-thor-20240919121303"
+    },
+    {
+      "comment": "Runtime dependencies for alarm",
+      "relatedSpdxElement": "DocumentRef-runtime-alarm:SPDXRef-DOCUMENT",
+      "relationshipType": "OTHER",
+      "spdxElementId": "SPDXRef-Image-image-full-thor-20240919121303"
+    },
+    {
+      "relatedSpdxElement": "DocumentRef-alignmentpavendors:SPDXRef-Package-alignmentpavendors",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Image-image-full-thor-20240919121303"
+    },
+    {
+      "comment": "Runtime dependencies for alignmentpavendors",
+      "relatedSpdxElement": "DocumentRef-runtime-alignmentpavendors:SPDXRef-DOCUMENT",
+      "relationshipType": "OTHER",
+      "spdxElementId": "SPDXRef-Image-image-full-thor-20240919121303"
+    },
+    {
+      "relatedSpdxElement": "DocumentRef-alps:SPDXRef-Package-alps",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Image-image-full-thor-20240919121303"
+    },
+    {
+      "comment": "Runtime dependencies for alps",
+      "relatedSpdxElement": "DocumentRef-runtime-alps:SPDXRef-DOCUMENT",
+      "relationshipType": "OTHER",
+      "spdxElementId": "SPDXRef-Image-image-full-thor-20240919121303"
+    }
+    
+  ],
+  "spdxVersion": "SPDX-2.2"
+}
