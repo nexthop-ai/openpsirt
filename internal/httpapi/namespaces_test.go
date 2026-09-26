@@ -191,3 +191,21 @@ func TestADecisionReachesABuildThatNamesThePackageUnderAnotherNamespace(t *testi
 		}
 	})
 }
+
+func TestAListNarrowedBeneathAComponentTakesTheNamespace(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.shipsUnderTwoNamespaces(t, seededLib, seededTwin)
+		at := "/v1/products/mine/findings?stream=master&variant=broadcom" +
+			"&beneath=libnl-3-200&beneath_version=3.7.0"
+		got := asPerson(t, r, "triager", http.MethodGet, at, "")
+		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), `"namespace":"sonic"`) {
+			t.Errorf("a name held twice answered %d, want 409 offering both: %s",
+				got.Code, got.Body.String())
+		}
+		got = asPerson(t, r, "triager", http.MethodGet,
+			at+"&beneath_ecosystem=deb&beneath_namespace=sonic", "")
+		if got.Code != http.StatusOK {
+			t.Errorf("naming the namespace answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}

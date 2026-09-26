@@ -659,4 +659,3 @@ func TestEveryDoorThatTurnsAnUploadAwayRecordsIt(t *testing.T) {
 		})
 	}
 }
-

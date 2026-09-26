@@ -331,8 +331,8 @@ name is not enough.
 | A part left empty matches anything | A caller that never meets the ambiguity sends nothing more |
 | A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
-| Findings rows, tree nodes, the steps of a way down and component packages carry the ecosystem and namespace | A screen can send back only what it was given |
-| The finding and its reach, decision, assignment and tags, and a component's neighbors, trend, open issues and decision about them, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
+| Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down and component packages carry the ecosystem and namespace | A screen can send back only what it was given |
+| The finding and its reach, decision, assignment and tags, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
 
 ## Upstream name and version
 
@@ -554,4 +554,3 @@ root, against 0.018 s.
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |
 | The lists linking to a finding from elsewhere name its component by name and version alone | The unassigned, late, disposed and blocking lists, the review queue, a claim, an issue and a disclosure. Where a build holds that name at that version as two components, the link lands on the choice between them |
-| The findings list's `beneath` filter takes a name alone | It refuses a name held as more than one component, and says so |
