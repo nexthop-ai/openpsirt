@@ -1053,6 +1053,10 @@ the findings and to the judgments standing on them.</p>
 <td>The finding closes as revised, which is what a carried patch looks like from outside</td>
 </tr>
 <tr>
+<td>The build declares a patch that fixes an issue</td>
+<td>The finding closes as patched. A later build that stops declaring the patch opens it again</td>
+</tr>
+<tr>
 <td>A component leaves the build</td>
 <td>Its findings close as removed</td>
 </tr>
@@ -1209,9 +1213,11 @@ says what turns each on.</p>
   points at one revision of the reason, and editing the text withdraws it</li>
 <li>A rating that disagrees with the published one, or a note for whoever
   decides, belongs to one product and applies to every build of it</li>
-<li>A third party's word is evidence. The build's suppressions, a supplier's VEX
-  and a supplier's advisory are shown beside the finding, and offer a prefill
-  only at the versions they name</li>
+<li>A third party's word is evidence. A supplier's VEX and a supplier's advisory
+  are shown beside the finding, and offer a prefill only at the versions they
+  name</li>
+<li>A build's own patches close what they fix. Its claim that an issue does not
+  apply is kept on the finding, which stays open</li>
 <li>A deployment sets what it considers worth triaging, and a product may set
   something narrower. Below the line a finding is still recorded, counted and
   reportable, and any list that hides something says how much</li>
