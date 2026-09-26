@@ -213,15 +213,90 @@ func TestAListNarrowedBeneathAComponentTakesTheNamespace(t *testing.T) {
 func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.shipsUnderTwoNamespaces(t, seededLib, seededTwin)
-		got := asPerson(t, r, "triager", http.MethodGet, "/v1/unassigned?product=mine", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("the unassigned list answered %d: %s", got.Code, got.Body.String())
-		}
-		for _, namespace := range []string{`"namespace":"debian"`, `"namespace":"sonic"`} {
-			if !strings.Contains(got.Body.String(), namespace) {
+		build := "/v1/products/mine/streams/master/variants/broadcom"
+		finding := build + "/findings/CVE-2026-9999/components/libnl-3-200"
+		// Before anything is handed out, the unassigned list holds both.
+		unassigned := asPerson(t, r, "triager", http.MethodGet, "/v1/unassigned?product=mine", "")
+		for _, want := range []string{`"namespace":"debian"`, `"namespace":"sonic"`} {
+			if !strings.Contains(unassigned.Body.String(), want) {
 				t.Errorf("the unassigned list does not say %s, so its link cannot pick the component: %s",
-					namespace, got.Body.String())
+					want, unassigned.Body.String())
 			}
+		}
+		// A claim, so the list of decisions has one to name; and the work
+		// handed to the triager, so their own tree has something in it.
+		if got := asPerson(t, r, "triager", http.MethodPost,
+			finding+"/decision?version=3.7.0&ecosystem=deb&namespace=sonic",
+			`{"outcome":"wont-fix","reasoning":"Not worth it."}`); got.Code != http.StatusCreated {
+			t.Fatalf("deciding answered %d: %s", got.Code, got.Body.String())
+		}
+		for _, namespace := range []string{"debian", "sonic"} {
+			if got := asPerson(t, r, "assigner", http.MethodPut,
+				finding+"/assignment?version=3.7.0&ecosystem=deb&namespace="+namespace,
+				`{"person":"triager"}`); got.Code >= 300 {
+				t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
+			}
+		}
+		// What blocks a release names its rows' components among much else, so
+		// the rows themselves are read.
+		var readiness struct {
+			Blocking []struct {
+				Namespace string `json:"namespace"`
+			} `json:"blocking"`
+		}
+		read(t, r, "triager", build+"/readiness", &readiness)
+		if len(readiness.Blocking) == 0 || readiness.Blocking[0].Namespace == "" {
+			t.Errorf("what blocks a release does not say which component a row is: %+v", readiness)
+		}
+		for _, list := range []struct{ what, who, path, want string }{
+			// A claim and a blocking row stand for a place, which both
+			// components share, so each names one of them.
+			{"the decisions", "triager", "/v1/decisions?product=mine", `"namespace":"`},
+
+			{"the tree of one's own work", "triager", build + "/components/mine", ""},
+		} {
+			got := asPerson(t, r, list.who, http.MethodGet, list.path, "")
+			if got.Code != http.StatusOK {
+				t.Errorf("%s answered %d: %s", list.what, got.Code, got.Body.String())
+				continue
+			}
+			wants := []string{`"namespace":"debian"`, `"namespace":"sonic"`}
+			if list.want != "" {
+				wants = []string{list.want}
+			}
+			for _, want := range wants {
+				if !strings.Contains(got.Body.String(), want) {
+					t.Errorf("%s does not say %s, so its link cannot pick the component: %s",
+						list.what, want, got.Body.String())
+				}
+			}
+		}
+	})
+}
+
+func TestALinkNamingAVersionOpensTheTwinTheIssueIsOpenAt(t *testing.T) {
+	// apko describes a package once more as a directory with no identifier.
+	// The lookup reads a version with no ecosystem as naming that twin, and
+	// the issue is open at the other one.
+	twoReach(t, func(t *testing.T, r *reach) {
+		bare := graph.Described{Name: "libnl-3-200", Version: "3.7.0"}
+		r.scan(t, "bare-twin", graph.Snapshot{
+			Root:       seededRoot,
+			Components: []graph.Described{seededConsumer, seededLib, bare},
+			Dependencies: []graph.Dependency{
+				{Parent: seededRoot, Child: seededConsumer},
+				{Parent: seededConsumer, Child: seededLib},
+				{Parent: seededLib, Child: bare},
+			},
+		}, []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+			Component: seededLib,
+		}})
+		got := asPerson(t, r, "triager", http.MethodGet, twoNamespacesAt+
+			"/findings/CVE-2026-9999/components/libnl-3-200?version=3.7.0", "")
+		if got.Code != http.StatusOK {
+			t.Errorf("the finding named by its version answered %d, want 200: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }

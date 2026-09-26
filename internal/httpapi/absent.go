@@ -137,10 +137,16 @@ func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
 	targetID, issue int64, name string, which graph.Choice, none func(error) error) (int64, error) {
 
 	id, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, which)
-	if err == nil {
+	// A part left out after one was named may have been read as "none" by
+	// the lookup, which picks the component with nothing there. What carries
+	// the issue has its say first: a link naming a version alone means the
+	// component the issue is open at, and the twin with no identifier is the
+	// answer only where nothing carries it.
+	leftOut := which.Namespace == "" && (which.Version != "" || which.Ecosystem != "")
+	if err == nil && !leftOut {
 		return id, nil
 	}
-	if !errors.Is(err, graph.ErrAmbiguous) {
+	if err != nil && !errors.Is(err, graph.ErrAmbiguous) {
 		return 0, none(err)
 	}
 	all, second := finding.NewStore(in.DB.DB).VersionsWithIssue(ctx, subject, targetID, issue, name)
@@ -166,6 +172,8 @@ func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
 		return id, nil
 	case len(carrying) > 1:
 		return 0, ambiguousAmong(name, carrying)
+	case err == nil:
+		return id, nil
 	default:
 		return 0, none(err)
 	}
