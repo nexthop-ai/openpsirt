@@ -1297,10 +1297,10 @@ reasoning at all.
 | Choosing a narrower set than "all of them" when a judgment covers many places | An interface question. What exists is the count, which is what makes the choice an informed one when it arrives |
 | Nothing refuses a deferral for being long | The cumulative threshold is the whole of the refusal. The pattern is reported instead, at `/v1/deferrals/repeated`: one item deferred three times is a judgment, and forty of them is a policy nobody wrote down. A deliberate absence of a rule rather than a gap |
 
-A deferred item is never published as not-affected, and the rule is built where
-the outbound documents are: the VEX generator takes only approved
-`not-applicable` and `already-fixed` claims, so a deferral is absent rather than
-published as anything, and silence in that format already reads as affected.
+A deferred item is never published as not-affected. The VEX document takes no
+deferral (`DESIGN-remediation.md` § The VEX document), so a deferral is absent
+rather than published as anything, and silence in that format already reads as
+affected.
 
 ## Limits
 

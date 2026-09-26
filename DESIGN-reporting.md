@@ -373,10 +373,10 @@ kernel or a runtime rather than a whole image.
 | It takes the findings list's own two narrowings | A component at any version, or a component and everything under it. A chart and a list describing a subtree differently is drift worth a shared definition to avoid |
 | Across several builds it refuses | A subtree is a walk over one build's edges, so a selection holding two has no single answer, and both ways of producing one are silent: a chart of whichever build sorted first, or an empty one from an identifier left at zero |
 
-This is where a build beginning to carry patches becomes visible. A carried
-patch that names what it resolves is read at ingest and files a suppression, so
-the finding closes where it sits without the package version moving. In a list of
-what is open now the row is simply gone; here it is a step down.
+A carried patch shows here where it moves the shipped version: the finding
+closes as revised, and the open count steps down. A patch that names what it
+resolves marks the finding and leaves it open (`DESIGN-findings.md` § Build-declared
+claims), so the chart does not move for it.
 
 ## The disposition register
 
