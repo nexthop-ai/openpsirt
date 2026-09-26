@@ -161,6 +161,10 @@ skipped externalDocumentRefs[].checksum.checksumValue:string
 skipped externalDocumentRefs[].externalDocumentId:string
 skipped externalDocumentRefs[].spdxDocument:string
 read files[].SPDXID:string
+skipped files[].annotations[].annotationDate:string
+skipped files[].annotations[].annotationType:string
+skipped files[].annotations[].annotator:string
+skipped files[].annotations[].comment:string
 skipped files[].checksums[].algorithm:string
 skipped files[].checksums[].checksumValue:string
 skipped files[].comment:string

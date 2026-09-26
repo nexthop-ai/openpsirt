@@ -46,8 +46,8 @@ type RootsBody struct {
 	// and how much of it was placed.
 	Components int `json:"components" doc:"The number of components this build holds"`
 	Edges      int `json:"edges" doc:"The number of edges placing them"`
-	// Unidentified is what no scan can say anything about.
-	Unidentified int `json:"unidentified" doc:"The number of those components carrying neither a package identifier nor a platform enumeration, so that no scanner can match them"`
+	// Unidentified is what the scanner has no identifier to match on.
+	Unidentified int `json:"unidentified" doc:"The number of those components carrying neither a package identifier nor a platform enumeration"`
 	// Searching is the term somebody typed when Items would be thousands
 	// long, and it comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`

@@ -5,6 +5,7 @@ package sbom_test
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -177,6 +178,13 @@ func fixtureNames(t *testing.T) []string {
 			names = append(names, e.Name())
 		}
 	}
+	// And the producers' own documents kept compressed. The full-size ones are
+	// walked by the test that reads them, with a bound on how long it takes.
+	for _, f := range producerFixtures {
+		if strings.HasSuffix(f.file, ".xz") {
+			names = append(names, f.file)
+		}
+	}
 	slices.Sort(names)
 	return names
 }
@@ -191,9 +199,12 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 	t.Helper()
 
 	var r io.Reader
-	if len(from) > 0 {
+	switch {
+	case len(from) > 0:
 		r = from[0]
-	} else {
+	case strings.HasSuffix(name, ".xz"):
+		r = bytes.NewReader(fixtureBytes(t, name))
+	default:
 		f, err := os.OpenInRoot("testdata", name)
 		if err != nil {
 			t.Fatal(err)

@@ -9961,7 +9961,7 @@ export interface components {
             waiting: boolean;
         };
         ReceiptBody: {
-            /** @description The build time the producer states */
+            /** @description The build time the producer states, or the time the upload arrived where it states none */
             built_at?: string;
             /** @description The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
             caution?: string;
@@ -10456,7 +10456,7 @@ export interface components {
             term?: string;
             /**
              * Format: int64
-             * @description The number of those components carrying neither a package identifier nor a platform enumeration, so that no scanner can match them
+             * @description The number of those components carrying neither a package identifier nor a platform enumeration
              */
             unidentified: number;
         };

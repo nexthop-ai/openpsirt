@@ -555,9 +555,9 @@ func (c *reader) spdx3Roots() {
 // document's, and where it points at nothing the document has not said when
 // it was built: an imported document's time is a value that does not move
 // between builds, so standing it in has the first scan taken and every later
-// one refused as not newer, for good. Saying nothing is refused at the door
-// instead, which is a message about this upload rather than a target that
-// quietly stops accepting them.
+// one refused as not newer, for good. Saying nothing leaves the document
+// undated, and an undated upload is dated when it arrives, which moves with
+// each build where an imported time would not.
 func (c *reader) spdx3Settle() {
 	if len(c.spdx3Creations) == 0 || !c.doc.BuiltAt.IsZero() {
 		return
