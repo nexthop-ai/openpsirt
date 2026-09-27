@@ -517,7 +517,10 @@ back in its own order rather than refusing.
 | **The row is carried with its key** | Acting on a selection then acts on what was selected rather than on the part of it the current page happens to hold. Holding keys alone, the queue counted every ticked claim in its button and approved only the ones on screen, dropping the rest with no message |
 | **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them. Every change goes through the one function that holds the rule, including removing a single chip: today every chip only ever widens, so the rule held by a property of the chips rather than by construction |
 | **A figure about a selection counts what the selection holds** | The bulk-claim screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the cap is read against |
+| **The bulk-claim form asks before skipping what is decided** | A box, unticked, reading "Skip places already decided". Ticked, the result lists each place left out with a link to the decision standing there (`DESIGN-triage.md` § Decided places). Unticked, a decided place refuses the claim and the refusal names the decision |
 | **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
+| **Assigning a selection in one product is one request** | The picked rows travel together, and the server resolves them against the same filter the list is read with. A refusal is the whole act's, so nothing is left half assigned and the selection stays as it was. Across products each row is still its own request, under the loop below (`DESIGN-access.md` § Assignment by narrowing) |
+| **Select all takes every row the filter matches** | Offered on the batch bar in one product once something is ticked, and counted by the list's total rather than the pages seen. It names no rows: the server assigns what the filter matches when the act lands. A changed filter ends it, as it clears a selection |
 | **A loop over a selection survives a refusal** | Each row is its own act, so one refusal leaves the rest to be tried and the failures stay selected with a count saying how many. Unguarded, the first refusal abandoned everything after it, left the selection reading its original size, and skipped the control that undoes what did land |
 | Searching is submitted rather than sent per keystroke | Each is a query over every open finding in the build, and a half-typed word is not a question worth asking. It matches anywhere in a component's name, ignoring capitals |
 | A component's name opens the component (reversed) | It narrowed the list, and the component itself sat behind a small "Open →" in the last column next to "Hide" — an act parked away from the thing it acts on, which is the shape the By fix view was deleted for. The name is the way to the thing; narrowing and hiding are the two small acts beside it, and they sit together. The same name on the finding screen opens the same screen, so one word means one thing everywhere it appears |
@@ -953,9 +956,15 @@ adds:
 
 The queue narrows to one product, which is what a figure on the home screen
 counts: the address carries the product it was counted for, and the line under
-the heading names it. The exports narrow the same way, so a file taken from a
-narrowed screen is the narrowed backlog. Nothing narrower is offered — a claim is
-decided in a product and no finer.
+the heading names it.
+
+A row of filters above the queue narrows it further: who proposed a claim, an
+age of seven, thirty or ninety days, a severity, an outcome and a release
+(`DESIGN-triage.md` § Queue filters). Each rides in the address, so a link
+somebody sends is the same list, and changing one clears the selection. The
+exports carry the same filters, so a file taken from a narrowed screen is the
+narrowed backlog. The filters sit on the queue proper and not on the two tabs
+about the reader's own claims.
 
 The count beside the queue on the rail, and the home screen's figure for what is
 pending your approval, add the rulings on vulnerability reports the reader may
@@ -1860,7 +1869,7 @@ Coverage of the interface is measured and reported by the gate.
 | | |
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
-| **Narrowing the review queue further than a product** | By what kind of thing is waiting, by who proposed it, by age or by severity. Narrowing by product is built, because a figure that counts one product has to open a list about that product |
+| **Narrowing the review queue by what kind of thing is waiting** | A claim awaiting agreement, a lapsed decision, a deferral that ran out and a promise past its date share one list |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
 ## Gaps the checks left

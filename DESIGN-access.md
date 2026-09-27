@@ -221,7 +221,7 @@ took about 400 ms each, so 2,000 rows took about a quarter of an hour.
 | Without the assigner right, a colleague's work stays with them | The same outcome as assigning one row at a time: the act moves what nobody holds and what is already the caller's, and says how many findings changed hands |
 | Undisclosed work refuses the whole act | Asked at the strictest visibility among the rows, across the product, inside the transaction that writes. Handing over the disclosed part alone would leave the person holding less than they were told |
 | One notification for the act | A selection of 2,000 is one thing that happened to the recipient. Nobody is told about work handed back |
-| Not bounded | An assignment changes who holds something and nothing else, and the next act moves it again. It is written as one statement per fold rather than per row, so its size follows the number of source packages rather than the number of issues |
+| Not bounded | An assignment changes who holds something and nothing else, and the next act moves it again. It is written as one statement per fold rather than per row, so its size follows the number of source packages rather than the number of issues. Every row of one switch image, 7,868 rows over 757,952 findings, commits in 35 s on SQLite, where a request per row at 400 ms is 52 minutes |
 | One product per act | The list spanning products has no single product to authorize the act against, so it assigns a row at a time |
 
 ## Session state

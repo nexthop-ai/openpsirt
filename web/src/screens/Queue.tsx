@@ -24,6 +24,7 @@ import { Paged } from "../ui/Paged";
 import { Because, called, labeled } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
 import { Count } from "../ui/Count";
+import { QueueFilters, queueNarrowing } from "./QueueFilters";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
@@ -88,15 +89,25 @@ export function Queue() {
   // ignored it answered a different question from the number that was clicked.
   const product = params.get("product") ?? "";
   const within = product ? { product } : {};
+  // What else the queue is narrowed by: who proposed a claim, its age, the
+  // severity it covers, its outcome and the release it covers.
+  const narrowing = queueNarrowing(params);
   const queue = useQuery({
-    queryKey: ["queue", aside ? 0 : offset, aside, product],
+    queryKey: ["queue", aside ? 0 : offset, aside, product, narrowing],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
           // A page when it is the list being read, one row when it is only
           // the tab's count: both sides are asked for on every visit so a tab
           // carries its number without being opened.
-          params: { query: { limit: aside ? 1 : PAGE, offset: aside ? 0 : offset, ...within } },
+          params: {
+            query: {
+              limit: aside ? 1 : PAGE,
+              offset: aside ? 0 : offset,
+              ...within,
+              ...narrowing,
+            },
+          },
         }),
       ),
   });
@@ -187,6 +198,13 @@ export function Queue() {
   const exporting = new URLSearchParams();
   if (mine) exporting.set("mine", "true");
   if (product) exporting.set("product", product);
+  if (!mine) {
+    for (const [key, value] of Object.entries(narrowing)) {
+      for (const each of Array.isArray(value) ? value : [value]) {
+        exporting.append(key, String(each));
+      }
+    }
+  }
   const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
@@ -338,6 +356,18 @@ export function Queue() {
           </span>
         </button>
       </div>
+
+      {!aside && (
+        <QueueFilters
+          params={params}
+          onAsk={(next) => {
+            // A selection is made out of the list being replaced.
+            setPicked(new Map());
+            setRefused(0);
+            setParams(next);
+          }}
+        />
+      )}
 
       {wanted > 0 && !found && (
         <div className="alert" style={{ marginBottom: 10 }}>
