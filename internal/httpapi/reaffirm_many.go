@@ -12,7 +12,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -122,9 +121,11 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 			"Only the person who made a claim may re-affirm it. Where somebody else made any of " +
 			"them the whole act is refused, naming the issues. A claim with no lapsed row that " +
 			"nothing has replaced answers as though it were not there.\n\n" +
-			"Bounded. At most 2000 claims per request, and every finding the act writes, " +
-			"across every claim, counts against `triage.together-cap`. A promise to upgrade " +
-			"is not counted. `reasoning` is required.",
+			"Bounded over the whole act, promises to upgrade aside. The issues it covers count " +
+			"against `triage.agreed-issues` where no claim goes back to an approver, and " +
+			"against `triage.review-issues` where any does; the findings it writes count " +
+			"against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is " +
+			"required.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, anyPerson, "", triageRights()...), func(ctx context.Context, input *struct {
 		Body struct {
@@ -140,14 +141,13 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-			triage.DefaultTogetherCap)
+		bounds, err := boundsFor(ctx, in)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "the limit on one action could not be read", err)
+			return nil, err
 		}
 		made, err := store.ReaffirmMany(ctx, subject, triage.ReaffirmingMany{
 			ClaimIDs: input.Body.Claims, Reasoning: input.Body.Reasoning,
-			By: subject.ID, Cap: cap,
+			By: subject.ID, Bounds: bounds,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {

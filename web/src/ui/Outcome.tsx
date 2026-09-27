@@ -49,6 +49,12 @@ const said: Record<string, { label: string; color: string; means: string }> = {
   },
 };
 
+// Every outcome the interface knows, in the order above, for a control that
+// offers them.
+export function outcomeWords(): string[] {
+  return Object.keys(said);
+}
+
 // An outcome's name in a sentence, for the places that say it in
 // prose rather than as a chip. A word this does not know is shown as it
 // arrived: a server that grows an outcome before the interface does should

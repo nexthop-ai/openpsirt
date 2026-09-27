@@ -16,7 +16,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -537,8 +536,9 @@ func registerCarrying(api huma.API, in Ingest) {
 			"nothing to agree to, and one covering nothing here has nothing to apply to; " +
 			"naming either is refused rather than skipped, because a caller that got the set " +
 			"wrong should hear so.\n\n" +
-			"A deferral is carried with the date it had, not with a fresh one. Bounded by the " +
-			"same setting that bounds every other action writing many rows.",
+			"A deferral is carried with the date it had, not with a fresh one. Bounded by how " +
+			"many issues it covers, set under `triage.review-issues`, and by how many findings " +
+			"it writes, set under `triage.write-ceiling`.",
 		Tags:          []string{"Triage"},
 		DefaultStatus: http.StatusCreated,
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -581,13 +581,12 @@ func registerCarrying(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-			triage.DefaultTogetherCap)
+		bounds, err := boundsFor(ctx, in)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell how much may be carried at once", err)
+			return nil, err
 		}
 		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
-			fromTarget.ID, toTarget.ID, input.Body.Decisions, cap)
+			fromTarget.ID, toTarget.ID, input.Body.Decisions, bounds)
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}

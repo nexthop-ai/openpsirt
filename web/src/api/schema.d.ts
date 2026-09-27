@@ -763,7 +763,7 @@ export interface paths {
          *
          *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
          *
-         *     Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
+         *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
          *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
@@ -2486,6 +2486,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/findings/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign every finding a filter matches
+         * @description Assigns every row the findings list returns for the same parameters, across all of its pages, in one request. Takes the same filters as `GET /v1/products/{product}/findings`.
+         *
+         *     Each row is assigned the way one finding is: across every build of the product, at every package the row folds together. Send `person` as an empty string to hand the rows back to nobody, or `team` to route them to a team.
+         *
+         *     `only` limits the act to rows somebody picked from the list. A picked row the filter no longer matches is not assigned; `pieces` says how many were.
+         *
+         *     Without the assigner right you may take what nobody holds and hand back your own. Rows somebody else holds are left with them, and `moved` counts only what changed hands.
+         *
+         *     Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
+         *
+         *     Requires: public-triage or private-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+         */
+        post: operations["assign-matching-findings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/findings/components": {
         parameters: {
             query?: never;
@@ -3199,7 +3229,7 @@ export interface paths {
          *
          *     `reasoning` is required on everything but a duplicate. `duplicate_of` is required on a duplicate and refused on anything else, and names an issue open in this product. A duplicate of an issue that is not open here is refused: reject the report instead.
          *
-         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`, the setting that bounds every bulk judgment.
+         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`.
          *
          *     Requires: private-triage on the product
          */
@@ -3751,7 +3781,7 @@ export interface paths {
          *
          *     Only what the preview offered. A judgment that already applies here has nothing to agree to, and one covering nothing here has nothing to apply to; naming either is refused rather than skipped, because a caller that got the set wrong should hear so.
          *
-         *     A deferral is carried with the date it had, not with a fresh one. Bounded by the same setting that bounds every other action writing many rows.
+         *     A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
          *
          *     Requires: public-triage or private-triage on the product
          */
@@ -3897,7 +3927,9 @@ export interface paths {
          *
          *     Always needs a second person to agree, whatever the outcome.
          *
-         *     Bounded. At most 2000 names per request, and a limit on how many findings one action may write, set under `triage.together-cap`. The limit is checked against the findings this resolves to, which is more than the number of names.
+         *     A place a live decision already covers refuses the whole claim, naming that decision. Send `skip_decided` to leave those places out instead; `skipped` lists each one with the decision standing there. Where every place is covered, nothing is recorded and the request is refused.
+         *
+         *     Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
          *
          *     Requires: public-triage or private-triage on the product
          */
@@ -4753,7 +4785,7 @@ export interface paths {
          *
          *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there.
          *
-         *     Bounded. At most 2000 claims per request, and every finding the act writes, across every claim, counts against `triage.together-cap`. A promise to upgrade is not counted. `reasoning` is required.
+         *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
          *     Requires: public-triage or private-triage
          */
@@ -4893,6 +4925,8 @@ export interface paths {
          *
          *     Your own claims are not here. Approving your own is refused, so a queue containing them is a list of work you cannot do. Ask for `mine=true` to see what you proposed and nobody has agreed to yet, which is a different question.
          *
+         *     Narrow by who proposed a claim, how old it is, how severe the issues it covers are, its outcome, and the release it covers. A claim is kept where one of its rows matches every filter, and is then returned whole.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-review-queue"];
@@ -4917,7 +4951,7 @@ export interface paths {
          *
          *     One row per claim, the way the screen counts them — one proposer's action, however many decisions it wrote — with how much it covers and how old it is. A backlog is reported in claims because that is the unit somebody works through.
          *
-         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question, and `product` narrows it the way the screen does.
+         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question. `product` and the other filters narrow it the way the screen does.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -6129,6 +6163,40 @@ export interface components {
             /** @description A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it */
             team?: string;
         };
+        "Assign-matching-findingsRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Assign-matching-findingsRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The rows picked from the list. Left out, every row the filter matches; an empty list is refused */
+            only?: components["schemas"]["PieceBody"][] | null;
+            /** @description Their sign-in identity, or empty for nobody */
+            person?: string;
+            /** @description A team to route the rows to instead, by name */
+            team?: string;
+        };
+        AssignedMatchingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AssignedMatchingBody.json
+             */
+            readonly $schema?: string;
+            /** @description The rows that did not wholly move, because somebody else holds part of them and you may not take it */
+            left?: components["schemas"]["PieceBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of findings that changed hands, across every build of the product. Work somebody else holds stays with them unless you may give work away
+             */
+            moved: number;
+            /**
+             * Format: int64
+             * @description The number of rows of the list this reached
+             */
+            pieces: number;
+        };
         AtComponentBody: {
             /** @description The date it runs out. The earliest among its places here, which is the one that makes it late */
             due?: string;
@@ -6698,7 +6766,7 @@ export interface components {
             place: components["schemas"]["PlaceBody"];
             /**
              * Format: int64
-             * @description The number of distinct places it wrote at. The bulk cap is measured against this
+             * @description The number of distinct places it wrote at. The ceiling on one action is measured against this
              */
             places: number;
             /** @description This was agreed to before and came back */
@@ -6990,6 +7058,8 @@ export interface components {
             reasoning: string;
             /** @description The narrowing, in your own words. Recorded, and never part of the claim */
             selected_by: string;
+            /** @description Leave out every place a live decision already covers, and list them in the response. Left out, a selection covering one is refused, naming the decision */
+            skip_decided?: boolean;
             /** @description The issues this claim covers, by name */
             vulnerabilities: string[] | null;
         };
@@ -7008,6 +7078,8 @@ export interface components {
             ids: number[] | null;
             /** Format: int64 */
             recorded: number;
+            /** @description The places left out because a live decision already covers them, where skip_decided was sent */
+            skipped?: components["schemas"]["SkippedBody"][] | null;
         };
         DecidedBody: {
             /**
@@ -8422,10 +8494,18 @@ export interface components {
              */
             readonly $schema?: string;
             /** Format: int64 */
-            cap: number;
-            /** Format: int64 */
             findings: number;
+            /**
+             * Format: int64
+             * @description The number of issues one answer here may cover
+             */
+            issue_limit: number;
             items: components["schemas"]["AtComponentBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of findings one answer here may write
+             */
+            place_limit: number;
             /** Format: int64 */
             total: number;
         };
@@ -9657,7 +9737,7 @@ export interface components {
             packages: components["schemas"]["FoldPackageBody"][] | null;
             /**
              * Format: int64
-             * @description The number of times those sit somewhere in this build. What the bulk cap is measured against
+             * @description The number of times those sit somewhere in this build. What the ceiling on one action is measured against
              */
             places: number;
             /** @description The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing */
@@ -9714,6 +9794,12 @@ export interface components {
              * @description Claims they agreed to and later took back
              */
             withdrawn: number;
+        };
+        PieceBody: {
+            /** @description The row's fold, as the findings list gives it */
+            fold: string;
+            /** @description The issue, by any name it is known under */
+            vulnerability: string;
         };
         PlaceBody: {
             /** @description The place in the build, as the findings list gives it */
@@ -11099,6 +11185,18 @@ export interface components {
             /** @description The build has already argued this place away */
             suppressed?: boolean;
         };
+        SkippedBody: {
+            /**
+             * Format: int64
+             * @description The decision standing there
+             */
+            decision: number;
+            /** @description Where it sits, as the decision names it */
+            place: string;
+            /** @description How far that decision has got */
+            state: string;
+            vulnerability: string;
+        };
         SpentBody: {
             /**
              * Format: int64
@@ -11832,7 +11930,7 @@ export interface components {
             audits?: boolean;
             /**
              * Format: int64
-             * @description The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+             * @description The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
              */
             bulk_cap?: number;
             /**
@@ -15822,6 +15920,130 @@ export interface operations {
             };
         };
     };
+    "assign-matching-findings": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product */
+                variant?: string;
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
+                differs?: boolean;
+                /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
+                across_variants?: "only" | "every";
+                /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only issues somebody is known to be exploiting */
+                exploited?: boolean;
+                /** @description Keep only issues where an upstream fixed version is known */
+                fixable?: boolean;
+                /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
+                below_floor?: boolean;
+                /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
+                component?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
+                tag?: string[] | null;
+                /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
+                q?: string;
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
+                ecosystem?: string[] | null;
+                /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
+                on?: ("branch" | "tag")[] | null;
+                /** @description Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything */
+                support?: ("in-support" | "past-eol")[] | null;
+                /** @description Keep only what sits inside the container of this name */
+                under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
+                /** @description Keep only what the build holds directly, which is what has no container above it */
+                under_build?: boolean;
+                /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
+                assigned?: ("me" | "somebody" | "nobody")[] | null;
+                /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
+                epss_at_least?: number;
+                /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
+                open_for?: number;
+                /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
+                due_within?: number;
+                /** @description Keep only what is already past its deadline */
+                overdue?: boolean;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
+                weakness?: string[] | null;
+                /** @description Keep only groups where a claim is with its author, sent back for more */
+                sent_back?: boolean;
+                /** @description Keep only what one of these VEX publishers has a standing statement about */
+                vex_publisher?: string[] | null;
+                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
+                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                closed_after?: string;
+                /** @description Keep only what somebody claimed something about after this date */
+                proposed_after?: string;
+                /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
+                vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
+                reassessed?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
+                /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
+                planned?: "planned" | "unplanned" | "either";
+                /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
+                unconfirmed?: boolean;
+                /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
+                exclude?: string[] | null;
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
+                /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
+                asc?: boolean;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Assign-matching-findingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignedMatchingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-finding-components": {
         parameters: {
             query?: {
@@ -19622,6 +19844,16 @@ export interface operations {
                 mine?: boolean;
                 /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
+                /** @description Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty */
+                proposed_by?: string;
+                /** @description Keep only claims at least this many days old */
+                older_than?: number;
+                /** @description Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only claims of these outcomes. Any of them, not all */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
+                release?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -19658,6 +19890,16 @@ export interface operations {
                 mine?: boolean;
                 /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
+                /** @description Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty */
+                proposed_by?: string;
+                /** @description Keep only claims at least this many days old */
+                older_than?: number;
+                /** @description Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only claims of these outcomes. Any of them, not all */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
+                release?: string;
             };
             header?: never;
             path: {

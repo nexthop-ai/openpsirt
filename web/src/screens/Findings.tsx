@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { overCapNotice, useBulkCap } from "../ui/bulk";
-import { useSelection } from "./useSelection";
+import { questionIn, untaken, useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
@@ -88,6 +88,10 @@ const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
 // rather than dropped, which is what would widen the list back out while the
 // chips went on saying they were on.
 const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
+
+// The most rows one assignment may name. The server takes this many picked rows
+// in one request; past it, "select all" asks by the filter and names none.
+const NAMED_AT_ONCE = 2000;
 
 // One row per issue in a component, not per place. Every filter is in the URL,
 // so a link carries what somebody is looking at; every filter is the server's,
@@ -192,6 +196,13 @@ export function Findings() {
   // Beside the hooks it belongs with: this reads the session, so it cannot sit
   // after an early return.
   const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
+  // Every row the filter matches rather than the rows ticked, for the one
+  // product the list is about. Held as the question it was chosen under, so a
+  // changed filter ends it the way it clears a selection.
+  const [everyFor, setEveryFor] = useState<string | null>(null);
+  // How many rows the last assignment left with whoever holds them.
+  const [stayed, setStayed] = useState(0);
+  const everyMatching = everyFor !== null && everyFor === questionIn(asked);
   const me = useWho();
   const [handing, setHanding] = useState("");
   // The list somebody has turned down a prepared claim for, as its address.
@@ -320,6 +331,37 @@ export function Findings() {
     // these, and invalidating on each one interleaved a list refetch between
     // every write — so the page spent a long selection refetching rather than
     // writing. The loop invalidates once when it is done.
+  });
+
+  // Handing a selection over in one request, where the list is one product's.
+  // The server resolves the rows from the same filter the list is read with,
+  // so "every row matching" is what the count above says rather than what one
+  // page held; picked rows travel as `only`.
+  const handMatching = useMutation({
+    mutationFn: async (to: { who: string; team: boolean; only?: Row[] }) =>
+      unwrap(
+        await api.POST("/v1/products/{product}/findings/assignment", {
+          params: {
+            path: { product },
+            query: Object.fromEntries(
+              Object.entries({ ...query, ...selection }).filter(
+                ([key]) => key !== "limit" && key !== "offset",
+              ),
+            ) as Record<string, never>,
+          },
+          body: {
+            ...(to.team ? { team: to.who } : { person: to.who }),
+            ...(to.only
+              ? {
+                  only: to.only.map((row) => ({
+                    vulnerability: row.vulnerability ?? "",
+                    fold: row.fold ?? "",
+                  })),
+                }
+              : {}),
+          },
+        }),
+      ),
   });
 
   const findings = useQuery({
@@ -900,6 +942,11 @@ export function Findings() {
     return <Failed error={findings.error} what="The findings could not be read." />;
   }
 
+  // What the bar counts and acts on: every row matching, or what was ticked.
+  const chosen = everyMatching ? total : picked.size;
+  const assigning = hand.isPending || handMatching.isPending;
+  const tooMany = spanning ? overCap : !everyMatching && picked.size > NAMED_AT_ONCE;
+
   // The rows on this page, in the same key the selection uses.
   const shownKeys = rows.map(
     (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
@@ -911,6 +958,36 @@ export function Findings() {
   async function handOver(to?: string) {
     const who = to ?? handing.slice(handing.indexOf(":") + 1);
     const team = to === undefined && handing.startsWith("team:");
+    if (!spanning) {
+      // One request for the lot. A refusal is the whole act's, so nothing is
+      // half done and the selection stays as it was.
+      let done;
+      try {
+        done = await handMatching.mutateAsync({
+          who,
+          team,
+          only: everyMatching ? undefined : [...picked.values()],
+        });
+      } catch {
+        return;
+      }
+      // What somebody else holds stays with them, and stays selected, so the
+      // rows the act did not take are the ones still ticked.
+      const kept = untaken(picked, done.left ?? []);
+      clearPicked();
+      if (kept.length > 0) {
+        pickAll(
+          kept.map(([, row]) => row),
+          kept.map(([key]) => key),
+          true,
+        );
+      }
+      setStayed((done.left ?? []).length);
+      setEveryFor(null);
+      reread();
+      setHanding("");
+      return;
+    }
     await through((row: Row) => hand.mutateAsync({ row, who, team }));
     // Once, after the loop. On every write it put a list refetch between each
     // of them, so a long selection spent its time refetching.
@@ -951,19 +1028,40 @@ export function Findings() {
             : `${handFailed.toLocaleString()} rows could not be handed over and are still selected.`}
         </p>
       )}
+      {stayed > 0 && (
+        <p className="alert" role="status">
+          {stayed === 1
+            ? "One row is held by somebody else and was not taken."
+            : `${stayed.toLocaleString()} rows are held by somebody else and were not taken.`}
+        </p>
+      )}
+      {handMatching.error != null && (
+        <Failed error={handMatching.error} what="That could not be assigned." />
+      )}
       {picked.size > 0 && (
         <div className="batchbar" style={{ marginBottom: 8 }}>
           <span>
-            <b>{picked.size.toLocaleString()} selected</b>
+            <b>{chosen.toLocaleString()} selected</b>
           </span>
-          <span className="hint">across pages</span>
-          {/* The bound the deployment sets on one action, said here rather
-              than met one refusal at a time: handing over is a request per
-              row, so an unbounded selection is one click turning into as many
-              round trips as the filter matched. */}
-          {overCap && (
+          <span className="hint">{everyMatching ? "every row matching" : "across pages"}</span>
+          {!spanning && !everyMatching && total > picked.size && (
+            <button
+              type="button"
+              className="linkish"
+              onClick={() => setEveryFor(questionIn(asked))}
+            >
+              {`Select all ${total.toLocaleString()}`}
+            </button>
+          )}
+          {/* The bound on a selection sent row by row, said here rather than
+              met one refusal at a time. Across products each row is its own
+              request; in one product the rows travel in one request that
+              names at most so many. */}
+          {tooMany && (
             <span className="alert" role="status">
-              {overCapNotice(bulkCap)}
+              {spanning
+                ? overCapNotice(bulkCap)
+                : `${NAMED_AT_ONCE.toLocaleString()} at a time. Select all instead.`}
             </span>
           )}
           <span className="spacer" />
@@ -973,10 +1071,10 @@ export function Findings() {
           <button
             type="button"
             className="btn"
-            disabled={me.data?.identity == null || hand.isPending || overCap}
+            disabled={me.data?.identity == null || assigning || tooMany}
             onClick={() => void handOver(me.data!.identity)}
           >
-            {`Take ${picked.size}`}
+            {`Take ${chosen.toLocaleString()}`}
           </button>
           {/* One lookup rather than a list of people beside a list of teams:
               both are parties, and at a hundred people a select is a list
@@ -998,12 +1096,19 @@ export function Findings() {
           <button
             type="button"
             className="btn"
-            disabled={!handing || hand.isPending || overCap}
+            disabled={!handing || assigning || tooMany}
             onClick={() => void handOver()}
           >
-            {hand.isPending ? "Assigning…" : `Assign ${picked.size}`}
+            {assigning ? "Assigning…" : `Assign ${chosen.toLocaleString()}`}
           </button>
-          <button type="button" className="linkish" onClick={clearPicked}>
+          <button
+            type="button"
+            className="linkish"
+            onClick={() => {
+              clearPicked();
+              setEveryFor(null);
+            }}
+          >
             Clear
           </button>
         </div>

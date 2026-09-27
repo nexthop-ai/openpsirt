@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import type { paths } from "../api/schema";
 import { usePaging } from "./list";
 import { unwrap, whichOf } from "../api/queries";
@@ -32,6 +32,16 @@ const PAGE = 500;
 type Claimed = NonNullable<
   paths["/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions"]["post"]["requestBody"]
 >["content"]["application/json"];
+
+// A place a claim left out because a decision already stands there.
+type Skipped = Body<"SkippedBody">;
+
+// What the result says about the places a claim left out.
+export function skippedNotice(n: number): string {
+  return n === 1
+    ? "1 place skipped: a decision already stands there."
+    : `${n.toLocaleString()} places skipped: a decision already stands at each.`;
+}
 
 // One judgment about many issues at one component. The transpose of the usual
 // grouping: one issue across many places is what a decision already covers,
@@ -107,7 +117,10 @@ export function Together() {
   // every render would merge on every render.
   const items = useMemo(() => issues.data?.items ?? [], [issues.data]);
   const everything = issues.data?.total ?? items.length;
-  const cap = issues.data?.cap ?? 0;
+  // The two limits one answer is held to: issues, which is what the approver
+  // reads, and findings written.
+  const issueLimit = issues.data?.issue_limit ?? 0;
+  const placeLimit = issues.data?.place_limit ?? 0;
 
   // The selection's reach, in rows written rather than issues picked.
   //
@@ -133,7 +146,9 @@ export function Together() {
     everySelected || unseen
       ? (issues.data?.findings ?? 0)
       : [...picked].reduce((sum, name) => sum + (reach.get(name) ?? 0), 0);
-  const over = cap > 0 && writing > cap;
+  const overIssues = issueLimit > 0 && picked.size > issueLimit;
+  const overPlaces = placeLimit > 0 && writing > placeLimit;
+  const over = overIssues || overPlaces;
 
   // Everything the filter matches, not everything on the page. Fetched in one
   // request at the largest page the server offers, and repeated until the set
@@ -251,16 +266,15 @@ export function Together() {
             </button>
           </div>
 
-          {/* What it would write, said before anybody types a reasoning. The
-              bound is on findings and the list counts issues, so a screen that
-              said only the second reports 44 where the answer is 2,000. */}
+          {/* What it would write, said before anybody types a reasoning, beside
+              the two limits it is held to. */}
           {picked.size > 0 && (
             <p className={over ? "alert warn" : "hint"} style={{ margin: "0 0 10px" }}>
               {picked.size.toLocaleString()} {picked.size === 1 ? "issue" : "issues"} ·{" "}
               <b>{writing.toLocaleString()}</b> {writing === 1 ? "finding" : "findings"} would be
               written
-              {cap > 0 && <> · the limit here is {cap.toLocaleString()}</>}
-              {over && <> — narrow the selection or raise the limit.</>}
+              {overIssues && <> · limit {issueLimit.toLocaleString()} issues</>}
+              {overPlaces && <> · limit {placeLimit.toLocaleString()} findings</>}
             </p>
           )}
 
@@ -365,6 +379,7 @@ export function Together() {
             pending={decide.isPending}
             error={decide.error}
             recorded={decide.data?.recorded}
+            skipped={decide.data?.skipped ?? []}
             draftKey={draftKey}
             mentions={{ product }}
           />
@@ -381,6 +396,7 @@ function Claim({
   pending,
   error,
   recorded,
+  skipped,
   draftKey,
   mentions,
 }: {
@@ -390,6 +406,7 @@ function Claim({
   pending: boolean;
   error: unknown;
   recorded?: number;
+  skipped: Skipped[];
   draftKey: string;
   mentions: { product: string };
 }) {
@@ -405,6 +422,9 @@ function Claim({
   const [until, setUntil] = useState("");
   const [fixedVersion, setFixedVersion] = useState("");
   const [reasoning, setReasoning] = useState("");
+  // Off by default: a selection covering something already decided is
+  // refused, naming the decision, unless the person asks to leave it out.
+  const [skipDecided, setSkipDecided] = useState(false);
 
   const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
   // A correction carries past every version bump, so it takes only the two
@@ -522,12 +542,37 @@ function Claim({
           />
         </div>
 
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={skipDecided}
+            onChange={(event) => setSkipDecided(event.target.checked)}
+          />
+          Skip places already decided
+        </label>
+
         {error != null && <Failed error={error} what="That could not be recorded." />}
         {typeof recorded === "number" && recorded > 0 && (
           <p className="alert info" role="status">
             <strong>{recorded.toLocaleString()} records written — one per issue, per place.</strong>
             <span>One claim, pending a second person; each record expires on its own.</span>
           </p>
+        )}
+        {typeof recorded === "number" && skipped.length > 0 && (
+          <div className="alert" role="status">
+            <strong>{skippedNotice(skipped.length)}</strong>
+            <ul>
+              {skipped.map((each) => (
+                <li key={`${each.vulnerability} ${each.place}`}>
+                  {each.vulnerability} at <span className="id">{each.place}</span> —{" "}
+                  <Link to={`/decisions/${each.decision}`} className="linkish">
+                    decision {each.decision}
+                  </Link>{" "}
+                  ({each.state})
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div>
@@ -546,6 +591,7 @@ function Claim({
                 // was named, so an approver has something to check rather
                 // than only something to read.
                 ...(narrowed ? { contains: narrowed } : {}),
+                ...(skipDecided ? { skip_decided: true } : {}),
                 reasoning,
               });
             }}

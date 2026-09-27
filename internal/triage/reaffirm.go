@@ -865,12 +865,12 @@ type ReaffirmingClaim struct {
 	// which is what makes it one thing a second person can read.
 	Reasoning string
 	By        int64
-	// Cap bounds a re-affirmed judgment, which this mostly is: the outcome
+	// Bounds bound a re-affirmed judgment, which this mostly is: the outcome
 	// comes from the claim being re-made, so re-affirming a bulk dismissal
 	// comes through here. A promise carries no bound, because the next scan
-	// re-checks it; nothing re-checks a dismissal, which is the reason the cap
-	// exists (REQ-27).
-	Cap int
+	// re-checks it; nothing re-checks a dismissal, which is the reason the
+	// bound exists (REQ-27).
+	Bounds Bounds
 }
 
 // Reaffirmed is what one bulk re-affirmation did.
@@ -943,7 +943,9 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		if err := permitted(subject, plan.proposals, s.now()); err != nil {
 			return Reaffirmed{}, err
 		}
-	} else if err := allowed(subject, plan.proposals, r.Cap, s.now()); err != nil {
+	} else if err := permitted(subject, plan.proposals, s.now()); err != nil {
+		return Reaffirmed{}, err
+	} else if err := r.Bounds.check(plan.proposals); err != nil {
 		return Reaffirmed{}, err
 	}
 	return s.writeReaffirm(ctx, plan)

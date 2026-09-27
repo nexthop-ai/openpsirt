@@ -137,3 +137,14 @@ export function useSelection(asked: URLSearchParams): {
 
   return { picked, pick, pickAll, clear, asking, failed, through };
 }
+
+// The picked rows an act did not take, named by the issue and fold the server
+// reports as left where it was. Those stay selected, so what is still ticked
+// after the act is exactly what it did not reach.
+export function untaken(
+  picked: Map<string, Row>,
+  left: readonly { vulnerability: string; fold: string }[],
+): [string, Row][] {
+  const stayed = new Set(left.map((each) => `${each.vulnerability} ${each.fold}`));
+  return [...picked].filter(([, row]) => stayed.has(`${row.vulnerability} ${row.fold}`));
+}

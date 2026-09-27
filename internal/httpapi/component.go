@@ -44,7 +44,7 @@ type PerBuildBody struct {
 	// fold, and what varies underneath it is the set of consumers pulling the
 	// package in.
 	Consumers int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
-	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the bulk cap is measured against"`
+	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
 	// Upgrades are the versions this build could move to.
 	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets"`
 	DueAt    *time.Time    `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`

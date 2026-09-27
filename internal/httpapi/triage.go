@@ -10,12 +10,14 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -267,6 +269,53 @@ type QueueOutput struct {
 	}
 }
 
+// QueueNarrowing is the filters the review queue and its export both take.
+type QueueNarrowing struct {
+	ProposedBy string    `query:"proposed_by" maxLength:"191" doc:"Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
+	OlderThan  int       `query:"older_than" minimum:"1" doc:"Keep only claims at least this many days old"`
+	Severity   string    `query:"severity" enum:"low,medium,high,critical" doc:"Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
+	Outcome    []outcome `query:"outcome,explode" doc:"Keep only claims of these outcomes. Any of them, not all"`
+	Release    string    `query:"release" maxLength:"191" doc:"Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
+}
+
+// filter turns the queue's parameters into the store's narrowing.
+//
+// Authorized before the proposer's name is resolved, which the caller has
+// done by reaching here: a name nobody holds and a name somebody holds both
+// narrow the queue, to nothing where they proposed nothing, so the answer
+// says nothing about who has an account.
+func (n QueueNarrowing) filter(ctx context.Context, in Ingest, subject access.Subject,
+	mine bool, product string) (triage.QueueFilter, error) {
+
+	within, err := narrowedTo(ctx, in, subject, product)
+	if err != nil {
+		return triage.QueueFilter{}, err
+	}
+	filter := triage.QueueFilter{
+		Mine: mine, ProductID: within,
+		Severities: finding.AtLeast(n.Severity),
+		Release:    n.Release,
+	}
+	for _, each := range n.Outcome {
+		filter.Outcomes = append(filter.Outcomes, triage.Outcome(each))
+	}
+	if n.OlderThan > 0 {
+		before := time.Now().UTC().AddDate(0, 0, -n.OlderThan)
+		filter.ProposedBefore = &before
+	}
+	if who := strings.TrimSpace(n.ProposedBy); who != "" {
+		filter.ProposedBy = []int64{}
+		person, err := access.NewStore(in.DB.DB).ByIdentity(ctx, who)
+		switch {
+		case err == nil:
+			filter.ProposedBy = append(filter.ProposedBy, person.ID)
+		case !errors.Is(err, access.ErrNoSuchPerson):
+			return filter, wentWrong(in.Logger, "who proposed these could not be read", err)
+		}
+	}
+	return filter, nil
+}
+
 func registerTriage(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-review-queue", Method: http.MethodGet, Path: "/v1/review-queue",
@@ -283,24 +332,28 @@ func registerTriage(api huma.API, in Ingest) {
 			"`POST /v1/claims/{id}/send-back`.\n\n" +
 			"Your own claims are not here. Approving your own is refused, so a queue " +
 			"containing them is a list of work you cannot do. Ask for `mine=true` to see what " +
-			"you proposed and nobody has agreed to yet, which is a different question.",
+			"you proposed and nobody has agreed to yet, which is a different question.\n\n" +
+			"Narrow by who proposed a claim, how old it is, how severe the issues it covers " +
+			"are, its outcome, and the release it covers. A claim is kept where one of its " +
+			"rows matches every filter, and is then returned whole.",
 		Tags: []string{"Triage"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Mine    bool   `query:"mine" doc:"Return what you proposed and nobody has agreed to, instead of what is waiting on you"`
 		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset  int    `query:"offset" minimum:"0"`
+		QueueNarrowing
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0"`
 	}) (*QueueOutput, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		within, err := narrowedTo(ctx, in, subject, input.Product)
+		filter, err := input.filter(ctx, in, subject, input.Mine, input.Product)
 		if err != nil {
 			return nil, err
 		}
 
-		waiting, total, err := store.Queue(ctx, subject, input.Mine, within, input.Limit, input.Offset)
+		waiting, total, err := store.Queue(ctx, subject, filter, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the review queue could not be read", err)
 		}

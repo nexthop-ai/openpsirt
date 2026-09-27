@@ -245,7 +245,7 @@ func TestADecisionIsReadAndAgreedToAtTheVisibilityHeldInItsOwnProduct(t *testing
 			t.Errorf("the record shows claims %v, want %v", read, want)
 		}
 
-		waiting, _, err := f.store.Queue(ctx, mixed, false, 0, 50, 0)
+		waiting, _, err := f.store.Queue(ctx, mixed, triage.QueueFilter{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -276,7 +276,7 @@ func TestAClaimWithARowTheReaderMayNotAgreeToIsNotWaitingOnThem(t *testing.T) {
 		privateApprover := f.holding(t, "private-approver", map[int64][]access.Role{
 			f.product: {access.PrivateRead, access.Approver},
 		})
-		waiting, total, err := f.store.Queue(ctx, privateApprover, false, 0, 50, 0)
+		waiting, total, err := f.store.Queue(ctx, privateApprover, triage.QueueFilter{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -298,7 +298,7 @@ func TestAClaimWithARowTheReaderMayNotAgreeToIsNotWaitingOnThem(t *testing.T) {
 		both := f.holding(t, "approver-of-both", map[int64][]access.Role{
 			f.product: {access.PublicRead, access.PrivateRead, access.Approver},
 		})
-		if _, total, err := f.store.Queue(ctx, both, false, 0, 50, 0); err != nil || total != 3 {
+		if _, total, err := f.store.Queue(ctx, both, triage.QueueFilter{}, 50, 0); err != nil || total != 3 {
 			t.Errorf("an approver at both visibilities is asked about %d claims (%v), want 3", total, err)
 		}
 	})

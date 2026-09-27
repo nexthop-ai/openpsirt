@@ -263,7 +263,7 @@ what became of it, what it wrote, and what it covers now.
 |---|---|
 | **What it says** | The outcome, the reason, the mitigation, the dates, the version an upgrade moves to, and the justification as it stands — the claim's, however many rows it wrote. It names no decision and carries no row state |
 | **What became of it** | One word over every row, the same word the proposer's own list reads, with when it became that and who did it. A claim whose rows did not all end the same way is said to be mixed rather than reported as whichever came first. A claim marked as having come back is one with an approval on record that is not standing on one — asked of a claim that is currently approved, "was this ever approved" answers about the agreement being read |
-| **What it wrote** | Rows, distinct issues, distinct places. The place count is what the bulk cap is measured against |
+| **What it wrote** | Rows, distinct issues, distinct places |
 | **Present reach** | Folds, packages, consumers and findings, matched the way a finding asks whether a decision applies to it, and every build it reaches |
 
 | Rule | |
@@ -552,6 +552,20 @@ that not looking is a choice rather than an omission.
 A claim that needed nobody — a deferral under the threshold — is not here at all,
 by the same rule that keeps unreachable work out.
 
+### Queue filters
+
+The queue and its export take the same filters. A claim is kept where one of its
+waiting rows satisfies every filter, and is then shown whole.
+
+| Filter | Meaning |
+|---|---|
+| Product | Claims made in one product |
+| Proposer | Claims one person made, by sign-in identity. A name nobody holds leaves the queue empty, so a filter that could not be applied never reads as one that worked, and the answer is the same whether the name exists or not |
+| Age | Claims proposed at least this many days ago, on the clock the age beside each entry is read from |
+| Severity | Claims covering an issue rated this badly or worse by the rating in force in the claim's product |
+| Outcome | Claims of these outcomes |
+| Release | Claims currently covering an open finding in a branch or tag of this name, by the match that names the builds a claim covers, narrowed to the findings the reader may see. A decision names no release, so a claim with nothing open under it in a release is not about that release |
+
 ## Claim outcomes
 
 A person's own page of what they proposed and what happened to it.
@@ -803,17 +817,17 @@ in drivers a given image never builds.
 | What is exploited or critical can be excluded before claiming | Take the bulk, hand-triage the handful the judgment should not cover |
 | **A candidate row says what a single finding's row says** | The identifier, the severity and a place count was the whole of it — while the narrowing matches the report's text, which the row did not show. Deciding many on less evidence than deciding one is the wrong way round, so each carries what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, the version that fixes it and the earliest deadline among its places |
 | It always needs a second person, whatever the outcome | The short-deferral exception is about one finding somebody is putting off for a fortnight; one person answering hundreds in a single action is the case a second pair of eyes exists for |
-| Two limits: how many issues a request may name, and how many findings it may write | Each name may sit at many places, so a limit checked against the names would let a request naming two thousand issues write sixty thousand rows |
-| **The bound is reversibility, not size** | A judgment is bounded because nothing re-checks it: one sentence answering a thousand findings has to stay a size a reviewer can follow. A promise to upgrade is not, because the next scan re-checks every row it names, and narrowing one makes the record false — the bump closes what it closes. One cap governed both, and the highest-value action in a real image was refused by a factor of twenty-two while the only escape raised the guard on the dismissal path |
+| **Counted in issues, with a ceiling on places** (REQ-27) | A reviewer reads issues, so the limit a second person is held to counts them: 200 by default. The places written are bounded separately by a ceiling, 50,000 by default, which guards the write rather than the reader. Both are counted over what the names resolve to, never over the names |
+| **The limit follows what a reviewer has to read** | A new answer always goes to a second person and takes the reviewer's limit. Re-affirming answers takes a larger limit, 2,000 issues by default, only where nothing in the act goes back to an approver; one that does takes the reviewer's. Answers carried onto another line always go back, so they take the reviewer's |
+| **The bound is reversibility, not size** | A judgment is bounded because nothing re-checks it: one sentence answering a thousand findings has to stay a size a reviewer can follow. A promise to upgrade is not, because the next scan re-checks every row it names, and narrowing one makes the record false — the bump closes what it closes |
+| Other acts keep a limit of their own | How many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time. Those bound a reading or a loop rather than a review, so they are counted in rows, 2,000 by default |
 
-The candidate list carries both numbers and the limit: how many issues the
-narrowing holds, how many findings those sit at, and how many one action may
-write. The second is counted over the whole narrowed set rather than summed from
-a page. The screen counted in issues while the cap counted in findings, so a
-kernel issue sitting at 45 places made a cap of two thousand mean about
-forty-four issues, discovered after typing the reasoning. Measured on a real
-image, 805 candidates narrowed by hand became eighteen separate claims, each
-with its own outlier table.
+The candidate list carries both numbers and both limits: how many issues the
+narrowing holds, how many findings those sit at, how many issues one answer may
+cover, and how many findings it may write. The findings are counted over the
+whole narrowed set rather than summed from a page. A kernel issue sits at about
+45 places, so a limit of 2,000 places is 44 issues. The 805 kernel candidates on
+a real image are five answers at 200 issues.
 
 Whatever is offered to narrow the set — a weakness class, a subsystem named in
 advisory text — is a starting point for a person, never a selection the tool
@@ -835,6 +849,21 @@ claimant's words, and as something an approver can re-run.
 | Read with the same visibility rule the candidate list used | Two numbers compared against each other have to be counts of the same population |
 | It is evidence, and refuses nothing | A person may legitimately claim about part of what a narrowing returns — that is what picking from the list is. What was missing was any way for the approver to see that they had |
 | The claimant's own sentence is kept | It says what they meant, which the counts do not |
+
+### Decided places
+
+A selection covering a place a live decision already covers is refused whole by
+default, naming that decision (§ One live claim per key). The claimant may ask
+instead for those places to be left out.
+
+| Rule | |
+|---|---|
+| Skipping is asked for | Skipping silently covers less than was selected. Refusing tells somebody holding five hundred rows which decision to go and read |
+| What was skipped is returned | Each place, by the issue's name, with the decision standing there and how far it has got. A claim smaller than its selection is visible to the person who made it |
+| A place counts as decided under either key | The question the unique index answers: a live decision at the versions, or a correction standing at any version. A place skipping keeps is one the index accepts |
+| The bounds count what is written | Skipped places are not written, so a selection within the limits once they are left out is not refused for them |
+| Every place decided refuses the request | Nothing is recorded. A claim with no rows is not something a second person can agree to |
+| The approver sees the rows the claim wrote | What was skipped is not recorded on the claim. The narrowing's two counts still compare the issues named with the issues the narrowing reaches |
 
 ## Fix bundles
 
@@ -1116,7 +1145,7 @@ One act re-makes several lapsed claims of one person's.
 | A second person is decided per claim | Each claim carries its own earlier agreement, so one that needs a second look says nothing about the others. Within a claim, any row escalating still sends the whole claim back (REQ-28) |
 | A claim somebody else made refuses the whole act, naming its issues | Re-affirming is the claimant's right. Named, the rows can be taken out of the selection |
 | Authorization is asked of every row before anything is said about who made it | A claim the subject may not act on answers as though it were not there (REQ-42) |
-| The cap counts every judgment the act writes, across every claim | Bound what is written. Held per claim, many claims each under the cap write as much as they like under one sentence (REQ-27). A promise to upgrade is not counted |
+| The limits count every judgment the act writes, across every claim | Bound what is written. Held per claim, many claims each under the limit write as much as they like under one sentence (REQ-27). The larger issue limit holds only where no claim goes back to an approver. A promise to upgrade is not counted |
 | Refused whole or written whole | One transaction. A selection half re-made is a selection somebody has to work out again |
 
 The response says, per claim, which claim lapsed, which re-makes it, and whether

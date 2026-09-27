@@ -177,7 +177,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// component two things pull in doubles what a request naming a long
 		// list of builds writes.
 		cap, err := setting.NewStore(tx).Count(ctx,
-			setting.TogetherCap, setting.DefaultTogetherCap)
+			setting.WriteCeiling, setting.DefaultWriteCeiling)
 		if err != nil {
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}

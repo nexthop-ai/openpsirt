@@ -114,18 +114,31 @@ const (
 	OwnDueHigh      = "remediation.own.due.high"
 	OwnDueMedium    = "remediation.own.due.medium"
 	OwnDueLow       = "remediation.own.due.low"
-	// TogetherCap is how many findings one bulk judgment may cover at
-	// once, and how many reports one ruling may cover. A bound rather than none, because a single action writing an
-	// unbounded number of rows is a denial of service somebody triggers by
-	// accident. How generous it should be is a judgment about a product — a
-	// kernel's list is long — so it is tuned here rather than compiled in.
+	// TogetherCap is how many reports one ruling may cover, how many places
+	// one answer about one issue may cover, and how many rows a screen acts
+	// on one request at a time. A bound rather than none, because a single
+	// action writing an unbounded number of rows is a denial of service
+	// somebody triggers by accident. An answer about many issues at once is
+	// bounded by the three settings below instead.
 	//
 	// A promise to upgrade is not bounded by this, and by nothing else
 	// either. The distinction is reversibility rather than size: nothing
-	// re-checks a dismissal, so one sentence answering a thousand findings has
-	// to stay a size a reviewer can follow, while the next scan re-checks
-	// every row a promise names.
+	// re-checks a dismissal, while the next scan re-checks every row a
+	// promise names.
 	TogetherCap = "triage.together-cap"
+	// ReviewIssues is how many issues one act may answer where a second
+	// person has to agree to it: a new answer about many issues at once, or
+	// one carried or re-confirmed that goes back to an approver. It counts
+	// issues rather than places, because issues are what a reviewer reads.
+	ReviewIssues = "triage.review-issues"
+	// AgreedIssues is how many issues one re-confirmation may answer where
+	// nothing in it goes back to an approver: every row carries an agreement
+	// already given, so nobody is asked to read anything new.
+	AgreedIssues = "triage.agreed-issues"
+	// WriteCeiling is how many findings one act answering many issues, or
+	// recording a flaw of our own, may write. A guard against a runaway write
+	// rather than a size a reviewer reads.
+	WriteCeiling = "triage.write-ceiling"
 	// QuietAfter is how long a declared build may go without a scan arriving
 	// before it is reported as having gone quiet.
 	//
@@ -355,19 +368,31 @@ const DefaultRoutingBatch = 2000
 // hundred is a suspicious number.
 const DefaultSavedPerPerson = 100
 
-// DefaultTogetherCap is how many rows one bulk judgment may write where nobody
-// has said.
+// DefaultTogetherCap is how many rows one ruling, one answer about one issue,
+// or one screen's loop may reach where nobody has said.
 //
-// Generous, because the case this exists for is a kernel: a real image put
-// 305,487 findings against one, and a person narrowing that down to the
-// drivers their build does not include is doing the right thing with a long
-// list. The bound is there because an unbounded write is something somebody
-// triggers by accident, not because two thousand is a suspicious number.
+// The bound is there because an unbounded write is something somebody
+// triggers by accident, and because one click that becomes a request per row
+// has to stay a size a screen can finish.
+const DefaultTogetherCap = 2000
+
+// DefaultReviewIssues is how many issues a second person is asked to read in
+// one act where nobody has said. A kernel answer over 805 issues is five acts
+// at this, where counting places made it eighteen.
+const DefaultReviewIssues = 200
+
+// DefaultAgreedIssues is how many issues one re-confirmation of answers
+// already agreed to may cover where nobody has said.
+const DefaultAgreedIssues = 2000
+
+// DefaultWriteCeiling is how many findings one such act may write where nobody
+// has said.
 //
 // Here rather than in the package that first needed it, because the packages
 // that read it cannot all see each other: recording a flaw bounds what it
-// opens, and a finding cannot import a triage decision.
-const DefaultTogetherCap = 2000
+// opens, and a finding cannot import a triage decision. Measured writes of 243,950 rows commit in 8 to 24 seconds across
+// the four engines, so this is well inside what a transaction bears.
+const DefaultWriteCeiling = 50000
 
 // DefaultQueueBacklog is how much work of one kind may wait where nobody has
 // said.

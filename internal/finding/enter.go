@@ -337,7 +337,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// in is two rows per build, and a widely vendored one across a long
 		// list of builds is a large write from a small request.
 		cap, err := setting.NewStore(tx).Count(ctx,
-			setting.TogetherCap, setting.DefaultTogetherCap)
+			setting.WriteCeiling, setting.DefaultWriteCeiling)
 		if err != nil {
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}

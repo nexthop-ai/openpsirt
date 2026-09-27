@@ -5,13 +5,16 @@ package triage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -20,15 +23,12 @@ import (
 // One decision covering everything at one component.
 //
 // A distinct act with its own resolution: the places are worked out from a
-// component and a build rather than named, the bound is on how many places one
-// action may cover, and what comes back is one claim however many it reached.
+// component and a build rather than named, the bounds are on how many issues
+// a reviewer reads and how many findings are written, and what comes back is
+// one claim however many it reached.
 
-// DefaultTogetherCap is how many findings one action may claim about when
-// nobody has set a limit.
-//
-// The same number every other bounded write falls back to, read from where the
-// setting itself is declared: recording a flaw bounds what it opens by this
-// too, and a finding cannot import a triage decision.
+// DefaultTogetherCap is how many places one answer about one issue may cover
+// when nobody has set a limit, read from where the setting itself is declared.
 const DefaultTogetherCap = setting.DefaultTogetherCap
 
 // allowed is what every proposal in a bulk judgment has to satisfy before
@@ -47,6 +47,80 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 			"or raise the limit deliberately", len(proposals), cap)
 	}
 	return permitted(subject, proposals, now)
+}
+
+// Bounds are the limits on one act that answers many issues at once
+// (REQ-27): a new answer about many issues, a re-confirmation of answers that
+// lapsed, and answers carried onto another line.
+//
+// Issues are counted where places are not, because a reviewer reads issues: a
+// kernel issue sits at about 45 places, so a limit of 2,000 places is 44
+// issues. Places are bounded separately, by a ceiling that guards the write
+// rather than the reader.
+type Bounds struct {
+	// Review is how many issues an act may answer where anything in it goes
+	// to a second person.
+	Review int
+	// Agreed is how many issues an act may answer where nothing in it does:
+	// every row carries an agreement already given.
+	Agreed int
+	// Places is how many findings any such act may write.
+	Places int
+}
+
+// DefaultBounds is the shipped limits, for where nobody has said.
+func DefaultBounds() Bounds {
+	return Bounds{
+		Review: setting.DefaultReviewIssues, Agreed: setting.DefaultAgreedIssues,
+		Places: setting.DefaultWriteCeiling,
+	}
+}
+
+// orDefaults fills in a limit left unset. Zero is not unbounded: an act that
+// answers many issues is always bounded.
+func (b Bounds) orDefaults() Bounds {
+	shipped := DefaultBounds()
+	if b.Review <= 0 {
+		b.Review = shipped.Review
+	}
+	if b.Agreed <= 0 {
+		b.Agreed = shipped.Agreed
+	}
+	if b.Places <= 0 {
+		b.Places = shipped.Places
+	}
+	return b
+}
+
+// check refuses an act past its bounds, counted over what it is about to
+// write. The issue limit is the reviewer's where any row goes to a second
+// person, and the larger one only where none does.
+func (b Bounds) check(proposals []Proposal) error {
+	issues := map[[2]int64]bool{}
+	review := false
+	for _, p := range proposals {
+		issues[[2]int64{p.Place.ProductID, p.Place.VulnerabilityID}] = true
+		review = review || p.NeedsApproval
+	}
+	return b.counted(len(issues), len(proposals), review)
+}
+
+// counted is check over counts already taken.
+func (b Bounds) counted(issues, places int, review bool) error {
+	b = b.orDefaults()
+	if places > b.Places {
+		return fmt.Errorf("that is %d findings and one action here writes at most %d: narrow "+
+			"the selection, or raise the limit deliberately", places, b.Places)
+	}
+	if review && issues > b.Review {
+		return fmt.Errorf("that is %d issues and a second person is asked to read at most %d "+
+			"in one action: split it, or raise the limit deliberately", issues, b.Review)
+	}
+	if !review && issues > b.Agreed {
+		return fmt.Errorf("that is %d issues and one action here re-confirms at most %d: "+
+			"split it, or raise the limit deliberately", issues, b.Agreed)
+	}
+	return nil
 }
 
 // permitted is everything except the bound: may this subject decide here, is
@@ -95,6 +169,20 @@ type TogetherAt struct {
 	// claimant's prose is how many issues that narrowing reaches, against how
 	// many were named.
 	Contains string
+	// SkipDecided leaves out every place a live decision already covers,
+	// where the claimant asked for that. Unset, a selection covering one is
+	// refused whole, naming the decision, because it is a selection somebody
+	// should look at again.
+	SkipDecided bool
+}
+
+// Skipped is a place a bulk judgment left out because a live decision already
+// covers it, and the decision that does.
+type Skipped struct {
+	VulnerabilityID int64
+	PlaceIdentity   string
+	DecisionID      int64
+	State           State
 }
 
 // resolved is a place a judgment is about to be written against, with how bad
@@ -123,18 +211,22 @@ type resolved struct {
 // whether this person may make the claim at all; read before the transaction,
 // they would be answers about a database that has since moved.
 //
-// Bounded, because one action writing an unbounded number of rows is a denial
-// of service somebody triggers by accident. The bound is checked against the
-// places this actually resolves to — the count somebody is asked to narrow is
-// the number of rows about to be written, not the number of names they typed.
-func (s *Store) Together(ctx context.Context, subject access.Subject, at TogetherAt, p Proposal,
-	cap int) (claimID int64, recorded []int64, err error) {
+// Bounded twice, over what this actually resolves to rather than the names
+// typed: by how many issues a second person is asked to read, and by how many
+// findings one action may write.
+//
+// What is skipped where the claimant asked for places already decided to be
+// left out is said rather than dropped: a claim covering less than was
+// selected is one the claimant has to be able to see is smaller, and which
+// decision stands at each place is where they go next.
+func (s *Store) Together(ctx context.Context, subject access.Subject, at TogetherAt,
+	p Proposal, bounds Bounds) (claimID int64, recorded []int64, skipped []Skipped, err error) {
 
 	if len(at.VulnerabilityIDs) == 0 {
-		return 0, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
+		return 0, nil, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
 	}
 	if p.By != subject.ID {
-		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return 0, nil, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
 	// attempted is what the write was about, kept so a refusal can be read
@@ -149,6 +241,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		// failed would report claims that no longer exist.
 		recorded = recorded[:0]
 		attempted = nil
+		skipped = nil
 		claimID = 0
 
 		// The fold, resolved inside the transaction that writes like
@@ -167,16 +260,20 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		if len(places) == 0 {
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
 		}
-		// A bulk judgment is bounded, so an unset cap is the shipped number
-		// rather than none: the siblings that take this argument fill it in
-		// the same way, and this one read "zero means unbounded" — which is
-		// the one reading the rule does not have.
-		if cap <= 0 {
-			cap = DefaultTogetherCap
+		if at.SkipDecided {
+			if places, skipped, err = within.leavingDecided(ctx, places); err != nil {
+				return err
+			}
+			if len(places) == 0 {
+				return ErrAllDecided
+			}
 		}
-		if len(places) > cap {
-			return fmt.Errorf("that is %d findings and the limit here is %d: narrow the "+
-				"selection, or raise the limit deliberately", len(places), cap)
+		// Bounded over what is about to be written: the places resolved,
+		// less any skipped, and the issues they sit under. Always the
+		// reviewer's issue limit, because this always goes to a second
+		// person.
+		if err := bounds.counted(issuesIn(places), len(places), true); err != nil {
+			return err
 		}
 
 		// The narrowing as something other than the claimant's word for it,
@@ -224,9 +321,82 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return nil
 	})
 	if err != nil {
-		return 0, nil, s.alreadyDecided(ctx, err, placesOf(attempted))
+		return 0, nil, nil, s.alreadyDecided(ctx, err, placesOf(attempted))
 	}
-	return claimID, recorded, nil
+	return claimID, recorded, skipped, nil
+}
+
+// ErrAllDecided says a bulk judgment asked to skip what is decided found
+// nothing else to claim.
+var ErrAllDecided = errors.New("a live decision already covers every place selected")
+
+// leavingDecided splits the places into those nothing stands at and those a
+// live decision covers, naming the decision.
+//
+// Asked in one statement over both keys a place can be held under, the
+// question Undecided asks, so a place this keeps is one the unique index will
+// accept. Two proposals arriving together can still both pass it, and the
+// index refuses the second as it would without skipping.
+func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolved,
+	[]Skipped, error) {
+
+	keys := make([]string, 0, len(places)*2)
+	for _, at := range places {
+		keys = append(keys, liveKeysFor(at.Place)...)
+	}
+	type row struct {
+		ID      int64  `bun:"id"`
+		LiveKey string `bun:"live_key"`
+		State   State  `bun:"state"`
+	}
+	// In chunks, because two keys per place across a kernel selection is a
+	// statement past what an engine accepts in one packet.
+	var standing []row
+	for from := 0; from < len(keys); from += database.BatchSize {
+		chunk := keys[from:min(from+database.BatchSize, len(keys))]
+		var some []row
+		if err := s.db.NewSelect().Model((*Decision)(nil)).
+			ColumnExpr("de.id, de.live_key, de.state").
+			Where("de.live_key IN (?)", bun.List(chunk)).
+			Scan(ctx, &some); err != nil {
+			return nil, nil, fmt.Errorf("read what already stands: %w", err)
+		}
+		standing = append(standing, some...)
+	}
+	// The earliest decision at a key is the one named, as a refusal names it.
+	sort.Slice(standing, func(i, j int) bool { return standing[i].ID < standing[j].ID })
+	held := make(map[string]int, len(standing))
+	for i := len(standing) - 1; i >= 0; i-- {
+		held[standing[i].LiveKey] = i
+	}
+	left := make([]resolved, 0, len(places))
+	var skipped []Skipped
+	for _, at := range places {
+		found := -1
+		for _, key := range liveKeysFor(at.Place) {
+			if i, ok := held[key]; ok && (found < 0 || i < found) {
+				found = i
+			}
+		}
+		if found < 0 {
+			left = append(left, at)
+			continue
+		}
+		skipped = append(skipped, Skipped{
+			VulnerabilityID: at.VulnerabilityID, PlaceIdentity: at.PlaceIdentity,
+			DecisionID: standing[found].ID, State: standing[found].State,
+		})
+	}
+	return left, skipped, nil
+}
+
+// issuesIn is how many distinct issues a set of places sits under.
+func issuesIn(places []resolved) int {
+	issues := map[[2]int64]bool{}
+	for _, at := range places {
+		issues[[2]int64{at.ProductID, at.VulnerabilityID}] = true
+	}
+	return len(issues)
 }
 
 // placesWithin reads every open place the named issues occupy at one

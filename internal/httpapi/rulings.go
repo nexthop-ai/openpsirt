@@ -68,8 +68,7 @@ func registerRulings(api huma.API, in Ingest) {
 			"report instead.\n\n" +
 			"Every report named has to be in this product, not accepted as an issue, and " +
 			"under no ruling, or nothing is " +
-			"written. The number of reports is bounded by `triage.together-cap`, the setting " +
-			"that bounds every bulk judgment.",
+			"written. The number of reports is bounded by `triage.together-cap`.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

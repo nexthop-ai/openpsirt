@@ -325,7 +325,7 @@ same work said again.
 Each row says how many packages and how many consumers it covers, because one
 judgment covering sixty consumers is a different act from one covering one — and
 because those are the units somebody acts in. The place count is stored, sorted
-on, and shown as a title; it is what the bulk cap is measured against and what
+on, and shown as a title; it is what the ceiling on one action is measured against and what
 the disposition register expands to, rather than a figure a reader is asked to
 reconcile with the other two.
 
@@ -516,8 +516,11 @@ back in its own order rather than refusing.
 | A row is selected by what it is, not by where it sits | The list is read again after every decision and on every page, so an index would select a different row each time. That also makes a selection survive paging, which is what "a filtered set" means when the filter matches more than a page |
 | **The row is carried with its key** | Acting on a selection then acts on what was selected rather than on the part of it the current page happens to hold. Holding keys alone, the queue counted every ticked claim in its button and approved only the ones on screen, dropping the rest with no message |
 | **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them. Every change goes through the one function that holds the rule, including removing a single chip: today every chip only ever widens, so the rule held by a property of the chips rather than by construction |
-| **A figure about a selection counts what the selection holds** | The bulk-claim screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the cap is read against |
+| **A figure about a selection counts what the selection holds** | The bulk-claim screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the ceiling is read against. The line under the list names whichever of the two limits the selection is past: issues, or findings written |
+| **The bulk-claim form asks before skipping what is decided** | A box, unticked, reading "Skip places already decided". Ticked, the result lists each place left out with a link to the decision standing there (`DESIGN-triage.md` § Decided places). Unticked, a decided place refuses the claim and the refusal names the decision |
 | **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
+| **Assigning a selection in one product is one request** | The picked rows travel together, and the server resolves them against the same filter the list is read with. A refusal is the whole act's, so nothing is left half assigned and the selection stays as it was. Rows a colleague holds and the caller may not take stay selected, with a count saying how many Across products each row is still its own request, under the loop below (`DESIGN-access.md` § Assignment by narrowing) |
+| **Select all takes every row the filter matches** | Offered on the batch bar in one product once something is ticked, and counted by the list's total rather than the pages seen. It names no rows: the server assigns what the filter matches when the act lands. A changed filter ends it, as it clears a selection |
 | **A loop over a selection survives a refusal** | Each row is its own act, so one refusal leaves the rest to be tried and the failures stay selected with a count saying how many. Unguarded, the first refusal abandoned everything after it, left the selection reading its original size, and skipped the control that undoes what did land |
 | Searching is submitted rather than sent per keystroke | Each is a query over every open finding in the build, and a half-typed word is not a question worth asking. It matches anywhere in a component's name, ignoring capitals |
 | A component's name opens the component (reversed) | It narrowed the list, and the component itself sat behind a small "Open →" in the last column next to "Hide" — an act parked away from the thing it acts on, which is the shape the By fix view was deleted for. The name is the way to the thing; narrowing and hiding are the two small acts beside it, and they sit together. The same name on the finding screen opens the same screen, so one word means one thing everywhere it appears |
@@ -646,7 +649,7 @@ and the act hangs off it.
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
 | Where it could go carries two counts | What a release fixed is how many of what is open name that exact version; what reaching it closes is that plus everything fixed before it. Sorted on the first, the version worth taking sinks: measured on the demo's kernel, the release that closes all 158 fixed 2 of its own and the one that fixed 49 leads |
 | Furthest along first where the versions can be ordered, unranked where they cannot | An ordering exists per ecosystem rather than in general, and one version a comparison refuses makes the whole list unrankable. Shown unranked the two counts are equal and the screen says so, rather than implying an order nothing established |
-| The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the bulk cap is measured against |
+| The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the ceiling on one action is measured against |
 | It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
 | Where to read about the package is built from its identifier | An identifier already names the ecosystem and the name within it, and each ecosystem has one address where a package is read about. Nothing is fetched and nothing is stored — the same way the issue records are worked out. An ecosystem with no address offers none rather than a guess, and a name is encoded into the path because it came out of a scan file |
 | The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
@@ -953,9 +956,15 @@ adds:
 
 The queue narrows to one product, which is what a figure on the home screen
 counts: the address carries the product it was counted for, and the line under
-the heading names it. The exports narrow the same way, so a file taken from a
-narrowed screen is the narrowed backlog. Nothing narrower is offered — a claim is
-decided in a product and no finer.
+the heading names it.
+
+A row of filters above the queue narrows it further: who proposed a claim, an
+age of seven, thirty or ninety days, a severity, an outcome and a release
+(`DESIGN-triage.md` § Queue filters). Each rides in the address, so a link
+somebody sends is the same list, and changing one clears the selection. The
+exports carry the same filters, so a file taken from a narrowed screen is the
+narrowed backlog. The filters sit on the queue proper and not on the two tabs
+about the reader's own claims.
 
 The count beside the queue on the rail, and the home screen's figure for what is
 pending your approval, add the rulings on vulnerability reports the reader may
@@ -1196,7 +1205,7 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | A report's status is one word, and a waiting ruling says so in it | "Rejected, waiting" reads differently from "Rejected", which is the whole of what the second person changes |
 | Only an open report can be selected | One under a ruling or accepted is refused by the server, and a checkbox that leads to a refusal is a control that always fails |
 | The selection and the form for one report are one form | A ruling covers any number of reports and the second person approves the selection as one act, so the two screens cannot come to say different things |
-| A selection past the bulk cap holds the button back and says why | The server refuses a ruling past what one act may write, and a button that always fails is worse than none |
+| A selection past the bulk action limit holds the button back and says why | The server refuses a ruling past what one act may write, and a button that always fails is worse than none |
 | The button names the act | "Propose" where somebody else has to agree, "Submit" where nobody does. The count is on it where more than one report is covered |
 | A duplicate asks for the issue, and says a closed one is rejected instead | The server refuses a duplicate of an issue not open here; the hint says what to do before the refusal does |
 | Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to whoever works reports, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
@@ -1860,7 +1869,7 @@ Coverage of the interface is measured and reported by the gate.
 | | |
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
-| **Narrowing the review queue further than a product** | By what kind of thing is waiting, by who proposed it, by age or by severity. Narrowing by product is built, because a figure that counts one product has to open a list about that product |
+| **Narrowing the review queue by what kind of thing is waiting** | A claim awaiting agreement, a lapsed decision, a deferral that ran out and a promise past its date share one list |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
 ## Gaps the checks left
