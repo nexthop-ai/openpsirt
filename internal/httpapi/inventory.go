@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -110,5 +111,157 @@ func registerInventoryChanges(api huma.API, in Ingest) {
 			})
 		}
 		return out, nil
+	})
+}
+
+// InventoryDifferenceBody is one name two builds hold differently.
+type InventoryDifferenceBody struct {
+	Name   string   `json:"name" doc:"The component name, as a document wrote it"`
+	Change string   `json:"change" enum:"added,removed,changed" doc:"How the later build differs from the earlier one on this name"`
+	Before []string `json:"before,omitempty" doc:"The versions the earlier build holds. Empty where only the later build holds the name"`
+	After  []string `json:"after,omitempty" doc:"The versions the later build holds. Empty where only the earlier build holds the name"`
+}
+
+// ListedInventoryDifferences is how two builds' inventories differ, as the
+// operation answers it.
+type ListedInventoryDifferences = listOutput[InventoryDifferenceBody]
+
+// TwoBuilds names the two builds of one product an inventory comparison is
+// between, in the words the findings comparison takes them in.
+type TwoBuilds struct {
+	From        string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
+	FromVariant string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
+	To          string `query:"to" required:"true" doc:"The later build's stream"`
+	ToVariant   string `query:"to_variant" required:"true" doc:"The later build's variant"`
+}
+
+// differences resolves the two builds and works out how their inventories
+// differ. Either build out of reach answers as one never scanned.
+func (pair TwoBuilds) differences(ctx context.Context, in Ingest, subject access.Subject,
+	product string, only string, limit, offset int) ([]graph.Change, int, error) {
+
+	from, err := targetIDOf(ctx, in, subject, product, pair.From, pair.FromVariant)
+	if err != nil {
+		return nil, 0, err
+	}
+	to, err := targetIDOf(ctx, in, subject, product, pair.To, pair.ToVariant)
+	if err != nil {
+		return nil, 0, err
+	}
+	changes, total, err := graph.NewStore(in.DB.DB).Between(ctx, subject, from, to,
+		graph.ChangeKind(only), limit, offset)
+	switch {
+	case errors.Is(err, access.ErrDenied):
+		return nil, 0, nothingScannedThere()
+	case errors.Is(err, graph.ErrNoInventory):
+		return nil, 0, huma.Error404NotFound("no inventory has been read for one of those builds")
+	case err != nil:
+		return nil, 0, wentWrong(in.Logger, "how the two builds differ could not be read", err)
+	}
+	return changes, total, nil
+}
+
+// registerInventoryComparison answers which names any two builds differ on.
+//
+// An upload's own listing compares a build with itself a moment earlier. This
+// compares two builds: two releases, two platforms of one release, or a tag and
+// the branch it was cut from.
+func registerInventoryComparison(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "compare-inventories", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/comparison/inventory",
+		Summary: "Compare the inventories of two builds",
+		Description: "Returns the component names the later build added, removed and holds at " +
+			"different versions, against the earlier build. Removals first, then " +
+			"arrivals, then the names at different versions.\n\n" +
+			"Any two builds of one product, across streams and variants. Each is compared " +
+			"as its most recent inventory stands.\n\n" +
+			"Counted by name, as the listing of one upload is. A name either build holds " +
+			"at several versions carries all of them on each side.\n\n" +
+			"Answers 404 where either build has no inventory read yet.",
+		Tags: []string{"Scans"},
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		TwoBuilds
+		Change string `query:"change" enum:"added,removed,changed" doc:"One kind of change alone"`
+		Limit  int    `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
+		Offset int    `query:"offset" minimum:"0" doc:"The number skipped"`
+	}) (*ListedInventoryDifferences, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		changes, total, err := input.differences(ctx, in, subject, input.Product,
+			input.Change, input.Limit, input.Offset)
+		if err != nil {
+			return nil, err
+		}
+		out := &ListedInventoryDifferences{}
+		out.Body.Total = total
+		out.Body.Items = make([]InventoryDifferenceBody, 0, len(changes))
+		for _, change := range changes {
+			out.Body.Items = append(out.Body.Items, InventoryDifferenceBody{
+				Name: change.Name, Change: string(change.Kind),
+				Before: change.Before, After: change.After,
+			})
+		}
+		return out, nil
+	})
+}
+
+// registerInventoryComparisonExport writes out which names two builds differ
+// on, whole rather than a page of them.
+func registerInventoryComparisonExport(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "export-inventory-comparison", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/comparison/inventory.{format}",
+		Summary: "Export an inventory comparison of two builds",
+		Description: "Every name the inventory comparison lists, as a file, in the same order.\n\n" +
+			"One row per name. A name held at several versions has them joined with `; ` " +
+			"in the before and after columns.\n\n" +
+			"Answers 404 where either build has no inventory read yet.",
+		Tags: []string{"Scans"},
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Format  string `path:"format" enum:"csv,json"`
+		TwoBuilds
+		Change string `query:"change" enum:"added,removed,changed" doc:"One kind of change alone"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Worked out whole before the response starts, so a build out of reach
+		// or without an inventory is refused with a status rather than a file
+		// cut short. It is bounded by what two builds hold now.
+		changes, _, err := input.differences(ctx, in, subject, input.Product, input.Change, 0, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := Exporting{
+			What: "inventory comparison of two builds",
+			About: []Stated{
+				{"earlier build", input.From + " (" + input.FromVariant + ")"},
+				{"later build", input.To + " (" + input.ToVariant + ")"},
+				{"change", input.Change},
+			},
+			Header: []string{"change", "name", "before", "after"},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				if offset > 0 {
+					return nil, nil
+				}
+				rows := make([][]string, 0, len(changes))
+				for _, change := range changes {
+					rows = append(rows, []string{
+						string(change.Kind), change.Name,
+						strings.Join(change.Before, "; "), strings.Join(change.After, "; "),
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			writeExport(writer, input.Format, "inventory-comparison-"+downloadName(input.Product), out)
+		}}, nil
 	})
 }

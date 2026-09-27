@@ -488,6 +488,25 @@ for the same listing; reading the build's rows costs the difference, and is
 what keeps an upload moving tens of thousands of names to under a second rather
 than one lookup per name.
 
+### Comparison of two builds
+
+Any two builds of one product are compared the same way: two releases, two
+platforms of one release, or a tag and the branch it was cut from. The fold is
+the one the listing of an upload uses, with the earlier build on the before
+side and the later build on the after side.
+
+| Rule | Reason |
+|---|---|
+| Each build is compared as its inventory stands now | The rows no scan has closed are what the build ships. Its earlier uploads are its history |
+| A build with no inventory is refused | Compared against nothing, every name the other build holds reads as added, which is a claim about a build nobody has described. A build has an inventory once any graph has been applied to it, which its root marks |
+| Both builds are authorized | Each is resolved through the lookup that answers a build out of reach as never scanned |
+| Worked out when asked, never stored | The open rows of both builds are one indexed read |
+| A page is cut after the comparison | As for one upload: the total is of the kind asked for, and the order is the server's |
+
+Comparing the master branch of a switch image built for two platforms, 6,866
+components against 6,748, 211 names differ. It takes 18 to 29 ms on each of the
+four engines, measured on 2026-09-27, one engine at a time.
+
 ### The size a change is against
 
 A count alone does not say whether a build is unlike itself, so what the change

@@ -1077,6 +1077,17 @@ nothing.
 | One kind at a time is a filter, asked of the server | A build that replaced two hundred names is read one kind at a time, and a count taken over the page would be of the page |
 | A name that went is not a link | Its component page is about what is open against something this build no longer ships. Everything else opens the component |
 
+The component comparison is the same listing between any two builds of a
+product, as each stands now. It is reached from release comparison, which
+carries the two builds picked there, and picks its own pair the same way.
+
+| Rule | |
+|---|---|
+| The table, the order and the filter are the upload listing's | The two answer one question about two different pairs of inventories, so they read alike |
+| The chosen kind is in the address | A link somebody shares opens the same narrowing |
+| The file is the narrowing on the screen | CSV and JSON take the same two builds and the same kind |
+| A build with no inventory is said in words | The server refuses rather than listing every name of the other build as added |
+
 ## Product and scan-run pages
 
 The product page names every declared build with what is open, overdue,

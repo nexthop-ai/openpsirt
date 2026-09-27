@@ -27,6 +27,9 @@ type fixture struct {
 	// second store over it.
 	db       *database.DB
 	targetID int64
+	// world is what the build was declared in, for the tests that need a
+	// second build of the same product.
+	world *fixtures.World
 	// scope is the same build as a selection, for the findings list, which
 	// takes one rather than a build identifier.
 	scope finding.Scope
@@ -38,10 +41,16 @@ type fixture struct {
 // identifier.
 func (f *fixture) scan(t *testing.T) int64 {
 	t.Helper()
+	return f.scanOf(t, f.targetID)
+}
+
+// scanOf records a new scan of any build, each newer than the last.
+func (f *fixture) scanOf(t *testing.T, targetID int64) int64 {
+	t.Helper()
 	f.seq++
 	f.built = f.built.Add(time.Hour)
 	rec, outcome, err := f.scans.Record(t.Context(), ingest.Arriving{
-		TargetID: f.targetID, ContentHash: fmt.Sprintf("hash-%d", f.seq),
+		TargetID: targetID, ContentHash: fmt.Sprintf("hash-%d", f.seq),
 		BuiltAt: f.built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -55,7 +64,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		fn(t, &fixture{
 			store: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB), db: w.DB,
-			targetID: w.Target.ID,
+			targetID: w.Target.ID, world: w,
 			scope: finding.Scope{
 				ProductID: &w.Product.ID, StreamID: &w.Branch.ID, VariantID: &w.Customer.ID,
 			},

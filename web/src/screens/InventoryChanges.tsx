@@ -10,7 +10,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
-import { Wide } from "../ui/Wide";
+import { KindChips, NamesMoved, type Kind } from "../ui/NamesMoved";
 
 // The most one page asks for. Long enough that an ordinary night fits on one
 // page, short enough that a build which replaced everything does not arrive as
@@ -26,7 +26,7 @@ const PAGE = 200;
 export function InventoryChanges() {
   const { product = "", stream = "", variant = "", scan = "" } = useParams();
   const [offset, setOffset] = useState(0);
-  const [only, setOnly] = useState<"" | "removed" | "added" | "changed">("");
+  const [only, setOnly] = useState<Kind>("");
   const at = { product, stream, variant, scan: Number(scan) };
   const build =
     `/products/${encodeURIComponent(product)}` +
@@ -71,31 +71,13 @@ export function InventoryChanges() {
         </p>
       </div>
 
-      {/* One kind at a time, asked of the server so that the count in the
-          footer is of that kind rather than of the page. */}
-      <div className="variants" style={{ marginBottom: 10 }}>
-        {(
-          [
-            ["", "Everything"],
-            ["removed", "Removed"],
-            ["added", "Added"],
-            ["changed", "New version"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value || "all"}
-            type="button"
-            className={`chip${only === value ? " on" : ""}`}
-            aria-pressed={only === value}
-            onClick={() => {
-              setOnly(value);
-              setOffset(0);
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <KindChips
+        only={only}
+        onPick={(kind) => {
+          setOnly(kind);
+          setOffset(0);
+        }}
+      />
 
       {items.length === 0 ? (
         /* Two different emptinesses. Narrowed to one kind, what is empty is
@@ -127,43 +109,7 @@ export function InventoryChanges() {
         )
       ) : (
         <>
-          <Wide>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Change</th>
-                  <th>Before</th>
-                  <th>After</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((row) => (
-                  <tr key={`${row.change} ${row.name}`}>
-                    <td>
-                      {/* The component's own page, where what is open against
-                          it is. A name that went is not there any more, so it
-                          is the one that is not a link. */}
-                      {row.change === "removed" ? (
-                        row.name
-                      ) : (
-                        <Link
-                          to={`/products/${encodeURIComponent(product)}/components/${encodeURIComponent(row.name ?? "")}`}
-                        >
-                          {row.name}
-                        </Link>
-                      )}
-                    </td>
-                    <td>
-                      <Moved change={row.change} />
-                    </td>
-                    <td className="hint">{(row.before ?? []).join(", ") || "—"}</td>
-                    <td className="hint">{(row.after ?? []).join(", ") || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Wide>
+          <NamesMoved product={product} rows={items} />
           <Paged
             shown={items.length}
             total={total}
@@ -176,14 +122,4 @@ export function InventoryChanges() {
       )}
     </div>
   );
-}
-
-// What happened to one name, as a word.
-//
-// A removal is marked rather than merely named: it is the one a reader is
-// looking for, and it is the one that reads as harmless.
-function Moved({ change }: { change?: string }) {
-  if (change === "removed") return <span className="sev high">removed</span>;
-  if (change === "added") return <span className="chip">added</span>;
-  return <span className="chip">new version</span>;
 }

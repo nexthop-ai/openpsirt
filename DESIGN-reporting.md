@@ -657,10 +657,11 @@ The measurement is `make measure`, and it runs on every engine.
 Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the record of judgments, the
 review queue, the by-component view, what is running out of time, scan coverage,
-what is out of support, a comparison of two builds, the fix bundles, the
-upgrades one build is waiting on, what keeps being put off, the backlog over
-time, what has been changed administratively, and the disposition register,
-which is the one an auditor asks for first.
+what is out of support, a comparison of two builds, a comparison of two
+builds' inventories, the fix bundles, the upgrades one build is waiting on,
+what keeps being put off, the backlog over time, what has been changed
+administratively, and the disposition register, which is the one an auditor
+asks for first.
 
 The subject travels through the stream. An export is the easiest place to
 build the list first and narrow it afterwards, so it is the same query with the
@@ -686,6 +687,7 @@ stops is one somebody reads as whole.
 | Paging is a struct of its own, kept out of the filters | An export answers the whole of a narrowing and pages internally; embedding the filters wholesale would make it offer a page size it does not honor |
 | The deadline report needed an offset before it could be a file | What somebody exports a deadline report for is precisely the part they have not read. Paging it also needed the build in the ordering, since an arbitrary order between pages repeats one row and skips another |
 | The comparison is one file with a column naming which of the three parts a row belongs to | Three files are three things to keep together by hand. It is read whole rather than paged, because a comparison is a single answer computed from two builds at once |
+| The inventory comparison is read whole, like the findings comparison | It is one answer computed from two builds at once. A name held at several versions has them joined in one cell per side, so a row is still one name |
 | The queue's file is what is waiting on you | Your own claims are not in it |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
 
