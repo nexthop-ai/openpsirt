@@ -126,25 +126,12 @@ type InventoryDifferenceBody struct {
 // operation answers it.
 type ListedInventoryDifferences = listOutput[InventoryDifferenceBody]
 
-// TwoBuilds names the two builds of one product an inventory comparison is
-// between, in the words the findings comparison takes them in.
-type TwoBuilds struct {
-	From        string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
-	FromVariant string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
-	To          string `query:"to" required:"true" doc:"The later build's stream"`
-	ToVariant   string `query:"to_variant" required:"true" doc:"The later build's variant"`
-}
-
 // differences resolves the two builds and works out how their inventories
-// differ. Either build out of reach answers as one never scanned.
+// differ.
 func (pair TwoBuilds) differences(ctx context.Context, in Ingest, subject access.Subject,
 	product string, only string, limit, offset int) ([]graph.Change, int, error) {
 
-	from, err := targetIDOf(ctx, in, subject, product, pair.From, pair.FromVariant)
-	if err != nil {
-		return nil, 0, err
-	}
-	to, err := targetIDOf(ctx, in, subject, product, pair.To, pair.ToVariant)
+	from, to, err := pair.targets(ctx, in, subject, product)
 	if err != nil {
 		return nil, 0, err
 	}

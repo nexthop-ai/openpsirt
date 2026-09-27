@@ -16367,13 +16367,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: The earlier build's stream
+        - description: The earlier build's stream — a branch or a tag
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The earlier build's stream
+            description: The earlier build's stream — a branch or a tag
             type: string
         - description: The earlier build's variant
           explode: false

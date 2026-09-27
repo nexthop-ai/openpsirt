@@ -167,7 +167,7 @@ export function InventoryCompare() {
               )
             ) : (
               <>
-                <NamesMoved product={product} rows={items} />
+                <NamesMoved product={product} rows={items} removedIsGone={false} />
                 <Paged
                   shown={items.length}
                   total={total}

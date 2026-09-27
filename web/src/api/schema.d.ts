@@ -15401,7 +15401,7 @@ export interface operations {
     "get-release-notes": {
         parameters: {
             query: {
-                /** @description The earlier build's stream */
+                /** @description The earlier build's stream — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;

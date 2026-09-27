@@ -45,25 +45,19 @@ export function Compare() {
   });
 
   const ready = from !== "" && fromVariant !== "" && to !== "" && toVariant !== "";
-  // The same comparison as prose, fetched rather than assembled here: what an
-  // API caller gets and what this shows have to be the same words, and two
-  // implementations of "how a release note reads" is one that drifts.
+  // The two builds alone, which the component comparison takes.
+  const pair = { from, from_variant: fromVariant, to, to_variant: toVariant };
   // The request the file is asked for with, which is the screen's own. Built
   // once so that a comparison somebody exports is the comparison in front of
   // them rather than one assembled again from parts.
-  const pair = new URLSearchParams({
-    from,
-    from_variant: fromVariant,
-    to,
-    to_variant: toVariant,
-  }).toString();
   const asked = new URLSearchParams({
-    from,
-    from_variant: fromVariant,
-    to,
-    to_variant: toVariant,
+    ...pair,
     ...(undisclosed ? { include_undisclosed: "true" } : {}),
   }).toString();
+  // The same comparison as prose, fetched rather than assembled here: what an
+  // API caller gets and what this shows have to be the same words, and two
+  // implementations of "how a release note reads" is one that drifts.
+  //
   // Asked for rather than always shown: most visits are somebody reading the
   // columns, and a wall of markdown above them would be answering a question
   // nobody asked yet. So the query is disabled until the button is pressed.
@@ -189,7 +183,7 @@ export function Compare() {
             {ready && (
               <Link
                 className="btn quiet"
-                to={`/products/${encodeURIComponent(product)}/comparison/inventory?${pair}`}
+                to={`/products/${encodeURIComponent(product)}/comparison/inventory?${new URLSearchParams(pair)}`}
               >
                 Compare components
               </Link>

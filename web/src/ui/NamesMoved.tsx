@@ -45,7 +45,19 @@ export function KindChips({ only, onPick }: { only: Kind; onPick: (kind: Kind) =
 }
 
 // The names, what happened to each, and every version on each side.
-export function NamesMoved({ product, rows }: { product: string; rows: NameMoved[] }) {
+//
+// removedIsGone says a removed name is shipped by nothing on the before side
+// either, which is true of one upload against its predecessor and false of two
+// builds, where the earlier build still ships it.
+export function NamesMoved({
+  product,
+  rows,
+  removedIsGone = true,
+}: {
+  product: string;
+  rows: NameMoved[];
+  removedIsGone?: boolean;
+}) {
   return (
     <Wide>
       <table>
@@ -62,9 +74,9 @@ export function NamesMoved({ product, rows }: { product: string; rows: NameMoved
             <tr key={`${row.change} ${row.name}`}>
               <td>
                 {/* The component's own page, where what is open against it
-                    is. A name that went is not there any more, so it is the
-                    one that is not a link. */}
-                {row.change === "removed" ? (
+                    is. A name nothing ships any more has nothing open
+                    against it, so it is the one that is not a link. */}
+                {removedIsGone && row.change === "removed" ? (
                   row.name
                 ) : (
                   <Link

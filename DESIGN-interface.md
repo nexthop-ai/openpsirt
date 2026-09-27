@@ -1084,6 +1084,7 @@ carries the two builds picked there, and picks its own pair the same way.
 | Rule | |
 |---|---|
 | The table, the order and the filter are the upload listing's | The two answer one question about two different pairs of inventories, so they read alike |
+| A removed name is a link | The earlier build still ships it, so its component page has what is open against it |
 | The chosen kind is in the address | A link somebody shares opens the same narrowing |
 | The file is the narrowing on the screen | CSV and JSON take the same two builds and the same kind |
 | A build with no inventory is said in words | The server refuses rather than listing every name of the other build as added |
