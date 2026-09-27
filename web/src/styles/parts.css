@@ -1936,7 +1936,9 @@ textarea:disabled {
   gap: 18px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 10px;
-  overflow-x: auto;
+  /* Wraps rather than scrolls. A box scrolling on one axis scrolls on both,
+     and each tab's underline sits one pixel into the border below. */
+  flex-wrap: wrap;
 }
 .viewtab {
   border: 0;
