@@ -33,6 +33,9 @@ const Inbox = lazy(() => import("../screens/Inbox").then((m) => ({ default: m.In
 const InboxReport = lazy(() =>
   import("../screens/InboxReport").then((m) => ({ default: m.InboxReport })),
 );
+const InventoryCompare = lazy(() =>
+  import("../screens/InventoryCompare").then((m) => ({ default: m.InventoryCompare })),
+);
 const InventoryChanges = lazy(() =>
   import("../screens/InventoryChanges").then((m) => ({ default: m.InventoryChanges })),
 );
@@ -108,6 +111,7 @@ export const ROUTES = {
   upgrades: `${build}/pending-upgrades`,
   vex: `${build}/vex`,
   comparison: "/products/:product/comparison",
+  inventoryComparison: "/products/:product/comparison/inventory",
   inbox: "/products/:product/inbox",
   inboxReport: "/products/:product/inbox/:reference",
   me: "/me",
@@ -232,6 +236,7 @@ export function App() {
               <Route path={ROUTES.upgrades} element={<Upgrades />} />
               <Route path={ROUTES.vex} element={<VEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
+              <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
               <Route path={ROUTES.inbox} element={<Inbox />} />
               <Route path={ROUTES.inboxReport} element={<InboxReport />} />
               {/* A person's own page: what they reach, what is sent to them,

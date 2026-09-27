@@ -14,6 +14,7 @@ import { Outcome } from "../ui/Outcome";
 import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
+import { PickBuild } from "../ui/PickBuild";
 
 // The rows of each column shown before it says how many more there are.
 const SHOWN = 8;
@@ -44,19 +45,19 @@ export function Compare() {
   });
 
   const ready = from !== "" && fromVariant !== "" && to !== "" && toVariant !== "";
-  // The same comparison as prose, fetched rather than assembled here: what an
-  // API caller gets and what this shows have to be the same words, and two
-  // implementations of "how a release note reads" is one that drifts.
+  // The two builds alone, which the component comparison takes.
+  const pair = { from, from_variant: fromVariant, to, to_variant: toVariant };
   // The request the file is asked for with, which is the screen's own. Built
   // once so that a comparison somebody exports is the comparison in front of
   // them rather than one assembled again from parts.
   const asked = new URLSearchParams({
-    from,
-    from_variant: fromVariant,
-    to,
-    to_variant: toVariant,
+    ...pair,
     ...(undisclosed ? { include_undisclosed: "true" } : {}),
   }).toString();
+  // The same comparison as prose, fetched rather than assembled here: what an
+  // API caller gets and what this shows have to be the same words, and two
+  // implementations of "how a release note reads" is one that drifts.
+  //
   // Asked for rather than always shown: most visits are somebody reading the
   // columns, and a wall of markdown above them would be answering a question
   // nobody asked yet. So the query is disabled until the button is pressed.
@@ -157,7 +158,7 @@ export function Compare() {
           }}
         >
           <h3 style={{ margin: 0 }}>Compare</h3>
-          <Pick
+          <PickBuild
             label="Earlier build"
             stream={from}
             variant={fromVariant}
@@ -167,7 +168,7 @@ export function Compare() {
             onVariant={(value) => set("from_variant", value)}
           />
           <span style={{ color: "var(--faint)" }}>to</span>
-          <Pick
+          <PickBuild
             label="Later build"
             stream={to}
             variant={toVariant}
@@ -177,6 +178,16 @@ export function Compare() {
             onVariant={(value) => set("to_variant", value)}
           />
           <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            {/* The same two builds, compared by what they contain rather
+                than by what is open against them. */}
+            {ready && (
+              <Link
+                className="btn quiet"
+                to={`/products/${encodeURIComponent(product)}/comparison/inventory?${new URLSearchParams(pair)}`}
+              >
+                Compare components
+              </Link>
+            )}
             <button
               type="button"
               className="chip"
@@ -266,58 +277,6 @@ export function Compare() {
         )}
       </div>
     </>
-  );
-}
-
-// A build is a stream and a variant together, never one of them: the same
-// branch built two ways is two builds, and comparing across the pair without
-// saying so is how a release note reports the wrong hardware.
-function Pick({
-  label,
-  stream,
-  variant,
-  streams,
-  variants,
-  onStream,
-  onVariant,
-}: {
-  label: string;
-  stream: string;
-  variant: string;
-  streams: string[];
-  variants: string[];
-  onStream: (value: string) => void;
-  onVariant: (value: string) => void;
-}) {
-  return (
-    <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}>
-      <select
-        aria-label={`${label} stream`}
-        style={{ width: "auto" }}
-        value={stream}
-        onChange={(event) => onStream(event.target.value)}
-      >
-        <option value="">Select a branch or tag</option>
-        {streams.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label={`${label} variant`}
-        style={{ width: "auto" }}
-        value={variant}
-        onChange={(event) => onVariant(event.target.value)}
-      >
-        <option value="">Select a variant</option>
-        {variants.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-      </select>
-    </span>
   );
 }
 

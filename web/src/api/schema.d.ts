@@ -2234,6 +2234,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/comparison/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare the inventories of two builds
+         * @description Returns the component names the later build added, removed and holds at different versions, against the earlier build. Removals first, then arrivals, then the names at different versions.
+         *
+         *     Any two builds of one product, across streams and variants. Each is compared as its most recent inventory stands.
+         *
+         *     Counted by name, as the listing of one upload is. A name either build holds at several versions carries all of them on each side.
+         *
+         *     Answers 404 where either build has no inventory read yet.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["compare-inventories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/comparison/inventory.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export an inventory comparison of two builds
+         * @description Every name the inventory comparison lists, as a file, in the same order.
+         *
+         *     One row per name. A name held at several versions has them joined with `; ` in the before and after columns.
+         *
+         *     Answers 404 where either build has no inventory read yet.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-inventory-comparison"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/comparison/notes": {
         parameters: {
             query?: never;
@@ -8091,6 +8145,19 @@ export interface components {
             /** @description The component name, as the document wrote it */
             name: string;
         };
+        InventoryDifferenceBody: {
+            /** @description The versions the later build holds. Empty where only the earlier build holds the name */
+            after?: string[] | null;
+            /** @description The versions the earlier build holds. Empty where only the later build holds the name */
+            before?: string[] | null;
+            /**
+             * @description How the later build differs from the earlier one on this name
+             * @enum {string}
+             */
+            change: "added" | "removed" | "changed";
+            /** @description The component name, as a document wrote it */
+            name: string;
+        };
         IssuanceBody: {
             /**
              * Format: uri
@@ -8523,6 +8590,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["InventoryChangeBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyInventoryDifferenceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyInventoryDifferenceBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["InventoryDifferenceBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -15233,10 +15311,97 @@ export interface operations {
             };
         };
     };
+    "compare-inventories": {
+        parameters: {
+            query: {
+                /** @description The earlier build's stream — a branch or a tag */
+                from: string;
+                /** @description The earlier build's variant */
+                from_variant: string;
+                /** @description The later build's stream */
+                to: string;
+                /** @description The later build's variant */
+                to_variant: string;
+                /** @description One kind of change alone */
+                change?: "added" | "removed" | "changed";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyInventoryDifferenceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-inventory-comparison": {
+        parameters: {
+            query: {
+                /** @description The earlier build's stream — a branch or a tag */
+                from: string;
+                /** @description The earlier build's variant */
+                from_variant: string;
+                /** @description The later build's stream */
+                to: string;
+                /** @description The later build's variant */
+                to_variant: string;
+                /** @description One kind of change alone */
+                change?: "added" | "removed" | "changed";
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-release-notes": {
         parameters: {
             query: {
-                /** @description The earlier build's stream */
+                /** @description The earlier build's stream — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;

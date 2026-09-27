@@ -165,26 +165,16 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			"usually a public document.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product        string `path:"product"`
-		Format         string `path:"format" enum:"csv,json"`
-		From           string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
-		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
-		To             string `query:"to" required:"true" doc:"The later build's stream"`
-		ToVariant      string `query:"to_variant" required:"true" doc:"The later build's variant"`
-		IncludePrivate bool   `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
+		Product string `path:"product"`
+		Format  string `path:"format" enum:"csv,json"`
+		TwoBuilds
+		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		locate := func(stream, variant string) (int64, error) {
-			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
-		}
-		from, err := locate(input.From, input.FromVariant)
-		if err != nil {
-			return nil, err
-		}
-		to, err := locate(input.To, input.ToVariant)
+		from, to, err := input.targets(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}

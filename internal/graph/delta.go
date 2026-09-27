@@ -365,10 +365,17 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, s
 	if err != nil {
 		return nil, 0, err
 	}
-	changes := changed(rows)[scanID]
+	return paged(changed(rows)[scanID], only, limit, offset)
+}
+
+// paged narrows a listing to one kind of change and cuts a page from it.
+//
+// The page is taken after the comparison rather than in the statement, and the
+// total is of the narrowed listing, so a count beside a page is of that kind.
+func paged(changes []Change, only ChangeKind, limit, offset int) ([]Change, int, error) {
 	if only != "" {
 		// A word this does not know would narrow the answer to nothing, which
-		// reads as an upload that changed nothing rather than as a question
+		// reads as a comparison that found nothing rather than as a question
 		// nobody can answer.
 		if only != Added && only != Removed && only != Changed {
 			return nil, 0, fmt.Errorf("%q is not a kind of change", only)

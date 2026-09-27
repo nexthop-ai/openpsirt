@@ -12,6 +12,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -202,25 +203,15 @@ func registerReports(api huma.API, in Ingest) {
 			"than something pasted in without noticing.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product        string `path:"product"`
-		From           string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
-		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
-		To             string `query:"to" required:"true" doc:"The later build's stream"`
-		ToVariant      string `query:"to_variant" required:"true" doc:"The later build's variant"`
-		IncludePrivate bool   `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
+		Product string `path:"product"`
+		TwoBuilds
+		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
 	}) (*struct{ Body ComparisonBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		locate := func(stream, variant string) (int64, error) {
-			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
-		}
-		from, err := locate(input.From, input.FromVariant)
-		if err != nil {
-			return nil, err
-		}
-		to, err := locate(input.To, input.ToVariant)
+		from, to, err := input.targets(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -245,6 +236,27 @@ func registerReports(api huma.API, in Ingest) {
 		out.Body.Still = changed(comparison.Still, false, true)
 		return out, nil
 	})
+}
+
+// TwoBuilds names the two builds of one product a comparison is between, for
+// every comparison: of findings, as release notes, and of inventories.
+type TwoBuilds struct {
+	From        string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
+	FromVariant string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
+	To          string `query:"to" required:"true" doc:"The later build's stream"`
+	ToVariant   string `query:"to_variant" required:"true" doc:"The later build's variant"`
+}
+
+// targets resolves the two builds. Either one out of reach answers as never
+// scanned.
+func (pair TwoBuilds) targets(ctx context.Context, in Ingest, subject access.Subject,
+	product string) (from, to int64, err error) {
+
+	if from, err = targetIDOf(ctx, in, subject, product, pair.From, pair.FromVariant); err != nil {
+		return 0, 0, err
+	}
+	to, err = targetIDOf(ctx, in, subject, product, pair.To, pair.ToVariant)
+	return from, to, err
 }
 
 // ReleasePointBody is the state one release shipped with.
@@ -349,12 +361,9 @@ func registerNotes(api huma.API, in Ingest) {
 			"builds look like.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product        string `path:"product"`
-		From           string `query:"from" required:"true" doc:"The earlier build's stream"`
-		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
-		To             string `query:"to" required:"true" doc:"The later build's stream"`
-		ToVariant      string `query:"to_variant" required:"true" doc:"The later build's variant"`
-		IncludePrivate bool   `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
+		Product string `path:"product"`
+		TwoBuilds
+		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -364,14 +373,7 @@ func registerNotes(api huma.API, in Ingest) {
 			return nil, noDatabase(in.Logger)
 		}
 		names := catalog.NewStore(in.DB.DB)
-		locate := func(stream, variant string) (int64, error) {
-			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
-		}
-		from, err := locate(input.From, input.FromVariant)
-		if err != nil {
-			return nil, err
-		}
-		to, err := locate(input.To, input.ToVariant)
+		from, to, err := input.targets(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
