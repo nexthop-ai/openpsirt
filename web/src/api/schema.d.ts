@@ -761,7 +761,7 @@ export interface paths {
          *
          *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
          *
-         *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the severity has risen since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
+         *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
          *
          *     Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
          *
@@ -4091,7 +4091,7 @@ export interface paths {
          *
          *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
          *
-         *     It does need approval again if nothing was ever agreed to, or if the vulnerability's severity has risen since the original was agreed to and the claim is one a severity bears on. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
+         *     It does need approval again if nothing was ever agreed to, or if the issue is rated a band worse since the original was agreed to and the claim is one a severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
          *
          *     Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
          *
@@ -5353,11 +5353,11 @@ export interface paths {
         };
         /**
          * List your lapsed claims
-         * @description Returns the claims you proposed that lapsed and that nothing has replaced, newest lapse first: the claims that are yours to re-affirm.
+         * @description Returns the claims you proposed that lapsed and that nothing has replaced, the most recently written first: the claims that are yours to re-affirm. `product` narrows them to one product.
          *
          *     A claim lapses when a version moves under it, and when the issue is rated into a higher band on a claim a severity bears on. `code_moved` and `rated_worse` say which, and both can hold.
          *
-         *     Narrowed to the claims you may still argue about.
+         *     Narrowed to the claims you may still argue about, every lapsed row of them.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may act on.
          */
@@ -6649,6 +6649,8 @@ export interface components {
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
+            /** @description Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it */
+            reaffirmable?: boolean;
             /**
              * Format: int64
              * @description The number of decisions the claim wrote
@@ -11312,7 +11314,7 @@ export interface components {
             issues: number;
             /** @description When it lapsed */
             lapsed_at?: string;
-            /** @description How bad the issue is judged to be here now. Absent where it is unrated */
+            /** @description How bad the same issue is judged to be here now. Absent where it is unrated */
             now?: string;
             place: components["schemas"]["PlaceBody"];
             /**
@@ -11320,11 +11322,11 @@ export interface components {
              * @description The number of distinct places those cover
              */
             places: number;
-            /** @description Whether the issue now sits in a higher band than when the claim was made, on a claim a severity bears on */
+            /** @description Whether an issue the claim covers now sits in a higher band than when the claim was made, on a claim a severity bears on */
             rated_worse: boolean;
             /** @description The reasoning the claim rested on */
             reasoning: string;
-            /** @description How bad the issue was judged to be when the claim was made. Absent where it was unrated */
+            /** @description How bad that issue was judged to be when the claim was made, or the representative issue where none was rated worse. Absent where it was unrated */
             was?: string;
         };
         ToReaffirmOutputBody: {
@@ -20234,6 +20236,8 @@ export interface operations {
     "list-to-reaffirm": {
         parameters: {
             query?: {
+                /** @description A product to narrow to, by name */
+                product?: string;
                 limit?: number;
                 offset?: number;
             };

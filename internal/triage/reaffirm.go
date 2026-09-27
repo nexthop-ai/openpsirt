@@ -176,6 +176,8 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 		Justification: Justification(justification),
 		Mitigation:    mitigation,
 		DeferredUntil: previous.Claim.DeferredUntil,
+		CommittedTo:   previous.Claim.CommittedTo,
+		UpgradeTo:     orEmpty(previous.Claim.UpgradeTo),
 		FixedVersion:  fixedVersion,
 		Reasoning:     r.Reasoning, By: r.By,
 		SeverityCenti: severityNow,
@@ -271,7 +273,7 @@ func needsFullApproval(previous Decision, claim Claim, severityNow int, agreed b
 // turnsOnSeverity reports whether a claim is a judgment that how bad the issue
 // is could change.
 //
-// Most are. A deferral, a refusal to fix and a promise to act all accept the
+// Most that hide risk are. A deferral, a refusal to fix and a promise to act all accept the
 // risk for a while, and the risk is the severity. An argument that nothing an
 // attacker controls reaches the code, or that something already stops it, is
 // weighed against what the issue lets an attacker do, and a higher rating is
@@ -280,6 +282,11 @@ func needsFullApproval(previous Decision, claim Claim, severityNow int, agreed b
 // Three are not. Code that is absent or never runs is not dangerous at any
 // severity, and a fix that already ships is there whatever the rating says.
 func turnsOnSeverity(claim Claim) bool {
+	// A claim that hides nothing is only strengthened by a rise, and a claim
+	// about identity is not a judgment about risk.
+	if !claim.Outcome.HidesRisk() || claim.Outcome == Mismatched {
+		return false
+	}
 	switch claim.Outcome {
 	case AlreadyFixed:
 		return false
@@ -1044,20 +1051,20 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 
 	proposals := make([]Proposal, 0, len(lapsed))
 	places := map[string]bool{}
-	// One place, however many rows of the claim lapsed at it. A place identity
-	// is names alone while a decision is keyed on the versions too, so one
-	// component at two versions under one consumer is two lapsed rows sharing
-	// a place — and walking both would resolve the same current place twice,
-	// write the same live key twice, and refuse the whole act with "a decision
-	// already stands here", which is false.
+	// One proposal per place and versions, however many rows lead to it. A
+	// place identity is names alone while a decision is keyed on the versions
+	// too, so one component at two versions under one consumer is two lapsed
+	// rows sharing a place — and writing the same live key twice refuses the
+	// whole act with "a decision already stands here", which is false.
 	done := map[string]bool{}
 	for _, row := range lapsed {
 		key := placeKey(row.ProductID, row.VulnerabilityID, row.PlaceIdentity)
-		if done[key] {
-			continue
-		}
-		done[key] = true
-		for _, at := range where[key] {
+		for _, at := range atVersions(row, where[key]) {
+			written := key + "\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
+			if done[written] {
+				continue
+			}
+			done[written] = true
 			// The visibility it had. A re-affirmation says the same claim
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
@@ -1067,6 +1074,8 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 				Justification: Justification(justification),
 				Mitigation:    mitigation,
 				DeferredUntil: previous.DeferredUntil,
+				CommittedTo:   previous.CommittedTo,
+				UpgradeTo:     orEmpty(previous.UpgradeTo),
 				FixedVersion:  fixedVersion,
 				Reasoning:     reasoning, By: by,
 				SeverityCenti: severity[[2]int64{row.ProductID, row.VulnerabilityID}],
@@ -1118,20 +1127,42 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 // stillLatest keeps the lapsed rows nothing has replaced, for a query over
 // decision AS "de".
 //
-// A row is replaced where a later decision of another claim sits at its place.
-// That is the re-affirmation that re-made it, or a fresh judgment, or one
-// somebody made and then withdrew; in every case the later one is what the
-// place last said. Re-making the earlier row would write a second live claim
-// where the later one already stands, or bring back a judgment somebody since
-// took back. Rows of one claim at two versions of one place are the same
-// judgment, so they do not replace each other.
+// A row is replaced where a decision of another claim was made at its place
+// after it stopped standing. That is the re-affirmation that re-made it, or a
+// fresh judgment, or one somebody made and then withdrew; in every case the
+// later one is what the place last said. Re-making the earlier row would write
+// a second live claim where the later one already stands, or bring back a
+// judgment somebody since took back.
+//
+// A claim made before the row stopped standing replaces nothing. Two streams
+// at two versions hold sibling claims at one place, keyed apart by the
+// versions, and one lapsing leaves the other its own. Rows of one claim are
+// one judgment and do not replace each other.
 func stillLatest(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "newer"` +
 		` WHERE newer.product_id = de.product_id` +
 		` AND newer.vulnerability_id = de.vulnerability_id` +
 		` AND newer.place_identity = de.place_identity` +
 		` AND newer.claim_id <> de.claim_id` +
-		` AND newer.id > de.id)`)
+		` AND newer.proposed_at >= de.ended_at)`)
+}
+
+// atVersions is where one lapsed row is re-made.
+//
+// At its own versions where the place is still open at them: a row lapsed
+// because its issue was rated worse, whose code did not move. Re-made at every
+// version the place is open at, it would take on builds it never covered, and a
+// sibling claim at another version would collide with it. Where its versions
+// are gone, the code moved, and it is re-made at every version the place is open
+// at now.
+func atVersions(row Decision, open []Place) []Place {
+	component, consumer := orEmpty(row.ComponentUpstreamVersion), orEmpty(row.ConsumerUpstreamVersion)
+	for _, at := range open {
+		if at.ComponentUpstream == component && at.ConsumerUpstream == consumer {
+			return []Place{at}
+		}
+	}
+	return open
 }
 
 // placeKey identifies a lapsed row's place within its product.

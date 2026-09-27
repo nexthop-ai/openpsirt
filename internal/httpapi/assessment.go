@@ -323,8 +323,8 @@ func productsNamed(ctx context.Context, in Ingest,
 // outgrown lapses the claims a change to the rating in force in one product
 // has risen past, and tells whoever made them (REQ-25).
 //
-// Reported and not fatal, as the scan's sweep is. The rating is recorded and
-// correct; the lapse is a prompt.
+// Reported and not fatal. The rating is recorded and correct, and a claim this
+// fails to mark stands until the next scan with the issue open sweeps again.
 func outgrown(ctx context.Context, in Ingest, productID, vulnerabilityID int64) {
 	worse, err := triage.NewStore(in.DB.DB).LapseRatedWorse(ctx, triage.RatedWorseWhere{
 		ProductID: productID, Vulnerabilities: []int64{vulnerabilityID},

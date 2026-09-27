@@ -307,7 +307,7 @@ function Reaffirm({
     },
   });
 
-  if (!mine || claim.happened !== "lapsed") return null;
+  if (!mine || !claim.reaffirmable) return null;
   return (
     <div className="card">
       <header className="dhead">

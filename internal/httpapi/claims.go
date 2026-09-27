@@ -235,8 +235,8 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 			"approver, for the reason the single form does not: two people already agreed, and " +
 			"a version upgrade is a prompt to re-check rather than a new claim.\n\n" +
 			"One act, one approval. Where any row would need approval again — nothing was " +
-			"ever agreed to, or the severity has risen since it was agreed to and the claim " +
-			"is one a severity bears on — the whole act does. An approver works at the unit " +
+			"ever agreed to, or the issue is rated a band worse since it was agreed to and " +
+			"the claim is one a severity bears on — the whole act does. An approver works at the unit " +
 			"the proposer acted at. A severity bears on every claim except `already-fixed`, " +
 			"and `not-applicable` because the component or the vulnerable code is not present " +
 			"or not in the execute path.\n\n" +

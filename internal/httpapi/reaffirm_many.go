@@ -28,10 +28,10 @@ type ToReaffirmBody struct {
 	Finding   *FindingRefBody `json:"finding,omitempty" doc:"The representative decision's subject. Absent where no open finding sits at its place"`
 	LapsedAt  string          `json:"lapsed_at,omitempty" doc:"When it lapsed"`
 	CodeMoved bool            `json:"code_moved" doc:"Whether a version moved under it"`
-	// RatedWorse and the two words beside it are about the representative row.
-	RatedWorse bool   `json:"rated_worse" doc:"Whether the issue now sits in a higher band than when the claim was made, on a claim a severity bears on"`
-	Was        string `json:"was,omitempty" doc:"How bad the issue was judged to be when the claim was made. Absent where it was unrated"`
-	Now        string `json:"now,omitempty" doc:"How bad the issue is judged to be here now. Absent where it is unrated"`
+	// Was and Now are about the first issue rated worse, where one was.
+	RatedWorse bool   `json:"rated_worse" doc:"Whether an issue the claim covers now sits in a higher band than when the claim was made, on a claim a severity bears on"`
+	Was        string `json:"was,omitempty" doc:"How bad that issue was judged to be when the claim was made, or the representative issue where none was rated worse. Absent where it was unrated"`
+	Now        string `json:"now,omitempty" doc:"How bad the same issue is judged to be here now. Absent where it is unrated"`
 }
 
 // ToReaffirmOutput is a page of lapsed claims.
@@ -49,21 +49,31 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 		OperationID: "list-to-reaffirm", Method: http.MethodGet, Path: "/v1/to-reaffirm",
 		Summary: "List your lapsed claims",
 		Description: "Returns the claims you proposed that lapsed and that nothing has replaced, " +
-			"newest lapse first: the claims that are yours to re-affirm.\n\n" +
+			"the most recently written first: the claims that are yours to re-affirm. " +
+			"`product` narrows them to one product.\n\n" +
 			"A claim lapses when a version moves under it, and when the issue is rated into a " +
 			"higher band on a claim a severity bears on. `code_moved` and `rated_worse` say " +
 			"which, and both can hold.\n\n" +
-			"Narrowed to the claims you may still argue about.",
+			"Narrowed to the claims you may still argue about, every lapsed row of them.",
 		Tags: []string{"Triage"},
 	}, anyPerson, "Answers only what you may act on."), func(ctx context.Context, input *struct {
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0"`
+		Product string `query:"product" doc:"A product to narrow to, by name"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset  int    `query:"offset" minimum:"0"`
 	}) (*ToReaffirmOutput, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		mine, total, err := store.ToReaffirm(ctx, subject, input.Limit, input.Offset)
+		var productID int64
+		if input.Product != "" {
+			product, err := productNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			productID = product.ID
+		}
+		mine, total, err := store.ToReaffirm(ctx, subject, productID, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is yours to re-affirm could not be read", err)
 		}

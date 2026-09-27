@@ -104,7 +104,7 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 			} else {
 				q = q.Where("de.severity_centi = ?", *group.Baseline)
 			}
-			if err := q.Scan(ctx, &rows); err != nil {
+			if err := q.Where(coversSomething).Scan(ctx, &rows); err != nil {
 				return fmt.Errorf("read what a severity rise outgrew: %w", err)
 			}
 			ids = append(ids, rows...)
@@ -113,14 +113,25 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 		for start := 0; start < len(ids); start += database.InBulk.Most {
 			end := min(start+database.InBulk.Most, len(ids))
 			chunk := ids[start:end]
-			if _, err := tx.NewUpdate().Model((*Decision)(nil)).
+			result, err := tx.NewUpdate().Model((*Decision)(nil)).
 				Set("state = ?", LapsedState).
 				Set("ended_at = ?", moment).
 				Set("live_key = ?", nil).
 				Where("de.id IN (?)", bun.List(chunk)).
 				Where("de.state IN (?, ?)", Proposed, Approved).
-				Exec(ctx); err != nil {
+				Exec(ctx)
+			if err != nil {
 				return fmt.Errorf("mark what a severity rise outgrew: %w", err)
+			}
+			// A row another sweep, a withdrawal or an approval moved in
+			// between is not this sweep's to report. Run again, the read no
+			// longer finds it, and nobody is told twice.
+			changed, err := database.Affected(result)
+			if err != nil {
+				return fmt.Errorf("mark what a severity rise outgrew: %w", err)
+			}
+			if changed != int64(len(chunk)) {
+				return database.ErrGoAgain
 			}
 		}
 		lapsed = ids
@@ -143,6 +154,24 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 	out.Told = told
 	return out, nil
 }
+
+// coversSomething keeps the decisions an open finding in their product still
+// matches, at the versions they were made against, for a query over decision
+// AS "de".
+//
+// A decision covering nothing is not a judgment anybody is relying on. Lapsed
+// for a rating, its proposer would be told the finding is open again when none
+// is, and re-affirming it would find nothing to re-make.
+const coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
+	` JOIN "component" AS "c" ON c.id = fc.component_id` +
+	` LEFT JOIN "component" AS "uc" ON uc.id = fc.consumer_id` +
+	` JOIN "target" AS "tgc" ON tgc.id = fc.target_id` +
+	` JOIN "stream" AS "stc" ON stc.id = tgc.stream_id` +
+	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
+	` AND fc.vulnerability_id = de.vulnerability_id` +
+	` AND fc.place_identity = de.place_identity` +
+	` AND COALESCE(de.component_upstream_version, '') = ` + finding.ComponentUpstreamExpr +
+	` AND COALESCE(de.consumer_upstream_version, '') = ` + finding.ConsumerUpstreamExpr + `)`
 
 // ratedWorseGroup is the standing rows of one claim about one issue in one
 // product that share a baseline, with the rating in force there now.
@@ -178,8 +207,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		Where("de.state IN (?, ?)", Proposed, Approved).
 		Where("de.live_key IS NOT NULL").
-		// A claim about identity is not a judgment about risk.
-		Where("cl.outcome <> ?", Mismatched).
+		Where(coversSomething).
 		GroupExpr("de.claim_id, de.product_id, de.vulnerability_id, cl.outcome, " +
 			"cl.justification, de.severity_centi, v.severity, ir.severity, v.score_centi")
 	if where.ProductID > 0 {

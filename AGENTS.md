@@ -188,7 +188,7 @@ unpick later.
 | **Never trust identifiers a scan file supplies** to be stable between builds or consistent between producers. Identity is derived from content | REQ-08 |
 | **Visibility is enforced in the data-access layer**, never per handler, and every query carries a subject. This covers counts, aggregates, search and exports — not just row reads | REQ-42 and REQ-43 |
 | **A finding is a component at a specific place.** Do not deduplicate up to the package. Grouping is presentation only | REQ-17 |
-| **Identity is structural; expiry is version-based.** Never mix them — that is how an unrelated top-level bump invalidates a leaf decision | REQ-25 |
+| **Identity is structural; expiry is version-based.** Never mix them — that is how an unrelated top-level bump invalidates a leaf decision. The one other expiry is a judgment about risk lapsing when its issue is rated worse, which is about the issue and never about identity | REQ-25 |
 | **A test that pins what a query does runs on every supported engine.** SQLite-only tests catch none of the portability traps. A test that pins routing, which role reaches which endpoint, or a response's shape runs on SQLite and PostgreSQL, because nothing it pins varies by engine — the choice is made by reading the test, and it is the SQL that decides | REQ-71 |
 | **Every transaction is retryable as a whole**, through the one helper. A cluster certifies at `COMMIT`, so a write whose statements all succeeded can still be rolled back under it | REQ-71 |
 | **Nothing a transaction depends on is read outside it.** A retry re-runs the closure against a moved database, so a value fetched before it began describes a world that is gone. Anything the closure uses but does not fetch is a defect | REQ-71 |

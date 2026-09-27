@@ -89,6 +89,7 @@ sweeps and nothing runs on a timer.
 | A decision's age travels with it everywhere it appears | The compensating control for the line above. An eight-year-old judgment should look like one |
 | A deferral runs out on a date, not on a version | A bump does not change a judgment about priority, and a calendar does not change one about applicability. The finding returns to the queue marked as deferred rather than as new |
 | A claim that the match is wrong runs out on neither | It is a claim about identity, and § Corrections holds it |
+| A judgment a severity bears on also lapses when its issue is rated worse (REQ-25) | Nothing matched changes, so this one is swept for rather than matched: § Lapse marking holds when |
 
 Identity is structural and expiry is version-based, and neither reaches into the
 other. Overlapping them is how a bump at the top of a build invalidates a
@@ -920,10 +921,13 @@ is one act at the grain the claim was made at.
 | The claimant's, and nobody else's | An approver doing it becomes proposer of the new claim while their own earlier agreement is carried onto it, which is one person on both sides of the control |
 | Any row escalating sends the whole act back | An approver works at the unit the proposer acted at (REQ-28). Asked per row, an act covering 45 places could write 44 standing decisions and one waiting, which is agreeing to part of an argument somebody was shown whole |
 | The carried agreement is one row, taking effect on all of them together | An agreement is an agreement to a claim's words. Recorded per decision, one person agreeing once would appear in the record 45 times; taking effect per decision, half the act could stand while half waited |
-| A row a later decision of another claim replaced is not re-made | The later one is what the place last said: the claim that re-made it, a fresh judgment, or one somebody made and withdrew. Re-making the earlier row writes a second live claim where the later one stands, or brings back a judgment somebody took back. Rows of one claim at two versions of one place are one judgment and do not replace each other |
+| A row that a decision of another claim, made at its place after it stopped standing, replaced is not re-made | The later one is what the place last said: the claim that re-made it, a fresh judgment, or one somebody made and withdrew. Re-making the earlier row writes a second live claim where the later one stands, or brings back a judgment somebody took back. A claim made before the row stopped standing replaces nothing: two streams at two versions hold sibling claims at one place, keyed apart by the versions. Rows of one claim are one judgment and do not replace each other |
+| A row whose versions are still open is re-made at them alone | It lapsed for a rating and its code did not move. Re-made at every version the place is open at, it would take on builds it never covered, and collide with a sibling claim at another version |
 
-The lapsed population is reached by the findings list's `lapsed` state, and the
-act itself sits on the claim.
+The lapsed population is reached by the findings list's `lapsed` state, and by
+the review queue's To reaffirm tab, which lists the reader's own lapsed claims.
+The act sits on the claim, or on several claims from that tab
+(§ Re-affirmation across claims).
 
 ### Approval gate
 
@@ -1018,7 +1022,7 @@ what rated worse means.
 | Compared per claim, per issue, per product | The rating in force is each product's own |
 | The proposer is told why | `DESIGN-notifications.md` § Claim outcomes |
 | Why a claim lapsed is worked out when it is read, not stored | A version that no longer matches anything open and a rating in a higher band are both facts about the present. Both can hold |
-| Failing to mark is reported and not fatal | The rating is recorded and correct; the lapse is a prompt |
+| Failing to mark is reported and not fatal | The claim stands until the next scan with the issue open sweeps again |
 
 What has **stopped standing** is one question, not two. A lapsed decision and a
 deferral whose date has passed are separate mechanisms — a version bump does not
@@ -1052,13 +1056,24 @@ Which claims a risen severity bears on:
 | Already fixed | No | The fix ships whatever the rating says |
 | Not applicable: cannot be controlled by an adversary | Yes | A higher rating is often a new way in |
 | Not applicable: inline mitigations exist | Yes | A mitigation is weighed against what the issue lets an attacker do |
-| Deferred, won't fix | Yes | Both accept the risk, and the severity is the risk |
+| Deferred, will not fix | Yes | Both accept the risk, and the severity is the risk |
 | Upgrade needed, patch needed | Yes | Both accept the risk until their date |
+| Affected, and a wrong match | No | Affected hides nothing, so a rise only strengthens it. A wrong match is a claim about identity |
 
 Rated worse means a higher band — low, medium, high, critical — and never a
 higher score within one. A rescoring from 7.5 to 7.6 is the same judgment about
 the same issue. A claim made about an unrated issue is measured from medium, the
-way a deadline reads one. The same rule lapses a standing claim when its issue is
+way a deadline reads one.
+
+The band is read from the rating in force as the baseline was: this product's
+word where it has one, and otherwise the published score, falling back to the
+published word where no score was given. Deadlines, filters and the triage line
+band on the word instead.
+
+| | |
+|---|---|
+| The score is read ahead of the published word | The published word is recorded when the issue is first seen and not revised, while the score moves as reports revise it. Banded on the word, no re-rating by the world would ever lapse a claim |
+| A product's own word overrides both | It is the rating in force here. Agreeing a word below the published one can still lapse a claim, where the word is above the published score the claim was made against | The same rule lapses a standing claim when its issue is
 rated worse (§ Lapse marking).
 
 The reasoning is the re-affirmer's own and nobody else has read it, so the

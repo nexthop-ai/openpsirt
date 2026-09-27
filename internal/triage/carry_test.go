@@ -254,3 +254,30 @@ func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 		}
 	})
 }
+
+func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
+	// The baseline a later rise is measured from. Without it a carried claim
+	// reads as made about an unrated issue, and a rating into high lapses it
+	// though nothing was rated worse since it was carried.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.agreed(t, f.at())
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+		f.rateIssue(t, 750)
+
+		if _, err := f.store.Carry(ctx, f.triager, was, next,
+			[]int64{agreed.ID}, triage.DefaultTogetherCap); err != nil {
+			t.Fatal(err)
+		}
+		var baseline *int
+		if err := f.db.DB.NewSelect().Table("decision").Column("severity_centi").
+			Where("place_identity = ?", agreed.PlaceIdentity).Where("id <> ?", agreed.ID).
+			Scan(ctx, &baseline); err != nil {
+			t.Fatal(err)
+		}
+		if baseline == nil || *baseline != 750 {
+			t.Errorf("the carried claim's baseline is %v, want the rating in force, 750", baseline)
+		}
+	})
+}

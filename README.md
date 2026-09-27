@@ -84,6 +84,7 @@ the findings and to the judgments standing on them.
 | The scanner stops reporting something present and unchanged | The finding closes as unexplained, and that is flagged at any volume |
 | The vulnerability data moves | The scheduled rescan finds it, in shipped releases as well as current ones |
 | A judged component, or what pulls it in, moves version | A judgment about risk lapses and returns to triage. A claim that the scanner matched the wrong thing stands |
+| An issue is rated worse | A judgment about risk that the severity bears on lapses and returns to whoever made it |
 | Another release or variant ships the same code | The judgment already made there applies |
 | A fix is declared for a set of releases | The next scan of each release says whether it arrived |
 
@@ -177,8 +178,10 @@ says what turns each on.
   proposer never approves their own, with no override. Short deferrals are
   exempt up to a cumulative threshold the deployment sets
 - A judgment about risk survives rescans and lapses when the upstream version
-  of the component, or of anything that pulls it in, moves. It carries to other
-  releases, tags and variants whose chains and versions match
+  of the component, or of anything that pulls it in, moves. It also lapses when
+  the issue is rated worse, unless it says the code is absent, never runs, or
+  already carries the fix. It carries to other releases, tags and variants whose
+  chains and versions match
 - A wrong match is a claim about identity. It stands at every version until
   somebody withdraws it, and always needs a second person
 - One judgment covers every place a finding sits

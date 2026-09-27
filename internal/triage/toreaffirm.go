@@ -33,7 +33,8 @@ type ToReaffirm struct {
 	CodeMoved  bool
 	RatedWorse bool
 	// Was and Now are how bad the issue was judged to be when the claim was
-	// made and how bad it is judged to be here now, for the representative row.
+	// made and how bad it is judged to be here now: for the first row rated
+	// worse where one was, and for the representative row otherwise.
 	Was, Now int
 }
 
@@ -44,14 +45,15 @@ func decidableBy(query *bun.SelectQuery, subject access.Subject, column string) 
 }
 
 // ToReaffirm lists the claims this person made that lapsed and that nothing
-// has replaced, newest lapse first.
+// has replaced, the most recently written first, in one product where one is
+// named.
 //
 // Only what they may still re-affirm: their own claims, whose rows they may
 // still argue about. Why each lapsed is worked out from what is there now
 // rather than stored: a version that no longer matches anything open, and a
 // rating in a higher band than the claim was made against, are both facts
 // about the present that anybody can check.
-func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject,
+func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productID int64,
 	limit, offset int) ([]ToReaffirm, int, error) {
 
 	if subject.Kind != access.Person {
@@ -60,14 +62,14 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject,
 	limit = database.AList.Of(limit)
 
 	mine := func() *bun.SelectQuery {
-		q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
+		q := s.yoursToReaffirm(subject).
 			ColumnExpr(`de.claim_id AS "claim_id"`).
 			ColumnExpr(`MAX(de.id) AS "newest"`).
-			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-			Where("cl.proposed_by = ?", subject.ID).
-			Where("de.state = ?", LapsedState)).
 			GroupExpr("de.claim_id")
-		return decidableBy(q, subject, "de")
+		if productID > 0 {
+			q = q.Where("de.product_id = ?", productID)
+		}
+		return q
 	}
 	page, err := s.pageClaims(ctx, subject, mine, limit, offset, "what is yours to re-affirm")
 	if err != nil {
@@ -132,8 +134,10 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject,
 			}
 			severity[key] = now
 		}
-		if turnsOnSeverity(entry.Claim) && ratedWorse(row.SeverityCenti, severity[key]) {
+		if !entry.RatedWorse && turnsOnSeverity(entry.Claim) &&
+			ratedWorse(row.SeverityCenti, severity[key]) {
 			entry.RatedWorse = true
+			entry.Was, entry.Now = orZeroCenti(row.SeverityCenti), severity[key]
 		}
 	}
 
@@ -157,13 +161,43 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject,
 		entry.Issues = len(issues[id])
 		entry.Places = len(places[id])
 		entry.Reasoning = reasoning[entry.Decision.ID]
-		if entry.Decision.SeverityCenti != nil {
-			entry.Was = *entry.Decision.SeverityCenti
+		if !entry.RatedWorse {
+			entry.Was = orZeroCenti(entry.Decision.SeverityCenti)
+			entry.Now = severity[[2]int64{entry.Decision.ProductID, entry.Decision.VulnerabilityID}]
 		}
-		entry.Now = severity[[2]int64{entry.Decision.ProductID, entry.Decision.VulnerabilityID}]
 		out = append(out, *entry)
 	}
 	return out, page.Total, nil
+}
+
+// yoursToReaffirm selects the lapsed rows, nothing having replaced them, of
+// the claims this subject made and may re-affirm, over decision AS "de".
+//
+// A claim with any lapsed row out of the subject's reach is left off:
+// re-affirming acts on the whole claim, and would refuse it.
+func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
+	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
+	q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Where("cl.proposed_by = ?", subject.ID).
+		Where("de.state = ?", LapsedState)).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dn" WHERE dn.claim_id = de.claim_id`+
+			` AND dn.state = ? AND `+outOfReach+`)`,
+			append([]any{LapsedState}, reachArgs...)...)
+	return decidableBy(q, subject, "de")
+}
+
+// Reaffirmable reports whether this subject may re-affirm the claim now: it is
+// theirs, it lapsed, and nothing has replaced it.
+func (s *Store) Reaffirmable(ctx context.Context, subject access.Subject, claimID int64) (bool, error) {
+	if subject.Kind != access.Person {
+		return false, nil
+	}
+	found, err := s.yoursToReaffirm(subject).Where("de.claim_id = ?", claimID).Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether this is yours to re-affirm: %w", err)
+	}
+	return found, nil
 }
 
 // movedUnder reports which lapsed rows no open finding in their product still
@@ -204,4 +238,12 @@ func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool
 		}
 	}
 	return moved, nil
+}
+
+// orZeroCenti is a baseline that may not be recorded, as a number.
+func orZeroCenti(centi *int) int {
+	if centi == nil {
+		return 0
+	}
+	return *centi
 }

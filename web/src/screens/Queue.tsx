@@ -100,19 +100,23 @@ export function Queue() {
         }),
       ),
   });
+  // The lapsed claims that are this person's to re-affirm, narrowed to the
+  // product the address names like the queue beside it.
+  const lapsedMine = useQuery({
+    queryKey: ["to-reaffirm", reaffirm ? offset : 0, reaffirm, product],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/to-reaffirm", {
+          params: {
+            query: { limit: reaffirm ? PAGE : 1, offset: reaffirm ? offset : 0, ...within },
+          },
+        }),
+      ),
+  });
   // The fate of what this person proposed. A different question from the
   // queue's, and a different statement: the queue lists what is pending, so
   // approved, withdrawn, lapsed and undone all present there as the row
   // disappearing, and the proposer finds out by reopening the finding.
-  const lapsedMine = useQuery({
-    queryKey: ["to-reaffirm", reaffirm ? offset : 0, reaffirm],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/to-reaffirm", {
-          params: { query: { limit: reaffirm ? PAGE : 1, offset: reaffirm ? offset : 0 } },
-        }),
-      ),
-  });
   const became = useQuery({
     queryKey: ["my-claims", mine ? offset : 0, mine],
     queryFn: async () =>

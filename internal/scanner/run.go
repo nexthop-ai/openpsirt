@@ -236,7 +236,9 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	// And the judgments a rating this scan raised has outgrown (REQ-25). An
 	// issue is one row for the whole deployment, so a scan of one build can
 	// raise the rating a claim in another product was made against; the issues
-	// asked about are the ones this build has open.
+	// asked about are the ones this build has open. Unlike a version lapse,
+	// nothing matched changes, so a claim this fails to mark stands until the
+	// next scan with the issue open sweeps again.
 	worse, err := triage.NewStore(r.db.DB).LapseRatedWorse(ctx,
 		triage.RatedWorseWhere{OpenIn: targetID})
 	if err != nil {

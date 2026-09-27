@@ -677,6 +677,14 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"admin", http.MethodGet, people, http.StatusOK},
 			{"admin", http.MethodGet, keys, http.StatusOK},
 
+			// Your own lapsed claims are a list anybody here may ask for, and
+			// answers only what they may act on. Who may re-affirm them is
+			// pinned with a real claim beside the act's own tests.
+			{"reader", http.MethodGet, "/v1/to-reaffirm", http.StatusOK},
+			{"triager", http.MethodGet, "/v1/to-reaffirm", http.StatusOK},
+			{"", http.MethodGet, "/v1/to-reaffirm", http.StatusUnauthorized},
+			{"", http.MethodPost, "/v1/reaffirmations", http.StatusUnauthorized},
+
 			// The source of roles, and what each group grants, is
 			// administration like everything else that decides access.
 			{"reader", http.MethodGet, "/v1/roles/mode", http.StatusForbidden},

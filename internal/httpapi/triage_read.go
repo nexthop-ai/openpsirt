@@ -51,10 +51,11 @@ type ClaimDetail struct {
 	Finding *FindingRefBody `json:"finding,omitempty" doc:"A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place"`
 	AgeDays int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 	// Happened is the claim's fate, read from its rows.
-	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
-	When     string `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
-	By       string `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
-	ByName   string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Happened     string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
+	When         string `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
+	By           string `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
+	ByName       string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Reaffirmable bool   `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
@@ -311,6 +312,9 @@ func registerTriageReading(api huma.API, in Ingest) {
 		}
 		if whole.Outliers != nil {
 			body.Outliers = outliersBody(*whole.Outliers)
+		}
+		if body.Reaffirmable, err = store.Reaffirmable(ctx, subject, input.ID); err != nil {
+			return nil, wentWrong(in.Logger, "that claim could not be read", err)
 		}
 		return &struct{ Body ClaimDetail }{Body: body}, nil
 	})
@@ -617,9 +621,9 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			"Only the person who made the original may do this, and it normally needs no second " +
 			"approver: two people already agreed to the claim, and a version upgrade is a prompt to " +
 			"re-check rather than a new claim.\n\n" +
-			"It does need approval again if nothing was ever agreed to, or if the " +
-			"vulnerability's severity has risen since the original was agreed to and the " +
-			"claim is one a severity bears on. A severity bears on every claim except " +
+			"It does need approval again if nothing was ever agreed to, or if the issue is " +
+			"rated a band worse since the original was agreed to and the claim is one a " +
+			"severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every claim except " +
 			"`already-fixed`, and `not-applicable` because the component or the vulnerable " +
 			"code is not present or not in the execute path. The response says whether a " +
 			"second person is needed.\n\n" +

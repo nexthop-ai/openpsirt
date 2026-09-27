@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -370,6 +373,169 @@ func TestAClaimLapsesWhenItsIssueIsRatedWorseHere(t *testing.T) {
 		}
 		if len(out.Claims) != 1 || !out.Claims[0].Waiting {
 			t.Errorf("a claim re-affirmed after a rise stood without a second person: %s", body)
+		}
+	})
+}
+
+func TestALapsedClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.T) {
+	// Authorized before anything is said about who made it (REQ-42). Naming a
+	// lapsed claim elsewhere and naming one that does not exist answer alike;
+	// otherwise the refusal names the issues, and walking claim identifiers is
+	// a directory of what every product has dismissed.
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scanned(t)
+		r.alsoScannedInto(t, "theirs", "master", "mellanox")
+		theirs, err := catalog.NewStore(r.db.DB).ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		person, err := r.rights.Ensure(ctx, "private-triage", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.GrantRole(ctx, person.ID, theirs.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/theirs/streams/master/variants/mellanox"+
+				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
+				`"reasoning":"Not compiled into that build."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("deciding in the other product answered %d: %s", made.Code, made.Body.String())
+		}
+		var their struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &their); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.db.DB.NewUpdate().Table("decision").
+			Set("state = ?", "lapsed").Set("ended_at = ?", time.Now().UTC()).
+			Set("live_key = NULL").
+			Where("claim_id = ?", their.ClaimID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// A triager of another product, and somebody who only reads this one.
+		for _, who := range []string{"triager", "reader"} {
+			code, invisible, _ := reaffirmingMany(t, r, who, their.ClaimID)
+			absentCode, absent, _ := reaffirmingMany(t, r, who, 999999)
+			if code != absentCode || invisible != absent {
+				t.Errorf("as %s, a lapsed claim elsewhere answered %d %s and a missing one %d %s",
+					who, code, invisible, absentCode, absent)
+			}
+			if code < 400 || strings.Contains(invisible, "CVE-2026-9999") {
+				t.Errorf("as %s, the refusal answered %d and named: %s", who, code, invisible)
+			}
+		}
+	})
+}
+
+// rated records a rating of CVE-2026-CURL1 here, has the reviewer agree where it
+// waits, and answers the assessment.
+func (r *reach) rated(t *testing.T, severity string) int64 {
+	t.Helper()
+	made := asPerson(t, r, "triager", http.MethodPost,
+		"/v1/products/mine/issues/CVE-2026-CURL1/assessment",
+		`{"severity":"`+severity+`","reasoning":"How we use it."}`)
+	if made.Code != http.StatusCreated {
+		t.Fatalf("rating answered %d: %s", made.Code, made.Body.String())
+	}
+	var claim struct {
+		ID            int64 `json:"id"`
+		NeedsApproval bool  `json:"needs_approval"`
+	}
+	if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+		t.Fatal(err)
+	}
+	if claim.NeedsApproval {
+		if ok := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/assessments/%d/agreement", claim.ID), ""); ok.Code >= 300 {
+			t.Fatalf("agreeing to the rating answered %d: %s", ok.Code, ok.Body.String())
+		}
+	}
+	return claim.ID
+}
+
+// stateOfClaim reads the state of one row of a claim.
+func (r *reach) stateOfClaim(t *testing.T, claim int64) string {
+	t.Helper()
+	var state string
+	if err := r.db.DB.NewSelect().Table("decision").Column("state").
+		Where("claim_id = ?", claim).Limit(1).Scan(t.Context(), &state); err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
+func TestAgreeingARatingThatRaisesTheOneInForceLapsesAClaim(t *testing.T) {
+	// A word below the published one is milder and waits for a second person,
+	// and can still be above the published score a claim was made against.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		if _, err := r.db.DB.NewUpdate().Table("vulnerability").Set("score_centi = ?", 500).
+			Where("identifier = ?", "CVE-2026-CURL1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		claim := r.agreedAcrossTheFold(t, "CVE-2026-CURL1",
+			"vulnerable_code_cannot_be_controlled_by_adversary")
+		r.rated(t, "high")
+		if state := r.stateOfClaim(t, claim); state != "lapsed" {
+			t.Errorf("agreeing a rating from medium to high left the claim %q", state)
+		}
+	})
+}
+
+func TestWithdrawingAMilderRatingLapsesAClaimMadeUnderIt(t *testing.T) {
+	// The published rating back in force can be worse than the one taken back.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		rating := r.rated(t, "low")
+		claim := r.agreedAcrossTheFold(t, "CVE-2026-CURL1",
+			"vulnerable_code_cannot_be_controlled_by_adversary")
+		if state := r.stateOfClaim(t, claim); state != "approved" {
+			t.Fatalf("the claim is %q before anything moved", state)
+		}
+		if got := asPerson(t, r, "triager", http.MethodDelete,
+			fmt.Sprintf("/v1/assessments/%d", rating), ""); got.Code >= 300 {
+			t.Fatalf("withdrawing the rating answered %d: %s", got.Code, got.Body.String())
+		}
+		if state := r.stateOfClaim(t, claim); state != "lapsed" {
+			t.Errorf("putting critical back in force left a claim made under low %q", state)
+		}
+	})
+}
+
+func TestReAffirmingAPromiseTakesNoCap(t *testing.T) {
+	// The next scan re-checks every row a promise names, so it is the one bulk
+	// write the cap does not reach (REQ-27), in one act over many claims as in
+	// one over one.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		if got := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`","reasoning":"Taking the 8.5.0 bump.",`+
+				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
+		}
+		var promise int64
+		if err := r.db.DB.NewSelect().TableExpr(`"claim" AS "cl"`).ColumnExpr("cl.id").
+			Where("cl.outcome = ?", "upgrade-needed").Limit(1).Scan(t.Context(), &promise); err != nil {
+			t.Fatal(err)
+		}
+		r.curlMovedTo(t, "8.4.1")
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"1"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+		code, body, out := reaffirmingMany(t, r, "triager", promise)
+		if code != http.StatusCreated {
+			t.Fatalf("re-affirming a promise past the cap answered %d: %s", code, body)
+		}
+		if len(out.Claims) != 1 || len(out.Claims[0].Decisions) < 2 {
+			t.Errorf("the promise was re-made as %s, want every place past a cap of one", body)
 		}
 	})
 }
