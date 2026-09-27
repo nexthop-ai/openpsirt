@@ -1073,6 +1073,10 @@ the findings and to the judgments standing on them.</p>
 <td>A judgment about risk lapses and returns to triage. A claim that the scanner matched the wrong thing stands</td>
 </tr>
 <tr>
+<td>An issue is rated worse</td>
+<td>A judgment about risk that the severity bears on lapses and returns to whoever made it</td>
+</tr>
+<tr>
 <td>Another release or variant ships the same code</td>
 <td>The judgment already made there applies</td>
 </tr>
@@ -1201,8 +1205,10 @@ says what turns each on.</p>
   proposer never approves their own, with no override. Short deferrals are
   exempt up to a cumulative threshold the deployment sets</li>
 <li>A judgment about risk survives rescans and lapses when the upstream version
-  of the component, or of anything that pulls it in, moves. It carries to other
-  releases, tags and variants whose chains and versions match</li>
+  of the component, or of anything that pulls it in, moves. It also lapses when
+  the issue is rated worse, unless it says the code is absent, never runs, or
+  already carries the fix. It carries to other releases, tags and variants whose
+  chains and versions match</li>
 <li>A wrong match is a claim about identity. It stands at every version until
   somebody withdraws it, and always needs a second person</li>
 <li>One judgment covers every place a finding sits</li>
