@@ -481,6 +481,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.3.0
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -968,6 +979,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.3.0
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1413,7 +1435,7 @@ refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <code>openpsirt migrate up</code>. One built by v0.1.0 passes through the v0.2.0 upgrade on
 the way. A database built by any build between releases is recreated.</p>
 <p>Read the sections for the release you are coming from, and every section after
-it: from v0.1.0, read all three.</p>
+it: from v0.1.0, read all four.</p>
 <h3 id="every-upgrade">Every upgrade<a class="headerlink" href="#every-upgrade" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -1534,6 +1556,22 @@ again under its Settings.</p>
 <tr>
 <td>A component</td>
 <td>Has no license until a scan reads one from its inventory</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v030">From v0.3.0<a class="headerlink" href="#from-v030" title="Permanent link">&para;</a></h3>
+<p>Also read after an upgrade from v0.1.0 or v0.2.0.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>triage.together-cap</code> bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read <code>triage.review-issues</code> (200 issues) and <code>triage.agreed-issues</code> (2,000 issues). Those three, and recording a flaw or adding builds to one, read <code>triage.write-ceiling</code> (50,000 findings). A value set on <code>triage.together-cap</code> is not carried to them</td>
+<td>Where <code>triage.together-cap</code> was changed, set the new limits under Settings, Triage</td>
 </tr>
 </tbody>
 </table>
