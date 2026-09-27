@@ -29,19 +29,12 @@ import (
 // nothing to happen to. Both are refused rather than quietly skipped, because
 // a caller that got the set wrong should hear so.
 //
-// Bounded, like every other bulk judgment.
+// Bounded, like every other act answering many issues at once.
 func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, toTarget int64,
-	chosen []int64, cap int) (int, error) {
+	chosen []int64, bounds Bounds) (int, error) {
 
 	if len(chosen) == 0 {
 		return 0, nil
-	}
-	if cap <= 0 {
-		cap = DefaultTogetherCap
-	}
-	if len(chosen) > cap {
-		return 0, fmt.Errorf("that would carry %d judgments and this deployment allows %d at "+
-			"once", len(chosen), cap)
 	}
 
 	carried := 0
@@ -78,6 +71,17 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				return fmt.Errorf("decision %d is not one this line was offered", id)
 			}
 			wanted = append(wanted, one)
+		}
+
+		// Bounded by the reviewer's issue limit, because every judgment
+		// carried waits for a second person. One chosen decision is one
+		// place on the new line.
+		issues := map[string]bool{}
+		for _, one := range wanted {
+			issues[one.Vulnerability] = true
+		}
+		if err := bounds.counted(len(issues), len(wanted), true); err != nil {
+			return err
 		}
 
 		for _, one := range wanted {

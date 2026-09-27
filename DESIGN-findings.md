@@ -80,7 +80,7 @@ judgment, the same upgrade and the same routing rule.
 Every number a person sees is counted in the unit they acted in. A row says how
 many packages of the fold sit here and how many things pull them in, because
 deciding on the row decides about all of them. The place count is still stored
-and still what the bulk cap is measured against and what the disposition
+and still what the ceiling on one action is measured against and what the disposition
 register expands to — it is not a figure a reader is asked to reconcile with the
 two above.
 
@@ -588,6 +588,7 @@ in a comparison exactly as a reported one does.
 |---|---|
 | Every build is resolved before anything is written | A component name one build holds and another does not is a question about which builds are affected, so it is refused and names the build rather than recorded against some of them and silently not the rest |
 | One product | The identifier is minted per product, so a flaw in two products is two records |
+| What one recording writes is held to the write ceiling alone | Recording a flaw adds findings and hides none, so the review-sized limits on a judgment do not apply. The ceiling, 50,000 findings by default, guards against a runaway write, and adding builds to a flaw later is held to it the same way |
 | Every row gets the same embargo, rank and deadline | They are the same flaw. A build added later copies them, or the newest build would get a later deadline for the same flaw |
 | What carries it is a component of the build, or the build itself | Naming nothing puts it on the root, which is honest where the flaw is in how the pieces fit together. Naming something the build does not hold is refused |
 | It is a component at a place, keyed exactly as a scanned one is (REQ-17) | The place is derived from the build's own graph rather than asked for: the entry path has already resolved the component there, and a component can sit in more than one place at once, which a form question could not express and which is why one recording opens one finding per place. Recorded as sitting directly under the product whatever the graph said, a flaw a person recorded and the same flaw a scan found were two places and two decisions — triaging either did nothing for the other |
@@ -742,7 +743,7 @@ one act, with one reason, covering one or more reports in one product.
 | A reason is required on everything but a duplicate, and goes through the submission policy | A reviewer and a reporter asking why are owed a sentence. A duplicate's reason is the issue it names |
 | A reason is never edited (REQ-28) | An approval is of particular words. Different words are a new ruling |
 | A ruling covers many reports and is approved, sent back or undone as one act (REQ-28) | Twenty slop reports rejected in one sentence take one approval. An approver facing one row per report is given "select all", which is not review |
-| A ruling is bounded by the bulk-judgment setting, counted in reports written (REQ-27) | Nothing re-checks a rejection. Naming one report twice writes it once, and a reference typed in another case is the same report |
+| A ruling is bounded by the bulk action limit, counted in reports written (REQ-27) | Nothing re-checks a rejection. Naming one report twice writes it once, and a reference typed in another case is the same report |
 | Every report named is in the product and unanswered, or nothing is written | A ruling that half applies is one nobody agreed to. Asked in the write, so two people ruling at once cannot both succeed |
 | A waiting ruling holds its reports | Nobody accepts them as an issue or rules on them again until it is approved or withdrawn |
 | A report under a waiting ruling reads as unjudged | Who judged it is written when the ruling takes effect. Before then one person has said it and nobody has agreed |

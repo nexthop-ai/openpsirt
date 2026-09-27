@@ -763,7 +763,7 @@ export interface paths {
          *
          *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
          *
-         *     Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
+         *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
          *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
@@ -3229,7 +3229,7 @@ export interface paths {
          *
          *     `reasoning` is required on everything but a duplicate. `duplicate_of` is required on a duplicate and refused on anything else, and names an issue open in this product. A duplicate of an issue that is not open here is refused: reject the report instead.
          *
-         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`, the setting that bounds every bulk judgment.
+         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`.
          *
          *     Requires: private-triage on the product
          */
@@ -3929,7 +3929,7 @@ export interface paths {
          *
          *     A place a live decision already covers refuses the whole claim, naming that decision. Send `skip_decided` to leave those places out instead; `skipped` lists each one with the decision standing there. Where every place is covered, nothing is recorded and the request is refused.
          *
-         *     Bounded. At most 2000 names per request, and a limit on how many findings one action may write, set under `triage.together-cap`. The limit is checked against the findings this resolves to, which is more than the number of names.
+         *     Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
          *
          *     Requires: public-triage or private-triage on the product
          */
@@ -4785,7 +4785,7 @@ export interface paths {
          *
          *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there.
          *
-         *     Bounded. At most 2000 claims per request, and every finding the act writes, across every claim, counts against `triage.together-cap`. A promise to upgrade is not counted. `reasoning` is required.
+         *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
          *     Requires: public-triage or private-triage
          */
@@ -8492,10 +8492,18 @@ export interface components {
              */
             readonly $schema?: string;
             /** Format: int64 */
-            cap: number;
-            /** Format: int64 */
             findings: number;
+            /**
+             * Format: int64
+             * @description The number of issues one answer here may cover
+             */
+            issue_limit: number;
             items: components["schemas"]["AtComponentBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of findings one answer here may write
+             */
+            place_limit: number;
             /** Format: int64 */
             total: number;
         };

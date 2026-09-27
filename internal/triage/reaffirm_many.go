@@ -24,9 +24,9 @@ type ReaffirmingMany struct {
 	// Reasoning is the fresh reason, for all of them.
 	Reasoning string
 	By        int64
-	// Cap bounds every judgment the act re-makes, counted together. A promise
-	// carries no bound (REQ-27).
-	Cap int
+	// Bounds bound every judgment the act re-makes, counted together. A
+	// promise carries no bound (REQ-27).
+	Bounds Bounds
 }
 
 // ReaffirmMany re-makes several lapsed claims in one act.
@@ -80,7 +80,7 @@ func (s *Store) reaffirmMany(ctx context.Context, subject access.Subject,
 	}
 
 	plans := make([]reaffirmPlan, 0, len(claims))
-	bounded := 0
+	var bounded []Proposal
 	for _, claimID := range claims {
 		plan, err := s.planReaffirm(ctx, subject, claimID, r.Reasoning, r.By)
 		if err != nil {
@@ -90,20 +90,17 @@ func (s *Store) reaffirmMany(ctx context.Context, subject access.Subject,
 			return nil, err
 		}
 		if !plan.unbounded() {
-			bounded += len(plan.proposals)
+			bounded = append(bounded, plan.proposals...)
 		}
 		plans = append(plans, plan)
 	}
 	// Bound what is written, over the whole act. Held per claim, a selection
-	// of many claims each under the cap writes as many rows as it likes with
-	// one sentence behind them, which is what the cap exists to stop.
-	cap := r.Cap
-	if cap <= 0 {
-		cap = DefaultTogetherCap
-	}
-	if bounded > cap {
-		return nil, fmt.Errorf("that is %d findings and the limit here is %d: narrow the "+
-			"selection, or raise the limit deliberately", bounded, cap)
+	// of many claims each under the limit writes as many rows as it likes with
+	// one sentence behind them, which is what the limit exists to stop. The
+	// larger issue limit holds only where no claim in the act goes back to a
+	// second person: one that does puts the whole act in front of a reader.
+	if err := r.Bounds.check(bounded); err != nil {
+		return nil, err
 	}
 
 	out := make([]Reaffirmed, 0, len(plans))

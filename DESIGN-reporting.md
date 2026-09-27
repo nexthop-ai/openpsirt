@@ -703,7 +703,10 @@ reach the filesystem and restart the process.
 | The deferral threshold | How long something may be put off before a second person has to agree |
 | The session lifetime | Also the window in which somebody who moved out of a team still holds what the team gave them, through a browser and through a personal token alike |
 | The token ceiling | The longest a personal token may last |
-| The limit on one action | How many findings a single judgment may cover |
+| The bulk action limit | How many reports one ruling may cover, places one answer about one issue may cover, and rows a screen acts on one request at a time |
+| The reviewed issue limit | How many issues one answer about many issues may cover where a second person has to agree |
+| The re-confirmation issue limit | How many issues one re-confirmation may cover where nobody has to agree again |
+| The write ceiling | How many findings one answer about many issues, or one flaw recorded here, may write |
 | The triage floor | The severity below which findings are recorded and counted but kept off the working list. A product may state its own |
 | Quiet after | How long a build may go without a scan before it is reported as quiet |
 | Scan every | How often everything tracked is scanned again |
@@ -720,7 +723,7 @@ A value nothing can read is refused, not stored. Every reader falls back to
 the shipped default where a setting is unset or unparseable, so a stored value
 nobody can read is a policy that quietly stopped applying. The value is checked
 before it is written, against the kind the name is: a duration for the windows,
-threshold and lifetimes; a whole number above zero for the limit on one action; a
+threshold and lifetimes; a whole number above zero for the four limits; a
 severity word for the triage floor; on or off for upstream currency.
 
 | Rule | Reason |

@@ -13,3 +13,8 @@ import "time"
 func NearestRank(sorted []time.Duration, part float64) time.Duration {
 	return nearestRank(sorted, part)
 }
+
+// Counted is Bounds.counted, for the test of which limit holds when.
+func (b Bounds) Counted(issues, places int, review bool) error {
+	return b.counted(issues, places, review)
+}

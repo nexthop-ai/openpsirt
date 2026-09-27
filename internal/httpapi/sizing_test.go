@@ -23,9 +23,10 @@ func TestTheCandidateListSaysHowFarAClaimWouldReach(t *testing.T) {
 				Vulnerability string `json:"vulnerability"`
 				Places        int    `json:"places"`
 			} `json:"items"`
-			Total    int `json:"total"`
-			Findings int `json:"findings"`
-			Cap      int `json:"cap"`
+			Total      int `json:"total"`
+			Findings   int `json:"findings"`
+			IssueLimit int `json:"issue_limit"`
+			PlaceLimit int `json:"place_limit"`
 		}
 		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
 			"/components/libyang/issues", &page)
@@ -47,8 +48,8 @@ func TestTheCandidateListSaysHowFarAClaimWouldReach(t *testing.T) {
 		if page.Findings != want {
 			t.Errorf("the list says %d findings and its rows add to %d", page.Findings, want)
 		}
-		if page.Cap <= 0 {
-			t.Error("the list does not say what the limit on one action is")
+		if page.IssueLimit <= 0 || page.PlaceLimit <= 0 {
+			t.Error("the list does not say what the limits on one action are")
 		}
 
 		// And both numbers are over the whole narrowed set rather than over the

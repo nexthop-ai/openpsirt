@@ -117,7 +117,10 @@ export function Together() {
   // every render would merge on every render.
   const items = useMemo(() => issues.data?.items ?? [], [issues.data]);
   const everything = issues.data?.total ?? items.length;
-  const cap = issues.data?.cap ?? 0;
+  // The two limits one answer is held to: issues, which is what the approver
+  // reads, and findings written.
+  const issueLimit = issues.data?.issue_limit ?? 0;
+  const placeLimit = issues.data?.place_limit ?? 0;
 
   // The selection's reach, in rows written rather than issues picked.
   //
@@ -143,7 +146,9 @@ export function Together() {
     everySelected || unseen
       ? (issues.data?.findings ?? 0)
       : [...picked].reduce((sum, name) => sum + (reach.get(name) ?? 0), 0);
-  const over = cap > 0 && writing > cap;
+  const overIssues = issueLimit > 0 && picked.size > issueLimit;
+  const overPlaces = placeLimit > 0 && writing > placeLimit;
+  const over = overIssues || overPlaces;
 
   // Everything the filter matches, not everything on the page. Fetched in one
   // request at the largest page the server offers, and repeated until the set
@@ -261,16 +266,15 @@ export function Together() {
             </button>
           </div>
 
-          {/* What it would write, said before anybody types a reasoning. The
-              bound is on findings and the list counts issues, so a screen that
-              said only the second reports 44 where the answer is 2,000. */}
+          {/* What it would write, said before anybody types a reasoning, beside
+              the two limits it is held to. */}
           {picked.size > 0 && (
             <p className={over ? "alert warn" : "hint"} style={{ margin: "0 0 10px" }}>
               {picked.size.toLocaleString()} {picked.size === 1 ? "issue" : "issues"} ·{" "}
               <b>{writing.toLocaleString()}</b> {writing === 1 ? "finding" : "findings"} would be
               written
-              {cap > 0 && <> · the limit here is {cap.toLocaleString()}</>}
-              {over && <> — narrow the selection or raise the limit.</>}
+              {overIssues && <> · limit {issueLimit.toLocaleString()} issues</>}
+              {overPlaces && <> · limit {placeLimit.toLocaleString()} findings</>}
             </p>
           )}
 

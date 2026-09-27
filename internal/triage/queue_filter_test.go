@@ -139,7 +139,7 @@ func TestTheQueueNarrowsByTheReleaseAClaimCovers(t *testing.T) {
 		ctx := t.Context()
 		in := f.selection(t)
 		if _, _, err := f.store.Together(ctx, f.triager, in, f.wontFix(),
-			triage.DefaultTogetherCap); err != nil {
+			triage.DefaultBounds()); err != nil {
 			t.Fatal(err)
 		}
 		f.claimsAbout(t, f.secondIssue(t), f.proposer, triage.NotApplicable)

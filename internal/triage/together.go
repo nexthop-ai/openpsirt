@@ -50,6 +50,80 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 	return permitted(subject, proposals, now)
 }
 
+// Bounds are the limits on one act that answers many issues at once
+// (REQ-27): a new answer about many issues, a re-confirmation of answers that
+// lapsed, and answers carried onto another line.
+//
+// Issues are counted where places are not, because a reviewer reads issues: a
+// kernel issue sits at about 45 places, and counting places made a limit of
+// 2,000 mean 44 issues. Places are bounded separately, by a ceiling that
+// guards the write rather than the reader.
+type Bounds struct {
+	// Review is how many issues an act may answer where anything in it goes
+	// to a second person.
+	Review int
+	// Agreed is how many issues an act may answer where nothing in it does:
+	// every row carries an agreement already given.
+	Agreed int
+	// Places is how many findings any such act may write.
+	Places int
+}
+
+// DefaultBounds is the shipped limits, for where nobody has said.
+func DefaultBounds() Bounds {
+	return Bounds{
+		Review: setting.DefaultReviewIssues, Agreed: setting.DefaultAgreedIssues,
+		Places: setting.DefaultWriteCeiling,
+	}
+}
+
+// orDefaults fills in a limit left unset. Zero is not unbounded: an act that
+// answers many issues is always bounded.
+func (b Bounds) orDefaults() Bounds {
+	shipped := DefaultBounds()
+	if b.Review <= 0 {
+		b.Review = shipped.Review
+	}
+	if b.Agreed <= 0 {
+		b.Agreed = shipped.Agreed
+	}
+	if b.Places <= 0 {
+		b.Places = shipped.Places
+	}
+	return b
+}
+
+// check refuses an act past its bounds, counted over what it is about to
+// write. The issue limit is the reviewer's where any row goes to a second
+// person, and the larger one only where none does.
+func (b Bounds) check(proposals []Proposal) error {
+	issues := map[[2]int64]bool{}
+	review := false
+	for _, p := range proposals {
+		issues[[2]int64{p.Place.ProductID, p.Place.VulnerabilityID}] = true
+		review = review || p.NeedsApproval
+	}
+	return b.counted(len(issues), len(proposals), review)
+}
+
+// counted is check over counts already taken.
+func (b Bounds) counted(issues, places int, review bool) error {
+	b = b.orDefaults()
+	if places > b.Places {
+		return fmt.Errorf("that is %d findings and one action here writes at most %d: narrow "+
+			"the selection, or raise the limit deliberately", places, b.Places)
+	}
+	if review && issues > b.Review {
+		return fmt.Errorf("that is %d issues and a second person is asked to read at most %d "+
+			"in one action: split it, or raise the limit deliberately", issues, b.Review)
+	}
+	if !review && issues > b.Agreed {
+		return fmt.Errorf("that is %d issues and one action here re-confirms at most %d: "+
+			"split it, or raise the limit deliberately", issues, b.Agreed)
+	}
+	return nil
+}
+
 // permitted is everything except the bound: may this subject decide here, is
 // each proposal well formed, and is it recorded as made by whoever made it.
 //
@@ -138,14 +212,13 @@ type resolved struct {
 // whether this person may make the claim at all; read before the transaction,
 // they would be answers about a database that has since moved.
 //
-// Bounded, because one action writing an unbounded number of rows is a denial
-// of service somebody triggers by accident. The bound is checked against the
-// places this actually resolves to — the count somebody is asked to narrow is
-// the number of rows about to be written, not the number of names they typed.
+// Bounded twice, over what this actually resolves to rather than the names
+// typed: by how many issues a second person is asked to read, and by how many
+// findings one action may write.
 func (s *Store) Together(ctx context.Context, subject access.Subject, at TogetherAt, p Proposal,
-	cap int) (claimID int64, recorded []int64, err error) {
+	bounds Bounds) (claimID int64, recorded []int64, err error) {
 
-	claimID, recorded, _, err = s.TogetherSkipping(ctx, subject, at, p, cap)
+	claimID, recorded, _, err = s.TogetherSkipping(ctx, subject, at, p, bounds)
 	return claimID, recorded, err
 }
 
@@ -156,7 +229,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 // selected is one the claimant has to be able to see is smaller, and which
 // decision stands at each place is where they go next.
 func (s *Store) TogetherSkipping(ctx context.Context, subject access.Subject, at TogetherAt,
-	p Proposal, cap int) (claimID int64, recorded []int64, skipped []Skipped, err error) {
+	p Proposal, bounds Bounds) (claimID int64, recorded []int64, skipped []Skipped, err error) {
 
 	if len(at.VulnerabilityIDs) == 0 {
 		return 0, nil, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
@@ -204,16 +277,12 @@ func (s *Store) TogetherSkipping(ctx context.Context, subject access.Subject, at
 				return ErrAllDecided
 			}
 		}
-		// A bulk judgment is bounded, so an unset cap is the shipped number
-		// rather than none: the siblings that take this argument fill it in
-		// the same way, and this one read "zero means unbounded" — which is
-		// the one reading the rule does not have.
-		if cap <= 0 {
-			cap = DefaultTogetherCap
-		}
-		if len(places) > cap {
-			return fmt.Errorf("that is %d findings and the limit here is %d: narrow the "+
-				"selection, or raise the limit deliberately", len(places), cap)
+		// Bounded over what is about to be written: the places resolved,
+		// less any skipped, and the issues they sit under. Always the
+		// reviewer's issue limit, because this always goes to a second
+		// person.
+		if err := bounds.counted(issuesIn(places), len(places), true); err != nil {
+			return err
 		}
 
 		// The narrowing as something other than the claimant's word for it,
@@ -319,6 +388,15 @@ func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolv
 		})
 	}
 	return left, skipped, nil
+}
+
+// issuesIn is how many distinct issues a set of places sits under.
+func issuesIn(places []resolved) int {
+	issues := map[[2]int64]bool{}
+	for _, at := range places {
+		issues[[2]int64{at.ProductID, at.VulnerabilityID}] = true
+	}
+	return len(issues)
 }
 
 // placesWithin reads every open place the named issues occupy at one

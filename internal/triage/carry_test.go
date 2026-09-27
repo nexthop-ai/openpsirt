@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -37,7 +39,7 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 		}
 
 		carried, err := f.store.Carry(ctx, f.triager, was, next,
-			[]int64{agreed.ID}, triage.DefaultTogetherCap)
+			[]int64{agreed.ID}, triage.DefaultBounds())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,23 +91,58 @@ func TestOnlyWhatTheNewLineWasOfferedMayBeCarried(t *testing.T) {
 			t.Fatalf("the matching line was offered %+v, want it applying already", offered)
 		}
 		if _, err := f.store.Carry(ctx, f.triager, was, same,
-			[]int64{agreed.ID}, triage.DefaultTogetherCap); err == nil {
+			[]int64{agreed.ID}, triage.DefaultBounds()); err == nil {
 			t.Error("a judgment that already applies was carried again")
 		}
 	})
 }
 
-func TestCarryingIsBounded(t *testing.T) {
-	// one judgment across many issues's rule, which is about any action
-	// that writes many rows.
+func TestCarryingIsBoundedByTheIssuesAReviewerReads(t *testing.T) {
+	// Every judgment carried waits for a second person, so the reviewer's
+	// issue limit holds. Two issues against a limit of one is refused, and
+	// the same two under a limit of two go through, so the count is what
+	// refused it.
 	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		second := f.secondIssue(t)
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
-		if _, err := f.store.Carry(t.Context(), f.triager, was, next,
-			[]int64{1, 2, 3}, 2); err == nil {
-			t.Error("carrying more than the cap was allowed")
+		f.alsoCarries(t, second, was, next)
+
+		first := f.agreed(t, f.at())
+		other := f.at()
+		other.VulnerabilityID = second
+		also := f.agreed(t, other)
+
+		chosen := []int64{first.ID, also.ID}
+		if _, err := f.store.Carry(ctx, f.triager, was, next, chosen,
+			triage.Bounds{Review: 1}); err == nil {
+			t.Fatal("carrying two issues under a limit of one was allowed")
+		}
+		if carried, err := f.store.Carry(ctx, f.triager, was, next, chosen,
+			triage.Bounds{Review: 2}); err != nil || carried != 2 {
+			t.Errorf("carrying two issues under a limit of two answered %d, %v", carried, err)
 		}
 	})
+}
+
+// alsoCarries puts a second issue at the fixture's place on each line, beside
+// the first.
+func (f *fixture) alsoCarries(t *testing.T, issue int64, targets ...int64) {
+	t.Helper()
+	var rows []finding.Finding
+	if err := f.db.DB.NewSelect().Model(&rows).
+		Where("target_id IN (?)", bun.List(targets)).
+		Where("vulnerability_id = ?", f.issue).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		row.ID = 0
+		row.VulnerabilityID = issue
+		if _, err := f.db.DB.NewInsert().Model(&row).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestSomebodyWhoMayNotDecideHereCarriesNothing(t *testing.T) {
@@ -114,7 +151,7 @@ func TestSomebodyWhoMayNotDecideHereCarriesNothing(t *testing.T) {
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
 		if _, err := f.store.Carry(t.Context(), f.onlooker, was, next,
-			[]int64{agreed.ID}, triage.DefaultTogetherCap); err == nil {
+			[]int64{agreed.ID}, triage.DefaultBounds()); err == nil {
 			t.Error("somebody who may not decide here carried a judgment")
 		}
 	})
@@ -210,7 +247,7 @@ func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
 				len(offered.Postponed))
 		}
 		if _, err := f.store.Carry(ctx, f.triager, was, next,
-			[]int64{offered.Postponed[0].DecisionID}, triage.DefaultTogetherCap); err == nil {
+			[]int64{offered.Postponed[0].DecisionID}, triage.DefaultBounds()); err == nil {
 			t.Fatal("a deferral was carried onto a release that was built once")
 		} else if !strings.Contains(err.Error(), "built once") {
 			t.Errorf("it was refused, but not for being a tag: %v", err)
@@ -267,7 +304,7 @@ func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
 		f.rateIssue(t, 750)
 
 		if _, err := f.store.Carry(ctx, f.triager, was, next,
-			[]int64{agreed.ID}, triage.DefaultTogetherCap); err != nil {
+			[]int64{agreed.ID}, triage.DefaultBounds()); err != nil {
 			t.Fatal(err)
 		}
 		var baseline *int

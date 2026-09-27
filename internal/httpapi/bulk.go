@@ -64,13 +64,12 @@ func registerBulk(api huma.API, in Ingest) {
 			Items []AtComponentBody `json:"items"`
 			Total int               `json:"total"`
 			// Findings is how many rows the whole narrowed set
-			// holds, and Cap how many one action may write. The
-			// two are what sizing a claim needs and what a count of
-			// issues cannot state: a bound on rows written means a
-			// screen counting issues reports 44 where the answer
-			// is 2,000.
-			Findings int `json:"findings"`
-			Cap      int `json:"cap"`
+			// holds. The two limits are what sizing an answer needs:
+			// how many issues one action may answer, and how many
+			// findings it may write.
+			Findings   int `json:"findings"`
+			IssueLimit int `json:"issue_limit" doc:"The number of issues one answer here may cover"`
+			PlaceLimit int `json:"place_limit" doc:"The number of findings one answer here may write"`
 		}
 	}, error) {
 		subject, _, err := triaging(ctx, in)
@@ -94,10 +93,9 @@ func registerBulk(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
-		limit, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-			triage.DefaultTogetherCap)
+		bounds, err := boundsFor(ctx, in)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "the limit on one action could not be read", err)
+			return nil, err
 		}
 
 		issues := make([]int64, 0, len(at))
@@ -111,13 +109,15 @@ func registerBulk(api huma.API, in Ingest) {
 
 		out := &struct {
 			Body struct {
-				Items    []AtComponentBody `json:"items"`
-				Total    int               `json:"total"`
-				Findings int               `json:"findings"`
-				Cap      int               `json:"cap"`
+				Items      []AtComponentBody `json:"items"`
+				Total      int               `json:"total"`
+				Findings   int               `json:"findings"`
+				IssueLimit int               `json:"issue_limit" doc:"The number of issues one answer here may cover"`
+				PlaceLimit int               `json:"place_limit" doc:"The number of findings one answer here may write"`
 			}
 		}{}
-		out.Body.Findings, out.Body.Cap = reaching, limit
+		out.Body.Findings = reaching
+		out.Body.IssueLimit, out.Body.PlaceLimit = bounds.Review, bounds.Places
 		// One row per issue. AtComponent returns every place, because that is
 		// what a decision is written against; this list is what somebody picks
 		// from, and the place count is the useful part of it.
@@ -179,9 +179,9 @@ func registerBulk(api huma.API, in Ingest) {
 			"decision. Send `skip_decided` to leave those places out instead; `skipped` lists " +
 			"each one with the decision standing there. Where every place is covered, nothing " +
 			"is recorded and the request is refused.\n\n" +
-			"Bounded. At most 2000 names per request, and a limit on how many findings one " +
-			"action may write, set under `triage.together-cap`. The limit is checked against " +
-			"the findings this resolves to, which is more than the number of names.",
+			"Bounded twice, over what the names resolve to: by how many issues one answer may " +
+			"cover, set under `triage.review-issues`, and by how many findings it may write, " +
+			"set under `triage.write-ceiling`. At most 2000 names per request.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
@@ -258,10 +258,9 @@ func registerBulk(api huma.API, in Ingest) {
 				"no issue is filed under " + strings.Join(clipped(unknown), ", "))
 		}
 
-		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-			triage.DefaultTogetherCap)
+		bounds, err := boundsFor(ctx, in)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "the limit on one action could not be read", err)
+			return nil, err
 		}
 
 		// The places are resolved inside the write, not here. Reading
@@ -283,7 +282,7 @@ func registerBulk(api huma.API, in Ingest) {
 			// is the case a second pair of eyes exists for, and the short
 			// deferral that stands on its own is a claim about one finding.
 			NeedsApproval: true,
-		}, cap)
+		}, bounds)
 		if err != nil {
 			if errors.Is(err, triage.ErrNothingOpen) {
 				return nil, huma.Error404NotFound(
@@ -340,6 +339,29 @@ func skippedBodies(ctx context.Context, in Ingest, skipped []triage.Skipped) ([]
 		})
 	}
 	return out, nil
+}
+
+// boundsFor reads the limits on an act answering many issues at once, as the
+// deployment sets them.
+func boundsFor(ctx context.Context, in Ingest) (triage.Bounds, error) {
+	settings := setting.NewStore(in.DB.DB)
+	var b triage.Bounds
+	for _, each := range []struct {
+		key      string
+		fallback int
+		into     *int
+	}{
+		{setting.ReviewIssues, setting.DefaultReviewIssues, &b.Review},
+		{setting.AgreedIssues, setting.DefaultAgreedIssues, &b.Agreed},
+		{setting.WriteCeiling, setting.DefaultWriteCeiling, &b.Places},
+	} {
+		n, err := settings.Count(ctx, each.key, each.fallback)
+		if err != nil {
+			return b, wentWrong(in.Logger, "the limits on one action could not be read", err)
+		}
+		*each.into = n
+	}
+	return b, nil
 }
 
 // deferredUntil reads the date a postponement runs to.

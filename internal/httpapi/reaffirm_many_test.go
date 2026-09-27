@@ -300,7 +300,7 @@ func TestReAffirmingManyIsBoundedOverTheWholeAct(t *testing.T) {
 		one := r.agreedAcrossTheFold(t, "CVE-2026-CURL1", "vulnerable_code_not_present")
 		two := r.agreedAcrossTheFold(t, "CVE-2026-CURL2", "vulnerable_code_not_present")
 		r.curlMovedTo(t, "8.6.0")
-		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.write-ceiling",
 			`{"value":"3"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}
@@ -526,7 +526,7 @@ func TestReAffirmingAPromiseTakesNoCap(t *testing.T) {
 			t.Fatal(err)
 		}
 		r.curlMovedTo(t, "8.4.1")
-		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.write-ceiling",
 			`{"value":"1"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}

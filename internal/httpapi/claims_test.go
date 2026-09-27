@@ -1227,7 +1227,7 @@ func TestReAffirmingADismissalIsBoundedAndAPromiseIsNot(t *testing.T) {
 		claimed := r.agreedThenLapsed(t)
 
 		// One, so the two places of the fold are already past it.
-		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.write-ceiling",
 			`{"value":"1"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}
@@ -1238,13 +1238,13 @@ func TestReAffirmingADismissalIsBoundedAndAPromiseIsNot(t *testing.T) {
 			t.Fatalf("re-affirming a dismissal past the cap answered %d: %s",
 				refused.Code, refused.Body.String())
 		}
-		if !strings.Contains(refused.Body.String(), "the limit here is") {
+		if !strings.Contains(refused.Body.String(), "writes at most") {
 			t.Errorf("the refusal does not name the bound: %s", refused.Body.String())
 		}
 
 		// And raising it deliberately is the way through, which is what the
 		// refusal offers.
-		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.write-ceiling",
 			`{"value":"50"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("raising the cap answered %d: %s", got.Code, got.Body.String())
 		}
