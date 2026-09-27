@@ -7,6 +7,7 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { Became } from "./QueueMine";
+import { ToReaffirm } from "./QueueReaffirm";
 import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
@@ -76,20 +77,39 @@ export function Queue() {
   // they were mixed in, which made the queue a list containing work the reader
   // cannot do, because approving your own is refused.
   const mine = params.get("mine") === "1";
+  // The claims of yours that lapsed. A tab of its own because the lapse alert
+  // links here: it is work handed back, not a record of what happened.
+  const reaffirm = params.get("reaffirm") === "1";
+  // Either of the two tabs about your own claims, where the queue proper is
+  // only counted.
+  const aside = mine || reaffirm;
   // The product, where the address names one. The figure on the home screen
   // is narrowed by the scope picker and links here with it, so a queue that
   // ignored it answered a different question from the number that was clicked.
   const product = params.get("product") ?? "";
   const within = product ? { product } : {};
   const queue = useQuery({
-    queryKey: ["queue", mine ? 0 : offset, mine, product],
+    queryKey: ["queue", aside ? 0 : offset, aside, product],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
           // A page when it is the list being read, one row when it is only
           // the tab's count: both sides are asked for on every visit so a tab
           // carries its number without being opened.
-          params: { query: { limit: mine ? 1 : PAGE, offset: mine ? 0 : offset, ...within } },
+          params: { query: { limit: aside ? 1 : PAGE, offset: aside ? 0 : offset, ...within } },
+        }),
+      ),
+  });
+  // The lapsed claims that are this person's to re-affirm, narrowed to the
+  // product the address names like the queue beside it.
+  const lapsedMine = useQuery({
+    queryKey: ["to-reaffirm", reaffirm ? offset : 0, reaffirm, product],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/to-reaffirm", {
+          params: {
+            query: { limit: reaffirm ? PAGE : 1, offset: reaffirm ? offset : 0, ...within },
+          },
         }),
       ),
   });
@@ -225,7 +245,12 @@ export function Queue() {
       <div className="screen-head">
         <h2>Review queue</h2>
         <p>
-          {mine ? (
+          {reaffirm ? (
+            <>
+              <Count of={lapsedMine}>{() => (lapsedMine.data?.total ?? 0).toLocaleString()}</Count>{" "}
+              lapsed claims of yours · the code moved or the issue was rated worse
+            </>
+          ) : mine ? (
             <>
               <Count of={became}>{() => (became.data?.total ?? 0).toLocaleString()}</Count> proposed
               by you · what became of each, newest first
@@ -264,10 +289,11 @@ export function Queue() {
         <button
           type="button"
           className="tab2"
-          aria-selected={!mine}
+          aria-selected={!mine && !reaffirm}
           onClick={() => {
             const now = new URLSearchParams(params);
             now.delete("mine");
+            now.delete("reaffirm");
             now.delete("offset");
             setParams(now);
           }}
@@ -284,6 +310,7 @@ export function Queue() {
           onClick={() => {
             const now = new URLSearchParams(params);
             now.set("mine", "1");
+            now.delete("reaffirm");
             now.delete("offset");
             setParams(now);
           }}
@@ -291,6 +318,23 @@ export function Queue() {
           Mine, recent{" "}
           <span className="n">
             <Count of={became}>{() => (became.data?.total ?? 0).toLocaleString()}</Count>
+          </span>
+        </button>
+        <button
+          type="button"
+          className="tab2"
+          aria-selected={reaffirm}
+          onClick={() => {
+            const now = new URLSearchParams(params);
+            now.set("reaffirm", "1");
+            now.delete("mine");
+            now.delete("offset");
+            setParams(now);
+          }}
+        >
+          To reaffirm{" "}
+          <span className="n">
+            <Count of={lapsedMine}>{() => (lapsedMine.data?.total ?? 0).toLocaleString()}</Count>
           </span>
         </button>
       </div>
@@ -307,7 +351,7 @@ export function Queue() {
         </div>
       )}
 
-      {!mine && claims.length > 0 && (
+      {!aside && claims.length > 0 && (
         <div className="batchbar">
           <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
             <input
@@ -396,7 +440,17 @@ export function Queue() {
         </div>
       )}
 
-      {mine ? (
+      {reaffirm ? (
+        <ToReaffirm
+          rows={lapsedMine.data?.items ?? []}
+          query={lapsedMine}
+          onDone={() => {
+            void queries.invalidateQueries({ queryKey: ["to-reaffirm"] });
+            void queries.invalidateQueries({ queryKey: ["my-claims"] });
+            void queries.invalidateQueries({ queryKey: ["queue"] });
+          }}
+        />
+      ) : mine ? (
         <Became rows={became.data?.items ?? []} query={became} />
       ) : claims.length === 0 ? (
         <Empty
@@ -422,8 +476,14 @@ export function Queue() {
         </div>
       )}
       <Paged
-        shown={mine ? (became.data?.items?.length ?? 0) : claims.length}
-        total={mine ? became.data?.total : queue.data?.total}
+        shown={
+          reaffirm
+            ? (lapsedMine.data?.items?.length ?? 0)
+            : mine
+              ? (became.data?.items?.length ?? 0)
+              : claims.length
+        }
+        total={reaffirm ? lapsedMine.data?.total : mine ? became.data?.total : queue.data?.total}
         offset={offset}
         limit={PAGE}
         onGo={go}

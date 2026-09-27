@@ -62,9 +62,9 @@ func TestABulkClaimRecordsTheRatingInForceAsItsBaseline(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := finding.SeverityScore("medium")
-		if written.SeverityAtApproval() != want {
-			t.Errorf("the baseline reads as %d, want %d — the rating in force here, "+
-				"not the published score", written.SeverityAtApproval(), want)
+		if written.SeverityCenti == nil || *written.SeverityCenti != want {
+			t.Errorf("the baseline reads as %v, want %d — the rating in force here, "+
+				"not the published score", written.SeverityCenti, want)
 		}
 	})
 }

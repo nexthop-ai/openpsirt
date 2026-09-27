@@ -308,6 +308,26 @@ func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column stri
 	return query.Where("NOT ("+where+")", args...)
 }
 
+// notDecidableWhere is the condition a decision row meets where the subject
+// may not argue about it, cases included — the complement of decidableBy, for
+// asking whether a claim has any row out of the subject's reach.
+func notDecidableWhere(subject access.Subject, column string) (string, []any) {
+	if subject.Kind != access.Person {
+		return "1 = 1", nil
+	}
+	products, all := subject.Products()
+	if all {
+		return "1 = 0", nil
+	}
+	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
+		return mayDecide(subject, id, v)
+	})
+	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
+	where, args = orBrought(subject, where, args, column+".product_id", column+".vulnerability_id")
+	// Neither column is ever null, so negating it is exact.
+	return "NOT (" + where + ")", args
+}
+
 // readableVisibilities is what this person may read across the products a set
 // of rows sits in: each visibility they may read on every one of those
 // products.

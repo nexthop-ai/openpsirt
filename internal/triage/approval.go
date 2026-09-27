@@ -261,6 +261,9 @@ type ForPerson struct {
 	VulnerabilityID int64
 	Rows            int
 	Undisclosed     bool
+	// RatedWorse says the rows lapsed because the issue was rated worse,
+	// rather than because the code moved.
+	RatedWorse bool
 }
 
 func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch string) (Undone, error) {

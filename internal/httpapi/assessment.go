@@ -13,6 +13,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // AssessmentBody is one product's rating of an issue, against the published
@@ -120,6 +122,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			return nil, asked(in.Logger, err)
 		}
+		outgrown(ctx, in, claim.ProductID, claim.VulnerabilityID)
 		body := assessmentBody(*claim, input.Vulnerability, subject.ID)
 		body.Product, body.ProductName = product.Name, product.DisplayName
 		return &struct{ Body AssessmentBody }{Body: body}, nil
@@ -155,6 +158,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			return nil, asked(in.Logger, err)
 		}
+		outgrown(ctx, in, claim.ProductID, claim.VulnerabilityID)
 		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, "", subject.ID)}, nil
 	})
 
@@ -185,6 +189,16 @@ func registerAssessment(api huma.API, in Ingest) {
 				return nil, huma.Error403Forbidden("not authorized")
 			}
 			return nil, asked(in.Logger, err)
+		}
+		// The published rating back in force can be worse than the one taken
+		// back.
+		var withdrawn finding.Assessment
+		if err := in.DB.DB.NewSelect().Model(&withdrawn).
+			Where("id = ?", input.ID).Scan(ctx); err != nil {
+			in.logger().Error("could not read the assessment just withdrawn",
+				"assessment", input.ID, "error", err)
+		} else {
+			outgrown(ctx, in, withdrawn.ProductID, withdrawn.VulnerabilityID)
 		}
 		return &struct{}{}, nil
 	})
@@ -304,4 +318,24 @@ func productsNamed(ctx context.Context, in Ingest,
 	}
 	shown, err = products.ProductNames(ctx, ids)
 	return called, shown, err
+}
+
+// outgrown lapses the claims a change to the rating in force in one product
+// has risen past, and tells whoever made them (REQ-25).
+//
+// Reported and not fatal. The rating is recorded and correct, and a claim this
+// fails to mark stands until the next scan with the issue open sweeps again.
+func outgrown(ctx context.Context, in Ingest, productID, vulnerabilityID int64) {
+	worse, err := triage.NewStore(in.DB.DB).LapseRatedWorse(ctx, triage.RatedWorseWhere{
+		ProductID: productID, Vulnerabilities: []int64{vulnerabilityID},
+	})
+	if err != nil {
+		in.logger().Error("could not mark what a rating rise outgrew",
+			"product", productID, "vulnerability", vulnerabilityID, "error", err)
+		return
+	}
+	for _, one := range worse.Told {
+		tell(ctx, in, "could not say that a decision lapsed", notify.Lapse(one),
+			"person", one.PersonID)
+	}
 }

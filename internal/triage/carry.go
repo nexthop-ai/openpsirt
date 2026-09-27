@@ -93,9 +93,17 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			if err != nil {
 				return err
 			}
+			// How bad the issue is judged to be here now, which is what a
+			// later rise is measured from. Without it a carried claim reads
+			// as made about an unrated issue.
+			severity, err := within.severityOf(ctx, place.ProductID, place.VulnerabilityID)
+			if err != nil {
+				return err
+			}
 			proposal := Proposal{
 				Place: *place, Outcome: old.Outcome,
 				Reasoning: one.Reasoning, By: subject.ID,
+				SeverityCenti: severity,
 				// Always. A judgment whose versions moved is a
 				// fresh claim about code nobody has looked at,
 				// however confident whoever carried it was —

@@ -506,6 +506,7 @@ var outsideTheTrail = map[string]string{
 	"plan-upgrade":                 "the decision record",
 	"point-claim-elsewhere":        "the decision record",
 	"reaffirm-claim":               "the decision record",
+	"reaffirm-many":                "the decision record",
 	"reaffirm-decision":            "the decision record",
 	"add-advisory-issue":           "the decision record",
 	"approve-advisory":             "the decision record",

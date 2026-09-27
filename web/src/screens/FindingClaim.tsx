@@ -757,7 +757,7 @@ export function Prior({
               Cancel
             </button>
             <span className="consequence">
-              No approval needed: same justification, severity unchanged
+              Keeps the earlier approval, unless it was never agreed or the issue is rated worse
             </span>
           </>
         )}

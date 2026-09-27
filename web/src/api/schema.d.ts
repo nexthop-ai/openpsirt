@@ -761,7 +761,7 @@ export interface paths {
          *
          *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
          *
-         *     One act, one approval. Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+         *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
          *
          *     Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
          *
@@ -4091,7 +4091,7 @@ export interface paths {
          *
          *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
          *
-         *     It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
+         *     It does need approval again if nothing was ever agreed to, or if the issue is rated a band worse since the original was agreed to and the claim is one a severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
          *
          *     Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
          *
@@ -4674,6 +4674,36 @@ export interface paths {
          *     Requires: administrator
          */
         post: operations["upload-vex-statements"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reaffirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-affirm several lapsed claims
+         * @description Re-makes each claim named, as one act with one reasoning. Name claims from `GET /v1/to-reaffirm`.
+         *
+         *     Each claim is re-made whole, exactly as re-affirming it alone does: every lapsed place at the versions it has now, keeping the claim's own outcome, justification and dates, and carrying its earlier agreement.
+         *
+         *     Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
+         *
+         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there.
+         *
+         *     Bounded. At most 2000 claims per request, and every finding the act writes, across every claim, counts against `triage.together-cap`. A promise to upgrade is not counted. `reasoning` is required.
+         *
+         *     Requires: public-triage or private-triage
+         */
+        post: operations["reaffirm-many"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5309,6 +5339,32 @@ export interface paths {
          *     Requires: administrator
          */
         delete: operations["remove-from-team"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/to-reaffirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List your lapsed claims
+         * @description Returns the claims you proposed that lapsed and that nothing has replaced, the most recently written first: the claims that are yours to re-affirm. `product` narrows them to one product.
+         *
+         *     A claim lapses when a version moves under it, and when the issue is rated into a higher band on a claim a severity bears on. `code_moved` and `rated_worse` say which, and both can hold.
+         *
+         *     Narrowed to the claims you may still argue about, every lapsed row of them.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may act on.
+         */
+        get: operations["list-to-reaffirm"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6593,6 +6649,8 @@ export interface components {
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
+            /** @description Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it */
+            reaffirmable?: boolean;
             /**
              * Format: int64
              * @description The number of decisions the claim wrote
@@ -9939,6 +9997,28 @@ export interface components {
             /** @description The reason it still holds, in markdown */
             reasoning: string;
         };
+        "Reaffirm-manyRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaffirm-manyRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The lapsed claims to re-make */
+            claims: number[] | null;
+            /** @description The reason every one of them still holds, in markdown */
+            reasoning: string;
+        };
+        "Reaffirm-manyResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaffirm-manyResponse.json
+             */
+            readonly $schema?: string;
+            /** @description One entry per claim re-made */
+            claims: components["schemas"]["ReaffirmedBody"][] | null;
+        };
         ReaffirmedBody: {
             /**
              * Format: uri
@@ -9957,6 +10037,11 @@ export interface components {
              * @description The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
              */
             places: number;
+            /**
+             * Format: int64
+             * @description The claim that lapsed
+             */
+            previous_claim_id: number;
             /** @description Whether a second person has to agree */
             waiting: boolean;
         };
@@ -11209,6 +11294,51 @@ export interface components {
             members?: string[] | null;
             /** @description The team's name */
             name: string;
+        };
+        ToReaffirmBody: {
+            claim: components["schemas"]["ClaimBody"];
+            /** @description Whether a version moved under it */
+            code_moved: boolean;
+            decision: components["schemas"]["DecisionBody"];
+            /**
+             * Format: int64
+             * @description The number of its rows that lapsed
+             */
+            decisions: number;
+            /** @description The representative decision's subject. Absent where no open finding sits at its place */
+            finding?: components["schemas"]["FindingRefBody"];
+            /**
+             * Format: int64
+             * @description The number of distinct issues those cover
+             */
+            issues: number;
+            /** @description When it lapsed */
+            lapsed_at?: string;
+            /** @description How bad the same issue is judged to be here now. Absent where it is unrated */
+            now?: string;
+            place: components["schemas"]["PlaceBody"];
+            /**
+             * Format: int64
+             * @description The number of distinct places those cover
+             */
+            places: number;
+            /** @description Whether an issue the claim covers now sits in a higher band than when the claim was made, on a claim a severity bears on */
+            rated_worse: boolean;
+            /** @description The reasoning the claim rested on */
+            reasoning: string;
+            /** @description How bad that issue was judged to be when the claim was made, or the representative issue where none was rated worse. Absent where it was unrated */
+            was?: string;
+        };
+        ToReaffirmOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ToReaffirmOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ToReaffirmBody"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         TokenBody: {
             /**
@@ -19127,6 +19257,39 @@ export interface operations {
             };
         };
     };
+    "reaffirm-many": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reaffirm-manyRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reaffirm-manyResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-out-of-support": {
         parameters: {
             query?: {
@@ -20058,6 +20221,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-to-reaffirm": {
+        parameters: {
+            query?: {
+                /** @description A product to narrow to, by name */
+                product?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToReaffirmOutputBody"];
+                };
             };
             /** @description Error */
             default: {
