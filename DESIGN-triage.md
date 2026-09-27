@@ -552,6 +552,20 @@ that not looking is a choice rather than an omission.
 A claim that needed nobody — a deferral under the threshold — is not here at all,
 by the same rule that keeps unreachable work out.
 
+### Queue filters
+
+The queue and its export take the same filters. A claim is kept where one of its
+waiting rows satisfies every filter, and is then shown whole.
+
+| Filter | Meaning |
+|---|---|
+| Product | Claims made in one product |
+| Proposer | Claims one person made, by sign-in identity. A name nobody holds leaves the queue empty rather than being ignored, so a filter that could not be applied never reads as one that worked, and the answer is the same whether the name exists or not |
+| Age | Claims proposed at least this many days ago, on the clock the age beside each entry is read from |
+| Severity | Claims covering an issue rated this badly or worse by the rating in force in the claim's product |
+| Outcome | Claims of these outcomes |
+| Release | Claims currently covering an open finding in a branch or tag of this name, by the match that names the builds a claim covers, narrowed to the findings the reader may see. A decision names no release, so a claim with nothing open under it in a release is not about that release |
+
 ## Claim outcomes
 
 A person's own page of what they proposed and what happened to it.
@@ -835,6 +849,21 @@ claimant's words, and as something an approver can re-run.
 | Read with the same visibility rule the candidate list used | Two numbers compared against each other have to be counts of the same population |
 | It is evidence, and refuses nothing | A person may legitimately claim about part of what a narrowing returns — that is what picking from the list is. What was missing was any way for the approver to see that they had |
 | The claimant's own sentence is kept | It says what they meant, which the counts do not |
+
+### Decided places
+
+A selection covering a place a live decision already covers is refused whole by
+default, naming that decision (§ One live claim per key). The claimant may ask
+instead for those places to be left out.
+
+| Rule | |
+|---|---|
+| Skipping is asked for, never assumed | Skipping silently covers less than was selected. Refusing tells somebody holding five hundred rows which decision to go and read |
+| What was skipped is returned | Each place, by the issue's name, with the decision standing there and how far it has got. A claim smaller than its selection is visible to the person who made it |
+| A place counts as decided under either key | The question the unique index answers: a live decision at the versions, or a correction standing at any version. A place skipping keeps is one the index accepts |
+| The bound counts what is written | Skipped places are not written, so a selection within the cap once they are left out is not refused for them |
+| Every place decided refuses the request | Nothing is recorded. A claim with no rows is not something a second person can agree to |
+| The approver sees the rows the claim wrote | What was skipped is not recorded on the claim. The narrowing's two counts still compare the issues named with the issues the narrowing reaches |
 
 ## Fix bundles
 

@@ -34,8 +34,25 @@ var ErrSamePerson = errors.New("that would hand their work to themselves")
 func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject,
 	productID, vulnerabilityID, componentID int64, to *int64, dispatches bool) (int64, error) {
 
+	return s.moveWhere(ctx, db, subject, productID, to, dispatches,
+		func(q *bun.UpdateQuery) *bun.UpdateQuery {
+			return q.Where("vulnerability_id = ?", vulnerabilityID).
+				Where("component_id = ?", componentID)
+		})
+}
+
+// moveWhere is moveWork over whichever work the caller names: one issue at one
+// component, or several issues at every binary of one fold.
+//
+// The naming is the only part a caller supplies. The product, the open rows and
+// who may move which of them are this function's, so an act that hands over
+// many pieces at once is held to exactly the rule that hands over one.
+func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID int64, to *int64, dispatches bool,
+	naming func(*bun.UpdateQuery) *bun.UpdateQuery) (int64, error) {
+
 	now := s.now().UTC().Truncate(time.Microsecond)
-	update := db.NewUpdate().Model((*Finding)(nil)).
+	update := naming(db.NewUpdate().Model((*Finding)(nil)).
 		// Across the product's builds, not one of them. The same code
 		// built as several variants is one piece of work — a judgment
 		// carries no variant, so somebody taking this on has taken on
@@ -44,9 +61,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 		// beside it, which is how a person ends up holding half of
 		// what they think they hold.
 		Where(inThisProduct, productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id = ?", componentID).
-		Where("closed_at IS NULL")
+		Where("closed_at IS NULL"))
 
 	// Which rows this caller may move, asked here rather than beforehand so
 	// that the engine answers it at the moment of the write: there is no

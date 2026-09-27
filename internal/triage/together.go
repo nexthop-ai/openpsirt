@@ -5,6 +5,7 @@ package triage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -95,6 +96,20 @@ type TogetherAt struct {
 	// claimant's prose is how many issues that narrowing reaches, against how
 	// many were named.
 	Contains string
+	// SkipDecided leaves out every place a live decision already covers,
+	// where the claimant asked for that. Unset, a selection covering one is
+	// refused whole, naming the decision, because it is a selection somebody
+	// should look at again.
+	SkipDecided bool
+}
+
+// Skipped is a place a bulk judgment left out because a live decision already
+// covers it, and the decision that does.
+type Skipped struct {
+	VulnerabilityID int64
+	PlaceIdentity   string
+	DecisionID      int64
+	State           State
 }
 
 // resolved is a place a judgment is about to be written against, with how bad
@@ -130,11 +145,24 @@ type resolved struct {
 func (s *Store) Together(ctx context.Context, subject access.Subject, at TogetherAt, p Proposal,
 	cap int) (claimID int64, recorded []int64, err error) {
 
+	claimID, recorded, _, err = s.TogetherSkipping(ctx, subject, at, p, cap)
+	return claimID, recorded, err
+}
+
+// TogetherSkipping is Together, also returning what it left out where the
+// claimant asked it to skip places already decided.
+//
+// What is skipped is said rather than dropped: a claim covering less than was
+// selected is one the claimant has to be able to see is smaller, and which
+// decision stands at each place is where they go next.
+func (s *Store) TogetherSkipping(ctx context.Context, subject access.Subject, at TogetherAt,
+	p Proposal, cap int) (claimID int64, recorded []int64, skipped []Skipped, err error) {
+
 	if len(at.VulnerabilityIDs) == 0 {
-		return 0, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
+		return 0, nil, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
 	}
 	if p.By != subject.ID {
-		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return 0, nil, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
 	// attempted is what the write was about, kept so a refusal can be read
@@ -149,6 +177,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		// failed would report claims that no longer exist.
 		recorded = recorded[:0]
 		attempted = nil
+		skipped = nil
 		claimID = 0
 
 		// The fold, resolved inside the transaction that writes like
@@ -166,6 +195,14 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		}
 		if len(places) == 0 {
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
+		}
+		if at.SkipDecided {
+			if places, skipped, err = within.leavingDecided(ctx, places); err != nil {
+				return err
+			}
+			if len(places) == 0 {
+				return ErrAllDecided
+			}
 		}
 		// A bulk judgment is bounded, so an unset cap is the shipped number
 		// rather than none: the siblings that take this argument fill it in
@@ -224,9 +261,64 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return nil
 	})
 	if err != nil {
-		return 0, nil, s.alreadyDecided(ctx, err, placesOf(attempted))
+		return 0, nil, nil, s.alreadyDecided(ctx, err, placesOf(attempted))
 	}
-	return claimID, recorded, nil
+	return claimID, recorded, skipped, nil
+}
+
+// ErrAllDecided says a bulk judgment asked to skip what is decided found
+// nothing else to claim.
+var ErrAllDecided = errors.New("a live decision already covers every place selected")
+
+// leavingDecided splits the places into those nothing stands at and those a
+// live decision covers, naming the decision.
+//
+// Asked in one statement over both keys a place can be held under, the
+// question Undecided asks, so a place this keeps is one the unique index will
+// accept. Two proposals arriving together can still both pass it, and the
+// index refuses the second as it would without skipping.
+func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolved,
+	[]Skipped, error) {
+
+	keys := make([]string, 0, len(places)*2)
+	for _, at := range places {
+		keys = append(keys, liveKeysFor(at.Place)...)
+	}
+	var standing []struct {
+		ID      int64  `bun:"id"`
+		LiveKey string `bun:"live_key"`
+		State   State  `bun:"state"`
+	}
+	if err := s.db.NewSelect().Model((*Decision)(nil)).
+		ColumnExpr("de.id, de.live_key, de.state").
+		Where("de.live_key IN (?)", bun.List(keys)).
+		OrderExpr("de.id").
+		Scan(ctx, &standing); err != nil {
+		return nil, nil, fmt.Errorf("read what already stands: %w", err)
+	}
+	held := make(map[string]int, len(standing))
+	for i := len(standing) - 1; i >= 0; i-- {
+		held[standing[i].LiveKey] = i
+	}
+	left := make([]resolved, 0, len(places))
+	var skipped []Skipped
+	for _, at := range places {
+		found := -1
+		for _, key := range liveKeysFor(at.Place) {
+			if i, ok := held[key]; ok && (found < 0 || i < found) {
+				found = i
+			}
+		}
+		if found < 0 {
+			left = append(left, at)
+			continue
+		}
+		skipped = append(skipped, Skipped{
+			VulnerabilityID: at.VulnerabilityID, PlaceIdentity: at.PlaceIdentity,
+			DecisionID: standing[found].ID, State: standing[found].State,
+		})
+	}
+	return left, skipped, nil
 }
 
 // placesWithin reads every open place the named issues occupy at one

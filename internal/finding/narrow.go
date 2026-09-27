@@ -455,17 +455,24 @@ func (f Filter) product() (string, []any) {
 // severities returns the words a floor admits, or nil where it admits all of
 // them and the filter should not be applied at all.
 func (f Filter) severities() []string {
+	return AtLeast(f.MinSeverity)
+}
+
+// AtLeast is the severity words at or above one, for a filter asking for
+// what is rated this badly or worse. Nil for "low", which excludes nothing,
+// and for a word that is not a band.
+func AtLeast(word string) []string {
 	// Compared without regard to capitals, like every other name somebody
 	// types. Compared exactly, a caller sending "High" matched no word and
 	// got no narrowing at all rather than a refusal — the filter silently
 	// did nothing.
-	wanted := strings.ToLower(strings.TrimSpace(f.MinSeverity))
-	for i, word := range ranked {
-		if word == wanted {
+	wanted := strings.ToLower(strings.TrimSpace(word))
+	for i, each := range ranked {
+		if each == wanted {
 			if i == 0 {
 				return nil
 			}
-			return ranked[i:]
+			return append([]string{}, ranked[i:]...)
 		}
 	}
 	return nil

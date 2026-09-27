@@ -68,7 +68,7 @@ Missing or wrong, with no decision needed to fix it.
 | The component screen's twelve-week chart does not mark version changes | It shows findings opened and closed, and not which version the build shipped each week, so it cannot show whether an upgrade worked |
 | A version 4 CVSS score is left out of published advisories | CSAF 2.0 has no field for one. A flaw rated only under 4.0 publishes no score until the document moves to CSAF 2.1 |
 | Advisories carry no text of our own beyond the title | Everything else in the document is assembled from the flaws it covers |
-| The review queue filters by product only | No filter for what is waiting, who proposed it, its age or its severity |
+| The review queue cannot be narrowed by what is waiting | A claim awaiting agreement, a lapsed decision, a deferral that ran out and a promise past its date share one list |
 | A judgment always covers every place a finding sits | Choosing a subset of the places is not offered |
 | No single view of an upgrade promise across the builds it names | Each build answers for itself |
 | Mail is plain text only | The server-side markdown renderer is kept for an HTML part that is not built |
@@ -107,8 +107,6 @@ Each needs the owner to choose before anything is built.
 | Count the exploitation clock from the catalog's date? | The clock starts when a scan learns an issue is exploited. The catalog states the date it added the issue, and nothing reads it |
 | Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |
 | Keep the screen's short list of weakness names? | The screen shows a short list in plain words. Published advisories use the full CWE catalog |
-| Add an endpoint that assigns a whole selection? | Assigning loops one request per row at about 400 ms each, so 2,000 rows take about a quarter of an hour. There is no "select all matching" |
-| Let a bulk claim skip rows already decided? | A bulk claim covering a decided row is refused, naming the decision. Skipping silently covers less than was selected |
 | Offer saved filters on the all-products findings list? | Saved filters belong to one product, so the list the home screen's tiles open has none |
 | Have the server list the package kinds present? | The package-kind filter is a fixed list. A kind missing from it is reachable only by editing the address |
 | Add a gate for tracker references in comments? | The rule is enforced by reading. No existing gate fits it |

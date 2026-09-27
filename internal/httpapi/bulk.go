@@ -175,6 +175,10 @@ func registerBulk(api huma.API, in Ingest) {
 			"reaches, read here, against how many you named. Equal, the claim is exactly what " +
 			"that narrowing returns; far apart, the sentence does not describe the set.\n\n" +
 			"Always needs a second person to agree, whatever the outcome.\n\n" +
+			"A place a live decision already covers refuses the whole claim, naming that " +
+			"decision. Send `skip_decided` to leave those places out instead; `skipped` lists " +
+			"each one with the decision standing there. Where every place is covered, nothing " +
+			"is recorded and the request is refused.\n\n" +
 			"Bounded. At most 2000 names per request, and a limit on how many findings one " +
 			"action may write, set under `triage.together-cap`. The limit is checked against " +
 			"the findings this resolves to, which is more than the number of names.",
@@ -194,12 +198,14 @@ func registerBulk(api huma.API, in Ingest) {
 			DeferredUntil   string        `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 			FixedVersion    string        `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them"`
 			Reasoning       string        `json:"reasoning" minLength:"1" doc:"The reasoning, holding for every issue named"`
+			SkipDecided     bool          `json:"skip_decided,omitempty" doc:"Leave out every place a live decision already covers, and list them in the response. Left out, a selection covering one is refused, naming the decision"`
 		}
 	}) (*struct {
 		Body struct {
-			ClaimID  int64   `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-			Recorded int     `json:"recorded"`
-			IDs      []int64 `json:"ids"`
+			ClaimID  int64         `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
+			Recorded int           `json:"recorded"`
+			IDs      []int64       `json:"ids"`
+			Skipped  []SkippedBody `json:"skipped,omitempty" doc:"The places left out because a live decision already covers them, where skip_decided was sent"`
 		}
 	}, error) {
 		subject, store, err := triaging(ctx, in)
@@ -262,9 +268,9 @@ func registerBulk(api huma.API, in Ingest) {
 		// them first and passing them in would authorize this against
 		// rows as they stood before the transaction, and would let a
 		// caller's selection decide which places a decision lands on.
-		claimID, recorded, err := store.Together(ctx, subject, triage.TogetherAt{
+		claimID, recorded, skipped, err := store.TogetherSkipping(ctx, subject, triage.TogetherAt{
 			TargetID: target, ComponentID: component, VulnerabilityIDs: issues,
-			Contains: input.Body.Contains,
+			Contains: input.Body.Contains, SkipDecided: input.Body.SkipDecided,
 		}, triage.Proposal{
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Justification),
@@ -288,16 +294,52 @@ func registerBulk(api huma.API, in Ingest) {
 
 		out := &struct {
 			Body struct {
-				ClaimID  int64   `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-				Recorded int     `json:"recorded"`
-				IDs      []int64 `json:"ids"`
+				ClaimID  int64         `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
+				Recorded int           `json:"recorded"`
+				IDs      []int64       `json:"ids"`
+				Skipped  []SkippedBody `json:"skipped,omitempty" doc:"The places left out because a live decision already covers them, where skip_decided was sent"`
 			}
 		}{}
 		out.Body.ClaimID = claimID
 		out.Body.Recorded = len(recorded)
 		out.Body.IDs = recorded
+		if out.Body.Skipped, err = skippedBodies(ctx, in, skipped); err != nil {
+			return nil, err
+		}
 		return out, nil
 	})
+}
+
+// SkippedBody is a place a bulk judgment left out, and the decision that
+// already covers it.
+type SkippedBody struct {
+	Vulnerability string `json:"vulnerability"`
+	Place         string `json:"place" doc:"Where it sits, as the decision names it"`
+	Decision      int64  `json:"decision" doc:"The decision standing there"`
+	State         string `json:"state" doc:"How far that decision has got"`
+}
+
+// skippedBodies names what a bulk judgment left out, by the issues' names.
+func skippedBodies(ctx context.Context, in Ingest, skipped []triage.Skipped) ([]SkippedBody, error) {
+	if len(skipped) == 0 {
+		return nil, nil
+	}
+	issues := make([]int64, 0, len(skipped))
+	for _, each := range skipped {
+		issues = append(issues, each.VulnerabilityID)
+	}
+	named, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, issues)
+	if err != nil {
+		return nil, wentWrong(in.Logger, "what the skipped issues are called could not be read", err)
+	}
+	out := make([]SkippedBody, 0, len(skipped))
+	for _, each := range skipped {
+		out = append(out, SkippedBody{
+			Vulnerability: named[each.VulnerabilityID], Place: each.PlaceIdentity,
+			Decision: each.DecisionID, State: string(each.State),
+		})
+	}
+	return out, nil
 }
 
 // deferredUntil reads the date a postponement runs to.

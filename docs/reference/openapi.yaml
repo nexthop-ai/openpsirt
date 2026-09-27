@@ -669,6 +669,53 @@ components:
           description: "A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"
           type: string
       type: object
+    Assign-matching-findingsRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Assign-matching-findingsRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        only:
+          description: The rows picked from the list. Left out, every row the filter matches
+          items:
+            $ref: "#/components/schemas/PieceBody"
+          maxItems: 2000
+          type:
+            - array
+            - "null"
+        person:
+          description: Their sign-in identity, or empty for nobody
+          type: string
+        team:
+          description: A team to route the rows to instead, by name
+          type: string
+      type: object
+    AssignedMatchingBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AssignedMatchingBody.json
+          format: uri
+          readOnly: true
+          type: string
+        moved:
+          description: The number of findings that changed hands, across every build of the product. Work somebody else holds stays with them unless you may give work away
+          format: int64
+          type: integer
+        pieces:
+          description: The number of rows of the list this reached
+          format: int64
+          type: integer
+      required:
+        - pieces
+        - moved
+      type: object
     AtComponentBody:
       additionalProperties: false
       properties:
@@ -2147,6 +2194,9 @@ components:
           maxLength: 500
           minLength: 1
           type: string
+        skip_decided:
+          description: Leave out every place a live decision already covers, and list them in the response. Left out, a selection covering one is refused, naming the decision
+          type: boolean
         vulnerabilities:
           description: The issues this claim covers, by name
           items:
@@ -2186,6 +2236,13 @@ components:
         recorded:
           format: int64
           type: integer
+        skipped:
+          description: The places left out because a live decision already covers them, where skip_decided was sent
+          items:
+            $ref: "#/components/schemas/SkippedBody"
+          type:
+            - array
+            - "null"
       required:
         - claim_id
         - recorded
@@ -7048,6 +7105,23 @@ components:
         - approved
         - withdrawn
       type: object
+    PieceBody:
+      additionalProperties: false
+      properties:
+        fold:
+          description: The row's fold, as the findings list gives it
+          maxLength: 512
+          minLength: 1
+          type: string
+        vulnerability:
+          description: The issue, by any name it is known under
+          maxLength: 191
+          minLength: 1
+          type: string
+      required:
+        - vulnerability
+        - fold
+      type: object
     PlaceBody:
       additionalProperties: false
       properties:
@@ -9364,6 +9438,27 @@ components:
       required:
         - place
         - component
+      type: object
+    SkippedBody:
+      additionalProperties: false
+      properties:
+        decision:
+          description: The decision standing there
+          format: int64
+          type: integer
+        place:
+          description: Where it sits, as the decision names it
+          type: string
+        state:
+          description: How far that decision has got
+          type: string
+        vulnerability:
+          type: string
+      required:
+        - vulnerability
+        - place
+        - decision
+        - state
       type: object
     SpentBody:
       additionalProperties: false
@@ -17643,6 +17738,510 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
+  /v1/products/{product}/findings/assignment:
+    post:
+      description: |-
+        Assigns every row the findings list returns for the same parameters, across all of its pages, in one request. Takes the same filters as `GET /v1/products/{product}/findings`.
+
+        Each row is assigned the way one finding is: across every build of the product, at every package the row folds together. Send `person` as an empty string to hand the rows back to nobody, or `team` to route them to a team.
+
+        `only` limits the act to rows somebody picked from the list. A picked row the filter no longer matches is not assigned; `pieces` says how many were.
+
+        Without the assigner right you may take what nobody holds and hand back your own. Rows somebody else holds are left with them, and `moved` counts only what changed hands.
+
+        Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
+
+        Requires: public-triage or private-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+      operationId: assign-matching-findings
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product
+            type: string
+        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            type: string
+        - description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
+          explode: false
+          in: query
+          name: differs
+          schema:
+            description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
+            type: boolean
+        - description: Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held
+          explode: false
+          in: query
+          name: across_variants
+          schema:
+            description: Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held
+            enum:
+              - only
+              - every
+            type: string
+        - description: Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating
+          explode: false
+          in: query
+          name: severity
+          schema:
+            description: Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating
+            enum:
+              - low
+              - medium
+              - high
+              - critical
+            type: string
+        - description: Keep only issues somebody is known to be exploiting
+          explode: false
+          in: query
+          name: exploited
+          schema:
+            description: Keep only issues somebody is known to be exploiting
+            type: boolean
+        - description: Keep only issues where an upstream fixed version is known
+          explode: false
+          in: query
+          name: fixable
+          schema:
+            description: Keep only issues where an upstream fixed version is known
+            type: boolean
+        - description: Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list
+          explode: false
+          in: query
+          name: below_floor
+          schema:
+            description: Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list
+            type: boolean
+        - description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
+          explode: true
+          in: query
+          name: component
+          schema:
+            description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
+            items:
+              maxLength: 191
+              type: string
+            maxItems: 200
+            type:
+              - array
+              - "null"
+        - description: "Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"
+          explode: true
+          in: query
+          name: tag
+          schema:
+            description: "Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"
+            items:
+              maxLength: 191
+              type: string
+            maxItems: 200
+            type:
+              - array
+              - "null"
+        - description: Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name
+            maxLength: 200
+            type: string
+        - description: Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi
+          explode: true
+          in: query
+          name: ecosystem
+          schema:
+            description: Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi
+            items:
+              maxLength: 64
+              type: string
+            maxItems: 200
+            type:
+              - array
+              - "null"
+        - description: "Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"
+          explode: true
+          in: query
+          name: "on"
+          schema:
+            description: "Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"
+            items:
+              enum:
+                - branch
+                - tag
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
+        - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
+          explode: true
+          in: query
+          name: support
+          schema:
+            description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
+            items:
+              enum:
+                - in-support
+                - past-eol
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep only what sits inside the container of this name
+          explode: false
+          in: query
+          name: under
+          schema:
+            description: Keep only what sits inside the container of this name
+            maxLength: 191
+            type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
+        - description: Keep only what the build holds directly, which is what has no container above it
+          explode: false
+          in: query
+          name: under_build
+          schema:
+            description: Keep only what the build holds directly, which is what has no container above it
+            type: boolean
+        - description: "Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"
+          explode: true
+          in: query
+          name: state
+          schema:
+            description: "Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"
+            items:
+              enum:
+                - undecided
+                - waiting
+                - agreed
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - mismatched
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
+          explode: true
+          in: query
+          name: assigned
+          schema:
+            description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
+            items:
+              enum:
+                - me
+                - somebody
+                - nobody
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
+          explode: false
+          in: query
+          name: epss_at_least
+          schema:
+            description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
+            format: double
+            maximum: 1
+            minimum: 0
+            type: number
+        - description: Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier
+          explode: false
+          in: query
+          name: open_for
+          schema:
+            description: Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
+          explode: false
+          in: query
+          name: due_within
+          schema:
+            description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
+            format: int64
+            minimum: 1
+            type: integer
+        - description: Keep only what is already past its deadline
+          explode: false
+          in: query
+          name: overdue
+          schema:
+            description: Keep only what is already past its deadline
+            type: boolean
+        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+          explode: true
+          in: query
+          name: fix_state
+          schema:
+            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            items:
+              enum:
+                - fixed
+                - none
+                - wont-fix
+                - unknown
+                - mixed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
+          explode: true
+          in: query
+          name: weakness
+          schema:
+            description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
+            items:
+              maxLength: 32
+              type: string
+            maxItems: 200
+            type:
+              - array
+              - "null"
+        - description: Keep only groups where a claim is with its author, sent back for more
+          explode: false
+          in: query
+          name: sent_back
+          schema:
+            description: Keep only groups where a claim is with its author, sent back for more
+            type: boolean
+        - description: Keep only what one of these VEX publishers has a standing statement about
+          explode: true
+          in: query
+          name: vex_publisher
+          schema:
+            description: Keep only what one of these VEX publishers has a standing statement about
+            items:
+              maxLength: 191
+              type: string
+            maxItems: 200
+            type:
+              - array
+              - "null"
+        - description: Keep only what was first seen here after this date, as 2026-03-31
+          explode: false
+          in: query
+          name: opened_after
+          schema:
+            description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
+        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+          explode: false
+          in: query
+          name: closed_after
+          schema:
+            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            type: string
+        - description: Keep only what somebody claimed something about after this date
+          explode: false
+          in: query
+          name: proposed_after
+          schema:
+            description: Keep only what somebody claimed something about after this date
+            type: string
+        - description: Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold
+          explode: true
+          in: query
+          name: vex_status
+          schema:
+            description: Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
+          explode: false
+          in: query
+          name: reassessed
+          schema:
+            description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
+            type: boolean
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+          explode: false
+          in: query
+          name: origin
+          schema:
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
+        - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
+          explode: false
+          in: query
+          name: planned
+          schema:
+            description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
+            enum:
+              - planned
+              - unplanned
+              - either
+            type: string
+        - description: Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does
+          explode: false
+          in: query
+          name: unconfirmed
+          schema:
+            description: Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does
+            type: boolean
+        - description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
+          explode: true
+          in: query
+          name: exclude
+          schema:
+            description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
+            items:
+              maxLength: 191
+              type: string
+            maxItems: 200
+            type:
+              - array
+              - "null"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+          explode: false
+          in: query
+          name: sort
+          schema:
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            enum:
+              - urgency
+              - age
+              - deadline
+              - places
+              - epss
+              - severity
+            type: string
+        - description: Order the other way — oldest, nearest deadline, fewest places, lowest first
+          explode: false
+          in: query
+          name: asc
+          schema:
+            description: Order the other way — oldest, nearest deadline, fewest places, lowest first
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Assign-matching-findingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignedMatchingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Assign every finding a filter matches
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
   /v1/products/{product}/findings/components:
     get:
       description: |-
@@ -21636,6 +22235,8 @@ paths:
 
         Always needs a second person to agree, whatever the outcome.
 
+        A place a live decision already covers refuses the whole claim, naming that decision. Send `skip_decided` to leave those places out instead; `skipped` lists each one with the decision standing there. Where every place is covered, nothing is recorded and the request is refused.
+
         Bounded. At most 2000 names per request, and a limit on how many findings one action may write, set under `triage.together-cap`. The limit is checked against the findings this resolves to, which is more than the number of names.
 
         Requires: public-triage or private-triage on the product
@@ -24267,6 +24868,8 @@ paths:
 
         Your own claims are not here. Approving your own is refused, so a queue containing them is a list of work you cannot do. Ask for `mine=true` to see what you proposed and nobody has agreed to yet, which is a different question.
 
+        Narrow by who proposed a claim, how old it is, how severe the issues it covers are, its outcome, and the release it covers. A claim is kept where one of its rows matches every filter, and is then returned whole.
+
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-review-queue
       parameters:
@@ -24283,6 +24886,63 @@ paths:
           name: product
           schema:
             description: Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
+            type: string
+        - description: Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty
+          explode: false
+          in: query
+          name: proposed_by
+          schema:
+            description: Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty
+            maxLength: 191
+            type: string
+        - description: Keep only claims at least this many days old
+          explode: false
+          in: query
+          name: older_than
+          schema:
+            description: Keep only claims at least this many days old
+            format: int64
+            minimum: 1
+            type: integer
+        - description: Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing
+          explode: false
+          in: query
+          name: severity
+          schema:
+            description: Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing
+            enum:
+              - low
+              - medium
+              - high
+              - critical
+            type: string
+        - description: Keep only claims of these outcomes. Any of them, not all
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: Keep only claims of these outcomes. Any of them, not all
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - mismatched
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
+          explode: false
+          in: query
+          name: release
+          schema:
+            description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
+            maxLength: 191
             type: string
         - explode: false
           in: query
@@ -24326,7 +24986,7 @@ paths:
 
         One row per claim, the way the screen counts them — one proposer's action, however many decisions it wrote — with how much it covers and how old it is. A backlog is reported in claims because that is the unit somebody works through.
 
-        Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question, and `product` narrows it the way the screen does.
+        Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question. `product` and the other filters narrow it the way the screen does.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-review-queue
@@ -24352,6 +25012,63 @@ paths:
           name: product
           schema:
             description: Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
+            type: string
+        - description: Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty
+          explode: false
+          in: query
+          name: proposed_by
+          schema:
+            description: Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty
+            maxLength: 191
+            type: string
+        - description: Keep only claims at least this many days old
+          explode: false
+          in: query
+          name: older_than
+          schema:
+            description: Keep only claims at least this many days old
+            format: int64
+            minimum: 1
+            type: integer
+        - description: Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing
+          explode: false
+          in: query
+          name: severity
+          schema:
+            description: Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing
+            enum:
+              - low
+              - medium
+              - high
+              - critical
+            type: string
+        - description: Keep only claims of these outcomes. Any of them, not all
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: Keep only claims of these outcomes. Any of them, not all
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - mismatched
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
+          explode: false
+          in: query
+          name: release
+          schema:
+            description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
+            maxLength: 191
             type: string
       responses:
         "200":

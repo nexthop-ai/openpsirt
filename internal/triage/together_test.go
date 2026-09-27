@@ -107,3 +107,69 @@ func TestABulkClaimNamesTheDecisionThatBlockedIt(t *testing.T) {
 		}
 	})
 }
+
+func TestABulkClaimAskedToSkipLeavesOutWhatIsDecidedAndNamesIt(t *testing.T) {
+	// Skipping is something the claimant asks for, and what it left out is
+	// said: a claim covering less than was selected is one the claimant can
+	// see is smaller, and the decision standing at each skipped place is where
+	// they go next.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		both := f.twoIssues(t)
+		first := both
+		first.VulnerabilityIDs = both.VulnerabilityIDs[:1]
+		_, standing, err := f.store.Together(ctx, f.triager, first, f.wontFix(),
+			triage.DefaultTogetherCap)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unasked, the selection is refused whole.
+		if _, _, err := f.store.Together(ctx, f.triager, both, f.wontFix(),
+			triage.DefaultTogetherCap); !errors.Is(err, triage.ErrAlreadyDecided) {
+			t.Fatalf("a selection covering a decided place was not refused: %v", err)
+		}
+
+		both.SkipDecided = true
+		_, recorded, skipped, err := f.store.TogetherSkipping(ctx, f.triager, both,
+			f.wontFix(), triage.DefaultTogetherCap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(recorded) != 1 {
+			t.Errorf("%d decisions recorded, want the one undecided place", len(recorded))
+		}
+		if len(skipped) != 1 || skipped[0].DecisionID != standing[0] ||
+			skipped[0].VulnerabilityID != both.VulnerabilityIDs[0] {
+			t.Errorf("what was skipped reads %+v, want decision %d on the first issue",
+				skipped, standing[0])
+		}
+
+		// Everything decided now: nothing to claim, and nothing written.
+		if _, _, _, err := f.store.TogetherSkipping(ctx, f.triager, both, f.wontFix(),
+			triage.DefaultTogetherCap); !errors.Is(err, triage.ErrAllDecided) {
+			t.Errorf("a selection that is all decided answered %v", err)
+		}
+	})
+}
+
+func TestABulkClaimsCapCountsWhatItWritesAfterSkipping(t *testing.T) {
+	// The bound is on rows written. A place skipped is not written, so a
+	// selection that would pass the cap once its decided places are left out
+	// is not refused for them.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		both := f.twoIssues(t)
+		first := both
+		first.VulnerabilityIDs = both.VulnerabilityIDs[:1]
+		if _, _, err := f.store.Together(ctx, f.triager, first, f.wontFix(), 1); err != nil {
+			t.Fatal(err)
+		}
+		both.SkipDecided = true
+		if _, recorded, _, err := f.store.TogetherSkipping(ctx, f.triager, both,
+			f.wontFix(), 1); err != nil || len(recorded) != 1 {
+			t.Errorf("a claim writing one place under a cap of one answered %v, %d written",
+				err, len(recorded))
+		}
+	})
+}

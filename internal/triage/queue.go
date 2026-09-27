@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Waiting is one claim somebody has to look at, with what an approver needs in
@@ -146,6 +147,93 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 	productID int64, limit, offset int) ([]Waiting, int, error) {
 
+	return s.QueueNarrowed(ctx, subject, QueueFilter{Mine: mine, ProductID: productID},
+		limit, offset)
+}
+
+// QueueFilter narrows the review queue. The zero value is every claim waiting
+// on the reader, in every product they may approve in.
+type QueueFilter struct {
+	// Mine asks for what the reader proposed instead of what waits on them.
+	Mine bool
+	// ProductID is one product, or zero for every one.
+	ProductID int64
+	// ProposedBy keeps the claims these people made. Nil asks nothing; an
+	// empty, non-nil list is a name that resolved to nobody and keeps
+	// nothing, so a filter that could not be applied never widens the list.
+	ProposedBy []int64
+	// ProposedBefore keeps claims older than this moment, on the clock the
+	// age beside each entry is read from.
+	ProposedBefore *time.Time
+	// Severities keeps claims covering an issue rated one of these words in
+	// its own product, which is the rating in force there.
+	Severities []string
+	// Outcomes keeps claims of these kinds.
+	Outcomes []Outcome
+	// Release keeps claims that currently cover an open finding in a branch
+	// or tag of this name, matched the way a build's own names are.
+	Release string
+}
+
+// narrow applies the filter to a grouped query over decision AS de.
+//
+// Every condition is on a row, so a claim is kept where one of its waiting
+// rows satisfies all of them. The rows a claim is shown with are read
+// afterwards and whole, so narrowing never shows part of a claim.
+func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	if f.ProductID != 0 {
+		q = q.Where("de.product_id = ?", f.ProductID)
+	}
+	if f.ProposedBy != nil {
+		if len(f.ProposedBy) == 0 {
+			return q.Where("1 = 0")
+		}
+		q = q.Where("de.proposed_by IN (?)", bun.List(f.ProposedBy))
+	}
+	if f.ProposedBefore != nil {
+		q = q.Where("de.proposed_at <= ?", *f.ProposedBefore)
+	}
+	if len(f.Severities) > 0 {
+		// The product's own rating where it has stated one, as the findings
+		// list reads it, joined on the decision's product so a claim is judged
+		// by the rating in force where it was made.
+		q = q.Where("de.vulnerability_id IN (?)",
+			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
+				Join(rating.For(rating.OnDecision)).
+				Column("v.id").
+				Where(rating.EffectiveExpr+" IN (?)", bun.List(f.Severities)))
+	}
+	if len(f.Outcomes) > 0 {
+		q = q.Where("de.claim_id IN (?)",
+			q.NewSelect().TableExpr(`"claim" AS "qc"`).Column("qc.id").
+				Where("qc.outcome IN (?)", bun.List(f.Outcomes)))
+	}
+	if release := strings.ToLower(strings.TrimSpace(f.Release)); release != "" {
+		// The match buildsCovered makes, asked as a condition: an open
+		// finding at the row's place, at the versions the row was written
+		// against, in a build of the named release the reader may see.
+		covers := q.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("1").
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Where("f.vulnerability_id = de.vulnerability_id").
+			Where("f.place_identity = de.place_identity").
+			Where("f.closed_at IS NULL").
+			Where("st.product_id = de.product_id").
+			Where("st.name = ?", release).
+			Where(finding.KeyMatches)
+		q = q.Where("EXISTS (?)", readableFindings(covers, subject, "f", "st.product_id"))
+	}
+	return q
+}
+
+// QueueNarrowed is Queue under a filter.
+func (s *Store) QueueNarrowed(ctx context.Context, subject access.Subject, filter QueueFilter,
+	limit, offset int) ([]Waiting, int, error) {
+
+	mine := filter.Mine
 	limit = database.AList.Of(limit)
 
 	// The claims with a waiting row this person may act on, ordered by the
@@ -157,12 +245,11 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 			ColumnExpr(`MAX(de.id) AS "newest"`).
 			GroupExpr("de.claim_id")
 		q = approvableBy(waiting(q, s.now()), subject, "de")
-		// One product where the caller named one. A claim is decided in a
-		// product, so this narrows the same way every other list does — and
-		// zero is every product, which is what the queue screen asks for.
-		if productID != 0 {
-			q = q.Where("de.product_id = ?", productID)
-		}
+		// One product where the caller named one, and whatever else the
+		// reader narrowed by. A claim is decided in a product, so this
+		// narrows the same way every other list does — and zero is every
+		// product, which is what the queue screen asks for.
+		q = filter.narrow(q, subject)
 		// Whose claims. The same statement either way, so the count and the
 		// page cannot disagree about which question was asked.
 		if mine {
