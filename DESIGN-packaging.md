@@ -441,7 +441,7 @@ Everything after the tag is the `Release` workflow.
 
    ```
    make engines-up
-   for from in v0.1.0 v0.2.0; do for engine in sqlite postgres mysql mariadb; do
+   for from in v0.1.0 v0.2.0 v0.3.0; do for engine in sqlite postgres mysql mariadb; do
      make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
    done; done
    ```

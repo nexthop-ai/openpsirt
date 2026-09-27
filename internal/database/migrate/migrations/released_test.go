@@ -26,10 +26,12 @@ func TestEveryTaggedReleaseShipsTheFilesItTagged(t *testing.T) {
 	if len(records) == 0 {
 		t.Fatal("no release is recorded, so nothing was checked")
 	}
+	// A release that changes no schema records no files, and is still held:
+	// a file numbered or named for it is a fault. Across every release,
+	// though, no file recorded means nothing was compared.
+	files := 0
 	for _, r := range records {
-		if len(r.Digests) == 0 {
-			t.Errorf("%s records no files, so nothing of it was checked", r.Version)
-		}
+		files += len(r.Digests)
 		faults, err := released.Held(recorded, ".", r)
 		if err != nil {
 			t.Fatal(err)
@@ -37,5 +39,8 @@ func TestEveryTaggedReleaseShipsTheFilesItTagged(t *testing.T) {
 		for _, fault := range faults {
 			t.Error(fault)
 		}
+	}
+	if files == 0 {
+		t.Fatal("no release records a file, so nothing was checked")
 	}
 }

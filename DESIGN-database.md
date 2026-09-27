@@ -221,7 +221,8 @@ The chain is one part per release.
 |---|---|
 | 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again |
 | 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
-| 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. Untagged, so a schema change edits it and its declarations |
+| 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. A database v0.3.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| None | v0.4.0 changes no schema. Its record carries migration 38 as its last. The next schema change is migration 39 |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
