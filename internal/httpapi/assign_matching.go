@@ -28,6 +28,8 @@ type PieceBody struct {
 type AssignedMatchingBody struct {
 	Pieces int   `json:"pieces" doc:"The number of rows of the list this reached"`
 	Moved  int64 `json:"moved" doc:"The number of findings that changed hands, across every build of the product. Work somebody else holds stays with them unless you may give work away"`
+	// Left is the rows that stayed, so a screen can keep them selected.
+	Left []PieceBody `json:"left,omitempty" doc:"The rows that did not wholly move, because somebody else holds part of them and you may not take it"`
 }
 
 // errRecipient carries a refusal about who work is going to out of the
@@ -65,7 +67,7 @@ func registerAssignMatching(api huma.API, in Ingest) {
 		Body struct {
 			Person string      `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
 			Team   string      `json:"team,omitempty" doc:"A team to route the rows to instead, by name"`
-			Only   []PieceBody `json:"only,omitempty" maxItems:"2000" doc:"The rows picked from the list. Left out, every row the filter matches"`
+			Only   []PieceBody `json:"only,omitempty" minItems:"1" maxItems:"2000" doc:"The rows picked from the list. Left out, every row the filter matches; an empty list is refused"`
 		}
 	}) (*struct{ Body AssignedMatchingBody }, error) {
 		at, err := narrowing(ctx, in, ScopeQuery{
@@ -152,16 +154,21 @@ func registerAssignMatching(api huma.API, in Ingest) {
 		// of two thousand is one thing that happened to the person receiving
 		// it. Told only where they may see all of it, for the reason the
 		// single assignment gives, and never for handing back.
-		if to != nil && *to != subject.Party() && whoToTell != 0 && handed.Moved > 0 &&
+		arrived := handed.Pieces - len(handed.Left)
+		if to != nil && *to != subject.Party() && whoToTell != 0 && arrived > 0 &&
 			seenBy(ctx, in, input.Body.Person, product, handed.Undisclosed) {
 			tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
-				Body: piecesOfWork(handed.Pieces) + " in " + input.Product,
+				Body: piecesOfWork(arrived) + " in " + input.Product,
 				Link: "/work", Private: handed.Undisclosed, ProductID: &product,
 			}, "person", whoToTell)
 		}
+		left, err := pieceBodies(ctx, in, handed.Left)
+		if err != nil {
+			return nil, err
+		}
 		return &struct{ Body AssignedMatchingBody }{Body: AssignedMatchingBody{
-			Pieces: handed.Pieces, Moved: handed.Moved,
+			Pieces: handed.Pieces, Moved: handed.Moved, Left: left,
 		}}, nil
 	})
 }
@@ -196,6 +203,26 @@ func piecesNamed(ctx context.Context, in Ingest, picked []PieceBody) ([]finding.
 	if len(unknown) > 0 {
 		return nil, huma.Error404NotFound(
 			"no issue is filed under " + strings.Join(clipped(unknown), ", "))
+	}
+	return out, nil
+}
+
+// pieceBodies names pieces by their issues' names.
+func pieceBodies(ctx context.Context, in Ingest, pieces []finding.Piece) ([]PieceBody, error) {
+	if len(pieces) == 0 {
+		return nil, nil
+	}
+	issues := make([]int64, 0, len(pieces))
+	for _, each := range pieces {
+		issues = append(issues, each.VulnerabilityID)
+	}
+	named, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, issues)
+	if err != nil {
+		return nil, wentWrong(in.Logger, "what these issues are called could not be read", err)
+	}
+	out := make([]PieceBody, 0, len(pieces))
+	for _, each := range pieces {
+		out = append(out, PieceBody{Vulnerability: named[each.VulnerabilityID], Fold: each.Fold})
 	}
 	return out, nil
 }

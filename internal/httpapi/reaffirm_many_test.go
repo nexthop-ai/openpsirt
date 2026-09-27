@@ -539,3 +539,55 @@ func TestReAffirmingAPromiseTakesNoCap(t *testing.T) {
 		}
 	})
 }
+
+// limitsOf sets the two issue limits.
+func (r *reach) limitsOf(t *testing.T, review, agreed string) {
+	t.Helper()
+	for key, value := range map[string]string{
+		"triage.review-issues": review, "triage.agreed-issues": agreed,
+	} {
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/"+key,
+			`{"value":"`+value+`"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting %s answered %d: %s", key, got.Code, got.Body.String())
+		}
+	}
+}
+
+func TestReAffirmingTakesTheLargerLimitOnlyWhereNothingGoesBackToAnApprover(t *testing.T) {
+	// Two issues, a reviewer's limit of one and a re-confirmation limit of
+	// two. Where both claims stand on their earlier agreement the act passes;
+	// the test below has one go back to an approver, which makes the whole act
+	// a review.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		one := r.agreedAcrossTheFold(t, "CVE-2026-CURL1", "vulnerable_code_not_present")
+		two := r.agreedAcrossTheFold(t, "CVE-2026-CURL2", "vulnerable_code_not_present")
+		r.curlMovedTo(t, "8.6.0")
+		r.limitsOf(t, "1", "2")
+		if code, body, _ := reaffirmingMany(t, r, "triager", one, two); code !=
+			http.StatusCreated {
+			t.Errorf("re-confirming two agreed issues under a limit of two answered %d: %s",
+				code, body)
+		}
+	})
+}
+
+func TestReAffirmingTakesTheReviewersLimitWhereAnyClaimGoesBack(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		absent := r.agreedAcrossTheFold(t, "CVE-2026-CURL1", "vulnerable_code_not_present")
+		unreachable := r.agreedAcrossTheFold(t, "CVE-2026-CURL2",
+			"vulnerable_code_cannot_be_controlled_by_adversary")
+		if _, err := r.db.DB.NewUpdate().Table("vulnerability").
+			Set("score_centi = ?", 990).Set("severity = ?", "critical").
+			Where("identifier = ?", "CVE-2026-CURL2").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		r.curlMovedTo(t, "8.6.0")
+		r.limitsOf(t, "1", "2")
+		code, body, _ := reaffirmingMany(t, r, "triager", absent, unreachable)
+		if code != http.StatusUnprocessableEntity || !strings.Contains(body, "that is 2 issues") {
+			t.Errorf("an act with a claim going back to an approver answered %d: %s", code, body)
+		}
+	})
+}

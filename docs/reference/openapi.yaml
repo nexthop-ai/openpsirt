@@ -680,10 +680,11 @@ components:
           readOnly: true
           type: string
         only:
-          description: The rows picked from the list. Left out, every row the filter matches
+          description: The rows picked from the list. Left out, every row the filter matches; an empty list is refused
           items:
             $ref: "#/components/schemas/PieceBody"
           maxItems: 2000
+          minItems: 1
           type:
             - array
             - "null"
@@ -704,6 +705,13 @@ components:
           format: uri
           readOnly: true
           type: string
+        left:
+          description: The rows that did not wholly move, because somebody else holds part of them and you may not take it
+          items:
+            $ref: "#/components/schemas/PieceBody"
+          type:
+            - array
+            - "null"
         moved:
           description: The number of findings that changed hands, across every build of the product. Work somebody else holds stays with them unless you may give work away
           format: int64
@@ -1676,7 +1684,7 @@ components:
         place:
           $ref: "#/components/schemas/PlaceBody"
         places:
-          description: The number of distinct places it wrote at. The bulk cap is measured against this
+          description: The number of distinct places it wrote at. The ceiling on one action is measured against this
           format: int64
           type: integer
         previously_approved:
@@ -7003,7 +7011,7 @@ components:
             - array
             - "null"
         places:
-          description: The number of times those sit somewhere in this build. What the bulk cap is measured against
+          description: The number of times those sit somewhere in this build. What the ceiling on one action is measured against
           format: int64
           type: integer
         source:
@@ -10749,7 +10757,7 @@ components:
           description: May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them
           type: boolean
         bulk_cap:
-          description: The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+          description: The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
           format: int64
           type: integer
         deferral_days:
@@ -21897,7 +21905,7 @@ paths:
 
         Only what the preview offered. A judgment that already applies here has nothing to agree to, and one covering nothing here has nothing to apply to; naming either is refused rather than skipped, because a caller that got the set wrong should hear so.
 
-        A deferral is carried with the date it had, not with a fresh one. Bounded by the same setting that bounds every other action writing many rows.
+        A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
 
         Requires: public-triage or private-triage on the product
       operationId: carry-decisions

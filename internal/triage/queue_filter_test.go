@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -14,7 +15,7 @@ import (
 // queued is how many claims the queue holds for the reviewer under a filter.
 func (f *fixture) queued(t *testing.T, filter triage.QueueFilter) int {
 	t.Helper()
-	waiting, total, err := f.store.QueueNarrowed(t.Context(), f.reviewer, filter, 50, 0)
+	waiting, total, err := f.store.Queue(t.Context(), f.reviewer, filter, 50, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +139,7 @@ func TestTheQueueNarrowsByTheReleaseAClaimCovers(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		in := f.selection(t)
-		if _, _, err := f.store.Together(ctx, f.triager, in, f.wontFix(),
+		if _, _, _, err := f.store.Together(ctx, f.triager, in, f.wontFix(),
 			triage.DefaultBounds()); err != nil {
 			t.Fatal(err)
 		}
@@ -152,6 +153,45 @@ func TestTheQueueNarrowsByTheReleaseAClaimCovers(t *testing.T) {
 		}
 		if got := f.queued(t, triage.QueueFilter{Release: "2026.04"}); got != 0 {
 			t.Errorf("%d claims cover a release that holds nothing", got)
+		}
+	})
+}
+
+func TestTheReleaseFilterReadsOnlyFindingsTheApproverMaySee(t *testing.T) {
+	// A claim that covers an undisclosed finding in a release says nothing
+	// about that release to an approver who reads disclosed work alone: the
+	// filter would otherwise tell them the release holds something.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		in := f.selection(t)
+		if _, _, _, err := f.store.Together(ctx, f.triager, in, f.wontFix(),
+			triage.DefaultBounds()); err != nil {
+			t.Fatal(err)
+		}
+		later := f.build(t, f.product, "2026.04")
+		f.finds(t, later, in.ComponentID, "place-of-libfoo", access.Private)
+
+		public := f.holding(t, "public-approver",
+			map[int64][]access.Role{f.product: {access.PublicTriage}})
+		both := f.privateTriager(t, "both-approver", "Both")
+		asked := func(who access.Subject, release string) int {
+			_, total, err := f.store.Queue(ctx, who,
+				triage.QueueFilter{Release: release}, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return total
+		}
+		if got := asked(both, "2026.04"); got != 1 {
+			t.Fatalf("somebody who reads undisclosed work sees %d claims on the release, "+
+				"so this fixture does not reach it", got)
+		}
+		if got := asked(public, "2026.04"); got != 0 {
+			t.Errorf("an approver who reads disclosed work alone learned the release holds "+
+				"%d claims through an undisclosed finding", got)
+		}
+		if got := asked(public, "2026.03"); got != 1 {
+			t.Errorf("the disclosed release reads %d claims, want 1", got)
 		}
 	})
 }

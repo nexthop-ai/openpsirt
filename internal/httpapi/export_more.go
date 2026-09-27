@@ -408,7 +408,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 				"previously approved", "deferred days", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				waiting, _, err := store.QueueNarrowed(ctx, subject, filter, limit, offset)
+				waiting, _, err := store.Queue(ctx, subject, filter, limit, offset)
 				if err != nil {
 					return nil, err
 				}

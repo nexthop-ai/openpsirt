@@ -62,7 +62,7 @@ type ClaimDetail struct {
 	// Rows is the decisions the claim wrote.
 	Rows   int `json:"rows" doc:"The number of decisions the claim wrote"`
 	Issues int `json:"issues" doc:"The number of distinct issues it covers"`
-	Places int `json:"places" doc:"The number of distinct places it wrote at. The bulk cap is measured against this"`
+	Places int `json:"places" doc:"The number of distinct places it wrote at. The ceiling on one action is measured against this"`
 	// Folds is its present reach. A claim reaches by matching, so this grows
 	// as builds appear with nobody acting; the reach an approver agreed to is
 	// on the approval.

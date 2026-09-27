@@ -72,7 +72,7 @@ type WhoBody struct {
 	// single writes bounded by nothing turns one click into as many round
 	// trips as the filter matched, which is a page nobody can use and
 	// nothing can cancel.
-	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
+	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
 }
 
 func registerWhoAmI(api huma.API, in Ingest) {

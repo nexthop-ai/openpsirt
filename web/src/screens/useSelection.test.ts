@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { questionIn } from "./useSelection";
+import { questionIn, untaken } from "./useSelection";
+import type { Row } from "./list";
 
 // The definition of a change of question decides when the selection is emptied,
 // and the selection is what a bulk act writes against. Both directions matter:
@@ -44,5 +45,22 @@ describe("what the list is asking", () => {
     expect(questionIn(new URLSearchParams("limit=50"))).not.toBe(
       questionIn(new URLSearchParams("limit=200")),
     );
+  });
+});
+
+describe("what an act did not take", () => {
+  const row = (vulnerability: string, fold: string) => ({ vulnerability, fold }) as Row;
+  const picked = new Map<string, Row>([
+    ["a", row("CVE-1", "curl@8")],
+    ["b", row("CVE-2", "curl@8")],
+    ["c", row("CVE-1", "openssl@3")],
+  ]);
+  it("keeps the rows the server names as left, by issue and fold", () => {
+    expect(untaken(picked, [{ vulnerability: "CVE-1", fold: "curl@8" }]).map(([k]) => k)).toEqual([
+      "a",
+    ]);
+  });
+  it("keeps nothing when everything moved", () => {
+    expect(untaken(picked, [])).toEqual([]);
   });
 });

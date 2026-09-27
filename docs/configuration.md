@@ -40,7 +40,7 @@ A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
 the way. A database built by any build between releases is recreated.
 
 Read the sections for the release you are coming from, and every section after
-it: from v0.1.0, read all three.
+it: from v0.1.0, read all four.
 
 ### Every upgrade
 
@@ -86,6 +86,14 @@ Also read after an upgrade from v0.1.0.
 | A flaw recorded here with no severity in force | Not rated, and with no deadline |
 | A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
 | A component | Has no license until a scan reads one from its inventory |
+
+### From v0.3.0
+
+Also read after an upgrade from v0.1.0 or v0.2.0.
+
+| Change | What to do |
+|---|---|
+| `triage.together-cap` bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read `triage.review-issues` (200 issues) and `triage.agreed-issues` (2,000 issues). Those three, and recording a flaw or adding builds to one, read `triage.write-ceiling` (50,000 findings). A value set on `triage.together-cap` is not carried to them | Where `triage.together-cap` was changed, set the new limits under Settings, Triage |
 
 ## Serving
 

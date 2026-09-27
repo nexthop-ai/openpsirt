@@ -560,7 +560,7 @@ waiting rows satisfies every filter, and is then shown whole.
 | Filter | Meaning |
 |---|---|
 | Product | Claims made in one product |
-| Proposer | Claims one person made, by sign-in identity. A name nobody holds leaves the queue empty rather than being ignored, so a filter that could not be applied never reads as one that worked, and the answer is the same whether the name exists or not |
+| Proposer | Claims one person made, by sign-in identity. A name nobody holds leaves the queue empty, so a filter that could not be applied never reads as one that worked, and the answer is the same whether the name exists or not |
 | Age | Claims proposed at least this many days ago, on the clock the age beside each entry is read from |
 | Severity | Claims covering an issue rated this badly or worse by the rating in force in the claim's product |
 | Outcome | Claims of these outcomes |
@@ -825,9 +825,9 @@ in drivers a given image never builds.
 The candidate list carries both numbers and both limits: how many issues the
 narrowing holds, how many findings those sit at, how many issues one answer may
 cover, and how many findings it may write. The findings are counted over the
-whole narrowed set rather than summed from a page. Counted in places, a limit of
-2,000 meant about 44 kernel issues, and 805 candidates on a real image became
-eighteen separate claims; at 200 issues they are five.
+whole narrowed set rather than summed from a page. A kernel issue sits at about
+45 places, so a limit of 2,000 places is 44 issues. The 805 kernel candidates on
+a real image are five answers at 200 issues.
 
 Whatever is offered to narrow the set — a weakness class, a subsystem named in
 advisory text — is a starting point for a person, never a selection the tool
@@ -858,7 +858,7 @@ instead for those places to be left out.
 
 | Rule | |
 |---|---|
-| Skipping is asked for, never assumed | Skipping silently covers less than was selected. Refusing tells somebody holding five hundred rows which decision to go and read |
+| Skipping is asked for | Skipping silently covers less than was selected. Refusing tells somebody holding five hundred rows which decision to go and read |
 | What was skipped is returned | Each place, by the issue's name, with the decision standing there and how far it has got. A claim smaller than its selection is visible to the person who made it |
 | A place counts as decided under either key | The question the unique index answers: a live decision at the versions, or a correction standing at any version. A place skipping keeps is one the index accepts |
 | The bounds count what is written | Skipped places are not written, so a selection within the limits once they are left out is not refused for them |

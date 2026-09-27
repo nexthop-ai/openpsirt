@@ -267,7 +267,7 @@ func registerBulk(api huma.API, in Ingest) {
 		// them first and passing them in would authorize this against
 		// rows as they stood before the transaction, and would let a
 		// caller's selection decide which places a decision lands on.
-		claimID, recorded, skipped, err := store.TogetherSkipping(ctx, subject, triage.TogetherAt{
+		claimID, recorded, skipped, err := store.Together(ctx, subject, triage.TogetherAt{
 			TargetID: target, ComponentID: component, VulnerabilityIDs: issues,
 			Contains: input.Body.Contains, SkipDecided: input.Body.SkipDecided,
 		}, triage.Proposal{

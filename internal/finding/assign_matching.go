@@ -34,6 +34,10 @@ type Handed struct {
 	// announced, which decides what may be said about the act outside the
 	// application.
 	Undisclosed bool
+	// Left is the pieces that did not wholly land where they were sent,
+	// because somebody else holds part of them and this caller may not take
+	// it. Read after the write, narrowed to what the caller may see.
+	Left []Piece
 }
 
 // Admits answers whether work of this strictness may go where it is being
@@ -164,9 +168,48 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 			}
 			handed.Moved += moved
 		}
+
+		for _, fold := range folds {
+			left, err := inner.leftBehind(ctx, productID, visible, byFold[fold], fold, to)
+			if err != nil {
+				return err
+			}
+			handed.Left = append(handed.Left, left...)
+		}
 		return nil
 	})
 	return handed, err
+}
+
+// leftBehind is the pieces at one fold with an open, visible place not held
+// where the act sent them.
+func (s *Store) leftBehind(ctx context.Context, productID int64, visible []access.Visibility,
+	issues []int64, fold string, to *int64) ([]Piece, error) {
+
+	held := "assigned_to IS NULL"
+	var args []any
+	if to != nil {
+		held = "assigned_to = ?"
+		args = append(args, *to)
+	}
+	var ids []int64
+	if err := s.db.NewSelect().Model((*Finding)(nil)).
+		Column("vulnerability_id").
+		Where(inThisProduct, productID).
+		Where("vulnerability_id IN (?)", bun.List(issues)).
+		Where(inFold, fold).
+		Where("closed_at IS NULL").
+		Where("visibility IN (?)", bun.List(visible)).
+		Where("NOT ("+held+")", args...).
+		Group("vulnerability_id").
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read what stayed where it was: %w", err)
+	}
+	out := make([]Piece, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, Piece{VulnerabilityID: id, Fold: fold})
+	}
+	return out, nil
 }
 
 // inFold narrows findings to the binaries of one fold.
@@ -176,10 +219,9 @@ const inFold = `component_id IN (SELECT c.id FROM "component" AS "c" WHERE ` +
 // pieces is every group a narrowing admits, unpaged: the rows the findings
 // list would show across all its pages, as an issue and a fold.
 //
-// The page's own statement without its order and its bounds, grouped on the
-// same grain and narrowed by the same filter, so a filter that holds on the
-// list holds here and a group condition — how far decided, who holds it — is
-// asked of the same group.
+// The page's own statement without its order and its bounds, narrowed by the
+// same filter, so a filter that holds on the list holds here and a group
+// condition — how far decided, who holds it — is asked of the same group.
 func (s *Store) pieces(ctx context.Context, targets []int64, visible []access.Visibility,
 	filter Filter) ([]Piece, error) {
 
@@ -187,15 +229,9 @@ func (s *Store) pieces(ctx context.Context, targets []int64, visible []access.Vi
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Fold            string `bun:"fold"`
 	}
-	q := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+	q := openGroups(s.db, targets, visible).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr(GroupedOn)
+		ColumnExpr(FoldedOn + ` AS "fold"`)
 	if err := filter.narrow(q).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what the narrowing admits: %w", err)
 	}

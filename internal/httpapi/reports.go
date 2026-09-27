@@ -536,8 +536,9 @@ func registerCarrying(api huma.API, in Ingest) {
 			"nothing to agree to, and one covering nothing here has nothing to apply to; " +
 			"naming either is refused rather than skipped, because a caller that got the set " +
 			"wrong should hear so.\n\n" +
-			"A deferral is carried with the date it had, not with a fresh one. Bounded by the " +
-			"same setting that bounds every other action writing many rows.",
+			"A deferral is carried with the date it had, not with a fresh one. Bounded by how " +
+			"many issues it covers, set under `triage.review-issues`, and by how many findings " +
+			"it writes, set under `triage.write-ceiling`.",
 		Tags:          []string{"Triage"},
 		DefaultStatus: http.StatusCreated,
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {

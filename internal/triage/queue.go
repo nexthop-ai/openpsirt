@@ -126,31 +126,6 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	return total, nil
 }
 
-// Queue returns what is waiting for somebody, newest first, one entry per
-// claim.
-//
-// Narrowed to what the asker may act on, in the query. A reviewer who cannot
-// triage a product should not be shown its claims at all — a queue is a work
-// list, and one containing work somebody cannot do teaches them to skip rows.
-//
-// A claim is shown only where the reader may act on every row in it. Acting on
-// a claim is acting on the argument, which does not come in halves: shown the
-// part they may approve, a reader would agree to words whose other half stays
-// waiting on somebody else, and the count beside the card would be wrong.
-//
-// And not their own. Approving your own claim is refused, because a control
-// one person completes alone is not one — so a queue containing them
-// is a work list of things the reader cannot do, which teaches them to skip
-// rows. `mine` asks for exactly those instead: somebody wants to find what they
-// proposed and nobody has agreed to yet, and that is a different question from
-// what is waiting on them.
-func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
-	productID int64, limit, offset int) ([]Waiting, int, error) {
-
-	return s.QueueNarrowed(ctx, subject, QueueFilter{Mine: mine, ProductID: productID},
-		limit, offset)
-}
-
 // QueueFilter narrows the review queue. The zero value is every claim waiting
 // on the reader, in every product they may approve in.
 type QueueFilter struct {
@@ -229,8 +204,25 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 	return q
 }
 
-// QueueNarrowed is Queue under a filter.
-func (s *Store) QueueNarrowed(ctx context.Context, subject access.Subject, filter QueueFilter,
+// Queue returns what is waiting for somebody, newest first, one entry per
+// claim.
+//
+// Narrowed to what the asker may act on, in the query. A reviewer who cannot
+// triage a product should not be shown its claims at all — a queue is a work
+// list, and one containing work somebody cannot do teaches them to skip rows.
+//
+// A claim is shown only where the reader may act on every row in it. Acting on
+// a claim is acting on the argument, which does not come in halves: shown the
+// part they may approve, a reader would agree to words whose other half stays
+// waiting on somebody else, and the count beside the card would be wrong.
+//
+// And not their own. Approving your own claim is refused, because a control
+// one person completes alone is not one — so a queue containing them
+// is a work list of things the reader cannot do, which teaches them to skip
+// rows. `mine` asks for exactly those instead: somebody wants to find what they
+// proposed and nobody has agreed to yet, and that is a different question from
+// what is waiting on them.
+func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueFilter,
 	limit, offset int) ([]Waiting, int, error) {
 
 	mine := filter.Mine

@@ -119,13 +119,28 @@ func TestAssigningByFilterWithoutTheAssignerRightLeavesAColleaguesWorkWithThem(t
 		r.scannedSiblings(t)
 		assignedMatching(t, r, "assigner", "?planned=either&q=CURL1", `{"person":"reader"}`)
 
-		pieces, moved := assignedMatching(t, r, "triager", "?planned=either",
+		got := asPerson(t, r, "triager", http.MethodPost, matchingAt+"?planned=either",
 			`{"person":"triager"}`)
-		if pieces != 3 {
-			t.Errorf("the act reached %d rows, want all 3", pieces)
+		var out struct {
+			Pieces int   `json:"pieces"`
+			Moved  int64 `json:"moved"`
+			Left   []struct {
+				Vulnerability string `json:"vulnerability"`
+			} `json:"left"`
 		}
-		if moved != 3 {
-			t.Errorf("%d findings changed hands, want the 3 nobody held", moved)
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil || got.Code != http.StatusOK {
+			t.Fatalf("taking every row answered %d: %s", got.Code, got.Body.String())
+		}
+		if out.Pieces != 3 {
+			t.Errorf("the act reached %d rows, want all 3", out.Pieces)
+		}
+		if out.Moved != 3 {
+			t.Errorf("%d findings changed hands, want the 3 nobody held", out.Moved)
+		}
+		// The row a colleague holds is named, so a screen can keep it
+		// selected rather than report it taken.
+		if len(out.Left) != 1 || out.Left[0].Vulnerability != "CVE-2026-CURL1" {
+			t.Errorf("the rows left behind read %+v, want the one a colleague holds", out.Left)
 		}
 
 		// And giving work to somebody else is refused outright.
@@ -182,6 +197,48 @@ func TestAssigningByFilterAnswersNothingAboutAProductNobodyShowedYou(t *testing.
 		got = asPerson(t, r, "reader", http.MethodPost, matchingAt, `{"person":"reader"}`)
 		if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {
 			t.Errorf("a reader assigning answered %d", got.Code)
+		}
+	})
+}
+
+func TestAssigningByFilterToATeamNobodyOnWhichMayReadItIsRefused(t *testing.T) {
+	// Routing to a team asks that one member may read the strictest row.
+	// A team of public readers is handed disclosed work and refused
+	// undisclosed work, whole.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"readers","display_name":"Readers","members":["reader"]}`); made.Code !=
+			http.StatusCreated {
+			t.Fatalf("recording a team answered %d: %s", made.Code, made.Body.String())
+		}
+		if _, moved := assignedMatching(t, r, "private-dispatcher", "?planned=either&q=CURL2",
+			`{"team":"readers"}`); moved != 2 {
+			t.Errorf("a team of readers was handed %d disclosed findings, want 2", moved)
+		}
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("visibility = ?", "private").
+			Where("vulnerability_id IN (SELECT id FROM \"vulnerability\" WHERE identifier = ?)",
+				"CVE-2026-CURL3").
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		refused := asPerson(t, r, "private-dispatcher", http.MethodPost,
+			matchingAt+"?planned=either", `{"team":"readers"}`)
+		if refused.Code != http.StatusUnprocessableEntity {
+			t.Errorf("routing undisclosed work to a team nobody on which may read it "+
+				"answered %d: %s", refused.Code, refused.Body.String())
+		}
+	})
+}
+
+func TestAnEmptySelectionIsRefusedRatherThanReadAsEverything(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		got := asPerson(t, r, "assigner", http.MethodPost, matchingAt+"?planned=either",
+			`{"person":"reader","only":[]}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an empty selection answered %d: %s", got.Code, got.Body.String())
 		}
 	})
 }

@@ -305,8 +305,12 @@ func (n QueueNarrowing) filter(ctx context.Context, in Ingest, subject access.Su
 	}
 	if who := strings.TrimSpace(n.ProposedBy); who != "" {
 		filter.ProposedBy = []int64{}
-		if person, err := access.NewStore(in.DB.DB).ByIdentity(ctx, who); err == nil {
+		person, err := access.NewStore(in.DB.DB).ByIdentity(ctx, who)
+		switch {
+		case err == nil:
 			filter.ProposedBy = append(filter.ProposedBy, person.ID)
+		case !errors.Is(err, access.ErrNoSuchPerson):
+			return filter, wentWrong(in.Logger, "who proposed these could not be read", err)
 		}
 	}
 	return filter, nil
@@ -349,7 +353,7 @@ func registerTriage(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		waiting, total, err := store.QueueNarrowed(ctx, subject, filter, input.Limit, input.Offset)
+		waiting, total, err := store.Queue(ctx, subject, filter, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the review queue could not be read", err)
 		}

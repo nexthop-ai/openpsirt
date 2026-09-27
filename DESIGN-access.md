@@ -210,16 +210,16 @@ yourself is still doing it.
 ### Assignment by narrowing
 
 One act assigns every row the findings list returns for a narrowing, across all
-its pages, or the rows somebody picked out of it (REQ-34). One request per row
-took about 400 ms each, so 2,000 rows took about a quarter of an hour.
+its pages, or the rows somebody picked out of it (REQ-34).
 
 | Rule | |
 |---|---|
 | The rows are the list's own | Resolved from the same filter, at the same grain: one issue at one fold. A group condition, such as who holds it or how far it is decided, is asked of the same group the list shows |
 | Each row is assigned the way one finding is | Across every build of the product, at every binary of the fold, under the rule that decides who may move which work. The single-finding path names one binary; a row of the list names the fold, so the act covers what the row covers |
 | Picked rows are intersected with the narrowing | A picked row the filter no longer admits is not assigned. The selection was made out of that list, and a row that has left it is not in front of the person any more |
-| Without the assigner right, a colleague's work stays with them | The same outcome as assigning one row at a time: the act moves what nobody holds and what is already the caller's, and says how many findings changed hands |
-| Undisclosed work refuses the whole act | Asked at the strictest visibility among the rows, across the product, inside the transaction that writes. Handing over the disclosed part alone would leave the person holding less than they were told |
+| Without the assigner right, a colleague's work stays with them | The same outcome as assigning one row at a time: the act moves what nobody holds and what is already the caller's, says how many findings changed hands, and names the rows that stayed. The notification counts the rows that arrived |
+| An empty selection is refused | Read as "no selection", it would assign every row the filter matches |
+| Undisclosed work the recipient may not read refuses the whole act | Asked at the strictest visibility among the rows, across the product, inside the transaction that writes. Handing over the disclosed part alone would leave the person holding less than they were told. Taking work yourself, handing it back, and handing it to somebody who reads undisclosed work are not refused |
 | One notification for the act | A selection of 2,000 is one thing that happened to the recipient. Nobody is told about work handed back |
 | Not bounded | An assignment changes who holds something and nothing else, and the next act moves it again. It is written as one statement per fold rather than per row, so its size follows the number of source packages rather than the number of issues. Every row of one switch image, 7,868 rows over 757,952 findings, commits in 35 s on SQLite, where a request per row at 400 ms is 52 minutes |
 | One product per act | The list spanning products has no single product to authorize the act against, so it assigns a row at a time |

@@ -148,8 +148,8 @@ func (e *NotHere) Is(target error) bool { return target == ErrNoSuchReport }
 // does waits, and its reports are held by it: nobody can accept them as an
 // issue or rule on them again until it is approved or withdrawn.
 //
-// Bounded by the setting that bounds every bulk judgment, counted in reports
-// written rather than names given.
+// Bounded by the bulk action limit, counted in reports written rather than
+// names given.
 func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int64,
 	in Ruled) (*ReportRuling, error) {
 

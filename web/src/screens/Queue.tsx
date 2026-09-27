@@ -93,7 +93,7 @@ export function Queue() {
   // severity it covers, its outcome and the release it covers.
   const narrowing = queueNarrowing(params);
   const queue = useQuery({
-    queryKey: ["queue", aside ? 0 : offset, aside, product, narrowing],
+    queryKey: ["queue", aside ? 0 : offset, aside, product, aside ? {} : narrowing],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
@@ -105,7 +105,9 @@ export function Queue() {
               limit: aside ? 1 : PAGE,
               offset: aside ? 0 : offset,
               ...within,
-              ...narrowing,
+              // Only where the filters are on screen: the tab count on the
+              // other two tabs reads the whole queue.
+              ...(aside ? {} : narrowing),
             },
           },
         }),

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { overCapNotice, useBulkCap } from "../ui/bulk";
-import { questionIn, useSelection } from "./useSelection";
+import { questionIn, untaken, useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
@@ -200,6 +200,8 @@ export function Findings() {
   // product the list is about. Held as the question it was chosen under, so a
   // changed filter ends it the way it clears a selection.
   const [everyFor, setEveryFor] = useState<string | null>(null);
+  // How many rows the last assignment left with whoever holds them.
+  const [stayed, setStayed] = useState(0);
   const everyMatching = everyFor !== null && everyFor === questionIn(asked);
   const me = useWho();
   const [handing, setHanding] = useState("");
@@ -959,8 +961,9 @@ export function Findings() {
     if (!spanning) {
       // One request for the lot. A refusal is the whole act's, so nothing is
       // half done and the selection stays as it was.
+      let done;
       try {
-        await handMatching.mutateAsync({
+        done = await handMatching.mutateAsync({
           who,
           team,
           only: everyMatching ? undefined : [...picked.values()],
@@ -968,7 +971,18 @@ export function Findings() {
       } catch {
         return;
       }
+      // What somebody else holds stays with them, and stays selected, so the
+      // rows the act did not take are the ones still ticked.
+      const kept = untaken(picked, done.left ?? []);
       clearPicked();
+      if (kept.length > 0) {
+        pickAll(
+          kept.map(([, row]) => row),
+          kept.map(([key]) => key),
+          true,
+        );
+      }
+      setStayed((done.left ?? []).length);
       setEveryFor(null);
       reread();
       setHanding("");
@@ -1012,6 +1026,13 @@ export function Findings() {
           {handFailed === 1
             ? "One row could not be handed over and is still selected."
             : `${handFailed.toLocaleString()} rows could not be handed over and are still selected.`}
+        </p>
+      )}
+      {stayed > 0 && (
+        <p className="alert" role="status">
+          {stayed === 1
+            ? "One row is held by somebody else and was not taken."
+            : `${stayed.toLocaleString()} rows are held by somebody else and were not taken.`}
         </p>
       )}
       {handMatching.error != null && (

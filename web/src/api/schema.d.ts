@@ -3781,7 +3781,7 @@ export interface paths {
          *
          *     Only what the preview offered. A judgment that already applies here has nothing to agree to, and one covering nothing here has nothing to apply to; naming either is refused rather than skipped, because a caller that got the set wrong should hear so.
          *
-         *     A deferral is carried with the date it had, not with a fresh one. Bounded by the same setting that bounds every other action writing many rows.
+         *     A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
          *
          *     Requires: public-triage or private-triage on the product
          */
@@ -6170,7 +6170,7 @@ export interface components {
              * @example https://example.com/schemas/Assign-matching-findingsRequest.json
              */
             readonly $schema?: string;
-            /** @description The rows picked from the list. Left out, every row the filter matches */
+            /** @description The rows picked from the list. Left out, every row the filter matches; an empty list is refused */
             only?: components["schemas"]["PieceBody"][] | null;
             /** @description Their sign-in identity, or empty for nobody */
             person?: string;
@@ -6184,6 +6184,8 @@ export interface components {
              * @example https://example.com/schemas/AssignedMatchingBody.json
              */
             readonly $schema?: string;
+            /** @description The rows that did not wholly move, because somebody else holds part of them and you may not take it */
+            left?: components["schemas"]["PieceBody"][] | null;
             /**
              * Format: int64
              * @description The number of findings that changed hands, across every build of the product. Work somebody else holds stays with them unless you may give work away
@@ -6764,7 +6766,7 @@ export interface components {
             place: components["schemas"]["PlaceBody"];
             /**
              * Format: int64
-             * @description The number of distinct places it wrote at. The bulk cap is measured against this
+             * @description The number of distinct places it wrote at. The ceiling on one action is measured against this
              */
             places: number;
             /** @description This was agreed to before and came back */
@@ -9735,7 +9737,7 @@ export interface components {
             packages: components["schemas"]["FoldPackageBody"][] | null;
             /**
              * Format: int64
-             * @description The number of times those sit somewhere in this build. What the bulk cap is measured against
+             * @description The number of times those sit somewhere in this build. What the ceiling on one action is measured against
              */
             places: number;
             /** @description The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing */
@@ -11928,7 +11930,7 @@ export interface components {
             audits?: boolean;
             /**
              * Format: int64
-             * @description The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+             * @description The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
              */
             bulk_cap?: number;
             /**

@@ -48,7 +48,7 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 		}
 
 		// A claim waiting for somebody lands, carrying the old words.
-		rows, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 50, 0)
+		rows, _, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
