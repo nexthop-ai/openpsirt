@@ -471,8 +471,8 @@ func registerExport(api huma.API, in Ingest) {
 			line = floor.Word
 		}
 		out := Exporting{
-			What:  "findings",
-			About: []Stated{{"triaged at or above", line}},
+			What:   "findings",
+			About:  []Stated{{"triaged at or above", line}},
 			Header: findingColumns(),
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.Groups(ctx, subject, scope, limit, offset, narrowed)
@@ -539,8 +539,8 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 		narrowed.MinSeverity = ""
 		store := finding.NewStore(in.DB.DB)
 		out := Exporting{
-			What:  "findings, every product",
-			About: []Stated{{"triaged at or above", "each product's own line"}},
+			What:   "findings, every product",
+			About:  []Stated{{"triaged at or above", "each product's own line"}},
 			Header: append([]string{"product"}, findingColumns()...),
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.Anywhere(ctx, subject, limit, offset, narrowed)
