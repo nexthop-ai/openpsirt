@@ -1019,10 +1019,10 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 
 	// A request for who may read something undisclosed is itself about
 	// undisclosed work, and the answer is the one every other read gives:
-	// nothing. Asked here rather than only at the two handlers that call it,
-	// because a third endpoint over this query would answer for everybody —
-	// which is the rule this project does not bend, and the gate was written
-	// out at each caller instead of being carried on the query.
+	// nothing. Asked here rather than only at the handlers that call it,
+	// because an endpoint over this query that forgot to ask would answer for
+	// everybody, and visibility is carried on the query rather than written
+	// out at each caller.
 	if !subject.Reads(visibility, productID) {
 		return nil, nil
 	}
@@ -1146,9 +1146,7 @@ func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int
 // than an empty condition to be filled in.
 func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQuery {
 	// The roles enough to read at this visibility, asked of the rule
-	// rather than of a list. It was the same four lines as rolesReading, in
-	// the same package, one of them named and one not — which is how "may
-	// read" comes to mean two things.
+	// rather than of a list: one spelling, so "may read" means one thing.
 	enough := rolesReading(productID, visibility)
 	if len(enough) == 0 {
 		return nil

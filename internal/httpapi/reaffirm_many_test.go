@@ -597,8 +597,8 @@ func TestReAffirmingTakesTheReviewersLimitWhereAnyClaimGoesBack(t *testing.T) {
 //
 // A tag is a release built once. A deferral or a promise to patch dated
 // against one is a promise nothing can keep, and deciding one there answers
-// 422. The single-place re-affirmation built its place without saying it sat
-// in a tag, so the same outcome was re-made there and recorded.
+// 422. Re-affirming at a single place says whether the place sits in a tag,
+// so the same refusal applies there.
 func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
