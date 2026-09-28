@@ -19,6 +19,10 @@ const escapes = /(^|[\s;])(position\s*:\s*(fixed|absolute|sticky)|inset\s*:)/;
 // order. A rule inside an at-rule block is read like any other; the block's
 // own prelude never reaches a selector.
 //
+// A rule nested inside another rule is refused rather than read. The reader
+// takes innermost blocks, so a nested rule would arrive with the outer rule's
+// declarations as its selector and the outer rule would never be seen.
+//
 // A rule is read as the text before its brace, so everything else that can
 // stand before one goes first:
 //
@@ -31,6 +35,9 @@ export function cssRules(text) {
   const css = text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/@[\w-]+[^;{}]*;/g, " ");
   const out = [];
   for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (selector.includes(";")) {
+      throw new Error(`a rule nested inside another is not read: ${selector.trim()}`);
+    }
     out.push({ selector: selector.trim(), body });
   }
   return out;

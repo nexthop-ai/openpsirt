@@ -1914,12 +1914,6 @@ textarea:disabled {
 .filterbtn:hover {
   border-color: var(--accent-line);
 }
-/* After the hover, which it outranks by position. */
-.filterbtn:focus-visible {
-  border-color: var(--accent);
-  box-shadow: var(--ring);
-  outline: none;
-}
 .filterbtn .k,
 .filterbtn .caret {
   color: var(--faint);
@@ -1930,6 +1924,12 @@ textarea:disabled {
 .filterbtn[data-on="yes"] {
   border-color: var(--line-strong);
   background: var(--raised);
+}
+/* After the hover and the picked state, which it outranks by position. */
+.filterbtn:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+  outline: none;
 }
 .filterlist {
   min-width: max(100%, 190px);

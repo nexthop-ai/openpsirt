@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { act } from "react";
+import { act, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useFindingNeighbors } from "./findingNeighbors";
 import { useDecisionPrefill } from "./findingPrefill";
@@ -64,8 +64,12 @@ describe("where a finding sits in the list it was opened from", () => {
 
 describe("what the decision form starts from", () => {
   let seen: ReturnType<typeof useDecisionPrefill> | undefined;
+  // Walks to another finding without remounting, as a params-only change does.
+  let walkTo: (finding: string) => void = () => {};
   function Prefill({ rule }: { rule: string }) {
-    seen = useDecisionPrefill("sonic", "one", rule);
+    const [finding, setFinding] = useState("one");
+    walkTo = setFinding;
+    seen = useDecisionPrefill("sonic", finding, rule);
     return null;
   }
   function kept(prepares: Record<string, unknown>) {
@@ -79,6 +83,8 @@ describe("what the decision form starts from", () => {
   it("opens on what the rule prepares, until the reader starts from something", async () => {
     kept({ outcome: "not-applicable", justification: "code-not-present", reasoning: "gone" });
     mount.render(screen(<Prefill rule="kept" />));
+    // Held until the rule is read, so the form does not open blank and refill.
+    expect(seen?.settled).toBe(false);
     await settle();
     expect(seen?.settled).toBe(true);
     expect(seen?.opening).toMatchObject({ outcome: "not-applicable", reasoning: "gone" });
@@ -87,6 +93,16 @@ describe("what the decision form starts from", () => {
     expect(seen?.untouched).toBe(false);
     expect(seen?.opening).toEqual({ reasoning: "mine" });
     expect(seen?.opened).not.toBe(first);
+  });
+
+  it("starts the next finding from the rule again, whatever this one started from", async () => {
+    kept({ outcome: "not-applicable", justification: "code-not-present", reasoning: "gone" });
+    mount.render(screen(<Prefill rule="kept" />));
+    await settle();
+    act(() => seen?.startFrom({ reasoning: "mine" }));
+    act(() => walkTo("two"));
+    expect(seen?.untouched).toBe(true);
+    expect(seen?.opening).toMatchObject({ outcome: "not-applicable", reasoning: "gone" });
   });
 
   it("fills nothing from a deferral with no length, and says so", async () => {

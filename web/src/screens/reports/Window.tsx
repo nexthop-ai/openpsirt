@@ -25,8 +25,9 @@ const LONGEST = 3650;
 // A window goes into date arithmetic on the render path, so `Number("x")` is
 // not a wrong figure — it is `new Date(NaN).toISOString()`, which throws and
 // takes the sheet down with it. It also goes to the server, which refuses a
-// window it cannot answer for. So anything that is not a whole number from one
-// to the most the sheet offers falls back to what the sheet asked for.
+// window it cannot answer for. So anything that is not a number from one to
+// the most the sheet offers falls back to what the sheet asked for, and a
+// fraction is cut to its whole number.
 export function boundedAsked(
   params: URLSearchParams,
   name: string,

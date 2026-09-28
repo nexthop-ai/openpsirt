@@ -38,8 +38,8 @@ export function Backlog() {
   const at = useScope();
   const scope = scopeQuery(at);
   const [params] = useSearchParams();
-  // A value that is not a whole number of weeks in range falls back to a
-  // quarter.
+  // A value outside the range falls back to a quarter, and a fraction is cut
+  // to its whole number of weeks.
   const weeks = boundedAsked(params, "weeks", 104, 13);
 
   const trend = useQuery({

@@ -42,6 +42,10 @@ describe("how a stylesheet is read", () => {
     expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".overpane"]);
   });
 
+  it("refuses a rule nested inside another rule", () => {
+    expect(() => cssRules(`.foo { color: red; &:hover { color: blue; } }`)).toThrow(/nested/);
+  });
+
   it("reads a rule inside an at-rule block without the block's prelude", () => {
     const css = `@media (max-width: 780px) {\n  .chip { padding: 0; }\n}`;
     expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".chip"]);
