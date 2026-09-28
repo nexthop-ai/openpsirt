@@ -108,12 +108,12 @@ func registerTags(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		if in.DB == nil {
+			return nil, noDatabase(in.logger())
+		}
 		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.logger())
 		}
 		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
 		if err != nil {

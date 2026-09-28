@@ -421,9 +421,6 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// coverage report reads as a pipeline nobody wired up, telling the wrong
 	// person about the commoner of the two failures this record exists for.
 	note := func(reason string, builtAt *time.Time, hash *string) {
-		if in.DB == nil {
-			return
-		}
 		if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, ingest.Refusal{
 			TargetID: target.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
 		}); noted != nil {
