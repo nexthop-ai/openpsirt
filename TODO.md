@@ -76,6 +76,7 @@ Missing or wrong, with no decision needed to fix it.
 | A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
 | Patch branches cannot clone through an outbound HTTP proxy | The fetcher connects directly, so a network with no direct route out fetches nothing |
 | The exploitation clock starts when a scan sees the catalog listing | The catalog's own date for the issue is not read, so the pipeline's lag counts against the window |
+| A weakness outside the screen's common ones shows as a bare number | The server holds the whole CWE catalog and sends no name beside the identifier |
 
 ## Weak tests
 
@@ -94,7 +95,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Keep the screen's short list of weakness names? | The screen shows a short list in plain words. Published advisories use the full CWE catalog |
 | Offer saved filters on the all-products findings list? | Saved filters belong to one product, so the list the home screen's tiles open has none |
 | Have the server list the package kinds present? | The package-kind filter is a fixed list. A kind missing from it is reachable only by editing the address |
 | Add a gate for tracker references in comments? | The rule is enforced by reading. No existing gate fits it |
