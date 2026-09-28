@@ -25,9 +25,6 @@ import (
 // from the one it appears to — "exploited" over fifty rows means exploited
 // among those fifty — and it makes the total meaningless, which is the number
 // people quote.
-//
-// It already had its own test file, narrow_test.go, which is what says this
-// seam is real rather than a line count.
 
 // SortKey is a column somebody may order the findings list by.
 //
@@ -126,10 +123,8 @@ func directed(expr string, nothingLast, ascending bool) string {
 //
 // One list. The query parameter's enum is built from this at registration and
 // the interface's own union is generated from the document that enum produces,
-// so an order added here is offered and an order removed here is refused —
-// rather than the three agreeing because a test says they do. It said it was
-// the one list while nothing but a test called it, which is the shape this
-// exists to stop.
+// so an order added here is offered and an order removed here is refused,
+// with nothing to keep in step by hand.
 //
 // The map above is keyed rather than ordered, which is why the ordering is
 // written once here instead of being read back out of it.
@@ -484,10 +479,10 @@ func AtLeast(word string) []string {
 // what an issue is rated or what a component is called is asked as a
 // membership test against the table that holds the answer — "issues rated at
 // least high", "components named openssl" — so the query being narrowed can
-// walk finding's covering index and touch nothing else. The joins were the
-// first version, and they were what put a row lookup behind every one of a
-// build's open findings on every page: the engine had to read the row to
-// find the key to join on, whether or not any filter used the joined table.
+// walk finding's covering index and touch nothing else. A join puts a row
+// lookup behind every one of a build's open findings on every page: the
+// engine has to read the row to find the key to join on, whether or not any
+// filter uses the joined table.
 //
 // Severity is a condition on a row and the fix is a condition on the group,
 // so they land in different clauses. Putting either in the other place is
@@ -635,15 +630,12 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// name the issue is known by, because which identifier a publisher chose
 	// is a preference of whichever database they consulted.
 	//
-	// Resolved once and joined, never asked per row. This was a correlated
-	// EXISTS over three subqueries, evaluated for every candidate finding: on
-	// a demo image of 281,884 findings it did not return inside five minutes
-	// and it held a core for minutes after the request was abandoned, which
-	// made every other request on the deployment look broken too. There are
-	// far fewer statements than findings — 1,854 against 281,884 on that same
-	// image — so the cheap direction is to work out which (component, issue)
-	// pairs the statements name, once, and join the list to that. The same
-	// answer arrives in 0.27s.
+	// Resolved once and joined, never asked per row. Statements are far fewer
+	// than findings — 1,854 against 281,884 on one demo image — so the cheap
+	// direction is to work out which (component, issue) pairs the statements
+	// name, once, and join the list to that: 0.27s there. A correlated EXISTS
+	// over three subqueries per candidate finding did not return inside five
+	// minutes on that image, and held a core after the request was abandoned.
 	//
 	// Distinct on the pair, by UNION rather than UNION ALL, so joining
 	// cannot multiply a finding by the number of statements about it — a
@@ -689,13 +681,9 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	q = f.whatUpstreamDid(q)
 	if cwes := trimmed(f.Weaknesses); len(cwes) > 0 {
-		// One indexed lookup against the table that holds them.
-		//
-		// The classification was a comma-joined column, which made a
-		// membership test a substring match — and a bare LIKE answers CWE-79
-		// for a search for CWE-7, so it took four escaped patterns per name
-		// asked, none of which an index can be used for, over every issue.
-		// Every other multi-valued attribute here is a table; this one is too.
+		// One indexed lookup against the table that holds them. A
+		// comma-joined column would make membership a substring match, and a
+		// bare LIKE answers CWE-79 for a search for CWE-7.
 		upper := make([]string, 0, len(cwes))
 		for _, cwe := range cwes {
 			upper = append(upper, strings.ToUpper(strings.TrimSpace(cwe)))
@@ -927,10 +915,9 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 // sayingIt keeps only what a VEX publisher has a standing statement about,
 // and only where that statement says what was asked.
 //
-// Sixty lines of one idea, lifted out of narrow so that the rest of it reads
-// as the thirty independent narrowings it is. Nothing about it changed: the
-// statements are resolved into the (component, issue) pairs they name, once,
-// and the list is joined to that.
+// Apart from narrow, so that the rest of it reads as independent narrowings.
+// The statements are resolved into the (component, issue) pairs they name,
+// once, and the list is joined to that.
 func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	publishers, saidIt := trimmed(f.Publishers), trimmed(f.VexStatus)
 	if len(publishers) > 0 || len(saidIt) > 0 {

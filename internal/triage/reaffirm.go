@@ -159,12 +159,10 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	// The severity judged now, read here with everything else this
-	// turns on. Passed in by the caller it was a number from before the
-	// transaction opened, so an advisory sweep raising the severity in
-	// between — or a retry running against a database that has moved — carried
-	// the old agreement forward on the strength of a figure that is gone. The
-	// docstring above already said everything it turns on is read in here.
+	// The severity judged now, read inside the transaction with everything
+	// else this turns on: an advisory sweep or a retry can move the severity
+	// between the request and the write, and the agreement is carried on the
+	// strength of it.
 	severityNow, err := s.severityOf(ctx, previous.ProductID, previous.VulnerabilityID)
 	if err != nil {
 		return nil, err
@@ -223,12 +221,10 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 // than read off a column. The product is the one the decision was made in: a
 // rating another team holds is not evidence about this claim.
 //
-// It read `score_centi` alone, which is the published score and nothing else:
-// an assessment writes the word and never that column, so an issue published
-// `high` with no vector scored zero before the assessment and zero after it.
-// Zero against zero is "no worse than when it was agreed to", so a dismissal
-// agreed once was re-affirmed with nobody else after somebody had rated the
-// issue critical — which is the one thing this comparison exists to catch.
+// Not the published score alone: an assessment writes the word and never the
+// score, so an issue published `high` with no vector scores zero before an
+// assessment and after it, and zero against zero would read as no worse after
+// somebody rated it critical — the one thing this comparison exists to catch.
 func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64) (int, error) {
 	var issue struct {
 		Published  string `bun:"published"`
@@ -654,11 +650,10 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	}
 
 	// productID is which product this is about, read from the build rather
-	// than taken from the caller. The first version selected decisions by
-	// live key and a matching place alone — and a place is a hash of
-	// component names carrying no product, so a shared distribution
-	// package matched across products and the reasoning of undisclosed
-	// claims came back to anybody who could read one product.
+	// than taken from the caller. Decisions are selected by product as well as
+	// by live key and place: a place is a hash of component names carrying no
+	// product, so a shared distribution package matches across products, and
+	// the reasoning of undisclosed claims elsewhere would come back.
 	var productID int64
 	if err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
@@ -713,10 +708,9 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "component"`, toTarget).
-		// Both versions, because a decision is keyed on both. Comparing only
-		// the component's meant a build whose *consumer* had moved was
-		// reported as already covered, when the claim does not reach it and
-		// the finding surfaces unanswered.
+		// Both versions, because a decision is keyed on both: a build whose
+		// consumer alone has moved is one the claim does not reach, and the
+		// finding surfaces unanswered.
 		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id

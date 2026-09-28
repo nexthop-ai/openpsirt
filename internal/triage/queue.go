@@ -535,10 +535,10 @@ func outliersOf(claim Claim, productID int64, decisionsOf map[int64][]int64,
 	// The term the list was actually narrowed by, where the act recorded one,
 	// and the claimant's prose only where it did not.
 	//
-	// The structured record is the one the check reads. Reading the prose
-	// meant a claimant who narrowed by one word and wrote a sentence phrasing
-	// it differently got no "does not mention" flag at all — and the field
-	// they write is asked for in their own words, which invites exactly that.
+	// The structured record is the one the check reads. A claimant who
+	// narrowed by one word and wrote a sentence phrasing it differently would
+	// get no "does not mention" flag from the prose, and the field they write
+	// is asked for in their own words, which invites exactly that.
 	term := orEmpty(claim.SelectedWhere)
 	if term == "" {
 		term = narrowingTerm(orEmpty(claim.SelectedBy))

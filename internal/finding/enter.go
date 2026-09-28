@@ -550,13 +550,11 @@ var (
 func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int64, string, error) {
 	name := strings.TrimSpace(in.Component)
 	if name != "" {
-		// The resolver every other component lookup already goes through,
-		// rather than a second one here. This took the first row a name
-		// matched, which is the guess that was measured wrong elsewhere: three
-		// vendored versions of one library all resolved to the same component,
-		// so a flaw recorded against one of them was filed against whichever
-		// had been interned first and nothing said so. An ambiguous name is
-		// now a refusal carrying the choices.
+		// The resolver every other component lookup goes through. An
+		// ambiguous name is refused with the choices: one image carries three
+		// vendored versions of one library under one name, and taking the
+		// first row the name matches files a flaw against whichever was
+		// interned first.
 		id, err := graph.ComponentAsIn(ctx, db, targetID, name, graph.Choice{
 			Version:   strings.TrimSpace(in.Version),
 			Ecosystem: strings.TrimSpace(in.Ecosystem),
@@ -631,11 +629,10 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 //
 // Shaped like a vendor advisory identifier because that is what it becomes:
 // the product, the year, and a number. The number is drawn rather than
-// counted. Counting from one made the identifier a running total of what
-// this product has kept quiet — anybody could ask for the first one, walk
-// upward until the answers changed, and read off both how many undisclosed
-// flaws exist and when the last one was recorded. That is a disclosure made by
-// the name alone, before any route is asked anything.
+// counted. A counted identifier is a running total of what this product has
+// kept quiet: walking upward from the first until the answers change reads off
+// both how many undisclosed flaws exist and when the last one was recorded,
+// which is a disclosure made by the name alone.
 //
 // Drawn from a source fit for the purpose, because guessing the next one is
 // the whole of what this prevents. What happens to a collision is

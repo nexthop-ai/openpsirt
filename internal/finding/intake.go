@@ -301,11 +301,9 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 			Set("evaluated_at = ?", now).
 			Set("evaluated_by = ?", subject.ID).
 			Where("id = ?", row.ID).
-			// Whether it is still unjudged is asked here and nowhere else.
-			// Asked before the write as well, the answer read a row that may
-			// have moved since — and the second guard was unreachable by any
-			// input a single caller can produce, so it was a rule with no
-			// test rather than a second line of defense.
+			// Whether it is still unjudged is asked here and nowhere else: a
+			// read before the write answers about a row that may have moved
+			// since.
 			Where("vulnerability_id IS NULL").
 			// A report under a ruling is answered, or about to be. Accepting
 			// it as well would leave it two things at once.
