@@ -90,6 +90,9 @@ describe("opening the dependency tree from a finding", () => {
       `sonic-broadcom${WITHIN}${WITHIN}${WITHIN}${SEPARATOR}` +
         `linux-image${WITHIN}6.12.41-1${WITHIN}deb${WITHIN}debian`,
     );
+    // And the row it lands on is named the same way, so it is the one marked.
+    expect(query.get("ecosystem")).toBe("deb");
+    expect(query.get("namespace")).toBe("debian");
   });
 
   it("sends the component alone where no place has one", () => {

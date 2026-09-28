@@ -793,6 +793,11 @@ owns that rule.
 | A claim's scope names its locations rather than only counting them | "One location" says how large a judgment was and not which code it was about. Three at most, then how many more, because a kernel sits at sixty and the list would become the card |
 | An approved claim at the same component and consumer is offered to a new issue (REQ-28) | With its reasoning and "apply decision #N", which fills the form and records the new claim as an extension. It still needs a second person |
 | A comment can be rewritten by whoever wrote it, in place | The control is offered only to the author so nobody is invited into a refusal the server would give them anyway. The box opens on the text as stored rather than as a draft: a copy of something already stored would come back later as an unsent draft of somebody's own comment |
+| What belongs to one finding goes when the screen walks to the next | The screen is not remounted when only its address changes, so the confirmation of what was recorded, the decision being extended, the rating form and the exploited-here forms are put back on arriving at another finding |
+| The rating form opens on a rating it offers | The four bands. A published "negligible" or "none" opens it on medium, and nothing it offers is milder than either |
+| The references are cut at twelve, and say how many more there are | Patches first, then advisories and reports; the rest are a control away rather than silently gone |
+| A description shortened to fit says it was shortened | Cut at a whole character with a mark after it. Stopped mid-sentence with nothing after it, it reads as the whole |
+| Starting an advisory mints one name and names the flaw on it once | The name is kept the moment it exists and the flaw once it is added, so a later step failing is retried from where it stopped rather than spending another number in the year's sequence |
 | A recorded flaw is closed from its own finding screen, and only a recorded one shows the control | Everything a scanner found is resolved by the next scan, and offering a button that overrules that would offer the thing the rule exists to prevent. The panel says outright that nothing else can close it and that nothing reopens it, because both are surprising and the second is irreversible |
 
 ## The decision form
@@ -1464,6 +1469,7 @@ chosen (REQ-64).
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
 | It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. Returning without navigating anywhere leaves the box looking live and swallowing what was typed |
 | A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
+| The findings list's box holds the term the list applies | Whatever takes the term out of the address — its chip, clearing the filters, a saved filter, Back — empties the box as well, or Enter there puts back a search the reader thought was gone |
 
 ## A person's own page
 

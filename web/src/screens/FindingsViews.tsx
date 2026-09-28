@@ -31,6 +31,7 @@ import { Exploited, Severity } from "../ui/Severity";
 // list anybody assembles a day's work out of.
 import { PAGE, type Row } from "./list";
 import { Wide } from "../ui/Wide";
+import { cut } from "../ui/cut";
 
 // A component's place, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
@@ -569,7 +570,7 @@ export function Peek({
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {it?.description ? (
         <p style={{ margin: "8px 0 0", fontSize: "var(--step--1)", maxWidth: "78ch" }}>
-          {it.description.slice(0, 420)}
+          {cut(it.description, 420)}
         </p>
       ) : (
         <p className="hint" style={{ margin: 0 }}>

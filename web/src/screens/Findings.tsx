@@ -63,6 +63,7 @@ import {
   withParam,
   withParams,
 } from "./list";
+import { useReseed } from "../ui/reseed";
 
 // The filters the bar sets itself, so the count on More filters leaves them out.
 const ON_THE_BAR = new Set(["q", "floor", "state", "assigned", "running"]);
@@ -211,6 +212,11 @@ export function Findings() {
   // is offered again.
   const [declined, setDeclined] = useState<string | null>(null);
   const [typed, setTyped] = useState(searching);
+  // The box says what the list applies. Whatever takes the term out of the
+  // address — the chip, clearing every filter, a saved filter, Back — takes
+  // it out of the box too, or pressing Enter there puts back a search the
+  // reader thought was gone.
+  useReseed(searching, () => setTyped(searching));
   // The direction an order opens at, which is not the same for all of them:
   // "sort by severity" means the worst first and "sort by due" means the
   // soonest, and both were opening most-first.

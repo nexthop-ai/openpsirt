@@ -75,6 +75,10 @@ export function intoTheTree(places: Sitting[]): string {
   // two rows there.
   query.set("path", steps.map((step) => keyOf(step)).join("\u001f"));
   if (last?.version) query.set("version", last.version);
+  // The rest of what the tree keys a row on, so the row the link exists to
+  // show is the one marked.
+  if (last?.ecosystem) query.set("ecosystem", last.ecosystem);
+  if (last?.namespace) query.set("namespace", last.namespace);
   return query.toString();
 }
 
