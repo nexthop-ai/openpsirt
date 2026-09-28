@@ -1936,6 +1936,8 @@ export interface paths {
          *
          *     It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
          *
+         *     Somebody with no identifier pinned answers 404 and records nothing.
+         *
          *     Requires: administrator
          */
         delete: operations["unbind-identifier"];
@@ -2828,7 +2830,7 @@ export interface paths {
          * Take somebody off a case
          * @description Withdraws the grant. The record of it is kept, because who could see an embargoed case, and when, is exactly what is asked afterwards.
          *
-         *     Taking somebody off a case they are not on succeeds and changes nothing.
+         *     Taking somebody off a case they are not on answers 404 and records nothing.
          *
          *     Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
          */

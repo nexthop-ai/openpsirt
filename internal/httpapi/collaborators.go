@@ -156,7 +156,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 		Summary: "Take somebody off a case",
 		Description: "Withdraws the grant. The record of it is kept, because who could see " +
 			"an embargoed case, and when, is exactly what is asked afterwards.\n\n" +
-			"Taking somebody off a case they are not on succeeds and changes nothing.",
+			"Taking somebody off a case they are not on answers 404 and records nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "Only where you may read undisclosed work.", privateRights()...),
 		func(ctx context.Context, input *struct {
