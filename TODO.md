@@ -39,7 +39,6 @@ The owner has chosen to wait on each of these.
 | Microsoft Teams and Google Chat | Slack and Zulip are the chat platforms. A Teams direct message needs a workflow in the tenant or a registered bot, and a Google Chat one a Chat app installed for the people it reaches |
 | Asking GitHub or GitLab which branches hold a commit | Patch branches clone each repository. An API call would skip the clone for a repository with few linked commits |
 | Fetching a repository from a mirror | The kernel stable tree is 5.1 GB from kernel.org and 1.1 GB from a mirror that sends commits only |
-| Publishing which outcomes dismiss and which state a reason | The interface holds a copy of both classes, so an outcome the server moves to another class is not a compile error there |
 
 ## Decided, not built
 
