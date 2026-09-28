@@ -38,6 +38,14 @@ plugins:
   - search
   - swagger-ui-tag
 
+# {{ release }} in a page is the release this build describes. The hook says
+# where that comes from; it is a build script, not a page, so it is not
+# published.
+hooks:
+  - docs/hooks/release.py
+exclude_docs: |
+  /hooks/
+
 nav:
   - Home: index.md
   - Current state: built.md

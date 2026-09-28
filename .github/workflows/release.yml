@@ -322,9 +322,12 @@ jobs:
       # they are looking at. A prerelease publishes under its own version and
       # moves nothing, and nor does a fix to an older line: "latest" has to
       # keep meaning the newest release somebody is meant to be running.
+      # The pages name the release a reader deploys, and this build names the
+      # tag it was started by rather than looking for the newest one.
       - name: Publish under this version
         env:
           LATEST: ${{ needs.publish.outputs.latest }}
+          DOCS_RELEASE: ${{ github.ref_name }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           case "$version" in

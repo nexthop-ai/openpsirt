@@ -21,6 +21,8 @@ jobs:
       # mike pushes the built set to the documentation branch.
       contents: write
     steps:
+      # Full history and tags: mike needs the documentation branch, and the
+      # pages name the newest release tag reachable from main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0

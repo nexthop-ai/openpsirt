@@ -435,7 +435,7 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 | Rule | Why |
 |---|---|
 | `version` and `appVersion` are set when the chart is packaged, from the tag | The committed number is the one somebody forgets to move — the failure `pins-check` exists for. Stamping at package time leaves the tag as the only thing that has to be right |
-| `Chart.yaml` carries `0.1.0` as a placeholder | A chart packaged from a checkout is not a release, and should not claim to be one |
+| `Chart.yaml` carries `0.0.0-dev` as a placeholder | A chart packaged from a checkout is not a release, and names none that exists |
 | `image.tag` stays empty and falls back to `appVersion` | A chart installs the application it was packaged for. An operator who wants another passes it |
 
 ## Signing and provenance

@@ -35,30 +35,25 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
-A database built by v0.1.0, v0.2.0, v0.3.0 or v0.4.0 is upgraded in place, at
-startup or by `openpsirt migrate up`. One built by an earlier release passes
-through each later release's upgrade on the way. v0.4.0 changed no schema, so a
-v0.3.0 database takes the same upgrade a v0.4.0 one does. A database built by
+A database built by any release is upgraded in place, at startup or by
+`openpsirt migrate up`. One built by an earlier release passes through each
+later release's upgrade on the way. A database built by a release candidate or
 any build between releases is recreated.
 
-Read the sections for the release you are coming from, and every section after
-it: from v0.1.0, read all five.
+Read [Every upgrade](#every-upgrade), the section for the release you are coming
+from, and every section after it.
 
 ### Every upgrade
 
 | Step | |
 |---|---|
 | Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
-| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them |
+| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them |
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
 Going back is `openpsirt migrate down`, once for each release stepped back that
 carries a migration, run with this build before the earlier one is deployed.
-v0.4.0 carries none, so going back to v0.4.0 or v0.3.0 is one, and to v0.2.0
-is two. v0.1.0 started against an
-upgraded schema reports it current and cannot read it. Patch branch lookups
-come back off in v0.2.0, which reads its own setting for them: turn them on
-again under its Settings.
+The section for the release gone back to says what else it needs.
 
 ### From v0.1.0
 
@@ -72,9 +67,10 @@ again under its Settings.
 | An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
 | A reported flaw | Has a reference, minted as one recorded today would be |
 
-### From v0.2.0
+v0.1.0 started against a schema that was not taken back down reports it
+current and cannot read it.
 
-Also read after an upgrade from v0.1.0.
+### From v0.2.0
 
 | Change | What to do |
 |---|---|
@@ -91,17 +87,20 @@ Also read after an upgrade from v0.1.0.
 | A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
 | A component | Has no license until a scan reads one from its inventory |
 
+Going back to v0.2.0 leaves patch branch lookups off, because v0.2.0 reads its
+own setting for them: turn them on again under its Settings.
+
 ### From v0.3.0
 
-Also read after an upgrade from v0.1.0 or v0.2.0.
+v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
+one does, and going back to v0.3.0 takes the same `openpsirt migrate down` as
+going back to v0.4.0.
 
 | Change | What to do |
 |---|---|
 | `triage.together-cap` bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read `triage.review-issues` (200 issues) and `triage.agreed-issues` (2,000 issues). Those three, and recording a flaw or adding builds to one, read `triage.write-ceiling` (50,000 findings). A value set on `triage.together-cap` is not carried to them | Where `triage.together-cap` was changed, set the new limits under Settings, Triage |
 
 ### From v0.4.0
-
-Also read after an upgrade from any earlier release.
 
 | Change | What to do |
 |---|---|
