@@ -818,6 +818,9 @@ collects the answer it suggested.
 | Rule | |
 |---|---|
 | The deferral threshold is a number on the form, not a sentence about a threshold | Which side of it a date falls on decides whether a second person has to agree, and reading that off the response is reading it after the choice was made |
+| A deferral is forecast against what its places were put off for already | The server adds a deferral to everything the place was put off for before, so the finding carries each place's total and the form adds the largest of those it covers. A deferral reaching the threshold exactly waits for a second person, as it does on the server |
+| A promise to act by a date is forecast against the earliest deadline it covers | By that deadline it stands on its own, and later it waits for a second person. It is not called a dismissal |
+| Ctrl+Enter asks what the button asks | Nothing is sent while a submission is in flight or the review sheet is open, so a second press does not post the decision twice |
 | It names the next missing answer, beside the button | A disabled button says something is missing and never what, and Ctrl+Enter does nothing until the same answer is given. One rule decides both the sentence and the refusal |
 | Ctrl+Enter submits, and the form says so | A shortcut nobody knows about is a shortcut nobody has, and the person it is for is making a hundred of these a day |
 | The last pair is offered, never applied | Retyping the outcome and the justification is the cost the review measured, but a judgment prefilled with the last one made is a record that can say what nobody meant. So it is a button that says what it will fill in, and the fill is somebody's own click. Per session, because a default that survives a night is a default nobody chose |
@@ -857,6 +860,7 @@ written, and only then is anything sent.
 | The reach is answered whole rather than sampled | Where a judgment lands beyond this build is a question per place, and asking per place is a request each — so it asked about the first eight. That was a cost control that had become a rule about what a decision covers: what is offered is what gets written, so a build reachable only from the ninth place was never offered and nothing said so |
 | The review step is skipped where there is nothing to review | It ran even when the reach it exists to confirm is zero, and at around 150 decisions a day that is some 300 keystrokes spent confirming nothing |
 | What counts as nothing is one thing: no build holds this issue at another version | Builds already matching are named on the sheet rather than asked about, so their absence from a skipped sheet costs nothing — the confirmation that follows names them |
+| This build is counted in consumers, and what is written in places | Consumers are what the scope control beside the form narrows by, so the sheet states what it covers in them; how many records are written is a count of places. A build at another version is counted in places, because its consumers are not read |
 | An unread reach is not an empty one | A query still in flight, or one that failed, contributes no other versions, and treating that silence as "there are none" would submit past a question rather than skip one that was not there. The sheet is skipped only when every one of those reads succeeded |
 
 ## List navigation
@@ -1330,6 +1334,7 @@ the part of a decision that matters most.
 | **Signing out also clears what the tab remembers** | The scope somebody picked and the last judgment they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
 | **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
+| A revision opens on its draft where one was left | The editor restores only into an empty field, so a revision opening on the standing text would write that over the draft |
 | It is restored into the form it was typed in, and is not a default | The rule that the decision form opens on nothing chosen is about what somebody has *not* answered. This is their own answer to this exact finding, keyed on every part of it, and an explicit "start from this" beats it |
 
 ### Restored position
@@ -1441,6 +1446,7 @@ to; on an undisclosed finding the mention itself says a finding exists.
 |---|---|
 | Asking who may be mentioned on an undisclosed finding is itself a question about undisclosed findings | Somebody who cannot read them is answered as though the product were not there. Without that, the endpoint is a way to enumerate who holds private access, which is a more useful thing to steal than the list it is attached to |
 | What is being typed after an `@` is read from the text before the cursor | Rather than tracked as state, so it stays right however somebody edits |
+| What is typed is sent, and the server narrows | The server holds the whole list and matches display names as well as identities. A page of the first few people filtered here leaves out whoever is past it |
 | The pickers that say who is dealing with a finding ask the same endpoint (REQ-34) | They asked for the list of people, which is administration, so for every triager in the deployment both selects were empty. Asking who may *read* it rather than who *exists* also narrows the offer to people who can open what they are handed |
 | A box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A claim is asked at the visibility of its most careful row |
 | The one box that offers nothing is the bulk form, and it is the one that cannot ask | Deciding many findings at once carries no visibility on the wire, so the question has no answer to send. Asking as though the set were public would offer people who cannot open half of it |
@@ -1683,6 +1689,10 @@ question.
 |---|---|
 | **Absolute** | The calendar day as stored, deliberately not localized. These are dates people quote to each other across time zones, and one that reads differently for two people looking at the same row is worse than one that reads unfamiliarly for both |
 | **Relative** | For the reader asking whether something is stale. It reads the same scale in both directions, because a deadline and a last scan are the same question about opposite sides of now, and it carries the absolute form on the title |
+
+A value that is not a stored moment is drawn as nothing in both forms: the shape
+is checked, because a bare number parses as a year, and the calendar day is
+checked, because a parser rolls a day past the end of its month into the next.
 
 Waiting looks the same everywhere, and says so. The sentence was typed out
 thirty-nine times in four spellings, and none of them announced anything — which

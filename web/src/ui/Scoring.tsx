@@ -283,11 +283,23 @@ export function Scoring({
   // of them are answered.
   const [version, setVersion] = useState(() => versionOf(vector));
 
+  // The vector this form last handed its caller. The caller hands it back,
+  // and that echo is not a new vector: an incomplete set of answers composes
+  // to the empty string, and re-seeding from that would clear every answer
+  // the moment one was blanked or the scheme was changed.
+  const [emitted, setEmitted] = useState(vector);
+  function emit(next: string) {
+    setEmitted(next);
+    onChange(next);
+  }
+
   // Kept in step with whatever the caller holds, so that a vector pasted in
   // whole lights up the metrics it states. Re-seeded rather than remounted:
   // picking the last metric completes the vector, and a remount would collapse
   // the metric list at the moment somebody finished with it.
   useReseed(vector, () => {
+    if (vector === emitted) return;
+    setEmitted(vector);
     setChosen(read(vector));
     if (vector !== "") setVersion(versionOf(vector));
   });
@@ -303,7 +315,7 @@ export function Scoring({
   function pick(metric: string, value: string) {
     const next = { ...chosen, [metric]: value };
     setChosen(next);
-    onChange(vectorOf(next, version));
+    emit(vectorOf(next, version));
   }
 
   // Changing the scheme keeps the answers the new one also asks for, by the
@@ -315,7 +327,7 @@ export function Scoring({
     const next = carriedTo(under, chosen);
     setVersion(under);
     setChosen(next);
-    onChange(vectorOf(next, under));
+    emit(vectorOf(next, under));
     setOpen(true);
   }
 
@@ -339,7 +351,7 @@ export function Scoring({
             className="btn quiet"
             onClick={() => {
               setChosen({});
-              onChange("");
+              emit("");
             }}
           >
             Clear it

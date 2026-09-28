@@ -91,24 +91,31 @@ export function Editor({
   // listing everybody teaches somebody to name a colleague who then cannot
   // open what they were called to — and on an undisclosed finding the mention
   // itself would say a finding exists.
+  //
+  // Narrowed by what is typed, in the server, which is where the whole list
+  // is and which matches names as well as identities. A list capped before it
+  // is filtered leaves out the person somebody typed.
   const offerable = useQuery({
-    queryKey: ["mentionable", mentions?.product, mentions?.visibility],
+    queryKey: ["mentionable", mentions?.product, mentions?.visibility, typing ?? ""],
     enabled: typing !== null && !!mentions?.product,
     staleTime: 5 * 60_000,
+    placeholderData: (previous) => previous,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/mentionable", {
           params: {
             path: { product: mentions?.product ?? "" },
-            query: { visibility: mentions?.visibility ?? "public", limit: 50 },
+            query: {
+              visibility: mentions?.visibility ?? "public",
+              limit: 25,
+              ...(typing ? { q: typing } : {}),
+            },
           },
         }),
       ),
   });
 
-  const candidates = (offerable.data?.items ?? []).filter((each) =>
-    typing ? (each.identity ?? "").toLowerCase().startsWith(typing.toLowerCase()) : true,
-  );
+  const candidates = offerable.data?.items ?? [];
 
   // The text typed after an @, if any. Read from the text before the
   // cursor rather than tracked as state, so it stays right however somebody

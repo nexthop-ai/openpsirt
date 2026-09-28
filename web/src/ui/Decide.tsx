@@ -8,7 +8,7 @@ import { unwrap, whichOf } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
 import { labeled, reasonOffered, reasonsFor, type Justification } from "./Outcome";
-import { Covering, type Sitting } from "./Covering";
+import { Covering, consumersOf, type Sitting } from "./Covering";
 import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
@@ -195,6 +195,37 @@ function deferredDays(until: string): number {
   return Math.max(0, Math.ceil((then - Date.now()) / 86_400_000));
 }
 
+// Whether a claim stands on its own or waits for a second person, said before
+// it is sent and in the terms the server decides it in.
+//
+// A deferral is measured with what the place was already put off for, and a
+// promise to act by a date against the earliest deadline it covers. One
+// function for the aside and the field beside the date, so the two cannot
+// come to say different things about one claim.
+export function forecast(
+  outcome: string,
+  threshold: number | null,
+  until: string,
+  soFar = 0,
+): string {
+  if (outcome === "affected") return "No approval needed. Goes to remediation.";
+  if (outcome === "deferred") {
+    const before = soFar > 0 ? ` Already put off ${soFar} days, which counts toward it.` : "";
+    if (threshold === null || until === "") {
+      return `Under the threshold this stands alone. Over it, a second person.${before}`;
+    }
+    const total = deferredDays(until) + soFar;
+    const counted = soFar > 0 ? `${total} days with what was put off before` : `${total} days`;
+    return total >= threshold
+      ? `${counted} reaches the ${threshold}-day threshold, so a second person has to agree.`
+      : `${counted} is inside the ${threshold}-day threshold, so this stands on its own.`;
+  }
+  if (outcome === "patch-needed" || outcome === "upgrade-needed") {
+    return "By the earliest deadline it covers, this stands on its own. Later, a second person.";
+  }
+  return `A ${said(outcome)} takes effect only after a second person approves.`;
+}
+
 export function Decide({
   at,
   places,
@@ -292,6 +323,10 @@ export function Decide({
   const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
   const answered = places.length - open.length;
   const covering = open.filter((p) => !excluded.has(p.place ?? ""));
+  // What the most put-off place this covers was put off for before. The server
+  // measures each place's deferral with its own, and one place over the
+  // threshold sends the claim to a second person.
+  const soFar = Math.max(0, ...covering.map((p) => p.deferred_days ?? 0));
   const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
   // A correction carries past every version bump, so the reasons it may state
   // are the two that say something is not there. The other three are about how
@@ -516,7 +551,9 @@ export function Decide({
     },
   });
 
-  readyRef.current = ready;
+  // The button's own test, pending submit included, so a second press of the
+  // shortcut cannot post the decision twice.
+  readyRef.current = ready && !submit.isPending && !reviewing;
   startRef.current = start;
 
   function start() {
@@ -692,15 +729,9 @@ export function Decide({
               changes what somebody is about to do, and reading it off the
               response is reading it too late. */}
           <span className="hint">
-            {days === null
-              ? "Under the deferral threshold, no approval is needed; over it, a second person."
-              : until === ""
-                ? `Up to ${days} days needs nobody; longer waits for a second person.`
-                : deferredDays(until) > days
-                  ? `That is ${deferredDays(until)} days out, past the ${days}-day threshold: ` +
-                    "it waits for a second person."
-                  : `That is ${deferredDays(until)} days out, inside the ${days}-day threshold: ` +
-                    "it stands on its own."}
+            {days !== null && until === "" && soFar === 0
+              ? `Up to ${days} days needs nobody; longer waits for a second person.`
+              : forecast("deferred", days, until, soFar)}
           </span>
         </div>
       )}
@@ -748,6 +779,8 @@ export function Decide({
     build: `${at.product} · ${at.stream} · ${at.variant}`,
     covered: covering.length,
     total: open.length,
+    consumers: consumersOf(covering),
+    consumersTotal: consumersOf(open),
     matching,
     offered,
     reasoning,
@@ -764,19 +797,7 @@ export function Decide({
         differing={offered.length}
       />
       <div className="tier auto" style={{ margin: 0 }}>
-        <p className="said">
-          {outcome === "affected"
-            ? "No approval needed. Goes to remediation."
-            : outcome === "deferred"
-              ? days === null || until === ""
-                ? "Under the threshold this stands alone. Over it, a second person."
-                : deferredDays(until) > days
-                  ? `${deferredDays(until)} days is past the ${days}-day threshold, so a second ` +
-                    "person has to agree."
-                  : `${deferredDays(until)} days is inside the ${days}-day threshold, so this ` +
-                    "stands on its own."
-              : "Dismissals take effect only after a second person approves."}
-        </p>
+        <p className="said">{forecast(outcome, days, until, soFar)}</p>
       </div>
     </aside>
   );

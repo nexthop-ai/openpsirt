@@ -3,16 +3,14 @@
 
 // The two letters standing for somebody where there is no room for a name.
 //
-// One function, because there were three and they had drifted: two split an
-// address on the `@` and one did not, so `alice@example.com` was "AE" on a
-// finding and in the work list and "AC" in the rail — the same person with two
-// avatars on one screen, which reads as two people.
+// One function, so one person has one avatar on every screen.
 //
 // An identity is a username, so it is split on the separators a username
-// actually uses — the `@` among them, so a mail address gives the local part
-// rather than the domain.
+// actually uses. A mail address gives its local part: the domain is shared by
+// everybody at one organization, and a letter taken from it tells nobody apart.
 export function initials(name: string): string {
-  const parts = name.split(/[\s._@-]+/).filter(Boolean);
+  const local = name.split("@")[0] ?? "";
+  const parts = local.split(/[\s._-]+/).filter(Boolean);
   if (parts.length === 0) {
     return "?";
   }

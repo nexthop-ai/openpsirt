@@ -4,12 +4,13 @@
 import { describe, expect, it } from "vitest";
 import { initials } from "./initials";
 
-// There were three of these and they had drifted: two split an address on the
-// `@` and one did not, so one person had two avatars on one screen — which
-// reads as two people rather than as a rendering difference.
+// One person has one avatar on every screen, and two people at one domain have
+// two.
 describe("the letters standing for somebody", () => {
   it("takes the local part of an address rather than the domain", () => {
-    expect(initials("alice@example.com")).toBe("AE");
+    expect(initials("alice@example.com")).toBe("AL");
+    expect(initials("adam@example.com")).toBe("AD");
+    expect(initials("ana.morales@example.com")).toBe("AM");
   });
 
   it("reads an identity as the username it is", () => {
@@ -17,7 +18,6 @@ describe("the letters standing for somebody", () => {
     // with nothing in front of it. Written `provider:username`, the prefix
     // would have to be stripped here.
     expect(initials("dev")).toBe("DE");
-    expect(initials("ashwin@example.com")).toBe("AE");
   });
 
   it("uses two names where there are two", () => {
@@ -26,7 +26,7 @@ describe("the letters standing for somebody", () => {
   });
 
   it("answers something for a name it cannot split", () => {
-    expect(initials("dev")).toBe("DE");
     expect(initials("")).toBe("?");
+    expect(initials("@example.com")).toBe("?");
   });
 });

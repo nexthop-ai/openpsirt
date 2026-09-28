@@ -38,6 +38,30 @@ func (s *Store) DeferredSoFar(ctx context.Context, decision Decision) (time.Dura
 	return totals[decision.ID], nil
 }
 
+// DeferredAt is the same total for several places of one issue in one
+// product, keyed by place, in one statement for all of them. A form deciding
+// about those places says whether a deferral would stand on its own, and that
+// is the total it is measured against.
+func (s *Store) DeferredAt(ctx context.Context, productID, vulnerabilityID int64,
+	places []string) (map[string]time.Duration, error) {
+	decisions := make([]Decision, 0, len(places))
+	for i, place := range places {
+		decisions = append(decisions, Decision{
+			ID: int64(-1 - i), ProductID: productID, VulnerabilityID: vulnerabilityID,
+			PlaceIdentity: place,
+		})
+	}
+	totals, err := s.deferredSoFar(ctx, decisions)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]time.Duration, len(places))
+	for _, decision := range decisions {
+		out[decision.PlaceIdentity] = totals[decision.ID]
+	}
+	return out, nil
+}
+
 // deferredSoFar reads, in one statement for all of them, how long each of
 // these decisions' places has been put off for in total, keyed by the
 // decision asked about.

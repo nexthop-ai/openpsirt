@@ -9469,6 +9469,10 @@ components:
         declared_as:
           description: "The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"
           type: string
+        deferred_days:
+          description: The total this place has been put off for, in days, across every deferral recorded about it, taken back ones included for the span they stood
+          format: int64
+          type: integer
         place:
           description: Name this when recording a decision about it
           type: string

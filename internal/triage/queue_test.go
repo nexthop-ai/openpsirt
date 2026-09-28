@@ -318,3 +318,33 @@ func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
 		}
 	})
 }
+
+func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
+	// A form deciding about several places says whether a deferral would stand
+	// on its own, and each place is measured against what it was put off for
+	// before — so every place's total is read, and a place never deferred has
+	// none.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		until := time.Now().UTC().Add(20 * 24 * time.Hour)
+		at := f.at()
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: at, Outcome: triage.Deferred, DeferredUntil: &until,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := f.store.DeferredAt(ctx, at.ProductID, at.VulnerabilityID,
+			[]string{at.PlaceIdentity, "a-place-nobody-deferred"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if days := got[at.PlaceIdentity].Hours() / 24; days < 19 || days > 21 {
+			t.Errorf("the deferred place reads %.1f days, want about twenty", days)
+		}
+		if other := got["a-place-nobody-deferred"]; other != 0 {
+			t.Errorf("a place nobody deferred reads %s", other)
+		}
+	})
+}

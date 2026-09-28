@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // sortOrder is the query parameter for which order to page in, and it takes
@@ -700,6 +701,10 @@ type SittingBody struct {
 	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
 	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
+	// DeferredDays is what a deferral asked for here is added to before it is
+	// measured against the threshold, so the form can say which side of it a
+	// date falls on before it is sent.
+	DeferredDays int `json:"deferred_days,omitempty" doc:"The total this place has been put off for, in days, across every deferral recorded about it, taken back ones included for the span they stood"`
 	// Chain is display rather than identity. A decision is keyed on the direct
 	// consumer and nothing else, which is what keeps one judgment from
 	// multiplying by every route through the graph.
@@ -946,6 +951,9 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {
 			return nil, wentWrong(in.Logger, "which branches carry the patches could not be read", err)
 		}
+		if err := putOff(ctx, in, named.ProductID, issue, body.Places); err != nil {
+			return nil, wentWrong(in.Logger, "how long these places were put off could not be read", err)
+		}
 		// The record kept in this product, where one stands. Read here rather
 		// than in the detail because it is the triage record's, and what it
 		// carries — the moment something became known, the grounds, who wrote
@@ -1091,6 +1099,26 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		body.Places = append(body.Places, sitting)
 	}
 	return body
+}
+
+// putOff fills in how long each place has been put off for, in one read.
+func putOff(ctx context.Context, in Ingest, productID, vulnerabilityID int64,
+	places []SittingBody) error {
+	if len(places) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(places))
+	for _, place := range places {
+		names = append(names, place.Place)
+	}
+	totals, err := triage.NewStore(in.DB.DB).DeferredAt(ctx, productID, vulnerabilityID, names)
+	if err != nil {
+		return err
+	}
+	for i := range places {
+		places[i].DeferredDays = int(totals[places[i].Place].Hours() / 24)
+	}
+	return nil
 }
 
 // labelPatches fills in the branches each patch link's commit is on, where a

@@ -7,6 +7,7 @@ import { useRevise, useWithdraw } from "../api/mutations";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
 import { Markdown } from "./Markdown";
+import { restore } from "../app/drafts";
 
 // The words a claim rests on, and the two things that can be done to them.
 //
@@ -34,6 +35,14 @@ const FINISHED = new Set(["withdrawn", "lapsed"]);
 // revisable reports whether a claim in this state may still be revised or
 // withdrawn. The words are the ones the record uses for what became of a
 // claim, and the ones the API reports as a decision's state.
+// The text a revision opens with: the draft left from an earlier attempt,
+// where there is one, and the standing reasoning otherwise. The editor
+// restores a draft only over an empty field, so opening on the standing text
+// would write it over the draft.
+export function revisionStart(draftKey: string, reasoning: string): string {
+  return restore(draftKey) || reasoning;
+}
+
 export function revisable(state: string): boolean {
   return state !== "" && !FINISHED.has(state);
 }
@@ -130,7 +139,7 @@ export function ReasonEditor({
             type="button"
             className="btn ghost"
             onClick={() => {
-              setText(reasoning);
+              setText(revisionStart(draftKey, reasoning));
               setEditing(true);
             }}
           >

@@ -11208,6 +11208,11 @@ export interface components {
             decision?: number;
             /** @description The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it */
             declared_as?: string;
+            /**
+             * Format: int64
+             * @description The total this place has been put off for, in days, across every deferral recorded about it, taken back ones included for the span they stood
+             */
+            deferred_days?: number;
             /** @description Name this when recording a decision about it */
             place: string;
             /** @description The build has already argued this place away */

@@ -30,7 +30,18 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
   // The scan an upload matched, where the build already held it. Said here
   // rather than answered with the receipts screen, because nothing new is
   // waiting there and arriving on it reads as the upload having been taken.
-  const [held, setHeld] = useState<number | null>(null);
+  // Held with the build it was uploaded to, so the way to it names that build
+  // whatever the target has been changed to since.
+  const [held, setHeld] = useState<{
+    scan: number;
+    product: string;
+    stream: string;
+    variant: string;
+  } | null>(null);
+  // Whether this opening of the drawer has tried an upload. A failure belongs
+  // to the attempt that made it, and the drawer is not remounted between
+  // openings.
+  const [tried, setTried] = useState(false);
 
   // Prefilled from the scope each time it opens, so the common case is
   // choosing a file and nothing else. The drawer stays mounted while it is
@@ -43,6 +54,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     setInventory(null);
     setSuppressions([]);
     setHeld(null);
+    setTried(false);
   });
 
   const { products, streams, variants } = useCatalog(open, product);
@@ -64,7 +76,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     },
     onSuccess: (result) => {
       if (result.outcome === "already_held") {
-        setHeld(result.scan_id);
+        setHeld({ scan: result.scan_id, product, stream, variant });
         return;
       }
       void queries.invalidateQueries({ queryKey: ["scans"] });
@@ -86,7 +98,16 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" disabled={!ready} onClick={() => upload.mutate()}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!ready}
+            onClick={() => {
+              setTried(true);
+              setHeld(null);
+              upload.mutate();
+            }}
+          >
             {upload.isPending ? "Uploading…" : "Upload"}
           </button>
           <button type="button" className="btn quiet" onClick={onClose}>
@@ -100,16 +121,20 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         <span className="mono">suppressions</span>.
       </p>
 
-      {upload.error != null && <Failed error={upload.error} what="That could not be uploaded." />}
+      {tried && upload.error != null && (
+        <Failed error={upload.error} what="That could not be uploaded." />
+      )}
       {held !== null && (
         <div className="alert info">
           <strong>Already held</strong>
           <span>
-            This build already holds this inventory, as scan {held}. Nothing was queued.{" "}
+            {held.product} · {held.stream} · {held.variant} already holds this inventory, as scan{" "}
+            {held.scan}. Nothing was queued.{" "}
             <Link
               to={
-                `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}` +
-                `/variants/${encodeURIComponent(variant)}/scans`
+                `/products/${encodeURIComponent(held.product)}` +
+                `/streams/${encodeURIComponent(held.stream)}` +
+                `/variants/${encodeURIComponent(held.variant)}/scans`
               }
               onClick={onClose}
               className="linkish"
