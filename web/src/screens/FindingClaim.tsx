@@ -427,7 +427,7 @@ export function Activity({
           <p className="eyebrow" style={{ margin: "12px 0 6px" }}>
             Earlier at this place
           </p>
-          <ul className="timeline earlier">{earlier.map(line)}</ul>
+          <ul className="timeline past">{earlier.map(line)}</ul>
         </>
       )}
     </div>

@@ -187,17 +187,6 @@
 .deciding .rendered {
   min-height: 210px;
 }
-.deciding .writing {
-  display: grid;
-  grid-template-columns: minmax(0, 78ch) minmax(220px, 1fr);
-  gap: var(--gap-room);
-  align-items: start;
-}
-@media (width <= 900px) {
-  .deciding .writing {
-    grid-template-columns: 1fr;
-  }
-}
 
 .shortfall {
   display: flex;
@@ -1231,7 +1220,7 @@
   height: 22px;
   font-size: 9px;
 }
-.timeline.earlier {
+.timeline.past {
   opacity: 0.8;
 }
 

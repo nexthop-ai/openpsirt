@@ -319,6 +319,13 @@ Only names written as literals are read. A class assembled entirely from an
 interpolation produces no token, so this stays quiet rather than reporting
 something it cannot see.
 
+A modifier whose bare rule draws a box. A class reached as a modifier —
+`.state.warn` — that also has a rule of its own setting a display, a margin, a
+padding, a border or a background hands that rule to every element carrying the
+modifier, at the same specificity. The later rule wins, so a chip in a table cell
+draws as a block-level callout. A modifier's bare rule may set a font and a
+color and nothing that shapes the box. A web test reads every stylesheet for it.
+
 ## Database engines
 
 The suite runs against SQLite alone unless pointed at real servers, and a
