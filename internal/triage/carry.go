@@ -5,6 +5,7 @@ package triage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/uptrace/bun"
@@ -13,6 +14,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
+
+// ErrNotOffered refuses carrying a decision the preview did not offer this
+// line: one that already applies here, or one covering nothing here.
+var ErrNotOffered = errors.New("is not one this line was offered")
 
 // Carry takes chosen judgments onto a new line as claims waiting for
 // agreement.
@@ -68,7 +73,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 		for _, id := range chosen {
 			one, ok := available[id]
 			if !ok {
-				return fmt.Errorf("decision %d is not one this line was offered", id)
+				return fmt.Errorf("decision %d %w", id, ErrNotOffered)
 			}
 			wanted = append(wanted, one)
 		}

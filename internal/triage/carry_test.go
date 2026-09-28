@@ -4,6 +4,7 @@
 package triage_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -165,9 +166,12 @@ func TestOnlyWhatTheNewLineWasOfferedMayBeCarried(t *testing.T) {
 		if offered.Applying != 1 || len(offered.Moved) != 0 {
 			t.Fatalf("the matching line was offered %+v, want it applying already", offered)
 		}
+		// Asserted on the refusal itself, which the bounds, an empty set and
+		// the write can all fail differently from. Verified by deleting the
+		// not-offered return in Carry.
 		if _, err := f.store.Carry(ctx, f.triager, was, same,
-			[]int64{agreed.ID}, triage.DefaultBounds()); err == nil {
-			t.Error("a judgment that already applies was carried again")
+			[]int64{agreed.ID}, triage.DefaultBounds()); !errors.Is(err, triage.ErrNotOffered) {
+			t.Errorf("a judgment that already applies was not refused as unoffered: %v", err)
 		}
 	})
 }
@@ -301,12 +305,10 @@ func (f *fixture) placeAt(t *testing.T, stream string, target int64, component, 
 // Carrying a judgment onto a new line goes through the same validation every
 // other write does.
 //
-// It built a proposal and went straight to the writer, so nothing asked
-// whether what it was carrying could be said at all — and the place it built
-// never read whether the new line was a tag, so the rule that refuses a dated
-// judgment on a release built once could not fire here however often it was
-// asked. A dated promise about a release that cannot change is exactly the
-// case that rule exists to refuse.
+// The place a carried claim is about records whether the new line is a tag,
+// so the rule that refuses a dated judgment on a release built once applies
+// here as it does to a claim written by hand. A dated promise about a release
+// that cannot change is exactly the case that rule exists to refuse.
 func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
