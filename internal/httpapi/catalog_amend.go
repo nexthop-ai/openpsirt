@@ -73,7 +73,7 @@ func registerVariantEdits(api huma.API, d Declaring) {
 			}
 			variant, err := store.VariantByName(ctx, product.ID, in.Variant)
 			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
+				return undeclared(d.Logger, err, "that variant could not be looked up")
 			}
 			about := product.Name + " " + variant.Name
 
@@ -148,7 +148,7 @@ func registerVariantEdits(api huma.API, d Declaring) {
 			}
 			variant, err := store.VariantByName(ctx, product.ID, in.Variant)
 			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
+				return undeclared(d.Logger, err, "that variant could not be looked up")
 			}
 			if err := store.RetireVariant(ctx, variant.ID); err != nil {
 				if errors.Is(err, catalog.ErrNotFound) {
@@ -334,7 +334,7 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			}
 			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
 			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
+				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			if strings.EqualFold(name, stream.Name) && name == stream.DisplayName {
 				return nil
@@ -390,7 +390,7 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			}
 			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
 			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
+				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			if err := store.RetireStream(ctx, stream.ID); err != nil {
 				if errors.Is(err, catalog.ErrNotFound) {
