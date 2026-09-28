@@ -296,7 +296,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		Join(nodeJoin).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`LEFT JOIN "decision" AS "de" ON `+finding.DecisionAt("?")+`
+		Join(`LEFT JOIN (`+finding.Decisions+`) ON `+finding.DecisionAt("?")+`
 			AND de.state = 'approved'
 			AND de.live_key IS NOT NULL
 			AND (EXISTS (SELECT 1 FROM "claim" AS "mc"

@@ -251,7 +251,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 			ColumnExpr("f.vulnerability_id").
 			Where("f.closed_at IS NULL").
 			Where("f.opened_at <= ?", older).
-			Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
+			Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
 				WHERE `+DecisionAt("st.product_id")+`
 				  AND de.live_key IS NOT NULL
 				  AND `+standing+`)`, held...).

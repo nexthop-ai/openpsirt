@@ -197,15 +197,15 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		sameProduct += " AND " + mayRead
 	}
 	q := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(finding.Decisions).
 		// The finding this was a claim about, for when it was first seen and
 		// how it was rated. Joined on the same three columns a decision is
 		// matched by, and left-joined: a claim about a place that has since
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
-		Join(`LEFT JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id
+		Join(`LEFT JOIN "finding" AS "f" ON f.vulnerability_id = dv.issue_id
 			AND f.place_identity = de.place_identity `+sameProduct, readArgs...).
-		Join(`LEFT JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		Join(`LEFT JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
 		// Rated as the product that made the decision rates it, which is the
 		// band every other surface groups this issue under. Read from the
 		// published word alone, a product that re-rated an issue measured its

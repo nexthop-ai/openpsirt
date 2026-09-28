@@ -6225,6 +6225,8 @@ export interface components {
             state?: "proposed" | "live" | "withdrawn";
             /** @description The issue this is about */
             vulnerability?: string;
+            /** @description Why the rating was withdrawn, where a merge of two issues withdrew it rather than a person */
+            withdrawn_because?: string;
         };
         "Assign-findingRequest": {
             /**
@@ -6685,10 +6687,10 @@ export interface components {
         ChangeBody: {
             about: string;
             /**
-             * @description What made the change: a person in the application, or the deployment's startup configuration, which names administrators
+             * @description What made the change: a person in the application, the deployment's startup configuration, which names administrators, or a scan merging two issues its report named together
              * @enum {string}
              */
-            actor: "person" | "configuration";
+            actor: "person" | "configuration" | "merge";
             at: string;
             became?: string;
             /** @description The person who made the change, by sign-in identity. Absent where configuration made it */
@@ -6701,7 +6703,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -8393,6 +8395,8 @@ export interface components {
             description?: string;
             exploited?: boolean;
             items: components["schemas"]["SightingBody"][] | null;
+            /** @description Issues held apart until a report named them together, and merged into this one. What was decided under each applies here */
+            merged?: components["schemas"]["MergedBody"][] | null;
             /**
              * Format: int64
              * @description The number of your products carrying it
@@ -9256,6 +9260,14 @@ export interface components {
             readonly $schema?: string;
             /** @description Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the text is about — deliberately not said which */
             not_notified?: string[] | null;
+        };
+        MergedBody: {
+            /** @description When the report naming both was applied */
+            merged_at: string;
+            /** @description The names that report gave the issue */
+            named: string[] | null;
+            /** @description The name the merged issue was filed under */
+            vulnerability: string;
         };
         Meta: {
             category: string;
@@ -12263,7 +12275,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -12303,7 +12315,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */

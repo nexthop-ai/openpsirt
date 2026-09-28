@@ -53,6 +53,10 @@ type Assessment struct {
 	ProposedAt    time.Time  `bun:"proposed_at,notnull"`
 	DecidedBy     *int64     `bun:"decided_by"`
 	DecidedAt     *time.Time `bun:"decided_at"`
+	// WithdrawnBecause is why a claim was withdrawn where no person withdrew
+	// it: a merge of two issues that left another claim standing in this
+	// product. DecidedBy is absent then.
+	WithdrawnBecause *string `bun:"withdrawn_because"`
 	// LiveVulnerabilityID is the issue this is a claim about while it is
 	// still a live claim, and null once it is withdrawn. Paired with the
 	// product under a unique constraint, that is what enforces one live
@@ -351,6 +355,29 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	severity string) error {
 
+	// Held for the issue the claim is read as. A claim filed under an issue
+	// that merged into another rates the other, and where a claim under each
+	// name was in force the one left standing when either is taken back is
+	// the rating in force.
+	vulnerabilityID, err := issueOf(ctx, tx, vulnerabilityID)
+	if err != nil {
+		return err
+	}
+	if severity == "" {
+		var left []string
+		if err := tx.NewSelect().Model((*Assessment)(nil)).
+			Column("severity").
+			Where("product_id = ?", productID).
+			Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+			Where("state = ?", AssessmentLive).
+			OrderExpr("decided_at DESC, id DESC").Limit(1).
+			Scan(ctx, &left); err != nil {
+			return fmt.Errorf("read what else rates this here: %w", err)
+		}
+		if len(left) > 0 {
+			severity = left[0]
+		}
+	}
 	if severity == "" {
 		if _, err := tx.NewDelete().Model((*IssueRating)(nil)).
 			Where("vulnerability_id = ?", vulnerabilityID).
@@ -818,7 +845,7 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 				TableExpr(`"finding" AS "f"`).
 				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				Where("f.vulnerability_id = asm.vulnerability_id").
+				Where(SameIssue("f.vulnerability_id", "asm.vulnerability_id")).
 				Where("st.product_id = asm.product_id"),
 				subject, products, all)
 			q = q.Where("EXISTS (?)", readable)
@@ -941,7 +968,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		Where("f.vulnerability_id = ?", claim.VulnerabilityID).
+		Where(HeldAs("f.vulnerability_id"), claim.VulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", claim.ProductID).
 		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, " + rating.EffectiveExpr)

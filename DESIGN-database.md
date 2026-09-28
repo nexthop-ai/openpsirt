@@ -439,13 +439,21 @@ stands.
 | A closed graph node | Gains the two columns, holding nothing |
 | A component's identity | Worked out again with the package identifier and the name with a version hashed apart. No two rows meet: two rows v0.4.0 held apart differ in what is hashed |
 | A scan or refused upload's sender, recorded as a name | The key holding the name, else the person holding it, recorded as a key or a person and its identifier. A name held by neither is left as it is |
+| An issue | Read as itself: it states its own identifier as the issue it is read as. v0.4.0 merged nothing |
+| Merges | Two new tables, empty: the record of an issue merged into another, and of a decision a merge superseded. v0.4.0 refused the report that would have merged two issues |
+| A rating claim | Unchanged, with no reason for withdrawal. Every claim v0.4.0 withdrew, a person withdrew |
 
 Rolled back, the actor goes and the person refuses a null again. A row
-configuration wrote goes with it, because v0.4.0 has no place for a change no
-person made. Every named administrator's administration granted here is set
-again, which is where v0.4.0 reads the name. Which names a person typed goes
-with its column, and the names stay. Each component takes v0.4.0's identity
-again, each sender is recorded by name, and the node columns go.
+configuration or a merge wrote goes with it, because v0.4.0 has no place for a
+change no person made. The merge tables, the issue each row is read as and the
+reason a merge withdrew a rating claim go with their columns and tables. The
+findings a merge moved stay with the issue they moved to, which v0.4.0 reads
+as holding them, and what was decided under an absorbed issue stays filed under
+it, which v0.4.0 reads as an issue with no findings. Every named
+administrator's administration granted here is set again, which is where
+v0.4.0 reads the name. Which names a person typed goes with its column, and
+the names stay. Each component takes v0.4.0's identity again, each sender is
+recorded by name, and the node columns go.
 
 Two components v0.4.0 identifies alike refuse the roll back, and the refusal
 names both: a name shaped like a package identifier beside that package, or a
@@ -460,7 +468,8 @@ database is left as v0.5.0 left it on every engine.
 | A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
 | A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was. Rolled back, the column is gone and the names remain |
 | A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person. With a name shaped like a package's identifier beside it, the roll back is refused naming it and changes nothing. Without, rolled back, each is what v0.4.0 held |
-| v0.5.0's declarations | The trail, the names an issue answers to and the graph node table as the release declares them, each built beside the real one under a scratch name, are described exactly as the chain builds them |
+| v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it |
+| A v0.4.0 database holding two issues | Upgraded, each is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and both issues remain |
 
 ### Release records
 

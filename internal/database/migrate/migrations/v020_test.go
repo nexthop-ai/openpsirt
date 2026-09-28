@@ -90,16 +90,14 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("upgraded a second time, the schema differs from a fresh install's:\n%s", diff)
 		}
-		dbtest.Reset(t, db)
-		// Left where every other test in the package expects it.
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("migrate to the latest: %v", err)
-		}
-		dbtest.Reset(t, db)
+		leaveAtLatest(t, ctx, db)
 	})
 }
 
 // rollBack takes a migrated database back to nothing.
+//
+// Emptied at the latest, because emptying asks every table the latest
+// migration makes, and a test may have left the database short of it.
 func rollBack(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	// A test that fails before it migrates forward again leaves the schema
@@ -110,6 +108,9 @@ func rollBack(t *testing.T, ctx context.Context, db *database.DB) {
 			t.Errorf("migrate back to the latest: %v", err)
 		}
 	})
+	if err := schema.Up(ctx, db, quiet()); err != nil {
+		t.Fatalf("migrate to the latest: %v", err)
+	}
 	dbtest.Reset(t, db)
 	for {
 		at, err := schema.Version(ctx, db)

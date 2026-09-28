@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Spent is what the work went into, for one component in one product.
@@ -76,7 +77,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	// the count ask the same question.
 	grouped := func() *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr(`"decision" AS "de"`).
+			TableExpr(finding.Decisions).
 			Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 			// The argument, which is where an outcome lives.
 			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
@@ -96,7 +97,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// rows. Every figure below counts distinct identifiers for that
 			// reason: what is being counted is acts, and an act is one row of the
 			// decision table however many builds share the place it names.
-			Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = de.vulnerability_id
+			Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = dv.issue_id
 			AND pf.place_identity = de.place_identity`).
 			Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
 			Where("de.proposed_at < ?", until).

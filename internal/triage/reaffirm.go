@@ -107,8 +107,15 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	}
 	// The claim being re-made has to be about the same thing. Otherwise a
 	// re-affirmation is a way to attach one place's agreement to another's.
+	// Compared as the issue each is read as: a decision filed under an issue
+	// that merged into another is about the place under the other.
+	readAs, err := finding.IssuesOf(ctx, s.db,
+		[]int64{previous.VulnerabilityID, r.Place.VulnerabilityID})
+	if err != nil {
+		return nil, err
+	}
 	if previous.ProductID != r.Place.ProductID ||
-		previous.VulnerabilityID != r.Place.VulnerabilityID ||
+		readAs[previous.VulnerabilityID] != readAs[r.Place.VulnerabilityID] ||
 		previous.PlaceIdentity != r.Place.PlaceIdentity {
 		return nil, fmt.Errorf("that decision was about a different place")
 	}
@@ -231,13 +238,16 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 		Assessed   string `bun:"assessed"`
 		ScoreCenti int    `bun:"score_centi"`
 	}
+	// Read as the issue the decision's own issue stands for: a merge moves
+	// the published word and the product's rating to the issue kept.
 	if err := s.db.NewSelect().
-		TableExpr(`"vulnerability" AS "v"`).
+		TableExpr(`"vulnerability" AS "sv"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = sv.issue_id`).
 		Join(rating.Here, productID).
 		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed"`).
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		Where("v.id = ?", vulnerabilityID).Scan(ctx, &issue); err != nil {
+		Where("sv.id = ?", vulnerabilityID).Scan(ctx, &issue); err != nil {
 		return 0, fmt.Errorf("read how bad this is now: %w", err)
 	}
 	return finding.Rating{
@@ -456,7 +466,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.target_id = ?", targetID).
 			Where("f.closed_at IS NULL").
-			Where("f.vulnerability_id = de.vulnerability_id").
+			Where("f.vulnerability_id = dv.issue_id").
 			Where("f.place_identity = de.place_identity")
 	}
 	matching := "COALESCE(de.component_upstream_version, '') = " + finding.ComponentUpstreamExpr +
@@ -474,7 +484,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Where("st.product_id = de.product_id").
 			Where("f.closed_at IS NULL").
-			Where("f.vulnerability_id = de.vulnerability_id").
+			Where("f.vulnerability_id = dv.issue_id").
 			Where("f.place_identity = de.place_identity").
 			Where(matching)
 	}
@@ -485,6 +495,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// decision recorded against no version matches a component stating none.
 	lapsable := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().Model((*Decision)(nil)).
+			Join(finding.DecisionIssue).
 			ColumnExpr("de.id").
 			Where("de.state IN (?, ?)", Proposed, Approved).
 			// A claim about the match rather than about the version does not
@@ -702,12 +713,14 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		// The issue each decision is read as, which is the one the new line holds.
+		Join(finding.DecisionIssue).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
 		// The argument, which is where the outcome lives.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
 		ColumnExpr(`de.id AS "decision_id"`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "was"`).
@@ -716,7 +729,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// The new line's contents at that place, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "component"`, toTarget).
 		// Both versions, because a decision is keyed on both: a build whose
@@ -725,18 +738,18 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "now_at"`, toTarget).
 		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "consumer_now"`, toTarget).
 		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
 			AS "still_there"`, toTarget).
 		// A date it carries that has already gone by, either of them.
@@ -746,7 +759,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Where("de.product_id = ?", productID).
 		Where("de.visibility IN (?)", bun.List(readable)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
-			WHERE g.target_id = ? AND g.vulnerability_id = de.vulnerability_id
+			WHERE g.target_id = ? AND g.vulnerability_id = dv.issue_id
 			  AND g.place_identity = de.place_identity)`, fromTarget).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -840,7 +853,7 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
 		Column("vulnerability_id", "place_identity", "proposed_at", "state", "ended_at").
 		Where("de.product_id = ?", productID).
-		Where("de.vulnerability_id IN (?)", bun.List(issues)).
+		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(issues)).
 		Where("de.place_identity IN (?)", bun.List(identities)).
 		Where("claim.outcome = ?", Deferred).
 		// Withdrawn ones for the span they were in force, as the threshold
@@ -848,7 +861,18 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
+	// Keyed by the issue each deferral is read as, which is how the places
+	// were asked for.
+	filed := make([]int64, 0, len(deferrals))
 	for _, deferral := range deferrals {
+		filed = append(filed, deferral.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
+	for _, deferral := range deferrals {
+		deferral.VulnerabilityID = issueOf[deferral.VulnerabilityID]
 		key := at{deferral.VulnerabilityID, deferral.PlaceIdentity}
 		// The pair of lists matches more combinations than were asked for, so
 		// what was not asked for is dropped here.
@@ -1159,7 +1183,10 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 func stillLatest(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "newer"` +
 		` WHERE newer.product_id = de.product_id` +
-		` AND newer.vulnerability_id = de.vulnerability_id` +
+		// Filed under either issue, where one merged into the other.
+		` AND EXISTS (SELECT 1 FROM "vulnerability" AS "sl"` +
+		` JOIN "vulnerability" AS "so" ON "so"."issue_id" = "sl"."issue_id"` +
+		` WHERE "sl"."id" = newer.vulnerability_id AND "so"."id" = de.vulnerability_id)` +
 		` AND newer.place_identity = de.place_identity` +
 		` AND newer.claim_id <> de.claim_id` +
 		` AND newer.proposed_at >= de.ended_at)`)

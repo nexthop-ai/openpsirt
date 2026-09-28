@@ -652,7 +652,8 @@ record a second beside it.
 | **Live, not ever** | A withdrawn or lapsed decision covers nothing and stops holding the place the moment it stops applying. Otherwise one lapse walls a place off permanently |
 | **Per combination, not per place** | The versions are part of what a decision is about, so a claim about one version and a claim about the next are different claims and both stand |
 | Enforced by the database, not by a check | The key is held while a decision is live and set to null once it is not, under a unique index. Null values do not collide in a unique index on any of the four engines, which is what makes a rule applying to only some rows portable. A read-then-write check is exactly the shape two simultaneous proposals both walk through, and the test drives that case |
-| The same holds for a rating of an issue | Keyed on the issue, held from the moment a claim is proposed, released when it is withdrawn. Six proposals at once leave one claim standing; removing the constraint lets all six through |
+| The same holds for a rating of an issue | Keyed on the issue, held from the moment a claim is proposed, released when it is withdrawn. Six proposals at once leave one claim standing; removing the constraint lets all six through. A merge of two issues that each held one in a product withdraws the one with less standing, naming the merge rather than a person, as `DESIGN-findings.md` § Merged issues holds |
+| The key names the issue a decision is read as | A decision filed under an issue that merged into another holds its key under the other, and a new claim is filed under the issue that stands. `DESIGN-findings.md` § Merged issues says how a merge settles the keys |
 
 Revising keeps the old words readable, takes back the approval given for them,
 returns the claim to the queue and records who wrote the new version. Two
@@ -1069,6 +1070,12 @@ what rated worse means.
 | The proposer is told why | `DESIGN-notifications.md` § Claim outcomes |
 | Why a claim lapsed is worked out when it is read, not stored | A version that no longer matches anything open and a rating in a higher band are both facts about the present. Both can hold |
 | Failing to mark is reported and not fatal | The claim stands until the next scan with the issue open sweeps again |
+
+A claim also lapses when a report merges two issues and it is one of two live
+decisions at one place, the one with less standing. The merge records which
+decision stands in its place, and the lapse is written in the transaction that
+applies the report. `DESIGN-findings.md` § Merged issues holds the rule, and
+`DESIGN-notifications.md` § Claim outcomes says who is told.
 
 What has **stopped standing** is one question, not two. A lapsed decision and a
 deferral whose date has passed are separate mechanisms — a version bump does not

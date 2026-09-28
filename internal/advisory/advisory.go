@@ -511,6 +511,16 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 		return nil, nil, database.FromRead(err, ErrNoSuchIssue,
 			fmt.Sprintf("look up what issue %q is", identifier))
 	}
+	// A name that merged into another issue is read as the issue it merged
+	// into, which holds its findings.
+	if issue.IssueID != issue.ID {
+		standing := issue.IssueID
+		issue = finding.Vulnerability{}
+		if err := s.db.NewSelect().Model(&issue).
+			Where("vu.id = ?", standing).Scan(ctx); err != nil {
+			return nil, nil, fmt.Errorf("look up the issue %q merged into: %w", identifier, err)
+		}
+	}
 
 	// The earliest finding of this issue in this product that a person
 	// recorded. Earliest because it is what the document dates itself from,

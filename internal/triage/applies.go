@@ -49,16 +49,14 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	// deferral stops standing on a date that is held there too.
 	query := s.db.NewSelect().Model(decision).Relation("Claim").
 		Where("de.product_id = ?", at.ProductID).
-		Where("de.vulnerability_id = ?", at.VulnerabilityID).
+		Where(finding.FiledUnder("de.vulnerability_id"), at.VulnerabilityID).
 		Where("de.place_identity = ?", at.PlaceIdentity).
 		// Approved, or proposed and never needing agreement, and not one
 		// that was sent back — asked of the one spelling rather than written
-		// out here. It was written out here, and the sent-back half was added
-		// to this copy alone, so a claim an approver returned went on
-		// suppressing its finding everywhere else that asks the same
-		// question: the overdue figure, the list, the backlog, the compliance
-		// rate, the notice saying a deferral is ending, and the count of what
-		// stands on one signature.
+		// out here. A copy of it here is a copy the next rule can miss, and
+		// the same question is asked by the overdue figure, the list, the
+		// backlog, the compliance rate, the notice saying a deferral is ending
+		// and the count of what stands on one signature.
 		Where(standing, held...)
 
 	// The versions, except where the claim is that the match itself is wrong:
@@ -121,7 +119,7 @@ func (s *Store) PreviouslyAt(ctx context.Context, subject access.Subject, at Pla
 	// With the argument each row applied, which is what is offered back.
 	if err := readableBy(s.db.NewSelect().Model(&previous).Relation("Claim"), subject, "de").
 		Where("de.product_id = ?", at.ProductID).
-		Where("de.vulnerability_id = ?", at.VulnerabilityID).
+		Where(finding.FiledUnder("de.vulnerability_id"), at.VulnerabilityID).
 		Where("de.place_identity = ?", at.PlaceIdentity).
 		Order("de.id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)

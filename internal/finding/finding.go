@@ -413,6 +413,14 @@ type Applied struct {
 	// contain. A report that does not match the inventory it was produced from
 	// is worth seeing rather than quietly discarding.
 	Unplaced int
+	// Merged counts issues the report showed to be one with another held
+	// separately, and merged into it.
+	Merged int
+	// Displaced is the judgments a merge took out of force because one under
+	// the other name said something different in the same product: a live
+	// decision at the same place, a rating claim, or a record of being
+	// attacked. The product's triagers are told.
+	Displaced []Displaced
 }
 
 // Unchanged reports whether the run changed nothing.

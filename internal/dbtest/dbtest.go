@@ -922,6 +922,8 @@ var tables = []string{
 	// agreement names the one it came from. The key is declared to null
 	// rather than to block, so emptying the table needs no ordering.
 	"claim_approval",
+	// Before decision and vulnerability_merge, both of which it points at.
+	"decision_superseded",
 	"decision",
 	// After the rows that point at it, and before the claim it hangs off.
 	"claim_revision",
@@ -997,6 +999,9 @@ var tables = []string{
 	"party",
 	"finding",
 	"suppression",
+	// Before scan_run and vulnerability, both of which it points at, and
+	// after decision_superseded, which points at it.
+	"vulnerability_merge",
 	"scan_run",
 	"vulnerability_alias",
 	"vulnerability_weakness",

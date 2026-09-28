@@ -58,7 +58,7 @@ asks, which is why they are stored rather than worked out again.
 | The moment it became known | What every window a deployment might be under counts from. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
-| Clearing the exploitation record | An explicit human withdrawal, recorded with who cleared it and why. Never automatic, and never a side effect of a scan |
+| Clearing the exploitation record | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `DESIGN-findings.md` § Merged issues holds the rule |
 
 The record is against an issue and one product, the shape an assessment has. A
 place would be wrong twice over: the attack is a fact about the product rather

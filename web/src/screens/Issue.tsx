@@ -110,6 +110,12 @@ export function Issue() {
           Also known as <span className="id">{(it?.aliases ?? []).join(" · ")}</span>
         </p>
       )}
+      {(it?.merged ?? []).map((one) => (
+        <p key={one.vulnerability} className="hint" style={{ marginBottom: 10 }}>
+          Merged from <span className="id">{one.vulnerability}</span> on{" "}
+          {one.merged_at.slice(0, 10)}, when a report named both
+        </p>
+      ))}
 
       {it?.description && (
         <div className="card" style={{ marginBottom: 12 }}>

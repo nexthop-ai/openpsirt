@@ -335,7 +335,7 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		err := tx.NewSelect().Model(&held).
 			Where("advisory_id = ?", row.ID).
 			Where("product_id = ?", named.ID).
-			Where("vulnerability_id = ?", issue.ID).
+			Where(finding.FiledUnder("vulnerability_id"), issue.ID).
 			Limit(1).Scan(ctx)
 		switch {
 		case err != nil && !database.IsNoRows(err):
@@ -428,7 +428,7 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 			Set("removed_by = ?", subject.ID).
 			Where("advisory_id = ?", row.ID).
 			Where("product_id = ?", named.ID).
-			Where("vulnerability_id = ?", issue.ID).
+			Where(finding.FiledUnder("vulnerability_id"), issue.ID).
 			Where("removed_at IS NULL").
 			Exec(ctx)
 		if err != nil {
@@ -504,7 +504,11 @@ func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
 	err := s.db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
 		Join(`JOIN "product" AS "pd" ON pd.id = ac.product_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = ac.vulnerability_id`).
+		// Read as the issue the covered row stands for: a cover filed under
+		// an issue that merged into another covers the other, which is where
+		// the findings and the name a reader looks for are.
+		Join(`JOIN "vulnerability" AS "cv" ON cv.id = ac.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = cv.issue_id`).
 		ColumnExpr(`pd.name AS "product"`).
 		ColumnExpr(catalog.ShownExpr("pd")+` AS "product_name"`).
 		ColumnExpr(`pd.id AS "product_id"`).
@@ -522,7 +526,20 @@ func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read what an advisory covers: %w", err)
 	}
-	return rows, nil
+	// One entry per issue and product. An advisory that covered both names of
+	// an issue before a report merged them covers the one issue once, where
+	// it was first added.
+	seen := map[[2]int64]bool{}
+	once := rows[:0]
+	for _, row := range rows {
+		key := [2]int64{row.ProductID, row.IssueID}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		once = append(once, row)
+	}
+	return once, nil
 }
 
 // Listed is one advisory as a list of them reads it.
@@ -591,8 +608,11 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 	// one flaw is asking which advisories already say something about it,
 	// which is the question somebody has before they start another.
 	if over.Vulnerability != "" {
+		// Any name of the issue the cover stands for, so an advisory
+		// covering a name that merged into another is found by either.
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ac2"
-			JOIN "vulnerability" AS "v2" ON v2.id = ac2.vulnerability_id
+			JOIN "vulnerability" AS "c2" ON c2.id = ac2.vulnerability_id
+			JOIN "vulnerability" AS "v2" ON v2.issue_id = c2.issue_id
 			WHERE ac2.advisory_id = ad.id AND ac2.removed_at IS NULL
 			  AND v2.identifier_folded = ?)`, fold(over.Vulnerability))
 	}

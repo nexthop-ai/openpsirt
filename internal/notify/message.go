@@ -54,6 +54,7 @@ var called = map[Kind]string{
 	ApprovalUndone:    "An agreement to a claim of yours was taken back",
 	ApprovalWithdrawn: "A claim you agreed to was changed",
 	ClaimLapsed:       "A decision of yours stopped applying",
+	MergeSuperseded:   "Two judgments met when two issues merged",
 	BroughtIn:         "You have been brought into a case",
 	Disclosed:         "An issue you hold was disclosed",
 	Unanswered:        "A vulnerability report has not been answered",

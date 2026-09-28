@@ -669,6 +669,9 @@ components:
         vulnerability:
           description: The issue this is about
           type: string
+        withdrawn_because:
+          description: Why the rating was withdrawn, where a merge of two issues withdrew it rather than a person
+          type: string
       required:
         - severity
         - reasoning
@@ -1449,10 +1452,11 @@ components:
         about:
           type: string
         actor:
-          description: "What made the change: a person in the application, or the deployment's startup configuration, which names administrators"
+          description: "What made the change: a person in the application, the deployment's startup configuration, which names administrators, or a scan merging two issues its report named together"
           enum:
             - person
             - configuration
+            - merge
           type: string
         at:
           type: string
@@ -1482,6 +1486,7 @@ components:
             - alias
             - catalog
             - exploited-here
+            - merge
           type: string
         unset:
           description: Whether nothing had been set before this, as distinct from a value stored empty
@@ -4411,6 +4416,13 @@ components:
           type:
             - array
             - "null"
+        merged:
+          description: Issues held apart until a report named them together, and merged into this one. What was decided under each applies here
+          items:
+            $ref: "#/components/schemas/MergedBody"
+          type:
+            - array
+            - "null"
         products:
           description: The number of your products carrying it
           format: int64
@@ -6116,6 +6128,27 @@ components:
           type:
             - array
             - "null"
+      type: object
+    MergedBody:
+      additionalProperties: false
+      properties:
+        merged_at:
+          description: When the report naming both was applied
+          type: string
+        named:
+          description: The names that report gave the issue
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        vulnerability:
+          description: The name the merged issue was filed under
+          type: string
+      required:
+        - vulnerability
+        - merged_at
+        - named
       type: object
     Meta:
       additionalProperties: false
@@ -11202,6 +11235,7 @@ paths:
               - alias
               - catalog
               - exploited-here
+              - merge
             type: string
         - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
           explode: false
@@ -11300,6 +11334,7 @@ paths:
               - alias
               - catalog
               - exploited-here
+              - merge
             type: string
         - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
           explode: false

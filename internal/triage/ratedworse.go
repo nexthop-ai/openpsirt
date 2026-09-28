@@ -161,13 +161,13 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 // A decision covering nothing is not a judgment anybody is relying on. Lapsed
 // for a rating, its proposer would be told the finding is open again when none
 // is, and re-affirming it would find nothing to re-make.
-const coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
+var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
 	` JOIN "component" AS "c" ON c.id = fc.component_id` +
 	` LEFT JOIN "component" AS "uc" ON uc.id = fc.consumer_id` +
 	` JOIN "target" AS "tgc" ON tgc.id = fc.target_id` +
 	` JOIN "stream" AS "stc" ON stc.id = tgc.stream_id` +
 	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
-	` AND fc.vulnerability_id = de.vulnerability_id` +
+	` AND ` + finding.SameIssue("fc.vulnerability_id", "de.vulnerability_id") +
 	` AND fc.place_identity = de.place_identity` +
 	` AND COALESCE(de.component_upstream_version, '') = ` + finding.ComponentUpstreamExpr +
 	` AND COALESCE(de.consumer_upstream_version, '') = ` + finding.ConsumerUpstreamExpr + `)`
@@ -191,9 +191,10 @@ type ratedWorseGroup struct {
 // per place, and the rating it is compared with is the same for all of them.
 func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([]ratedWorseGroup, error) {
 	q := tx.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(finding.Decisions).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		// Rated as the issue the decision is read as.
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
 		Join(rating.For(rating.OnDecision)).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
@@ -213,10 +214,10 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		q = q.Where("de.product_id = ?", where.ProductID)
 	}
 	if len(where.Vulnerabilities) > 0 {
-		q = q.Where("de.vulnerability_id IN (?)", bun.List(where.Vulnerabilities))
+		q = q.Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(where.Vulnerabilities))
 	}
 	if where.OpenIn > 0 {
-		q = q.Where(`de.vulnerability_id IN (SELECT "fo".vulnerability_id FROM "finding" AS "fo"`+
+		q = q.Where(`dv.issue_id IN (SELECT "fo".vulnerability_id FROM "finding" AS "fo"`+
 			` WHERE "fo".target_id = ? AND "fo".closed_at IS NULL)`, where.OpenIn)
 	}
 	var groups []ratedWorseGroup

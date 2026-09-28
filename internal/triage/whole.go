@@ -210,8 +210,9 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		TableExpr(`"decision" AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
+		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
+		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
@@ -285,7 +286,8 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every finding.
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
+		Where(finding.SameIssue("f.vulnerability_id", "de.vulnerability_id")+
+			" AND f.place_identity = de.place_identity").
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).

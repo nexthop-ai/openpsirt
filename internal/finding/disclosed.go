@@ -96,7 +96,7 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 			// was waiting leaves the queue with nothing left to disclose.
 			waiting, err := tx.NewSelect().Model((*Movement)(nil)).
 				Where("product_id = ?", productID).
-				Where("vulnerability_id = ?", vulnerabilityID).
+				Where(FiledUnder("vulnerability_id"), vulnerabilityID).
 				Where("act = ?", Disclosure).
 				Where("needs_approval = ?", true).
 				Where("approved_at IS NULL").
@@ -144,7 +144,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		ColumnExpr(`COALESCE(MAX(CASE WHEN f.visibility = ? AND f.closed_at IS NULL THEN f.disclose_at END), `+
 			`MAX(CASE WHEN f.visibility = ? THEN f.disclose_at END)) AS "ends"`,
 			access.Private, access.Private).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
 		Scan(ctx, &held)
 	if err != nil {
@@ -178,7 +178,7 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 		Set("visibility = ?", access.Public).
 		Set("disclose_at = NULL").
 		Set("last_changed_at = ?", now).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where("visibility = ?", access.Private).
 		Where(inThisProduct, productID).
 		Exec(ctx); err != nil {
@@ -187,7 +187,9 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 	if _, err := db.NewUpdate().TableExpr(`"decision"`).
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"product_id" = ?`, productID).
-		Where(`"vulnerability_id" = ?`, vulnerabilityID).
+		// Every decision about the issue, including those filed under an
+		// issue that merged into it.
+		Where(FiledUnder(`"vulnerability_id"`), vulnerabilityID).
 		Where(`"visibility" = ?`, access.Private).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the decisions: %w", err)
@@ -229,7 +231,7 @@ func (s *Store) ToTell(ctx context.Context, subject access.Subject,
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "person" AS "ps" ON ps.party_id = f.assigned_to`).
 		ColumnExpr("DISTINCT ps.id").
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
 		OrderExpr("ps.id").
 		Scan(ctx, &out.People)

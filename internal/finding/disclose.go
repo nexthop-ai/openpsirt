@@ -403,7 +403,7 @@ func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("MAX(f.disclose_at)").
 		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where("f.visibility = ?", access.Private).
 		Where("f.closed_at IS NULL").
 		Where("f.disclose_at IS NOT NULL").
@@ -551,7 +551,7 @@ func (s *Store) Movements(ctx context.Context, subject access.Subject,
 	var rows []Movement
 	if err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
 		Order("asked_at", "id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how this embargo has been moved: %w", err)
 	}
@@ -573,7 +573,7 @@ func movedBy(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) 
 	var rows []Movement
 	err := db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
 		Scan(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("read how far this has already been moved: %w", err)
@@ -595,7 +595,7 @@ func moveTo(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	_, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set("disclose_at = ?", until).
 		Set("last_changed_at = ?", now).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where("visibility = ?", access.Private).
 		Where("closed_at IS NULL").
 		Where(inThisProduct, productID).
@@ -680,7 +680,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "fu"
 			JOIN "target" AS "tu" ON tu.id = fu.target_id
 			JOIN "stream" AS "su" ON su.id = tu.stream_id
-			WHERE fu.vulnerability_id = dx.vulnerability_id
+			WHERE `+SameIssue("fu.vulnerability_id", "dx.vulnerability_id")+`
 			AND su.product_id = dx.product_id
 			AND fu.visibility = ?)`, access.Private).
 		OrderExpr("dx.asked_at DESC")

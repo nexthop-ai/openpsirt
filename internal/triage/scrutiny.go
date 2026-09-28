@@ -438,8 +438,8 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Covers  int   `bun:"covers"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id`+
+		TableExpr(finding.Decisions).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = dv.issue_id`+
 			" AND f.place_identity = de.place_identity").
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).

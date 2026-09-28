@@ -75,10 +75,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			issues = append(issues, r.Issue)
 		}
 		interned := NewVulnerabilities(tx)
+		interned.run = runID
 		vulnerabilities, err := interned.Intern(ctx, issues)
 		if err != nil {
 			return err
 		}
+		applied.Merged = len(interned.absorbed)
+		applied.Displaced = interned.displaced
 		// The product this build belongs to, read before anything is
 		// ranked. A rating belongs to a product, so what ranks here is
 		// this product's rating and not a word somebody working on

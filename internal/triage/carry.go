@@ -194,25 +194,27 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 	undisclosed, private := access.AnyPrivate("f.visibility")
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
+		// The issue the decision is read as, which is the one the new line holds.
+		Join(finding.DecisionIssue).
 		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "visibility"`, private, string(access.Private), string(access.Public), toTarget).
 		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "component_now"`, toTarget).
 		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "consumer_now"`, toTarget).
 		// A line carried onto that was built once. It is a fact

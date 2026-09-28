@@ -97,10 +97,52 @@ names**: every name resolves to one row, and a decision holds across all of them
 | An issue is filed under the most widely recognized of its names | What a person sees is the name they will find in an advisory. The rest are kept, and any of them finds the row |
 | The name is chosen over the filed name and a report's names together, the filed name first | A report that omits the better name leaves the issue where it is filed. Chosen from the report's names alone, the filed name flips between scans with whichever names each producer carries, and so do the published advisory and every lookup by name |
 | Identifiers are compared in one case | Every scheme treats them as case-insensitive and reports disagree about which case to write |
-| A report that would merge two held issues is refused | That is a merge of findings and decisions already made against both, and reading a scan is the wrong moment to do it quietly |
+| A report naming two issues held apart merges them into one (REQ-18) | The alias that joins them is the report learning what the issue is, and one issue is one issue under every name. § Merged issues holds the rules |
 | The filed name, folded, is what makes one issue one row | It was a hash of the unfolded name in a column of its own, which nothing read and which only one of the two paths that refile an issue under a better-known name maintained — so the key drifted away from the row it identified, and the collision when it came named a name neither issue was filed under |
 | The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its places disagree" |
 | **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
+
+### Merged issues
+
+A report can name two issues already held apart. One feed matches the national
+identifier on a distribution's copy of a library; another matches its own
+advisory identifier on a second copy before a national one is assigned, which
+takes weeks. When the second feed learns the first name, its report names both.
+The two are merged in the transaction that applies the scan, and the scan
+applies.
+
+The merge is a record of its own (REQ-22). What people recorded under the
+issue that is absorbed stays filed under it, and is read as the issue kept.
+
+| Rule | Reason |
+|---|---|
+| The issue kept is the one filed under the best-known of all the names, and otherwise the one recorded first | It is filed under that name already. Every name the absorbed issue answers to answers to it |
+| A merge record names the issue absorbed, the issue kept, the names the report gave, the run and the moment | The issue's page reads it to say where a name came from |
+| Every issue states the issue it is read as: itself, or the one it merged into, one step away however many merges led there | A decision is related to a finding by equality on that column, which every engine answers from an index. Counting the decisions over a build of 300,000 findings and 150,000 decisions takes 72 ms on PostgreSQL, 0.47 s on MySQL and 2.5 s on MariaDB, the same as the exact match. Related through a subquery, the count runs for more than ten minutes on PostgreSQL; through a null meaning itself, it takes 0.19 s and hashes every decision |
+| Two scans merging overlapping sets take the issues in turn | Each takes every issue it names before reading them, and goes again where one is no longer its own issue, so no issue ends two steps from the one that stands |
+| Decisions, their claims, approvals and revisions, notes, rating claims, records of being attacked, attachments, case grants, advisories covering the issue, embargo movements and reports stay filed under the absorbed issue | Each is read as the issue kept, through the issue it states. A decision about the absorbed issue suppresses, counts and is listed at the kept issue's findings as it does at its own. The rows below are the whole of what a merge writes to any of them |
+| A case grant under either name reaches every record filed under either | A collaborator reads, revises and re-affirms what they made under the absorbed name |
+| An advisory covering either name covers the kept issue, once per product | Generating it reads the kept issue's findings. A search by either name finds it |
+| One report stands for an issue across its names | A second report is refused as the record of an issue whose absorbed name already has one |
+| A re-affirmation reads the rating in force for the kept issue, and accepts a decision filed under the absorbed name at the same place | The absorbed row keeps only what it held when absorbed, and the place is the kept issue's |
+| What a report said moves to the issue kept: its names, its findings, its classification, its ratings, its references and the signals that rank it | That is observed state and it describes the one issue. The absorbed row keeps its own copy of what it held |
+| A place in one build open under both names as a scanned finding keeps the finding open longer, and the other closes as invalid | It is one finding held twice, and the reason for an invalid closure is a record that duplicates an issue already tracked. A finding a person entered is never closed this way |
+| The finding that stays open takes the other's assignment where it has none | The work stays in the queue it is in |
+| Two live decisions at one product and place under the two names collide where their versions agree, or where both stand at any version | Those hold one key under one issue. A claim at any version and a claim about particular versions stand side by side under one issue, and after a merge (REQ-25) |
+| Of two that collide, the approved one stays over the proposed one, and otherwise the newer. The other lapses, with a record naming the merge and the decision standing in its place | One live decision per place, chosen by standing rather than by which name the report led with |
+| A live decision filed under the absorbed issue holds its key under the issue kept | The key is what makes one live decision per place a rule the database keeps. Left under the old name, a second claim about the same place finds nothing in its way |
+| The key is the one column of a standing decision a merge rewrites, and that is accepted under REQ-22 | The key is an index over what a decision is about, never a field anybody decided. The issue a decision is filed under, its claim, place, state, author and time are untouched, and a test pins each of them across a merge |
+| Tags move to the issue kept, once per word on each component | A tag is a word kept only while it is on a row. One the kept issue already carries is dropped |
+| The rating in force moves to the issue kept unless the kept issue holds its own in that product, and then the absorbed one's is dropped | It is derived from the rating claims, which the next rows settle |
+| A rating claim and a record of being attacked standing under either name hold their key under the issue kept | One standing per issue and product is a rule the database keeps |
+| Where a rating claim stands under each name in one product, the one in force stays over the one waiting for a second person, and otherwise the newer | The standing rule two decisions at one place follow |
+| The other rating claim is withdrawn, naming no person, with the reason "Superseded when the absorbed issue merged into the kept one" | A claim nobody withdrew states why it stopped standing. The rating in force is worked out again from the claim that stands, which re-ranks and re-clocks the product's findings |
+| Where a record of being attacked stands under each name in one product, the newer stays | Every standing record has the same standing |
+| The other record is cleared, naming no person, with the same reason | A clearing names who cleared it and why |
+| Each rating claim withdrawn and record cleared this way is a row in the administration trail, with a merge as its actor | What a product lost is asked about afterwards, and no person acted. `DESIGN-access.md` § The administration trail holds the actors |
+| Two judgments that disagree are told to everybody who triages the product: two decisions with different outcomes, two rating claims with different ratings, two records with different dates of attack. Two that agree tell nobody | Nobody chooses which of two judgments stands. The date is what every window after an attack counts from, so a different date is a different obligation |
+| Published advisories and VEX documents that named the absorbed issue are left as issued | What went out is a fact about the moment it went |
+| A name recorded by hand that another issue holds is still refused | Recording a name is a person asserting identity, and nothing reported says the two are one |
 
 ## Report contents
 
@@ -1480,3 +1522,5 @@ question next year should find the answer rather than the question.
 | A deployment that reaches the internet only through a proxy of its own fetches nothing | git is pointed at the loopback guard and at nothing else, so the guard is the one way out, and the guard dials directly |
 | A ruling carries one disposition and one reason for every report it covers | Reports needing different reasons are different rulings. Splitting one is withdrawing it and proposing two |
 | Accepting a report takes no ruling and no second person | Accepting re-exposes risk, and an issue already carries its own triage |
+| A merge is not undone | Two issues a report wrongly named together stay one. Nothing a report says is taken to unmerge, and unmerging would have to divide findings and decisions made since |
+| An issue absorbed keeps the name it was filed under | The kept issue is not refiled under a name the absorbed row holds. Where the best-known name is one the absorbed row holds, the kept issue stays filed where it is |

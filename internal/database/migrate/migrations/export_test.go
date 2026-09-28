@@ -16,12 +16,17 @@ func StatementsV030(engine database.Engine) map[string][]string {
 	}
 }
 
-// StatementsV050 is v0.5.0's declaration of each table it changes.
+// StatementsV050 is v0.5.0's declaration of each table it creates or changes.
 func StatementsV050(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
+	merge := mergeV050(t)
 	return map[string][]string{
 		"admin_change":        trailV050(t),
 		"graph_node":          graphNodeV050(t),
 		"vulnerability_alias": aliasV050(t),
+		"vulnerability":       vulnerabilityV050(t),
+		"vulnerability_merge": merge[:2],
+		"decision_superseded": merge[2:],
+		"assessment":          assessmentV050(t),
 	}
 }

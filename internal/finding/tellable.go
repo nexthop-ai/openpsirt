@@ -94,12 +94,15 @@ func (s *Store) ToldOfIn(ctx context.Context, subject access.Subject,
 	seen := subject.Sees(productID)
 	read := func(ids []int64, narrowed bool) error {
 		return database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			// Each issue asked is read as the issue it stands for, which
+			// holds the findings where a merge absorbed it.
 			q := s.db.NewSelect().
-				TableExpr(`"finding" AS "f"`).
+				TableExpr(`"vulnerability" AS "tv"`).
+				Join(`JOIN "finding" AS "f" ON f.vulnerability_id = tv.issue_id`).
 				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				ColumnExpr("DISTINCT f.vulnerability_id").
-				Where("f.vulnerability_id IN (?)", bun.List(batch)).
+				ColumnExpr("DISTINCT tv.id").
+				Where("tv.id IN (?)", bun.List(batch)).
 				Where("st.product_id = ?", productID)
 			if narrowed {
 				q = onlyReadable(q, subject, products, all)
@@ -151,7 +154,7 @@ func MayBeToldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where("st.product_id = ?", productID),
 		subject, products, all).Count(ctx)
 	if err != nil {
@@ -174,7 +177,7 @@ func sitsIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.id").
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where("st.product_id = ?", productID).
 		Exists(ctx)
 	if err != nil {

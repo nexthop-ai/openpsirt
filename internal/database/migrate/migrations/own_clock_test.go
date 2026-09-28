@@ -141,10 +141,7 @@ func TestAV020DatabaseMovesItsRecordedFlawsOntoTheirOwnClock(t *testing.T) {
 			}
 		}
 		dbtest.MigrateTo(t, db, ownClock)
-		dbtest.Reset(t, db)
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("migrate to the latest: %v", err)
-		}
+		leaveAtLatest(t, ctx, db)
 	})
 }
 

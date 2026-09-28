@@ -68,6 +68,9 @@ export function label(kind?: string): string {
       return "agreed claim changed";
     case "claim-lapsed":
       return "stopped applying";
+    // Two judgments that disagreed met when two issues merged; one stands.
+    case "merge-superseded":
+      return "superseded by a merge";
     case "disclosed":
       return "disclosed";
     default:

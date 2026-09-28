@@ -5,11 +5,8 @@ package triage
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -18,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
@@ -425,6 +423,23 @@ func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Propos
 	// Inside the caller's transaction, which every one of them has open: a
 	// retry re-runs the closure, and a record kept in between is one this
 	// claim contradicts.
+	// Filed under the issue each place is read as. A place carried from a
+	// decision filed under an issue that has since merged into another names
+	// the issue it was filed under, and a new judgment is about the issue
+	// that stands — keyed under it, where every live decision about it is.
+	filed := make([]int64, 0, len(proposals))
+	for _, p := range proposals {
+		filed = append(filed, p.Place.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
+	for i := range proposals {
+		if issue, known := issueOf[proposals[i].Place.VulnerabilityID]; known {
+			proposals[i].Place.VulnerabilityID = issue
+		}
+	}
 	if err := s.refuseIfExploitedHere(ctx, claim, proposals); err != nil {
 		return nil, err
 	}
@@ -783,17 +798,12 @@ func text(s string) *string {
 // The two shapes cannot collide. A key over three fields and a key over five
 // are different strings before they are hashed, so a correction and a claim
 // about a place that states no version at all stay apart.
+//
+// Spelled in the finding package, which re-keys the live decisions of an issue
+// merged into another under the issue they are read as.
 func liveKeyFor(at Place, anyVersion bool) string {
-	parts := []string{
-		strconv.FormatInt(at.ProductID, 10),
-		strconv.FormatInt(at.VulnerabilityID, 10),
-		at.PlaceIdentity,
-	}
-	if !anyVersion {
-		parts = append(parts, version(at.ComponentUpstream), version(at.ConsumerUpstream))
-	}
-	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
-	return hex.EncodeToString(sum[:])
+	return finding.LiveKey(at.ProductID, at.VulnerabilityID, at.PlaceIdentity,
+		at.ComponentUpstream, at.ConsumerUpstream, anyVersion)
 }
 
 // liveKeysFor is every key a live claim covering this place could be held

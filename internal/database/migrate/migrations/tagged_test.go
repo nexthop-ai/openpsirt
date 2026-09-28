@@ -42,7 +42,8 @@ func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 // where every other test in the package expects it.
 func leaveAtLatest(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
-	dbtest.Reset(t, db)
+	// Up before emptying, because emptying asks every table the latest
+	// migration makes.
 	if err := schema.Up(ctx, db, quiet()); err != nil {
 		t.Fatalf("migrate to the latest: %v", err)
 	}

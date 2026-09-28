@@ -191,10 +191,13 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 		// The product's own rating where it has stated one, as the findings
 		// list reads it, joined on the decision's product so a claim is judged
 		// by the rating in force where it was made.
+		// Asked of the issue each row is read as, which is where a rating
+		// stands once one issue has merged into another.
 		q = q.Where("de.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
+			q.NewSelect().TableExpr(`"vulnerability" AS "mv"`).
+				Join(`JOIN "vulnerability" AS "v" ON v.id = mv.issue_id`).
 				Join(rating.For(rating.OnDecision)).
-				Column("v.id").
+				Column("mv.id").
 				Where(rating.EffectiveExpr+" IN (?)", bun.List(f.Severities)))
 	}
 	if len(f.Outcomes) > 0 {
@@ -212,7 +215,7 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Where("f.vulnerability_id = de.vulnerability_id").
+			Where(finding.SameIssue("f.vulnerability_id", "de.vulnerability_id")).
 			Where("f.place_identity = de.place_identity").
 			Where("f.closed_at IS NULL").
 			Where("st.product_id = de.product_id").
@@ -365,8 +368,9 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		TableExpr(`"decision" AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
+		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
+		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
@@ -425,12 +429,13 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
+		Join(finding.DecisionIssue).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
 		ColumnExpr(`de.id AS "decision_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		Where("de.claim_id IN (?)", bun.List(claimIDs)).
-		OrderExpr("de.claim_id, de.vulnerability_id, de.id").
+		OrderExpr("de.claim_id, dv.issue_id, de.id").
 		Scan(ctx, &heads); err != nil {
 		return nil, fmt.Errorf("read what a bulk claim covers: %w", err)
 	}
@@ -494,8 +499,9 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	known := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The decision on the outside, as buildsCovered has it.
+		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
+		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).

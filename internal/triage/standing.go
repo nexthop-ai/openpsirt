@@ -67,6 +67,8 @@ func (s *Store) StandingAt(ctx context.Context, subject access.Subject, productI
 	if len(at) == 0 {
 		return nil, nil
 	}
+	// A live decision holds its key under the issue it is read as, including
+	// one filed under an issue that merged into this one.
 	keys := make([]string, 0, len(at)*2)
 	for _, place := range at {
 		keys = append(keys, liveKeysFor(Place{
@@ -79,7 +81,7 @@ func (s *Store) StandingAt(ctx context.Context, subject access.Subject, productI
 	// is shown: the outcome, the justification, the dates.
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where("de.product_id = ?", productID).
-		Where("de.vulnerability_id = ?", issueID).
+		Where(finding.FiledUnder("de.vulnerability_id"), issueID).
 		Where("de.live_key IN (?)", bun.List(keys)).
 		Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what stands here: %w", err)
@@ -220,7 +222,7 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	// With the argument each row applied, which is what is offered back.
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where("de.product_id = ?", productID).
-		Where("de.vulnerability_id = ?", issueID).
+		Where(finding.FiledUnder("de.vulnerability_id"), issueID).
 		Where("de.place_identity IN (?)", bun.List(places)).
 		Where("de.state IN (?, ?)", Withdrawn, LapsedState).
 		// Bounded, newest first. This is the whole history of what was
@@ -285,7 +287,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	var rows []Decision
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where("de.product_id = ?", productID).
-		Where("de.vulnerability_id <> ?", issueID).
+		Where("NOT ("+finding.FiledUnder("de.vulnerability_id")+")", issueID).
 		Where("de.place_identity IN (?)", bun.List(places)).
 		Where("claim.outcome = ?", NotApplicable).
 		Where("de.state = ?", Approved).
@@ -338,7 +340,10 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	}
 	if err := readableBy(s.db.NewSelect().Model((*Decision)(nil)), subject, "de").
 		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`COUNT(DISTINCT de.vulnerability_id) AS "issues"`).
+		// Counted as the issues the rows are read as, so two names a report
+		// merged are one issue.
+		Join(finding.DecisionIssue).
+		ColumnExpr(`COUNT(DISTINCT dv.issue_id) AS "issues"`).
 		Where("de.claim_id IN (?)", bun.List(order)).
 		GroupExpr("de.claim_id").
 		Scan(ctx, &counted); err != nil {
@@ -430,7 +435,7 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 	var rows []Decision
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where("de.product_id <> ?", productID).
-		Where("de.vulnerability_id = ?", issueID).
+		Where(finding.FiledUnder("de.vulnerability_id"), issueID).
 		Where("de.place_identity IN (?)", bun.List(places)).
 		Where("de.state = ?", Approved).
 		Where("de.live_key IS NOT NULL").

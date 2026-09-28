@@ -81,10 +81,10 @@ func TestAnUpgradeKeepsEveryTrailRowAPersons(t *testing.T) {
 	})
 }
 
-// v0.5.0's declaration of each table it changes is the table the chain of
-// migrations builds, on every engine. SQLite builds it from the declaration and
-// the servers alter the table v0.4.0 built, so nothing else holds the two to
-// each other. Each is built beside the real table under a scratch name and the
+// v0.5.0's declaration of each table it creates or changes is the table the
+// chain of migrations builds, on every engine. SQLite builds a changed table
+// from the declaration and the servers alter the table v0.4.0 built, so
+// nothing else holds the two to each other. Each is built beside the real table under a scratch name and the
 // two are described alike.
 func TestTheV050DeclarationsAreTheTablesTheMigrationsBuild(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {

@@ -96,12 +96,12 @@ func setUp(t *testing.T, db *database.DB) *fixture {
 func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibility) int64 {
 	t.Helper()
 	ctx := t.Context()
-	issue := &finding.Vulnerability{
-		Identifier: name, IdentifierFolded: strings.ToLower(name), Severity: "high",
-	}
-	if _, err := f.db.DB.NewInsert().Model(issue).Exec(ctx); err != nil {
+	interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+		[]finding.Named{{Identifier: name, Severity: "high"}})
+	if err != nil {
 		t.Fatalf("record an issue: %v", err)
 	}
+	issue := &finding.Vulnerability{ID: interned[strings.ToUpper(name)]}
 	component := &graph.Component{
 		Identity: "component-" + name, Name: "libnl-3-200", Version: "3.7.0",
 		Purl: "pkg:deb/debian/libnl@3.7.0",
