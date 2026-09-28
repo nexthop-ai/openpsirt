@@ -112,11 +112,14 @@ Also read after an upgrade from any earlier release.
 | `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
 | With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
 | Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
+| Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
 
 | After the upgrade from v0.4.0 | |
 |---|---|
 | A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
 | Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
+| An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
+| Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
 
 ## Serving
 
