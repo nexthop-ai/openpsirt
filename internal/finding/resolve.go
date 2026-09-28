@@ -112,6 +112,13 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 		ids := make([]int64, 0, len(rows))
 		reported := false
 		for _, row := range rows {
+			// A row the caller may not read is one they are not told of, so
+			// it neither refuses nor says a scanner reported something
+			// here. With nothing readable left, nothing is open.
+			if !subject.Reads(row.Visibility, productID) &&
+				!subject.OnCase(productID, row.VulnerabilityID) {
+				continue
+			}
 			if row.Kind != Entered {
 				reported = true
 				continue

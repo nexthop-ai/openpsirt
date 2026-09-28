@@ -150,10 +150,52 @@ func TestClosingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		public := f.planner(t, access.PublicTriage)
-		_, err = f.store.Resolve(ctx, public, f.target, row.VulnerabilityID, "Fixed.")
+		// Reading it and not triaging it is refused as that.
+		reads := f.planner(t, access.PublicTriage, access.PrivateRead)
+		_, err = f.store.Resolve(ctx, reads, f.target, row.VulnerabilityID, "Fixed.")
 		if !errors.Is(err, access.ErrDenied) {
 			t.Errorf("somebody without the private right closed an undisclosed flaw: %v", err)
+		}
+		// Not reading it at all, there is nothing open that they may see.
+		public := f.planner(t, access.PublicTriage)
+		_, err = f.store.Resolve(ctx, public, f.target, row.VulnerabilityID, "Fixed.")
+		if !errors.Is(err, finding.ErrNothingOpenThere) {
+			t.Errorf("somebody who may not read an undisclosed flaw was answered %v", err)
+		}
+	})
+}
+
+func TestClosingByHandSaysNothingOfWhatTheCallerMayNotRead(t *testing.T) {
+	// An undisclosed scanner finding at a build is a finding somebody
+	// triaging disclosed work there may not be told of. "A scan is the
+	// authority" says it exists, where "nothing is open" says nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherBuild(t, "v2.0")
+		f.shippedTo(t, other, twoConsumers())
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		issueID, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, "CVE-2026-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
+			Set("visibility = ?", access.Private).
+			Where("target_id = ?", other).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		public := f.planner(t, access.PublicTriage)
+		_, err = f.store.Resolve(ctx, public, other, issueID, "Fixed.")
+		if !errors.Is(err, finding.ErrNothingOpenThere) {
+			t.Errorf("closing where only an undisclosed scanner finding sits answered %v", err)
 		}
 	})
 }

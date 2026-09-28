@@ -866,6 +866,12 @@ The kind exists ahead of the second thing to put in it for that reason: a model
 assuming every finding came from a scan cannot take one that did not without
 changing how closure works.
 
+Closing a recorded flaw by hand is asked of the rows at that build the caller
+may read. A row they may not read is left out before anything else is asked of
+it, so an undisclosed scanner finding there is answered as nothing open, the
+same as a build holding nothing. A readable recorded row they may not triage is
+refused.
+
 ## Interval storage
 
 Findings are open until closed and never deleted. Re-scanning happens nightly
