@@ -63,17 +63,9 @@ func registerVariantEdits(api huma.API, d Declaring) {
 		// first standing when the second fails, and the answer would describe
 		// a state the database does not hold.
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, variant, err := variantIn(ctx, d, tx, in.Product, in.Variant)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
-			}
-			variant, err := store.VariantByName(ctx, product.ID, in.Variant)
-			if err != nil {
-				return undeclared(d.Logger, err, "that variant could not be looked up")
 			}
 			about := product.Name + " " + variant.Name
 
@@ -138,17 +130,9 @@ func registerVariantEdits(api huma.API, d Declaring) {
 			return nil, err
 		}
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, variant, err := variantIn(ctx, d, tx, in.Product, in.Variant)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
-			}
-			variant, err := store.VariantByName(ctx, product.ID, in.Variant)
-			if err != nil {
-				return undeclared(d.Logger, err, "that variant could not be looked up")
 			}
 			if err := store.RetireVariant(ctx, variant.ID); err != nil {
 				if errors.Is(err, catalog.ErrNotFound) {
@@ -208,13 +192,9 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 				"say what to change: the name, the displayed name, or both")
 		}
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, err := productIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			about := product.Name
 			if name != "" && !strings.EqualFold(name, product.Name) {
@@ -272,13 +252,9 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			return nil, err
 		}
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, err := productIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			if err := store.RetireProduct(ctx, product.ID); err != nil {
 				if errors.Is(err, catalog.ErrNotFound) {
@@ -324,17 +300,9 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			return nil, huma.Error400BadRequest("say what to call it")
 		}
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, stream, err := streamIn(ctx, d, tx, in.Product, in.Stream)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
-			}
-			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
-			if err != nil {
-				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			if strings.EqualFold(name, stream.Name) && name == stream.DisplayName {
 				return nil
@@ -380,17 +348,9 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			return nil, err
 		}
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, stream, err := streamIn(ctx, d, tx, in.Product, in.Stream)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
-			}
-			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
-			if err != nil {
-				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			if err := store.RetireStream(ctx, stream.ID); err != nil {
 				if errors.Is(err, catalog.ErrNotFound) {

@@ -164,7 +164,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			// added.
 			//
 			// By the stored name rather than the one typed: a path segment
-			// carries no length, and the lookup keeps only the first 191
+			// carries no length, and the lookup keeps only the first NameWidth
 			// runes of it, so what resolved and what was typed are not the
 			// same string. Before, because recording an alias refiles the
 			// issue under the more widely recognized of its names — read

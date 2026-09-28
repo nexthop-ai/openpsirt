@@ -164,7 +164,7 @@ func (s *Store) Within(ctx context.Context, do func(context.Context, *Store) err
 
 // maxNameLength matches the column width in characters, which is bounded so a
 // unique index on it stays inside every engine's key-length limit.
-const maxNameLength = 191
+const maxNameLength = database.NameWidth
 
 // validName rejects what would be confusing or unusable as an identifier.
 func validName(what, name string) error {
