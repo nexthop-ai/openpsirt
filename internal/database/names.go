@@ -13,8 +13,9 @@ import (
 // map from identifier to value. An identifier no row carries is absent from
 // the answer.
 //
-// The list is split the way InAnyOf splits it, so a list of any length is one
-// statement every engine takes. Table and column are Expr for the reason
+// The list is OR-ed in pieces the way InAnyOf does it, so no one IN list
+// outgrows what the four engines accept. The pieces are one statement, so a
+// list is bounded by the statement's size. Table and column are Expr for the reason
 // InAnyOf's column is: a placeholder cannot bind either, so both are spliced
 // into the statement, and only text the caller wrote reaches it (REQ-66). The
 // column may be composed, such as a display name falling back to another

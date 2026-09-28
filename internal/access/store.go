@@ -900,12 +900,10 @@ func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error
 // Beside Names, and the other half of it: Names is for showing and this is for
 // resolving, and wherever somebody has a display name the two are different
 // strings. ByIdentity matches the folded identity column alone, so a list that
-// published a display name in a field a route resolves could not be acted on —
-// which is how a collaborator on an embargoed case became somebody the API
-// could list and not remove.
+// publishes a display name in a field a route resolves cannot be acted on: a
+// collaborator on an embargoed case listed that way cannot be removed.
 //
-// The package offered no batch identity lookup at all, so a handler that had
-// to round-trip a name had nothing else to reach for.
+// Batched, for the reason Names is.
 func (s *Store) Handles(ctx context.Context, ids []int64) (map[int64]string, error) {
 	handles, err := database.NamesByID(ctx, s.db, `"person"`, `"identity"`, ids)
 	if err != nil {

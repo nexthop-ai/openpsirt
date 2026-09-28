@@ -10,11 +10,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// A list of identifiers past one statement's ceiling is answered whole.
+// A list of identifiers longer than one IN piece is answered whole.
 //
-// One row sits in the first batch of identifiers and one in the second, so an
-// answer that read only the first batch, or refused the list, is caught.
-func TestNamesAreReadForAListPastOneStatement(t *testing.T) {
+// One row sits in the first piece of identifiers and one in the second, so an
+// answer that read only the first piece, or refused the list, is caught.
+func TestNamesAreReadForAListLongerThanOnePiece(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		scratchTable(t, db, "named_rows",

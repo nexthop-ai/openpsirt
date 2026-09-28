@@ -390,9 +390,9 @@ A type stated either way round is the same edge. A producer may say a
 program contains a library or that the library is contained by the program, and
 the graph does not have two shapes.
 
-What built something is not what shipped. A build tool, a test dependency
-and a development dependency are statements about the build rather than about
-what is in the product, so none of them places a component under another. The
+What built something is not what shipped. A build tool, a development tool and
+a test dependency are statements about the build rather than about what is in
+the product, so none of them places a component under another. The
 component is still held and still counted as sitting under nothing, which is
 the same treatment CycloneDX build tooling gets by arriving under `formulation`
 rather than beside the contents.

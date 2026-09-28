@@ -99,9 +99,10 @@ Engine-specific code is confined to these places:
 
 This list is the complete set, and where an engine may be named is checked by
 grep rather than trusted: `make confined` refuses a dialect named anywhere but
-the places it allows. It allows them by path, and two of its paths are whole
-packages — this one and the test harness — so a new branch inside either passes
-it, and the row naming that branch here is kept by review. It reads the tests
+the places it allows. It allows them by path, and four of its paths are whole
+directories — this package, the test harness, and the two tools that enforce
+this rule and regenerate the reserved words — so a new branch inside any of them
+passes it, and the row naming that branch here is kept by review. It reads the tests
 too: a branch in a test is a branch, and the one thing it lets past there is an
 engine named to choose which engine runs.
 
@@ -634,14 +635,12 @@ What its absence costs: the picker deciding who may be named on an embargoed
 case answers a term of "%" with every person the deployment can offer, in one
 request.
 
-Folding happens in Go, and a column compared against a folded term has a
-folded copy of its own, made on the way in. Folding in Go is Unicode-aware and
-`LOWER()` on SQLite is ASCII-only, so a term carrying a non-ASCII capital
-compared against `LOWER()` of a column is found on three engines and missed on
-the fourth. Both halves of the findings search have a folded copy. The
-component search compares against it; the issue search still folds the raw
-identifier with the engine, which differs only outside ASCII, and issue
-identifiers are ASCII in every scheme anybody publishes.
+Folding happens in Go. `LOWER()` on SQLite is ASCII-only, so a term carrying a
+non-ASCII capital compared against `LOWER()` of a column is found on three
+engines and missed on the fourth. The component-name search compares against a
+folded copy made on the way in. Issue identifiers, package identifiers,
+descriptions and the person picker compare against `LOWER()` of the column,
+which differs only outside ASCII.
 
 ## Affected-row counts
 

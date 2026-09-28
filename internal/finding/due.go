@@ -322,9 +322,9 @@ func InForce() (string, []any) {
 // rather than after — measured at about eight seconds over 441,108 findings.
 // Stored at ingest, this is one range over an index.
 //
-// A finding with no deadline is left out: it is below the line, in a release
-// out of support or built once, or has nothing upstream to take, and NoDeadline
-// says which. None of those is something to interrupt anybody about.
+// A finding with no deadline is left out: nobody has rated a flaw recorded
+// here, it is below the line, it is in a release out of support or built once,
+// or it has nothing upstream to take, and NoDeadline says which. None of those is something to interrupt anybody about.
 //
 // Paged because a screen reads the first page and a file reads all of them,
 // and the file is the reason the offset exists: an export
