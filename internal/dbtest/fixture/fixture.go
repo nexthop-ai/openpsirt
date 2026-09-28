@@ -31,6 +31,7 @@ package fixture
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -45,6 +46,17 @@ type World struct {
 	Catalog *catalog.Store
 	Access  *access.Store
 
+	Declared
+
+	t *testing.T
+}
+
+// Declared is the default world's rows, without the stores that made them.
+//
+// It holds nothing tied to one database, so a seeded template can return it:
+// on SQLite the template is seeded once and what it returned is read by every
+// test copying it.
+type Declared struct {
 	// Product is the one product every test has. Its display name is not its
 	// name recapitalized, so a reader answering the display name where the
 	// address name is resolved fails immediately rather than passing.
@@ -64,8 +76,6 @@ type World struct {
 	// Person is somebody with a display name that is neither empty nor equal
 	// to their identity, so a read of one can never coincide with the other.
 	Person *access.Account
-
-	t *testing.T
 }
 
 // Default names. Stated once, because a test that wants to look one of these
@@ -102,20 +112,48 @@ func Two(t *testing.T, fn func(t *testing.T, w *World)) {
 // and empty.
 func New(t *testing.T, db *database.DB) *World {
 	t.Helper()
-	w := &World{
-		DB:      db,
-		Catalog: catalog.NewStore(db.DB),
-		Access:  access.NewStore(db.DB),
-		t:       t,
+	declared, err := Declare(t.Context(), db)
+	if err != nil {
+		t.Fatalf("seed the default world: %v", err)
 	}
-	w.Product = w.DeclareProduct(ProductName, ProductDisplayName)
-	w.Branch = w.DeclareStream(w.Product, BranchName, catalog.Branch, nil)
-	w.Tag = w.DeclareStream(w.Product, TagName, catalog.Tag, &w.Branch.ID)
-	w.Customer = w.DeclareVariant(w.Product, CustomerVariant, true)
-	w.Internal = w.DeclareVariant(w.Product, InternalVariant, false)
-	w.Target = w.TargetFor(w.Branch, w.Customer)
-	w.Person = w.DeclarePerson(PersonIdentity, PersonDisplayName, false)
-	return w
+	return &World{
+		DB:       db,
+		Catalog:  catalog.NewStore(db.DB),
+		Access:   access.NewStore(db.DB),
+		Declared: declared,
+		t:        t,
+	}
+}
+
+// Declare seeds the default world in db and answers its rows. It is New for a
+// seeded template, which has no test to fail.
+func Declare(ctx context.Context, db *database.DB) (Declared, error) {
+	cat := catalog.NewStore(db.DB)
+	var d Declared
+	var err error
+	if d.Product, err = cat.DeclareProduct(ctx, ProductName, ProductDisplayName); err != nil {
+		return Declared{}, fmt.Errorf("declare the product %q: %w", ProductName, err)
+	}
+	if d.Branch, err = cat.DeclareStream(ctx, d.Product.ID, BranchName, catalog.Branch, nil); err != nil {
+		return Declared{}, fmt.Errorf("declare the branch %q: %w", BranchName, err)
+	}
+	if d.Tag, err = cat.DeclareStream(ctx, d.Product.ID, TagName, catalog.Tag, &d.Branch.ID); err != nil {
+		return Declared{}, fmt.Errorf("declare the tag %q: %w", TagName, err)
+	}
+	if d.Customer, err = cat.DeclareVariant(ctx, d.Product.ID, CustomerVariant, true); err != nil {
+		return Declared{}, fmt.Errorf("declare the variant %q: %w", CustomerVariant, err)
+	}
+	if d.Internal, err = cat.DeclareVariant(ctx, d.Product.ID, InternalVariant, false); err != nil {
+		return Declared{}, fmt.Errorf("declare the variant %q: %w", InternalVariant, err)
+	}
+	if d.Target, err = cat.TargetFor(ctx, d.Branch.ID, d.Customer.ID); err != nil {
+		return Declared{}, fmt.Errorf("place %s as %s: %w", BranchName, CustomerVariant, err)
+	}
+	if d.Person, err = access.NewStore(db.DB).Ensure(ctx, PersonIdentity, PersonDisplayName,
+		access.Stated(false), nil); err != nil {
+		return Declared{}, fmt.Errorf("declare %q: %w", PersonIdentity, err)
+	}
+	return d, nil
 }
 
 // DeclareProduct adds a product, failing the test rather than returning an
