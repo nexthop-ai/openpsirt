@@ -207,7 +207,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 		return fmt.Errorf("read an attachment: %w", err)
 	}
 	if row.Redacted() {
-		return ErrGone
+		return s.removeRedacted(ctx, row.ObjectKey)
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -236,10 +236,27 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 		}
 		return nil
 	})
+	if errors.Is(err, ErrGone) {
+		return s.removeRedacted(ctx, row.ObjectKey)
+	}
 	if err != nil {
 		return err
 	}
 	return s.files.Delete(ctx, row.ObjectKey)
+}
+
+// removeRedacted removes the bytes of a file already marked redacted, and
+// answers ErrGone once they are gone.
+//
+// The row is marked before the bytes go, so a delete that failed leaves a
+// marked row over bytes still in the store. Asking again is how that
+// finishes: deleting what is already gone is not an error, so the repeat is
+// safe whoever marked it.
+func (s *Store) removeRedacted(ctx context.Context, key string) error {
+	if err := s.files.Delete(ctx, key); err != nil {
+		return fmt.Errorf("remove a redacted file: %w", err)
+	}
+	return ErrGone
 }
 
 // Sweep removes uploads nothing ever referred to.

@@ -339,6 +339,47 @@ func TestRedactionTakesTheBytesAndLeavesTheRecord(t *testing.T) {
 	})
 }
 
+// A redaction whose delete failed is finished by asking again. The row is
+// marked first, so the repeat finds it redacted, and it still removes the
+// bytes before answering that the file is gone.
+func TestARedactionWhoseDeleteFailedIsFinishedByAskingAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		stored := f.upload(t, who, "oops.txt", []byte("AKIAIOSFODNN7EXAMPLE"))
+
+		flaky := &failingOnce{Storage: f.files}
+		store := attach.NewStore(f.db.DB, flaky)
+		if err := store.Redact(ctx, f.admin(t), stored.Token, "a credential"); err == nil {
+			t.Fatal("a redaction whose delete failed reported success")
+		}
+		if err := store.Redact(ctx, f.admin(t), stored.Token, "a credential"); !errors.Is(err, attach.ErrGone) {
+			t.Fatalf("asking again answered %v, want that it is gone", err)
+		}
+		row, err := f.store.Find(ctx, who, stored.Token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.files.Open(ctx, row.ObjectKey); err == nil {
+			t.Error("the bytes are still in the store after the redaction was asked again")
+		}
+	})
+}
+
+// failingOnce is a store whose first delete fails.
+type failingOnce struct {
+	attach.Storage
+	failed bool
+}
+
+func (s *failingOnce) Delete(ctx context.Context, key string) error {
+	if !s.failed {
+		s.failed = true
+		return errors.New("the store could not be reached")
+	}
+	return s.Storage.Delete(ctx, key)
+}
+
 func TestUploadsNothingRefersToAreCollected(t *testing.T) {
 	// Somebody drags a file in and closes the tab.
 	each(t, func(t *testing.T, f *fixture) {
