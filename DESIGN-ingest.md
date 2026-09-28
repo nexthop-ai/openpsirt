@@ -645,7 +645,7 @@ asks:
 
 | Kept | Use |
 |---|---|
-| The version range the match fired on | For a distribution's package reached by identifier it names no packaging revision and so cannot see a backported fix. Read beside the version that ships, a range naming no revision is the whole argument in a line |
+| The version range the match fired on, from the detail its kind was decided by | For a distribution's package reached by identifier it names no packaging revision and so cannot see a backported fix. Read beside the version that ships, a range naming no revision is the whole argument in a line |
 | The body of data that answered | Finer than the two words the match kind records |
 
 Both are kept as the scanner wrote them and **never parsed**. Deciding whether a
