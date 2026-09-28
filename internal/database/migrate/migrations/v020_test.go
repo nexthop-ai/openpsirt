@@ -396,6 +396,14 @@ func snapshot(t *testing.T, ctx context.Context, db *database.DB) map[string][]m
 
 func read(t *testing.T, ctx context.Context, db *database.DB, table string, names []string) []map[string]string {
 	t.Helper()
+	return readWhere(t, ctx, db, table, names, "")
+}
+
+// readWhere is read narrowed to the rows where, a condition with its values
+// bound in args, holds. Empty reads every row.
+func readWhere(t *testing.T, ctx context.Context, db *database.DB, table string, names []string,
+	where string, args ...any) []map[string]string {
+	t.Helper()
 	quoted := make([]string, len(names))
 	for i, n := range names {
 		quoted[i] = `"` + n + `"`
@@ -404,7 +412,11 @@ func read(t *testing.T, ctx context.Context, db *database.DB, table string, name
 	if slices.Contains(names, "id") {
 		order = `"id"`
 	}
-	rows, err := db.QueryContext(ctx, `SELECT `+strings.Join(quoted, ", ")+` FROM "`+table+`" ORDER BY `+order)
+	if where != "" {
+		where = ` WHERE ` + where
+	}
+	rows, err := db.QueryContext(ctx, `SELECT `+strings.Join(quoted, ", ")+` FROM "`+table+`"`+where+
+		` ORDER BY `+order, args...)
 	if err != nil {
 		t.Fatalf("read %s: %v", table, err)
 	}

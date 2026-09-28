@@ -161,7 +161,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined release-freeze release-check
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-clean engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined release-freeze release-check
 
 all: check build
 
@@ -1043,6 +1043,13 @@ engines-down:
 	@echo "removed. local.mk was left alone, so 'make engines-up' reuses it —"
 	@echo "and until you run it, 'make check' and 'make test-engines' ask for"
 	@echo "three servers that are no longer there. 'make test' is unaffected."
+
+# Drops the test databases on the configured servers that no running test
+# binary holds. Safe while other checkouts run their tests: each binary holds
+# its slot's lock for as long as it uses the slot's database, and a database is
+# dropped only while this holds that lock instead (internal/dbtest).
+engines-clean:
+	$(GO) run ./internal/tools/dbclean
 
 engines-status:
 	@$(DOCKER) ps -a --filter "name=^$(ENGINE_PREFIX)-" \

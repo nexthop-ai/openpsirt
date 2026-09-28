@@ -682,6 +682,7 @@ same command and the same pinned versions.
 | `make engines-up` | Starts the four database servers those two checks need |
 | `make engines-down` | Removes them |
 | `make engines-status` | What is running, and which engines are unconfigured |
+| `make engines-clean` | Drops the test databases no running test holds |
 
 While working, run `make test`. It is the SQLite-only, parallel, cached
 run — a few seconds — and it is what to run after every change. It does not
@@ -723,12 +724,12 @@ the ordinary case and takes the code's tier rather than the document one.
 
 Packages run in parallel in both. Each test binary builds the schema once — a
 migrated SQLite file copied per test, and on each server a database of the
-binary's own, named for the package, dropped and recreated on first use — so
-no package can tear down another's tables (see `internal/dbtest`). The one
-thing that still collides is running the *same* package twice at once against
-the same server, or the same package from two checkouts hashing alike — the
-checkout's directory is in the hash, so that takes a hash collision rather
-than a second worktree.
+binary's own, named for the package and a slot — so no package can tear down
+another's tables (see `internal/dbtest`). A binary leases the lowest free slot
+of its package through a lock the server holds for its connection, so the same
+package run twice at once, from one checkout or two, gets two slots and two
+databases. Every checkout reuses the same slots, and `make engines-clean` drops
+the databases of slots nobody holds, safely while other tests run.
 
 ### The second command
 

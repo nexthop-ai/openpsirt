@@ -32,18 +32,19 @@ import (
 // takes a copy of a migrated template file.
 
 // The first call makes the database, the second recognizes it, and a third
-// under the same prefix with a different schema fingerprint drops the one the
-// older migrations built.
+// for the same slot with a different schema fingerprint drops the one the
+// older migrations built, which is how a slot is rebuilt for a new schema.
 func TestAKeptDatabaseIsRecognizedAndAnOlderSchemaDropped(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
 		admin := openAdmin(t, base)
 
-		// Two names under one prefix, differing only where the fingerprint of
-		// the migrations sits — which is exactly what an edited migration
+		// Two names for one slot, differing only where the fingerprint of the
+		// migrations sits — which is exactly what an edited migration
 		// produces.
-		prefix := fmt.Sprintf("openpsirt_t_reuse_%s_", suffixFor(t, engine))
-		first, second := prefix+"aaaaaa", prefix+"bbbbbb"
+		path := "example.com/reuse" + suffixFor(t, engine) + ".test"
+		first, second := databaseName(path, 1, "aaaaaa"), databaseName(path, 1, "bbbbbb")
+		prefix := packagePrefix(first)
 		t.Cleanup(func() {
 			for _, name := range []string{first, second} {
 				if _, err := admin.ExecContext(context.WithoutCancel(ctx),
