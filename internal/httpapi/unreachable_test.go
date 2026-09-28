@@ -108,6 +108,16 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 // answer of their own, which is a different arm and not this one.
 func overAClosedDatabase(t *testing.T, r *reach, logged slog.Handler) http.Handler {
 	t.Helper()
+	return overAClosedDatabaseAs(t, r, logged,
+		publisher.Named{Name: "Example Networks", Namespace: "https://example.test"})
+}
+
+// overAClosedDatabaseAs is overAClosedDatabase for a deployment publishing as
+// somebody else, or as nobody.
+func overAClosedDatabaseAs(t *testing.T, r *reach, logged slog.Handler,
+	who publisher.Named) http.Handler {
+
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "gone.db")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -135,9 +145,31 @@ func overAClosedDatabase(t *testing.T, r *reach, logged slog.Handler) http.Handl
 	handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Ingest{
 		DB: gone, Queue: queue.New(gone, queue.DefaultOptions()), Files: files,
 		Access:    access.NewResolver(r.rights, access.Trust{Header: testHeader, From: sources}),
-		Publisher: publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
+		Publisher: who,
 	})
 	return handler
+}
+
+// A read that needs no publisher, failing where none is configured, is a
+// fault. The missing publisher is a refusal of its own, and answering every
+// other failure with it hands the caller the error's text as a conflict.
+func TestAFailedReadWithNoPublisherIsAFault(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		handler := overAClosedDatabaseAs(t, r, &counting{}, publisher.Named{})
+		req := httptest.NewRequest(http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/vex/issuance", nil)
+		req.Header.Set(testHeader, "reader")
+		fromOurOwnPage(req)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("what has gone out, over a database nobody can reach, answered %d: %s",
+				rec.Code, rec.Body.String())
+		}
+		if strings.Contains(strings.ToLower(rec.Body.String()), "database is closed") {
+			t.Errorf("the driver's message reached the body: %s", rec.Body.String())
+		}
+	})
 }
 
 // counting is a log handler that keeps how many lines were written and none of

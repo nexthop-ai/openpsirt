@@ -261,10 +261,10 @@ func vexRefused(in Ingest, err error, what string) error {
 		// caller can act on in the log. Recording that one went out generates
 		// the document too, so it refuses the same way.
 		return huma.Error422UnprocessableEntity(err.Error())
-	// Asked of the publisher directly. A wrapper of its own in the package
-	// that answers it spells one predicate two ways in one file, and the
-	// wrapper is the half nothing executes.
-	case !in.Publisher.Stated():
+	// The store's own refusal, and nothing else. Asked of the configuration
+	// instead, every failure of a read that needs no publisher answers 409
+	// carrying its text wherever none is configured.
+	case errors.Is(err, vex.ErrNoPublisher):
 		// A configuration gap rather than a bad request, and named as one:
 		// whoever is asking cannot fix it from here, and an operator can.
 		return huma.Error409Conflict(err.Error())

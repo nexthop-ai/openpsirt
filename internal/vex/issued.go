@@ -93,7 +93,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	product, stream, variant string) (*Issuance, error) {
 
 	if !who.Stated() {
-		return nil, errNoPublisher
+		return nil, ErrNoPublisher
 	}
 	named, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
