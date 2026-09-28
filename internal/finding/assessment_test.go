@@ -6,6 +6,8 @@ package finding_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -976,3 +979,31 @@ func (h *beforeAgreeing) BeforeQuery(ctx context.Context, e *bun.QueryEvent) con
 }
 
 func (h *beforeAgreeing) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// A claim that could not be read is a fault. Answered as a claim that is not
+// there, the queue lists it with what agreeing would do silently left off.
+func TestWhatAgreeingWouldDoOverAFailedReadIsNotAnAbsentClaim(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gone.db")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target, err := database.ParseURL("sqlite://" + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err := database.Open(t.Context(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gone.Close(); err != nil {
+		t.Fatal(err)
+	}
+	who := access.NewPerson(1, "approver", false, nil, 101)
+	_, err = finding.NewStore(gone.DB).WhatAgreeingWouldDo(t.Context(), who, 1)
+	if err == nil {
+		t.Fatal("a database nobody can reach answered what agreeing would do")
+	}
+	if errors.Is(err, finding.ErrNoSuchAssessment) {
+		t.Errorf("a database nobody can reach said the claim is not there: %v", err)
+	}
+}

@@ -887,7 +887,8 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	claim := new(Assessment)
 	if err := s.db.NewSelect().Model(claim).Where("id = ?", assessmentID).
 		Scan(ctx); err != nil {
-		return Consequence{}, ErrNoSuchAssessment
+		return Consequence{}, database.FromRead(err, ErrNoSuchAssessment,
+			fmt.Sprintf("read assessment %d", assessmentID))
 	}
 	// Enforced here as well as on the list that reaches it, because this
 	// is the layer that answers and a caller that arrived another way
