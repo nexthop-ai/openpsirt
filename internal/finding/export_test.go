@@ -3,6 +3,8 @@
 
 package finding
 
+import "time"
+
 // FixedBecause is how a closure is said in a release note, for the test.
 //
 // Exported for the test alone: it is what the note writes beside each line,
@@ -38,3 +40,10 @@ func Exploiting(urgency int64) bool { return urgency >= exploiting }
 // every input a single caller can produce — so without a way into that window
 // the condition can be deleted with the suite green.
 func (s *Store) JudgingAfter(fn func()) { s.afterReadingReport = fn }
+
+// Clock replaces the moment the store reads, for the test.
+//
+// Exported for the test alone: an identifier and a reference carry the year
+// they were minted in, so a test asserting the year has to fix the moment the
+// store reads rather than the one the suite happens to run at.
+func (s *Store) Clock(now func() time.Time) { s.now = now }
