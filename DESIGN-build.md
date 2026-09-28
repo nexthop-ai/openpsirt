@@ -407,12 +407,16 @@ from, and it keeps apart the attributes a hand-written seed collapses.
 | A person whose display name is neither empty nor their identity | A read of one never coincides with the other |
 
 A test needing a second product declares it on the same world. The catalog and
-access packages declare their own rows, because the declarations are what they
-test.
+access packages, the API package's catalog tests and the schema width tests
+declare their own rows, because the declarations are what they test. The API
+authorization tests keep a world of their own, whose two products and people are
+what that matrix tests, and a migration test seeds the older schema it migrates
+from, which the default world does not match.
 
 The harness empties the database before every test, so a test does not empty
 it again before it starts. Emptying it part way through is for a test that
-seeds a second world of its own.
+starts over within itself: one seeding a second world, one whose cases each need
+an empty table, and a migration test rolling the schema back.
 
 What the seed returns on SQLite is one value shared by every test copying the
 template, and those tests run beside each other, so a test reads it and does
