@@ -291,10 +291,9 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 // Whoever may read it and may act on it. Every other operational
 // alert goes to administrators because it is about the tool rather than about
 // a finding; this one names an issue, a component and a build, which is
-// finding content. Since an administrator no longer reads a product by
-// administering it, sending it to administrators alone would be both
-// a disclosure to people who may not read it and silence for the people who
-// can act.
+// finding content. Administering a deployment grants no reading of a
+// product, so sending it to administrators alone would be both a disclosure
+// to people who may not read it and silence for the people who can act.
 func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, error) {
 	standing, args := finding.OffTheClock("st.product_id", time.Now().UTC())
 
@@ -404,10 +403,9 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 
 	// Asked as the deployment rather than as anybody in it, because that
 	// is what this is: the tool reporting on itself rather than answering
-	// a person. What it produces is then told only to administrators —
-	// who, now that administering grants no reading, do not themselves read
-	// every product, which is exactly why this could no
-	// longer be an administrator's subject.
+	// a person. What it produces is told only to administrators, and
+	// administering grants no reading of a product, so an administrator's
+	// subject would not reach every product.
 	everything := access.Everything("the watch")
 	rows, err := ingest.NewStore(w.db).Scanning(ctx, everything, finding.Scope{}, after)
 	if err != nil {
@@ -526,8 +524,8 @@ func (w *Watch) beingTold(ctx context.Context, kind Kind) ([]int64, error) {
 // It asks rather than acts. Long leave and having left look identical from
 // here, and nothing detects somebody leaving — so this opens a
 // condition an administrator reads and clears by doing something, rather than
-// handing the work back on its own. Withdrawing a role does hand work back
-// , and that is a deliberate act by a person.
+// handing the work back on its own. Withdrawing a role does hand work back,
+// and that is a deliberate act by a person.
 func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	after, err := setting.NewStore(w.db).Duration(ctx,
 		setting.AbsentAfter, setting.DefaultAbsentAfter)
@@ -612,7 +610,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 			// every time somebody assigned them anything.
 			About: identify("person:" + row.Identity),
 			Body:  body,
-			Link:  "/work?holder=" + url.QueryEscape(row.Identity),
+			Link:  "/work?tab=people&person=" + url.QueryEscape(row.Identity),
 		})
 	}
 	return holding, nil

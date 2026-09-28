@@ -884,12 +884,11 @@ func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testin
 			}
 		}
 		watch := notify.NewWatch(db.DB, quiet)
-		// The row's identity as well as its words. Asserted on the text alone
-		// this passed just as happily against a version-keyed condition: the
-		// second sweep would clear the old row and open a new one carrying the
-		// newer version, and Waiting returns whatever is uncleared — same
-		// assertion, same green, and a fresh unread alert about something that
-		// never stopped being true.
+		// The row's identity as well as its words. A version-keyed condition
+		// passes an assertion on the text alone: the second sweep clears the old
+		// row and opens a new one carrying the newer version, Waiting returns
+		// whatever is uncleared, and the reader gets a fresh unread alert about
+		// something that never stopped being true.
 		said := func() (int64, string) {
 			t.Helper()
 			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, admin), 50, 0)
@@ -1028,8 +1027,7 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 	reason := string(triage.CodeNotPresent)
 	// The typed models rather than maps of column names, so the generated key
 	// comes back the way bun returns one. Asking the driver for it works on
-	// one engine and is unsupported on another, which is what four engines are
-	// for — and this failed on the second of them.
+	// one engine and is unsupported on another.
 	claim := &triage.Claim{
 		Kind: triage.FindingClaim, ProposedBy: who.ID, ProposedAt: now,
 		Outcome: triage.NotApplicable, Justification: &reason,
@@ -1056,9 +1054,8 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 // A data bundle is a build stamp, so restoring an older one reproduces a
 // version string exactly. Measured as the first sighting of whichever version
 // ran most recently, an air-gapped deployment re-importing last quarter's
-// bundle was told the data had not moved in seven months — about data that had
-// moved two days earlier — and sent somebody looking for a fetch that never
-// failed.
+// bundle would be told the data had not moved in seven months, about data that
+// moved two days earlier.
 func TestAVersionComingBackIsNotTheDataStandingStill(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -1139,9 +1136,9 @@ func TestTwoReplicasADataFetchApartDoNotAlternate(t *testing.T) {
 
 // The window is a setting, and a window under a day is said in words.
 //
-// Neither staleness test set it, so replacing the read with the compiled
-// default left the suite green and nothing held that the knob did anything.
-// The words matter at the same time: "0 days" is what arithmetic gives for a
+// Set here to a value other than the compiled default, so a read replaced by
+// the default fails. The words matter at the same time: "0 days" is what
+// arithmetic gives for a
 // threshold measured in hours, and a deployment fetching nightly has a reason
 // to set one.
 func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {

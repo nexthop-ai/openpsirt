@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -237,24 +238,69 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 }
 
 // reopened takes a condition's delivery again for a new opening, where the
-// row it was claimed for has cleared. Reports whether this pass took it.
+// opening it was claimed for has ended. Reports whether this pass took it.
 //
-// Conditional on the delivery still pointing at the cleared row, so two
-// replicas reaching it together take it once.
+// A condition held by several people is several rows, and one opening lasts
+// while any of them is open. The row the delivery points at clearing while
+// another row of the condition stays open across that moment hands the
+// delivery to that row instead, so the window settles against a row that is
+// still open and the next clear is judged from there.
+//
+// Both writes are conditional on the delivery still pointing at the row this
+// pass read, so two replicas reaching it together act once.
 func (s *Signal) reopened(ctx context.Context, held Delivery, rowID int64,
 	now time.Time) (bool, error) {
 
-	ended, err := s.db.NewSelect().
-		TableExpr(`"notification" AS "prior"`).
-		Where(`"prior"."id" = ?`, held.NotificationID).
-		Where(`"prior"."cleared_at" IS NOT NULL`).
-		Exists(ctx)
-	if err != nil {
+	var prior Notification
+	if err := s.db.NewSelect().Model(&prior).
+		Where(`"nt"."id" = ?`, held.NotificationID).
+		Scan(ctx); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, fmt.Errorf("read whether a condition opened again: %w", err)
 	}
-	if !ended {
-		return false, nil
+	covering := prior.ID
+	for prior.ClearedAt != nil {
+		// The row of this condition that was open when the covering one
+		// cleared, preferring one still open, then the one that stayed open
+		// longest. Each step moves to a later clear, so the walk ends.
+		var next []Notification
+		if err := s.db.NewSelect().Model(&next).
+			Where(`"nt"."about" = ?`, held.About).
+			Where(`"nt"."id" <> ?`, prior.ID).
+			Where(`"nt"."created_at" <= ?`, *prior.ClearedAt).
+			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.Where(`"nt"."cleared_at" IS NULL`).
+					WhereOr(`"nt"."cleared_at" > ?`, *prior.ClearedAt)
+			}).
+			OrderExpr(`CASE WHEN "nt"."cleared_at" IS NULL THEN 0 ELSE 1 END ASC`).
+			OrderExpr(`"nt"."cleared_at" DESC, "nt"."id" ASC`).
+			Limit(1).
+			Scan(ctx); err != nil {
+			return false, fmt.Errorf("read whether a condition opened again: %w", err)
+		}
+		if len(next) == 0 {
+			break
+		}
+		prior = next[0]
 	}
+	if prior.ID == 0 || prior.ClearedAt != nil {
+		return s.retake(ctx, held, rowID, now)
+	}
+	if prior.ID != covering {
+		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
+			Set("notification_id = ?", prior.ID).
+			Where("id = ?", held.ID).
+			Where("notification_id = ?", held.NotificationID).
+			Exec(ctx); err != nil {
+			return false, fmt.Errorf("hand a delivery to a row still holding its condition: %w", err)
+		}
+	}
+	return false, nil
+}
+
+// retake points a delivery at a new opening of its condition, unsent.
+func (s *Signal) retake(ctx context.Context, held Delivery, rowID int64,
+	now time.Time) (bool, error) {
+
 	res, err := s.db.NewUpdate().Model((*Delivery)(nil)).
 		Set("sent_at = NULL").
 		Set("attempts = 0").

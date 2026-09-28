@@ -16,9 +16,7 @@ import (
 //
 // Shared by all three groups of conditions — the waits in stale.go, the
 // operational alerts in watch.go, and the embargo conditions in disclosure.go
-// — and belonging to none of them. They lived in the file of whichever
-// condition asked first, which is how the same question came to be answered
-// three ways.
+// — and belonging to none of them, so the question has one answer.
 
 // acts is what one person may do with one product, as the questions these
 // conditions ask of it.
@@ -30,9 +28,7 @@ import (
 // Reading and triaging are kept apart rather than folded into one pair,
 // because the conditions divide on exactly that: a message about work waiting
 // goes to whoever may *act*, and one about something that has happened goes to
-// whoever may read it. Folded, the two hand-written copies of this loop asked
-// the narrower question and the named one asked the wider, and which a
-// condition got depended on which copy its author started from.
+// whoever may read it.
 type acts struct {
 	approves                                                 bool
 	readsPublic, readsPrivate, triagesPublic, triagesPrivate bool
@@ -56,15 +52,11 @@ func (a acts) readsAll(public, private int) bool {
 }
 
 // approvesAll is whether they may agree to every row of something spanning
-// both visibilities: the approver capability, or the right to triage at each
-// visibility the rows are at, over the right to read all of them. A triager
-// may approve somebody else's claim.
+// both visibilities: the rule a signed-in approver is held to, at each
+// visibility the rows are at.
 func (a acts) approvesAll(public, private int) bool {
-	if !a.readsAll(public, private) {
-		return false
-	}
-	return a.approves ||
-		((public == 0 || a.triagesPublic) && (private == 0 || a.triagesPrivate))
+	return (public == 0 || access.MayApprove(a.approves, a.readsPublic, a.triagesPublic)) &&
+		(private == 0 || access.MayApprove(a.approves, a.readsPrivate, a.triagesPrivate))
 }
 
 // readsIn is whether they read the product at either visibility: the question
@@ -87,8 +79,7 @@ func (a acts) triages(private bool) bool {
 // upload is what raised the question. Every condition asking the
 // same two tables is that much more work to answer one question, and — the
 // part that matters more — that many places for "may read" to be spelled
-// slightly differently. It was three: this, and two copies written out by hand
-// in watch.go that also re-read access.People per condition.
+// slightly differently.
 func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) {
 	people, held, err := access.NewStore(db).People(ctx)
 	if err != nil {

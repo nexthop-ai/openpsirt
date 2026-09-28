@@ -714,6 +714,80 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 	})
 }
 
+// A condition held by several people is one opening while any of them still
+// holds it. The row the delivery was claimed for clearing, while another
+// holder's row stays open across that moment, is not the condition returning.
+func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		ana, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ben, err := rights.Ensure(ctx, "ben@example.com", "Ben", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, ana), "chat",
+			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+		held := []notify.Holds{{
+			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
+			Link: "/reports/rubber-stamp",
+		}}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		requests := func() int {
+			saw.mu.Lock()
+			defer saw.mu.Unlock()
+			return saw.requests
+		}
+
+		// Ana's row opens first, so the delivery is claimed for it.
+		for _, step := range []struct {
+			name    string
+			who     int64
+			holding []notify.Holds
+			want    int
+		}{
+			{"Ana holds it", ana.ID, held, 1},
+			{"Ben holds it too", ben.ID, held, 1},
+			{"Ana's row clears while Ben's stays open", ana.ID, nil, 1},
+			{"Ana holds it again while Ben still does", ana.ID, held, 1},
+			{"Ana's second row clears", ana.ID, nil, 1},
+			{"Ben's row clears, so nobody holds it", ben.ID, nil, 1},
+			{"Ana holds it after it ended", ana.ID, held, 2},
+		} {
+			if _, _, err := store.Reconcile(ctx, step.who, notify.RiskUnagreed, step.holding); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := signal.Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if got := requests(); got != step.want {
+				t.Fatalf("%s: the channel was sent %d requests, want %d", step.name, got, step.want)
+			}
+		}
+		left, err := notify.StillToTell(signal, ctx, "chat")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left != 0 {
+			t.Errorf("%d rows are still to tell after one opening was carried", left)
+		}
+	})
+}
+
 // A destination's reason is why the last delivery failed, and nothing once one
 // has gone since.
 func TestADestinationSaysWhyItLastFailed(t *testing.T) {

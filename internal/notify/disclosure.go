@@ -196,7 +196,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	}
 	private := map[int64]map[int64]bool{}
 	// The party itself. The assignment column holds a party rather than a
-	// person , and a notification goes to somebody, so the two are mapped
+	// person, and a notification goes to somebody, so the two are mapped
 	// in one place rather than at each use.
 	whose := make(map[int64]int64, len(people))
 	for _, person := range people {
@@ -216,9 +216,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	// is never handed a list is never reconciled — and their alert stands
 	// after the thing it was about has been answered.
 	//
-	// This does not arise for the conditions that only ever go to
-	// administrators, because that set does not move. It arises here because
-	// who hears about an embargo includes whoever holds it, and work is handed
+	// Who hears about an embargo includes whoever holds it, and work is handed
 	// around: the person who held it yesterday would keep an alert about a
 	// date that has since been moved, with nothing left to clear it.
 	out, err := w.everybodyAnd(ctx, kind, nil, admins)
