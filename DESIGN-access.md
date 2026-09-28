@@ -57,6 +57,7 @@ should be here.
 | Public and private mean disclosed, not readable | Every request is authenticated either way, so a mistake in these rules exposes something to a colleague rather than to the internet |
 | Anything unrecognized reads as not disclosed | A column added later would otherwise default every row that predates it to visible |
 | A deployment that cannot tell who is asking serves nobody | Failing closed means an unconfigured deployment is up and refusing, which is visible, rather than up and answering everybody |
+| Stating administration or auditing is conditional on the value read, and one that matched nothing is taken again whole | Two administrators granting the same thing at once would both record it as moved. The retry reads the value the other left, and records nothing where nothing moved |
 | Recording somebody says nothing about administration unless it is stated | Three things stay distinguishable: granting it, taking it away, and saying nothing. Decided from a read taken before the write, a request about a role passed back whatever that read returned — so two requests at once lost one, and a read that failed answered "nobody is recorded as this" and withdrew it from somebody who had it, with nothing saying anybody had |
 
 ## Roles

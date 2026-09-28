@@ -315,3 +315,35 @@ func (s *Store) claimAgain(ctx context.Context, personID int64, identity string)
 	}).Exec(ctx)
 	return err
 }
+
+// A conditional write that matched nothing lost a race, and says so rather
+// than reporting a move it did not make: the caller records the move from the
+// value it read, so success here would put a change nobody made in the trail.
+func TestAMoveThatLostARaceIsTakenAgain(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		at := time.Now()
+		store, id := atClock(t, db, &at)
+		// Read before another writer withdrew administration and granted
+		// auditing, so both values it holds are stale.
+		stale, err := store.byID(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Ensure(ctx, "someone", "", Stated(false), Stated(true)); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct {
+			what          string
+			admin, audits *bool
+		}{
+			{"administration", Stated(false), nil},
+			{"auditing", nil, Stated(true)},
+		} {
+			copied := *stale
+			if err := store.move(ctx, &copied, c.admin, c.audits); !errors.Is(err, database.ErrGoAgain) {
+				t.Errorf("a move of %s that matched nothing answered %v", c.what, err)
+			}
+		}
+	})
+}

@@ -478,6 +478,11 @@ func registerAdministration(api huma.API, a Administering) {
 
 			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
 				in.Body.Admin, in.Body.Audits); err != nil {
+				// A lost race is taken again whole, so the trail below records
+				// the move from the value the retry reads.
+				if errors.Is(err, database.ErrGoAgain) {
+					return err
+				}
 				return huma.Error400BadRequest(err.Error())
 			}
 			if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {

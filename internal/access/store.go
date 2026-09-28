@@ -266,6 +266,44 @@ func (s *Store) Within(ctx context.Context,
 	})
 }
 
+// move writes what is held over the deployment where it differs from what was
+// read, and records the new values on the account.
+//
+// Conditional on what was read, so the value being replaced is read by the
+// statement that replaces it. A write that matched nothing lost a race with
+// another writer who moved the same flag since, and is ErrGoAgain: the caller
+// records the move from the value it read, and a fresh transaction is what
+// reads the value that is there now.
+func (s *Store) move(ctx context.Context, existing *Account, admin, audits *bool) error {
+	for _, flag := range []struct {
+		column, what string
+		held         *bool
+		asked        *bool
+	}{
+		{"is_admin", "is an administrator", &existing.IsAdmin, admin},
+		{"audits", "audits this deployment", &existing.Audits, audits},
+	} {
+		if flag.asked == nil || *flag.held == *flag.asked {
+			continue
+		}
+		result, err := s.db.NewUpdate().Model((*Account)(nil)).
+			Set("? = ?", bun.Ident(flag.column), *flag.asked).Where("id = ?", existing.ID).
+			Where("? = ?", bun.Ident(flag.column), *flag.held).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
+		}
+		n, err := database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
+		}
+		if n == 0 {
+			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, database.ErrGoAgain)
+		}
+		*flag.held = *flag.asked
+	}
+	return nil
+}
+
 // Ensure records somebody who has been granted access, or confirms one already
 // recorded.
 //
@@ -297,24 +335,8 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string,
 
 	existing, err := s.ByIdentity(ctx, identity)
 	if err == nil {
-		// Conditional on what is stored, so the value being replaced is read
-		// by the statement that replaces it. The affected-row count then says
-		// whether it moved, which is what the trail records.
-		if admin != nil && existing.IsAdmin != *admin {
-			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-				Set("is_admin = ?", *admin).Where("id = ?", existing.ID).
-				Where("is_admin = ?", existing.IsAdmin).Exec(ctx); err != nil {
-				return nil, fmt.Errorf("record that %q is an administrator: %w", identity, err)
-			}
-			existing.IsAdmin = *admin
-		}
-		if audits != nil && existing.Audits != *audits {
-			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-				Set("audits = ?", *audits).Where("id = ?", existing.ID).
-				Where("audits = ?", existing.Audits).Exec(ctx); err != nil {
-				return nil, fmt.Errorf("record that %q audits this deployment: %w", identity, err)
-			}
-			existing.Audits = *audits
+		if err := s.move(ctx, existing, admin, audits); err != nil {
+			return nil, err
 		}
 		return existing, nil
 	}
