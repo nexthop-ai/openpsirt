@@ -75,9 +75,9 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 	// A rule reaching most of a build is refused when it is written, not left
 	// to be discovered by the sweep that runs it every pass. Asked here rather
 	// than only at the preview, which is the handler's and which a second
-	// caller can forget.
+	// caller can forget. Measured folded, because that is how it is matched.
 	if beneath != "" {
-		if _, err := s.beneathIn(ctx, productID, beneath); err != nil {
+		if _, err := s.beneathIn(ctx, productID, graph.Folded(beneath)); err != nil {
 			return nil, err
 		}
 	}
@@ -172,17 +172,16 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // Filling is measured by what was read, not by what was written. The two
 // differ: the page is bounded on rows read and the write re-checks the holder,
 // so a single assignment landing inside the window makes one row of the batch
-// somebody else's. Reading "wrote fewer than the cap" as "reached the end"
-// therefore stopped the sweep one human action into a product with fifty
-// thousand findings in it, silently, with the job reported successful and the
-// rest never routed.
+// somebody else's. "Wrote fewer than the cap" is not "reached the end": read
+// that way, one human action stops the sweep with the rest of the product
+// unrouted and the job reported successful.
 //
 // A rule that has outgrown the bound places nothing and stops nothing else.
 // It was accepted when it was written and the tree grew under it, which is not
-// a fault of the sweep's — and the condition is permanent, so returning it as a
-// job failure stopped that product's routing entirely, every rule ordered after
-// it included, with a retry that could never clear it. They come back named so
-// the caller can say which, because a rule that silently stopped placing is the
+// a fault of the sweep's, and the condition is permanent: as a job failure it
+// would stop that product's routing entirely, every rule ordered after it
+// included, with a retry that can never clear it. They come back named so the
+// caller can say which, because a rule that silently stopped placing is the
 // same shape as a rule nobody notices is wrong.
 func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, []int64, error) {
 	if cap <= 0 {
@@ -536,10 +535,10 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 		if len(roots) == 0 {
 			continue
 		}
-		// One walk per build rather than one per named component. It was one
-		// recursive round trip each, inside a loop over every build of the
-		// product, so a pattern matching broadly issued tens of thousands of
-		// them in one request.
+		// One walk per build rather than one per named component. A walk per
+		// component, inside a loop over every build of the product, is tens of
+		// thousands of recursive round trips in one request for a pattern
+		// matching broadly.
 		var found []int64
 		if err := graph.WithinAny(s.db, build, roots).Scan(ctx, &found); err != nil {
 			return nil, fmt.Errorf("walk what sits under it: %w", err)
