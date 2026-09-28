@@ -1343,7 +1343,9 @@ somebody received.
 
 Whether a place sits on a tag is read from the finding, like its visibility,
 rather than supplied by whoever is deciding: what may be said about a place is a
-fact about the place.
+fact about the place. Every route that decides at a place, re-affirmation
+included, builds the place from the finding in one spelling, so the refusal
+holds on each of them.
 
 ## Tags
 

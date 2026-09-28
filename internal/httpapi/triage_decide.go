@@ -271,13 +271,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		for i, places := range reached {
 			for _, place := range places {
 				proposal := triage.Proposal{
-					Place: triage.Place{
-						ProductID: place.ProductID, VulnerabilityID: place.VulnerabilityID,
-						PlaceIdentity: place.PlaceIdentity, Visibility: place.Visibility,
-						ComponentUpstream: place.ComponentUpstream,
-						ConsumerUpstream:  place.ConsumerUpstream,
-						OnTag:             place.OnTag,
-					},
+					Place:         placeOf(place),
 					Outcome:       triage.Outcome(input.Body.Outcome),
 					Justification: triage.Justification(input.Body.Justification),
 					Mitigation:    input.Body.Mitigation,
@@ -379,12 +373,7 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 	}
 	ask := make([]triage.Place, 0, len(places))
 	for _, place := range places {
-		ask = append(ask, triage.Place{
-			ProductID: place.ProductID, VulnerabilityID: place.VulnerabilityID,
-			PlaceIdentity: place.PlaceIdentity, Visibility: place.Visibility,
-			ComponentUpstream: place.ComponentUpstream,
-			ConsumerUpstream:  place.ConsumerUpstream,
-		})
+		ask = append(ask, placeOf(place))
 	}
 	left, err := store.Undecided(ctx, ask)
 	if err != nil {
@@ -472,4 +461,19 @@ func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
 		return nil, 0, noSuchFinding()
 	}
 	return at, target.ID, nil
+}
+
+// placeOf is the place a decision is about, as the finding there states it.
+//
+// One spelling for every route. Whether the place sits in a tag build is read
+// from the finding rather than supplied, and a route that leaves it out makes
+// a dated outcome on a release built once, which the store refuses on every
+// other route.
+func placeOf(d finding.Deciding) triage.Place {
+	return triage.Place{
+		ProductID: d.ProductID, VulnerabilityID: d.VulnerabilityID,
+		PlaceIdentity: d.PlaceIdentity, Visibility: d.Visibility,
+		ComponentUpstream: d.ComponentUpstream, ConsumerUpstream: d.ConsumerUpstream,
+		OnTag: d.OnTag,
+	}
 }

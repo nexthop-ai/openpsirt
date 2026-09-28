@@ -604,11 +604,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		place := triage.Place{
-			ProductID: where.ProductID, VulnerabilityID: where.VulnerabilityID,
-			PlaceIdentity: where.PlaceIdentity, Visibility: where.Visibility,
-			ComponentUpstream: where.ComponentUpstream, ConsumerUpstream: where.ConsumerUpstream,
-		}
+		place := placeOf(*where)
 
 		standing, err := store.Applying(ctx, place)
 		if err != nil {
@@ -685,13 +681,9 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 
 		made, err := store.Reaffirm(ctx, subject, triage.Reaffirmation{
 			PreviousID: input.Body.Previous,
-			Place: triage.Place{
-				ProductID: where.ProductID, VulnerabilityID: where.VulnerabilityID,
-				PlaceIdentity: where.PlaceIdentity, Visibility: where.Visibility,
-				ComponentUpstream: where.ComponentUpstream, ConsumerUpstream: where.ConsumerUpstream,
-			},
-			Reasoning: input.Body.Reasoning,
-			By:        subject.ID,
+			Place:      placeOf(*where),
+			Reasoning:  input.Body.Reasoning,
+			By:         subject.ID,
 		})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)

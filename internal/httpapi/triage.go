@@ -768,12 +768,7 @@ func registerProposing(api huma.API, in Ingest) {
 		}
 
 		proposal := triage.Proposal{
-			Place: triage.Place{
-				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
-				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
-				OnTag: at.OnTag,
-			},
+			Place:         placeOf(*at),
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Justification),
 			Mitigation:    input.Body.Mitigation,

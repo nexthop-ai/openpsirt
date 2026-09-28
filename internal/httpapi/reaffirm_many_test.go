@@ -591,3 +591,55 @@ func TestReAffirmingTakesTheReviewersLimitWhereAnyClaimGoesBack(t *testing.T) {
 		}
 	})
 }
+
+// A dated outcome re-affirmed at a place in a tag build is refused, as making
+// it there is.
+//
+// A tag is a release built once. A deferral or a promise to patch dated
+// against one is a promise nothing can keep, and deciding one there answers
+// 422. The single-place re-affirmation built its place without saying it sat
+// in a tag, so the same outcome was re-made there and recorded.
+func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		place := r.scanned(t)
+		r.agreedAt(t, place, `{"outcome":"deferred","deferred_until":"2030-01-01",`+
+			`"reasoning":"Held until the next point release."}`)
+		var previous int64
+		if err := r.db.DB.NewSelect().Table("decision").ColumnExpr("MAX(id)").
+			Scan(ctx, &previous); err != nil {
+			t.Fatal(err)
+		}
+
+		// The component moves, which lapses the deferral, and the release it
+		// sits in is a tag.
+		if _, err := r.db.DB.NewUpdate().Table("component").
+			Set("version = ?", "3.8.0-1").Set("upstream_version = ?", "3.8.0").
+			Where("name = ?", "libnl-3-200").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var targets []int64
+		if err := r.db.DB.NewSelect().TableExpr(`"target" AS "t"`).
+			ColumnExpr("t.id").Scan(ctx, &targets); err != nil {
+			t.Fatal(err)
+		}
+		for _, target := range targets {
+			if _, err := triage.NewStore(r.db.DB).Lapse(ctx, target); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := r.db.DB.NewUpdate().Table("stream").
+			Set("kind = ?", catalog.Tag).Where("name = ?", "master").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		got := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999/places/"+
+				place+"/decision/reaffirmation",
+			fmt.Sprintf(`{"previous":%d,"reasoning":"Still true."}`, previous))
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("re-affirming a deferral in a tag build answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
