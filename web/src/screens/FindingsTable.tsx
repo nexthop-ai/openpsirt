@@ -10,7 +10,8 @@ import { decidedAs } from "../ui/decided";
 import { DAY_MS, on } from "../ui/when";
 import { own } from "../ui/own";
 import { Peek, Sits } from "./FindingsViews";
-import { SORTS, identityOf, pathTo, type Row } from "./list";
+import { SORTS, identityOf, type Row } from "./list";
+import { componentAt, findingAt, productFindingsAt } from "../app/routes";
 import { bandOf } from "../ui/severities";
 
 // The findings list as a table, and as cards on a narrow screen.
@@ -179,7 +180,7 @@ export function FindingsTable({
           <tbody id="findingRows">
             {rows.map((row, i) => {
               const key = identityOf(row);
-              const at = pathTo(buildOf(row), row, carrying, prepared?.name);
+              const at = findingAt(buildOf(row), row, carrying, prepared?.name);
               // Its decision state comes from the server, defined the
               // way the state filter defines it; a row does not guess from
               // what the build argued away, which is a different claim by
@@ -265,7 +266,7 @@ export function FindingsTable({
                     {spanning && (
                       <td>
                         <Link
-                          to={`/products/${encodeURIComponent(row.product ?? "")}/findings`}
+                          to={productFindingsAt(row.product ?? "")}
                           onClick={(e) => e.stopPropagation()}
                         >
                           {row.product}
@@ -348,9 +349,12 @@ export function FindingsTable({
                           // The row's own product, not the selection's:
                           // across every product there is no selection, and
                           // a path with an empty product matches no route.
-                          to={`/products/${encodeURIComponent(
+                          to={componentAt(
                             buildOf(row).product,
-                          )}/components/${encodeURIComponent(row.component ?? "")}`}
+                            row.component ?? "",
+                            row.version,
+                            buildOf(row),
+                          )}
                           onClick={(event) => event.stopPropagation()}
                         >
                           {row.component}
@@ -400,9 +404,12 @@ export function FindingsTable({
                             onClick={(event) => {
                               event.stopPropagation();
                               navigate(
-                                `/products/${encodeURIComponent(
+                                componentAt(
                                   buildOf(row).product,
-                                )}/components/${encodeURIComponent(row.component ?? "")}`,
+                                  row.component ?? "",
+                                  row.version,
+                                  buildOf(row),
+                                ),
                               );
                             }}
                           >
@@ -507,7 +514,7 @@ export function FindingsTable({
 
       <div className="cards">
         {rows.map((row) => {
-          const at = pathTo(buildOf(row), row, carrying, prepared?.name);
+          const at = findingAt(buildOf(row), row, carrying, prepared?.name);
           return (
             // The only way to open a finding on a narrow screen, so it
             // has to be reachable without a pointer: a card that answers

@@ -13,6 +13,13 @@ import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 import { mayOf, useWho } from "../app/session";
 import { useRulings } from "../api/intake";
+import {
+  buildFindingsAt,
+  inboxAt,
+  inventoriesAt,
+  productFindingsAt,
+  reviewQueueAt,
+} from "../app/routes";
 
 // One product's own page.
 //
@@ -45,7 +52,9 @@ export function Product() {
   const it = overview.data;
   if (!it) return null;
   const builds = it.builds ?? [];
-  const at = `/products/${encodeURIComponent(product)}`;
+  // The list as the figures here count it, with one more filter where a figure
+  // is narrower.
+  const counted = (more = "") => new URLSearchParams(UNNARROWED + more);
 
   return (
     <div>
@@ -62,12 +71,12 @@ export function Product() {
           {mayReadReports && (
             <>
               {" "}
-              · <Link to={`/products/${encodeURIComponent(product)}/inbox`}>Inbox</Link>
+              · <Link to={inboxAt(product)}>Inbox</Link>
               {(waitingRulings.data?.total ?? 0) > 0 && (
                 <>
                   {" "}
                   (
-                  <Link to={`/products/${encodeURIComponent(product)}/inbox?waiting=1`}>
+                  <Link to={inboxAt(product, true)}>
                     {(waitingRulings.data?.total ?? 0).toLocaleString()} waiting for approval
                   </Link>
                   )
@@ -101,25 +110,25 @@ export function Product() {
           counted with none of them — so without this every number here opened
           a list with fewer rows in it than the number said. */}
       <div className="kpis">
-        <Link className="kpi" to={`${at}/findings?${UNNARROWED}`}>
+        <Link className="kpi" to={productFindingsAt(product, counted())}>
           <span className="l">Open · {it.name}</span>
           <span className="n">{(it.open ?? 0).toLocaleString()}</span>
           <span className="d">issues at components, as the list counts them</span>
         </Link>
         <Link
           className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
-          to={`${at}/findings?${UNNARROWED}&running=overdue`}
+          to={productFindingsAt(product, counted("&running=overdue"))}
         >
           <span className="l">Past a deadline</span>
           <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
           <span className="d">already late, across every build</span>
         </Link>
-        <Link className="kpi" to={`${at}/findings?${UNNARROWED}&state=undecided`}>
+        <Link className="kpi" to={productFindingsAt(product, counted("&state=undecided"))}>
           <span className="l">Nobody has argued about</span>
           <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
           <span className="d">no place has a decision of any kind</span>
         </Link>
-        <Link className="kpi" to={`/review-queue?product=${encodeURIComponent(product)}`}>
+        <Link className="kpi" to={reviewQueueAt({ product })}>
           <span className="l">Waiting on a second person</span>
           <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
           <span className="d">claims here that nobody has agreed to</span>
@@ -149,13 +158,11 @@ export function Product() {
               </thead>
               <tbody>
                 {builds.map((row) => {
-                  const build =
-                    `${at}/streams/${encodeURIComponent(row.stream ?? "")}` +
-                    `/variants/${encodeURIComponent(row.variant ?? "")}`;
+                  const build = { product, stream: row.stream ?? "", variant: row.variant ?? "" };
                   return (
                     <tr key={`${row.stream} ${row.variant}`} className="row">
                       <td>
-                        <Link to={`${build}/findings?${UNNARROWED}`} className="id">
+                        <Link to={buildFindingsAt(build, counted())} className="id">
                           {row.stream}
                         </Link>{" "}
                         <span className="hint">·</span> <span className="id">{row.variant}</span>
@@ -175,7 +182,7 @@ export function Product() {
                       <td className="num">
                         {row.overdue ? (
                           <Link
-                            to={`${build}/findings?${UNNARROWED}&running=overdue`}
+                            to={buildFindingsAt(build, counted("&running=overdue"))}
                             className="due over"
                           >
                             {row.overdue.toLocaleString()}
@@ -186,7 +193,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.exploited ? (
-                          <Link to={`${build}/findings?${UNNARROWED}&only=exploited`}>
+                          <Link to={buildFindingsAt(build, counted("&only=exploited"))}>
                             {row.exploited.toLocaleString()}
                           </Link>
                         ) : (
@@ -195,7 +202,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.undecided ? (
-                          <Link to={`${build}/findings?${UNNARROWED}&state=undecided`}>
+                          <Link to={buildFindingsAt(build, counted("&state=undecided"))}>
                             {row.undecided.toLocaleString()}
                           </Link>
                         ) : (
@@ -204,7 +211,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.agreed ? (
-                          <Link to={`${build}/findings?${UNNARROWED}&state=agreed`}>
+                          <Link to={buildFindingsAt(build, counted("&state=agreed"))}>
                             {row.agreed.toLocaleString()}
                           </Link>
                         ) : (
@@ -216,7 +223,7 @@ export function Product() {
                             page exists to show: a product reads as clean when
                             part of it was never looked at. */}
                         {row.last_scan_at ? (
-                          <Link to={`${build}/scans`}>{on(row.last_scan_at)}</Link>
+                          <Link to={inventoriesAt(build)}>{on(row.last_scan_at)}</Link>
                         ) : (
                           <span className="alertish">never</span>
                         )}

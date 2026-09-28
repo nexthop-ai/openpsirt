@@ -18,6 +18,7 @@ import { claimOf } from "../api/claims";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
+import { comparisonAt, inventoriesAt, reviewQueueAt } from "../app/routes";
 
 // The most of the deadline list the tiles read. The response carries the
 // whole-answer count beside it, so the figures say when they are a floor
@@ -319,7 +320,7 @@ function Readiness({ at }: { at: Scoped }) {
           >
             Work what is blocking →
           </Link>
-          <Link to={`/products/${encodeURIComponent(at.product)}/comparison`} className="linkish">
+          <Link to={comparisonAt(at.product)} className="linkish">
             Release comparison →
           </Link>
         </footer>
@@ -521,7 +522,7 @@ function Figures({
       <button
         type="button"
         className={`kpi${sentBack > 0 ? " urgent" : ""}`}
-        onClick={() => navigate("/queue?mine=true")}
+        onClick={() => navigate(reviewQueueAt({ mine: true }))}
       >
         <span className="l">Sent back to you</span>
         <span className="n">
@@ -570,13 +571,7 @@ function Figures({
       <button
         type="button"
         className="kpi"
-        onClick={() =>
-          navigate(
-            at.product
-              ? `/review-queue?product=${encodeURIComponent(at.product)}`
-              : "/review-queue",
-          )
-        }
+        onClick={() => navigate(reviewQueueAt({ product: at.product }))}
       >
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Pending your approval
@@ -1036,7 +1031,11 @@ function Status() {
       {whole && (
         <footer>
           <Link
-            to={`/products/${encodeURIComponent(at.product ?? "")}/streams/${encodeURIComponent(at.stream ?? "")}/variants/${encodeURIComponent(at.variant ?? "")}/scans`}
+            to={inventoriesAt({
+              product: at.product ?? "",
+              stream: at.stream ?? "",
+              variant: at.variant ?? "",
+            })}
             className="linkish"
           >
             View inventories →

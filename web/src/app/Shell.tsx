@@ -9,6 +9,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTopOnArrival } from "./arrival";
 import { findingsPath, useScope, type Scoped } from "./scope";
+import {
+  inboxAt,
+  inventoriesAt,
+  issueAt,
+  streamsAt,
+  treeAt,
+  upgradesAt,
+  variantsAt,
+} from "./routes";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
 import { mayOf, signOut } from "./session";
@@ -56,9 +65,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const reportsAnywhere = who.reach.some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
   const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
-  const build = whole
-    ? `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}/variants/${encodeURIComponent(variant)}`
-    : "";
+  const build = whole ? { product, stream, variant } : undefined;
   const [uploading, setUploading] = useState(false);
   // On a narrow screen the rail is a panel that opens from a menu control. The
   // tab bar carries the three places somebody reviews and responds from , and
@@ -244,12 +251,17 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               unit="findings — an issue at a component, counted once per build"
               quiet
             />
-            <Rail to={`${build}/components`} icon="tree" label="Dependencies" needs={whole} />
-            <Rail to={`${build}/scans`} icon="scan" label="Inventories" needs={whole} />
+            <Rail to={build ? treeAt(build) : ""} icon="tree" label="Dependencies" needs={whole} />
+            <Rail
+              to={build ? inventoriesAt(build) : ""}
+              icon="scan"
+              label="Inventories"
+              needs={whole}
+            />
             {/* What this build is waiting on, which is the fix-bundle view read
               from the other end. */}
             <Rail
-              to={`${build}/pending-upgrades`}
+              to={build ? upgradesAt(build) : ""}
               icon="flag"
               label="Pending upgrades"
               needs={whole}
@@ -259,7 +271,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               picked because an inbox belongs to one. */}
             {reportsAnywhere && (
               <Rail
-                to={product ? `/products/${encodeURIComponent(product)}/inbox` : ""}
+                to={product ? inboxAt(product) : ""}
                 icon="letter"
                 label="Inbox"
                 needs={!!product && reportsHere}
@@ -305,7 +317,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               above, which is what that control is for. */}
             <Rail to="/products" end icon="box" label="Products" />
             <Rail
-              to={`/products/${encodeURIComponent(product ?? "")}/streams`}
+              to={streamsAt(product ?? "")}
               end
               icon="branch"
               label="Branches and tags"
@@ -313,7 +325,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               why="Pick a product first"
             />
             <Rail
-              to={`/products/${encodeURIComponent(product ?? "")}/variants`}
+              to={variantsAt(product ?? "")}
               icon="layers"
               label="Variants"
               needs={!!product}
@@ -557,7 +569,7 @@ function Search({ at }: { at: Scoped }) {
           .then((answer) => {
             setLooking(false);
             if (answer.data) {
-              navigate(`/issues/${encodeURIComponent(term)}`);
+              navigate(issueAt(term));
               return;
             }
             // Only a 404 means nobody here carries it. A 500 or a 503 is a

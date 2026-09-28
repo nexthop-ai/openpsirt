@@ -14,7 +14,8 @@ import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
-import { pathTo, usePaging } from "./list";
+import { usePaging } from "./list";
+import { findingAt } from "../app/routes";
 
 // One page of what somebody holds. The answer carries a total, so this is a
 // page rather than a cap and the footer pages through the rest.
@@ -391,7 +392,7 @@ function Held({
                 </td>
                 <td>
                   <Link
-                    to={pathTo(
+                    to={findingAt(
                       {
                         product: row.product ?? "",
                         stream: row.stream ?? "",

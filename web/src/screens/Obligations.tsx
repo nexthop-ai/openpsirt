@@ -12,6 +12,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { at, since } from "../ui/when";
+import { issueAt } from "../app/routes";
 
 // Every standing attack on a product, with the windows this deployment counts
 // from the moment each became known and the notices given.
@@ -89,7 +90,7 @@ function Incident({
   return (
     <div className="card">
       <h3>
-        <Link className="id" to={`/issues/${encodeURIComponent(incident.vulnerability ?? "")}`}>
+        <Link className="id" to={issueAt(incident.vulnerability ?? "")}>
           {incident.vulnerability}
         </Link>{" "}
         in {incident.product_name || incident.product}

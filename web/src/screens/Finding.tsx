@@ -32,7 +32,8 @@ import { Markdown } from "../ui/Markdown";
 import { Decide, said, type Recorded } from "../ui/Decide";
 import { useKept } from "../ui/Saved";
 import { Because } from "../ui/Outcome";
-import { fromAt, listQuery, pathTo, where, windowFor, withinVariant } from "./list";
+import { fromAt, listQuery, where, windowFor, withinVariant } from "./list";
+import { buildFindingsAt, componentAt, findingAt, issueAt, productFindingsAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
@@ -266,7 +267,7 @@ export function Finding() {
       if (!row) return null;
       return {
         row,
-        to: pathTo(
+        to: findingAt(
           {
             product,
             stream: row.stream || (list.get("stream") ?? ""),
@@ -462,14 +463,8 @@ export function Finding() {
   // them, because the build travels in the address like every other filter and
   // the list may have been across several.
   const back = walking
-    ? `/products/${encodeURIComponent(product)}/findings${from ? `?${from}` : ""}`
-    : `/products/${encodeURIComponent(product)}` +
-      `/streams/${encodeURIComponent(stream)}` +
-      `/variants/${encodeURIComponent(variant)}/findings`;
-  const build =
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}`;
+    ? productFindingsAt(product, from)
+    : buildFindingsAt({ product, stream, variant });
   const mine = (proposedBy: string) => !!who.data && proposedBy === who.data.identity;
 
   return (
@@ -506,12 +501,10 @@ export function Finding() {
           </div>
         )}
         <h2>
-          {/* The one screen that answers "everywhere this issue sits" had
-              almost no doors into it: an exact-match search, one report and
-              one queue link. The identifier a reader is already looking at is
-              the natural one. */}
+          {/* The identifier opens the screen that answers "everywhere this
+              issue sits", which is the question a reader looking at it asks. */}
           <Link
-            to={`/issues/${encodeURIComponent(it.vulnerability ?? "")}`}
+            to={issueAt(it.vulnerability ?? "")}
             className="id"
             title={`${it.vulnerability} everywhere it sits`}
           >
@@ -822,7 +815,7 @@ export function Finding() {
             <Link
               className="linkish id"
               title={`Open ${it.component}`}
-              to={`/products/${encodeURIComponent(product)}/components/${encodeURIComponent(it.component ?? "")}`}
+              to={componentAt(product, it.component ?? "", it.version, { stream, variant })}
             >
               {it.component} {it.version}
             </Link>
@@ -1255,7 +1248,7 @@ export function Finding() {
             the issue is and what upstream did before they want the walk down
             to it. */}
         <div className="card">
-          <Places places={places} build={build} version={it.version} />
+          <Places places={places} build={{ product, stream, variant }} version={it.version} />
         </div>
 
         {/* Who has been let into this one case. Only where it is

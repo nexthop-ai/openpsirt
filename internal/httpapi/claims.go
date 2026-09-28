@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -18,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // ClaimApprovalBody is the body of an approval.
@@ -82,7 +81,7 @@ func registerClaims(api huma.API, in Ingest) {
 			tell(ctx, in, "could not say that rows were set aside", notify.Telling{
 				PersonID: done.Returned.ProposedBy, Kind: notify.SentBack,
 				Body: "Part of a claim of yours was set aside: " + input.Body.Because,
-				Link: "/review-queue",
+				Link: weblink.ReviewQueue(),
 				// A claim covers many findings and this path
 				// holds the claim rather than any of them, so
 				// the disclosure of any one of them cannot be
@@ -131,11 +130,11 @@ func registerClaims(api huma.API, in Ingest) {
 		// review queue lists what waits on an approver and leaves out what
 		// waits on its author. The decision itself stands in where no open
 		// finding the sender may read describes it any more.
-		link := "/decisions/" + strconv.FormatInt(back.Decision.ID, 10)
+		link := weblink.Decision(back.Decision.ID)
 		if described, err := store.Describe(ctx, subject, []triage.Decision{back.Decision}); err == nil {
 			if d, ok := described[back.Decision.ID]; ok {
-				link = findingPath(d.Product, d.Stream, d.Variant,
-					d.Issue.Identifier, d.Component) + "?version=" + url.QueryEscape(d.Version)
+				link = weblink.Finding(d.Product, d.Stream, d.Variant,
+					d.Issue.Identifier, d.Component, d.Version)
 			}
 		} else if err != nil {
 			in.logger().Error("could not say which finding a sent-back claim is about",

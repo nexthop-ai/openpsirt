@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Link } from "react-router-dom";
+import { streamAt, streamsAt } from "../app/routes";
 
 // The place you are in, and the way back up. A screen bound to one build says
 // which build that is on the screen rather than only in the address bar.
@@ -14,7 +15,6 @@ export function Crumbs({
   stream?: string;
   variant?: string;
 }) {
-  const at = `/products/${encodeURIComponent(product)}`;
   return (
     <nav
       aria-label="Breadcrumb"
@@ -25,7 +25,7 @@ export function Crumbs({
       </Link>
       <span aria-hidden>/</span>
       {stream ? (
-        <Link to={`${at}/streams`} className="hover:text-[var(--ink)]">
+        <Link to={streamsAt(product)} className="hover:text-[var(--ink)]">
           {product}
         </Link>
       ) : (
@@ -35,10 +35,7 @@ export function Crumbs({
         <>
           <span aria-hidden>/</span>
           {variant ? (
-            <Link
-              to={`${at}/streams/${encodeURIComponent(stream)}`}
-              className="hover:text-[var(--ink)]"
-            >
+            <Link to={streamAt(product, stream)} className="hover:text-[var(--ink)]">
               {stream}
             </Link>
           ) : (

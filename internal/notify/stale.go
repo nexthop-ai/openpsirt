@@ -6,7 +6,6 @@ package notify
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Work that has stopped moving.
@@ -111,7 +111,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 			Body: fmt.Sprintf("A claim in %s has been waiting %s for a second person. "+
 				"It covers %s and takes effect only once somebody agrees to it.",
 				row.Product, plainly(days), rowsWritten(row.Rows)),
-			Link:    "/review-queue",
+			Link:    weblink.ReviewQueue(),
 			Private: private,
 			// A claim is one product and, in bulk, many issues, so it names
 			// the product and no single issue.
@@ -189,8 +189,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 				"second person. It takes effect only once somebody agrees to it.",
 				row.Product, reports, strings.ReplaceAll(row.Disposition, "-", " "),
 				plainly(days)),
-			Link: fmt.Sprintf("/products/%s/inbox?waiting=1",
-				url.PathEscape(row.Product)),
+			Link: weblink.InboxWaiting(row.Product),
 			// A claim nobody has agreed to set aside is one nobody has
 			// decided is safe to repeat.
 			Private:   true,
@@ -280,7 +279,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 			Body: fmt.Sprintf("A claim of yours in %s was sent back %s ago and has not "+
 				"been revised. It applies to nothing until it is.",
 				row.Product, plainly(days)),
-			Link:      "/review-queue?mine=1",
+			Link:      weblink.ReviewQueueMine(),
 			Private:   private,
 			ProductID: &row.ProductID,
 		})
@@ -366,7 +365,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 			Body: fmt.Sprintf("A deferral of yours in %s ends on %s, covering %s. "+
 				"On that date it stops applying and the finding is open again.",
 				row.Product, row.Until.Format(time.DateOnly), rowsWritten(row.Places)),
-			Link:      "/review-queue?mine=1",
+			Link:      weblink.ReviewQueueMine(),
 			Private:   private,
 			ProductID: &row.ProductID,
 		})
@@ -483,7 +482,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken. "+
 				"Work in a queue is held by nobody until somebody picks it up.",
 				row.Team, itemsWaiting(row.Waiting), row.Product),
-			Link:      fmt.Sprintf("/work?tab=people&team=%s", url.QueryEscape(row.TeamName)),
+			Link:      weblink.WorkTeam(row.TeamName),
 			Private:   private,
 			ProductID: &row.ProductID,
 			TeamID:    &row.TeamID,
@@ -585,8 +584,7 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Identifier, row.Product, when),
-			Link: fmt.Sprintf("/products/%s/findings?q=%s",
-				url.PathEscape(row.Product), url.QueryEscape(row.Identifier)),
+			Link:    weblink.ProductFindings(row.Product, row.Identifier),
 			Private: row.Undisclosed,
 			// One issue, so a collaborator brought onto that case keeps
 			// reading it after the pass that wrote it.
@@ -602,8 +600,7 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
-			holds.Link = fmt.Sprintf("/products/%s/inbox/%s",
-				url.PathEscape(row.Product), url.PathEscape(row.Reference))
+			holds.Link = weblink.InboxReport(row.Product, row.Reference)
 			holds.VulnerabilityID = nil
 		}
 		for personID, per := range reach {

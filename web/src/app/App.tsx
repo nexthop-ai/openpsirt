@@ -10,6 +10,7 @@ import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
 import { retrying } from "./retrying";
+import { ROUTES } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
@@ -69,63 +70,6 @@ const Stream = retrying(() => import("../screens/Stream").then((m) => m.Stream))
 const Advisories = retrying(() => import("../screens/Advisories").then((m) => m.Advisories));
 const Advisory = retrying(() => import("../screens/Advisory").then((m) => m.Advisory));
 const VEX = retrying(() => import("../screens/VEX").then((m) => m.VEX));
-
-const build = "/products/:product/streams/:stream/variants/:variant";
-
-// Every address this application answers, as the patterns the router matches.
-//
-// Named and read by the routes below rather than written only in the JSX, so
-// that something other than a person clicking can ask whether an address built
-// by hand elsewhere resolves to a screen. Eight entries in the report catalog
-// compose an address from a scope and nothing pinned any of them against the
-// router — a report leading nowhere redirects to the front page, silently.
-export const ROUTES = {
-  home: "/",
-  reviewQueue: "/review-queue",
-  unassigned: "/unassigned",
-  findings: "/findings",
-  claim: "/claims/:id",
-  decision: "/decisions/:id",
-  issue: "/issues/:vulnerability",
-  products: "/products",
-  product: "/products/:product",
-  streams: "/products/:product/streams",
-  stream: "/products/:product/streams/:stream",
-  variants: "/products/:product/variants",
-  productFindings: "/products/:product/findings",
-  productComponent: "/products/:product/components/:component",
-  buildFindings: `${build}/findings`,
-  finding: `${build}/findings/:vulnerability/components/:component`,
-  tree: `${build}/components`,
-  decide: `${build}/components/:component/decide`,
-  inventories: `${build}/scans`,
-  inventoryChanges: `${build}/scans/:scan/changes`,
-  run: `${build}/runs/:run`,
-  upgrades: `${build}/pending-upgrades`,
-  matchCoverage: `${build}/match-coverage`,
-  vex: `${build}/vex`,
-  comparison: "/products/:product/comparison",
-  inventoryComparison: "/products/:product/comparison/inventory",
-  inbox: "/products/:product/inbox",
-  inboxReport: "/products/:product/inbox/:reference",
-  me: "/me",
-  people: "/people",
-  person: "/people/:identity",
-  teams: "/teams",
-  work: "/work",
-  audit: "/audit",
-  reports: "/reports",
-  report: "/reports/:report",
-  record: "/record",
-  disclosing: "/disclosing",
-  obligations: "/obligations",
-  advisories: "/advisories",
-  advisory: "/advisories/:advisory",
-  autoAssignment: "/auto-assignment",
-  settings: "/settings",
-  settingsSection: "/settings/:section",
-  system: "/system",
-} as const;
 
 export function App() {
   const who = useWho();

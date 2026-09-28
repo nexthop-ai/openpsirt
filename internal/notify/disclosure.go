@@ -6,13 +6,13 @@ package notify
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // The conditions about findings rather than about the tool.
@@ -129,7 +129,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 				"and a standing decision was made after reading the old statement. "+
 				"The decision stands; somebody should look.",
 				row.Publisher, row.Vulnerability, row.Product),
-			Link:            fmt.Sprintf("/decisions/%d", row.DecisionID),
+			Link:            weblink.Decision(row.DecisionID),
 			Private:         private,
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
@@ -249,11 +249,8 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 			About: identify(about, row.Product, row.Stream, row.Variant,
 				row.Vulnerability, row.Component),
 			Body: body,
-			Link: "/products/" + url.PathEscape(row.Product) +
-				"/streams/" + url.PathEscape(row.Stream) +
-				"/variants/" + url.PathEscape(row.Variant) +
-				"/findings/" + url.PathEscape(row.Vulnerability) +
-				"/components/" + url.PathEscape(row.Component),
+			Link: weblink.Finding(row.Product, row.Stream, row.Variant,
+				row.Vulnerability, row.Component, ""),
 			// Every one of these is about a finding nobody has
 			// announced — that is what an embargo is — so what
 			// leaves this deployment about it is a link and

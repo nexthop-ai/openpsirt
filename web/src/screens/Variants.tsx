@@ -9,7 +9,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
-import { buildPath } from "./list";
+import { buildFindingsAt } from "../app/routes";
 import { AddButton, Declare, FacingField, Field } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
@@ -180,7 +180,7 @@ export function Variants() {
                   <td className="rowacts">
                     {stream ? (
                       <Link
-                        to={`${buildPath({ product, stream, variant: variant.name ?? "" })}/findings`}
+                        to={buildFindingsAt({ product, stream, variant: variant.name ?? "" })}
                         className="linkish"
                       >
                         Findings →

@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -21,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // betweenSweeps is how often the conditions are re-derived.
@@ -359,9 +359,8 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 				row.Vulnerability, row.Component),
 			Body: fmt.Sprintf("%s %s and is open against %s, which has been released. Nothing has been decided about it.",
 				row.Vulnerability, why, where),
-			Link: fmt.Sprintf("/products/%s/streams/%s/variants/%s/findings/%s/components/%s",
-				url.PathEscape(row.Product), url.PathEscape(row.Stream), url.PathEscape(row.Variant),
-				url.PathEscape(row.Vulnerability), url.PathEscape(row.Component)),
+			Link: weblink.Finding(row.Product, row.Stream, row.Variant,
+				row.Vulnerability, row.Component, ""),
 			Private:         private,
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
@@ -450,9 +449,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			// read are in the body.
 			About: identify("quiet", row.Product, row.Stream, row.Variant),
 			Body:  body,
-			Link: "/products/" + url.PathEscape(row.Product) +
-				"/streams/" + url.PathEscape(row.Stream) +
-				"/variants/" + url.PathEscape(row.Variant) + "/scans",
+			Link:  weblink.Inventories(row.Product, row.Stream, row.Variant),
 		})
 	}
 	return holding, nil
@@ -611,7 +608,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 			// every time somebody assigned them anything.
 			About: identify("person:" + row.Identity),
 			Body:  body,
-			Link:  "/work?tab=people&person=" + url.QueryEscape(row.Identity),
+			Link:  weblink.WorkPerson(row.Identity),
 		})
 	}
 	return holding, nil

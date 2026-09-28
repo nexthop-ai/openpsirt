@@ -12,6 +12,7 @@ import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 import { apiBuildPath } from "./list";
 import { own } from "../ui/own";
+import { claimAt } from "../app/routes";
 
 // A promise's state, said in words rather than left to a color.
 const STANDING: Record<string, string> = {
@@ -118,7 +119,7 @@ export function Upgrades() {
                           decision is one claim about one issue at one place,
                           so clicking one would answer about a single CVE. */}
                       {row.claim_id ? (
-                        <Link to={`/claims/${row.claim_id}`} className="linkish id">
+                        <Link to={claimAt(row.claim_id)} className="linkish id">
                           {row.upstream}
                         </Link>
                       ) : (

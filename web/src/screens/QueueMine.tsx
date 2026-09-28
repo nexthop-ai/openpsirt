@@ -14,7 +14,7 @@ import { Loading } from "../ui/Loading";
 import { Because } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
-import { pathTo } from "./list";
+import { findingAt } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
 
 // The fate of what you proposed.
@@ -95,7 +95,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         <td>
           {row.finding ? (
             <Link
-              to={pathTo(
+              to={findingAt(
                 {
                   product: row.finding.product ?? "",
                   stream: row.finding.stream ?? "",

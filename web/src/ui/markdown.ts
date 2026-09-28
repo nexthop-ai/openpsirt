@@ -3,6 +3,7 @@
 
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
+import { issueAt } from "../app/routes";
 
 // The API returns no markup, so this carries the half of the policy that
 // travels with rendering (DESIGN-text.md). The other half — what may be submitted at all, which links survive, what a
@@ -160,7 +161,7 @@ const ISSUE = /^issue:([A-Za-z][A-Za-z0-9._-]{2,63})$/;
 // The page an issue is read on. A page of this deployment, so it keeps its
 // href and the router follows it without a reload.
 function issuePath(identifier: string): string {
-  return `/issues/${encodeURIComponent(identifier)}`;
+  return issueAt(identifier);
 }
 
 // The address one is actually fetched from. Same origin, so the content

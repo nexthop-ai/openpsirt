@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // The conditions about an attack somebody outside may be waiting to hear of.
@@ -113,7 +114,7 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 					"known, %s %s. No notice outside is recorded against it.",
 					one.Issue, one.ProductName, due.Window.Name, verb,
 					due.EndsAt.Format("2006-01-02 15:04 MST")),
-				Link:            "/obligations",
+				Link:            weblink.Obligations(),
 				Private:         one.Private,
 				ProductID:       &one.Record.ProductID,
 				VulnerabilityID: &one.Record.VulnerabilityID,

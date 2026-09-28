@@ -22,6 +22,7 @@ import { on } from "../ui/when";
 import { standing } from "./inbox";
 import { RuleForm, RulingCard } from "./InboxRuling";
 import { Attached } from "../ui/Attached";
+import { inboxAt, issueAt, recordAt } from "../app/routes";
 
 // One report: what was claimed, who sent it, whether they were answered, what
 // arrived with it, and what it was judged to be.
@@ -37,7 +38,7 @@ export function InboxReport() {
     return <Failed error={report.error} what="That vulnerability report could not be read." />;
   const it = report.data;
   const stands = standing(it);
-  const inbox = `/products/${encodeURIComponent(product)}/inbox`;
+  const inbox = inboxAt(product);
 
   return (
     <div>
@@ -49,7 +50,7 @@ export function InboxReport() {
           {it.issue && (
             <>
               {" "}
-              <Link className="id" to={`/issues/${encodeURIComponent(it.issue)}`}>
+              <Link className="id" to={issueAt(it.issue)}>
                 {it.issue}
               </Link>
             </>
@@ -113,7 +114,7 @@ export function InboxReport() {
         {it.disposition === "accepted" ? (
           <p className="reading">
             Accepted as{" "}
-            <Link className="id" to={`/issues/${encodeURIComponent(it.issue ?? "")}`}>
+            <Link className="id" to={issueAt(it.issue ?? "")}>
               {it.issue}
             </Link>
             {it.evaluated_by && (
@@ -150,10 +151,7 @@ function Judge({ product, reference }: { product: string; reference: string }) {
   return (
     <>
       <div className="actions" style={{ marginBottom: 12 }}>
-        <Link
-          className="btn"
-          to={`/record?product=${encodeURIComponent(product)}&from=${encodeURIComponent(reference)}`}
-        >
+        <Link className="btn" to={recordAt(product, reference)}>
           Record as a new flaw
         </Link>
       </div>

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -19,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // EmbargoedBody is one finding nobody has announced, and when that ends.
@@ -724,8 +724,7 @@ func toldDisclosed(ctx context.Context, in Ingest, store *finding.Store,
 			PersonID: person, Kind: notify.Disclosed,
 			Body: told.Vulnerability + " is disclosed in " + told.Product +
 				". Its findings, decisions and comments are public.",
-			Link: "/products/" + url.PathEscape(told.Product) +
-				"/findings?q=" + url.QueryEscape(told.Vulnerability),
+			Link:            weblink.ProductFindings(told.Product, told.Vulnerability),
 			ProductID:       &product,
 			VulnerabilityID: &issue,
 		}, "issue", told.Vulnerability)

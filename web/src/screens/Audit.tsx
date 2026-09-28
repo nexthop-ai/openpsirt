@@ -20,6 +20,7 @@ import { Wide } from "../ui/Wide";
 import { calendarDay, coveringPeriod, endExclusive, stated } from "./reports/Window";
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
+import { decisionAt } from "../app/routes";
 
 // The share of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -572,7 +573,7 @@ function Judgment({ row }: { row: Judged }) {
         {/* A row that names a judgment and cannot be opened is one an auditor
             reads and then hunts for by hand. It prints as its own text, so the
             paper record is unchanged. */}
-        <Link className="id" to={`/decisions/${row.id}`}>
+        <Link className="id" to={decisionAt(row.id)}>
           {row.issue}
         </Link>
         <span className={`claimed ${row.outcome}`}>

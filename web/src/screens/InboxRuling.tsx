@@ -22,6 +22,7 @@ import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { on } from "../ui/when";
 import { dispositionSaid, needsReason, needsSecond, RULABLE, ready } from "./inbox";
+import { inboxAt, inboxReportAt, issueAt } from "../app/routes";
 
 // Saying what one or more reports are, where the answer is not an issue here.
 //
@@ -153,7 +154,6 @@ export function RulingCard({
   // other: an approver who reads undisclosed work may agree and may not send
   // a ruling back, which is working the reports.
   const may = mayOf(useWho().data, product);
-  const at = `/products/${encodeURIComponent(product)}/inbox`;
   const state =
     ruling.state === "waiting"
       ? { said: "Waiting for approval", tone: "waiting" }
@@ -166,7 +166,7 @@ export function RulingCard({
       <p style={{ margin: 0 }}>
         {named && (
           <>
-            <Link to={`/products/${encodeURIComponent(product)}/inbox`}>{product}</Link> ·{" "}
+            <Link to={inboxAt(product)}>{product}</Link> ·{" "}
           </>
         )}
         <b>{dispositionSaid(ruling.disposition)}</b>{" "}
@@ -175,7 +175,7 @@ export function RulingCard({
           <>
             {" "}
             · of{" "}
-            <Link className="id" to={`/issues/${encodeURIComponent(ruling.duplicate_of)}`}>
+            <Link className="id" to={issueAt(ruling.duplicate_of)}>
               {ruling.duplicate_of}
             </Link>
           </>
@@ -200,7 +200,7 @@ export function RulingCard({
       {ruling.reasoning && <Markdown source={ruling.reasoning} className="reading" />}
       <p style={{ margin: "6px 0 0", display: "flex", flexWrap: "wrap", gap: 6 }}>
         {(ruling.reports ?? []).map((reference) => (
-          <Link key={reference} className="id" to={`${at}/${encodeURIComponent(reference)}`}>
+          <Link key={reference} className="id" to={inboxReportAt(product, reference)}>
             {reference}
           </Link>
         ))}

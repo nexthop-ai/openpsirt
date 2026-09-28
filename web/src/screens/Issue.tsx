@@ -14,6 +14,7 @@ import { IssueAdvisory } from "./IssueAdvisory";
 import { IssueNotes } from "./FindingNotes";
 import { useWho } from "../app/session";
 import { Wide } from "../ui/Wide";
+import { findingAt } from "../app/routes";
 
 // One issue, everywhere it sits.
 //
@@ -168,14 +169,14 @@ export function Issue() {
                   </td>
                   <td>
                     <Link
-                      to={
-                        `/products/${encodeURIComponent(row.product ?? "")}` +
-                        `/streams/${encodeURIComponent(row.stream ?? "")}` +
-                        `/variants/${encodeURIComponent(row.variant ?? "")}` +
-                        `/findings/${encodeURIComponent(it?.vulnerability ?? "")}` +
-                        `/components/${encodeURIComponent(row.component ?? "")}` +
-                        (row.version ? `?version=${encodeURIComponent(row.version)}` : "")
-                      }
+                      to={findingAt(
+                        {
+                          product: row.product ?? "",
+                          stream: row.stream ?? "",
+                          variant: row.variant ?? "",
+                        },
+                        { ...row, vulnerability: it?.vulnerability },
+                      )}
                       className="id"
                     >
                       {row.component}

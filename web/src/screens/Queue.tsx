@@ -12,7 +12,8 @@ import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { UNOWNED_LIST, usePaging, pathTo } from "./list";
+import { UNOWNED_LIST, usePaging } from "./list";
+import { claimAt, decisionAt, findingAt, issueAt } from "../app/routes";
 import { unwrap } from "../api/queries";
 import { claimOf, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
@@ -581,7 +582,7 @@ function Stopped({ row }: { row: Standing }) {
   return (
     <article className="qcard lapsedcard">
       <header>
-        <Link to={`/decisions/${it?.id}`} className="id linkish">
+        <Link to={decisionAt(it?.id ?? 0)} className="id linkish">
           {row.place?.vulnerability}
         </Link>
         <span style={{ color: "var(--muted)" }}>
@@ -624,7 +625,7 @@ function Stopped({ row }: { row: Standing }) {
         {/* The claim, where the whole-act control is, rather than the row.
             A lapsed claim is re-made once however many places it covered. */}
         <Link
-          to={lapsed && it?.claim_id ? `/claims/${it.claim_id}` : `/decisions/${it?.id}`}
+          to={lapsed && it?.claim_id ? claimAt(it.claim_id) : decisionAt(it?.id ?? 0)}
           className="btn ghost"
         >
           {lapsed && it?.claim_id ? "Open the claim →" : "Open the decision →"}
@@ -706,7 +707,7 @@ function Card({
         {f?.exploited && <Exploited when />}
         {/* The issue opens its finding, which carries everything an approver
             could want; the decision record is one link further, from there. */}
-        <Link to={f ? findingPath(f) : `/decisions/${claim.decisionId}`} className="linkish id">
+        <Link to={f ? findingPath(f) : decisionAt(claim.decisionId)} className="linkish id">
           {claim.title}
         </Link>
         {/* What is being claimed, in its own right rather than as the fifth
@@ -896,7 +897,7 @@ function Card({
                     This claim says <b>{called(claim.outcome)}</b>.
                   </>
                 )}{" "}
-                <Link to={`/issues/${encodeURIComponent(claim.title)}`} className="linkish">
+                <Link to={issueAt(claim.title)} className="linkish">
                   Everywhere it sits →
                 </Link>
               </li>
@@ -1066,7 +1067,7 @@ function findingPath(f: {
   ecosystem?: string;
   namespace?: string;
 }): string {
-  return pathTo(
+  return findingAt(
     { product: f.product ?? "", stream: f.stream ?? "", variant: f.variant ?? "" },
     {
       vulnerability: f.vulnerability ?? "",

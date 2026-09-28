@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Link } from "react-router-dom";
+import { remember } from "../app/scope";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -10,6 +11,7 @@ import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { BANDS } from "../ui/severities";
 import { Wide } from "../ui/Wide";
+import { buildFindingsAt, comparisonAt, reportAt, streamsAt, treeAt, vexAt } from "../app/routes";
 
 // One release, gathered.
 //
@@ -103,8 +105,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           {here.parent && (
             <>
               {" "}
-              · cut from{" "}
-              <Link to={`/products/${encodeURIComponent(product)}/streams`}>{here.parent}</Link>
+              · cut from <Link to={streamsAt(product)}>{here.parent}</Link>
             </>
           )}
           {here.end_of_life && <> · support ends {here.end_of_life}</>}
@@ -134,10 +135,7 @@ export function Release({ product, stream }: { product: string; stream: string }
               </thead>
               <tbody>
                 {variants.map((variant, at_) => {
-                  const at =
-                    `/products/${encodeURIComponent(product)}` +
-                    `/streams/${encodeURIComponent(stream)}` +
-                    `/variants/${encodeURIComponent(variant.name ?? "")}`;
+                  const at = { product, stream, variant: variant.name ?? "" };
                   // Off the same answer the severity split below is added
                   // from, rather than off the variant list: that endpoint
                   // lists what a release was built as and never fills the
@@ -146,7 +144,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                   return (
                     <tr key={variant.name}>
                       <td className="id">
-                        <Link to={`${at}/findings`}>{variant.name}</Link>
+                        <Link to={buildFindingsAt(at)}>{variant.name}</Link>
                       </td>
                       <td>
                         {counts[at_]?.isPending ? (
@@ -159,7 +157,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                       </td>
                       <td>{variant.customer_facing === false ? "No" : "Yes"}</td>
                       <td>
-                        <Link className="linkish" to={`${at}/components`}>
+                        <Link className="linkish" to={treeAt(at)}>
                           Dependencies
                         </Link>
                       </td>
@@ -217,13 +215,7 @@ export function Release({ product, stream }: { product: string; stream: string }
             <p className="hint" style={{ marginTop: 0 }}>
               Against <b>{previous.name}</b>, the previous release.
             </p>
-            <Link
-              to={
-                `/products/${encodeURIComponent(product)}/comparison` +
-                `?from=${encodeURIComponent(previous.name ?? "")}` +
-                `&to=${encodeURIComponent(stream)}`
-              }
-            >
+            <Link to={comparisonAt(product, { from: previous.name ?? "", to: stream })}>
               Compare {previous.name} with {stream}
             </Link>
           </>
@@ -243,13 +235,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           <li>
             <div>
               {previous ? (
-                <Link
-                  to={
-                    `/products/${encodeURIComponent(product)}/comparison` +
-                    `?from=${encodeURIComponent(previous.name ?? "")}` +
-                    `&to=${encodeURIComponent(stream)}`
-                  }
-                >
+                <Link to={comparisonAt(product, { from: previous.name ?? "", to: stream })}>
                   The release note
                 </Link>
               ) : (
@@ -272,13 +258,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           {variants.map((variant) => (
             <li key={`vex-${variant.name}`}>
               <div>
-                <Link
-                  to={
-                    `/products/${encodeURIComponent(product)}` +
-                    `/streams/${encodeURIComponent(stream)}` +
-                    `/variants/${encodeURIComponent(variant.name ?? "")}/vex`
-                  }
-                >
+                <Link to={vexAt({ product, stream, variant: variant.name ?? "" })}>
                   VEX document · {variant.name}
                 </Link>
               </div>
@@ -300,12 +280,11 @@ export function Release({ product, stream }: { product: string; stream: string }
           {variants.map((variant) => (
             <li key={`register-${variant.name}`}>
               <div>
+                {/* The register answers for the build the picker holds, so
+                    the link picks this one on its way there. */}
                 <Link
-                  to={
-                    `/reports/disposition-register?product=${encodeURIComponent(product)}` +
-                    `&stream=${encodeURIComponent(stream)}` +
-                    `&variant=${encodeURIComponent(variant.name ?? "")}`
-                  }
+                  to={reportAt("disposition-register")}
+                  onClick={() => remember({ product, stream, variant: variant.name ?? "" })}
                 >
                   Disposition register · {variant.name}
                 </Link>

@@ -15,6 +15,7 @@ import { Wide } from "../ui/Wide";
 import { own } from "../ui/own";
 import { exportAt } from "../api/exports";
 import { apiBuildPath } from "./list";
+import { componentAt } from "../app/routes";
 
 const PAGE = 200;
 
@@ -145,7 +146,7 @@ export function MatchCoverage() {
                   >
                     <td>
                       <Link
-                        to={`/products/${encodeURIComponent(product)}/components/${encodeURIComponent(row.name)}`}
+                        to={componentAt(product, row.name, row.version, { stream, variant })}
                         className="linkish"
                       >
                         {row.name}

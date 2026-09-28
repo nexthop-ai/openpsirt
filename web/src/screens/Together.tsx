@@ -27,6 +27,7 @@ import {
 import { needsJustification as statesReason } from "../ui/outcomes";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
+import { decisionAt, issueAt } from "../app/routes";
 
 // A page of issues at one component. A kernel carries thousands, and a list
 // drawn as if it were all of them says "select all" against a number that is
@@ -353,7 +354,7 @@ export function Together() {
                           <Severity word={issue.severity} />
                         </td>
                         <td>
-                          <Link to={`/issues/${encodeURIComponent(name)}`} className="id">
+                          <Link to={issueAt(name)} className="id">
                             {name}
                           </Link>{" "}
                           <ExploitedHere when={issue.exploited_here} />{" "}
@@ -578,7 +579,7 @@ function Claim({
               {skipped.map((each) => (
                 <li key={`${each.vulnerability} ${each.place}`}>
                   {each.vulnerability} at <span className="id">{each.place}</span> —{" "}
-                  <Link to={`/decisions/${each.decision}`} className="linkish">
+                  <Link to={decisionAt(each.decision)} className="linkish">
                     decision {each.decision}
                   </Link>{" "}
                   ({each.state})

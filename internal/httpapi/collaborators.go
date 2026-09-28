@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // CollaboratorBody is one person brought into one case.
@@ -147,7 +148,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				Body: "You have been brought into " + input.Vulnerability + " in " +
 					input.Product + ". You can read and argue about that issue there, " +
 					"and nothing else of that product.",
-				Link:    "/products/" + input.Product + "/findings?q=" + input.Vulnerability,
+				Link:    weblink.ProductFindings(input.Product, input.Vulnerability),
 				Private: true,
 				// The pair the case grant itself is, so the
 				// person being brought in can read the line

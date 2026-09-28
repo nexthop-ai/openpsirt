@@ -12,7 +12,6 @@ import {
   identityOf,
   listQuery,
   pageSize,
-  pathTo,
   where,
   widened,
   windowFor,
@@ -230,57 +229,6 @@ describe("the filters as the server takes them", () => {
   it("leaves out a build the address does not name", () => {
     expect(where(new URLSearchParams("stream=main"))).toEqual({ stream: "main" });
     expect(where(new URLSearchParams())).toEqual({});
-  });
-});
-
-describe("where a row opens", () => {
-  it("carries the version, because a component name is not unique in a build", () => {
-    expect(
-      pathTo(
-        { product: "sonic", stream: "main", variant: "broadcom" },
-        {
-          vulnerability: "CVE-2024-1",
-          component: "zlib",
-          version: "1.2.11",
-        },
-      ),
-    ).toBe(
-      "/products/sonic/streams/main/variants/broadcom/findings/CVE-2024-1/components/zlib?version=1.2.11",
-    );
-  });
-
-  it("carries the list as one value, so a filter added to the list needs nothing here", () => {
-    const at = pathTo(
-      { product: "sonic", stream: "main", variant: "broadcom" },
-      { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
-      "state=undecided&offset=50",
-    );
-    const asked = new URLSearchParams(at.split("?")[1]);
-    expect(asked.get("from")).toBe("state=undecided&offset=50");
-    expect(asked.has("version")).toBe(false);
-  });
-
-  // A rule prepares a claim and a person proposes it, so what travels to the
-  // finding is which filter was picked. The name rather than the words: the
-  // filter decides what it says, and a copy in the address would go stale the
-  // moment somebody saved over the name.
-  it("names the saved filter a prepared claim comes from", () => {
-    const at = pathTo(
-      { product: "sonic", stream: "main", variant: "broadcom" },
-      { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
-      "state=undecided",
-      "overdue kernel",
-    );
-    expect(new URLSearchParams(at.split("?")[1]).get("rule")).toBe("overdue kernel");
-  });
-
-  it("says nothing about a rule where no filter prepares one", () => {
-    const at = pathTo(
-      { product: "sonic", stream: "main", variant: "broadcom" },
-      { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
-      "",
-    );
-    expect(new URLSearchParams(at.split("?")[1]).has("rule")).toBe(false);
   });
 });
 

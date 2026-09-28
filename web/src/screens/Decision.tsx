@@ -16,6 +16,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
+import { claimAt } from "../app/routes";
 
 export function Decision() {
   const { id: raw = "" } = useParams();
@@ -37,5 +38,5 @@ export function Decision() {
   // Replaced rather than pushed: the decision's address is a way in, not a
   // step somebody took, and leaving it in the history sends Back through it
   // again.
-  return <Navigate to={`/claims/${claim}`} replace />;
+  return <Navigate to={claimAt(claim)} replace />;
 }

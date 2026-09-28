@@ -16,6 +16,7 @@ import { Failed } from "../ui/Failed";
 import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
+import { settingsAt } from "../app/routes";
 
 // The decisions this deployment has made for everybody in it, one section at a
 // time. The section a setting belongs to, its title and what it decides are
@@ -62,7 +63,7 @@ export function Settings({ who }: { who: Who }) {
         {tabs.map(([key, name]) => (
           <Link
             key={key}
-            to={`/settings/${key}`}
+            to={settingsAt(key)}
             className="tab2"
             aria-selected={tab === key}
             aria-current={tab === key ? "page" : undefined}

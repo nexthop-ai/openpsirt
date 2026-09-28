@@ -25,6 +25,7 @@ import { Markdown } from "../ui/Markdown";
 import { EditPiece, Thread } from "../ui/Thread";
 import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
+import { decisionAt } from "../app/routes";
 
 type Detail = Body<"DecisionDetail">;
 
@@ -680,7 +681,7 @@ function Prior({
             Reuse this reasoning
           </button>
         )}
-        <Link to={`/decisions/${item.id}`} className="linkish">
+        <Link to={decisionAt(item.id)} className="linkish">
           Open #{item.id} →
         </Link>
       </div>

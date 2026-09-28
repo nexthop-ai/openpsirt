@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // mentionTarget is the subject of a piece of text, for deciding who may be
@@ -81,7 +82,7 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 		VulnerabilityID: rows[0].VulnerabilityID,
 		Visibility:      rows[0].Visibility,
 		About:           rows[0].PlaceIdentity[:min(8, len(rows[0].PlaceIdentity))],
-	}, body, fmt.Sprintf("/claims/%d", claimID))
+	}, body, weblink.Claim(claimID))
 	if err != nil {
 		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
 	}

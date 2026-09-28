@@ -9,6 +9,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Events and conditions](#events-and-conditions)
 - [Triggers and kinds](#triggers-and-kinds)
 - [The in-application area](#the-in-application-area)
+- [Links](#links)
 - [Mentions](#mentions)
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
 - [An inventory that moved sharply](#an-inventory-that-moved-sharply)
@@ -95,6 +96,18 @@ would otherwise have every operational alert sent into a void.
 Everyone has one. A triager sees work arriving, a proposer sees a claim sent
 back, an approver sees what waits on them, an administrator sees that the tool
 itself is unwell. What differs by role is the content, not the mechanism.
+
+## Links
+
+Every notification carries a link into the interface. The server builds each
+one in a single package, one function per destination.
+
+| Rule | |
+|---|---|
+| Built in one place | An address spelled by hand elsewhere in the server is a test failure. A link built by hand is the link nothing holds to the interface's routes |
+| Held to the interface's route table | Every builder is called with names holding every separator an address has, and each result is matched against the table the interface's router is built from, query parameters included (`DESIGN-interface.md` § The route table). A builder added without a sample fails the same test |
+| Each part escaped for where it lands | A path segment escaped as one, a query value as one. A product or issue name holding a slash otherwise opens a screen about something else |
+| A private notification's message carries the front page | The rule in § Outbound content. The front page's address comes from the same package |
 
 ## Mentions
 
