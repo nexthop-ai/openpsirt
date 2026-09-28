@@ -143,6 +143,13 @@ and never arriving.
 | The flaw was seen before upstream released anything | **The fix.** Counting from the sighting sets a deadline against a version that did not exist, which is the common case for an inventory made of distribution packages |
 | The issue became exploited later | The learning. Counted from the opening, an issue exploited after six months lands three days before anybody knew |
 
+Exploitation is learned on the date the known-exploited catalog added the
+issue, bounded by the moment of the scan, the same bound a fix's date takes.
+The days before a scan sees a listing are the pipeline's lag, and they do not
+extend the window. A finding opened after the listing still counts from its
+opening, because the latest moment wins. Not built: the moment a scan first
+saw the listing stands in for the catalog's date, which is not read.
+
 The same rule governs every writer. A scan counts it per finding, and an edited
 window rewrites every open deadline as three passes, one per moment, each over
 the rows for which that moment is the latest. A fix dated later than the

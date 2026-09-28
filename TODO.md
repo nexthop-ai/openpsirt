@@ -75,6 +75,7 @@ Missing or wrong, with no decision needed to fix it.
 | No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
 | A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
 | Patch branches cannot clone through an outbound HTTP proxy | The fetcher connects directly, so a network with no direct route out fetches nothing |
+| The exploitation clock starts when a scan sees the catalog listing | The catalog's own date for the issue is not read, so the pipeline's lag counts against the window |
 
 ## Weak tests
 
@@ -93,7 +94,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Count the exploitation clock from the catalog's date? | The clock starts when a scan learns an issue is exploited. The catalog states the date it added the issue, and nothing reads it |
 | Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |
 | Keep the screen's short list of weakness names? | The screen shows a short list in plain words. Published advisories use the full CWE catalog |
 | Offer saved filters on the all-products findings list? | Saved filters belong to one product, so the list the home screen's tiles open has none |
