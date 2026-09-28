@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrDiffers is returned when something has been declared before, with
@@ -22,7 +23,7 @@ import (
 // pipeline that declares before every build must not fail on the second one,
 // and a pipeline that has quietly changed what it means by a name must not
 // pass — telling those apart is the whole point of a declaration step.
-var ErrDiffers = errors.New("already declared, differently")
+var ErrDiffers = refusal.New("already declared, differently")
 
 // Declared is what a declaration did.
 //

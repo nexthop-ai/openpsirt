@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // EstateGrant is a role held across every product (REQ-42).
@@ -36,7 +37,7 @@ type EstateGrant struct {
 // GrantEstateRole gives somebody a role across every product.
 func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) error {
 	if !role.Valid() {
-		return fmt.Errorf("%q is not a role", role)
+		return refusal.Errorf("%q is not a role", role)
 	}
 	grant := &EstateGrant{
 		PersonID: personID, Role: role,

@@ -22,7 +22,7 @@ import (
 
 // TokenBody is somebody's own credential for scripting.
 type TokenBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The owner's name for it"`
+	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The owner's name for it, stored in lower case and matched without regard to capitals"`
 	// Product narrows it below its owner. Its reach is the intersection, so
 	// naming something they cannot read reaches nothing.
 	Product string `json:"product,omitempty" doc:"Optionally, the one product it may reach, by the name that addresses it"`
@@ -148,7 +148,10 @@ func registerTokens(api huma.API, in Ingest) {
 			}
 			token, secret, err = access.NewStore(tx).NewToken(ctx, subject.ID,
 				input.Body.Name, productID, holds, lifetime, ceiling)
-			if err != nil {
+			switch {
+			case errors.Is(err, access.ErrTokenNamed):
+				return huma.Error409Conflict(err.Error())
+			case err != nil:
 				// The refusals here are about what was asked for — a name that
 				// is missing, a lifetime past the ceiling — so they are
 				// reported.

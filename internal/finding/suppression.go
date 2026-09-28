@@ -40,11 +40,15 @@ type Claim struct {
 	// Origin says whether this came attached to a component or in a document
 	// of its own, which is the difference between a claim that knows exactly
 	// what it is about and one that names something we have to match.
-	Origin       string `bun:"origin,notnull"`
-	SubjectPurl  string `bun:"subject_purl"`
-	SubjectName  string `bun:"subject_name"`
-	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
-	ClosedScanID *int64 `bun:"closed_scan_id"`
+	Origin      string `bun:"origin,notnull"`
+	SubjectPurl string `bun:"subject_purl"`
+	SubjectName string `bun:"subject_name"`
+	// SubjectFolded is the subject's name folded, which is what a name
+	// somebody types is matched against. The name itself is the producer's
+	// spelling and is what a screen shows.
+	SubjectFolded string `bun:"subject_folded,nullzero"`
+	OpenedScanID  int64  `bun:"opened_scan_id,notnull"`
+	ClosedScanID  *int64 `bun:"closed_scan_id"`
 }
 
 // covers reports whether this claim is about the component described.
@@ -132,7 +136,8 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 					Status: string(claim.Status), Justification: claim.Justification,
 					Statement: claim.Statement, Origin: string(claim.Origin),
 					SubjectPurl: subject.Purl, SubjectName: subject.Name,
-					OpenedScanID: scanID,
+					SubjectFolded: graph.Folded(subject.Name),
+					OpenedScanID:  scanID,
 				}
 				row.Identity = claimIdentity(row)
 				wanted[row.Identity] = row
@@ -268,7 +273,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 			// component row, because a claim naming something this build does
 			// not carry is exactly the row somebody is looking for when they
 			// ask why a patch stopped working.
-			q = q.Where("LOWER(sup.subject_name) = ?", strings.ToLower(name))
+			q = q.Where("sup.subject_folded = ?", graph.Folded(name))
 		}
 		return q
 	}

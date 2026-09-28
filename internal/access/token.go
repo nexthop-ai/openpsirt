@@ -5,7 +5,6 @@ package access
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Credential prefixes.
@@ -66,9 +66,11 @@ const MaxTokenLifetime = 365 * 24 * time.Hour
 // revokes, and the ones that matter are discovered when somebody leaves and
 // nobody knows what breaks if it is turned off.
 func (s *Store) NewToken(ctx context.Context, personID int64, name string, productID *int64, holds []Role, lifetime, ceiling time.Duration) (*Token, string, error) {
-	name = strings.TrimSpace(name)
+	// Folded, the way a key's name is: its owner types it to mint the token
+	// and again to withdraw it.
+	name = credentialNamed(name)
 	if name == "" {
-		return nil, "", fmt.Errorf("a token needs a name, so its owner can tell it from the others")
+		return nil, "", refusal.Errorf("a token needs a name, so its owner can tell it from the others")
 	}
 	if ceiling <= 0 {
 		ceiling = MaxTokenLifetime
@@ -81,7 +83,7 @@ func (s *Store) NewToken(ctx context.Context, personID int64, name string, produ
 		lifetime = min(DefaultTokenLifetime, ceiling)
 	}
 	if lifetime > ceiling {
-		return nil, "", fmt.Errorf("a token may last at most %s here", ceiling)
+		return nil, "", refusal.Errorf("a token may last at most %s here", ceiling)
 	}
 
 	// Refused rather than stored. A token naming no role it could carry
@@ -106,6 +108,9 @@ func (s *Store) NewToken(ctx context.Context, personID int64, name string, produ
 		CreatedAt: now, ExpiresAt: now.Add(lifetime).Truncate(time.Microsecond),
 	}
 	if _, err := s.db.NewInsert().Model(token).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			return nil, "", ErrTokenNamed
+		}
 		return nil, "", fmt.Errorf("record a token: %w", err)
 	}
 	return token, presented, nil
@@ -123,7 +128,7 @@ func rolesFor(holds []Role) (*string, error) {
 	named := map[Role]bool{}
 	for _, role := range holds {
 		if !role.Valid() {
-			return nil, fmt.Errorf("%q is not a role", role)
+			return nil, refusal.Errorf("%q is not a role", role)
 		}
 		named[role] = true
 	}
@@ -292,7 +297,11 @@ func (s Subject) narrowedTo(productID int64) Subject {
 //
 // A sentinel rather than a sentence, because whoever asked has to tell it from
 // a read that could not be made: the first is a 404 and the second is a fault.
-var ErrNoSuchToken = errors.New("no token is recorded under that name")
+var ErrNoSuchToken = refusal.New("no token is recorded under that name")
+
+// ErrTokenNamed refuses a token under a name its owner already holds a token
+// by, in any capitals.
+var ErrTokenNamed = refusal.New("you already hold a token by that name")
 
 // Tokens lists somebody's own credentials.
 func (s *Store) Tokens(ctx context.Context, personID int64) ([]Token, error) {
@@ -330,7 +339,10 @@ func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 }
 
 // TokenByName finds one of somebody's tokens.
+//
+// The name is matched the way it is stored, folded, so any capitals find it.
 func (s *Store) TokenByName(ctx context.Context, personID int64, name string) (*Token, error) {
+	name = credentialNamed(name)
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
 		Where("person_id = ?", personID).Where("name = ?", name).Scan(ctx); err != nil {

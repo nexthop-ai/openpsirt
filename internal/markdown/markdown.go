@@ -19,10 +19,11 @@
 package markdown
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // MaxBytes bounds a single field.
@@ -57,6 +58,9 @@ type Fault struct {
 // a string with no wrapping, so no caller could ever match it. An exported
 // sentinel nothing can use as one is a contract stated and not kept.
 func (f Fault) Unwrap() error { return f.err }
+
+// Refused marks a fault as a sentence for whoever wrote the text.
+func (f Fault) Refused() {}
 
 func (f Fault) Error() string {
 	if f.Line == 0 {
@@ -100,7 +104,7 @@ func (f Faults) Error() string {
 const MaxFaults = 20
 
 // ErrTooLong is returned for text past the bound.
-var ErrTooLong = errors.New("that is longer than a justification may be")
+var ErrTooLong = refusal.New("that is longer than a justification may be")
 
 // Check reports everything wrong with submitted text.
 //

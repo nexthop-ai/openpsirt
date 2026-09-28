@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Team is a named set of people that holds work and grants nothing.
@@ -58,7 +59,7 @@ type Membership struct {
 }
 
 // ErrNoSuchTeam is returned when a name matches no team in use.
-var ErrNoSuchTeam = errors.New("no team is known by that name")
+var ErrNoSuchTeam = refusal.New("no team is known by that name")
 
 // DeclareTeam records a team, or returns the one already declared under that
 // name.
@@ -69,7 +70,7 @@ var ErrNoSuchTeam = errors.New("no team is known by that name")
 func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Team, error) {
 	matched := teamNamed(name)
 	if matched == "" {
-		return nil, fmt.Errorf("a team needs a name")
+		return nil, refusal.Errorf("a team needs a name")
 	}
 	shown := strings.TrimSpace(displayName)
 

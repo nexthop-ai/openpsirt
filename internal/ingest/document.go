@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Kind says what a document a build sent is.
@@ -372,5 +373,5 @@ func (d *Documents) Held(ctx context.Context, scanID, documentID int64) (*Docume
 // contents were released after they were read.
 var (
 	ErrNoDocument = errors.New("no such document")
-	ErrLetGo      = errors.New("the contents of that document were let go")
+	ErrLetGo      = refusal.New("the contents of that document were let go")
 )

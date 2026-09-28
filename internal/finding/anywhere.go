@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -64,7 +65,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		return nil, 0, nil
 	}
 	if filter.Beneath != nil {
-		return nil, 0, fmt.Errorf("read findings beneath a component: a subtree is a walk over" +
+		return nil, 0, refusal.Errorf("read findings beneath a component: a subtree is a walk over" +
 			" one build's edges, and this list spans products")
 	}
 	limit = database.AList.Of(limit)

@@ -21,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Status is what became of a scan.
@@ -94,7 +95,7 @@ const storedPrecision = time.Microsecond
 func asStored(t time.Time) time.Time { return t.UTC().Truncate(storedPrecision) }
 
 // ErrRejected is returned for any arriving scan we decline to take.
-var ErrRejected = errors.New("scan rejected")
+var ErrRejected = refusal.New("scan rejected")
 
 // ErrNoScan is returned when something names a scan that is not there.
 var ErrNoScan = errors.New("no such scan")
@@ -412,16 +413,20 @@ func (s *Store) ByID(ctx context.Context, id int64) (*Scan, error) {
 // The reason is kept with it. A producer sending files nothing can read needs
 // to be visible as exactly that, rather than as a scan that was accepted and
 // then quietly did nothing.
+//
+// The reason recorded is a refusal's own sentence — what is wrong with the
+// document — or fixed words. The receipt is read back by the key that sent the
+// scan, and a fault's text names what this deployment dialed: a database's
+// address and user, an object store's endpoint. The cause is in the log the
+// reader writes.
 func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 	reason := ""
 	switch {
-	case database.FromEngine(cause):
-		// The receipt is read back by the key that sent the scan, and a
-		// database's failure names the address and the user it dialed. The
-		// cause is in the log the reader writes.
-		reason = "the scan could not be applied"
-	case cause != nil:
+	case cause == nil:
+	case refusal.In(cause) && !database.FromEngine(cause):
 		reason = cause.Error()
+	default:
+		reason = "the scan could not be applied"
 	}
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).
 		Set("status = ?", Failed).

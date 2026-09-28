@@ -141,6 +141,27 @@ func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
 	})
 }
 
+// Re-affirming a whole claim is its proposer's right. Anybody else holding
+// triage is told so in the store's words, as a refusal they can act on by
+// proposing afresh.
+func TestReAffirmingAWholeClaimSomebodyElseMadeIsRefusedInWords(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		claimed := r.agreedThenLapsed(t)
+
+		refused := asPerson(t, r, "wide-triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
+		if refused.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("somebody else re-affirming the claim answered %d: %s",
+				refused.Code, refused.Body.String())
+		}
+		if !strings.Contains(refused.Body.String(), "only the person who made a decision") {
+			t.Errorf("the refusal does not say whose it is: %s", refused.Body.String())
+		}
+	})
+}
+
 func TestReAffirmingADismissalIsBoundedAndAPromiseIsNot(t *testing.T) {
 	// The outcome comes from the claim being re-made, so a lapsed bulk
 	// dismissal comes back through this path — and nothing re-checks a

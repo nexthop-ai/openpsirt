@@ -5,7 +5,6 @@ package graph
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Node is a component's presence in a variant.
@@ -192,7 +192,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			parent, okP := nodeIDs[ids[asStored(dep.Parent).Identity()]]
 			child, okC := nodeIDs[ids[asStored(dep.Child).Identity()]]
 			if !okP || !okC {
-				return fmt.Errorf("dependency names a component the snapshot does not list: %s -> %s",
+				return refusal.Errorf("dependency names a component the snapshot does not list: %s -> %s",
 					dep.Parent.Name, dep.Child.Name)
 			}
 			wantedEdges[edgeAt{Parent: parent, Child: child, Kind: dep.Kind}] = true
@@ -261,14 +261,14 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 
 // ErrAmbiguous says a name matched more than one component and no version was
 // given to tell them apart.
-var ErrAmbiguous = errors.New("this build contains that name as more than one component")
+var ErrAmbiguous = refusal.New("this build contains that name as more than one component")
 
 // ErrNoComponent says a build holds nothing by that name.
 //
 // A sentinel rather than a sentence, because a name reaching nothing and the
 // lookup failing are different answers and a caller that cannot tell them
 // apart reports a database fault as a typo, or a typo as a fault.
-var ErrNoComponent = errors.New("this build contains no component by that name")
+var ErrNoComponent = refusal.New("this build contains no component by that name")
 
 // Ambiguous carries which versions a name matched.
 //
@@ -356,6 +356,9 @@ func (a *Ambiguous) Error() string {
 // Is makes errors.Is(err, ErrAmbiguous) hold for this, so callers that only
 // care that it was ambiguous keep working.
 func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
+
+// Refused marks it as a sentence for the caller, who typed the name.
+func (a *Ambiguous) Refused() {}
 
 // ComponentAs resolves a component by name and, where they are given, the
 // version, ecosystem and namespace a choice names.

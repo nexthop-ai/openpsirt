@@ -410,14 +410,15 @@ func TestAKeyReadsBackWhatItSentAndNotWhatAPersonOfItsNameSent(t *testing.T) {
 func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T) {
 	// A read that died after its attempts ran out without marking the scan,
 	// because marking it failed as well, is a failure on the receipt rather
-	// than a read still in progress.
+	// than a read still in progress. Its reason is fixed words: the job's last
+	// error is whatever failed, and a dropped connection names its address.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
 		target := quietTarget(t, s, ours)
 		now := time.Now().UTC()
 
 		for i, each := range []struct{ hash, lastError string }{
-			{"with-cause", "the document ended early"},
+			{"with-cause", "dial tcp 10.0.4.7:5432: connect: connection refused"},
 			{"without-cause", ""},
 		} {
 			file(t, s, target, each.hash, now.Add(time.Duration(i-2)*time.Hour))
@@ -446,8 +447,8 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 		seen := 0
 		for _, receipt := range receipts {
 			want, ours := map[string]string{
-				"with-cause":    "the document ended early",
-				"without-cause": "the upload could not be read",
+				"with-cause":    "the scan could not be applied",
+				"without-cause": "the scan could not be applied",
 			}[receipt.Scan.ContentHash]
 			if !ours {
 				continue

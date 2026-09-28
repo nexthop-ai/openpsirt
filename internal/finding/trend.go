@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Within narrows a trend to part of one build's tree.
@@ -179,7 +180,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// which is what leaving the identifier at zero would have done —
 		// silently, and with an empty chart.
 		if len(targets) != 1 {
-			return nil, fmt.Errorf("trend beneath a component: a subtree is a walk over one"+
+			return nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
 				" build's edges, and %d builds are in scope", len(targets))
 		}
 		componentID, err := graph.NewStore(s.db).ComponentAs(ctx, targets[0], under, graph.Choice{

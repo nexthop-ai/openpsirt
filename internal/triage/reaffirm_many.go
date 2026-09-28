@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ReaffirmingMany is somebody saying every one of several lapsed claims of
@@ -47,10 +48,10 @@ func (s *Store) ReaffirmMany(ctx context.Context, subject access.Subject,
 	r ReaffirmingMany) ([]Reaffirmed, error) {
 
 	if r.By != subject.ID {
-		return nil, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return nil, refusal.Errorf("a decision is recorded as made by whoever made it")
 	}
 	if len(r.ClaimIDs) == 0 {
-		return nil, fmt.Errorf("nothing was selected, so there is nothing to re-affirm")
+		return nil, refusal.Errorf("nothing was selected, so there is nothing to re-affirm")
 	}
 	var out []Reaffirmed
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
@@ -177,7 +178,7 @@ func (s *Store) refuseOthersClaims(ctx context.Context, subject access.Subject,
 	if len(named) > 10 {
 		named = append(named[:10], fmt.Sprintf("and %d more", len(others)-10))
 	}
-	return fmt.Errorf("only the person who made a decision may re-affirm it, and somebody "+
+	return refusal.Errorf("only the person who made a decision may re-affirm it, and somebody "+
 		"else made the one at %s: take those out of the selection", strings.Join(named, ", "))
 }
 
@@ -238,7 +239,7 @@ func (s *Store) ReaffirmClaim(ctx context.Context, subject access.Subject,
 	r ReaffirmingClaim) (Reaffirmed, error) {
 
 	if r.By != subject.ID {
-		return Reaffirmed{}, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return Reaffirmed{}, refusal.Errorf("a decision is recorded as made by whoever made it")
 	}
 	var out Reaffirmed
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
@@ -339,7 +340,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// one proposer. Without it an approver could re-affirm, becoming proposer
 	// of the new claim while their own earlier agreement is carried onto it.
 	if previous.ProposedBy != subject.ID {
-		return reaffirmPlan{}, fmt.Errorf(
+		return reaffirmPlan{}, refusal.Errorf(
 			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
 	}
 

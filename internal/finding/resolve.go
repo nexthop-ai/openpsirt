@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,17 +14,18 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrNotOursToClose says a scanner's finding is not something a person closes.
-var ErrNotOursToClose = errors.New(
+var ErrNotOursToClose = refusal.New(
 	"a scan is the authority on what it found, so only a flaw somebody recorded is closed by hand")
 
 // ErrNoReason says a closure arrived without one.
-var ErrNoReason = errors.New("say what fixed it")
+var ErrNoReason = refusal.New("say what fixed it")
 
 // ErrNothingOpenThere says the build holds nothing open under that issue.
-var ErrNothingOpenThere = errors.New("nothing is open there")
+var ErrNothingOpenThere = refusal.New("nothing is open there")
 
 // Resolved is what a closure did.
 type Resolved struct {

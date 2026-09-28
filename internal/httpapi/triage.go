@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -864,17 +865,14 @@ func refusedDecision(logger *slog.Logger, err error) error {
 	if errors.As(err, &faults) {
 		return refusedText(faults)
 	}
-	// A database that broke is not somebody having asked for the impossible.
-	// The default arm answers both as 422 with the message in it, so a lost
-	// connection reaches the caller as a bad request carrying the statement
-	// text and the address the driver tried.
-	if database.FromEngine(err) {
-		return wentWrong(logger, "that could not be recorded", err)
+	// A sentence the store wrote for a person to read: a decision already
+	// standing here, a claim covering nothing, a threshold crossed. Those are
+	// the caller's to fix, and the message is the answer. Anything else is a
+	// fault, and its text is withheld.
+	if refusal.In(err) && !database.FromEngine(err) {
+		return huma.Error422UnprocessableEntity(err.Error())
 	}
-	// The remainder is a sentence the triage store wrote for a person to read:
-	// a decision already standing here, a claim covering nothing, a threshold
-	// crossed. Those are the caller's to fix, and the message is the answer.
-	return huma.Error422UnprocessableEntity(err.Error())
+	return wentWrong(logger, "that could not be recorded", err)
 }
 
 // refusedText answers a refused piece of writing with where to look.

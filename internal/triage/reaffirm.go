@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Reaffirmation is somebody saying a lapsed claim still holds.
@@ -61,7 +62,7 @@ func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 		return nil, ErrNotTheirs
 	}
 	if r.By != subject.ID {
-		return nil, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return nil, refusal.Errorf("a decision is recorded as made by whoever made it")
 	}
 
 	var made *Decision
@@ -116,14 +117,14 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	if previous.ProductID != r.Place.ProductID ||
 		readAs[previous.VulnerabilityID] != readAs[r.Place.VulnerabilityID] ||
 		previous.PlaceIdentity != r.Place.PlaceIdentity {
-		return nil, fmt.Errorf("that decision was about a different place")
+		return nil, refusal.Errorf("that decision was about a different place")
 	}
 	// Re-affirming is a right the person who made the claim has, and nobody
 	// else. Without this the approver could re-affirm — becoming proposer of
 	// the new claim while their own earlier agreement is carried onto it, so
 	// one person ends up on both sides of a control that says they may not be.
 	if previous.ProposedBy != subject.ID {
-		return nil, fmt.Errorf(
+		return nil, refusal.Errorf(
 			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
 	}
 
@@ -362,7 +363,7 @@ func (s *Store) carryApprovalTo(ctx context.Context, made []*Decision, claim Cla
 		return nil
 	}
 	if claim.RevisionID == nil {
-		return fmt.Errorf("a re-affirmed claim has no reasoning to stand on")
+		return refusal.Errorf("a re-affirmed claim has no reasoning to stand on")
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -400,7 +401,7 @@ func (s *Store) carryApprovalTo(ctx context.Context, made []*Decision, claim Cla
 		return fmt.Errorf("carry an approval forward: %w", err)
 	}
 	if changed != int64(len(ids)) {
-		return fmt.Errorf("the reasoning changed while this was being agreed to")
+		return refusal.Errorf("the reasoning changed while this was being agreed to")
 	}
 	for _, one := range made {
 		one.State = Approved

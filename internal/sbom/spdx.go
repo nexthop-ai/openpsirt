@@ -4,10 +4,10 @@
 package sbom
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The major version read. 2.2 and 2.3 share one vocabulary — 2.3 adds fields
@@ -126,10 +126,10 @@ func (c *reader) spdxFormatVersion() error {
 	}
 	version, ok := strings.CutPrefix(strings.TrimSpace(stated), "SPDX-")
 	if !ok {
-		return fmt.Errorf("scan file is not %s: it says %q", SPDX, trim(stated))
+		return refusal.Errorf("scan file is not %s: it says %q", SPDX, trim(stated))
 	}
 	if major, _, _ := strings.Cut(version, "."); major != spdxMajor {
-		return fmt.Errorf("%s version %q is not one this reads", SPDX, trim(stated))
+		return refusal.Errorf("%s version %q is not one this reads", SPDX, trim(stated))
 	}
 	c.declared = SPDX
 	return nil
@@ -265,7 +265,7 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 		return graph.Described{}, "", err
 	}
 	if err := described.Valid(); err != nil {
-		return graph.Described{}, "", fmt.Errorf("%w, so it cannot be tracked", err)
+		return graph.Described{}, "", refusal.Errorf("%w, so it cannot be tracked", err)
 	}
 
 	// The supplier where a producer stated one, whatever order it wrote the
@@ -379,7 +379,7 @@ func (c *reader) spdxFiles() error {
 		// and here it would resolve to the package and invent a dependency the
 		// producer never stated.
 		if _, clash := c.byRef[ref]; clash {
-			return fmt.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
+			return refusal.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
 		}
 		c.files[ref] = true
 		return nil

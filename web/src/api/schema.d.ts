@@ -6728,13 +6728,13 @@ export interface components {
         ChangeBody: {
             about: string;
             /**
-             * @description What made the change: a person in the application, the deployment's startup configuration, which names administrators, or a scan merging two issues its report named together
+             * @description What made the change: a person in the application, the deployment's startup configuration, which names administrators, a scan merging two issues its report named together, or an upgrade, which withdraws a key or a token whose name another holds
              * @enum {string}
              */
-            actor: "person" | "configuration" | "merge";
+            actor: "person" | "configuration" | "merge" | "upgrade";
             at: string;
             became?: string;
-            /** @description The person who made the change, by sign-in identity. Absent where configuration made it */
+            /** @description The person who made the change, by sign-in identity. Absent where no person made it */
             by?: string;
             /** @description Their display name, where it differs from their identity */
             by_name?: string;
@@ -8531,7 +8531,7 @@ export interface components {
             created_at?: string;
             /** @description The last time it sent something */
             last_used_at?: string;
-            /** @description The credential's purpose */
+            /** @description The credential's purpose, stored in lower case and matched without regard to capitals */
             name: string;
             /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
@@ -11762,7 +11762,7 @@ export interface components {
             last_used_at?: string;
             /** @description The lifetime, such as "720h". There is a configured maximum */
             lifetime?: string;
-            /** @description The owner's name for it */
+            /** @description The owner's name for it, stored in lower case and matched without regard to capitals */
             name: string;
             /** @description The owner. Shown to an administrator listing everybody's */
             owner?: string;

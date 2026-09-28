@@ -91,6 +91,18 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //   - A kept findings-list filter is rewritten into the words v0.5.0's list
 //     reads: the two flags "only" named become flags of their own, and hidden
 //     components joined by commas become one parameter each.
+//   - A key's name and a personal token's are stored folded, the way a
+//     username is: a key's unique across the deployment, a token's to its
+//     owner. v0.4.0 stored them as typed, so two names it held apart can fold
+//     to one. The first to hold the name keeps it and stays as it was — one in
+//     force before a withdrawn one, then the oldest. Every other one is
+//     withdrawn where it is still in force, recorded in the trail with the
+//     upgrade as the actor, and named by its folded name and its number,
+//     because the name is unique across withdrawn ones too. The senders are
+//     read before this, by the names v0.4.0 recorded.
+//   - A build's claim records the name of what it is about folded, beside the
+//     name as the producer spelled it. Each claim v0.4.0 holds takes its own
+//     name folded.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -128,6 +140,20 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := sendersQualified(ctx, tx); err != nil {
+		return err
+	}
+	// After the senders, which are matched on the names v0.4.0 recorded.
+	if err := namesFolded(ctx, tx, keysV050); err != nil {
+		return err
+	}
+	if err := namesFolded(ctx, tx, tokensV050); err != nil {
+		return err
+	}
+	if err := u.change(suppressionV050(t), change{table: "suppression",
+		add: []added{{column: "subject_folded"}}}); err != nil {
+		return err
+	}
+	if err := subjectsFolded(ctx, tx); err != nil {
 		return err
 	}
 	// A column every existing row fills from its own identifier. A default
@@ -190,7 +216,12 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // acted. Whether a person typed each name an issue answers to goes with its
 // column, and the names stay. A kept filter stays in v0.5.0's words, which
 // v0.4.0's list reads too, except that a hidden name holding a comma is read
-// by v0.4.0 as several names, and upgrading again keeps them apart.
+// by v0.4.0 as several names, and upgrading again keeps them apart. A claim's
+// folded subject goes with its column. A key or token keeps the name it was
+// folded or numbered to, which v0.4.0 matches as typed, and one the upgrade
+// withdrew stays withdrawn: nothing says it would still be wanted. The trail
+// rows recording those withdrawals go, because v0.4.0 has no place for a
+// change no person made.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err
@@ -219,9 +250,11 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := apply(ctx, tx.Tx, []string{
+		`ALTER TABLE "suppression" DROP COLUMN "subject_folded"`,
 		`ALTER TABLE "assessment" DROP COLUMN "withdrawn_because"`,
 		`ALTER TABLE "vulnerability" DROP COLUMN "issue_id"`,
 		`DELETE FROM "admin_change" WHERE "actor" = 'merge'`,
+		`DELETE FROM "admin_change" WHERE "actor" = 'upgrade'`,
 	}); err != nil {
 		return err
 	}

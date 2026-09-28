@@ -5,7 +5,6 @@ package triage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,11 +13,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrNotOffered refuses carrying a decision the preview did not offer this
 // line: one that already applies here, or one covering nothing here.
-var ErrNotOffered = errors.New("is not one this line was offered")
+var ErrNotOffered = refusal.New("is not one this line was offered")
 
 // Carry takes chosen judgments onto a new line as claims waiting for
 // agreement.

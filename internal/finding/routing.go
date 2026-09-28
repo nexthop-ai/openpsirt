@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -61,14 +62,14 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 	}
 	upstream, beneath = strings.TrimSpace(upstream), strings.TrimSpace(beneath)
 	if upstream == "" && beneath == "" {
-		return nil, fmt.Errorf("a rule that matches nothing places nothing: " +
+		return nil, refusal.Errorf("a rule that matches nothing places nothing: " +
 			"name a source package, a place in the tree, or both")
 	}
 	// The columns a key is matched against are cut to the folded width, so a
 	// longer key could never match and would place nothing, silently.
 	for _, key := range []string{upstream, beneath} {
 		if utf8.RuneCountInString(key) > database.NameWidth {
-			return nil, fmt.Errorf("a key is at most %d characters, the width of the "+
+			return nil, refusal.Errorf("a key is at most %d characters, the width of the "+
 				"names it is matched against", database.NameWidth)
 		}
 	}
@@ -164,7 +165,7 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 		return fmt.Errorf("retire that rule: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("no rule of this product is in use under that identifier")
+		return refusal.Errorf("no rule of this product is in use under that identifier")
 	}
 	return nil
 }
@@ -629,4 +630,4 @@ const RoutingReach = 2000
 
 // ErrTooBroad is returned when a rule's pattern names most of a build rather
 // than a place in it.
-var ErrTooBroad = errors.New("that names too much of the tree")
+var ErrTooBroad = refusal.New("that names too much of the tree")

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Rate is how much of one severity's work met its deadline.
@@ -182,7 +183,7 @@ func Since(at string) (*time.Time, error) {
 	}
 	when, err := time.Parse(time.DateOnly, at)
 	if err != nil {
-		return nil, fmt.Errorf("%q is not a date, written as 2026-03-31", at)
+		return nil, refusal.Errorf("%q is not a date, written as 2026-03-31", at)
 	}
 	return &when, nil
 }

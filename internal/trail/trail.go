@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Kind is what sort of thing was changed. A reader filters by it, so the set
@@ -98,7 +99,9 @@ func Kinds() []Kind {
 }
 
 // Actor is what made a change: a person, the deployment's startup
-// configuration, or a merge of two issues.
+// configuration, a merge of two issues, or an upgrade. An upgrade's rows are
+// written by the migration that makes them, which holds its own copy of the
+// word "upgrade" as it holds its own copy of every rule it applies.
 type Actor string
 
 const (
@@ -123,7 +126,7 @@ type Change struct {
 	// Actor is what made it, and never absent: a change nobody made is a
 	// change nothing records, which is the state this exists to end.
 	Actor Actor `bun:"actor,notnull"`
-	// By is the person who made it. Absent where configuration or a merge did.
+	// By is the person who made it. Absent where no person did.
 	By   *int64 `bun:"by"`
 	Kind Kind   `bun:"kind,notnull"`
 	Name string `bun:"about,notnull"`
@@ -185,7 +188,7 @@ func (s *Store) Record(ctx context.Context, by access.Subject, kind Kind, name s
 	was, became *string) error {
 
 	if by.Kind != access.Person || by.ID == 0 {
-		return fmt.Errorf("an administrative change is recorded against whoever made it")
+		return refusal.Errorf("an administrative change is recorded against whoever made it")
 	}
 	person := by.ID
 	return s.write(ctx, &Change{Actor: ByPerson, By: &person,

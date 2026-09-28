@@ -25,6 +25,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -307,7 +308,7 @@ func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 // better held and visible than dropped.
 func (d Described) Valid() error {
 	if strings.TrimSpace(d.Name) == "" {
-		return fmt.Errorf("component has no name")
+		return refusal.Errorf("component has no name")
 	}
 	return nil
 }

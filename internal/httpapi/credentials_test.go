@@ -60,6 +60,81 @@ func TestAnIngestKeyIsCreatedWithItsScope(t *testing.T) {
 	})
 }
 
+// A key's name is typed by an administrator to make it and again to withdraw
+// it, so it is one name in any capitals: stored folded, refused as taken in
+// other capitals, and withdrawn by any spelling of it.
+func TestAKeyNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		made := asPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+			`{"name":" Nightly-Mine ","product":"mine"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("creating a key answered %d: %s", made.Code, made.Body.String())
+		}
+		var issued struct {
+			Item struct {
+				Name string `json:"name"`
+			} `json:"item"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &issued); err != nil {
+			t.Fatalf("decode: %v (%s)", err, made.Body.String())
+		}
+		if issued.Item.Name != "nightly-mine" {
+			t.Errorf("the key is named %q, want it folded", issued.Item.Name)
+		}
+
+		again := asPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+			`{"name":"NIGHTLY-mine","product":"mine"}`)
+		if again.Code != http.StatusConflict {
+			t.Errorf("the same name in other capitals answered %d: %s", again.Code, again.Body.String())
+		}
+		blank := asPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+			`{"name":"   ","product":"mine"}`)
+		if blank.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a name of spaces answered %d: %s", blank.Code, blank.Body.String())
+		}
+
+		withdrawn := asPerson(t, r, "admin", http.MethodDelete, "/v1/keys/NIGHTLY-MINE", "")
+		if withdrawn.Code != http.StatusNoContent {
+			t.Errorf("withdrawing by another spelling answered %d: %s",
+				withdrawn.Code, withdrawn.Body.String())
+		}
+	})
+}
+
+// A personal token's name is typed by its owner to mint it and again to
+// withdraw it, so it is one name in any capitals: stored folded, refused as
+// taken in other capitals, and withdrawn by any spelling of it.
+func TestATokenNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		made := asPerson(t, r, "private", http.MethodPost, "/v1/tokens",
+			`{"name":" Laptop ","lifetime":"24h"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("minting a token answered %d: %s", made.Code, made.Body.String())
+		}
+		var minted struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &minted); err != nil {
+			t.Fatalf("decode: %v (%s)", err, made.Body.String())
+		}
+		if minted.Name != "laptop" {
+			t.Errorf("the token is named %q, want it folded", minted.Name)
+		}
+
+		again := asPerson(t, r, "private", http.MethodPost, "/v1/tokens",
+			`{"name":"LAPTOP","lifetime":"24h"}`)
+		if again.Code != http.StatusConflict {
+			t.Errorf("the same name in other capitals answered %d: %s", again.Code, again.Body.String())
+		}
+
+		withdrawn := asPerson(t, r, "private", http.MethodDelete, "/v1/tokens/LapTop", "")
+		if withdrawn.Code != http.StatusNoContent {
+			t.Errorf("withdrawing by another spelling answered %d: %s",
+				withdrawn.Code, withdrawn.Body.String())
+		}
+	})
+}
+
 // A key pinned to one release and one variant is listed with both. Listed
 // without them it reads as a key for the whole product, which is a different
 // credential and the wrong one to withdraw.

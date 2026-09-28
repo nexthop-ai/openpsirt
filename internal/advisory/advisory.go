@@ -23,7 +23,6 @@ package advisory
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -34,11 +33,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
 // ErrNotOurs says the issue is not one this deployment recorded.
-var ErrNotOurs = errors.New(
+var ErrNotOurs = refusal.New(
 	"an advisory is about a flaw in what we ship, and this issue was reported by a scanner")
 
 // ErrNoPublisher says the deployment has not been told who it publishes as.
@@ -46,7 +46,7 @@ var ErrNotOurs = errors.New(
 // Wrapped by missingPublisher, which names the variable that is not set: the
 // person who sees this cannot fix it, and the operator who can is reading a
 // relayed message rather than sitting at the process.
-var ErrNoPublisher = errors.New("this deployment has not been configured with a publisher")
+var ErrNoPublisher = refusal.New("this deployment has not been configured with a publisher")
 
 // missingPublisher says which half of the publisher is missing.
 func missingPublisher(p publisher.Named) error {
@@ -62,7 +62,7 @@ func missingPublisher(p publisher.Named) error {
 }
 
 // ErrNoSuchIssue says the product holds nothing under that identifier.
-var ErrNoSuchIssue = errors.New("this product holds no issue by that name")
+var ErrNoSuchIssue = refusal.New("this product holds no issue by that name")
 
 // Store assembles advisories.
 type Store struct {

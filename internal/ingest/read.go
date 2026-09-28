@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
@@ -277,11 +278,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		}
 		documentsRead++
 		if documentsRead > limits.MaxDocuments {
-			return nil, fmt.Errorf("scan %d: more suppression documents than the %d limit",
+			return nil, refusal.Errorf("scan %d: more suppression documents than the %d limit",
 				scanID, limits.MaxDocuments)
 		}
 		if left <= 0 {
-			return nil, fmt.Errorf("scan %d: more claims than the %d limit",
+			return nil, refusal.Errorf("scan %d: more claims than the %d limit",
 				scanID, limits.MaxStatements)
 		}
 		within := limits

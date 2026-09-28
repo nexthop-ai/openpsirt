@@ -5,11 +5,12 @@ package access
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Trust says how a person's identity may reach us.
@@ -48,9 +49,9 @@ func (t Trust) Configured() error {
 	case t.Header == "" && len(t.From) == 0:
 		return nil
 	case t.Header == "":
-		return fmt.Errorf("trusted sources are configured but no header is named, so nothing would be read from them")
+		return refusal.Errorf("trusted sources are configured but no header is named, so nothing would be read from them")
 	case len(t.From) == 0:
-		return fmt.Errorf("a trusted header is named but no source is trusted, and honoring it from anywhere would let anyone reaching this process be anyone")
+		return refusal.Errorf("a trusted header is named but no source is trusted, and honoring it from anywhere would let anyone reaching this process be anyone")
 	}
 	// Naming every address reaches the same place as naming none, by the one
 	// setting that is supposed to be the guard. Halting on the empty case and
@@ -58,7 +59,7 @@ func (t Trust) Configured() error {
 	// mistake.
 	for _, network := range t.From {
 		if ones, _ := network.Mask.Size(); ones == 0 {
-			return fmt.Errorf("a trusted header is honored from every address, which is the same as trusting it from anywhere")
+			return refusal.Errorf("a trusted header is honored from every address, which is the same as trusting it from anywhere")
 		}
 	}
 	return nil
@@ -334,7 +335,7 @@ func ParseSources(raw string) ([]net.IPNet, error) {
 		}
 		ip := net.ParseIP(entry)
 		if ip == nil {
-			return nil, fmt.Errorf("%q is neither an address nor a range", entry)
+			return nil, refusal.Errorf("%q is neither an address nor a range", entry)
 		}
 		bits := 32
 		if ip.To4() == nil {

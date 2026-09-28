@@ -30,6 +30,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // signalTimeout bounds one request to one destination, and is what the sweep's
@@ -586,7 +587,7 @@ func outboundClient() *http.Client {
 	return &http.Client{
 		Timeout: signalTimeout,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			return fmt.Errorf("refused a redirect to %s: a destination is configured, not followed",
+			return refusal.Errorf("refused a redirect to %s: a destination is configured, not followed",
 				req.URL.Host)
 		},
 		Transport: &outboundGuard{inner: &http.Transport{DialContext: dialer.DialContext}},
@@ -604,11 +605,11 @@ func outboundClient() *http.Client {
 func reachable(address string) error {
 	parsed, err := url.Parse(strings.TrimSpace(address))
 	if err == nil && parsed.User != nil {
-		return fmt.Errorf("an address here carries no name or password in it: put the " +
+		return refusal.Errorf("an address here carries no name or password in it: put the " +
 			"secret in the field for it, so what is signed and what is sent are separate")
 	}
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-		return fmt.Errorf("a destination is an https address: the body is signed and not " +
+		return refusal.Errorf("a destination is an https address: the body is signed and not " +
 			"encrypted, and what it carries is what somebody is being told about a vulnerability")
 	}
 	return nil
@@ -619,7 +620,7 @@ type outboundGuard struct{ inner http.RoundTripper }
 
 func (g *outboundGuard) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Scheme != "https" {
-		return nil, fmt.Errorf("refused a request to %s: a destination is reached over https",
+		return nil, refusal.Errorf("refused a request to %s: a destination is reached over https",
 			req.URL.Scheme+"://"+req.URL.Host)
 	}
 	return g.inner.RoundTrip(req)
@@ -765,7 +766,7 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		row.Platform = Webhook
 	}
 	if row.Name == "" || row.Kind == "" {
-		return nil, fmt.Errorf("a destination needs a name and a kind")
+		return nil, refusal.Errorf("a destination needs a name and a kind")
 	}
 	// A kind nothing is ever of is a destination that never receives
 	// anything, listed as configured and working.
@@ -774,7 +775,7 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		for _, each := range Kinds() {
 			named = append(named, string(each))
 		}
-		return nil, fmt.Errorf("no notification is of the kind %q: the kind is %q for every "+
+		return nil, refusal.Errorf("no notification is of the kind %q: the kind is %q for every "+
 			"notification, or one of %s", row.Kind, Everything, strings.Join(named, ", "))
 	}
 	if row.Platform == Webhook {
@@ -833,13 +834,13 @@ func webhookOnly(d Destination, row *Outbound) error {
 		return err
 	}
 	if row.Secret == "" {
-		return fmt.Errorf("a webhook needs a secret to sign with")
+		return refusal.Errorf("a webhook needs a secret to sign with")
 	}
 	if strings.TrimSpace(d.Channel) != "" || strings.TrimSpace(d.Topic) != "" {
-		return fmt.Errorf("a webhook has an address rather than a channel")
+		return refusal.Errorf("a webhook has an address rather than a channel")
 	}
 	if d.ProductID != nil || d.TeamID != nil {
-		return fmt.Errorf("a webhook belongs to the deployment: whatever receives it " +
+		return refusal.Errorf("a webhook belongs to the deployment: whatever receives it " +
 			"filters for itself")
 	}
 	return nil
@@ -849,34 +850,34 @@ func webhookOnly(d Destination, row *Outbound) error {
 func chatOnly(d Destination, row *Outbound, offered []string) error {
 	if !slices.Contains(offered, row.Platform) {
 		if len(offered) == 0 {
-			return fmt.Errorf("no chat platform is configured, so a %s channel is one "+
+			return refusal.Errorf("no chat platform is configured, so a %s channel is one "+
 				"nothing could post to", row.Platform)
 		}
-		return fmt.Errorf("%q is not a chat platform this deployment is configured for: "+
+		return refusal.Errorf("%q is not a chat platform this deployment is configured for: "+
 			"it offers %s", row.Platform, strings.Join(offered, " and "))
 	}
 	if row.URL != "" || row.Secret != "" {
-		return fmt.Errorf("a chat channel is reached through the platform's credential, " +
+		return refusal.Errorf("a chat channel is reached through the platform's credential, " +
 			"so it takes no address or secret of its own")
 	}
 	channel := strings.TrimSpace(d.Channel)
 	if channel == "" {
-		return fmt.Errorf("a chat destination names the channel it posts to")
+		return refusal.Errorf("a chat destination names the channel it posts to")
 	}
 	row.Channel = &channel
 	if topic := strings.TrimSpace(d.Topic); topic != "" {
 		if row.Platform != Zulip {
-			return fmt.Errorf("only a Zulip channel has topics")
+			return refusal.Errorf("only a Zulip channel has topics")
 		}
 		row.Topic = &topic
 	}
 	if d.ProductID != nil && d.TeamID != nil {
-		return fmt.Errorf("a channel belongs to a product or to a team, not both")
+		return refusal.Errorf("a channel belongs to a product or to a team, not both")
 	}
 	// A channel is never sent what is somebody's own, so a destination for
 	// one of those kinds is listed as configured and receives nothing.
 	if row.Kind != Everything && !isShared(Kind(row.Kind)) {
-		return fmt.Errorf("%q is addressed to one person, and a channel is sent only "+
+		return refusal.Errorf("%q is addressed to one person, and a channel is sent only "+
 			"what is about a product, a team or the deployment", row.Kind)
 	}
 	return nil

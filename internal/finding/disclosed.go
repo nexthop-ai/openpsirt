@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,16 +14,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // ErrDisclosed says the issue is already public in this product.
-var ErrDisclosed = errors.New("that issue is already disclosed in this product")
+var ErrDisclosed = refusal.New("that issue is already disclosed in this product")
 
 // ErrDisclosureWaiting says a disclosure of this issue is already waiting for
 // a second person. A second request would put two entries on the queue for
 // one act.
-var ErrDisclosureWaiting = errors.New("a disclosure of that issue is already waiting for a second person")
+var ErrDisclosureWaiting = refusal.New("a disclosure of that issue is already waiting for a second person")
 
 // Disclose makes one issue public in one product, and reports whether it took
 // effect or is waiting for somebody to agree.

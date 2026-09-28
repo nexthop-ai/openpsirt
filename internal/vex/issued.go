@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrMayNotPublish says the subject may read this build and may not say a
@@ -300,7 +301,7 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject,
 }
 
 // ErrNoSuchRevision says no document went out as that revision.
-var ErrNoSuchRevision = errors.New("no document went out as that revision")
+var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 
 // revision is which revision the document for this build is, counting from
 // one.
@@ -409,7 +410,7 @@ func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, wha
 // ErrRenamed is a build renamed while its document was being generated. The
 // document names what it had been called, so it is not recorded; asking again
 // generates one under the name it has now.
-var ErrRenamed = errors.New("the build was renamed while its document was being written; ask again")
+var ErrRenamed = refusal.New("the build was renamed while its document was being written; ask again")
 
 // stillNamed confirms each part of a build is still called what it was when
 // its document was generated.

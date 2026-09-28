@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Revise states the reasoning again, and takes back any approval standing on
@@ -74,7 +75,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	reasoning string) (Revised, error) {
 
 	if strings.TrimSpace(reasoning) == "" {
-		return Revised{}, errors.New("a revision has to say something")
+		return Revised{}, refusal.New("a revision has to say something")
 	}
 	if err := markdown.Check(reasoning); err != nil {
 		return Revised{}, err

@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -24,7 +24,7 @@ import (
 // here would be overwriting what was found with what somebody thinks. A flaw
 // recorded by hand has no scan behind it, which is exactly why its build set
 // is ours to correct.
-var ErrNotOursToSay = errors.New(
+var ErrNotOursToSay = refusal.New(
 	"which builds hold a scanned issue is what the scans found, not something to set here")
 
 // Reset is what setting the builds did.

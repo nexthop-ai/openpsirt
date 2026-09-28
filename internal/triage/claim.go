@@ -6,7 +6,6 @@ package triage
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Claim is one proposer's action: what an approver reads and agrees to.
@@ -264,7 +264,7 @@ func (s *Store) newClaimNarrowed(ctx context.Context, kind ClaimKind, by int64,
 }
 
 // ErrNotExtendable is returned when a claim cannot be carried to a new issue.
-var ErrNotExtendable = errors.New("that claim cannot be extended")
+var ErrNotExtendable = refusal.New("that claim cannot be extended")
 
 // Extend records the same judgment an approved claim made, against a new issue
 // at the same places.
@@ -407,7 +407,7 @@ func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimI
 
 	if len(except) > 0 {
 		if strings.TrimSpace(because) == "" {
-			return nil, fmt.Errorf("say why those are set aside: rows returned with no reason " +
+			return nil, refusal.Errorf("say why those are set aside: rows returned with no reason " +
 				"are a round trip nobody learns from")
 		}
 		if err := markdown.Check(because); err != nil {
@@ -447,7 +447,7 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 	}
 	for id := range aside {
 		if !named[id] {
-			return nil, fmt.Errorf("decision %d is not part of claim %d", id, claimID)
+			return nil, refusal.Errorf("decision %d is not part of claim %d", id, claimID)
 		}
 	}
 	if claim.RevisionID == nil {
@@ -612,7 +612,7 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 		return fmt.Errorf("record an approval: %w", err)
 	}
 	if n != int64(len(ids)) {
-		return fmt.Errorf("the reasoning changed while this was being agreed to; read it again")
+		return refusal.Errorf("the reasoning changed while this was being agreed to; read it again")
 	}
 	return nil
 }
@@ -622,7 +622,7 @@ func (s *Store) sayOn(ctx context.Context, subject access.Subject, claimID int64
 	now time.Time) error {
 
 	if strings.TrimSpace(body) == "" {
-		return fmt.Errorf("a comment has to say something")
+		return refusal.Errorf("a comment has to say something")
 	}
 	if err := markdown.Check(body); err != nil {
 		return err
@@ -670,10 +670,10 @@ func (s *Store) Split(ctx context.Context, subject access.Subject, claimID int64
 	rows []int64, because string) (*Claim, error) {
 
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("say which rows are being held back")
+		return nil, refusal.Errorf("say which rows are being held back")
 	}
 	if strings.TrimSpace(because) == "" {
-		return nil, fmt.Errorf("say why these are being held back: a subset with no reason " +
+		return nil, refusal.Errorf("say why these are being held back: a subset with no reason " +
 			"is a claim nobody can read afterwards")
 	}
 	if err := markdown.Check(because); err != nil {
@@ -701,7 +701,7 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 		}
 	}
 	if claim.ProposedBy != subject.ID {
-		return nil, fmt.Errorf(
+		return nil, refusal.Errorf(
 			"only the person who made a claim may hold part of it back; an approver sets rows aside")
 	}
 
@@ -719,17 +719,17 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 	holding := make(map[int64]bool, len(rows))
 	for _, id := range rows {
 		if !named[id] {
-			return nil, fmt.Errorf("decision %d is not part of claim %d", id, claimID)
+			return nil, refusal.Errorf("decision %d is not part of claim %d", id, claimID)
 		}
 		holding[id] = true
 	}
 	if len(holding) >= waiting {
-		return nil, fmt.Errorf(
+		return nil, refusal.Errorf(
 			"that is the whole claim: revise it, or withdraw it, rather than splitting it in two")
 	}
 	for _, row := range all {
 		if holding[row.ID] && row.State != Proposed {
-			return nil, fmt.Errorf(
+			return nil, refusal.Errorf(
 				"decision %d is %s, so it is not part of what is still being argued", row.ID, row.State)
 		}
 	}
@@ -802,7 +802,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 	because string) (*SentBack, error) {
 
 	if strings.TrimSpace(because) == "" {
-		return nil, fmt.Errorf("say what needs to change: sending something back without a " +
+		return nil, refusal.Errorf("say what needs to change: sending something back without a " +
 			"reason is a round trip nobody learns from")
 	}
 	if err := markdown.Check(because); err != nil {
@@ -822,7 +822,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			return err
 		}
 		if author == subject.ID {
-			return fmt.Errorf("that is your own claim to revise, not one to send back")
+			return refusal.Errorf("that is your own claim to revise, not one to send back")
 		}
 		result.Author = author
 		var ids []int64
@@ -845,7 +845,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			ids = append(ids, row.ID)
 		}
 		if len(ids) == 0 {
-			return fmt.Errorf("nothing in that claim is waiting on anybody")
+			return refusal.Errorf("nothing in that claim is waiting on anybody")
 		}
 		now := s.now().Truncate(time.Microsecond)
 		// The reason travels as a comment on the claim, because that is what
@@ -865,7 +865,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			return fmt.Errorf("record that this was sent back: %w", err)
 		}
 		if n != int64(len(ids)) {
-			return fmt.Errorf("the claim changed while it was being sent back; read it again")
+			return refusal.Errorf("the claim changed while it was being sent back; read it again")
 		}
 		result.Sent = len(ids)
 		return nil

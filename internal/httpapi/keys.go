@@ -134,6 +134,8 @@ func registerKeys(api huma.API, a Administering) {
 			switch {
 			case database.IsDuplicate(err):
 				return huma.Error409Conflict("a key already has that name")
+			case errors.Is(err, access.ErrNoKeyName):
+				return huma.Error422UnprocessableEntity(err.Error())
 			case err != nil:
 				return wentWrong(a.Logger, "cannot issue a credential", err)
 			}
@@ -174,8 +176,9 @@ func registerKeys(api huma.API, a Administering) {
 			if err != nil {
 				return wentWrong(a.Logger, "cannot read the credentials", err)
 			}
+			named := access.KeyName(in.Name)
 			for _, key := range keys {
-				if key.Name != in.Name || key.RevokedAt != nil {
+				if key.Name != named || key.RevokedAt != nil {
 					continue
 				}
 				switch err := store.Revoke(ctx, key.ID); {
@@ -184,7 +187,7 @@ func registerKeys(api huma.API, a Administering) {
 				case err != nil:
 					return wentWrong(a.Logger, "cannot withdraw the credential", err)
 				}
-				if err := noted(ctx, tx, trail.Credential, in.Name,
+				if err := noted(ctx, tx, trail.Credential, key.Name,
 					trail.Said("in force", true), nil); err != nil {
 					return notRecorded(a.Logger, err)
 				}

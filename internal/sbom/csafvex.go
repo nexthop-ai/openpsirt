@@ -4,11 +4,11 @@
 package sbom
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Reading CSAF-VEX, the second of the two shapes a supplier's VEX as evidence
@@ -178,7 +178,7 @@ func (r *csafReader) name(id string) error {
 		return nil
 	}
 	if len(r.charged) >= r.lim.MaxComponents {
-		return fmt.Errorf("the document names more than the %d product limit",
+		return refusal.Errorf("the document names more than the %d product limit",
 			r.lim.MaxComponents)
 	}
 	r.charged[id] = struct{}{}
@@ -206,7 +206,7 @@ const mentionsPerProduct = 10
 func (r *csafReader) hold(n int) error {
 	ceiling := r.lim.MaxComponents * mentionsPerProduct
 	if n > ceiling-r.held {
-		return fmt.Errorf("the document names its products more than the %d times "+
+		return refusal.Errorf("the document names its products more than the %d times "+
 			"the %d product limit allows", ceiling, r.lim.MaxComponents)
 	}
 	r.held += n
@@ -280,7 +280,7 @@ func (r *csafReader) finish() ([]Suppression, error) {
 // document that could not be read at all: one is a publisher issuing more than
 // one kind of document, which is ordinary, and the other is something wrong.
 // The two read identically as text.
-var ErrWrongProfile = errors.New("a CSAF document of another kind")
+var ErrWrongProfile = refusal.New("a CSAF document of another kind")
 
 // wrongProfile is the refusal for a document this reader was not opened for,
 // which names the path that does read it.
@@ -617,7 +617,7 @@ func (r *csafReader) vulnerability() error {
 	// Compared before the object is read, so that the claim past the limit is
 	// refused rather than walked in full and then refused.
 	if len(r.claims) >= r.lim.MaxStatements {
-		return fmt.Errorf("more claims than the %d limit", r.lim.MaxStatements)
+		return refusal.Errorf("more claims than the %d limit", r.lim.MaxStatements)
 	}
 	one := &claimed{
 		byProduct: map[string]Status{},
@@ -661,7 +661,7 @@ func (r *csafReader) vulnerability() error {
 	case len(ids) > 0:
 		one.vulnerability, one.aliases = ids[0], ids[1:]
 	default:
-		return fmt.Errorf("a claim names no vulnerability, so there is nothing it could be about")
+		return refusal.Errorf("a claim names no vulnerability, so there is nothing it could be about")
 	}
 	r.claims = append(r.claims, one)
 	return nil
@@ -937,7 +937,7 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 			claim.Targets = append(claim.Targets, targetOf(at))
 		}
 		if len(order) == 0 {
-			return nil, fmt.Errorf("the claim about %s points at no product this document "+
+			return nil, refusal.Errorf("the claim about %s points at no product this document "+
 				"defines, so there is nothing it could be about", trim(one.vulnerability))
 		}
 		for _, status := range order {

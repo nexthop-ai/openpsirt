@@ -4,12 +4,12 @@
 package sbom
 
 import (
-	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // refEdge is one declared dependency, still named by the identifiers the file
@@ -204,12 +204,12 @@ func (c *reader) bind(ref string, described graph.Described) error {
 		return nil
 	}
 	if _, clash := c.byRef[ref]; clash {
-		return fmt.Errorf("two components share the identifier %q, so every edge naming it is ambiguous", trim(ref))
+		return refusal.Errorf("two components share the identifier %q, so every edge naming it is ambiguous", trim(ref))
 	}
 	// Checked against the other array too, and checked here as well as there
 	// because which of the two a format puts first is the producer's business.
 	if c.files[ref] {
-		return fmt.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
+		return refusal.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
 	}
 	c.byRef[ref] = described
 	return nil
@@ -263,7 +263,7 @@ func (c *reader) add(described graph.Described) error {
 func (c *reader) count() error {
 	c.stated++
 	if c.stated > c.lim.MaxComponents {
-		return fmt.Errorf("scan file describes more than the %d component limit", c.lim.MaxComponents)
+		return refusal.Errorf("scan file describes more than the %d component limit", c.lim.MaxComponents)
 	}
 	return nil
 }
@@ -275,7 +275,7 @@ func (c *reader) count() error {
 func (c *reader) file() error {
 	c.filed++
 	if c.filed > c.lim.MaxFiles {
-		return fmt.Errorf("scan file catalogs more than the %d file limit", c.lim.MaxFiles)
+		return refusal.Errorf("scan file catalogs more than the %d file limit", c.lim.MaxFiles)
 	}
 	return nil
 }
@@ -301,7 +301,7 @@ func (c *reader) refile() error {
 func (c *reader) claim() error {
 	c.claimed++
 	if c.claimed > c.lim.MaxStatements {
-		return fmt.Errorf("scan file carries more than the %d claim limit", c.lim.MaxStatements)
+		return refusal.Errorf("scan file carries more than the %d claim limit", c.lim.MaxStatements)
 	}
 	return nil
 }
@@ -315,7 +315,7 @@ const licensesPerComponent = 10
 func (c *reader) license() error {
 	c.licensed++
 	if ceiling := c.lim.MaxComponents * licensesPerComponent; c.licensed > ceiling {
-		return fmt.Errorf("scan file states more than %d license entries, %d for each of "+
+		return refusal.Errorf("scan file states more than %d license entries, %d for each of "+
 			"the %d components the limit allows", ceiling, licensesPerComponent, c.lim.MaxComponents)
 	}
 	return nil
@@ -325,7 +325,7 @@ func (c *reader) license() error {
 func (c *reader) charge() error {
 	c.charged++
 	if c.charged > c.lim.MaxEdges {
-		return fmt.Errorf("scan file declares more than the %d dependency limit", c.lim.MaxEdges)
+		return refusal.Errorf("scan file declares more than the %d dependency limit", c.lim.MaxEdges)
 	}
 	return nil
 }

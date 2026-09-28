@@ -50,6 +50,9 @@ func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
 		everyIssueIsReadAsItself(),
 		everyTrailRowIsAPersons(),
 		everyDestinationIsAWebhook(),
+		keyNamesAreFoldedAndClashesWithdrawn(),
+		tokenNamesAreFoldedAndClashesWithdrawn(),
+		claimSubjectsAreFolded(),
 		theV050DeclarationsAreTheTablesTheMigrationsBuild(),
 	}
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {

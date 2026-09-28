@@ -4,10 +4,10 @@
 package sbom
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The third major version of SPDX, which is a different document rather than a
@@ -138,7 +138,7 @@ func (c *reader) spdx3Context() error {
 			return nil
 		}
 		if major, _, _ := strings.Cut(rest, "."); major != spdx3Major {
-			return fmt.Errorf("%s version %q is not one this reads", SPDX, trim(context))
+			return refusal.Errorf("%s version %q is not one this reads", SPDX, trim(context))
 		}
 		c.declared = SPDX
 		return nil
@@ -321,7 +321,7 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 		// and a package share resolves to the package and invents a
 		// dependency nobody stated.
 		if _, clash := c.byRef[e.id]; clash {
-			return fmt.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(e.id))
+			return refusal.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(e.id))
 		}
 		c.files[e.id] = true
 		return nil
@@ -366,7 +366,7 @@ func (c *reader) spdx3Created(e spdx3Element) error {
 		// so it is read past rather than taken as a different major version.
 		stated := strings.TrimPrefix(strings.TrimSpace(e.specVersion), "SPDX-")
 		if major, _, _ := strings.Cut(stated, "."); major != spdx3Major {
-			return fmt.Errorf("%s version %q is not one this reads", SPDX, trim(e.specVersion))
+			return refusal.Errorf("%s version %q is not one this reads", SPDX, trim(e.specVersion))
 		}
 		c.declared = SPDX
 	}
@@ -398,7 +398,7 @@ func (c *reader) spdx3Package(e spdx3Element) error {
 		CPE:     sentinel(e.cpe),
 	}
 	if err := described.Valid(); err != nil {
-		return fmt.Errorf("%w, so it cannot be tracked", err)
+		return refusal.Errorf("%w, so it cannot be tracked", err)
 	}
 	described.UpstreamName, described.UpstreamVersion = graph.UpstreamFromPurl(described.Purl)
 	if err := c.add(described); err != nil {

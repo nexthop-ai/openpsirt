@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // A word somebody put on a finding.
@@ -60,7 +61,7 @@ func (s *Store) TagIt(ctx context.Context, subject access.Subject, productID,
 
 	folded := TagAs(typed)
 	if folded == "" {
-		return fmt.Errorf("a tag has to say something")
+		return refusal.Errorf("a tag has to say something")
 	}
 	if err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID); err != nil {
 		return err

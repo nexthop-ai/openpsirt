@@ -27,7 +27,6 @@ package vex
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -39,6 +38,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -52,7 +52,7 @@ const namespace = "https://openvex.dev/ns/v0.2.0"
 // can act on: narrow to a variant, or ask about a build that argues less. A
 // bare error reaches the route as "the document could not be generated" with a
 // 500, which reads as the tool being broken.
-var ErrTooLarge = errors.New("more dismissals than one document carries")
+var ErrTooLarge = refusal.New("more dismissals than one document carries")
 
 // Statements is one VEX document about one build.
 //
@@ -222,7 +222,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 // gone out. That read names no author and assembles nothing, so refusing it
 // answers a question nobody asked with a sentence about a field the answer
 // does not carry.
-var ErrNoPublisher = errors.New("this deployment has not said who it publishes as, " +
+var ErrNoPublisher = refusal.New("this deployment has not said who it publishes as, " +
 	"so a document has nobody to name as its author")
 
 // locate resolves the build a document is asked for and refuses anybody who

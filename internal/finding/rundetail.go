@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // One run of the scanner.
@@ -61,7 +62,7 @@ type RanDetail struct {
 //
 // A sentinel rather than a sentence, because whoever asked has to tell it from
 // a read that could not be made: the first is a 404 and the second is a fault.
-var ErrNoSuchRun = errors.New("no such run on this build")
+var ErrNoSuchRun = refusal.New("no such run on this build")
 
 // Ran reads one run of the scanner and what it changed.
 //

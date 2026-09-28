@@ -5,7 +5,6 @@ package obligation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -58,7 +58,7 @@ const RecipientLimit = 200
 // ErrNoSuchRecord is returned where a record of being exploited is missing or
 // is about an issue this subject may not be told of. One error for both,
 // because telling them apart turns a record identifier into a directory.
-var ErrNoSuchRecord = errors.New("no record of being exploited is kept there")
+var ErrNoSuchRecord = refusal.New("no record of being exploited is kept there")
 
 // RecordTold records that somebody outside was told about an attack.
 //
@@ -70,31 +70,31 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 	windowID *int64, recipient string, toldAt time.Time, said string) (*Told, error) {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return nil, errors.New("a notice is recorded against whoever recorded it")
+		return nil, refusal.New("a notice is recorded against whoever recorded it")
 	}
 	recipient = strings.TrimSpace(recipient)
 	if recipient == "" {
-		return nil, errors.New("say who was told")
+		return nil, refusal.New("say who was told")
 	}
 	if utf8.RuneCountInString(recipient) > RecipientLimit {
-		return nil, fmt.Errorf("who was told is at most %d characters", RecipientLimit)
+		return nil, refusal.Errorf("who was told is at most %d characters", RecipientLimit)
 	}
 	if strings.TrimSpace(said) == "" {
-		return nil, errors.New(
+		return nil, refusal.New(
 			"say what they were told. A notice is read later by somebody answering for it, " +
 				"and what was said is the part they cannot find anywhere else")
 	}
 	if len(said) > triage.GroundsLimit {
-		return nil, fmt.Errorf("what they were told is longer than %d bytes", triage.GroundsLimit)
+		return nil, refusal.Errorf("what they were told is longer than %d bytes", triage.GroundsLimit)
 	}
 	if err := markdown.Check(said); err != nil {
 		return nil, err
 	}
 	if toldAt.IsZero() {
-		return nil, errors.New("say when they were told")
+		return nil, refusal.New("say when they were told")
 	}
 	if toldAt.After(s.now()) {
-		return nil, errors.New("say when they were told. A moment still to come is not one anybody was told at")
+		return nil, refusal.New("say when they were told. A moment still to come is not one anybody was told at")
 	}
 
 	told := new(Told)
@@ -125,7 +125,7 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 		// nobody here knew of yet is a mistake in one moment or the other,
 		// and the record is the one already kept.
 		if toldAt.Before(record.KnownAt) {
-			return fmt.Errorf("that is before this became known, at %s. Correct whichever of "+
+			return refusal.Errorf("that is before this became known, at %s. Correct whichever of "+
 				"the two is wrong", record.KnownAt.Format(time.RFC3339))
 		}
 		if windowID != nil {

@@ -4,9 +4,10 @@
 package sbom
 
 import (
-	"fmt"
 	"io"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The exchange format suppressions arrive in. Its namespace is what a document
@@ -36,25 +37,25 @@ func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 	b := newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth)
 	v := &suppressions{b: b, lim: lim}
 	if err := v.read(); err != nil {
-		return nil, fmt.Errorf("reading suppressions: %w", err)
+		return nil, refusal.Errorf("reading suppressions: %w", err)
 	}
 	// A document that fired both vocabularies is not either of them. Read as
 	// one, the other's statements would be dropped without a word while the
 	// upload reports success. The inventory side refuses the same and says
 	// why.
 	if v.csaf != nil && len(v.claims) > 0 {
-		return nil, fmt.Errorf("suppressions state both OpenVEX and CSAF-VEX, " +
+		return nil, refusal.Errorf("suppressions state both OpenVEX and CSAF-VEX, " +
 			"so which format the document is cannot be settled")
 	}
 	if v.csaf != nil {
 		claims, err := v.csaf.finish()
 		if err != nil {
-			return nil, fmt.Errorf("reading suppressions: %w", err)
+			return nil, refusal.Errorf("reading suppressions: %w", err)
 		}
 		return claims, nil
 	}
 	if !strings.Contains(v.namespace, suppressionNamespace) {
-		return nil, fmt.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
+		return nil, refusal.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
 	}
 	return v.claims, nil
 }
@@ -83,7 +84,7 @@ type suppressions struct {
 func (v *suppressions) name() error {
 	v.named++
 	if v.named > v.lim.MaxComponents {
-		return fmt.Errorf("suppression document names more than the %d product limit",
+		return refusal.Errorf("suppression document names more than the %d product limit",
 			v.lim.MaxComponents)
 	}
 	return nil
@@ -104,7 +105,7 @@ func (v *suppressions) read() error {
 				// Compared before the element is read, so that the claim past
 				// the limit is refused rather than walked in full first.
 				if len(v.claims) >= v.lim.MaxStatements {
-					return fmt.Errorf("more claims than the %d limit", v.lim.MaxStatements)
+					return refusal.Errorf("more claims than the %d limit", v.lim.MaxStatements)
 				}
 				claim, err := v.statement()
 				if err != nil {
@@ -159,13 +160,13 @@ func (v *suppressions) statement() (Suppression, error) {
 		return Suppression{}, err
 	}
 	if claim.Vulnerability == "" {
-		return Suppression{}, fmt.Errorf("a claim names no vulnerability, so there is nothing it could be about")
+		return Suppression{}, refusal.Errorf("a claim names no vulnerability, so there is nothing it could be about")
 	}
 	if !claim.Status.known() {
 		// Ignoring a claim we cannot read would let a build's judgment go
 		// missing silently, which is the failure this arrangement exists to
 		// remove.
-		return Suppression{}, fmt.Errorf("claim about %s says %q, which is not a status this reads",
+		return Suppression{}, refusal.Errorf("claim about %s says %q, which is not a status this reads",
 			trim(claim.Vulnerability), trim(string(claim.Status)))
 	}
 	return claim, nil

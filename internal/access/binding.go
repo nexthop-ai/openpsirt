@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Mode is where a person's roles come from, for the whole deployment.
@@ -94,10 +95,10 @@ type AdminBinding struct {
 func (s *Store) Bind(ctx context.Context, group string, productID int64, role Role) error {
 	group = strings.TrimSpace(group)
 	if group == "" {
-		return fmt.Errorf("a binding needs a group to bind")
+		return refusal.Errorf("a binding needs a group to bind")
 	}
 	if !role.Valid() {
-		return fmt.Errorf("%q is not a role", role)
+		return refusal.Errorf("%q is not a role", role)
 	}
 	binding := &Binding{
 		GroupName: group, ProductID: productID, Role: role,
@@ -150,10 +151,10 @@ func (s *Store) Bindings(ctx context.Context) ([]Binding, error) {
 func (s *Store) BindOver(ctx context.Context, group string, over Over) error {
 	group = strings.TrimSpace(group)
 	if group == "" {
-		return fmt.Errorf("a binding needs a group to bind")
+		return refusal.Errorf("a binding needs a group to bind")
 	}
 	if !over.Valid() {
-		return fmt.Errorf("%q is not something held over this deployment", over)
+		return refusal.Errorf("%q is not something held over this deployment", over)
 	}
 	binding := &AdminBinding{
 		GroupName: group, Grants: over,
@@ -176,7 +177,7 @@ func (s *Store) BindOver(ctx context.Context, group string, over Over) error {
 func (s *Store) UnbindOver(ctx context.Context, group string, over Over) error {
 	group = strings.TrimSpace(group)
 	if over == Administers {
-		return fmt.Errorf("administration is unbound where what remains can be counted")
+		return refusal.Errorf("administration is unbound where what remains can be counted")
 	}
 	res, err := s.db.NewDelete().Model((*AdminBinding)(nil)).
 		Where("group_name = ?", group).Where("grants = ?", over).Exec(ctx)
@@ -198,7 +199,7 @@ func (s *Store) UnbindOver(ctx context.Context, group string, over Over) error {
 //
 // A sentinel, because the caller answers it differently from a failure: it is
 // a refusal somebody can act on rather than something that went wrong.
-var ErrLastAdministrator = errors.New("nothing would be left to administer this deployment")
+var ErrLastAdministrator = refusal.New("nothing would be left to administer this deployment")
 
 // modeIn reads where roles come from, against whichever handle it is given.
 //
@@ -651,7 +652,7 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			return fmt.Errorf("clear what groups audited: %w", err)
 		}
 	default:
-		return fmt.Errorf("%q is not a way for roles to be assigned", mode)
+		return refusal.Errorf("%q is not a way for roles to be assigned", mode)
 	}
 	return nil
 }
@@ -743,7 +744,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) (N
 		// by the phantom. This is the way back in, so it fails loudly at the
 		// one moment somebody needs it.
 		if before, _, found := strings.Cut(trimmed, ":"); found && before != "" {
-			return Naming{}, fmt.Errorf(
+			return Naming{}, refusal.Errorf(
 				"%q names an administrator as \"provider:username\". A name here is the "+
 					"plain username the provider or the trusted proxy reports, with no "+
 					"prefix. Write %q and start again",

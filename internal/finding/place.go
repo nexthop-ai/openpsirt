@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The upstream version a decision is keyed on, as SQL, so that everything
@@ -36,7 +36,7 @@ const (
 // ErrNoOpenFinding is a place, or a component in a build, where nothing is
 // open against the issue asked about. A sentinel, so a caller can tell it from
 // a read that could not be made.
-var ErrNoOpenFinding = errors.New("no open finding is recorded there")
+var ErrNoOpenFinding = refusal.New("no open finding is recorded there")
 
 // Deciding carries everything a decision needs about where it is being
 // made, read from the findings rather than from whoever is making it.

@@ -114,8 +114,8 @@ func labelBeside(name, handle string) string {
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
 	At    string `json:"at"`
-	Actor string `json:"actor" enum:"person,configuration,merge" doc:"What made the change: a person in the application, the deployment's startup configuration, which names administrators, or a scan merging two issues its report named together"`
-	By    string `json:"by,omitempty" doc:"The person who made the change, by sign-in identity. Absent where configuration made it"`
+	Actor string `json:"actor" enum:"person,configuration,merge,upgrade" doc:"What made the change: a person in the application, the deployment's startup configuration, which names administrators, a scan merging two issues its report named together, or an upgrade, which withdraws a key or a token whose name another holds"`
+	By    string `json:"by,omitempty" doc:"The person who made the change, by sign-in identity. Absent where no person made it"`
 	// ByName is the label beside the identity rather than in its place.
 	ByName string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here,merge" doc:"The kind of thing that changed"`

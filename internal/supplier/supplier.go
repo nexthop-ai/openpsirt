@@ -47,6 +47,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Source is a supplier this deployment fetches advisories from.
@@ -148,7 +149,7 @@ func Mark(address string) string {
 }
 
 // ErrNameTaken says a supplier is already read under that name.
-var ErrNameTaken = errors.New("a supplier is already read under that name")
+var ErrNameTaken = refusal.New("a supplier is already read under that name")
 
 // administering refuses anybody but an administrator.
 //
@@ -257,14 +258,14 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	typed := strings.TrimSpace(name)
 	address = strings.TrimSpace(address)
 	if typed == "" || address == "" {
-		return nil, fmt.Errorf("a supplier needs a name and an address")
+		return nil, refusal.Errorf("a supplier needs a name and an address")
 	}
 	if utf8.RuneCountInString(typed) > MostName {
-		return nil, fmt.Errorf("that name is longer than the %d characters this records",
+		return nil, refusal.Errorf("that name is longer than the %d characters this records",
 			MostName)
 	}
 	if utf8.RuneCountInString(address) > MostURL {
-		return nil, fmt.Errorf("that address is longer than the %d characters this records",
+		return nil, refusal.Errorf("that address is longer than the %d characters this records",
 			MostURL)
 	}
 	// Judged here as well as at the request, so a second caller cannot store
@@ -280,7 +281,7 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	case err != nil:
 		return nil, err
 	case !live:
-		return nil, fmt.Errorf("that product is out of use, and a supplier is read " +
+		return nil, refusal.Errorf("that product is out of use, and a supplier is read " +
 			"against what a product ships")
 	}
 	folded := matching(typed)

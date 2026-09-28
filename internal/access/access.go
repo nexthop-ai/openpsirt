@@ -43,6 +43,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Role is what somebody may do with a product.
@@ -181,7 +182,7 @@ var ErrDenied = errors.New("not authorized")
 // A revocation is the case it exists for: "this grant does not exist" and
 // "this grant has been removed" are different answers, and only one of them
 // means the caller should go on to record what it did.
-var ErrNothingMatched = errors.New("nothing matched")
+var ErrNothingMatched = refusal.New("nothing matched")
 
 // matched reads how many rows a revocation matched, and answers one that
 // matched none with ErrNothingMatched, saying none.

@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -243,7 +244,7 @@ func (m Movement) Distance() time.Duration {
 }
 
 // ErrNotEmbargoed says there is no embargo here to move.
-var ErrNotEmbargoed = errors.New("nothing undisclosed here has a date to move")
+var ErrNotEmbargoed = refusal.New("nothing undisclosed here has a date to move")
 
 // ErrAlreadyAgreed says somebody has already agreed to this movement.
 //
@@ -252,18 +253,21 @@ var ErrNotEmbargoed = errors.New("nothing undisclosed here has a date to move")
 // conflict rather than something going wrong. Left as a plain error it reached
 // the caller as a 500, which reads as a defect in the tool and sends somebody
 // to the logs to find out that nothing was broken.
-var ErrAlreadyAgreed = errors.New("that movement has already been agreed to")
+var ErrAlreadyAgreed = refusal.New("that movement has already been agreed to")
 
 // ErrNotLater says an extension would not move the date later.
-var ErrNotLater = errors.New("an extension moves a date later")
+var ErrNotLater = refusal.New("an extension moves a date later")
 
 // Unreasoned is a movement asked for with no reason. The caller's to fix.
 type Unreasoned struct{ Said string }
 
 func (u Unreasoned) Error() string { return u.Said }
 
+// Refused marks it as a sentence for the caller, who left the reason out.
+func (u Unreasoned) Refused() {}
+
 // ErrNotEarlier says bringing a date forward would not move it earlier.
-var ErrNotEarlier = errors.New("bringing a disclosure date forward moves it earlier")
+var ErrNotEarlier = refusal.New("bringing a disclosure date forward moves it earlier")
 
 // wrongWay is the refusal for an act asked to move a date the way it does not.
 func wrongWay(act Act) error {
@@ -320,7 +324,7 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 	productID, vulnerabilityID int64, until time.Time, reason string) (*Movement, error) {
 
 	if !act.Valid() {
-		return nil, fmt.Errorf("a disclosure date moves as one of the acts this records")
+		return nil, refusal.Errorf("a disclosure date moves as one of the acts this records")
 	}
 	if !subject.Triages(access.Private, productID) {
 		return nil, access.Denied(
