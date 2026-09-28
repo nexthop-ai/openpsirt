@@ -244,7 +244,7 @@ func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
 		// a fault: the issue scope must not hand the product away either.
 		for _, path := range paths {
 			got := asPerson(t, r, "outsider", http.MethodGet, path, "")
-			if got.Code < 400 || got.Code >= 500 {
+			if got.Code != http.StatusNotFound {
 				t.Errorf("%s answers somebody with nothing on this product %d: %s",
 					path, got.Code, got.Body.String())
 			}

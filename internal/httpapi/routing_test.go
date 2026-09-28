@@ -107,11 +107,9 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 
 		// A triager may see the rules but not write one: a rule hands work to
 		// somebody, which is the act the assigner right names.
-		if refused := asPerson(t, r, "triager", http.MethodPost,
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/routing-rules",
-			`{"name":"mine","team":"curlers","upstream":"curl"}`); refused.Code < 400 {
-			t.Errorf("a triager wrote a routing rule, answering %d", refused.Code)
-		}
+			`{"name":"mine","team":"curlers","upstream":"curl"}`), http.StatusNotFound)
 		// And a rule that matches nothing is refused rather than recorded.
 		if empty := asPerson(t, r, "assigner", http.MethodPost,
 			"/v1/products/mine/routing-rules",

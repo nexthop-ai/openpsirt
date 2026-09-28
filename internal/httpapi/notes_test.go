@@ -137,10 +137,8 @@ func TestOnlyTheAuthorEditsANoteThroughTheApi(t *testing.T) {
 		at := "/v1/notes/" + itoa(wrote.ID)
 
 		// Somebody else who holds triage here.
-		if got := asPerson(t, r, "private-triage", http.MethodPut, at,
-			`{"body":"Somebody else's words."}`); got.Code < 400 {
-			t.Errorf("another triager rewrote somebody's note: %d %s", got.Code, got.Body.String())
-		}
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodPut, at,
+			`{"body":"Somebody else's words."}`), http.StatusUnprocessableEntity)
 		if got := asPerson(t, r, "triager", http.MethodPut, at,
 			`{"body":"Second thought."}`); got.Code != http.StatusOK {
 			t.Fatalf("the author could not change their own note: %d %s",

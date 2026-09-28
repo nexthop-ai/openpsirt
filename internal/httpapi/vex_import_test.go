@@ -25,9 +25,16 @@ import (
 // vexed uploads one OpenVEX document as a publisher's statements.
 func (r *reach) vexed(t *testing.T, who, publisher, document string) *httptest.ResponseRecorder {
 	t.Helper()
+	return r.vexedAs(t, who, publisher, publisher+".json", document)
+}
+
+// vexedAs uploads a VEX document under a chosen file name, naming the
+// publisher in the query only where one is given.
+func (r *reach) vexedAs(t *testing.T, who, publisher, filename, document string) *httptest.ResponseRecorder {
+	t.Helper()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	part, err := form.CreateFormFile("statements", publisher+".json")
+	part, err := form.CreateFormFile("statements", filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,8 +44,11 @@ func (r *reach) vexed(t *testing.T, who, publisher, document string) *httptest.R
 	if err := form.Close(); err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodPost,
-		"/v1/products/mine/vex-statements?publisher="+publisher, &body)
+	at := "/v1/products/mine/vex-statements"
+	if publisher != "" {
+		at += "?publisher=" + publisher
+	}
+	req := httptest.NewRequest(http.MethodPost, at, &body)
 	req.Header.Set("Content-Type", form.FormDataContentType())
 	req.Header.Set(testHeader, who)
 	fromOurOwnPage(req)
@@ -449,8 +459,18 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 			  "justification":"vulnerable_code_not_present",
 			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
 
-		if got := r.vexed(t, "admin", strings.Repeat("d", 192), document); got.Code < 400 {
-			t.Errorf("a publisher longer than the column answered %d", got.Code)
+		refusedWith(t, r.vexed(t, "admin", strings.Repeat("d", 192), document),
+			http.StatusUnprocessableEntity)
+		// The file name stands in for a publisher the query leaves out, and is
+		// held to the same width by the handler rather than by the parameter's
+		// declared bound. The handler's refusal says how to name a publisher
+		// instead; the store's, reached with the handler's check deleted, does
+		// not.
+		named := r.vexedAs(t, "admin", "", strings.Repeat("d", 187)+".json", document)
+		refusedWith(t, named, http.StatusUnprocessableEntity)
+		if !contains(named.Body.String(), "?publisher=") {
+			t.Errorf("a file name too long to be the publisher is not told how to name one: %s",
+				named.Body.String())
 		}
 		if got := r.vexed(t, "admin", strings.Repeat("d", 191), document); got.Code != http.StatusCreated {
 			t.Errorf("a publisher exactly the width of the column answered %d: %s",

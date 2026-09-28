@@ -237,10 +237,15 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		r.scannedSiblings(t)
 
 		const at = "/v1/products/mine/components/libcurl4t64/upgrade"
-		// A judgment with no reasoning is refused like every other.
-		if got := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"to":"8.5.0-1","by":"`+aheadOfUs+`"}`); got.Code < 400 {
-			t.Errorf("a bump with no reasoning answered %d", got.Code)
+		// A judgment with no reasoning is refused like every other. The body
+		// carries everything else a bump needs, so the refusal is the
+		// reasoning's alone.
+		unreasoned := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
+				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+		refusedWith(t, unreasoned, http.StatusUnprocessableEntity)
+		if !contains(unreasoned.Body.String(), "reasoning") {
+			t.Errorf("the refusal does not name the reasoning: %s", unreasoned.Body.String())
 		}
 
 		// One act, one transaction. A release past end-of-life cannot be a fix
@@ -258,9 +263,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the bump.",`+
 				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
-		if refused.Code < 400 {
-			t.Fatalf("declaring a fix in a retired release answered %d", refused.Code)
-		}
+		refusedWith(t, refused, http.StatusForbidden)
 		var left struct {
 			Total int `json:"total"`
 		}

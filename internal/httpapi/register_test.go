@@ -96,11 +96,9 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 			t.Error("the register export holds no rows")
 		}
 		// Somebody who holds nothing on the product gets nothing at all.
-		if refused := asPerson(t, r, "approver", http.MethodGet,
+		refusedWith(t, asPerson(t, r, "approver", http.MethodGet,
 			"/v1/products/mine/streams/master/variants/broadcom/register.csv",
-			""); refused.Code < 400 {
-			t.Errorf("somebody holding no read role exported the register: %d", refused.Code)
-		}
+			""), http.StatusNotFound)
 	})
 }
 

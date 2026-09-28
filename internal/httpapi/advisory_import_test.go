@@ -251,14 +251,10 @@ func TestEachUploadRefusesTheOtherKindOfDocument(t *testing.T) {
 
 		asAdvisory := r.advised(t, "admin", "vex.json",
 			said("not_affected", "vulnerable_code_not_present", ""))
-		if asAdvisory.Code == http.StatusCreated {
-			t.Error("a VEX document was taken as a security advisory")
-		}
+		refusedWith(t, asAdvisory, http.StatusUnprocessableEntity)
 		asVex := r.vexed(t, "admin", "example",
 			supplierAdvisory("EXSA-2026:1001", "fixed", "3.7.0"))
-		if asVex.Code == http.StatusCreated {
-			t.Error("a security advisory was taken as VEX statements")
-		}
+		refusedWith(t, asVex, http.StatusUnprocessableEntity)
 		if !strings.Contains(asVex.Body.String(), "supplier advisory") {
 			t.Errorf("the refusal does not say where it goes: %s", asVex.Body.String())
 		}

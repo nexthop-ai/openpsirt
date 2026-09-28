@@ -70,10 +70,8 @@ func TestWhereTheEffortWentIsAReport(t *testing.T) {
 		}
 
 		// And it takes the same scope the other reports do.
-		if elsewhere := asPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/effort?product=theirs", ""); elsewhere.Code < 400 {
-			t.Errorf("a product this reader cannot see answered %d", elsewhere.Code)
-		}
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/effort?product=theirs", ""), http.StatusNotFound)
 		if unknown := asPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/effort?team=nobodys", ""); unknown.Code != http.StatusNotFound {
 			t.Errorf("a team nobody declared answered %d", unknown.Code)

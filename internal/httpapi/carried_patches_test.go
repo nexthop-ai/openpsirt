@@ -4,7 +4,6 @@
 package httpapi_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -78,14 +77,6 @@ func TestWhatABuildCarriesIsReachableAndNarrowedLikeEverythingElse(t *testing.T)
 		// A build's claims are read by whoever may read its findings and by
 		// nobody else: a claim names an issue and a package, which is the
 		// finding said another way.
-		if got := asPerson(t, r, "approver", http.MethodGet, at, ""); got.Code < 400 {
-			var refused struct {
-				Total int `json:"total"`
-			}
-			if err := json.Unmarshal(got.Body.Bytes(), &refused); err == nil && refused.Total > 0 {
-				t.Errorf("somebody who may read nothing here was told about %d claims",
-					refused.Total)
-			}
-		}
+		refusedWith(t, asPerson(t, r, "approver", http.MethodGet, at, ""), http.StatusNotFound)
 	})
 }

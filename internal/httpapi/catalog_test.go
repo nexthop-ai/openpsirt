@@ -590,18 +590,14 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 		// Cut from itself, and cut from another tag: both are refused rather
 		// than stored, because one is a comparison that never returns and the
 		// other is a line that does not exist.
-		if got := asPerson(t, r, "admin", http.MethodPut, at,
-			`{"released_on":"2026-03-31","cut_from":"v2.0"}`); got.Code < 400 {
-			t.Errorf("a release cut from itself answered %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "admin", http.MethodPut, at,
+			`{"released_on":"2026-03-31","cut_from":"v2.0"}`), http.StatusUnprocessableEntity)
 		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/streams",
 			`{"name":"v1.9","kind":"tag"}`); made.Code >= 300 {
 			t.Fatalf("declaring a second tag answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := asPerson(t, r, "admin", http.MethodPut, at,
-			`{"released_on":"2026-03-31","cut_from":"v1.9"}`); got.Code < 400 {
-			t.Errorf("a release cut from another tag answered %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "admin", http.MethodPut, at,
+			`{"released_on":"2026-03-31","cut_from":"v1.9"}`), http.StatusUnprocessableEntity)
 
 		if got := asPerson(t, r, "admin", http.MethodPut, at,
 			`{"released_on":"2026-03-31","cut_from":"master"}`); got.Code >= 300 {
@@ -640,10 +636,8 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 			`{"name":"other","kind":"branch"}`); made.Code >= 300 {
 			t.Fatalf("declaring a second branch answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := asPerson(t, r, "admin", http.MethodPut, at,
-			`{"released_on":"2026-03-31","cut_from":"other"}`); got.Code < 400 {
-			t.Errorf("a release was re-cut from a different branch: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "admin", http.MethodPut, at,
+			`{"released_on":"2026-03-31","cut_from":"other"}`), http.StatusUnprocessableEntity)
 
 		// The date clears, and the day it was declared here stands in again.
 		// The parent does not: an empty one leaves whatever stands alone.
@@ -676,9 +670,7 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 		}
 
 		// Administration, like every other catalog change.
-		if got := asPerson(t, r, "triager", http.MethodPut, at,
-			`{"released_on":"2026-03-31"}`); got.Code < 400 {
-			t.Errorf("somebody who does not administer set a release date: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPut, at,
+			`{"released_on":"2026-03-31"}`), http.StatusForbidden)
 	})
 }

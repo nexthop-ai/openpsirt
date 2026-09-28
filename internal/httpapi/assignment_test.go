@@ -174,16 +174,12 @@ func TestTheAssignerRightAloneHandsNobodyAnything(t *testing.T) {
 		const at = "/v1/products/mine/streams/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
-		if got := asPerson(t, r, "dispatcher", http.MethodPut, at,
-			`{"person":"reader"}`); got.Code < 400 {
-			t.Errorf("the assigner role alone assigned work: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "dispatcher", http.MethodPut, at,
+			`{"person":"reader"}`), http.StatusNotFound)
 		// Nor to themselves, which is the exception triage carries and this
 		// identity does not hold.
-		if got := asPerson(t, r, "dispatcher", http.MethodPut, at,
-			`{"person":"dispatcher"}`); got.Code < 400 {
-			t.Errorf("the assigner role alone took work: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "dispatcher", http.MethodPut, at,
+			`{"person":"dispatcher"}`), http.StatusNotFound)
 
 		var told struct {
 			Reach []struct {
@@ -218,9 +214,7 @@ func TestOnlyAnAdministratorMovesSomebodyElsesWork(t *testing.T) {
 		}
 
 		release := "/v1/people/reader/assignments/hand-back"
-		if got := asPerson(t, r, "triager", http.MethodPost, release, `{}`); got.Code < 400 {
-			t.Errorf("a triager released somebody else's work: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, release, `{}`), http.StatusForbidden)
 
 		got := asPerson(t, r, "admin", http.MethodPost, release, `{}`)
 		if got.Code != http.StatusOK {
