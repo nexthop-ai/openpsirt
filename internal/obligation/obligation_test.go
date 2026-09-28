@@ -7,8 +7,11 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -430,11 +433,119 @@ func TestANoticeSaysWhoWhenAndWhat(t *testing.T) {
 				"An attack.", when},
 			{"nothing said", "ENISA", "  ", when},
 			{"no moment", "ENISA", "An attack.", time.Time{}},
+			// What was said is kept in a table nobody edits and rendered to
+			// whoever answers for it, so the markdown policy and the bound
+			// hold before it is stored.
+			{"raw HTML in what was said", "ENISA", "<b>An attack.</b>", when},
+			{"more said than the bound", "ENISA", strings.Repeat("x", triage.GroundsLimit+1), when},
 		} {
 			if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil,
 				tc.recipient, tc.at, tc.said); err == nil {
 				t.Errorf("a notice with %s was recorded", tc.name)
 			}
+		}
+	})
+}
+
+// TestANoticeIsRecordedAgainstAPerson pins that a notice names who recorded
+// it, and that a subject who is not a person is told so rather than told the
+// record is missing.
+func TestANoticeIsRecordedAgainstAPerson(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		record := f.attacked(t)
+		_, err := f.store.RecordTold(t.Context(), access.Everything("a background pass"),
+			record.ID, nil, "ENISA", knownAt.Add(time.Hour), "An attack.")
+		if err == nil || !strings.Contains(err.Error(), "against whoever recorded it") {
+			t.Errorf("a notice recorded by no person answered %v, want the refusal naming who records one", err)
+		}
+	})
+}
+
+// rivalBefore returns a store whose first update of table is preceded by
+// rival, run on another connection and committed before the
+// statement reaches the engine.
+//
+// That is the interleaving a conditional write exists for: the transaction
+// has read the row and is about to write it, and somebody else's write lands
+// in between. SQLite has one connection and one writer, so the interleaving
+// cannot happen there and the caller skips it.
+func rivalBefore(t *testing.T, f *fixture, table string, rival func()) *obligation.Store {
+	t.Helper()
+	if f.db.Stats().MaxOpenConnections == 1 {
+		t.Skip("one connection: nothing lands between a read and a write")
+	}
+	hooked := bun.NewDB(f.db.DB.DB, f.db.Dialect())
+	hook := &interleave{table: table, rival: rival}
+	hooked.AddQueryHook(hook)
+	t.Cleanup(func() {
+		if !hook.ran {
+			t.Error("the rival never ran, so nothing landed between the read and the write")
+		}
+	})
+	return obligation.NewStore(hooked)
+}
+
+type interleave struct {
+	once  sync.Once
+	table string
+	rival func()
+	ran   bool
+}
+
+func (h *interleave) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	// Quoted with backticks on two engines and double quotes on the others.
+	named := strings.Contains(e.Query, h.table+"`") || strings.Contains(e.Query, h.table+`"`)
+	if strings.HasPrefix(e.Query, "UPDATE ") && named {
+		h.once.Do(func() { h.ran = true; h.rival() })
+	}
+	return ctx
+}
+
+func (h *interleave) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// trailed counts the administrative trail's rows about one window.
+func trailed(t *testing.T, f *fixture, name string) int {
+	t.Helper()
+	n, err := f.db.DB.NewSelect().TableExpr(`"admin_change"`).
+		Where("about = ?", "Obligation window "+name).Count(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestTwoRetirementsAtOnceRecordOneAct(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		early := f.window(t, "Early warning", 24)
+		racing := rivalBefore(t, f, "obligation_window", func() {
+			if err := f.store.RetireWindow(context.Background(), f.admin, early.ID); err != nil {
+				t.Errorf("the rival retirement: %v", err)
+			}
+		})
+		if err := racing.RetireWindow(t.Context(), f.admin, early.ID); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			t.Errorf("retiring a window another retirement reached first answered %v", err)
+		}
+		// One for declaring it and one for retiring it.
+		if n := trailed(t, f, "Early warning"); n != 2 {
+			t.Errorf("the trail holds %d changes to the window, want 2", n)
+		}
+	})
+}
+
+func TestAWindowRetiredWhileBeingChangedIsNotChanged(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		early := f.window(t, "Early warning", 24)
+		racing := rivalBefore(t, f, "obligation_window", func() {
+			if err := f.store.RetireWindow(context.Background(), f.admin, early.ID); err != nil {
+				t.Errorf("the rival retirement: %v", err)
+			}
+		})
+		if _, err := racing.ChangeWindow(t.Context(), f.admin, early.ID,
+			obligation.WindowSaid{Name: "Early warning", Hours: 48}); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			t.Errorf("changing a window retired since it was read answered %v", err)
+		}
+		if n := trailed(t, f, "Early warning"); n != 2 {
+			t.Errorf("the trail holds %d changes to the window, want 2", n)
 		}
 	})
 }
