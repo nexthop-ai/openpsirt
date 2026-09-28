@@ -387,6 +387,8 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		ColumnExpr(`MIN(st.display_name) AS "stream"`).
 		ColumnExpr(`MIN(va.display_name) AS "variant"`).
 		Where("de.claim_id IN (?)", bun.List(claims)).
+		// Live rows only, as a claim's reach is counted.
+		Where("de.live_key IS NOT NULL").
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
 		Where(finding.KeyMatches)

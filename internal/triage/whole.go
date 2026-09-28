@@ -197,6 +197,9 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		ColumnExpr(`COALESCE(SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END), 0) AS "direct"`).
 		ColumnExpr(`COUNT(*) AS "findings"`).
 		Where("de.claim_id = ?", claimID).
+		// Live rows only: a row withdrawn or lapsed covers nothing, however
+		// well its versions still match.
+		Where("de.live_key IS NOT NULL").
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
 		Where(finding.KeyMatches)

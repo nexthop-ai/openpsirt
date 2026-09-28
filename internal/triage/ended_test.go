@@ -208,6 +208,39 @@ func TestAClaimThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
 	})
 }
 
+func TestAWithdrawnClaimReachesNothing(t *testing.T) {
+	// What a claim covers now is what it suppresses. Taken back, it
+	// suppresses nothing, however well its versions still match.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		in := f.build(t, f.product, "2026.03")
+		at := f.at()
+		at.PlaceIdentity = "place-of-libfoo"
+		at.ConsumerUpstream = ""
+		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), "place-of-libfoo", access.Public)
+		made := f.claims(t, at)
+
+		before, err := f.store.Whole(ctx, f.triager, made.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before.Reach.Findings != 1 || len(before.Builds) != 1 {
+			t.Fatalf("a standing claim reaches %+v in %v, want one finding in one build",
+				before.Reach, before.Builds)
+		}
+		if err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+		after, err := f.store.Whole(ctx, f.triager, made.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after.Reach.Findings != 0 || len(after.Builds) != 0 {
+			t.Errorf("a withdrawn claim reaches %+v in %v, want nothing", after.Reach, after.Builds)
+		}
+	})
+}
+
 func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 	// A lapse records when and why a row stopped applying. Withdrawing the
 	// claim afterwards is about the rows still standing.
