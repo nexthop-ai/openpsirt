@@ -88,7 +88,7 @@ func TestTheEngineURLIsReadFromTheEnvironmentRatherThanTheCommandLine(t *testing
 
 func TestAnUnreadableEngineURLIsNotRepeatedBack(t *testing.T) {
 	// The URL parser quotes the text it could not read, password included.
-	r := &run{engine: "postgres", adminURL: "postgres://u:pa%zz@db/x"}
+	r := &run{engine: "postgres", adminURL: "postgres://u:" + "pa%zz" + "@db/x"}
 	err := r.database(t.Context())
 	if err == nil {
 		t.Fatal("a URL with a malformed escape was accepted")

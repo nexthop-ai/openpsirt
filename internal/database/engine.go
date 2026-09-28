@@ -408,12 +408,17 @@ func hostOf(rest string) string {
 		authority = authority[:end]
 	}
 	for _, r := range authority {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' ||
-			strings.ContainsRune(".-:[]", r)) {
+		if !hostRune(r) {
 			return ""
 		}
 	}
 	return authority
+}
+
+// hostRune reports whether a character may appear in a host and port.
+func hostRune(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' ||
+		strings.ContainsRune(".-:[]", r)
 }
 
 // secretParams are query parameters that carry a credential. Drivers accept
