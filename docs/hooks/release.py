@@ -49,7 +49,9 @@ def on_config(config):
     given = os.environ.get("DOCS_RELEASE", "").strip()
     source = "DOCS_RELEASE"
     if not given:
-        given = _from_git(os.path.dirname(config.config_file_path))
+        # mike hands over the configuration's path as given, relative when it
+        # was, and the directory of a bare file name is empty.
+        given = _from_git(os.path.dirname(os.path.abspath(config.config_file_path)))
         source = "the newest release tag"
     match = RELEASE.match(given)
     if not match:

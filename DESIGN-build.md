@@ -772,8 +772,10 @@ A test in `internal/docs` fails on a release version written by hand in
 
 `README.md` is not built by the site, so it names no version at all. The
 compatibility notes on it and on the site say that a database built by any
-tagged release is upgraded in place, which holds while every release's
-migrations are kept (`DESIGN-database.md` § Migrations).
+release is upgraded in place, which holds while every release's migrations are
+kept, and that one a release candidate built is recreated, because a
+candidate's migration can be fixed before the release (`DESIGN-database.md`
+§ Migrations).
 
 ### Environment variables
 

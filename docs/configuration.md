@@ -35,10 +35,10 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
-A database built by any tagged release is upgraded in place, at startup or by
+A database built by any release is upgraded in place, at startup or by
 `openpsirt migrate up`. One built by an earlier release passes through each
-later release's upgrade on the way. A database built by any build between
-releases is recreated.
+later release's upgrade on the way. A database built by a release candidate or
+any build between releases is recreated.
 
 Read [Every upgrade](#every-upgrade), the section for the release you are coming
 from, and every section after it.
