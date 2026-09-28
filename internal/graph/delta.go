@@ -350,6 +350,24 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, s
 	if !subject.Sees(productID) {
 		return nil, 0, access.Denied(fmt.Sprintf("read what product %d contains", productID))
 	}
+	// A key reads back what it sent and nothing more, the rule its receipts
+	// and retained documents are read under. Another sender's upload to the
+	// same build is refused as one it cannot reach.
+	if subject.Kind == access.Pipeline {
+		sent, err := s.db.NewSelect().
+			TableExpr(`"scan" AS "sc"`).
+			ColumnExpr("sc.id").
+			Where("sc.id = ?", scanID).
+			Where("sc.target_id = ?", targetID).
+			Where("sc.credential = ?", subject.Identity).
+			Exists(ctx)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read who sent scan %d: %w", scanID, err)
+		}
+		if !sent {
+			return nil, 0, access.Denied(fmt.Sprintf("read what scan %d changed", scanID))
+		}
+	}
 
 	wanted, err := s.comparable(ctx, targetID, []int64{scanID})
 	if err != nil {

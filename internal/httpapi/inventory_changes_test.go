@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -96,6 +97,31 @@ func TestAnUploadSaysWhichNamesItMoved(t *testing.T) {
 		if came.Name != "curl" || came.Change != "added" ||
 			len(came.Before) != 0 || strings.Join(came.After, ",") != "8.4.0" {
 			t.Errorf("the second row is %+v, want curl arriving at 8.4.0", came)
+		}
+	})
+}
+
+func TestAKeyReadsWhatOnlyItsOwnUploadsChanged(t *testing.T) {
+	// A key reads back what it sent and nothing more, which is the rule the
+	// receipts and the retained documents apply. Another key sending to the
+	// same build is told the upload is not there.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		scanID := twoUploads(t, f,
+			map[string]string{"libc6": "2.41"},
+			map[string]string{"libc6": "2.41", "curl": "8.4.0"})
+		at := f.path + "/" + strconv.FormatInt(scanID, 10) + "/changes"
+
+		if code, _ := moved(t, f, f.key, at); code != http.StatusOK {
+			t.Fatalf("the key that sent it read what it changed with %d", code)
+		}
+		_, secret, err := access.NewStore(f.db.DB).NewKey(t.Context(), "somebody-else",
+			access.Scope{ProductID: productHere(t, f)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code, out := moved(t, f, secret, at); code != http.StatusNotFound {
+			t.Errorf("another key read what somebody else's upload changed with %d: %+v",
+				code, out.Body.Items)
 		}
 	})
 }
