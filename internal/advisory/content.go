@@ -13,6 +13,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
@@ -270,7 +271,7 @@ func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []
 		if strings.TrimSpace(vector) == "" {
 			continue
 		}
-		scored, err := finding.Score(vector)
+		scored, err := cvss.Score(vector)
 		if err != nil || scored == nil || !carriedByCSAF[scored.Scheme()] {
 			continue
 		}

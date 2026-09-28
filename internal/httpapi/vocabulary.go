@@ -7,6 +7,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -237,7 +238,7 @@ func (lineOrClear) Schema(huma.Registry) *huma.Schema {
 type scoreBand string
 
 // Schema offers every band a score can fall in, least first.
-func (scoreBand) Schema(huma.Registry) *huma.Schema { return words(finding.ScoreBands()) }
+func (scoreBand) Schema(huma.Registry) *huma.Schema { return words(cvss.Bands()) }
 
 // which is the words of a vocabulary a rule of its own keeps, in its order.
 // A subset is the domain's rule applied, never a shorter list typed here.

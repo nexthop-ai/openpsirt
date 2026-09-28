@@ -76,12 +76,12 @@ var Held = []Entry{
 
 	// FIRST's reference calculator for CVSS version 4: its table of class
 	// scores transcribed, and the scores it answers for a corpus of vectors.
-	{"internal/finding/cvss4.go", "BSD-2-Clause", "https://github.com/FIRSTdotorg/cvss-v4-calculator"},
-	{"internal/finding/testdata/cvss4-scores.txt", "BSD-2-Clause",
+	{"internal/cvss/cvss4.go", "BSD-2-Clause", "https://github.com/FIRSTdotorg/cvss-v4-calculator"},
+	{"internal/cvss/testdata/cvss4-scores.txt", "BSD-2-Clause",
 		"https://github.com/FIRSTdotorg/cvss-v4-calculator"},
 	// Ratings as the National Vulnerability Database publishes them, a work
 	// of the United States government.
-	{"internal/finding/testdata/cvss4-published.txt", PublicDomain, "https://nvd.nist.gov"},
+	{"internal/cvss/testdata/cvss4-published.txt", PublicDomain, "https://nvd.nist.gov"},
 
 	// The weakness catalog's names, generated from what MITRE publishes.
 	{"internal/weakness/names.go", CWETerms, "https://cwe.mitre.org/about/termsofuse.html"},

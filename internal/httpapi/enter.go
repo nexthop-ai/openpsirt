@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -178,7 +179,7 @@ func registerEntry(api huma.API, in Ingest) {
 				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
 			case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
 				return nil, asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNotAVector):
+			case errors.Is(err, cvss.ErrNotAVector):
 				return nil, asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNothingScanned):
 				return nil, huma.Error404NotFound(finding.ErrNothingScanned.Error())

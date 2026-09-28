@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -243,7 +244,7 @@ func TestEveryEnumOfADomainVocabularyIsOneTheDomainNames(t *testing.T) {
 		}},
 		{"severity words", [][]string{
 			finding.Bands(), finding.LeastFirst(), finding.Recordable(),
-			finding.TriageFloors(), append(finding.TriageFloors(), ""), finding.ScoreBands(),
+			finding.TriageFloors(), append(finding.TriageFloors(), ""), cvss.Bands(),
 		}},
 	}
 

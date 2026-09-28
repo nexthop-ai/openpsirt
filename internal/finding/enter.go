@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -251,7 +252,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	// The vector first, because it can settle the severity. Scored here rather
 	// than taken as a number beside the vector, so that a stated vector and a
 	// stated score cannot disagree with nothing to say which was meant.
-	scored, err := Score(in.Vector)
+	scored, err := cvss.Score(in.Vector)
 	if err != nil {
 		return nil, "", err
 	}

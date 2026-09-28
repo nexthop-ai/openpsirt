@@ -38,9 +38,9 @@ This product includes the version 4 class scores of the Common Vulnerability
 Scoring System from the reference calculator FIRST publishes, licensed under
 the 2-clause BSD License. See https://github.com/FIRSTdotorg/cvss-v4-calculator
 
-The scores are transcribed in internal/finding/cvss4.go, and the calculator's
+The scores are transcribed in internal/cvss/cvss4.go, and the calculator's
 answers for a corpus of vectors are in
-internal/finding/testdata/cvss4-scores.txt.
+internal/cvss/testdata/cvss4-scores.txt.
 
   Copyright (c) 2023 FIRST.ORG, Inc., Red Hat, and contributors
 

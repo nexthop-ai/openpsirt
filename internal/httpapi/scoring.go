@@ -11,8 +11,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
-
-	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 )
 
 func registerScoring(api huma.API, in Ingest) {
@@ -48,10 +47,10 @@ func registerScoring(api huma.API, in Ingest) {
 		// has no word for.
 		if strings.TrimSpace(input.Vector) == "" {
 			return nil, asked(in.Logger,
-				fmt.Errorf("%w: state a vector to score", finding.ErrNotAVector))
+				fmt.Errorf("%w: state a vector to score", cvss.ErrNotAVector))
 		}
-		scored, err := finding.Score(input.Vector)
-		if errors.Is(err, finding.ErrNotAVector) {
+		scored, err := cvss.Score(input.Vector)
+		if errors.Is(err, cvss.ErrNotAVector) {
 			return nil, asked(in.Logger, err)
 		}
 		if err != nil {

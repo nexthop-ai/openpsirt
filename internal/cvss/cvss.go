@@ -1,7 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package finding
+// Package cvss scores a CVSS vector: versions 3.0, 3.1 and 4.0, base metrics
+// only, and the qualitative band a score falls in.
+package cvss
 
 import (
 	"errors"
@@ -205,9 +207,9 @@ func roundUp(x float64) float64 {
 	return (math.Floor(float64(scaled)/10000) + 1) / 10
 }
 
-// ScoreBands is every word a score can fall in, least first: "none" for a
-// score of zero, then the four rated words.
-func ScoreBands() []string { return append([]string{"none"}, LeastFirst()...) }
+// Bands is every word a score can fall in, least first: "none" for a score of
+// zero, then the four rated words the published scale names.
+func Bands() []string { return []string{"none", "low", "medium", "high", "critical"} }
 
 // bandOf is the word a score falls in, by the published bands.
 //

@@ -49,6 +49,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
 | `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
 | `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |
+| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `DESIGN-findings.md` |
 | `internal/triage/`, `internal/advisory/` | Judgments, approvals, and the CSAF document. See `DESIGN-triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |

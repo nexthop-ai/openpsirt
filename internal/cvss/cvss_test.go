@@ -1,14 +1,14 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package finding_test
+package cvss_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
-	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 )
 
 func TestAVectorIsScoredTheWayThePublishedFormulaScoresIt(t *testing.T) {
@@ -42,7 +42,7 @@ func TestAVectorIsScoredTheWayThePublishedFormulaScoresIt(t *testing.T) {
 		{"CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", 980, "critical"},
 	} {
 		t.Run(c.vector, func(t *testing.T) {
-			got, err := finding.Score(c.vector)
+			got, err := cvss.Score(c.vector)
 			if err != nil {
 				t.Fatalf("scoring: %v", err)
 			}
@@ -74,7 +74,7 @@ func TestAVectorThisDoesNotUnderstandIsRefusedRatherThanScored(t *testing.T) {
 			// callers branch on it to answer the caller rather than reporting
 			// a fault, so an unwrapped refusal turns a malformed vector into
 			// a 500 where a sibling test demands a 422.
-			if _, err := finding.Score(c.vector); !errors.Is(err, finding.ErrNotAVector) {
+			if _, err := cvss.Score(c.vector); !errors.Is(err, cvss.ErrNotAVector) {
 				t.Errorf("%s answered %v, want it named as the caller's to fix", c.what, err)
 			}
 		})
@@ -85,7 +85,7 @@ func TestNoVectorIsNotAScoreOfZero(t *testing.T) {
 	// Early triage: somebody records what they have found before anybody has
 	// worked out how bad it is. A zero would say "harmless", which is a
 	// judgment nobody made.
-	got, err := finding.Score("")
+	got, err := cvss.Score("")
 	if err != nil {
 		t.Fatalf("an unstated vector answered %v", err)
 	}
@@ -95,7 +95,7 @@ func TestNoVectorIsNotAScoreOfZero(t *testing.T) {
 }
 
 func TestTheVectorIsKeptAsGivenApartFromItsCase(t *testing.T) {
-	got, err := finding.Score("cvss:3.1/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/a:h")
+	got, err := cvss.Score("cvss:3.1/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/a:h")
 	if err != nil {
 		t.Fatal(err)
 	}
