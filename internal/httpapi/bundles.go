@@ -172,7 +172,7 @@ func registerBundles(api huma.API, in Ingest) {
 			About: []Stated{{"triaged at or above", line}},
 			Header: []string{
 				"upstream", "from", "to", "components", "issues", "places",
-				"builds", "severity", "exploited", "in",
+				"builds", "severity", "exploited", "exploited here", "in",
 			},
 			// Paged through the store the screen reads, so the file is the
 			// list rather than a second query that will come to disagree
@@ -188,12 +188,19 @@ func registerBundles(api huma.API, in Ingest) {
 					for _, at := range body.In {
 						builds = append(builds, at.Stream+"/"+at.Variant)
 					}
+					// Empty where the selection is one build, as the list
+					// leaves it out: it is the same number on every row.
+					count := ""
+					if !oneBuild {
+						count = strconv.Itoa(body.Builds)
+					}
 					rows = append(rows, []string{
 						body.Upstream, body.From, body.To,
 						strings.Join(body.Components, " "),
 						strconv.Itoa(body.Issues), strconv.Itoa(body.Places),
-						strconv.Itoa(body.Builds), body.Severity,
+						count, body.Severity,
 						strconv.FormatBool(body.Exploited),
+						strconv.FormatBool(body.ExploitedHere),
 						strings.Join(builds, " "),
 					})
 				}
