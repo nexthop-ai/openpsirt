@@ -268,7 +268,7 @@ type KeyBody struct {
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: this field is what create-key resolves, and a display
 	// name resolves to nothing.
-	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Stream and Variant narrow it further. Either, both or neither may be
 	// given: a key covering a whole product cannot imply which release an
 	// upload is for, which is why an upload always states its own target.

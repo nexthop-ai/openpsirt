@@ -371,8 +371,8 @@ label, is sent back by the withdraw beside it and matches nothing.
 Every listing carries both fields: the collaborators, the roles, the
 credentials, the bindings, the tokens and the routing rules.
 
-The personal-token list is the one listing that still leaves a product's label
-off where it repeats the product's name.
+The pipeline-key and personal-token lists leave a product's label off where it
+repeats the product's name.
 
 A person named as the actor on a record, and a product, branch or tag, variant
 or team a row is about, are named the same way.

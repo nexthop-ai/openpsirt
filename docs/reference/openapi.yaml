@@ -4513,7 +4513,7 @@ components:
           minLength: 1
           type: string
         product_name:
-          description: The product's display name, or its name where it has none
+          description: The product's display name, where it differs from its name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again

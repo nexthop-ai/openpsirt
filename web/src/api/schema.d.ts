@@ -8354,7 +8354,7 @@ export interface components {
             name: string;
             /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
-            /** @description The product's display name, or its name where it has none */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
