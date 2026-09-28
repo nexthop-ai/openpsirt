@@ -121,11 +121,15 @@ func TestAMistypedCVEIsRemovedAndTheFlawRefiledUnderItsOwnReference(t *testing.T
 			t.Fatalf("recording a CVE answered %d", code)
 		}
 		var detail struct {
-			Vulnerability string `json:"vulnerability"`
+			Vulnerability string   `json:"vulnerability"`
+			AliasesByHand []string `json:"aliases_by_hand"`
 		}
 		read(t, r, "private-triage", findingAt(minted), &detail)
 		if detail.Vulnerability != typo {
 			t.Fatalf("the flaw is filed under %q, want the CVE typed", detail.Vulnerability)
+		}
+		if !slices.Contains(detail.AliasesByHand, typo) {
+			t.Errorf("the filed-under CVE typed by hand is not offered for removal: %v", detail.AliasesByHand)
 		}
 
 		var before changed

@@ -3176,7 +3176,7 @@ components:
             - array
             - "null"
         aliases_by_hand:
-          description: The other names somebody recorded by hand, which are the ones that may be removed
+          description: Every name somebody recorded by hand, the one it is filed under included, which are the ones that may be removed
           items:
             type: string
           type:

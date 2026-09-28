@@ -7631,7 +7631,7 @@ export interface components {
             advisory?: string;
             /** @description Other names the same issue is known by */
             aliases?: string[] | null;
-            /** @description The other names somebody recorded by hand, which are the ones that may be removed */
+            /** @description Every name somebody recorded by hand, the one it is filed under included, which are the ones that may be removed */
             aliases_by_hand?: string[] | null;
             /** @description The version this was upgraded from, where the upgrade did not resolve it */
             arrived_from?: string;

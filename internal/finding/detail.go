@@ -51,8 +51,9 @@ type Measured struct {
 type Evidence struct {
 	Vulnerability string
 	Aliases       []string
-	// AliasesByHand is the other names a person recorded, which are the ones
-	// that may be removed.
+	// AliasesByHand is every name a person recorded, the one it is filed
+	// under included where a person typed it. These are the ones that may be
+	// removed.
 	AliasesByHand []string
 	Severity      string
 	// ScoreCenti and Vector are the severity as a number and the statement of
@@ -371,9 +372,11 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	for _, alias := range aliases {
 		if alias.Identifier != issue.Identifier {
 			evidence.Aliases = append(evidence.Aliases, alias.Identifier)
-			if alias.ByHand {
-				evidence.AliasesByHand = append(evidence.AliasesByHand, alias.Identifier)
-			}
+		}
+		// The name it is filed under among them where a person typed it,
+		// because that one may be removed too.
+		if alias.ByHand {
+			evidence.AliasesByHand = append(evidence.AliasesByHand, alias.Identifier)
 		}
 	}
 	for _, weakness := range weaknesses {
