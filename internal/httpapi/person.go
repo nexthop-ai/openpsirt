@@ -28,7 +28,12 @@ import (
 type AboutPersonBody struct {
 	Identity    string `json:"identity"`
 	DisplayName string `json:"display_name,omitempty"`
-	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Admin and AdminByConfiguration are the two sources of administration,
+	// reported apart: removing a name from configuration revokes only what
+	// the name gave, and a reader deciding whether somebody stays an
+	// administrator after that needs to see which of the two they hold.
+	Admin                bool `json:"admin,omitempty" doc:"Whether administration is granted to them in the application, by an administrator or through a group"`
+	AdminByConfiguration bool `json:"admin_by_configuration,omitempty" doc:"Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it"`
 	// Audits is the read-only half of what is held over the deployment: its
 	// own records, and no product's findings or decisions.
 	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
@@ -120,7 +125,8 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 
 		body := AboutPersonBody{
-			Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.Administers(),
+			Identity: person.Identity, DisplayName: person.DisplayName,
+			Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 			Audits:        person.Audits,
 			DeactivatedAt: orAbsent(person.DeactivatedAt),
 		}

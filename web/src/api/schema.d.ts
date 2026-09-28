@@ -5769,8 +5769,10 @@ export interface components {
              * @example https://example.com/schemas/AboutPersonBody.json
              */
             readonly $schema?: string;
-            /** @description Whether they administer this deployment */
+            /** @description Whether administration is granted to them in the application, by an administrator or through a group */
             admin?: boolean;
+            /** @description Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it */
+            admin_by_configuration?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
             /** @description The date they left. Absent means they are active */
@@ -9756,8 +9758,10 @@ export interface components {
             version: string;
         };
         PersonBody: {
-            /** @description Whether they administer this deployment */
+            /** @description Whether administration is granted to them in the application, by an administrator or through a group */
             admin?: boolean;
+            /** @description Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it */
+            admin_by_configuration?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
             /** @description The date they left. Absent means they may still sign in */
@@ -10342,7 +10346,7 @@ export interface components {
              * @example https://example.com/schemas/RecordBody.json
              */
             readonly $schema?: string;
-            /** @description Whether they administer this deployment. Omit it to leave it as it is */
+            /** @description Whether administration is granted to them in the application. Omit it to leave it as it is. Administration named in OPENPSIRT_BOOTSTRAP_ADMINS is not changed by this, and a grant made here outlasts the name */
             admin?: boolean;
             /** @description Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is */
             audits?: boolean;

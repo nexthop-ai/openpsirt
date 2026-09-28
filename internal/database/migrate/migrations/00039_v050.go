@@ -37,8 +37,10 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 // and the column holds only what was granted here or derived from a group. A
 // named administrator whose row says a group derived it keeps that, because a
 // group is what says so. Every other named administrator's column is cleared:
-// v0.4.0 kept nothing that tells a grant made here apart from the one the name
-// wrote, and clearing it is the reading that ends with configuration deciding.
+// v0.4.0 kept nothing complete that tells a grant made here apart from the one
+// the name wrote, and clearing it is the reading that ends with configuration
+// deciding. The administrative trail holds a grant made here that moved the
+// column, and none made while the name already had.
 // They administer through the name for as long as it stays in configuration.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	if _, err := tx.NewRaw(`UPDATE "person" SET "is_admin" = ?`+

@@ -275,6 +275,65 @@ func TestRecordingSomebodyAgainLeavesAdministrationAlone(t *testing.T) {
 	})
 }
 
+// Administration has two sources, and a person is read with both. The one
+// granted here is what the request changes, so somebody named in
+// configuration reads as not granted here until somebody grants it, and a
+// grant made here is what keeps them an administrator once the name goes.
+func TestAPersonIsReadWithBothSourcesOfAdministration(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if _, err := r.rights.NameBootstrapAdmins(t.Context(), []string{"operator"}); err != nil {
+			t.Fatal(err)
+		}
+		type sources struct {
+			Identity             string `json:"identity"`
+			Admin                bool   `json:"admin"`
+			AdminByConfiguration bool   `json:"admin_by_configuration"`
+		}
+		listed := func() sources {
+			t.Helper()
+			var out struct {
+				Items []sources `json:"items"`
+			}
+			read(t, r, "admin", "/v1/people", &out)
+			for _, person := range out.Items {
+				if person.Identity == "operator" {
+					return person
+				}
+			}
+			t.Fatal("the operator is not in the list of people")
+			return sources{}
+		}
+		one := func() sources {
+			t.Helper()
+			var person sources
+			read(t, r, "admin", "/v1/people/operator", &person)
+			return person
+		}
+
+		for what, got := range map[string]sources{"the list": listed(), "their page": one()} {
+			if got.Admin || !got.AdminByConfiguration {
+				t.Errorf("named in configuration, %s reads granted here %v, by configuration %v",
+					what, got.Admin, got.AdminByConfiguration)
+			}
+		}
+
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"operator","admin":true}`); got.Code >= 300 {
+			t.Fatalf("granting administration answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := one(); !got.Admin || !got.AdminByConfiguration {
+			t.Errorf("granted here as well, their page reads %+v", got)
+		}
+
+		if _, err := r.rights.NameBootstrapAdmins(t.Context(), nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := listed(); !got.Admin || got.AdminByConfiguration {
+			t.Errorf("with the name gone, the list reads %+v", got)
+		}
+	})
+}
+
 func TestWithdrawingSomethingNobodyHoldsRecordsNothingAndReleasesNothing(t *testing.T) {
 	// The write bound only the error from its statement and never read how
 	// many rows it matched, so a role somebody does not hold — or a word that

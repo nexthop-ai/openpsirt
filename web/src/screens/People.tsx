@@ -152,10 +152,9 @@ export function People({ who: me }: { who: Who }) {
   });
 
   // Administration is global rather than granted against a product, so it sits
-  // beside the grid rather than in it (REQ-42). It had no control at all: the
-  // API took it, the screens only ever displayed it, and the only ways to
-  // grant it were the configuration file, a group binding, or calling the API
-  // by hand.
+  // beside the grid rather than in it (REQ-42). The box writes the grant made
+  // here. Administration named in configuration is shown beside it, and only
+  // configuration changes it.
   const administer = useMutation({
     mutationFn: async (who: { identity: string; admin: boolean }) =>
       unwrap(await api.POST("/v1/people", { body: { identity: who.identity, admin: who.admin } })),
@@ -288,7 +287,7 @@ export function People({ who: me }: { who: Who }) {
                       >
                         {person.display_name || person.identity}
                       </Link>
-                      {person.admin && (
+                      {(person.admin || person.admin_by_configuration) && (
                         <>
                           {" "}
                           <span className="state agreed">administrator</span>
@@ -475,6 +474,14 @@ export function People({ who: me }: { who: Who }) {
                           Administers people, roles, credentials, settings and the catalog. Product
                           access is granted below.
                         </label>
+                        {/* The box is the grant made here. Configuration's grant
+                            is its own, and only configuration takes it back. */}
+                        {person.admin_by_configuration && (
+                          <p className="hint" style={{ margin: "0 0 8px" }}>
+                            Also an administrator by configuration (OPENPSIRT_BOOTSTRAP_ADMINS) —
+                            remove the name there and restart to revoke
+                          </p>
+                        )}
                         {administer.error != null && (
                           <Failed error={administer.error} what="That could not be changed." />
                         )}

@@ -53,8 +53,9 @@ it: from v0.1.0, read all five.
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
 Going back is `openpsirt migrate down`, once for each release stepped back that
-changed the schema, run with this build before the earlier one is deployed.
-Going back to v0.4.0 or v0.3.0 is one. v0.1.0 started against an
+carries a migration, run with this build before the earlier one is deployed.
+v0.4.0 carries none, so going back to v0.4.0 or v0.3.0 is one, and to v0.2.0
+is two. v0.1.0 started against an
 upgraded schema reports it current and cannot read it. Patch branch lookups
 come back off in v0.2.0, which reads its own setting for them: turn them on
 again under its Settings.
@@ -105,11 +106,12 @@ Also read after an upgrade from any earlier release.
 | Change | What to do |
 |---|---|
 | `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
-| Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: grant it to them under People |
+| Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
+| With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
 
 | After the upgrade from v0.4.0 | |
 |---|---|
-| Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant as one, and they lose administration when the name goes unless it is granted again |
+| Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
 
 ## Serving
 

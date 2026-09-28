@@ -43,7 +43,8 @@ func described(ctx context.Context, a Administering, store *access.Store,
 		return nil, err
 	}
 	body := &PersonBody{
-		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.Administers(),
+		Identity: person.Identity, DisplayName: person.DisplayName,
+		Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 		Email: person.Email, EmailSource: string(person.EmailSource),
 	}
@@ -124,7 +125,12 @@ func (a Administering) handle() bun.IDB {
 type PersonBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"The label shown instead of the identity"`
-	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Admin and AdminByConfiguration are the two sources of administration,
+	// reported apart: removing a name from configuration revokes only what
+	// the name gave, and a reader deciding whether somebody stays an
+	// administrator after that needs to see which of the two they hold.
+	Admin                bool `json:"admin,omitempty" doc:"Whether administration is granted to them in the application, by an administrator or through a group"`
+	AdminByConfiguration bool `json:"admin_by_configuration,omitempty" doc:"Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it"`
 	// Audits is the read-only half: this deployment's own records, and no
 	// product's findings or decisions.
 	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
@@ -195,7 +201,7 @@ type RecordBody struct {
 	// somebody an administrator, taking it away, and saying nothing about it.
 	// A plain bool decodes an absent field as false, so granting a role — a
 	// request that says nothing about administration — withdraws it.
-	Admin *bool `json:"admin,omitempty" doc:"Whether they administer this deployment. Omit it to leave it as it is"`
+	Admin *bool `json:"admin,omitempty" doc:"Whether administration is granted to them in the application. Omit it to leave it as it is. Administration named in OPENPSIRT_BOOTSTRAP_ADMINS is not changed by this, and a grant made here outlasts the name"`
 	// Audits is the same shape for the other thing held over the deployment:
 	// reading its own records and writing none of them.
 	Audits *bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"`
@@ -350,7 +356,8 @@ func registerAdministration(api huma.API, a Administering) {
 		out.Body.Items = make([]PersonBody, 0, len(people))
 		for _, person := range people {
 			body := PersonBody{
-				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.Administers(),
+				Identity: person.Identity, DisplayName: person.DisplayName,
+				Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 				// Their address, and which of the two sources said
 				// so. On the list as well as on the one-person read: the

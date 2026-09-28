@@ -11,7 +11,10 @@ components:
           readOnly: true
           type: string
         admin:
-          description: Whether they administer this deployment
+          description: Whether administration is granted to them in the application, by an administrator or through a group
+          type: boolean
+        admin_by_configuration:
+          description: Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it
           type: boolean
         audits:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
@@ -7050,7 +7053,10 @@ components:
       additionalProperties: false
       properties:
         admin:
-          description: Whether they administer this deployment
+          description: Whether administration is granted to them in the application, by an administrator or through a group
+          type: boolean
+        admin_by_configuration:
+          description: Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it
           type: boolean
         audits:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
@@ -7995,7 +8001,7 @@ components:
           readOnly: true
           type: string
         admin:
-          description: Whether they administer this deployment. Omit it to leave it as it is
+          description: Whether administration is granted to them in the application. Omit it to leave it as it is. Administration named in OPENPSIRT_BOOTSTRAP_ADMINS is not changed by this, and a grant made here outlasts the name
           type: boolean
         audits:
           description: "Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"

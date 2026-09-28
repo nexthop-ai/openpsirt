@@ -840,6 +840,8 @@ when any one of them holds.
 |---|---|
 | Configuration writes only its own source | A name removed from configuration takes back what the name gave, and nothing granted here or derived from a group |
 | Somebody named and also granted here keeps administration when the name goes | The grant here is a separate act that nobody took back |
+| A person is read with two answers: granted here, and named in configuration | Deciding whether somebody stays an administrator once a name goes needs to see which they hold. A group's grant reads as granted here |
+| Stating administration here writes only the grant made here | A named person reads as not granted here until somebody grants it, and granting it is how they keep administration after the name goes. The People screen's box is that grant, with a line beneath it where configuration names them too |
 | A name removed is logged at startup, by identity | Nobody made the change in the application, and the trail records what a person did there |
 | The upgrade from v0.4.0 clears the flag for every named administrator whose flag no group derived | v0.4.0 wrote the name into the flag and kept nothing telling the two apart. The name still holds, so nobody loses administration at the upgrade; an administrator granted here and also named has to be granted again once the name goes |
 

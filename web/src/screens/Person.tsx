@@ -67,7 +67,7 @@ export function Person() {
         <h2>{who.display_name || who.identity}</h2>
         <p>
           <span className="id">{who.identity}</span>
-          {who.admin && <> · administers this deployment</>}
+          {(who.admin || who.admin_by_configuration) && <> · administers this deployment</>}
           {me.data?.admin && (
             <>
               {" "}
