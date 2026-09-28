@@ -79,6 +79,7 @@ Missing or wrong, with no decision needed to fix it.
 | A weakness outside the screen's common ones shows as a bare number | The server holds the whole CWE catalog and sends no name beside the identifier |
 | Saved filters keep a scope | Each belongs to the product it was saved in, and the list across every product offers none. `DESIGN-interface.md` § Saved filters states the rule: one list per person, applied within whatever scope is on screen. Filters kept under one name in two products need the product added to one of the names when the product comes off |
 | The package-kind filter is a fixed list | A kind outside it is reached only by editing the address, and a kind the scope does not hold is offered and leads to an empty list. The server reports no kinds present |
+| An upload refused for a full queue raises no alert | It is logged and the System screen marks the queue at its limit, so a build whose pipeline does not retry loses its inventory with nobody told |
 
 ## Weak tests
 
@@ -97,7 +98,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Alert on the depth of the job queue? | The System screen shows the depth against the bound. An alert needs a threshold and an alert kind |
 | Keep 30 days as the longest a sign-in lasts? | It bounds how long a role a group withdrew can still be held. 90 days is defensible |
 | Start a disclosure date for an outside report ruled a duplicate? | The flaw was found here and has no date, and the outside reporter may be counting down to publication |
 
