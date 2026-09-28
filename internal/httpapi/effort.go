@@ -52,8 +52,8 @@ func registerEffort(api huma.API, in Ingest) {
 		Period
 		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
 		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, by team name"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset  int    `query:"offset" minimum:"0"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most rows to return"`
+		Offset  int    `query:"offset" minimum:"0" doc:"How many rows to skip, in the order the report is sorted"`
 	}) (*overPeriod[SpentBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {

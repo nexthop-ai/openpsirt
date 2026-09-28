@@ -13619,19 +13619,23 @@ paths:
           schema:
             description: Limit to judgments this team's members proposed, by team name
             type: string
-        - explode: false
+        - description: The most rows to return
+          explode: false
           in: query
           name: limit
           schema:
             default: 50
+            description: The most rows to return
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - explode: false
+        - description: How many rows to skip, in the order the report is sorted
+          explode: false
           in: query
           name: offset
           schema:
+            description: How many rows to skip, in the order the report is sorted
             format: int64
             minimum: 0
             type: integer

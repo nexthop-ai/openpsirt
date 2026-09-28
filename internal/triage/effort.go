@@ -125,7 +125,11 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		// and before the limit. A total taken off the page reads a list cut
 		// at the limit as complete.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		OrderExpr("claims DESC, decisions DESC, component").
+		// Ended on the group's own key, so the order is total: one component
+		// in two products with equal counts ties on everything before it, and
+		// an order that ties lets an engine's top-N sort repeat one row and
+		// skip the other across pages.
+		OrderExpr("claims DESC, decisions DESC, component, de.product_id").
 		Limit(limit).Offset(offset)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read where the work went: %w", err)

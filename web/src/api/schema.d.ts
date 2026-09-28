@@ -13777,7 +13777,9 @@ export interface operations {
                 product?: string;
                 /** @description Limit to judgments this team's members proposed, by team name */
                 team?: string;
+                /** @description The most rows to return */
                 limit?: number;
+                /** @description How many rows to skip, in the order the report is sorted */
                 offset?: number;
             };
             header?: never;
