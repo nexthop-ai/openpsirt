@@ -435,3 +435,63 @@ func TestATeamsQueueCanBeOpened(t *testing.T) {
 		}
 	})
 }
+
+// Deactivating somebody again hands back whatever they still hold.
+//
+// The hand-back runs after the deactivation commits, so a failure there leaves
+// work with somebody who has left. Asking again found nothing to deactivate
+// and returned before handing anything back, so the work stayed held.
+func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scanned(t)
+		at := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		if got := asPerson(t, r, "triager", http.MethodPut, at,
+			`{"person":"triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
+		}
+		var held []int64
+		if err := r.db.DB.NewSelect().Table("finding").Column("assigned_to").
+			Where("assigned_to IS NOT NULL").Scan(ctx, &held); err != nil || len(held) == 0 {
+			t.Fatalf("nothing was assigned to begin with: %v", err)
+		}
+		first := asPerson(t, r, "admin", http.MethodPut, "/v1/people/triager/deactivation", "")
+		if first.Code != http.StatusOK {
+			t.Fatalf("deactivating answered %d: %s", first.Code, first.Body.String())
+		}
+		if !strings.Contains(first.Body.String(), `"released":1`) {
+			t.Errorf("deactivating somebody handed back nothing they held: %s", first.Body.String())
+		}
+
+		// What a hand-back that failed after the deactivation leaves behind.
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("assigned_to = ?", held[0]).Where("closed_at IS NULL").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		got := asPerson(t, r, "admin", http.MethodPut, "/v1/people/triager/deactivation", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("deactivating again answered %d: %s", got.Code, got.Body.String())
+		}
+		var again struct {
+			Released int64 `json:"released"`
+			Already  bool  `json:"already"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &again); err != nil {
+			t.Fatal(err)
+		}
+		if !again.Already || again.Released == 0 {
+			t.Errorf("deactivating again answered already=%v, released=%d",
+				again.Already, again.Released)
+		}
+		still, err := r.db.DB.NewSelect().Table("finding").
+			Where("assigned_to IS NOT NULL").Where("closed_at IS NULL").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if still != 0 {
+			t.Errorf("%d findings are still held by somebody who has left", still)
+		}
+	})
+}

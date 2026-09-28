@@ -342,7 +342,7 @@ Recorded by an administrator, as a date on the person.
 | Sessions are ended rather than left to expire | Roles are re-read at sign-in, so withdrawing one takes effect then. This is what makes leaving immediate instead |
 | Everything they held is handed back | Work held by somebody who is gone is work nobody is doing, and it does not look like it |
 | Granting what is already held succeeds, and only where the insert was refused as a duplicate | Five paths ran a second query on *any* insert failure and reported success if a row was there — including a failure caused by a concurrent insert that was then rolled back. What "already held" means is the part that differs, so it stays with each caller: a grant asks whether it is in force, a binding asks whether the row exists |
-| Deactivating somebody who has already left succeeds and moves nothing | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted |
+| Deactivating somebody who has already left succeeds and moves no date | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted. It still hands back whatever they hold, because the hand-back runs after the deactivation commits, and asking again is how one that failed is finished |
 | An administrator may not deactivate themselves | It leaves nobody able to undo it, and the bootstrap account is often the one doing it |
 | Coming back does not return their work | Somebody else may have picked it up, and reassigning it would take it off them silently |
 

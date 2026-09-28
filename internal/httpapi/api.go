@@ -465,6 +465,13 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	// in the record, and what they were told.
 	registerPerson(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
+		// Deactivating somebody hands back what they were dealing with.
+		Findings: func() *finding.Store {
+			if in.DB == nil {
+				return nil
+			}
+			return finding.NewStore(in.DB.DB)
+		},
 	})
 	// The destinations this deployment posts to.
 	registerOutbound(api, in, Administering{
