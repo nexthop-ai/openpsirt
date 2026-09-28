@@ -58,20 +58,13 @@ type Repeated struct {
 // is too many is a judgment about a product, and the caller may ask for more.
 const DefaultRepeatedAt = 2
 
-// Repeats lists places that have been deferred more than once, worst first.
+// RepeatsPage lists places that have been deferred more than once, worst
+// first, from a position in the list, with how many there are in all.
 //
 // Counted over the decisions rather than over the findings. A deferral is
 // one judgment about a place; the places fan out into as many findings as the
 // component has consumers, and counting those would order the list by how far
 // a component spreads through an image.
-func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID int64,
-	atLeast, limit int) ([]Repeated, int, error) {
-
-	return s.RepeatsPage(ctx, subject, productID, atLeast, limit, 0)
-}
-
-// RepeatsPage is the same list, from a position in it, with how many there are
-// in all.
 //
 // Paged because a ceiling with no offset means what is past it cannot be read
 // through the API at all — and this one grows with the estate, which is the

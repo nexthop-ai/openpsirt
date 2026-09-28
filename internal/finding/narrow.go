@@ -1428,13 +1428,3 @@ const (
 
 // Origins are the words the narrowing takes.
 func Origins() []Origin { return []Origin{ReportedByAScanner, RecordedByHand} }
-
-// Valid reports whether o is one of them.
-func (o Origin) Valid() bool {
-	for _, known := range Origins() {
-		if o == known {
-			return true
-		}
-	}
-	return false
-}

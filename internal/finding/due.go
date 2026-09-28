@@ -302,8 +302,9 @@ func InForce() (string, []any) {
 		[]any{"approved", "proposed", false}
 }
 
-// RunningOut reports findings whose deadline is within this many days and
-// which nobody has decided about, most pressing first.
+// RunningOutPage reports findings whose deadline is within this many days and
+// which nobody has decided about, most pressing first, from a position in the
+// list.
 //
 // Undecided only. A deadline that has been answered is not a deadline
 // running out: a dismissal takes a finding off the clock, because the claim is
@@ -324,16 +325,9 @@ func InForce() (string, []any) {
 // A finding with no deadline is left out: it is below the line, in a release
 // out of support or built once, or has nothing upstream to take, and NoDeadline
 // says which. None of those is something to interrupt anybody about.
-func (s *Store) RunningOut(ctx context.Context, subject access.Subject, scope Scope,
-	within time.Duration, limit int) ([]Late, int, error) {
-
-	return s.RunningOutPage(ctx, subject, scope, within, limit, 0)
-}
-
-// RunningOutPage is the same list, from a position in it.
 //
-// Separate from RunningOut because a screen reads the first page and a file
-// reads all of them, and the file is the reason the offset exists: an export
+// Paged because a screen reads the first page and a file reads all of them,
+// and the file is the reason the offset exists: an export
 // that stopped at the screen's page would be the screen with extra steps, and
 // what somebody exports a deadline report for is precisely the part they have
 // not read.

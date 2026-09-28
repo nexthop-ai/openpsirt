@@ -189,7 +189,7 @@ func TestAPipelineKeyIsRefusedByTheReadRatherThanAnsweredEmpty(t *testing.T) {
 					return err
 				}},
 				{"what is running out of time", func(s access.Subject) error {
-					_, _, err := f.store.RunningOut(ctx, s, finding.Scope{}, 14*24*time.Hour, 10)
+					_, _, err := f.store.RunningOutPage(ctx, s, finding.Scope{}, 14*24*time.Hour, 10, 0)
 					return err
 				}},
 			} {
