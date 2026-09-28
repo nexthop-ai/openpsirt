@@ -743,7 +743,7 @@ Built with mkdocs-material and published to GitHub Pages, with sets versioned by
 | Rule | |
 |---|---|
 | The site's default is `latest` once a release carries it, and `main` until then | The root of the site is what a visitor reads first, and unreleased documentation there describes a version nobody can install |
-| A push to `main` sets the default only where no set carries `latest` | The release workflow owns the default once there is a release, and a merge setting it back to `main` would undo it until the next release |
+| A push to `main` sets the default to `latest` where a set carries it, and to `main` where none does | Set on every merge, so a default another run moved is put back rather than left until the next release |
 
 The configuration page lists every environment variable the process reads, with
 its meaning and default. A variable that is set and cannot be read stops the

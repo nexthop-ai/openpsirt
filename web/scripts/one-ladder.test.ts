@@ -140,6 +140,62 @@ describe("a ladder of any length", () => {
   });
 });
 
+describe("text the bracket matcher cannot read", () => {
+  it("skips an escaped quote inside a string", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", hint: "a 5\\" gap" },
+        { key: "high", hint: 'it\\'s' },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads past an apostrophe in JSX text", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", note: <p>it's bad</p> },
+        { key: "high" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads past an escaped bracket in a regular expression", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", test: /\\]/ },
+        { key: "high" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads a block it cannot close over a window", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", test: /[(]/ },
+        { key: "high" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads a ladder nested among other entries", () => {
+    expect(
+      found(`const FIELDS = [
+        { name: "product" },
+        { name: "stream" },
+        { name: "variant" },
+        { name: "severity", options: [
+            ["critical", "C"],
+            ["high", "H"],
+        ] },
+      ];`),
+    ).toEqual([["critical", "high"]]);
+  });
+});
+
 describe("one report per copy", () => {
   it("reports a line once, however many shapes match on it", () => {
     expect(found(`const x = [["critical", "high"], ["medium", "low"]];`)).toHaveLength(1);

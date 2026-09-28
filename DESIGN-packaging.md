@@ -510,7 +510,6 @@ Everything after the tag is the `Release` workflow.
 | A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice. The only prerelease the migration check accepts is a release candidate, `-rc.N` |
 | A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
 | A fix to an older line moves nothing past a newer release | `latest`, the image's, the documentation's and the repository's Latest release, moves only where the tag is the newest release, and `<major>.<minor>` only where it is the newest on its line. A patch to 0.2 after 0.3 would otherwise hand everybody who asked for the current version the older schema |
-| A merge to `main` sets the documentation's default to `latest` where a release carries it, and to `main` where none does | The default is set on every merge, so one pointing anywhere else is put back |
 | A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
 
 When a step fails, the tag stays and the release does not exist yet. Fix what

@@ -77,22 +77,40 @@ export function listsIn(text) {
 // labels are rungs while none of them is a severity.
 const NAMING = /["']?(?:key|name|id|value|severity|band|level|word)["']?\s*:\s*["']([^"'\n]*)["']/g;
 
+// The index just past the quoted text opening at `start`, or -1 where it is not
+// quoted text. A backslash escapes the character after it. A single or double
+// quote with no partner before the end of its line opens nothing, which is
+// what an apostrophe in JSX text is.
+function pastQuote(text, start) {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    const c = text[i];
+    if (c === "\\") i++;
+    else if (c === quote) return i + 1;
+    else if (c === "\n" && quote !== "`") return -1;
+  }
+  return -1;
+}
+
 // The index of the bracket closing the one opened at `start`, or -1. Quoted
-// text and comments are skipped, so a bracket inside either closes nothing.
+// text and comments are skipped, so a bracket inside either closes nothing,
+// and so is a character after a backslash, which outside a string is a regular
+// expression's escaped bracket.
 function closing(text, start) {
   let depth = 0;
   for (let i = start; i < text.length; i++) {
     const c = text[i];
-    if (c === "/" && text[i + 1] === "/") {
+    if (c === "\\") {
+      i++;
+    } else if (c === "/" && text[i + 1] === "/") {
       const end = text.indexOf("\n", i);
       i = end < 0 ? text.length : end;
     } else if (c === "/" && text[i + 1] === "*") {
       const end = text.indexOf("*/", i + 2);
       i = end < 0 ? text.length : end + 1;
     } else if (c === '"' || c === "'" || c === "`") {
-      const end = text.indexOf(c, i + 1);
-      if (end < 0) return -1;
-      i = end;
+      const past = pastQuote(text, i);
+      if (past >= 0) i = past - 1;
     } else if (c === "[" || c === "{" || c === "(") {
       depth++;
     } else if (c === "]" || c === "}" || c === ")") {
@@ -103,16 +121,24 @@ function closing(text, start) {
   return -1;
 }
 
+// How far past its opening bracket a block that cannot be closed is read.
+const WINDOW = 800;
+
 // Every array whose first entry is an array or an object, found by matching
 // its brackets rather than within a window: a ladder of objects carrying a
 // label, a color and a hint runs well past any length a pattern could bound.
+// An array inside another is read as well as the one holding it, since a
+// ladder nested among other entries is a minority of the outer array's words.
+// A block whose brackets do not match, because something unread opened or
+// closed one, is read over a window from its opening bracket rather than
+// dropped.
 function blocksIn(text) {
   const out = [];
   for (const match of text.matchAll(/\[\s*[[{]/g)) {
-    if (out.length > 0 && match.index < out[out.length - 1].end) continue;
     const end = closing(text, match.index);
-    if (end < 0) continue;
-    out.push({ block: text.slice(match.index, end + 1), index: match.index, end });
+    const block =
+      end < 0 ? text.slice(match.index, match.index + WINDOW) : text.slice(match.index, end + 1);
+    out.push({ block, index: match.index });
   }
   return out;
 }
