@@ -254,6 +254,9 @@ func vexRefused(in Ingest, err error, what string) error {
 		return asked(in.Logger, err)
 	case errors.Is(err, catalog.ErrNotFound), errors.Is(err, access.ErrDenied):
 		return noSuchProduct()
+	case errors.Is(err, vex.ErrRenamed):
+		// The caller's to ask again, and the sentence says so.
+		return huma.Error409Conflict(vex.ErrRenamed.Error())
 	case errors.Is(err, vex.ErrTooLarge):
 		// Something to narrow rather than something broken, and the sentence
 		// says which build and what the limit is. Answered as a fault it is a

@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -403,6 +404,35 @@ func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
 		}
 		if baseline == nil || *baseline != 750 {
 			t.Errorf("the carried claim's baseline is %v, want the rating in force, 750", baseline)
+		}
+	})
+}
+
+// A limit left unset is the deployment's setting, read by the act itself.
+//
+// The handler read the settings before the transaction opened and passed the
+// numbers in, so a retry wrote against limits from before it began. Read in
+// the transaction that writes, a limit an administrator lowered holds on the
+// act that follows.
+func TestAnUnsetLimitIsTheDeploymentsSetting(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		second := f.secondIssue(t)
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+		f.alsoCarries(t, second, was, next)
+
+		first := f.agreed(t, f.at())
+		other := f.at()
+		other.VulnerabilityID = second
+		also := f.agreed(t, other)
+
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.ReviewIssues, "1"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Carry(ctx, f.triager, was, next, []int64{first.ID, also.ID},
+			triage.Bounds{}); err == nil {
+			t.Error("carrying two issues went through a deployment limit of one")
 		}
 	})
 }

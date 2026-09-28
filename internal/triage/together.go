@@ -57,6 +57,9 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 // kernel issue sits at about 45 places, so a limit of 2,000 places is 44
 // issues. Places are bounded separately, by a ceiling that guards the write
 // rather than the reader.
+//
+// A limit left at zero is the deployment's setting, read inside the
+// transaction the act writes in.
 type Bounds struct {
 	// Review is how many issues an act may answer where anything in it goes
 	// to a second person.
@@ -90,6 +93,33 @@ func (b Bounds) orDefaults() Bounds {
 		b.Places = shipped.Places
 	}
 	return b
+}
+
+// within fills each limit left unset from the deployment's settings, read
+// through the transaction the act writes in. A limit read before the
+// transaction opened describes a deployment a retry may no longer be running
+// against; one a caller set is kept.
+func (b Bounds) within(ctx context.Context, db bun.IDB) (Bounds, error) {
+	settings := setting.NewStore(db)
+	for _, each := range []struct {
+		key      string
+		fallback int
+		into     *int
+	}{
+		{setting.ReviewIssues, setting.DefaultReviewIssues, &b.Review},
+		{setting.AgreedIssues, setting.DefaultAgreedIssues, &b.Agreed},
+		{setting.WriteCeiling, setting.DefaultWriteCeiling, &b.Places},
+	} {
+		if *each.into > 0 {
+			continue
+		}
+		n, err := settings.Count(ctx, each.key, each.fallback)
+		if err != nil {
+			return b, fmt.Errorf("read the limits on one action: %w", err)
+		}
+		*each.into = n
+	}
+	return b, nil
 }
 
 // check refuses an act past its bounds, counted over what it is about to
@@ -272,7 +302,11 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		// less any skipped, and the issues they sit under. Always the
 		// reviewer's issue limit, because this always goes to a second
 		// person.
-		if err := bounds.counted(issuesIn(places), len(places), true); err != nil {
+		limits, err := bounds.within(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if err := limits.counted(issuesIn(places), len(places), true); err != nil {
 			return err
 		}
 

@@ -814,6 +814,17 @@ transaction began, or carried over from the attempt that failed, describes a
 world that no longer exists. Anything a closure uses but does not fetch is a
 defect.
 
+| Read inside the write | What it decides |
+|---|---|
+| The limits on an act answering many issues | Whether the act is refused. A limit a caller left unset is the deployment's setting |
+| The longest a personal token may last | The ceiling the new token is held to |
+| Whether the writer may write a note about an issue | Whether the note is written |
+| Where each added build holds a recorded flaw's component | Which rows the flaw opens. A build that stopped shipping it is refused |
+| What each part of a build is called, on recording that its VEX document went out | Whether the document names the build as it is now called; a rename in between is refused and asked again |
+
+A read made before the transaction as an early refusal is repeated inside it;
+the one inside decides.
+
 A statement that fails inside a transaction is not always recoverable. On
 PostgreSQL a failed statement aborts the whole transaction: every command after
 it is refused until the block ends, whatever the caller made of the failure. So

@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 )
@@ -124,6 +125,15 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// the earlier moment, so what went out reads as having gone out
 		// before the revision it follows.
 		issuedAt := s.now().UTC().Truncate(time.Microsecond)
+		// The names the document states, confirmed unchanged in the write
+		// that records it. The document is generated before the transaction,
+		// so a rename committing in between would otherwise record a document
+		// naming the build by a name it no longer has. Each check is a write
+		// matching the name read, which also holds the row against a rename
+		// until this commits.
+		if err := stillNamed(ctx, tx, named); err != nil {
+			return err
+		}
 		// Built inside, because an insert writes the generated identifier
 		// back into the model and the ordinal below is read from the
 		// database. A retry of a rolled-back attempt would re-insert a model
@@ -395,4 +405,38 @@ func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, wha
 		return false, fmt.Errorf("read whether anything has gone out for this %s: %w", what, err)
 	}
 	return issued, nil
+}
+
+// ErrRenamed is a build renamed while its document was being generated. The
+// document names what it had been called, so it is not recorded; asking again
+// generates one under the name it has now.
+var ErrRenamed = errors.New("the build was renamed while its document was being written; ask again")
+
+// stillNamed confirms each part of a build is still called what it was when
+// its document was generated.
+func stillNamed(ctx context.Context, tx bun.IDB, named *catalog.Named) error {
+	for _, level := range []struct {
+		model any
+		id    int64
+		name  string
+	}{
+		{(*catalog.Product)(nil), named.ProductID, named.Product},
+		{(*catalog.Stream)(nil), named.StreamID, named.Stream},
+		{(*catalog.Variant)(nil), named.VariantID, named.Variant},
+	} {
+		result, err := tx.NewUpdate().Model(level.model).
+			Set("name = name").
+			Where("id = ?", level.id).Where("name = ?", level.name).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("confirm what the build is called: %w", err)
+		}
+		n, err := database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("confirm what the build is called: %w", err)
+		}
+		if n == 0 {
+			return ErrRenamed
+		}
+	}
+	return nil
 }

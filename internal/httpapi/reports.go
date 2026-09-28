@@ -587,12 +587,8 @@ func registerCarrying(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
 		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
-			fromTarget.ID, toTarget.ID, input.Body.Decisions, bounds)
+			fromTarget.ID, toTarget.ID, input.Body.Decisions, triage.Bounds{})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}

@@ -141,13 +141,9 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
 		made, err := store.ReaffirmMany(ctx, subject, triage.ReaffirmingMany{
 			ClaimIDs: input.Body.Claims, Reasoning: input.Body.Reasoning,
-			By: subject.ID, Bounds: bounds,
+			By: subject.ID,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {

@@ -82,19 +82,6 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 	if err := markdown.Check(body); err != nil {
 		return nil, err
 	}
-	told, at, err := s.noteReach(ctx, subject, productID, vulnerabilityID)
-	if err != nil {
-		return nil, err
-	}
-	// Refused as a name nobody has used, so that a product somebody holds
-	// nothing on and an issue that is not there answer alike.
-	if !told {
-		return nil, ErrNoSuchNote
-	}
-	if !subject.Triages(at, productID) && !subject.OnCaseToAct(productID, vulnerabilityID) {
-		return nil, access.Denied("write a note about an issue here")
-	}
-
 	note := &IssueNote{
 		VulnerabilityID: vulnerabilityID, ProductID: productID, Body: body,
 		WrittenBy: subject.ID, WrittenAt: s.now().Truncate(time.Microsecond),
@@ -102,7 +89,23 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 	// Both writes or neither. Attaching is what makes a file listable and
 	// keeps it from the sweep, so a note stored without it points at
 	// something already gone from the issue's file list.
+	//
+	// Whether the writer may be here is asked inside, as rewording asks it:
+	// a retry re-runs the closure against a database that has moved.
 	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		note.ID = 0
+		told, at, err := noteReach(ctx, tx, subject, productID, vulnerabilityID)
+		if err != nil {
+			return err
+		}
+		// Refused as a name nobody has used, so that a product somebody holds
+		// nothing on and an issue that is not there answer alike.
+		if !told {
+			return ErrNoSuchNote
+		}
+		if !subject.Triages(at, productID) && !subject.OnCaseToAct(productID, vulnerabilityID) {
+			return access.Denied("write a note about an issue here")
+		}
 		if _, err := tx.NewInsert().Model(note).Exec(ctx); err != nil {
 			return fmt.Errorf("record a note: %w", err)
 		}
@@ -152,7 +155,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 	// because it looks like one.
 	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		if err := tx.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
-			return ErrNoSuchNote
+			return database.FromRead(err, ErrNoSuchNote, fmt.Sprintf("read note %d", noteID))
 		}
 		told, at, err := noteReach(ctx, tx, subject, note.ProductID, note.VulnerabilityID)
 		if err != nil {

@@ -6,6 +6,7 @@ package vex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -152,6 +153,58 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 		if recorded.Ordinal != 2 || doc.Version != 2 {
 			t.Errorf("recorded as revision %d, the document handed back says %d, want 2",
 				recorded.Ordinal, doc.Version)
+		}
+	})
+}
+
+// A document is not recorded under a name the build lost while it was being
+// written. The document is generated before the write that records it, and a
+// rename committing in between would record one naming what the build had
+// been called.
+func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.Resolve(ctx, "sonic", "master", "broadcom"); err != nil {
+			t.Fatal(err)
+		}
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
+			access.Stated(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subject := access.NewPerson(who.ID, who.Email, false,
+			map[int64][]access.Role{product.ID: {access.PublicTriage}}, 0)
+		named := publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
+
+		store := vex.NewStore(db.DB)
+		vex.Between(store, func() {
+			if _, err := db.DB.NewUpdate().Model((*catalog.Variant)(nil)).
+				Set("name = ?", "bcm").Where("id = ?", variant.ID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if _, err := store.Issued(ctx, subject, named, "sonic", "master", "broadcom"); !errors.Is(err, vex.ErrRenamed) {
+			t.Errorf("recording a document for a build renamed meanwhile answered %v", err)
+		}
+		went, err := db.DB.NewSelect().Table("vex_issuance").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if went != 0 {
+			t.Errorf("%d documents were recorded under a name the build no longer has", went)
 		}
 	})
 }

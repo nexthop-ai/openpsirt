@@ -80,7 +80,11 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 		for _, one := range wanted {
 			issues[one.Vulnerability] = true
 		}
-		if err := bounds.counted(len(issues), len(wanted), true); err != nil {
+		limits, err := bounds.within(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if err := limits.counted(len(issues), len(wanted), true); err != nil {
 			return err
 		}
 

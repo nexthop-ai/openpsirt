@@ -99,7 +99,11 @@ func (s *Store) reaffirmMany(ctx context.Context, subject access.Subject,
 	// one sentence behind them, which is what the limit exists to stop. The
 	// larger issue limit holds only where no claim in the act goes back to a
 	// second person: one that does puts the whole act in front of a reader.
-	if err := r.Bounds.check(bounded); err != nil {
+	limits, err := r.Bounds.within(ctx, s.db)
+	if err != nil {
+		return nil, err
+	}
+	if err := limits.check(bounded); err != nil {
 		return nil, err
 	}
 

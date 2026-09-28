@@ -112,15 +112,6 @@ func registerTokens(api huma.API, in Ingest) {
 			lifetime = parsed
 		}
 
-		ceiling := access.MaxTokenLifetime
-		if in.DB != nil {
-			ceiling, err = setting.NewStore(in.DB.DB).
-				Duration(ctx, setting.MaxTokenLifetime, access.MaxTokenLifetime)
-			if err != nil {
-				return nil, wentWrong(in.Logger, "cannot read how long a token may last", err)
-			}
-		}
-
 		// Absent and empty are different requests arriving as one value: a
 		// non-nil, zero-length slice, stored as NULL, which means every role
 		// its owner holds — so a script asking for a token that carries
@@ -148,7 +139,13 @@ func registerTokens(api huma.API, in Ingest) {
 		var token *access.Token
 		var secret string
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
-			var err error
+			// The ceiling is read in the transaction that mints, so a retry
+			// holds the token to the ceiling in force when it lands.
+			ceiling, err := setting.NewStore(tx).
+				Duration(ctx, setting.MaxTokenLifetime, access.MaxTokenLifetime)
+			if err != nil {
+				return wentWrong(in.Logger, "cannot read how long a token may last", err)
+			}
 			token, secret, err = access.NewStore(tx).NewToken(ctx, subject.ID,
 				input.Body.Name, productID, holds, lifetime, ceiling)
 			if err != nil {

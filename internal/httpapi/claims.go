@@ -254,19 +254,14 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// The bounds an answer about many issues is held to, read the way every other
-		// path reads it. Only a promise goes through unbounded, and which of
-		// the two this is comes from the claim being re-made rather than from
-		// the request.
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
+		// Held to the deployment's bounds, which the store reads inside the
+		// write. Only a promise goes through unbounded, and which of the two
+		// this is comes from the claim being re-made rather than from the
+		// request.
 		made, err := store.ReaffirmClaim(ctx, subject, triage.ReaffirmingClaim{
 			PreviousClaimID: input.ID,
 			Reasoning:       input.Body.Reasoning,
 			By:              subject.ID,
-			Bounds:          bounds,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {
