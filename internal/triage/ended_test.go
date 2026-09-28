@@ -337,6 +337,38 @@ func TestAClaimThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
 	})
 }
 
+func TestAClaimGrowsOnlyByWhatItsLiveRowsReach(t *testing.T) {
+	// A lapsed row covers nothing, so a build holding its place again is not
+	// growth anybody has to be told about.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		places := make([]triage.Place, 0, 2)
+		for _, name := range []string{"place-live", "place-lapsed"} {
+			at := f.at()
+			at.PlaceIdentity, at.ConsumerUpstream = name, ""
+			places = append(places, at)
+		}
+		made := f.claimsMany(t, places)
+		if err := agreeTo(ctx, f.store, f.reviewer, made[0].ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		f.ends(t, made[1].ID, time.Now().UTC().Truncate(time.Microsecond))
+		in := f.build(t, f.product, "2026.03")
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		f.finds(t, in, libfoo, "place-live", access.Public)
+		f.finds(t, in, libfoo, "place-lapsed", access.Public)
+
+		scrutiny, err := f.store.Scrutinize(ctx, f.reviewer, nil, time.Time{}, time.Time{}, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(scrutiny.Grew) != 1 || scrutiny.Grew[0].CoversNow != 1 {
+			t.Errorf("what grew reads %+v, want the claim covering one through its live row",
+				scrutiny.Grew)
+		}
+	})
+}
+
 func TestAWithdrawnClaimReachesNothing(t *testing.T) {
 	// What a claim covers now is what it suppresses. Taken back, it
 	// suppresses nothing, however well its versions still match.

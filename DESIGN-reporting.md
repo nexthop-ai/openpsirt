@@ -628,6 +628,8 @@ was capped.
 | Rule | |
 |---|---|
 | Growth is capped after it is found, most grown first | Whether a claim grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest claims fill the page and a claim that grew after them is in no answer |
+| Ties are broken by claim, then by approver | A claim with two standing agreements is two rows of equal growth, and a cap between them is decided by the record rather than by the engine |
+| What a claim covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its place again is not growth |
 | What claims cover now is counted a bounded set of claims per statement | One statement per claim is ten thousand round trips on ten thousand claims |
 
 ## Fix-bundle page cost

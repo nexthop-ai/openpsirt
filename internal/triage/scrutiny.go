@@ -340,7 +340,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where("ap.covered IS NOT NULL").
 		Where(standing, held...).
 		GroupExpr("de.claim_id, pe.identity, cl.outcome").
-		OrderExpr("de.claim_id")).Scan(ctx, &grew)
+		OrderExpr("de.claim_id, pe.identity")).Scan(ctx, &grew)
 	if err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
@@ -379,7 +379,11 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		if a.CoversNow-a.Covered != b.CoversNow-b.Covered {
 			return a.CoversNow-a.Covered > b.CoversNow-b.Covered
 		}
-		return a.ClaimID < b.ClaimID
+		if a.ClaimID != b.ClaimID {
+			return a.ClaimID < b.ClaimID
+		}
+		// A claim with two standing agreements is two rows of equal growth.
+		return a.ApprovedBy < b.ApprovedBy
 	})
 	if len(out.Grew) > limit {
 		out.Capped, out.Grew = true, out.Grew[:limit]
@@ -405,7 +409,10 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	if err := readableBy(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		ColumnExpr("de.id").
-		Where("de.claim_id IN (?)", bun.List(claims)), subject, "de").
+		Where("de.claim_id IN (?)", bun.List(claims)).
+		// Live rows only, as a claim's reach is counted: a row withdrawn or
+		// lapsed covers nothing, however well its versions still match.
+		Where("de.live_key IS NOT NULL"), subject, "de").
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which rows these claims wrote: %w", err)
 	}
