@@ -142,10 +142,20 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	}
 	claim.RevisionID = &revision.ID
 
+	// Keyed under the issue each row is read as, which is the key every live
+	// decision about that issue holds, whatever it was filed under.
+	filed := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		filed = append(filed, row.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return Revised{}, err
+	}
 	places := make([]Place, 0, len(rows))
 	for _, row := range rows {
 		places = append(places, Place{
-			ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
+			ProductID: row.ProductID, VulnerabilityID: issueOf[row.VulnerabilityID],
 			PlaceIdentity:     row.PlaceIdentity,
 			ComponentUpstream: orEmpty(row.ComponentUpstreamVersion),
 			ConsumerUpstream:  orEmpty(row.ConsumerUpstreamVersion),
@@ -543,8 +553,8 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	// the approval is served back, so an unnarrowed count discloses how many
 	// undisclosed findings sit behind a claim to somebody who may not read one.
 	covered, err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id`+
+		TableExpr(finding.Decisions).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = dv.issue_id`+
 			" AND f.place_identity = de.place_identity").
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).

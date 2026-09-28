@@ -9,7 +9,13 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 )
+
+// sameCase is the condition that a grant's issue column names the issue bound
+// in its one placeholder: the same issue, or one merged into it.
+func sameCase(column string) string { return filed.Under(column) }
 
 // Collaborator is one person brought into one undisclosed case.
 //
@@ -76,7 +82,7 @@ func (s *Store) RemoveFromCase(ctx context.Context, productID, vulnerabilityID, 
 		Set("removed_by = ?", by).
 		Set("live_person_id = ?", nil).
 		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(sameCase("vulnerability_id"), vulnerabilityID).
 		Where("person_id = ?", personID).
 		Where("live_person_id IS NOT NULL").
 		Exec(ctx)
@@ -92,7 +98,7 @@ func (s *Store) OnCase(ctx context.Context, productID, vulnerabilityID int64) ([
 	err := s.db.NewSelect().Model((*Collaborator)(nil)).
 		ColumnExpr("cc.person_id").
 		Where("cc.product_id = ?", productID).
-		Where("cc.vulnerability_id = ?", vulnerabilityID).
+		Where(sameCase("cc.vulnerability_id"), vulnerabilityID).
 		Where("cc.live_person_id IS NOT NULL").
 		OrderExpr("cc.added_at, cc.id").
 		Scan(ctx, &people)
@@ -110,10 +116,17 @@ func (s *Store) OnCase(ctx context.Context, productID, vulnerabilityID int64) ([
 // answers that can disagree.
 func (s *Store) CasesOf(ctx context.Context, personID int64) (map[int64][]int64, error) {
 	var rows []Collaborator
+	// Every issue read as the one the grant names: the issue that stands and
+	// every issue merged into it. A finding is filed under the issue that
+	// stands, and a decision, note or attachment under whichever issue it was
+	// made against, so the grant reaches each of them by the issue it states.
 	err := s.db.NewSelect().Model(&rows).
-		Column("product_id", "vulnerability_id").
-		Where("person_id = ?", personID).
-		Where("live_person_id IS NOT NULL").
+		Column("cc.product_id").
+		ColumnExpr(`"mv"."id" AS "vulnerability_id"`).
+		Join(`JOIN "vulnerability" AS "ci" ON "ci"."id" = "cc"."vulnerability_id"`).
+		Join(`JOIN "vulnerability" AS "mv" ON "mv"."issue_id" = "ci"."issue_id"`).
+		Where("cc.person_id = ?", personID).
+		Where("cc.live_person_id IS NOT NULL").
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read which cases they are on: %w", err)
@@ -122,7 +135,13 @@ func (s *Store) CasesOf(ctx context.Context, personID int64) (map[int64][]int64,
 		return nil, nil
 	}
 	cases := map[int64][]int64{}
+	seen := map[[2]int64]bool{}
 	for _, row := range rows {
+		key := [2]int64{row.ProductID, row.VulnerabilityID}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		cases[row.ProductID] = append(cases[row.ProductID], row.VulnerabilityID)
 	}
 	return cases, nil
@@ -135,7 +154,7 @@ func (s *Store) onCase(ctx context.Context, productID, vulnerabilityID,
 	on, err := s.db.NewSelect().Model((*Collaborator)(nil)).
 		Column("cc.id").
 		Where("cc.product_id = ?", productID).
-		Where("cc.vulnerability_id = ?", vulnerabilityID).
+		Where(sameCase("cc.vulnerability_id"), vulnerabilityID).
 		Where("cc.person_id = ?", personID).
 		Where("cc.live_person_id IS NOT NULL").
 		Exists(ctx)
@@ -153,7 +172,7 @@ func (s *Store) CaseRows(ctx context.Context, productID,
 	var rows []Collaborator
 	err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(sameCase("vulnerability_id"), vulnerabilityID).
 		Where("live_person_id IS NOT NULL").
 		Order("added_at", "id").
 		Scan(ctx)

@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // ReaffirmingMany is somebody saying every one of several lapsed claims of
@@ -137,10 +138,11 @@ func (s *Store) refuseOthersClaims(ctx context.Context, subject access.Subject,
 	if err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		Join(finding.DecisionIssue).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
 		ColumnExpr(`de.visibility AS "visibility"`).
 		ColumnExpr(`cl.proposed_by AS "proposed_by"`).
 		ColumnExpr(`v.identifier AS "identifier"`).

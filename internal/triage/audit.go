@@ -105,13 +105,17 @@ func (j Judged) BySomebodyElse() bool {
 // reads as narrowed.
 func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *bun.SelectQuery {
 	if f.Issue != "" {
+		// The name the issue is filed under, which is the issue the decision
+		// is read as: one filed under an issue that merged into it answers
+		// to the name that stands.
 		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
-			` WHERE iv.id = de.vulnerability_id AND iv.identifier = ?)`, f.Issue)
+			` JOIN "vulnerability" AS "ik" ON ik.id = iv.issue_id`+
+			` WHERE iv.id = de.vulnerability_id AND ik.identifier = ?)`, f.Issue)
 	}
 	if f.Component != "" {
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
-			` WHERE cf.vulnerability_id = de.vulnerability_id`+
+			` WHERE `+finding.SameIssue("cf.vulnerability_id", "de.vulnerability_id")+
 			` AND cf.place_identity = de.place_identity AND cc.name_folded = ?)`,
 			graph.Folded(f.Component))
 	}
@@ -127,7 +131,7 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
 			JOIN "target" AS "bt" ON bt.id = bf.target_id
 			JOIN "stream" AS "bs" ON bs.id = bt.stream_id
-			WHERE bf.vulnerability_id = de.vulnerability_id
+			WHERE ` + finding.SameIssue("bf.vulnerability_id", "de.vulnerability_id") + `
 			  AND bf.place_identity = de.place_identity
 			  AND bf.target_id = ? AND bs.product_id = de.product_id`
 		args := []any{f.TargetID}
@@ -358,11 +362,12 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
+		Join(finding.DecisionIssue).
 		Join(`JOIN "finding" AS "f" ON f.id = (
 			SELECT MIN(f2.id) FROM "finding" AS "f2"
 			JOIN "target" AS "tg2" ON tg2.id = f2.target_id
 			JOIN "stream" AS "st2" ON st2.id = tg2.stream_id
-			WHERE f2.vulnerability_id = de.vulnerability_id
+			WHERE f2.vulnerability_id = dv.issue_id
 				AND f2.place_identity = de.place_identity
 				AND st2.product_id = de.product_id)`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).

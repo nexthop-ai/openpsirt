@@ -147,7 +147,10 @@ func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
 
 	row := new(FlawReport)
 	err := s.db.NewSelect().Model(row).
-		Where("vulnerability_id = ?", vulnerabilityID).Scan(ctx)
+		// The issue's report, filed under it or under an issue that merged into
+		// it. The one received first where each name had one.
+		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+		OrderExpr("id").Limit(1).Scan(ctx)
 	switch {
 	case database.IsNoRows(err):
 		return nil, nil
@@ -265,7 +268,8 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 	err := s.db.NewSelect().
 		TableExpr(`"flaw_report" AS "fr"`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = fr.vulnerability_id`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = fr.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "ri" ON ri.id = fr.vulnerability_id`).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = ri.issue_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).

@@ -84,13 +84,12 @@ func repositoryOf(name string) string {
 func issue(t *testing.T, db *database.DB, identifier, severity string, links ...string) {
 	t.Helper()
 	ctx := t.Context()
-	row := &finding.Vulnerability{
-		Identifier: identifier, IdentifierFolded: strings.ToLower(identifier),
-		Severity: severity, FirstSeenAt: time.Now().UTC(),
-	}
-	if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+	interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
+		[]finding.Named{{Identifier: identifier, Severity: severity}})
+	if err != nil {
 		t.Fatalf("record %s: %v", identifier, err)
 	}
+	row := &finding.Vulnerability{ID: interned[strings.ToUpper(identifier)]}
 	for i, each := range links {
 		reference := &finding.Reference{
 			VulnerabilityID: row.ID, URL: each, Kind: finding.Patch,

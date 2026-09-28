@@ -212,7 +212,7 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 	var credits []string
 	err := s.db.NewSelect().Model((*finding.FlawReport)(nil)).
 		ColumnExpr("fr.credit").
-		Where("fr.vulnerability_id = ?", issueID).
+		Where(finding.FiledUnder("fr.vulnerability_id"), issueID).
 		Where("fr.product_id = ?", productID).
 		Scan(ctx, &credits)
 	if err != nil {

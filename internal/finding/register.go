@@ -355,8 +355,10 @@ func (s *Store) registerJoins(productID int64,
 		// The component's consumer. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		// The one decision on the record at the place, or none.
-		Join(`LEFT JOIN "decision" AS "de" ON `+DecisionAt("?")+` AND `+onTheRecordHere, productID).
+		// The one decision on the record at the place, or none, filed under
+		// any issue read as the finding's.
+		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+			AND `+onTheRecordHere, productID).
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`)
 }
 
@@ -378,16 +380,18 @@ func (s *Store) registerJoins(productID int64,
 // otherwise the oldest.
 var onTheRecordHere = `((de.live_key IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
 	AND NOT EXISTS (SELECT 1 FROM "decision" AS "d3"
+		JOIN "vulnerability" AS "d3v" ON d3v.id = d3.vulnerability_id
 		WHERE d3.product_id = de.product_id
-		  AND d3.vulnerability_id = de.vulnerability_id
+		  AND d3v.issue_id = dv.issue_id
 		  AND d3.place_identity = de.place_identity
 		  AND d3.live_key IS NOT NULL
 		  AND ` + keyMatchesOn("d3", outcomeOf("d3")) + `
 		  AND (` + rankOf("d3") + ` < ` + rankOf("de") + `
 		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND d3.id < de.id))))
 	OR (de.state = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
+		JOIN "vulnerability" AS "d2v" ON d2v.id = d2.vulnerability_id
 		WHERE d2.product_id = de.product_id
-		  AND d2.vulnerability_id = de.vulnerability_id
+		  AND d2v.issue_id = dv.issue_id
 		  AND d2.place_identity = de.place_identity
 		  AND ((d2.live_key IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
 		    OR (d2.state = 'lapsed' AND d2.id > de.id)))))`

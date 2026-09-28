@@ -103,10 +103,20 @@ func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
 		issueIDs = append(issueIDs, id)
 	}
 
+	// Every deferral of the issue, including those filed under an issue that
+	// merged into it: a place put off under either name was put off.
+	issueOf, err := finding.IssuesOf(ctx, s.db, issueIDs)
+	if err != nil {
+		return nil, err
+	}
+	asked := make([]int64, 0, len(issueOf))
+	for _, issue := range issueOf {
+		asked = append(asked, issue)
+	}
 	var deferrals []Decision
 	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Claim")).
 		Where("de.product_id IN (?)", bun.List(productIDs)).
-		Where("de.vulnerability_id IN (?)", bun.List(issueIDs)).
+		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(asked)).
 		Where("claim.outcome = ?", Deferred).
 		// Withdrawn ones included, for the span they were actually in force.
 		// Excluded outright, the threshold was defeated by taking a deferral
@@ -122,8 +132,17 @@ func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
 		product, issue int64
 		at             string
 	}
+	filed := make([]int64, 0, len(deferrals))
+	for _, deferral := range deferrals {
+		filed = append(filed, deferral.VulnerabilityID)
+	}
+	deferredAs, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
 	spans := map[place]time.Duration{}
 	for _, deferral := range deferrals {
+		deferral.VulnerabilityID = deferredAs[deferral.VulnerabilityID]
 		if deferral.Claim == nil || deferral.Claim.DeferredUntil == nil {
 			continue
 		}
@@ -136,7 +155,8 @@ func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
 		}
 	}
 	for _, decision := range decisions {
-		totals[decision.ID] = spans[place{decision.ProductID, decision.VulnerabilityID, decision.PlaceIdentity}]
+		totals[decision.ID] = spans[place{decision.ProductID, issueOf[decision.VulnerabilityID],
+			decision.PlaceIdentity}]
 	}
 	return totals, nil
 }

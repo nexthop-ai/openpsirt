@@ -29,13 +29,15 @@ type AssessmentBody struct {
 	// The name an address takes, never the spelling shown on screen — the
 	// same field on both operations has to mean the same thing, and this is
 	// the one a client feeds back to the filter beside it.
-	Product       string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
-	ProductName   string `json:"product_name,omitempty" doc:"That product's spelling on screen"`
-	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"This product's own rating"`
-	Published     string `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
-	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
-	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
-	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
+	Product     string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
+	ProductName string `json:"product_name,omitempty" doc:"That product's spelling on screen"`
+	Severity    string `json:"severity" enum:"low,medium,high,critical" doc:"This product's own rating"`
+	Published   string `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
+	Reasoning   string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
+	State       string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
+	// WithdrawnBecause is set only where no person withdrew the rating.
+	WithdrawnBecause string `json:"withdrawn_because,omitempty" doc:"Why the rating was withdrawn, where a merge of two issues withdrew it rather than a person"`
+	NeedsApproval    bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
 	// Open is the effect of agreeing beyond moving things down a list, on
 	// the claims waiting for somebody to agree. Absent on the
 	// rest: it is a question about a decision nobody has taken yet, and
@@ -278,12 +280,16 @@ func registerAssessment(api huma.API, in Ingest) {
 }
 
 func assessmentBody(a finding.Assessment, identifier string, asking int64) AssessmentBody {
-	return AssessmentBody{
+	body := AssessmentBody{
 		ID: a.ID, Vulnerability: identifier, Severity: a.Severity,
 		Published: a.Published, Reasoning: a.Reasoning,
 		State: a.State, NeedsApproval: a.NeedsApproval,
 		Mine: a.ProposedBy == asking,
 	}
+	if a.WithdrawnBecause != nil {
+		body.WithdrawnBecause = *a.WithdrawnBecause
+	}
+	return body
 }
 
 // productsNamed is the name each of these ratings' products goes by.

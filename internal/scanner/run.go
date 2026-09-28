@@ -40,6 +40,9 @@ type Runner struct {
 	// what has been ingested, so a scanner that reached it directly would
 	// close a cycle between the two.
 	told func(context.Context, []triage.ForPerson)
+	// superseded carries the judgments a merge of two issues took out of
+	// force, for the same reason.
+	superseded func(context.Context, []finding.Displaced)
 }
 
 // NewRunner returns a runner over db.
@@ -65,6 +68,13 @@ type Outcome struct {
 // single-purpose invocation wants; the deployment wires it once.
 func (r *Runner) Telling(tell func(context.Context, []triage.ForPerson)) *Runner {
 	r.told = tell
+	return r
+}
+
+// TellingSuperseded is the instruction for judgments a merge of two issues took
+// out of force because another said something different in the same product.
+func (r *Runner) TellingSuperseded(tell func(context.Context, []finding.Displaced)) *Runner {
+	r.superseded = tell
 	return r
 }
 
@@ -114,6 +124,7 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 			"updated", outcome.Applied.Updated,
 			"unexplained", outcome.Applied.Unexplained,
 			"unplaced", outcome.Applied.Unplaced,
+			"merged", outcome.Applied.Merged,
 			"lapsed", outcome.Lapsed)
 
 		// Several findings vanishing at once, with the components still
@@ -207,6 +218,9 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	applied, err := findings.Apply(ctx, targetID, runID, result.Reported)
 	if err != nil {
 		return nil, result, err
+	}
+	if r.superseded != nil && len(applied.Displaced) > 0 {
+		r.superseded(ctx, applied.Displaced)
 	}
 
 	// Now that the versions have moved, mark the judgments they moved out from

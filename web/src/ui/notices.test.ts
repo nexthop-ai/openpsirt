@@ -29,6 +29,7 @@ describe("what a notification is called", () => {
     expect(label("approval-undone")).toBe("agreement taken back");
     expect(label("approval-withdrawn")).toBe("agreed claim changed");
     expect(label("claim-lapsed")).toBe("stopped applying");
+    expect(label("merge-superseded")).toBe("superseded by a merge");
   });
 
   it("shows a kind it does not know rather than hiding it", () => {

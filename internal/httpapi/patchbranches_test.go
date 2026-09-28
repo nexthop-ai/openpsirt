@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
@@ -20,13 +19,12 @@ func TestPatchBranchProgressComesInTheOrderTheRepositoriesAreVisited(t *testing.
 			{"CVE-2031-0001", "low", "mild"},
 			{"CVE-2031-0002", "critical", "severe"},
 		} {
-			row := &finding.Vulnerability{
-				Identifier: each.identifier, IdentifierFolded: strings.ToLower(each.identifier),
-				Severity: each.severity, FirstSeenAt: time.Now().UTC(),
-			}
-			if _, err := r.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+			interned, err := finding.NewVulnerabilities(r.db.DB).Intern(ctx,
+				[]finding.Named{{Identifier: each.identifier, Severity: each.severity}})
+			if err != nil {
 				t.Fatal(err)
 			}
+			row := &finding.Vulnerability{ID: interned[each.identifier]}
 			reference := &finding.Reference{
 				VulnerabilityID: row.ID, Kind: finding.Patch, URLIdentity: each.identifier,
 				URL: "https://github.com/example/" + each.repository + "/commit/" + strings.Repeat("ab", 20),

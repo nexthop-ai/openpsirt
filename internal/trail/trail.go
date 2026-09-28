@@ -77,6 +77,11 @@ const (
 	// reading on the product, so who was let in and when is exactly what
 	// is asked afterwards.
 	Case Kind = "case"
+	// Merge is a judgment a report's merge of two issues took out of force
+	// because another stood in its place in the same product: a rating claim
+	// withdrawn, or a record of being attacked cleared. Nobody chose which of
+	// the two stands, so what the product lost is asked about afterwards.
+	Merge Kind = "merge"
 )
 
 // Kinds is every kind there is, in the order the API offers them.
@@ -88,12 +93,12 @@ const (
 func Kinds() []Kind {
 	return []Kind{
 		Setting, Role, Routing, Support, Release,
-		Credential, Account, Team, Case, Alias, Catalog, ExploitedHere,
+		Credential, Account, Team, Case, Alias, Catalog, ExploitedHere, Merge,
 	}
 }
 
-// Actor is what made a change: a person, or the deployment's startup
-// configuration.
+// Actor is what made a change: a person, the deployment's startup
+// configuration, or a merge of two issues.
 type Actor string
 
 const (
@@ -104,6 +109,9 @@ const (
 	// made, which names no person. Only the administrators configuration
 	// names are changed this way.
 	ByConfiguration Actor = "configuration"
+	// ByMerge is a change a scan made by merging two issues its report named
+	// together, which names no person.
+	ByMerge Actor = "merge"
 )
 
 // Change is one administrative act.
@@ -115,7 +123,7 @@ type Change struct {
 	// Actor is what made it, and never absent: a change nobody made is a
 	// change nothing records, which is the state this exists to end.
 	Actor Actor `bun:"actor,notnull"`
-	// By is the person who made it. Absent only where configuration did.
+	// By is the person who made it. Absent where configuration or a merge did.
 	By   *int64 `bun:"by"`
 	Kind Kind   `bun:"kind,notnull"`
 	Name string `bun:"about,notnull"`
@@ -190,6 +198,15 @@ func (s *Store) RecordByConfiguration(ctx context.Context, kind Kind, name strin
 	was, became *string) error {
 
 	return s.write(ctx, &Change{Actor: ByConfiguration,
+		Kind: kind, Name: name, Was: was, Became: became})
+}
+
+// RecordByMerge writes one change a merge of two issues made, in the
+// transaction that makes it.
+func (s *Store) RecordByMerge(ctx context.Context, kind Kind, name string,
+	was, became *string) error {
+
+	return s.write(ctx, &Change{Actor: ByMerge,
 		Kind: kind, Name: name, Was: was, Became: became})
 }
 

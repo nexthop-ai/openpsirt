@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -80,13 +81,15 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 	}
 	undisclosed, private := access.AnyPrivate("de.visibility")
 	err := w.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(finding.Decisions).
 		Join(`JOIN "vex_statement" AS "ss" ON ss.id = de.from_statement_id`).
 		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		// The issue the decision is read as, which is the one a reader finds
+		// where a merge put another name under it.
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
 		ColumnExpr(`MIN(de.id) AS "decision_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
 		ColumnExpr(`ss.publisher AS "publisher"`).
@@ -99,7 +102,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where("ss.superseded_at IS NOT NULL").
 		// Grouped exactly as the condition is identified, so one condition is
 		// one row and its link does not depend on which of several came last.
-		GroupExpr("de.product_id, de.vulnerability_id, ss.publisher").
+		GroupExpr("de.product_id, v.id, ss.publisher").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where a publisher changed their mind: %w", err)

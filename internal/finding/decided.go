@@ -79,7 +79,8 @@ func standsAs(product string, state decisionState) string {
 	return `EXISTS (SELECT 1 FROM "finding" AS "f2"
 			JOIN "component" AS "c" ON c.id = f2.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id
-			JOIN "decision" AS "de" ON de.vulnerability_id = f2.vulnerability_id
+			JOIN "vulnerability" AS "dv" ON dv.issue_id = f2.vulnerability_id
+			JOIN "decision" AS "de" ON de.vulnerability_id = dv.id
 			  AND de.place_identity = f2.place_identity
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE f2.id = f.id
@@ -96,7 +97,7 @@ func standsAs(product string, state decisionState) string {
 // name. Quoting it at the joint is what puts it back inside a rule something
 // checks.
 func decidedAs(product string, state decisionState) string {
-	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de"
+	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM ` + Decisions + `
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE ` + DecisionAt(product) + `
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`

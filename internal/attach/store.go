@@ -18,6 +18,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Store reads and writes attachments, and owns the bytes as well as the rows.
@@ -100,7 +101,7 @@ func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 		// — and this was the second copy of a shape recorded as removed.
 		ColumnExpr(access.PrivateCountAs("f.visibility", "undisclosed")).
 		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(finding.HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Scan(ctx, &counted)
 	if err != nil {
 		return access.Private, false, fmt.Errorf("read how disclosed an issue is: %w", err)

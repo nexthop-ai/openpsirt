@@ -103,8 +103,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		// equality that matches ten rows when it matches every open row in
 		// the deployment, and probed the decisions once per row: 0.46 s to
 		// describe a page of thirty-two, against 0.1 ms the other way round.
+		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
+		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
@@ -233,8 +234,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	if err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The decision on the outside, as above.
+		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
+		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).

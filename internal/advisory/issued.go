@@ -188,7 +188,7 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 			JOIN "target" AS "t" ON t.id = f.target_id
 			JOIN "stream" AS "st" ON st.id = t.stream_id
 			WHERE st.product_id = ac.product_id
-			  AND f.vulnerability_id = ac.vulnerability_id
+			  AND `+finding.SameIssue("f.vulnerability_id", "ac.vulnerability_id")+`
 			  AND f.kind = ?
 			  AND `+where+`))`,
 		append([]any{finding.Entered}, args...)...)
@@ -297,7 +297,8 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
 		Join(`JOIN "advisory_issue" AS "ac" ON ac.advisory_id = ai.advisory_id`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = ac.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "acv" ON acv.id = ac.vulnerability_id`).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = acv.issue_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Where("tg.stream_id = ?", streamID).

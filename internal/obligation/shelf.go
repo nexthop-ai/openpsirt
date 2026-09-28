@@ -85,7 +85,7 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 		ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "finding" AS "f"`+
 			` JOIN "target" AS "tg" ON tg.id = f.target_id`+
 			` JOIN "stream" AS "st" ON st.id = tg.stream_id`+
-			` WHERE f.vulnerability_id = eh.vulnerability_id`+
+			` WHERE `+finding.SameIssue("f.vulnerability_id", "eh.vulnerability_id")+
 			` AND st.product_id = eh.product_id AND f.visibility = ?)`+
 			` THEN 1 ELSE 0 END AS "private"`, access.Private).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = eh.vulnerability_id`).

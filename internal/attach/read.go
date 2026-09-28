@@ -121,7 +121,7 @@ func (s *Store) ForIssue(ctx context.Context, subject access.Subject,
 	var rows []Attachment
 	if err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(finding.FiledUnder("vulnerability_id"), vulnerabilityID).
 		Where("attached_at IS NOT NULL").
 		Order("uploaded_at DESC", "id DESC").
 		Scan(ctx); err != nil {
@@ -385,7 +385,9 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 	var issue int64
 	err = s.db.NewSelect().
 		TableExpr(`"vulnerability" AS "v"`).
-		ColumnExpr("v.id").
+		// The issue the name is read as, which is the issue that stands where
+		// the name was filed under one that merged into it.
+		ColumnExpr("v.issue_id").
 		// Against the folded column, folded by the one rule the column was
 		// written with, so this is an equality on a unique column.
 		Where("v.identifier_folded = ?", finding.FoldIdentifier(identifier)).

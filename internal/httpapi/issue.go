@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -30,6 +31,13 @@ type SightingBody struct {
 	FixedIn     string `json:"fixed_in,omitempty"`
 }
 
+// MergedBody is one issue merged into another because a report named both.
+type MergedBody struct {
+	Vulnerability string   `json:"vulnerability" doc:"The name the merged issue was filed under"`
+	MergedAt      string   `json:"merged_at" doc:"When the report naming both was applied"`
+	Named         []string `json:"named" doc:"The names that report gave the issue"`
+}
+
 // IssueOutput is one issue, everywhere the caller may see it.
 type IssueOutput struct {
 	Body struct {
@@ -41,6 +49,7 @@ type IssueOutput struct {
 		Ratings       []RatingBody   `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first"`
 		Exploited     bool           `json:"exploited,omitempty"`
 		Description   string         `json:"description,omitempty"`
+		Merged        []MergedBody   `json:"merged,omitempty" doc:"Issues held apart until a report named them together, and merged into this one. What was decided under each applies here"`
 		Items         []SightingBody `json:"items"`
 		// Total counts build-and-component pairs, which is what a row is.
 		Total    int `json:"total"`
@@ -133,6 +142,24 @@ func registerIssue(api huma.API, in Ingest) {
 		out.Body.Ratings = ratingBodies(known.Ratings)
 		out.Body.Exploited = known.Exploited
 		out.Body.Description = known.Description
+		merged, err := finding.MergesInto(ctx, in.DB.DB, id)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "what merged into this issue could not be read", err)
+		}
+		absorbed := make([]int64, 0, len(merged))
+		for _, one := range merged {
+			absorbed = append(absorbed, one.AbsorbedID)
+		}
+		filedUnder, err := issues.NamesByID(ctx, absorbed)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "what merged into this issue could not be read", err)
+		}
+		for _, one := range merged {
+			out.Body.Merged = append(out.Body.Merged, MergedBody{
+				Vulnerability: filedUnder[one.AbsorbedID],
+				MergedAt:      one.MergedAt.UTC().Format(time.RFC3339), Named: strings.Fields(one.Named),
+			})
+		}
 		out.Body.Items = make([]SightingBody, 0, len(rows))
 		products := map[string]bool{}
 		for _, row := range rows {

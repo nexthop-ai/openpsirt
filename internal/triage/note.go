@@ -234,7 +234,9 @@ func (s *Store) Notes(ctx context.Context, subject access.Subject,
 	}
 	var notes []IssueNote
 	if err := s.db.NewSelect().Model(&notes).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		// Every note on the issue, including those written under an issue that
+		// merged into it.
+		Where(finding.FiledUnder("vulnerability_id"), vulnerabilityID).
 		Where("product_id = ?", productID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the notes on this issue: %w", err)
@@ -284,7 +286,7 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.id").
-		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where(finding.HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where("st.product_id = ?", productID).
 		Where("f.visibility = ?", access.Private).
 		Exists(ctx)

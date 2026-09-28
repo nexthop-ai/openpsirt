@@ -74,6 +74,14 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     and its identifier, where v0.4.0 recorded a name. A name a key holds is
 //     read as that key, and otherwise a name a person holds as that person. A
 //     name held by neither stays as it is, and narrows nothing.
+//   - An issue states the issue it is read as. v0.4.0 merged nothing, so every
+//     row is read as itself.
+//   - A merge of two issues, and a decision one superseded, are recorded in
+//     two new tables. v0.4.0 refused the report that would have merged them,
+//     so both start empty.
+//   - A rating claim states why it was withdrawn where no person withdrew it.
+//     Every claim v0.4.0 withdrew, a person withdrew, so the column starts
+//     empty.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -107,7 +115,32 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV050); err != nil {
 		return err
 	}
-	return sendersQualified(ctx, tx)
+	if err := sendersQualified(ctx, tx); err != nil {
+		return err
+	}
+	// A column every existing row fills from its own identifier. A default
+	// cannot name another column, so it is added holding zero and each row is
+	// then pointed at itself.
+	if err := u.change(vulnerabilityV050(t), change{table: "vulnerability",
+		add:     []added{{column: "issue_id", fill: "0"}},
+		then:    func() error { return eachIssueItself(ctx, tx) },
+		indexes: []string{"vulnerability_issue_idx"}}); err != nil {
+		return err
+	}
+	if err := u.create(mergeV050(t), "vulnerability_merge", "decision_superseded"); err != nil {
+		return err
+	}
+	return u.change(assessmentV050(t), change{table: "assessment",
+		add: []added{{column: "withdrawn_because"}}})
+}
+
+// eachIssueItself reads every issue as itself, which is what an issue nothing
+// merged is.
+func eachIssueItself(ctx context.Context, tx bun.Tx) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE "vulnerability" SET "issue_id" = "id"`); err != nil {
+		return fmt.Errorf("read every issue as itself: %w", err)
+	}
+	return nil
 }
 
 // downgradeV050 puts back what v0.4.0 reads.
@@ -116,11 +149,17 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 // name before any table changes, so a refusal leaves the database as v0.5.0
 // left it on every engine. The node columns go.
 //
+// The merges go with the tables that recorded them, and the reason a merge
+// gave for withdrawing a rating claim with its column. The findings a merge
+// moved stay with the issue they moved to, and what was decided under the
+// issue it absorbed stays filed under that issue, which v0.4.0 reads as an
+// issue with no findings.
+//
 // The name is written back into the administration column, which is where
-// v0.4.0 reads it. A trail row configuration wrote has no person, which
-// v0.4.0 has no place for, so it goes with the column that says who acted.
-// Whether a person typed each name an issue answers to goes with its column,
-// and the names stay.
+// v0.4.0 reads it. A trail row configuration or a merge wrote has no person,
+// which v0.4.0 has no place for, so it goes with the column that says who
+// acted. Whether a person typed each name an issue answers to goes with its
+// column, and the names stay.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err
@@ -128,6 +167,20 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := sendersNamed(ctx, tx); err != nil {
 		return err
 	}
+	if err := dropTables(ctx, tx.Tx, "decision_superseded", "vulnerability_merge"); err != nil {
+		return err
+	}
+	if err := dropIndex(ctx, tx.Tx, "vulnerability", "vulnerability_issue_idx"); err != nil {
+		return err
+	}
+	if err := apply(ctx, tx.Tx, []string{
+		`ALTER TABLE "assessment" DROP COLUMN "withdrawn_because"`,
+		`ALTER TABLE "vulnerability" DROP COLUMN "issue_id"`,
+		`DELETE FROM "admin_change" WHERE "actor" = 'merge'`,
+	}); err != nil {
+		return err
+	}
+
 	if _, err := tx.NewRaw(`UPDATE "person" SET "is_admin" = ? WHERE "is_bootstrap" = ?`,
 		true, true).Exec(ctx); err != nil {
 		return fmt.Errorf("fold administration named in configuration back in: %w", err)

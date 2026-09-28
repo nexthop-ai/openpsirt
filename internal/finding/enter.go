@@ -522,7 +522,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			if changed == 0 {
 				return ErrAlreadyJudged
 			}
-			return nil
+			return refuseIfReported(ctx, tx, vulnerabilityID, reported.ID)
 		}
 		// Every flaw has a report, whether it was sent in or found here, so
 		// the Inbox is the one list of where flaws came from and the same

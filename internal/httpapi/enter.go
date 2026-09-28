@@ -193,6 +193,8 @@ func registerEntry(api huma.API, in Ingest) {
 				return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
 			case errors.Is(err, finding.ErrAlreadyJudged):
 				return nil, huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
+			case errors.Is(err, finding.ErrIssueReported):
+				return nil, huma.Error409Conflict(finding.ErrIssueReported.Error())
 			}
 			// A summary the writing policy refuses, answered with where to
 			// look, as every other piece of writing is.

@@ -332,7 +332,8 @@ func run(args []string, stdout, stderr *os.File) error {
 	runner := scanner.NewRunner(db, work, scanner.Grype{
 		Path: cfg.ScannerPath, Timeout: cfg.ScannerTimeout, Limits: cfg.ScannerLimits(),
 	}, logger, name).
-		Telling(notify.Lapses(db.DB, logger))
+		Telling(notify.Lapses(db.DB, logger)).
+		TellingSuperseded(notify.Superseded(db.DB, logger))
 	// Asks public indexes what upstream has released. Started whatever the
 	// setting says and does nothing until it is turned on: the setting is
 	// read each cycle, so turning this off takes effect without a

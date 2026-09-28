@@ -23,6 +23,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Lifetime is how long a notification is worth showing.
@@ -59,7 +60,8 @@ func Kinds() []Kind {
 		Assigned, Mentioned, SentBack, BuildQuiet, HoldingAbsent,
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
-		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, BroughtIn, Disclosed, Unanswered,
+		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, MergeSuperseded, BroughtIn, Disclosed,
+		Unanswered,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		InventoryMoved,
 		ObligationOpen, ObligationNear, ObligationPassed,
@@ -197,6 +199,12 @@ const (
 	// back to somebody who did nothing to cause it, and the alternative is the
 	// finding reappearing as though nobody had ever looked at it.
 	ClaimLapsed Kind = "claim-lapsed"
+	// MergeSuperseded is two judgments that disagreed meeting when a report
+	// merged the issues they were filed under: two decisions about one place,
+	// two rating claims, or two records of being attacked, in one product.
+	// One stands and the other stopped standing, which is a choice the tool
+	// made rather than a person, so every triager of the product is told.
+	MergeSuperseded Kind = "merge-superseded"
 
 	// BroughtIn is somebody granted one undisclosed case.
 	//
@@ -683,7 +691,7 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 		// whole of what the grant is not.
 		for _, product := range subject.CaseProducts() {
 			for _, issue := range subject.Cases(product) {
-				q = q.WhereOr("(product_id = ? AND vulnerability_id = ?)", product, issue)
+				q = q.WhereOr("(product_id = ? AND "+finding.FiledUnder("vulnerability_id")+")", product, issue)
 			}
 		}
 		return q

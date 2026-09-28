@@ -114,11 +114,11 @@ func labelBeside(name, handle string) string {
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
 	At    string `json:"at"`
-	Actor string `json:"actor" enum:"person,configuration" doc:"What made the change: a person in the application, or the deployment's startup configuration, which names administrators"`
+	Actor string `json:"actor" enum:"person,configuration,merge" doc:"What made the change: a person in the application, the deployment's startup configuration, which names administrators, or a scan merging two issues its report named together"`
 	By    string `json:"by,omitempty" doc:"The person who made the change, by sign-in identity. Absent where configuration made it"`
 	// ByName is the label beside the identity rather than in its place.
 	ByName string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"The kind of thing that changed"`
+	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here,merge" doc:"The kind of thing that changed"`
 	// About is the subject: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`
@@ -151,7 +151,7 @@ func registerTrail(api huma.API, in Ingest) {
 			"it holds.",
 		Tags: []string{"Administration"},
 	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
-		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"Keep only changes of one kind"`
+		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here,merge" doc:"Keep only changes of one kind"`
 		Period
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`

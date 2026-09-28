@@ -15,8 +15,8 @@ func trailV050(t *columnTypes) []string {
 		`CREATE TABLE "admin_change" (
 			"id"       ` + t.id + `,
 			"at"       ` + t.timestamp + ` NOT NULL,
-			-- Who, where a person made it. Null only where the actor is
-			-- configuration, which is no person.
+			-- Who, where a person made it. Null where the actor is
+			-- configuration or a merge, which are no person.
 			"by"       ` + t.ref + ` NULL,
 			-- What kind of thing moved, and which one of them. The kind is
 			-- what a reader filters by; the name is what they search for.

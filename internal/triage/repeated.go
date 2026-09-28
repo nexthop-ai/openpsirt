@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -85,8 +86,10 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 
 	var rows []Repeated
 	q := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		TableExpr(finding.Decisions).
+		// The issue each deferral is read as, so a place put off under two
+		// names that merged is one place put off.
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
 		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		// And what that product rates the issue, where it rates it anything.
 		// The report is per product already, and a rating belongs to one — so
@@ -123,7 +126,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// threshold counts them. Left out, the report built to catch
 		// withdraw-and-defer-again was blind to exactly that pattern.
 		Where("cl.deferred_until IS NOT NULL").
-		GroupExpr("de.product_id, de.vulnerability_id, de.place_identity").
+		GroupExpr("de.product_id, v.id, de.place_identity").
 		Having("SUM(CASE WHEN "+heldSeconds(s.db)+" > 0 THEN 1 ELSE 0 END) >= ?", atLeast).
 		// The most put-off first, and then the longest: a list read from the
 		// top should start with the thing somebody has avoided most.

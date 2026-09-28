@@ -35,10 +35,8 @@ func TestAskingAboutAnIssueSomewhereElseSaysNothingAboutIt(t *testing.T) {
 		// filed. Written directly: what is being measured is the resolver's
 		// answer, and the shortest way to a vulnerability row that this
 		// product holds nothing against is to make one.
-		if _, err := r.db.DB.NewInsert().Model(&finding.Vulnerability{
-			Identifier: "CVE-2026-ELSEWHERE", IdentifierFolded: "cve-2026-elsewhere",
-			Severity: "high",
-		}).Exec(t.Context()); err != nil {
+		if _, err := finding.NewVulnerabilities(r.db.DB).Intern(t.Context(),
+			[]finding.Named{{Identifier: "CVE-2026-ELSEWHERE", Severity: "high"}}); err != nil {
 			t.Fatal(err)
 		}
 

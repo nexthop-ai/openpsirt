@@ -319,10 +319,13 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 		if changed == 0 {
 			return ErrAlreadyJudged
 		}
-		return nil
+		// Asked once the report is judged, of every other report: the unique
+		// index keeps one per issue row and nothing keeps one across the
+		// names merged into an issue.
+		return refuseIfReported(ctx, tx, vulnerabilityID, row.ID)
 	})
 	switch {
-	case errors.Is(err, ErrAlreadyJudged):
+	case errors.Is(err, ErrAlreadyJudged), errors.Is(err, ErrIssueReported):
 		return nil, err
 	case database.IsDuplicate(err):
 		// One report is the record of an issue. A second pointed at the same
@@ -353,4 +356,26 @@ func mintReference(ctx context.Context, tx bun.IDB, product string, year int) (s
 		what: "reference", an: "a", pool: "reports of %s in %d", shape: "%s-R-%d-%d",
 		table: "flaw_report", column: "reference",
 	})
+}
+
+// refuseIfReported refuses a report as the record of an issue that another
+// report already stands for, filed under the issue itself or under an issue
+// that merged into it.
+//
+// The unique index keeps one report per issue row, and a report filed under an
+// absorbed issue is the record of the issue it merged into while that row
+// holds none of its own. Asked inside the transaction that writes, so a retry
+// asks again.
+func refuseIfReported(ctx context.Context, tx bun.IDB, vulnerabilityID, reportID int64) error {
+	held, err := tx.NewSelect().Model((*FlawReport)(nil)).
+		Where(FiledUnder("fr.vulnerability_id"), vulnerabilityID).
+		Where("fr.id <> ?", reportID).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("read whether the issue has a report: %w", err)
+	}
+	if held {
+		return ErrIssueReported
+	}
+	return nil
 }

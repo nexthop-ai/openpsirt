@@ -80,15 +80,22 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Outcome         string `bun:"outcome"`
 		Places          int    `bun:"places"`
 	}
+	// Counted by the issue each decision is read as, so what was agreed under
+	// a name that merged into this issue counts as agreed about it.
+	issueOf, err := finding.IssuesOf(ctx, s.db, issues)
+	if err != nil {
+		return nil, err
+	}
 	elsewhere := s.db.NewSelect().Model((*Decision)(nil)).
+		Join(finding.DecisionIssue).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
 		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
-		Where("de.vulnerability_id IN (?)", bun.List(issues)).
+		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(issues)).
 		Where("de.state = ?", Approved).
 		Where("de.live_key IS NOT NULL").
-		GroupExpr("de.vulnerability_id, cl.outcome")
+		GroupExpr("dv.issue_id, cl.outcome")
 	if err := readableBy(elsewhere, subject, "de").Scan(ctx, &agreed); err != nil {
 		return nil, fmt.Errorf("read what was decided about this elsewhere: %w", err)
 	}
@@ -120,7 +127,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Where("f.closed_at IS NULL").
 		Where("f.place_identity IN (?)", bun.List(places)).
 		Where("st.product_id IN (?)", bun.List(products)).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
+		Where(`NOT EXISTS (SELECT 1 FROM ` + finding.Decisions + `
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE ` + finding.DecisionAt("st.product_id") + `
 			  AND de.live_key IS NOT NULL
@@ -137,7 +144,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 
 	for _, row := range representatives {
 		out[row.ID] = Counter{
-			Elsewhere: byIssue[row.VulnerabilityID],
+			Elsewhere: byIssue[issueOf[row.VulnerabilityID]],
 			Undecided: byPlace[fmt.Sprintf("%d %s", row.ProductID, row.PlaceIdentity)],
 		}
 	}

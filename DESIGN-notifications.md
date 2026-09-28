@@ -57,6 +57,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
 | An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a claim that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the claim simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
+| A merge meeting two judgments that disagree in one product | event | Two decisions at one place, two rating claims, or two records of being attacked dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
 | An approval an edit withdrew | event | To everybody whose standing agreement a revision of the reasoning or a moved promise took back, once each, and never to whoever made the edit. Without it an approver goes on relying on an agreement the record no longer holds (REQ-24, REQ-28) |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
 | An embargo whose date arrived | condition | Reaching the date discloses nothing (REQ-37). Clears when the date moves or the finding is disclosed |
@@ -348,7 +349,18 @@ cycle.
 | A sweep that fails part way still tells | The batches before the failure are committed, and a lapse nobody hears of is the outcome the message exists to prevent |
 | Says why: the code moved, or the issue was rated worse | The two ask different things of the person re-affirming. `DESIGN-triage.md` § Lapse marking holds both |
 | Links to the review queue's To reaffirm tab | The work is re-affirming every claim that lapsed, not reading one of them. A link to one decision of three hundred leaves the rest to be found |
-| Sent by the scan's sweep and by a rating put in or out of force here | The two places a claim can lapse |
+| Sent by the scan's sweep and by a rating put in or out of force here | The two places a claim lapses by its own proposer's work coming back |
+
+A merge that ends one of two judgments in a product tells the product's
+triagers rather than whoever made it. `DESIGN-findings.md` § Merged issues
+holds the rules.
+
+| Merge message | |
+|---|---|
+| Sent only where the two say different things: another outcome, another rating, another date of attack | Two that agree collapse to one, and nothing the product reads changes |
+| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or a record of being attacked, unless a finding of the issue in the product is disclosed | The tool chooses between two people's judgments by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. A judgment about the whole issue has no visibility of its own |
+| Names both issues and the product, and links to the decision that stands, or for the other two to the issue | That is where the one that ends can be compared with the one that stands |
+| Sent by the scan that merges the issues, once the scan has applied, to each person in turn | What a scan does and how anybody hears about it are wired together at the deployment, as the lapse message is. One person not told leaves the rest told |
 
 ## The digest
 

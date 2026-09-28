@@ -492,6 +492,13 @@ function Administered() {
                     <span className="hint" title="The deployment's startup configuration">
                       configuration
                     </span>
+                  ) : row.actor === "merge" ? (
+                    <span
+                      className="hint"
+                      title="A scan merging two issues its report named together"
+                    >
+                      merge
+                    </span>
                   ) : (
                     row.by_name || row.by
                   )}

@@ -227,7 +227,7 @@ func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool
 			` JOIN "target" AS "tg" ON tg.id = f.target_id`+
 			` JOIN "stream" AS "st" ON st.id = tg.stream_id`+
 			` WHERE st.product_id = de.product_id AND f.closed_at IS NULL`+
-			` AND f.vulnerability_id = de.vulnerability_id`+
+			` AND `+finding.SameIssue("f.vulnerability_id", "de.vulnerability_id")+
 			` AND f.place_identity = de.place_identity AND `+matching+`)`).
 		Scan(ctx, &still); err != nil {
 		return nil, fmt.Errorf("read which of these the code moved under: %w", err)

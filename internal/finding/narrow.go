@@ -715,7 +715,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	if f.ProposedAfter != nil {
 		where, args := f.product()
-		q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS "de"
+		q = q.Where(`EXISTS (SELECT 1 FROM `+Decisions+`
 			WHERE `+DecisionAt(where)+`
 			  AND de.proposed_at > ?)`, append(args, *f.ProposedAfter)...)
 	}
@@ -793,7 +793,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		held := `EXISTS (SELECT 1 FROM "decision" AS "dc"
 			WHERE dc.claim_id = ?
 			  AND dc.product_id = ` + where + `
-			  AND dc.vulnerability_id = f.vulnerability_id
+			  AND ` + SameIssue("f.vulnerability_id", "dc.vulnerability_id") + `
 			  AND dc.place_identity = f.place_identity`
 		asked := append([]any{f.Claim}, args...)
 		if states := trimmed(f.ClaimStates); len(states) > 0 {
@@ -1024,7 +1024,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// vulnerability table, and the whole alias table, once per
 		// statement.
 		pairs := `(SELECT ss.product_id AS "product_id", vc.id AS "component_id",
-			vv.id AS "vulnerability_id"
+			vv.issue_id AS "vulnerability_id"
 			FROM "vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON vc.name_folded = ss.component
 			JOIN "vulnerability" AS "vv" ON vv.identifier_folded = ss.vulnerability
@@ -1189,26 +1189,28 @@ const (
 // filter and the triage package cannot drift on the spelling.
 const upgradeNeeded = "upgrade-needed"
 
-// DecisionAt is the one spelling of a decision `de` being about the finding
-// `f`: the same product, the same issue and the same place.
+// DecisionAt is the one spelling of a decision `de`, read beside `dv` through
+// Decisions, being about the finding `f`: the same product, the same issue and
+// the same place.
 //
-// A place identity carries no product, so a correlation on the issue and the
-// place alone matches a decision made in every product that ships the same
-// component under the same consumer. Every query relating a finding to its
-// decisions composes this rather than writing the three terms out, and adds
-// its own condition on liveness, versions and state beside it.
+// The same issue is asked of `dv.issue_id`, because a decision filed under an
+// issue that later merged into the finding's is about the finding's issue.
+// A place identity carries no product, so the product is named too: without
+// it a decision made in every other product that ships the same component
+// under the same consumer would match.
 //
-// product is how the query names the finding's product: a bound number, or
-// the stream it has joined. Anything else is a programming error, because it
-// is placed in the statement as written.
+// product is how the query names the finding's product: a bound number, the
+// stream it has joined, or the decision's own product where the query is
+// already narrowed to it. Anything else is a programming error, because it is
+// placed in the statement as written.
 func DecisionAt(product string) string {
 	switch product {
-	case "?", "st.product_id":
+	case "?", "st.product_id", "de.product_id":
 	default:
 		panic("finding.DecisionAt: " + product + " is not a product the statement names")
 	}
 	return "de.product_id = " + product +
-		" AND de.vulnerability_id = f.vulnerability_id" +
+		" AND dv.issue_id = f.vulnerability_id" +
 		" AND de.place_identity = f.place_identity"
 }
 
@@ -1304,8 +1306,8 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	// version as standing over a second build shipping another.
 	standingHere, inForce := InForce()
 	decided := q.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "finding" AS "f2" ON f2.vulnerability_id = de.vulnerability_id`+
+		TableExpr(Decisions).
+		Join(`JOIN "finding" AS "f2" ON f2.vulnerability_id = dv.issue_id`+
 			" AND f2.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
