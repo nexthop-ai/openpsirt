@@ -326,25 +326,27 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		byID[claim.ID] = claim
 	}
 
-	// Every row of each claim, for the issue count and the standing
-	// agreement — a claim about many issues has rows this finding does not
-	// sit at. Narrowed like the rows above, so the count counts what the
-	// reader may see rather than disclosing how many rows sit beyond it.
-	var all []Decision
-	if err := readableBy(s.db.NewSelect().Model(&all), subject, "de").
-		Where("claim_id IN (?)", bun.List(order)).
-		// Five claims, each of which may be a bulk act over two thousand
-		// places. What is read off them is a count of issues and whether an
-		// agreement stands, and both are answered by a bounded read.
-		Limit(database.InBulk.Most).Scan(ctx); err != nil {
+	// How many issues each claim covers, counted over every row of it: a
+	// claim about many issues has rows this finding does not sit at. Narrowed
+	// like the rows above, so the count counts what the reader may see
+	// rather than disclosing how many rows sit beyond it. Counted in the
+	// statement, which answers one row per claim however many places each
+	// wrote.
+	var counted []struct {
+		ClaimID int64 `bun:"claim_id"`
+		Issues  int   `bun:"issues"`
+	}
+	if err := readableBy(s.db.NewSelect().Model((*Decision)(nil)), subject, "de").
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`COUNT(DISTINCT de.vulnerability_id) AS "issues"`).
+		Where("de.claim_id IN (?)", bun.List(order)).
+		GroupExpr("de.claim_id").
+		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read what those claims cover: %w", err)
 	}
-	issues := map[int64]map[int64]bool{}
-	for _, row := range all {
-		if issues[row.ClaimID] == nil {
-			issues[row.ClaimID] = map[int64]bool{}
-		}
-		issues[row.ClaimID][row.VulnerabilityID] = true
+	issues := make(map[int64]int, len(counted))
+	for _, row := range counted {
+		issues[row.ClaimID] = row.Issues
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
@@ -374,7 +376,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		one := Similar{
 			Claim: byID[id], Decision: representative[id],
 			Reasoning: reasoning[representative[id].ID],
-			Issues:    len(issues[id]),
+			Issues:    issues[id],
 		}
 		if approval, ok := agreed[id]; ok {
 			when := approval.ApprovedAt

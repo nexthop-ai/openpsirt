@@ -106,6 +106,49 @@ func TestAProposerWhoseRowsSpanSeveralReadsIsToldOnce(t *testing.T) {
 	})
 }
 
+func TestASimilarClaimCountsEveryIssueItCovers(t *testing.T) {
+	// A bulk claim offered as similar covers far more rows than one read
+	// returns. Its issue count is over all of them.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other := f.at()
+		other.VulnerabilityID = f.secondIssue(t)
+		other.PlaceIdentity = "under-b"
+		agreed := f.claimsMany(t, []triage.Place{other})
+		if _, err := f.store.ApproveClaim(ctx, f.reviewer, agreed[0].ClaimID, "", nil, ""); err != nil {
+			t.Fatal(err)
+		}
+		// Many more rows of the same claim about the second issue, then one
+		// about a third, written last.
+		template := f.row(t, agreed[0].ID)
+		filler := make([]triage.Decision, 0, 601)
+		for i := range 600 {
+			row := template
+			row.ID = 0
+			row.LiveKey = nil
+			row.PlaceIdentity = fmt.Sprintf("filler-%03d", i)
+			filler = append(filler, row)
+		}
+		last := template
+		last.ID, last.LiveKey = 0, nil
+		last.PlaceIdentity = "filler-last"
+		last.VulnerabilityID = f.anotherIssue(t, "CVE-2026-3")
+		filler = append(filler, last)
+		if _, err := f.db.DB.NewInsert().Model(&filler).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		similar, err := f.store.SimilarAt(ctx, f.reviewer, f.product, f.issue,
+			[]string{"under-b"})
+		if err != nil || len(similar) != 1 {
+			t.Fatalf("the bulk claim is not offered: %+v (%v)", similar, err)
+		}
+		if similar[0].Issues != 2 {
+			t.Errorf("a claim over two issues is offered as covering %d", similar[0].Issues)
+		}
+	})
+}
+
 func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 	// A lapse records when and why a row stopped applying. Withdrawing the
 	// claim afterwards is about the rows still standing.

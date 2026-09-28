@@ -517,6 +517,7 @@ The finding carries three lists, each narrowed to what the reader may see.
 | Each entry carries how its rows here stand and the claim's state as a whole | Approved only where every live row is. A representative row's state stood in for the claim's, and one row approved beside forty-three sent back read as approved |
 | Rows sent back carry when, and the reason the approver gave | |
 | A decision records when it stopped applying | Nothing else did: an approval's withdrawal date exists only where somebody had agreed |
+| A similar claim's issue count is over every row of it the reader may see | A bulk claim writes a row per place, often thousands; a count over a sample of them is not the count |
 
 ## The review queue
 
