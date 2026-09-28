@@ -293,7 +293,7 @@ function one<K extends ClosedParameter>(name: K, value: string): Word<K> | undef
 // minimum is 1. The address is somebody else's text like any other, and a
 // value outside what the server takes is a parameter to leave off rather than
 // one to send wrong.
-export function num(raw: string | null, least: number, most: number): number | undefined {
+function num(raw: string | null, least: number, most: number): number | undefined {
   if (raw === null || raw.trim() === "") return undefined;
   const asked = Number(raw);
   if (!Number.isFinite(asked) || asked < least || asked > most) return undefined;
@@ -482,11 +482,11 @@ export function withinVariant(query: ReturnType<typeof listQuery>, named: boolea
 }
 
 // A row's own identity, for finding it again in a list read afresh, and the
-// key a selection, a preview and the list's own elements are held by. It
-// carries everything that picks a component: one name at one version is two
-// components where two namespaces publish it.
+// key a selection, a preview and the list's own elements are held by. It is
+// the grain the server groups the list by: one issue at one fold, in one
+// product on the list that spans products.
 export function identityOf(row: Row): string {
-  return `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""} ${row.namespace ?? ""}`;
+  return `${row.product ?? ""} ${row.vulnerability} ${row.fold}`;
 }
 
 // The prefix one build's screens live under, which every address under a

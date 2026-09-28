@@ -285,19 +285,23 @@ describe("where a row opens", () => {
 });
 
 describe("a row's identity", () => {
-  // One name at one version in one ecosystem is two components where two
-  // namespaces publish it, and each is a finding of its own. The identity is
-  // what a selection, a preview and a key are held by.
-  it("tells apart two components that differ only by namespace", () => {
-    const row = {
-      vulnerability: "CVE-2024-1",
-      component: "utils",
-      version: "1.0.0",
-      ecosystem: "maven",
-    } as Row;
-    expect(identityOf({ ...row, namespace: "org.one" })).not.toBe(
-      identityOf({ ...row, namespace: "org.two" }),
+  // A row is one issue at one fold, in one product on the list that spans
+  // products — the grain the server groups the list by. The identity is what a
+  // selection, a preview and a key are held by.
+  const row = { vulnerability: "CVE-2024-1", fold: "openssl 3.0.13 deb debian" } as Row;
+
+  it("tells apart the same issue at the same fold in two products", () => {
+    expect(identityOf({ ...row, product: "sonic" })).not.toBe(
+      identityOf({ ...row, product: "edge" }),
     );
+  });
+
+  it("tells apart two folds of one issue", () => {
+    expect(identityOf(row)).not.toBe(identityOf({ ...row, fold: "openssl 3.0.14 deb debian" }));
+  });
+
+  it("is the same for a row read afresh", () => {
+    expect(identityOf({ ...row, places: 3 } as Row)).toBe(identityOf({ ...row, places: 9 } as Row));
   });
 });
 
