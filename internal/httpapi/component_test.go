@@ -11,9 +11,9 @@ import (
 )
 
 func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
-	// The owner's ask, and one column for a party: moving a package is
-	// work a queue tracks rather than a judgment one person makes, so a
-	// team is a perfectly good holder of an upgrade — often the right one.
+	// One column for a party: moving a package is work a queue tracks
+	// rather than a judgment one person makes, so a team is a perfectly
+	// good holder of an upgrade — often the right one.
 	//
 	// Recorded in the same act as the promise, because a promise nobody is
 	// carrying and a holder with no promise are both things somebody has to
@@ -34,19 +34,14 @@ func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 		}
 
 		// Naming both is naming nobody: work is held by one party.
-		if got := plan("assigner", `"person":"triager","team":"platform",`); got.Code < 400 {
-			t.Errorf("naming a person and a team answered %d", got.Code)
-		}
+		refusedWith(t, plan("assigner", `"person":"triager","team":"platform",`),
+			http.StatusUnprocessableEntity)
 		// A team nobody declared is refused rather than quietly ignored, or
 		// the promise lands with a holder somebody thinks they set.
-		if got := plan("assigner", `"team":"not-a-team",`); got.Code < 400 {
-			t.Errorf("an unknown team answered %d", got.Code)
-		}
+		refusedWith(t, plan("assigner", `"team":"not-a-team",`), http.StatusNotFound)
 		// Giving work away needs the right that names it. A triager
 		// may take what nobody owns and hand back their own.
-		if got := plan("triager", `"team":"platform",`); got.Code < 400 {
-			t.Errorf("somebody who may not dispatch handed an upgrade to a team: %d", got.Code)
-		}
+		refusedWith(t, plan("triager", `"team":"platform",`), http.StatusUnprocessableEntity)
 
 		got := plan("assigner", `"team":"platform",`)
 		if got.Code != http.StatusCreated {
