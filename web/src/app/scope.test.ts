@@ -105,6 +105,19 @@ describe("an address that names a product", () => {
     }
   });
 
+  it("keeps the branch and variant remembered for the same product where it names none", () => {
+    const kept = { product: "sonic", stream: "master", variant: "broadcom" };
+    expect(scopeAt("/products/sonic/components/openssl", "", kept)).toEqual(kept);
+    expect(scopeAt("/products/sonic/inbox", "", kept)).toEqual(kept);
+    // Another product's branch is not this one's.
+    expect(scopeAt("/products/gnmi/components/openssl", "", kept)).toEqual({ product: "gnmi" });
+    // An address that names its own levels is the authority for them.
+    expect(scopeAt("/products/sonic/streams/release", "", kept)).toEqual({
+      product: "sonic",
+      stream: "release",
+    });
+  });
+
   it("moves to the product picked in its place", () => {
     for (const path of UNDER) {
       const to = { product: "gnmi", stream: "master", variant: "broadcom" };

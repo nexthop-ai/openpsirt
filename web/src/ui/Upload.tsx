@@ -14,6 +14,9 @@ import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
 import { Required } from "./Required";
 
+// The build an upload is sent to.
+type Target = { product: string; stream: string; variant: string };
+
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
 // build with no automation yet, or for trying the tool on any SBOM to hand.
 // Exactly the two parts the endpoint takes — one inventory and any
@@ -59,14 +62,18 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
   const { products, streams, variants } = useCatalog(open, product);
 
+  // The build is the mutation's variables rather than read from the form, so
+  // what happens after the upload answers is about the build it was sent to.
+  // A pending mutation is handed the latest render's options, and the pickers
+  // can move while the file is on its way.
   const upload = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (to: Target) => {
       const form = new FormData();
       if (inventory) form.append("inventory", inventory);
       for (const each of suppressions) form.append("suppressions", each);
       return unwrap(
         await api.POST("/v1/products/{product}/streams/{stream}/variants/{variant}/scans", {
-          params: { path: { product, stream, variant } },
+          params: { path: to },
           // The client would otherwise serialize this as JSON; a multipart
           // body is handed to fetch as it is, which sets the boundary itself.
           body: form as never,
@@ -74,17 +81,17 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         }),
       );
     },
-    onSuccess: (result) => {
+    onSuccess: (result, to) => {
       if (result.outcome === "already_held") {
-        setHeld({ scan: result.scan_id, product, stream, variant });
+        setHeld({ scan: result.scan_id, ...to });
         return;
       }
       void queries.invalidateQueries({ queryKey: ["scans"] });
       void queries.invalidateQueries({ queryKey: ["scanning"] });
       onClose();
       navigate(
-        `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}` +
-          `/variants/${encodeURIComponent(variant)}/scans`,
+        `/products/${encodeURIComponent(to.product)}/streams/${encodeURIComponent(to.stream)}` +
+          `/variants/${encodeURIComponent(to.variant)}/scans`,
       );
     },
   });
@@ -105,7 +112,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             onClick={() => {
               setTried(true);
               setHeld(null);
-              upload.mutate();
+              upload.mutate({ product, stream, variant });
             }}
           >
             {upload.isPending ? "Uploading…" : "Upload"}

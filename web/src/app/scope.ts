@@ -24,16 +24,20 @@ const LIST = "/products/:product/findings";
 // The same list with no product picked.
 const EVERY = "/findings";
 
-// The exact shapes first, then anything else under a product: every address
-// below `/products/:product` names that product, and a shape added to the
-// router without being listed here still yields it.
+// Anything else under a product: every address below `/products/:product`
+// names that product, and a shape added to the router without being listed
+// still yields it. It names no branch or variant, so it keeps the ones
+// remembered for the same product.
+const UNDER = "/products/:product/*";
+
+// The exact shapes first, then anything else under a product.
 const SHAPES = [
   `${BUILD}/*`,
   BUILD,
   "/products/:product/streams/:stream",
   "/products/:product/streams",
   "/products/:product",
-  "/products/:product/*",
+  UNDER,
 ];
 
 export type Scoped = { product?: string; stream?: string; variant?: string };
@@ -174,15 +178,18 @@ export function scopeQuery(at: Scoped): Record<string, string> {
 
 export function useScope(): Scoped {
   const { pathname, search } = useLocation();
-  const named = scopeAt(pathname, search);
-  if (!named) return remembered();
+  const kept = remembered();
+  const named = scopeAt(pathname, search, kept);
+  if (!named) return kept;
   if (named.product) remember(named);
   return named;
 }
 
 // The scope an address names, or null where it names none and the tab's
-// remembered one stands.
-export function scopeAt(pathname: string, search: string): Scoped | null {
+// remembered one stands. An address under a product that names nothing below
+// it, such as a component or an inbox, keeps the branch and variant
+// remembered for that product, so walking into one does not widen the scope.
+export function scopeAt(pathname: string, search: string, kept: Scoped = {}): Scoped | null {
   // The wider findings list is the one address whose scope is not all in the
   // path: the product is, and the two levels below it are in the query, which
   // is what lets either of them be "all" independently.
@@ -199,6 +206,7 @@ export function scopeAt(pathname: string, search: string): Scoped | null {
     const hit = matchPath(shape, pathname);
     if (hit) {
       const { product, stream, variant } = hit.params;
+      if (shape === UNDER && product === kept.product) return { ...kept };
       return { product, stream, variant };
     }
   }

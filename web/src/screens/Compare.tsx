@@ -158,6 +158,12 @@ export function Compare() {
           }}
         >
           <h3 style={{ margin: 0 }}>Compare</h3>
+          {(streams.isError || variants.isError) && (
+            <Failed
+              error={streams.isError ? streams.error : variants.error}
+              what="The builds to compare could not be read."
+            />
+          )}
           <PickBuild
             label="Earlier build"
             stream={from}
