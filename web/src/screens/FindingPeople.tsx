@@ -16,6 +16,7 @@ import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
 import { offeredAs, whoIs } from "../ui/whom";
 import { Required } from "../ui/Required";
+import { Attached } from "../ui/Attached";
 
 // The people brought into one undisclosed case.
 //
@@ -394,34 +395,18 @@ export function Attachments({
       <ul className="files">
         {files.map((file) => (
           <li key={file.token}>
-            {file.redacted ? (
-              <>
-                <span className="hint">
-                  <b>{file.filename}</b> was removed
-                  {file.redacted_reason ? <> — {file.redacted_reason}</> : null}
-                </span>
-              </>
-            ) : (
-              <>
-                <a href={`/v1/attachments/${file.token}`} rel="noreferrer">
-                  {file.filename}
-                </a>
-                <span className="hint">
-                  {" "}
-                  · {file.content_type} · {Math.max(1, Math.round((file.size ?? 0) / 1024))} KB
-                </span>
-                {admin && removing !== file.token && (
-                  <button
-                    type="button"
-                    className="btn quiet"
-                    style={{ marginLeft: 8 }}
-                    onClick={() => setRemoving(file.token ?? null)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </>
-            )}
+            <Attached file={file}>
+              {admin && removing !== file.token && (
+                <button
+                  type="button"
+                  className="btn quiet"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => setRemoving(file.token ?? null)}
+                >
+                  Remove
+                </button>
+              )}
+            </Attached>
             {removing === file.token && (
               <div className="field" style={{ margin: "6px 0 0", maxWidth: "60ch" }}>
                 <label>Reason for removal</label>

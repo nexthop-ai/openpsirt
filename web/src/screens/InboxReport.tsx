@@ -21,6 +21,7 @@ import { notACredential } from "../ui/noautofill";
 import { on } from "../ui/when";
 import { standing } from "./inbox";
 import { RuleForm, RulingCard } from "./InboxRuling";
+import { Attached } from "../ui/Attached";
 
 // One report: what was claimed, who sent it, whether they were answered, what
 // arrived with it, and what it was judged to be.
@@ -229,26 +230,11 @@ function Files({
         <p className="hint">None.</p>
       ) : (
         <ul className="files">
-          {files.map((file) =>
-            file.redacted ? (
-              <li key={file.token}>
-                <span className="hint">
-                  <b>{file.filename}</b> was removed
-                  {file.redacted_reason ? <> — {file.redacted_reason}</> : null}
-                </span>
-              </li>
-            ) : (
-              <li key={file.token}>
-                <a href={`/v1/attachments/${file.token}`} rel="noreferrer">
-                  {file.filename}
-                </a>
-                <span className="hint">
-                  {" "}
-                  · {file.content_type} · {Math.max(1, Math.round((file.size ?? 0) / 1024))} KB
-                </span>
-              </li>
-            ),
-          )}
+          {files.map((file) => (
+            <li key={file.token}>
+              <Attached file={file} />
+            </li>
+          ))}
         </ul>
       )}
       {works && (
