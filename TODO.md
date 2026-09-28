@@ -97,7 +97,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Add a gate for tracker references in comments? | The rule is enforced by reading. No existing gate fits it |
 | Alert on the depth of the job queue? | The System screen shows the depth against the bound. An alert needs a threshold and an alert kind |
 | Keep 30 days as the longest a sign-in lasts? | It bounds how long a role a group withdrew can still be held. 90 days is defensible |
 | Start a disclosure date for an outside report ruled a duplicate? | The flaw was found here and has no date, and the outside reporter may be counting down to publication |
