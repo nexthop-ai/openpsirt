@@ -855,9 +855,9 @@ a field for one in CSAF 2.1, and the document is written as CSAF 2.0; the
 rating is held, and is stated once the document is written in a version that
 carries it.
 
-Prose of the deployment's own in the document beyond its title. An edition
-carries the title, and the rest of what a reader acts on is assembled from the
-flaws the advisory covers.
+Document-level notes of the deployment's own. An edition carries the title and
+each issuance carries a typed revision summary; the rest of what a reader acts
+on is assembled from the flaws the advisory covers.
 
 ## Limits
 

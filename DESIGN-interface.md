@@ -1962,6 +1962,8 @@ the one that made it too long.
 
 | | |
 |---|---|
+| No component library | The interface is built from the mockup's tokens and from components written here |
+| Sibling components are not folded on the dependency tree | On a real image folding removes 281 of 36,991 child rows and shrinks the largest level from 4,867 rows to 4,679, which stays too large to browse |
 | Color and the brand mark resolve through tokens in one place | How an operator overrides them is deliberately unsettled — that gets decided against real screens — but keeping the whole palette in one stylesheet means the answer will be a stylesheet rather than a hunt through components |
 | Dependencies are pinned exactly, not by range | A range resolves at build time and CI stops being reproducible; a caret in a manifest does exactly that. `npm ci` installs the lockfile |
 | A failure shows what the server said | Inventing a friendlier sentence hides the one the server wrote, which names the line to fix or which part of a declaration is missing — and is the more useful of the two |

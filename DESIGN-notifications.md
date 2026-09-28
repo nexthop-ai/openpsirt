@@ -584,7 +584,7 @@ finding it names may since have been decided, closed or reopened.
 | Not built | Detail |
 |---|---|
 | A chat adapter | Behind the same interface mail uses. A chat adapter translates rather than forwarding markdown, and mostly sends a summary and a link |
-| The HTML part of a mail | The only remaining reader for the server-side renderer, and the reason it is kept rather than deleted |
+| The HTML part of a mail | It needs a markdown renderer on the server, and none exists |
 
 ## Limits
 
