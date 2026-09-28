@@ -226,7 +226,7 @@ func noteAbout(ctx context.Context, in Ingest, subject access.Subject,
 	issues := finding.NewVulnerabilities(in.DB.DB)
 	issue, err := issues.ByName(ctx, vulnerability)
 	if err != nil {
-		return 0, 0, "", noSuchNote()
+		return 0, 0, "", absent(in.Logger, err, "the issue could not be looked up", noSuchNote)
 	}
 	filed, err := issues.NamesByID(ctx, []int64{issue})
 	if err != nil {

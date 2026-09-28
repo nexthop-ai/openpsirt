@@ -83,7 +83,7 @@ func registerBulk(api huma.API, in Ingest) {
 		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
 			input.choice())
 		if err != nil {
-			return nil, ambiguousOrMissing(err)
+			return nil, ambiguousOrMissing(in.Logger, err)
 		}
 
 		// One call, which counts both. Two calls run the whole narrowing again
@@ -219,7 +219,7 @@ func registerBulk(api huma.API, in Ingest) {
 		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
 			input.choice())
 		if err != nil {
-			return nil, ambiguousOrMissing(err)
+			return nil, ambiguousOrMissing(in.Logger, err)
 		}
 
 		until, err := deferredUntil(string(input.Body.Outcome), input.Body.DeferredUntil)

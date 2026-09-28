@@ -342,7 +342,10 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 		return nil, 0, 0, err
 	}
 	all, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target, issue, at)
-	if err != nil || len(all) == 0 {
+	if err != nil {
+		return nil, 0, 0, absent(in.Logger, err, "those places could not be looked up", noSuchFinding)
+	}
+	if len(all) == 0 {
 		return nil, 0, 0, noSuchFinding()
 	}
 
@@ -429,8 +432,7 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which,
-		ambiguousOrMissing)
+	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which, func(err error) error { return ambiguousOrMissing(in.Logger, err) })
 	if err != nil {
 		return 0, 0, 0, err
 	}

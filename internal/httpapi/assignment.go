@@ -667,7 +667,14 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 		return 0, 0, 0, 0, err
 	}
 	held, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which,
-		func(error) error { return noSuchFinding() })
+		func(err error) error {
+			// A name matching several is not a finding here: an assignment
+			// names one place, and the choices are the finding routes' answer.
+			if errors.Is(err, graph.ErrAmbiguous) {
+				return noSuchFinding()
+			}
+			return absent(in.Logger, err, "that component could not be looked up", noSuchFinding)
+		})
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
