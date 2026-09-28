@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -143,6 +144,48 @@ func TestAGroupCanCarryAdministration(t *testing.T) {
 		}
 		if person.IsAdmin {
 			t.Error("administration survived leaving the group that carried it")
+		}
+	})
+}
+
+func TestAGroupDoesNotRedeemALapsedAuthorization(t *testing.T) {
+	// An authorization nobody redeemed stops being redeemable on every path.
+	// A mapped group admits somebody new; it does not hand them the account
+	// an administrator wrote for somebody who never came.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		waiting, err := f.store.Ensure(ctx, "alice", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, waiting.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, who := range []access.Arrival{
+			{Provider: "https://idp.example", Subject: "00u1a2b3", Username: "alice"},
+			{ViaProxy: true, Username: "alice"},
+		} {
+			_, err := f.store.AdmitByGroups(ctx, who, []string{"platform"})
+			if !errors.Is(err, access.ErrDenied) {
+				t.Errorf("a lapsed authorization was redeemed through a group (proxy=%v): %v",
+					who.ViaProxy, err)
+			}
+		}
+		doors, err := f.store.Identities(ctx, waiting.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, door := range doors {
+			if door.Subject != nil {
+				t.Error("the waiting account was pinned to whoever arrived")
+			}
+			if door.ClaimableUntil == nil || door.ClaimableUntil.After(time.Now()) {
+				t.Error("the lapsed window was renewed")
+			}
 		}
 	})
 }

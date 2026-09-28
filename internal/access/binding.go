@@ -371,7 +371,17 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		// Their administration is left alone: it is derived below from the
 		// groups they arrived with, and reading it from here would overwrite
 		// that with what the row happened to say.
+		//
+		// Adopted only while the authorization waiting for them is still
+		// redeemable. The match above refused a lapsed one or one pinned to
+		// another identifier, and a group does not reopen either: the window
+		// holds on every path, and renewing it here would hand the account to
+		// whoever arrived holding the name.
 		if waiting, err := s.ByIdentity(ctx, who.handle()); err == nil {
+			if claimed, err := s.claimedBy(ctx, who.handle()); err == nil &&
+				(claimed.Subject != nil || lapsed(claimed, s.now())) {
+				return nil, ErrDenied
+			}
 			person = waiting
 		} else {
 			person = &Account{
