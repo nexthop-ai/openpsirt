@@ -8,6 +8,7 @@ import { Failed } from "./Failed";
 import { Loading } from "./Loading";
 import { Markdown } from "./Markdown";
 import { initials } from "./initials";
+import { at } from "./when";
 
 // A conversation about one thing, however that thing is addressed.
 //
@@ -31,11 +32,10 @@ export type Said = {
   edited_at?: string;
 };
 
-// said is how a moment on a thread is written. One helper rather than the same
-// slice at four sites: it is the line most likely to need a real fix, and a
-// timezone correction that lands in one of four places is not a correction.
-export function said(at?: string): string {
-  return (at ?? "").replace("T", " ").slice(0, 16);
+// said is how a moment on a thread is written: to the minute, in UTC and
+// saying so, as every moment quoted across time zones is.
+export function said(moment?: string): string {
+  return at(moment);
 }
 
 export function Thread({

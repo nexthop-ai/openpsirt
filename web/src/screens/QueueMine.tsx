@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { at } from "../ui/when";
 
 import { type Body } from "../api/client";
 import { useSplitClaim } from "../api/claims";
@@ -141,7 +142,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
             </span>
           )}
         </td>
-        <td className="hint">{row.when ? row.when.replace("T", " ").slice(0, 16) : "—"}</td>
+        <td className="hint">{at(row.when) || "—"}</td>
       </tr>
       {outliers && (outliers.rows ?? []).length > 0 && (
         <tr>

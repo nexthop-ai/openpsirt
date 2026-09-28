@@ -3,6 +3,7 @@
 
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { at as minute } from "../../ui/when";
 import { useScope } from "../../app/scope";
 import { scopeWords } from "./catalog";
 
@@ -37,7 +38,7 @@ export function Sheet({
   children: ReactNode;
 }) {
   const at = useScope();
-  const taken = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const taken = minute(new Date().toISOString());
 
   return (
     <>
@@ -71,7 +72,7 @@ export function Sheet({
         <h1>OpenPSIRT — {name}</h1>
         <p>
           {scopeWords(at)}
-          {asked ? ` · ${asked}` : ""} · taken {taken}Z
+          {asked ? ` · ${asked}` : ""} · taken {taken}
         </p>
       </div>
 

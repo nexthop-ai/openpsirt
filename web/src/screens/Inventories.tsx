@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
-import { on } from "../ui/when";
+import { at as minute, on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
@@ -139,8 +139,8 @@ export function Inventories() {
             <tbody>
               {items.map((scan) => (
                 <tr key={scan.scan_id}>
-                  <td>{scan.received_at?.replace("T", " ").slice(0, 16)}</td>
-                  <td className="hint">{scan.built_at?.replace("T", " ").slice(0, 16)}</td>
+                  <td>{minute(scan.received_at)}</td>
+                  <td className="hint">{minute(scan.built_at)}</td>
                   <td>
                     {/* The run's own page, where there is one. A
                         state word is where somebody asks "what did it find",

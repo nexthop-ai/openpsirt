@@ -11,7 +11,7 @@
 
 import { FLOORS } from "../ui/severities";
 import { useState } from "react";
-import { on } from "../ui/when";
+import { at, on } from "../ui/when";
 import { initials } from "../ui/initials";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -136,7 +136,7 @@ export function Standing({
         </h3>
         <span className="hint">
           proposed by <b>{claim.proposed_by_name || claim.proposed_by}</b>
-          {claim.proposed_at && <> · {claim.proposed_at.replace("T", " ").slice(0, 16)}</>}
+          {claim.proposed_at && <> · {at(claim.proposed_at)}</>}
           {typeof claim.age_days === "number" && claim.age_days > 365 && (
             <>
               {" "}
@@ -235,7 +235,7 @@ export function Standing({
               <>
                 <span className="state agreed">Approved</span> by{" "}
                 <b>{last.approved_by_name || last.approved_by}</b>
-                {last.approved_at && <>, {last.approved_at.replace("T", " ").slice(0, 16)}</>}
+                {last.approved_at && <>, {at(last.approved_at)}</>}
                 {/* Carried onto this claim from the one it re-affirms: they
                     agreed to those words rather than to the reasoning shown
                     here. */}
@@ -361,7 +361,7 @@ export function Activity({
 
   const line = (e: Event, i: number) => (
     <li key={`${e.when} ${e.what} ${i}`}>
-      <span className="when">{e.when.replace("T", " ").slice(0, 16) || "—"}</span>
+      <span className="when">{at(e.when) || "—"}</span>
       <span className={`avatar${e.who ? "" : " none"}`}>{initials(e.who)}</span>
       <span className="what">
         {e.who && <b>{e.who} </b>}
@@ -431,7 +431,7 @@ export function Revisions({ claimId }: { claimId: number }) {
             <div key={r.id} className={`version${a && !a.withdrawn ? " agreed" : ""}`}>
               <span className="stamp">
                 <b>Revision {r.ordinal}</b>
-                {r.written_at?.replace("T", " ").slice(0, 16)} · {r.written_by_name || r.written_by}
+                {at(r.written_at)} · {r.written_by_name || r.written_by}
               </span>
               <div>
                 <div className="tagline">

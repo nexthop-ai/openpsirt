@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Loading } from "../ui/Loading";
-import { on } from "../ui/when";
+import { at, on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { usePaging } from "./list";
@@ -276,7 +276,7 @@ export function Audit() {
         <h1>OpenPSIRT — record of judgments</h1>
         <p>
           {asked} · {total.toLocaleString()} {total === 1 ? "judgment" : "judgments"} · taken{" "}
-          {new Date().toISOString().slice(0, 16).replace("T", " ")}Z
+          {at(new Date().toISOString())}
         </p>
         {/* Which of them this sheet holds. A printed page that says "1,842
             judgments" over a hundred rows is a page nobody can check against
@@ -488,7 +488,7 @@ function Administered() {
           <tbody>
             {rows.map((row, i) => (
               <tr key={`${row.at} ${row.about} ${i}`}>
-                <td className="id">{(row.at ?? "").slice(0, 16).replace("T", " ")}</td>
+                <td className="id">{at(row.at)}</td>
                 <td>
                   {row.actor === "configuration" ? (
                     <span className="hint" title="The deployment's startup configuration">

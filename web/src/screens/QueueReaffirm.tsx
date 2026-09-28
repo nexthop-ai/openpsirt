@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { at } from "../ui/when";
 import { useMutation } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
@@ -223,9 +224,7 @@ export function ToReaffirm({
                     <td className="num">
                       {row.places} {row.places === 1 ? "place" : "places"}
                     </td>
-                    <td className="hint">
-                      {row.lapsed_at ? row.lapsed_at.replace("T", " ").slice(0, 16) : "—"}
-                    </td>
+                    <td className="hint">{at(row.lapsed_at) || "—"}</td>
                   </tr>
                 ))}
               </tbody>
