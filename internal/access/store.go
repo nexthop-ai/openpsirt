@@ -325,26 +325,44 @@ func (s *Store) move(ctx context.Context, existing *Account, admin, audits *bool
 func (s *Store) Ensure(ctx context.Context, identity, displayName string,
 	admin, audits *bool) (*Account, error) {
 
+	_, person, err := s.Restate(ctx, identity, displayName, admin, audits)
+	return person, err
+}
+
+// ErrNoIdentity is a person asked for with no name to record them under.
+var ErrNoIdentity = errors.New("a person needs an identity to be granted anything")
+
+// Restate is Ensure, answering what was stored before the write beside what
+// is stored after it. Before is nil where they were not recorded.
+//
+// Before is the value the conditional write was made against, read by the
+// statement that decides whether anything moved. A caller recording the move
+// from a read of its own can read a value another writer has since replaced,
+// and record a move this write did not make.
+func (s *Store) Restate(ctx context.Context, identity, displayName string,
+	admin, audits *bool) (before, after *Account, err error) {
+
 	// Folded, so that what is recorded here and what a sign-in matches are the
 	// same string. An identity is a username, and a username is a name people
 	// type.
 	identity = folded(identity)
 	if identity == "" {
-		return nil, fmt.Errorf("a person needs an identity to be granted anything")
+		return nil, nil, ErrNoIdentity
 	}
 
 	existing, err := s.ByIdentity(ctx, identity)
 	if err == nil {
+		was := *existing
 		if err := s.move(ctx, existing, admin, audits); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return existing, nil
+		return &was, existing, nil
 	}
 	if !errors.Is(err, ErrNoSuchPerson) {
 		// A read that failed is not somebody who is not there. Answered as
 		// "not there", this went on to record them again — and with them a
 		// fresh party row, for a person who already had one.
-		return nil, err
+		return nil, nil, err
 	}
 
 	person := &Account{
@@ -359,9 +377,9 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string,
 		CreatedAt:   s.now().Truncate(time.Microsecond),
 	}
 	if err := s.record(ctx, person); err != nil {
-		return nil, fmt.Errorf("record %q: %w", identity, err)
+		return nil, nil, fmt.Errorf("record %q: %w", identity, err)
 	}
-	return person, nil
+	return nil, person, nil
 }
 
 // record writes a new person, and the party they are assignable as.

@@ -58,6 +58,7 @@ should be here.
 | Anything unrecognized reads as not disclosed | A column added later would otherwise default every row that predates it to visible |
 | A deployment that cannot tell who is asking serves nobody | Failing closed means an unconfigured deployment is up and refusing, which is visible, rather than up and answering everybody |
 | Stating administration or auditing is conditional on the value read, and one that matched nothing is taken again whole | Two administrators granting the same thing at once would both record it as moved. The retry reads the value the other left, and records nothing where nothing moved |
+| The trail records a move from the value the write was conditioned on | A separate read taken first can see a value another administrator replaces before the write reads it, and would record a move this write did not make |
 | Recording somebody says nothing about administration unless it is stated | Three things stay distinguishable: granting it, taking it away, and saying nothing. Decided from a read taken before the write, a request about a role passed back whatever that read returned — so two requests at once lost one, and a read that failed answered "nobody is recorded as this" and withdrew it from somebody who had it, with nothing saying anybody had |
 
 ## Roles

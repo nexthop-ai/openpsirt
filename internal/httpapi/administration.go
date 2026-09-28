@@ -457,34 +457,31 @@ func registerAdministration(api huma.API, a Administering) {
 				}
 			}
 
+			// What was stored before is the value the write was made against,
+			// so the record at the foot of this says what this write moved.
+			// A read of its own, taken first, can see a value another
+			// administrator replaces before the write reads it, and the
+			// record would then claim a move this request did not make.
+			//
 			// Nobody recorded under that name, and a read that failed, are
-			// different answers. Told apart by the sentinel rather than by
-			// "any error at all": read as "this person is new", a dropped
+			// different answers: read as "this person is new", a dropped
 			// connection takes administration away from somebody who has it,
 			// records nothing saying so, and answers 201.
-			//
-			// Read here rather than before the transaction, because what the
-			// record at the foot of it says depends on the answer and a retry
-			// re-runs against a database that has moved (REQ-71).
-			before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
+			var before *access.Account
+			before, person, err = store.Restate(ctx, in.Body.Identity, in.Body.DisplayName,
+				in.Body.Admin, in.Body.Audits)
 			switch {
-			case lookupErr == nil:
-			case errors.Is(lookupErr, access.ErrNoSuchPerson):
-				before = nil
-			default:
-				return wentWrong(a.Logger, "that person could not be looked up", lookupErr)
+			case errors.Is(err, database.ErrGoAgain):
+				// A lost race is taken again whole, and the retry reads the
+				// value the other writer left.
+				return err
+			case errors.Is(err, access.ErrNoIdentity):
+				return huma.Error400BadRequest(err.Error())
+			case err != nil:
+				return wentWrong(a.Logger, "that person could not be recorded", err)
 			}
 			recorded = before == nil
 
-			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
-				in.Body.Admin, in.Body.Audits); err != nil {
-				// A lost race is taken again whole, so the trail below records
-				// the move from the value the retry reads.
-				if errors.Is(err, database.ErrGoAgain) {
-					return err
-				}
-				return huma.Error400BadRequest(err.Error())
-			}
 			if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
 				return asked(a.Logger, err)
 			}

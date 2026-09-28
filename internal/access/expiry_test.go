@@ -347,3 +347,43 @@ func TestAMoveThatLostARaceIsTakenAgain(t *testing.T) {
 		}
 	})
 }
+
+// What Restate answers as before is the value its own write was made against.
+// Another writer that got there first leaves before and after equal, so the
+// caller records no move; a caller reading before for itself could have read
+// the value the other writer replaced.
+func TestRestatingSaysWhatTheWriteMovedFrom(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		at := time.Now()
+		store, _ := atClock(t, db, &at)
+
+		// Another administrator withdrew it first.
+		if _, err := store.Ensure(ctx, "someone", "", Stated(false), nil); err != nil {
+			t.Fatal(err)
+		}
+		before, after, err := store.Restate(ctx, "someone", "", Stated(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before.IsAdmin || after.IsAdmin {
+			t.Errorf("a withdrawal somebody else made read as %v then %v", before.IsAdmin, after.IsAdmin)
+		}
+
+		before, after, err = store.Restate(ctx, "someone", "", Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before.IsAdmin || !after.IsAdmin {
+			t.Errorf("a grant this write made read as %v then %v", before.IsAdmin, after.IsAdmin)
+		}
+
+		before, after, err = store.Restate(ctx, "somebody-new", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before != nil || after == nil {
+			t.Errorf("somebody newly recorded read as %v then %v", before, after)
+		}
+	})
+}
