@@ -186,22 +186,29 @@ written, so a renderer shows it as the text it is.
 | `:` | Before `//` | A bare address, which a renderer that links addresses links |
 | `.` | After `www` at the start of a word | The same, for an address with no scheme |
 | `@` | Before a letter or digit | A mail link, and a mention in a renderer with accounts |
-| `#`, `-` or `+` before a space, and `>` | First in the string | A heading, a list item, a rule or a quotation where the string opens a line, a list item's content included |
-| `.` or `)` before a space | After leading digits | An ordered list item |
+| Spaces | First in the string, dropped | A code block, which four of them open where the string opens a line |
+| A run of up to six `#`, or a `-` or `+`, before a space or the end of the string; a `-` before another `-`; a `>` | First in the string | A heading, a list item, a rule or a quotation where the string opens a line, a list item's content included |
+| `.` or `)` before a space or the end of the string | After up to nine leading digits | An ordered list item |
+| The first `#` of a run after a space | Last in the string, trailing spaces aside | A closing sequence, which a heading drops |
 
-Only a character that can open syntax where it sits is escaped. Both documents
-are also read as source, where `1\.2\.3` for every version is noise.
+A character is escaped where it can open syntax where it sits, and in the few
+places it only might: `--rc1` is written `\--rc1`, because a line of three is a
+rule. Both documents are also read as source, where `1\.2\.3` for every
+version is noise.
 
 ## Refusals
 
 A refusal carries the line, the offending text, and the reason. Every fault in
 the submission is reported at once rather than one at a time.
 
-The line is where the refused link is written. A destination written twice is
-named on both lines, and one shown in a fenced block above is not the one
+The line is where the refused link is written, found from the link's own
+text onward. A destination written twice is named on both lines, and one
+shown in a fenced block above or earlier in the same paragraph is not the one
 named. A destination supplied by a reference definition is named on the
 definition's line, and one that does not appear literally — spelled with a
-character reference — on the first line of its block.
+character reference — on the first line of its block. A link with no text and
+an autolink are searched from the start of their block, so for those an
+earlier copy in the same paragraph is the one named.
 
 ## Code block language tags
 

@@ -50,6 +50,8 @@ var hostile = []string{
 	"carriage\r\n<https://evil.example/p>",
 	"a tab\there",
 	"@channel and @here",
+	"    [x](y)",
+	"\t\t[x](y)",
 }
 
 // rendered is what a renderer with the common extensions makes of a document.
@@ -127,6 +129,33 @@ func TestOrdinaryNamesAreWrittenAsTheyAre(t *testing.T) {
 	} {
 		if got := markdown.Literal(name); got != name {
 			t.Errorf("%q was written as %q", name, got)
+		}
+	}
+}
+
+func TestACharacterReferenceIsWrittenAsItsCharacters(t *testing.T) {
+	// A renderer decodes a reference, so `&lt;` unescaped reads as `<`.
+	if got, want := markdown.Literal("&lt;"), `\&lt;`; got != want {
+		t.Errorf("&lt; was written as %q, want %q", got, want)
+	}
+}
+
+func TestATrailingNumberSignStaysInAHeading(t *testing.T) {
+	// A run of them after a space closes a heading, and a renderer drops it.
+	for _, raw := range []string{"CVE-1 #", "CVE-1 ##", "CVE-1 # "} {
+		document := "# " + markdown.Literal(raw) + "\n"
+		root := rendered(t, document)
+		var got strings.Builder
+		_ = ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+			if entering {
+				if typed, ok := node.(*ast.Text); ok {
+					got.Write(typed.Value([]byte(document)))
+				}
+			}
+			return ast.WalkContinue, nil
+		})
+		if read := strings.TrimSpace(shown(got.String())); read != strings.TrimSpace(raw) {
+			t.Errorf("%q as a heading reads as %q", raw, read)
 		}
 	}
 }

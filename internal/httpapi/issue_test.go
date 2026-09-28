@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -15,70 +16,161 @@ import (
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/text"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
-	// The description and aliases come from a feed and the component from a
-	// scan file, and the document is one somebody forwards. Each is text in
-	// it: no link, image, markup, heading or list a third party opened.
+	// The identifier, description, score and aliases come from a feed, the
+	// component from a scan file, the product, stream and variant from
+	// whoever declared them, and the names beside a judgment from a sign-in.
+	// The document is one somebody forwards. Each is text in it: no link,
+	// image, markup, heading or list a third party opened.
 	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
 		link := "[Download the fix](https://evil.example/p)"
+		// An identifier travels in the request path, so it carries no slash, and
+		// is stored in capitals.
+		identifier := "CVE-2026-7777 ![ID](X)"
 		hostile := graph.Described{
 			Purl: "pkg:generic/hostile@1.0", Name: "- <img src=https://evil.example/t.gif>",
 			Version: "1.0 ![x](https://evil.example/v)",
 		}
+		// A second place with a name a request path can carry, to judge.
+		plain := graph.Described{Purl: "pkg:generic/plainlib@1.0", Name: "plainlib", Version: "1.0"}
+		named := finding.Named{
+			Identifier:   identifier,
+			Aliases:      []string{"GHSA-" + link},
+			Severity:     "high <b>x</b>",
+			Score:        7.5,
+			ScoreVersion: "3.1 ![sv](x)",
+			Description:  "# Upgrade now\n\n" + link + "\n<script>alert(1)</script>",
+			Advisory:     "https://nvd.nist.gov/vuln/detail/CVE-2026-7777",
+		}
 		r.scan(t, "hostile-names",
 			graph.Snapshot{
-				Root:         seededRoot,
-				Components:   []graph.Described{hostile},
-				Dependencies: []graph.Dependency{{Parent: seededRoot, Child: hostile}},
-			},
-			[]finding.Reported{{
-				Issue: finding.Named{
-					Identifier:  "CVE-2026-7777",
-					Aliases:     []string{"GHSA-" + link},
-					Severity:    "high <b>x</b>",
-					Description: "# Upgrade now\n\n" + link + "\n<script>alert(1)</script>",
-					Advisory:    "https://nvd.nist.gov/vuln/detail/CVE-2026-7777",
+				Root:       seededRoot,
+				Components: []graph.Described{hostile, plain},
+				Dependencies: []graph.Dependency{
+					{Parent: seededRoot, Child: hostile}, {Parent: seededRoot, Child: plain},
 				},
-				Component: hostile,
-				FixState:  finding.FixedUpstream, FixedIn: "www.evil.example",
-			}})
+			},
+			[]finding.Reported{
+				{Issue: named, Component: hostile, FixState: finding.FixedUpstream, FixedIn: "www.evil.example"},
+				{Issue: named, Component: plain, FixState: finding.FixUnknown},
+			})
 
-		got := asPerson(t, r, "triager", http.MethodGet, "/v1/issues/CVE-2026-7777/document", "")
+		// A judgment proposed and agreed by people whose sign-in names are
+		// markup.
+		proposer, approver := "![proposer](x)", "![approver](x)"
+		located, err := catalog.NewStore(r.db.DB).Locate(ctx, "mine", "master", "broadcom")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for who, roles := range map[string][]access.Role{
+			proposer: {access.PublicTriage},
+			approver: {access.PublicRead, access.Approver},
+		} {
+			person, err := r.rights.Ensure(ctx, who, who, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := r.rights.Claim(ctx, person.ID, who); err != nil {
+				t.Fatal(err)
+			}
+			for _, role := range roles {
+				if err := r.rights.GrantRole(ctx, person.ID, located.ProductID, role); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		claim, _ := r.claimed(t, proposer, url.PathEscape(identifier), "plainlib", dismissal)
+		if got := asPerson(t, r, approver, http.MethodPost,
+			"/v1/claims/"+itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The build's names, renamed once the judgment no longer needs them
+		// in a path.
+		names := catalog.NewStore(r.db.DB)
+		if err := names.RenameStream(ctx, located.ProductID, located.StreamID, "![stream](x)"); err != nil {
+			t.Fatal(err)
+		}
+		if err := names.RenameVariant(ctx, located.ProductID, located.VariantID, "![variant](x)"); err != nil {
+			t.Fatal(err)
+		}
+		if err := names.RenameProduct(ctx, located.ProductID, "![product](x)"); err != nil {
+			t.Fatal(err)
+		}
+
+		got := asPerson(t, r, "triager", http.MethodGet, "/v1/issues/"+url.PathEscape(identifier)+"/document", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("the document answered %d: %s", got.Code, got.Body.String())
 		}
 		written := got.Body.String()
-		if !strings.Contains(written, "Upgrade now") || !strings.Contains(written, "evil.example/t.gif") {
-			t.Fatalf("the document does not carry the hostile text at all, so this checked nothing:\n%s",
-				written)
+		for _, carried := range []string{"Upgrade now", "evil.example/t.gif", "![ID]", "![sv]", "![stream]",
+			"![variant]", "![product]", "![proposer]", "![approver]"} {
+			if !strings.Contains(shownText(written), carried) {
+				t.Fatalf("the document does not carry %q, so this checked nothing:\n%s", carried, written)
+			}
 		}
+		markupIn(t, written)
 
-		source := []byte(written)
-		document := goldmark.New(goldmark.WithExtensions(extension.GFM)).Parser().
-			Parse(text.NewReader(source))
-		_ = ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-			if !entering {
-				return ast.WalkContinue, nil
-			}
-			switch typed := node.(type) {
-			case *ast.Heading:
-				// The document's own headings, and none a feed wrote.
-				if heading := string(typed.Lines().Value(source)); strings.Contains(heading, "Upgrade") {
-					t.Errorf("a feed wrote a heading:\n%s", written)
-				}
-			case *ast.AutoLink:
-				if url := string(typed.URL(source)); strings.Contains(url, "evil.example") {
-					t.Errorf("%q became a link:\n%s", url, written)
-				}
-			case *ast.Link, *ast.Image, *ast.RawHTML, *ast.HTMLBlock:
-				t.Errorf("a third party's text became %s:\n%s", node.Kind(), written)
-			}
+		// An issue nobody here carries is answered by name, and the name is a
+		// heading too.
+		unknown := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/issues/"+url.PathEscape("CVE-1999-0001 ![UNKNOWN](X)")+"/document", "")
+		if unknown.Code != http.StatusOK {
+			t.Fatalf("an issue nothing carries answered %d: %s", unknown.Code, unknown.Body.String())
+		}
+		if !strings.Contains(shownText(unknown.Body.String()), "![UNKNOWN]") {
+			t.Fatalf("the document does not name the issue asked about:\n%s", unknown.Body.String())
+		}
+		markupIn(t, unknown.Body.String())
+	})
+}
+
+// shownText is a document with its backslash escapes dropped, which is how a
+// renderer shows it.
+func shownText(document string) string {
+	var out strings.Builder
+	for i := 0; i < len(document); i++ {
+		if document[i] == '\\' && i+1 < len(document) &&
+			strings.IndexByte("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~", document[i+1]) >= 0 {
+			i++
+		}
+		out.WriteByte(document[i])
+	}
+	return out.String()
+}
+
+// markupIn fails on any link, image, markup or heading a third party opened
+// in a document.
+func markupIn(t *testing.T, written string) {
+	t.Helper()
+	source := []byte(written)
+	document := goldmark.New(goldmark.WithExtensions(extension.GFM)).Parser().
+		Parse(text.NewReader(source))
+	_ = ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
 			return ast.WalkContinue, nil
-		})
+		}
+		switch typed := node.(type) {
+		case *ast.Heading:
+			// The document's own headings, and none a feed wrote.
+			if heading := string(typed.Lines().Value(source)); strings.Contains(heading, "Upgrade") {
+				t.Errorf("a feed wrote a heading:\n%s", written)
+			}
+		case *ast.AutoLink:
+			if url := string(typed.URL(source)); strings.Contains(url, "evil.example") {
+				t.Errorf("%q became a link:\n%s", url, written)
+			}
+		case *ast.Link, *ast.Image, *ast.RawHTML, *ast.HTMLBlock:
+			t.Errorf("a third party's text became %s:\n%s", node.Kind(), written)
+		}
+		return ast.WalkContinue, nil
 	})
 }
 

@@ -22,7 +22,11 @@ import "strings"
 // escaped and where.
 //
 // The first character is judged as though the string began a line, because
-// a string written as a list item's content does.
+// a string written as a list item's content does. Leading spaces are dropped,
+// because four of them open a code block where the string begins a line, and
+// a renderer shows them as nothing anyway. The last character is judged as
+// though the string ended a heading, because the issue document's title is
+// one.
 func Literal(s string) string {
 	runes := []rune(s)
 	for i, r := range runes {
@@ -30,11 +34,14 @@ func Literal(s string) string {
 			runes[i] = ' '
 		}
 	}
+	for len(runes) > 0 && runes[0] == ' ' {
+		runes = runes[1:]
+	}
 	var b strings.Builder
 	b.Grow(len(s) + len(s)/8)
-	lead := leadingMarker(runes)
+	lead, closing := leadingMarker(runes), closingSequence(runes)
 	for i, r := range runes {
-		if i == lead || escaped(runes, i) {
+		if i == lead || i == closing || escaped(runes, i) {
 			b.WriteByte('\\')
 		}
 		b.WriteRune(r)
@@ -112,6 +119,24 @@ func leadingMarker(runes []rune) int {
 		return digits
 	}
 	return -1
+}
+
+// closingSequence is the position of the first "#" of a run that ends the
+// string after a space, or -1. At the end of a heading that run is a closing
+// sequence, which a renderer drops.
+func closingSequence(runes []rune) int {
+	end := len(runes)
+	for end > 0 && runes[end-1] == ' ' {
+		end--
+	}
+	start := end
+	for start > 0 && runes[start-1] == '#' {
+		start--
+	}
+	if start == end || start == 0 || runes[start-1] != ' ' {
+		return -1
+	}
+	return start
 }
 
 func wordy(r rune) bool {

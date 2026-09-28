@@ -146,6 +146,9 @@ func TestARefusalNamesTheLineOfTheLinkItRefuses(t *testing.T) {
 		{"written in two paragraphs", image + "\n\n" + image + "\n", []int{1, 3}},
 		{"written twice in one paragraph", image + "\n" + image + "\n", []int{1, 2}},
 		{"used below the definition it names", "[x]: javascript:alert(1)\n\nSee [x].\n", []int{1}},
+		{"named earlier in the same paragraph", "A reference like issue:x is\n[broken](issue:x).\n", []int{2}},
+		{"inside a longer destination earlier in the paragraph",
+			"[a](//evil.example/x/y) and\n[b](//evil.example/x).\n", []int{1, 2}},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			var faults markdown.Faults

@@ -327,17 +327,22 @@ func newLineIndex(source string) lineIndex {
 //
 // Used in preference to the enclosing block's position, because a paragraph
 // may run for twenty lines and pointing at its first one sends somebody to the
-// wrong place. The search starts at the node's block, or past the last place
-// the same text was found, so a copy shown earlier in a fenced block is not
-// the one named. A destination a reference definition supplies is written
-// wherever the definition is, which may be above the block, so the whole
-// source is searched after that.
+// wrong place. The search starts at the link's own text, or past the last
+// place the same text was found, so a copy shown earlier in a fenced block or
+// earlier in the same paragraph is not the one named. A link with no text
+// starts at its block. A destination a reference definition supplies is
+// written wherever the definition is, which may be above the block, so the
+// whole source is searched after that.
 func (l lineIndex) of(offending string, node ast.Node) int {
 	fallback := l.at(node)
 	if offending == "" {
 		return fallback
 	}
-	from := max(l.offset(node), l.next[offending], 0)
+	start := textStart(node)
+	if start < 0 {
+		start = l.offset(node)
+	}
+	from := max(start, l.next[offending], 0)
 	at := -1
 	if from <= len(l.source) {
 		if found := bytes.Index(l.source[from:], []byte(offending)); found >= 0 {
@@ -355,6 +360,20 @@ func (l lineIndex) of(offending string, node ast.Node) int {
 	}
 	l.next[offending] = at + len(offending)
 	return l.line(at)
+}
+
+// textStart returns where the first text inside a node begins in the source,
+// or -1 where it holds none.
+func textStart(node ast.Node) int {
+	start := -1
+	_ = ast.Walk(node, func(child ast.Node, entering bool) (ast.WalkStatus, error) {
+		if typed, ok := child.(*ast.Text); ok && entering {
+			start = typed.Segment.Start
+			return ast.WalkStop, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	return start
 }
 
 // at returns the 1-indexed line a node begins on, or 0 where it cannot be

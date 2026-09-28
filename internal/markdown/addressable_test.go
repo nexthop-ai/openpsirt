@@ -111,3 +111,17 @@ func TestTextPastTheBoundIsMatchableAsWhatItIs(t *testing.T) {
 		t.Errorf("a script link matched ErrTooLong: %v", other)
 	}
 }
+
+func TestOnlyAnAbsoluteAddressIsWrittenInsideAngleBrackets(t *testing.T) {
+	// Inside <> anything but an absolute address is read as markup.
+	for _, address := range []string{"style", "script", "findings/1", "issue:CVE-2026-1", "ftp://example.com/x"} {
+		if markdown.Autolinkable(address) == nil {
+			t.Errorf("%q is written into a document as <%s>", address, address)
+		}
+	}
+	for _, address := range []string{"https://example.com/a", "http://example.com/a", "mailto:psirt@example.com"} {
+		if err := markdown.Autolinkable(address); err != nil {
+			t.Errorf("%q is refused: %v", address, err)
+		}
+	}
+}
