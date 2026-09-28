@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -317,6 +318,7 @@ func Load() (Config, error) {
 	// the queue rather than restated: two spellings of one default disagree
 	// the first time either moves.
 	queueing := queue.DefaultOptions()
+	pool := database.DefaultPool()
 	c := Config{
 		Addr:                env("ADDR", ":8080"),
 		BaseURL:             env("BASE_URL", ""),
@@ -409,10 +411,10 @@ func Load() (Config, error) {
 		AutoMigrate:        r.boolean("AUTO_MIGRATE", true),
 		ReadTimeout:        5 * time.Minute,
 		WriteTimeout:       5 * time.Minute,
-		DBMaxOpen:          r.number("DB_MAX_OPEN", 25),
-		DBMaxIdle:          r.number("DB_MAX_IDLE", 25),
-		DBIdleTimeout:      r.duration("DB_IDLE_TIMEOUT", time.Minute),
-		DBLifetime:         r.duration("DB_CONN_LIFETIME", 30*time.Minute),
+		DBMaxOpen:          r.number("DB_MAX_OPEN", pool.MaxOpen),
+		DBMaxIdle:          r.number("DB_MAX_IDLE", pool.MaxIdle),
+		DBIdleTimeout:      r.duration("DB_IDLE_TIMEOUT", pool.IdleTimeout),
+		DBLifetime:         r.duration("DB_CONN_LIFETIME", pool.Lifetime),
 		// No default of its own and it follows nothing: a deployment either
 		// states this or it does not.
 		DBRequireEncryption: r.boolean("DB_REQUIRE_ENCRYPTION", false),

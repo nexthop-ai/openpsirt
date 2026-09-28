@@ -93,7 +93,7 @@ func NewDocuments(db bun.IDB) *Documents {
 func (d *Documents) Write(ctx context.Context, scanID int64, kind Kind, ordinal int, r io.Reader) (*Document, error) {
 	doc := &Document{
 		ScanID: scanID, Kind: kind, Ordinal: ordinal,
-		CreatedAt: d.now().UTC().Truncate(time.Microsecond),
+		CreatedAt: asStored(d.now()),
 	}
 	if _, err := d.db.NewInsert().Model(doc).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("record document: %w", err)
@@ -235,7 +235,7 @@ func (d *Documents) Discard(ctx context.Context, scanID int64) error {
 			return fmt.Errorf("discard document content: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*Document)(nil)).
-			Set("discarded_at = ?", d.now().UTC()).
+			Set("discarded_at = ?", asStored(d.now())).
 			Where("scan_id = ?", scanID).
 			Where("discarded_at IS NULL").Exec(ctx); err != nil {
 			return fmt.Errorf("record that the contents were let go: %w", err)

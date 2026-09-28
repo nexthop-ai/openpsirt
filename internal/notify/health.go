@@ -84,10 +84,11 @@ func (w *Watch) dataStale(ctx context.Context) ([]Holds, error) {
 	// The wall clock, as every other condition here reads it. A sweep is a
 	// pass over what is true now rather than a computation a test pins to a
 	// moment, and the fixtures below place their rows relative to it.
-	stopped := time.Now().UTC().Sub(*since)
-	if stopped < after {
+	now := time.Now().UTC()
+	if !(VulnerabilityData{Since: since, After: after}).StaleAt(now) {
 		return nil, nil
 	}
+	stopped := now.Sub(*since)
 	version, err := w.dataInForce(ctx)
 	if err != nil {
 		return nil, err
@@ -124,6 +125,14 @@ type VulnerabilityData struct {
 	// After is how long counts as stopped, so a screen can say how close this
 	// is to being reported rather than only whether it has been.
 	After time.Duration
+}
+
+// StaleAt reports whether the data had stopped moving for long enough to be
+// reported by now. One answer for the condition and the screen it links to,
+// because a screen somebody opens after being told has to agree with what
+// told them.
+func (d VulnerabilityData) StaleAt(now time.Time) bool {
+	return d.Since != nil && now.Sub(*d.Since) >= d.After
 }
 
 // DataInForce answers what the scans are running against and when it last

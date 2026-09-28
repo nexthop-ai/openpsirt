@@ -441,7 +441,7 @@ func outboundClient() *http.Client {
 	// above is what says the permission is intended.
 	dialer := &net.Dialer{Timeout: signalTimeout}
 	return &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: signalTimeout,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refused a redirect to %s: a destination is configured, not followed",
 				req.URL.Host)

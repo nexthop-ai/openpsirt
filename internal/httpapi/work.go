@@ -112,7 +112,7 @@ func registerWork(api huma.API, in Ingest) {
 		// Answered here as well as said by the condition, because a screen
 		// somebody opens after being told is a screen that has to agree with
 		// what told them.
-		out.Body.Stale = data.Since != nil && time.Since(*data.Since) >= data.After
+		out.Body.Stale = data.StaleAt(time.Now())
 		return out, nil
 	})
 

@@ -309,7 +309,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		ContentHash:   a.ContentHash,
 		Serial:        a.Serial,
 		BuiltAt:       asStored(a.BuiltAt),
-		ReceivedAt:    s.now().Truncate(time.Microsecond),
+		ReceivedAt:    asStored(s.now()),
 		ParserVersion: a.ParserVersion,
 		Credential:    a.Credential,
 		Status:        Accepted,
@@ -410,7 +410,7 @@ func (s *Store) retake(ctx context.Context, a Arriving) (*Scan, error) {
 	}
 	scan.Status = Accepted
 	scan.Failure = ""
-	scan.ReceivedAt = s.now().Truncate(storedPrecision)
+	scan.ReceivedAt = asStored(s.now())
 	scan.ParserVersion = a.ParserVersion
 	scan.Credential = a.Credential
 	if _, err := s.db.NewUpdate().Model(scan).
@@ -475,7 +475,7 @@ type Refusal struct {
 // The subject is who was turned away, not a narrowing: this writes one row
 // about one build and reads nothing back.
 func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) error {
-	r.At = s.now().Truncate(time.Microsecond)
+	r.At = asStored(s.now())
 	// The sender turned away comes from the subject rather than from the
 	// caller. The caller already has the name in two shapes and would be
 	// choosing between them here, which is one place for the record to

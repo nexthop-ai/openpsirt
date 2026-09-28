@@ -474,50 +474,46 @@ func registerFindings(api huma.API, in Ingest) {
 // spans products as on the one that does not — and two spellings is how a
 // column comes to say something slightly different on one screen.
 func findingBody(group finding.Group, now time.Time) FindingBody {
-	{
-		{
-			row := FindingBody{
-				Product: group.Product, ProductName: group.ProductName,
-				Vulnerability: group.Vulnerability, Summary: group.Summary,
-				Severity:  group.Severity,
-				Component: group.Component, Version: group.Version, Upstream: group.Upstream,
-				Source:    group.Source,
-				Ecosystem: group.Ecosystem, Namespace: group.Namespace,
-				FixState: string(group.FixState), FixedIn: group.FixedIn,
-				Matched: string(group.Matched),
-				Owner:   group.Owner, Parent: group.Parent,
-				Middle: group.Middle, Chains: group.Chains,
-				Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
-				StreamName:  labelBeside(group.StreamName, group.Stream),
-				VariantName: labelBeside(group.VariantName, group.Variant),
-				Tags:        group.Tags,
-				Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
-				Places: group.Places, Answered: group.Answered,
-				State: group.State, SentBack: group.SentBack,
-				Exploited: group.Exploited, ExploitedHere: group.ExploitedHere,
-				Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
-				Score:        float64(group.ScoreCenti) / 100,
-				ScoreVersion: group.ScoreVersion,
-				NoDeadline:   string(group.NoDeadline),
-				Undisclosed:  group.Undisclosed,
-			}
-			if group.DiscloseAt != nil {
-				row.DiscloseAt = group.DiscloseAt.Format(time.DateOnly)
-			}
-			if !group.OpenedAt.IsZero() {
-				row.Opened = group.OpenedAt.Format(time.DateOnly)
-			}
-			if group.DueAt != nil {
-				row.Due = group.DueAt.Format(time.DateOnly)
-				// Rounded down, not toward zero, the way the running-out list
-				// rounds it: truncation reports something twelve hours overdue
-				// as having zero days left, which reads as due today.
-				left := int(math.Floor(group.DueAt.Sub(now).Hours() / 24))
-				row.DaysLeft = &left
-			}
-			return row
-		}
+	row := FindingBody{
+		Product: group.Product, ProductName: group.ProductName,
+		Vulnerability: group.Vulnerability, Summary: group.Summary,
+		Severity:  group.Severity,
+		Component: group.Component, Version: group.Version, Upstream: group.Upstream,
+		Source:    group.Source,
+		Ecosystem: group.Ecosystem, Namespace: group.Namespace,
+		FixState: string(group.FixState), FixedIn: group.FixedIn,
+		Matched: string(group.Matched),
+		Owner:   group.Owner, Parent: group.Parent,
+		Middle: group.Middle, Chains: group.Chains,
+		Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
+		StreamName:  labelBeside(group.StreamName, group.Stream),
+		VariantName: labelBeside(group.VariantName, group.Variant),
+		Tags:        group.Tags,
+		Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
+		Places: group.Places, Answered: group.Answered,
+		State: group.State, SentBack: group.SentBack,
+		Exploited: group.Exploited, ExploitedHere: group.ExploitedHere,
+		Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
+		Score:        float64(group.ScoreCenti) / 100,
+		ScoreVersion: group.ScoreVersion,
+		NoDeadline:   string(group.NoDeadline),
+		Undisclosed:  group.Undisclosed,
 	}
+	if group.DiscloseAt != nil {
+		row.DiscloseAt = group.DiscloseAt.Format(time.DateOnly)
+	}
+	if !group.OpenedAt.IsZero() {
+		row.Opened = group.OpenedAt.Format(time.DateOnly)
+	}
+	if group.DueAt != nil {
+		row.Due = group.DueAt.Format(time.DateOnly)
+		// Rounded down, not toward zero, the way the running-out list
+		// rounds it: truncation reports something twelve hours overdue
+		// as having zero days left, which reads as due today.
+		left := int(math.Floor(group.DueAt.Sub(now).Hours() / 24))
+		row.DaysLeft = &left
+	}
+	return row
 }
 
 func registerComponentFindings(api huma.API, in Ingest) {

@@ -223,7 +223,7 @@ func stateWord(places, waiting, approved, lapsed int) string {
 // two places for "worst" to come to mean different things — and because the
 // order of these words is a fact about the domain, not a display choice.
 func worstBand(counts map[string]int) string {
-	for _, band := range []string{"critical", "high", "medium", "low"} {
+	for _, band := range Bands() {
 		if counts[band] > 0 {
 			return band
 		}

@@ -6,14 +6,12 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -577,23 +575,11 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 // subject may see — so a name only ever reaches a reader who could already read
 // the judgment it belongs to.
 func productsDecidedIn(ctx context.Context, in Ingest, rows []triage.Elsewhere) (map[int64]string, error) {
-	named := map[int64]string{}
-	if len(rows) == 0 {
-		return named, nil
-	}
 	ids := make([]int64, 0, len(rows))
 	for _, one := range rows {
 		ids = append(ids, one.ProductID)
 	}
-	var products []catalog.Product
-	if err := in.DB.DB.NewSelect().Model(&products).
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read which products these were decided in: %w", err)
-	}
-	for _, product := range products {
-		named[product.ID] = product.Name
-	}
-	return named, nil
+	return catalog.NewStore(in.DB.DB).ProductsCalled(ctx, ids)
 }
 
 func orBlank(s *string) string {
