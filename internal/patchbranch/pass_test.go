@@ -503,6 +503,71 @@ func TestGitIsGivenNoConfigurationOrCredentialsOfTheProcess(t *testing.T) {
 	}
 }
 
+// Every git a visit starts is run with that environment and those settings,
+// whatever the process running the pass carries. Git is reached through a
+// program that records what it was handed and then runs git.
+//
+// Verified by deleting the line that sets the command's environment in run,
+// and separately by dropping the settings from its arguments: each fails here.
+func TestEveryGitAVisitStartsIsGivenNothingOfTheProcess(t *testing.T) {
+	dbtest.Alone(t, func(t *testing.T, db *database.DB) {
+		made := project(t)
+		issue(t, db, "CVE-2025-0021", "critical", link("project", made.fix))
+
+		hostile := filepath.Join(t.TempDir(), "gitconfig")
+		if err := os.WriteFile(hostile, []byte("[credential]\n\thelper = store\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("GIT_CONFIG_GLOBAL", hostile)
+		t.Setenv("HTTPS_PROXY", "http://proxy.example.test")
+
+		dir := t.TempDir()
+		record := filepath.Join(dir, "invocations")
+		real, err := exec.LookPath("git")
+		if err != nil {
+			t.Fatal(err)
+		}
+		wrapper := filepath.Join(dir, "git")
+		script := "#!/bin/sh\n" +
+			"{ echo '--- invocation'; for each in \"$@\"; do echo \"ARG $each\"; done; " +
+			"env | sed 's/^/ENV /'; } >> '" + record + "'\n" +
+			"exec '" + real + "' \"$@\"\n"
+		if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the wrapper has to be executable
+			t.Fatal(err)
+		}
+
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
+			map[string]upstream{"project": made}).Running(wrapper)
+		if _, err := pass.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		recorded, err := os.ReadFile(record) //nolint:gosec // G304: a file in the test's own temporary directory
+		if err != nil {
+			t.Fatalf("git was never run: %v", err)
+		}
+		invocations := strings.Split(string(recorded), "--- invocation\n")[1:]
+		if len(invocations) == 0 {
+			t.Fatal("git was never run, so this checked nothing")
+		}
+		for i, each := range invocations {
+			lines := strings.Split(each, "\n")
+			if slices.Contains(lines, "ENV HTTPS_PROXY=http://proxy.example.test") {
+				t.Errorf("git run %d was given the process's proxy", i)
+			}
+			if !slices.Contains(lines, "ENV GIT_CONFIG_GLOBAL="+os.DevNull) {
+				t.Errorf("git run %d read the process's personal configuration", i)
+			}
+			for _, setting := range []string{"credential.helper=", "protocol.allow=never",
+				"core.hooksPath=" + os.DevNull, "http.followRedirects=false"} {
+				if !slices.Contains(lines, "ARG "+setting) {
+					t.Errorf("git run %d ran without %q", i, setting)
+				}
+			}
+		}
+	})
+}
+
 func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
