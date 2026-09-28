@@ -229,8 +229,17 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 			return fmt.Errorf("you are keeping %d filters for this product, which is the "+
 				"limit: forget one before keeping another", held)
 		}
-		_, err = db.NewInsert().Model(kept).Exec(ctx)
-		return err
+		// Two saves of one new name both find nothing to update and both
+		// add a row. The unique index refuses the later one, and that is a
+		// lost race: taken again, the update above finds the row the other
+		// kept and replaces it.
+		if _, err := db.NewInsert().Model(kept).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
+			return err
+		}
+		return nil
 	}
 	if err := database.Within(ctx, s.db, write); err != nil {
 		return nil, fmt.Errorf("keep that filter: %w", err)

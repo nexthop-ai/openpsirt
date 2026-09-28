@@ -4,8 +4,13 @@
 package saved_test
 
 import (
+	"context"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -250,6 +255,74 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 		}
 		if total != 2 {
 			t.Errorf("the list says %d are kept, want the 2 there are", total)
+		}
+	})
+}
+
+// insertsFilter starts rival before the first statement adding a saved
+// filter, on another connection, and gives it a moment to land.
+//
+// A moment rather than until it finishes: on the two engines whose empty
+// update holds a gap lock, the rival waits on this transaction and lands only
+// once it commits, so which of the two adds the row differs by engine and the
+// test asks only that both are kept as one.
+type insertsFilter struct {
+	once  sync.Once
+	rival func() error
+	done  chan error
+}
+
+func (h *insertsFilter) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if strings.HasPrefix(e.Query, "INSERT ") && strings.Contains(e.Query, "saved_filter") {
+		h.once.Do(func() {
+			go func() { h.done <- h.rival() }()
+			select {
+			case err := <-h.done:
+				h.done <- err
+			case <-time.After(2 * time.Second):
+			}
+		})
+	}
+	return ctx
+}
+
+func (h *insertsFilter) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
+	// A second press of save, or a second tab. Both find no filter by that
+	// name and both add one; the unique index refuses the later addition,
+	// and taken again it finds the filter the other kept and replaces it.
+	// SQLite has one connection, so nothing lands between the two there.
+	each(t, func(t *testing.T, f *fixture) {
+		if f.DB.Stats().MaxOpenConnections == 1 {
+			t.Skip("one connection: nothing lands between a read and a write")
+		}
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		product := f.products[fixtures.ProductName]
+		hook := &insertsFilter{done: make(chan error, 1), rival: func() error {
+			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID, product,
+				"Kernel", "component=linux", saved.Filter{}, 10)
+			return err
+		}}
+		hooked := bun.NewDB(f.DB.DB.DB, f.DB.Dialect())
+		hooked.AddQueryHook(hook)
+
+		if _, err := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID, product,
+			"kernel", "component=linux-image", saved.Filter{}, 10); err != nil {
+			t.Errorf("one of two saves of one name answered %v", err)
+		}
+		if err := <-hook.done; err != nil {
+			t.Errorf("the other of two saves of one name answered %v", err)
+		}
+		kept, err := f.store.SavedFilters(t.Context(), person.ID, product, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(kept) != 1 {
+			t.Errorf("the person keeps %+v, want one filter", kept)
 		}
 	})
 }
