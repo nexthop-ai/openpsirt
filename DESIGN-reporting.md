@@ -579,7 +579,10 @@ disposition register have sections above.
 | Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
 
 An issuance carries no visibility of its own, so a row of the last of those is
-narrowed by the flaw it was written about. Reading one as public because it has
+narrowed by the flaws it was written about: every issue the advisory covers now,
+and every issue it covered when that issuance went out. The document names the
+second, including an issue taken off since. The documents a directory serves are
+narrowed the same way. Reading one as public because it has
 no visibility column would announce an undisclosed flaw in the report about
 announcements, and the row names the identifier.
 

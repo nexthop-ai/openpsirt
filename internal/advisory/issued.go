@@ -149,10 +149,15 @@ func countedIn(document string) (issues, products int, err error) {
 // would hand out a document about a product somebody holds nothing on.
 //
 // It takes the alias the advisory carries in both: "ad".
+//
+// Both the issues it covers now and the ones it covered when the issuance
+// went out: the document names the second, and an issue taken off since is
+// still in what readers hold. It also takes the issuance as "ai".
 func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	// The product half is inside it: a product this reader holds nothing on
 	// is in none of the groups the issue clause admits.
-	return wholeIssues(q, subject)
+	q = wholeIssues(q, subject)
+	return everyIssue(q, subject, "ac.added_at <= ai.issued_at AND ac.removed_at > ai.issued_at")
 }
 
 // wholeIssues narrows a statement over "advisory" as "ad" to the advisories
@@ -170,6 +175,13 @@ func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // document is: a row saying an advisory went out is as much a disclosure as
 // the document.
 func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	return everyIssue(q, subject, "ac.removed_at IS NULL")
+}
+
+// everyIssue narrows a statement over "advisory" as "ad" to the advisories
+// every issue of which this reader may see, among the coverage rows the
+// condition over "ac" keeps.
+func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun.SelectQuery {
 	products, all := subject.Products()
 	if all {
 		return q
@@ -177,7 +189,7 @@ func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	both, public, private := access.Split(products, subject.Reads)
 	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
-		WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL AND NOT EXISTS (
+		WHERE ac.advisory_id = ad.id AND (`+covered+`) AND NOT EXISTS (
 			SELECT 1 FROM "finding" AS "f"
 			JOIN "target" AS "t" ON t.id = f.target_id
 			JOIN "stream" AS "st" ON st.id = t.stream_id

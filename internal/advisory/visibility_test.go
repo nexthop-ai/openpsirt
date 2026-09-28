@@ -154,3 +154,36 @@ func TestAnAdvisoryIsReadAtTheVisibilityHeldInItsOwnProduct(t *testing.T) {
 		got.expect(t, who, "a disclosed flaw in switchd, drafted", draftThere, true, false)
 	})
 }
+
+func TestAnIssuanceIsReadAtTheVisibilityOfWhatItNamed(t *testing.T) {
+	// The document names every issue the advisory covered when it went out.
+	// One taken off since is still in it, so a reader who may not see that
+	// issue is not shown the issuance, whatever the advisory covers now.
+	each(t, func(t *testing.T, f *fixture) {
+		there := f.recorded(t, f.other)
+		named := f.issuedOver(t, [2]string{"sonic", f.recorded(t, f.master)},
+			[2]string{"switchd", there})
+		if err := f.store.Drop(t.Context(), f.who, named, "switchd", there); err != nil {
+			t.Fatal(err)
+		}
+
+		sonicOnly := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{f.product: {access.PrivateRead}}, 0)
+		got := f.reachedBy(t, sonicOnly, named)
+		if got.published[named] || got.sent[named] {
+			t.Errorf("a reader of sonic alone was shown an issuance naming a flaw in switchd: "+
+				"reported %v, sent %v", got.published[named], got.sent[named])
+		}
+
+		both := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{
+				f.product:      {access.PrivateRead},
+				f.otherProduct: {access.PrivateRead},
+			}, 0)
+		got = f.reachedBy(t, both, named)
+		if !got.published[named] || !got.sent[named] {
+			t.Errorf("a reader of both was not shown the issuance: reported %v, sent %v",
+				got.published[named], got.sent[named])
+		}
+	})
+}
