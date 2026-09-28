@@ -113,8 +113,9 @@ func labelBeside(name, handle string) string {
 
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
-	At string `json:"at"`
-	By string `json:"by" doc:"The person who made the change, by sign-in identity"`
+	At    string `json:"at"`
+	Actor string `json:"actor" enum:"person,configuration" doc:"What made the change: a person in the application, or the deployment's startup configuration, which names administrators"`
+	By    string `json:"by,omitempty" doc:"The person who made the change, by sign-in identity. Absent where configuration made it"`
 	// ByName is the label beside the identity rather than in its place.
 	ByName string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"The kind of thing that changed"`
@@ -191,7 +192,9 @@ func registerTrail(api huma.API, in Ingest) {
 
 		who := make([]int64, 0, len(changes))
 		for _, change := range changes {
-			who = append(who, change.By)
+			if person := change.Person(); person != 0 {
+				who = append(who, person)
+			}
 		}
 		people, err := whoSigned(ctx, in.DB.DB, who)
 		if err != nil {
@@ -211,9 +214,9 @@ func registerTrail(api huma.API, in Ingest) {
 		out.Body.Items = make([]ChangeBody, 0, len(changes))
 		for _, change := range changes {
 			body := ChangeBody{
-				At: change.At.Format("2006-01-02T15:04:05Z"), By: people.identity(change.By),
-				ByName: people.label(change.By),
-				Kind:   string(change.Kind), About: change.Name,
+				At: change.At.Format("2006-01-02T15:04:05Z"), Actor: string(change.Actor),
+				By: people.identity(change.Person()), ByName: people.label(change.Person()),
+				Kind: string(change.Kind), About: change.Name,
 				Unset: change.Was == nil, Cleared: change.Became == nil,
 			}
 			if change.Was != nil {

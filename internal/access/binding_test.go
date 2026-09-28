@@ -258,16 +258,24 @@ func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *
 func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"}); err != nil {
-			t.Fatal(err)
-		}
-		// Removed from configuration and restarted.
-		unnamed, err := f.store.NameBootstrapAdmins(ctx, []string{"first"})
+		naming, err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(unnamed) != 1 || unnamed[0] != "second" {
-			t.Errorf("the names no longer in configuration came back as %v", unnamed)
+		if len(naming.Named) != 2 || len(naming.Unnamed) != 0 {
+			t.Errorf("naming two came back as %+v", naming)
+		}
+		// Removed from configuration and restarted.
+		naming, err = f.store.NameBootstrapAdmins(ctx, []string{"first"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(naming.Unnamed) != 1 || naming.Unnamed[0] != "second" {
+			t.Errorf("the names no longer in configuration came back as %v", naming.Unnamed)
+		}
+		// The one still named was named already, so nothing new is.
+		if len(naming.Named) != 0 {
+			t.Errorf("a name configuration already held came back as newly named: %v", naming.Named)
 		}
 
 		second, err := f.store.ByIdentity(ctx, "second")

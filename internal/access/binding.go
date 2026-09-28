@@ -723,10 +723,10 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 // Configuration's administration is recorded apart from administration
 // granted here, and this writes only its own half. Anybody no longer named
 // stops administering through the name, and keeps whatever was granted here or
-// derived from a group, because that did not come from configuration. The
-// identities that stopped being named are returned, so that startup can say
-// so.
-func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([]string, error) {
+// derived from a group, because that did not come from configuration. Who
+// came to be named and who stopped being named are returned, so that the start
+// that applied them can record and say so.
+func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) (Naming, error) {
 	named := make([]string, 0, len(identities))
 	for _, identity := range identities {
 		// Folded, because that is how an identity is stored and how a sign-in
@@ -743,7 +743,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([
 		// by the phantom. This is the way back in, so it fails loudly at the
 		// one moment somebody needs it.
 		if before, _, found := strings.Cut(trimmed, ":"); found && before != "" {
-			return nil, fmt.Errorf(
+			return Naming{}, fmt.Errorf(
 				"%q names an administrator as \"provider:username\". A name here is the "+
 					"plain username the provider or the trusted proxy reports, with no "+
 					"prefix. Write %q and start again",
@@ -756,10 +756,10 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([
 	// named now are one act: this function is the way back into a
 	// deployment nobody can administer, and run half through it is what
 	// creates that state rather than what ends it.
-	var unnamed []string
+	var naming Naming
 	err := database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
 		within := s.over(db)
-		unnamed = nil
+		naming = Naming{}
 		leaving := db.NewSelect().Model((*Account)(nil)).Column("identity").
 			Where("is_bootstrap = ?", true).OrderExpr("identity")
 		clearing := db.NewUpdate().Model((*Account)(nil)).
@@ -768,7 +768,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([
 			leaving = leaving.Where("identity NOT IN (?)", bun.List(named))
 			clearing = clearing.Where("identity NOT IN (?)", bun.List(named))
 		}
-		if err := leaving.Scan(ctx, &unnamed); err != nil {
+		if err := leaving.Scan(ctx, &naming.Unnamed); err != nil {
 			return fmt.Errorf("read who is no longer named as an administrator: %w", err)
 		}
 		if _, err := clearing.Exec(ctx); err != nil {
@@ -782,6 +782,9 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([
 			person, err := within.Ensure(ctx, identity, "", nil, nil)
 			if err != nil {
 				return err
+			}
+			if !person.IsBootstrap {
+				naming.Named = append(naming.Named, identity)
 			}
 			// Named in configuration is an authorization to sign in, so the
 			// way they will sign in is recorded with it. Without this the
@@ -808,7 +811,16 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return Naming{}, err
 	}
-	return unnamed, nil
+	return naming, nil
+}
+
+// Naming is what one application of the administrators configuration names
+// changed.
+type Naming struct {
+	// Named is who configuration names and did not before.
+	Named []string
+	// Unnamed is who configuration named before and does not now.
+	Unnamed []string
 }

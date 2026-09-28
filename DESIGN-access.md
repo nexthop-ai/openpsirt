@@ -842,7 +842,7 @@ when any one of them holds.
 | Somebody named and also granted here keeps administration when the name goes | The grant here is a separate act that nobody took back |
 | A person is read with two answers: granted here, and named in configuration | Deciding whether somebody stays an administrator once a name goes needs to see which they hold. A group's grant reads as granted here |
 | Stating administration here writes only the grant made here | A named person reads as not granted here until somebody grants it, and granting it is how they keep administration after the name goes. The People screen's box is that grant, with a line beneath it where configuration names them too |
-| A name removed is logged at startup, by identity | Nobody made the change in the application, and the trail records what a person did there |
+| A name added or removed is recorded in the administrative trail, with configuration as the actor, and a removal is also logged at startup by identity | An operator who just edited the configuration reads the log; an access review reads the trail |
 | The upgrade from v0.4.0 clears the flag for every named administrator whose flag no group derived | v0.4.0 wrote the name into the flag and kept nothing telling the two apart. The name still holds, so nobody loses administration at the upgrade; an administrator granted here and also named has to be granted again once the name goes |
 
 A deployment may not start unable to administer itself. In group-bound mode that
@@ -1029,6 +1029,8 @@ record, because it is the same question one layer up.
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the floor to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
+| Every row names its actor: a person, or configuration | Configuration is the deployment's startup configuration, and the one actor that is no person. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, and records nothing else. A row by a person names the person |
+| Configuration records a name when it starts or stops naming somebody | Administration moved with nobody in the application having moved it. A start naming the same people as the last records nothing, because nothing moved |
 | The record is written in the transaction that makes the change | Both are one act. Written afterwards, a change could succeed while the record of it silently failed, and a trail that is sometimes missing a line answers an auditor's question wrongly rather than not at all |
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
 | What follows the change is outside it | Deactivating somebody also ends their sessions and hands their work back. The sessions end inside, because they are what deactivation means; the work is handed back afterwards, bounded by how much they held rather than by the request |

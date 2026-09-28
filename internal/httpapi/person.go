@@ -160,7 +160,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 		for _, change := range changes {
 			body.Held = append(body.Held, HeldChangeBody{
-				At: change.At.Format(time.RFC3339), By: who[change.By],
+				At: change.At.Format(time.RFC3339), By: who[change.Person()],
 				About: change.Name, Was: orBlank(change.Was), Now: orBlank(change.Became),
 			})
 		}
@@ -208,7 +208,9 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 func whoChanged(ctx context.Context, in Ingest, a Administering, changes []trail.Change) (map[int64]string, error) {
 	who := map[int64]string{}
 	for _, change := range changes {
-		who[change.By] = ""
+		if person := change.Person(); person != 0 {
+			who[person] = ""
+		}
 	}
 	if len(who) == 0 {
 		return who, nil

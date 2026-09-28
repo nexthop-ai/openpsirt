@@ -1416,12 +1416,18 @@ components:
       properties:
         about:
           type: string
+        actor:
+          description: "What made the change: a person in the application, or the deployment's startup configuration, which names administrators"
+          enum:
+            - person
+            - configuration
+          type: string
         at:
           type: string
         became:
           type: string
         by:
-          description: The person who made the change, by sign-in identity
+          description: The person who made the change, by sign-in identity. Absent where configuration made it
           type: string
         by_name:
           description: Their display name, where it differs from their identity
@@ -1452,7 +1458,7 @@ components:
           type: string
       required:
         - at
-        - by
+        - actor
         - kind
         - about
       type: object

@@ -92,15 +92,31 @@ func Kinds() []Kind {
 	}
 }
 
+// Actor is what made a change: a person, or the deployment's startup
+// configuration.
+type Actor string
+
+const (
+	// ByPerson is a change somebody made in the application. The person is
+	// named beside it.
+	ByPerson Actor = "person"
+	// ByConfiguration is a change the deployment's startup configuration
+	// made, which names no person. Only the administrators configuration
+	// names are changed this way.
+	ByConfiguration Actor = "configuration"
+)
+
 // Change is one administrative act.
 type Change struct {
 	bun.BaseModel `bun:"table:admin_change,alias:ac"`
 
 	ID int64     `bun:"id,pk,autoincrement"`
 	At time.Time `bun:"at,notnull"`
-	// By is who did it. Never absent: a change nobody made is a change nothing
-	// records, which is the state this exists to end.
-	By   int64  `bun:"by,notnull"`
+	// Actor is what made it, and never absent: a change nobody made is a
+	// change nothing records, which is the state this exists to end.
+	Actor Actor `bun:"actor,notnull"`
+	// By is the person who made it. Absent only where configuration did.
+	By   *int64 `bun:"by"`
 	Kind Kind   `bun:"kind,notnull"`
 	Name string `bun:"about,notnull"`
 	// Was is what it held before and Became what it holds now. Absent before
@@ -108,6 +124,14 @@ type Change struct {
 	// different acts and a blank cannot tell them apart.
 	Was    *string `bun:"was"`
 	Became *string `bun:"became"`
+}
+
+// Person is who made the change, or zero where configuration did.
+func (c Change) Person() int64 {
+	if c.By == nil {
+		return 0
+	}
+	return *c.By
 }
 
 // NameLimit is how much of what a change is about the column holds.
@@ -155,12 +179,72 @@ func (s *Store) Record(ctx context.Context, by access.Subject, kind Kind, name s
 	if by.Kind != access.Person || by.ID == 0 {
 		return fmt.Errorf("an administrative change is recorded against whoever made it")
 	}
-	change := &Change{
-		At: s.now().Truncate(time.Microsecond), By: by.ID,
-		Kind: kind, Name: bound.HeadRunes(name, NameLimit), Was: was, Became: became,
+	person := by.ID
+	return s.write(ctx, &Change{Actor: ByPerson, By: &person,
+		Kind: kind, Name: name, Was: was, Became: became})
+}
+
+// RecordByConfiguration writes one change the deployment's startup
+// configuration made, in the transaction that makes it.
+func (s *Store) RecordByConfiguration(ctx context.Context, kind Kind, name string,
+	was, became *string) error {
+
+	return s.write(ctx, &Change{Actor: ByConfiguration,
+		Kind: kind, Name: name, Was: was, Became: became})
+}
+
+// NamedInConfiguration and UnnamedByConfiguration are what the trail says
+// about an account when configuration names an administrator and when it
+// stops naming them.
+const (
+	NamedInConfiguration   = "administrator: named in OPENPSIRT_BOOTSTRAP_ADMINS"
+	UnnamedByConfiguration = "administration removed: OPENPSIRT_BOOTSTRAP_ADMINS no longer names them"
+)
+
+// NameAdministrators applies the administrators configuration names, and
+// records each one it names or stops naming, against configuration, in one
+// transaction. It answers who stopped being named.
+//
+// Applied at every start rather than only the first, which makes it the
+// documented way back in: an operator who has locked themselves out adds
+// themselves and restarts. It is a pre-authorization rather than a bypass.
+// Being named grants the role; it does not admit anybody who has not
+// authenticated.
+//
+// A start that names the same people as the last one records nothing.
+func NameAdministrators(ctx context.Context, db bun.IDB, identities []string) ([]string, error) {
+	var naming access.Naming
+	err := database.Within(ctx, db, func(ctx context.Context, db bun.IDB) error {
+		var err error
+		if naming, err = access.NewStore(db).NameBootstrapAdmins(ctx, identities); err != nil {
+			return err
+		}
+		store := NewStore(db)
+		for _, identity := range naming.Named {
+			if err := store.RecordByConfiguration(ctx, Account, identity,
+				nil, Said(NamedInConfiguration, true)); err != nil {
+				return err
+			}
+		}
+		for _, identity := range naming.Unnamed {
+			if err := store.RecordByConfiguration(ctx, Account, identity,
+				Said(NamedInConfiguration, true), Said(UnnamedByConfiguration, true)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	return naming.Unnamed, nil
+}
+
+func (s *Store) write(ctx context.Context, change *Change) error {
+	change.At = s.now().Truncate(time.Microsecond)
+	change.Name = bound.HeadRunes(change.Name, NameLimit)
 	if _, err := s.db.NewInsert().Model(change).Exec(ctx); err != nil {
-		return fmt.Errorf("record that %q changed: %w", name, err)
+		return fmt.Errorf("record that %q changed: %w", change.Name, err)
 	}
 	return nil
 }

@@ -344,19 +344,3 @@ func ParseSources(raw string) ([]net.IPNet, error) {
 	}
 	return out, nil
 }
-
-// Bootstrap grants administrator to the identities configuration names.
-//
-// Applied at every start rather than only the first, which makes it the
-// documented way back in: an operator who has locked themselves out adds
-// themselves and restarts. For software somebody else runs, a way back in
-// matters more than a tidy one-shot bootstrap.
-//
-// It is a pre-authorization rather than a bypass. Being named grants the role;
-// it does not admit anybody who has not authenticated.
-//
-// The identities it returns were named before and are not now, and administer
-// no longer unless administration was granted to them here.
-func Bootstrap(ctx context.Context, store *Store, identities []string) ([]string, error) {
-	return store.NameBootstrapAdmins(ctx, identities)
-}

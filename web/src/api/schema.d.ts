@@ -6600,10 +6600,15 @@ export interface components {
         };
         ChangeBody: {
             about: string;
+            /**
+             * @description What made the change: a person in the application, or the deployment's startup configuration, which names administrators
+             * @enum {string}
+             */
+            actor: "person" | "configuration";
             at: string;
             became?: string;
-            /** @description The person who made the change, by sign-in identity */
-            by: string;
+            /** @description The person who made the change, by sign-in identity. Absent where configuration made it */
+            by?: string;
             /** @description Their display name, where it differs from their identity */
             by_name?: string;
             /** @description This change cleared it */

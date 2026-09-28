@@ -111,6 +111,7 @@ Also read after an upgrade from any earlier release.
 
 | After the upgrade from v0.4.0 | |
 |---|---|
+| A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
 | Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
 
 ## Serving

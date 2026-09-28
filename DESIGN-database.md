@@ -223,7 +223,7 @@ The chain is one part per release.
 | 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. A database v0.3.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | None | v0.4.0 changes no schema. Its record carries migration 38 as its last |
-| 39 | The untagged release: v0.4.0's rows moved onto its rules. It changes no schema, and it is edited until the release tags it |
+| 39 | The untagged release: v0.4.0's schema changed into its own, and the rows moved with it. § The v0.5.0 upgrade says what it does. It is edited until the release tags it |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -242,9 +242,8 @@ The chain collapses into a single initial migration before 1.0 (REQ-72), and a
 database any 0.x release built is recreated then.
 
 Migrations 1 to 36 each create something, which is why rolling one back is
-dropping what it made. Migrations 37 and 38 change existing tables, and rolling
-one back changes the tables back. Migration 39 changes rows only, and rolling
-it back changes them back.
+dropping what it made. Migrations 37, 38 and 39 change existing tables, and
+rolling one back changes the tables back.
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
@@ -284,12 +283,12 @@ when one stops half way.
 
 ### Release upgrades
 
-Each release after v0.1.0 carries one migration that changes the schema the
-release before it built into its own, and moves the rows with it: 37 carries a
-database from v0.1.0 to v0.2.0, 38 from v0.2.0 to v0.3.0, and 39 from v0.4.0
-to the release after it. A database a
-release built applies the ones after its own; a fresh install walks the whole
-chain. They are shaped the way every migration after 1.0 will be.
+Each release after v0.1.0 that changes the schema carries one migration that
+changes the schema the release before it built into its own, and moves the rows
+with it: 37 carries a database from v0.1.0 to v0.2.0, 38 from v0.2.0 to v0.3.0,
+and 39 from v0.4.0 to the release after it. v0.4.0 changes no schema and
+carries none. A database a release built applies the ones after its own; a
+fresh install walks the whole chain. They are shaped the way every migration after 1.0 will be.
 
 | Rule | |
 |---|---|
@@ -391,6 +390,30 @@ Tests on each of the four engines:
 | Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
 | v0.3.0's declarations | Each table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
 | Renamed and unread settings | The threshold under v0.1.0's name, from a v0.1.0 and a v0.2.0 database, reads under the new name afterwards and the old row is gone; set under both names, the new one stands; the patch branch switch is gone; rolled back, the threshold is still under the name v0.2.0 reads |
+
+### The v0.5.0 upgrade
+
+Migration 39. The administrative trail gains the actor of each change, and the
+person beside it takes a null where the actor is configuration. PostgreSQL,
+MySQL and MariaDB alter the table where it stands; SQLite rebuilds it from the
+release's declaration.
+
+| In v0.4.0 | After the upgrade |
+|---|---|
+| A trail row | A person's, keeping its person |
+| An administrator named in configuration, whose administration no group derived | Administration granted here cleared. They administer through the name, as `DESIGN-access.md` § The administration trail and the section on configuration's administration describe |
+| Any other account | Unchanged |
+
+Rolled back, the actor goes and the person refuses a null again. A row
+configuration wrote goes with it, because v0.4.0 has no place for a change no
+person made. Every named administrator's administration granted here is set
+again, which is where v0.4.0 reads the name.
+
+| Test, on each of the four engines | What it holds |
+|---|---|
+| A v0.4.0 database with named, derived and granted administrators | Upgraded, only the named-only one's grant here is cleared, and they still administer. Rolled back, every named one's grant is set |
+| A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
+| v0.5.0's declarations | The trail as the release declares it, built beside the real one under a scratch name, is described exactly as the chain builds it |
 
 ### Release records
 
