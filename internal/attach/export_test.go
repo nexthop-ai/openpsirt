@@ -15,3 +15,7 @@ func AfterPage(s *Store, fn func()) { s.afterPage = fn }
 // MintToken is the identifier an attachment is given, for the check that text
 // can refer to one.
 func MintToken() (string, error) { return mintToken() }
+
+// BeforeRecord runs fn inside an upload's transaction, between the room being
+// checked and the row being written.
+func BeforeRecord(s *Store, fn func()) { s.beforeRecord = fn }

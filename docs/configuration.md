@@ -294,8 +294,8 @@ web server serves them, at the address you give below.
 | `OPENPSIRT_DIRECTORY_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_DIRECTORY_REGION` | The region, where the store wants one | unset |
 | `OPENPSIRT_DIRECTORY_KEY` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_DIRECTORY_SECRET` | Its secret | unset |
-| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | A session token, where the credentials are temporary ones | unset |
+| `OPENPSIRT_DIRECTORY_SECRET` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
 | `OPENPSIRT_DIRECTORY_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants | set when an endpoint is |
 | `OPENPSIRT_DIRECTORY_ALLOW_HTTP` | Accept a store endpoint that is not `https` and is not this machine | off |
 | `OPENPSIRT_DIRECTORY_DIR` | A directory on this machine to write the files into instead. The bucket wins where both are set | unset |
@@ -720,8 +720,8 @@ environment rather than a key somebody stored.
 | `OPENPSIRT_ATTACHMENT_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_ATTACHMENT_REGION` | The region, where the store wants one | unset |
 | `OPENPSIRT_ATTACHMENT_KEY` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_ATTACHMENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | A session token, where the credentials are temporary ones | unset |
+| `OPENPSIRT_ATTACHMENT_SECRET` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
 | `OPENPSIRT_ATTACHMENT_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
 | `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
 | `OPENPSIRT_ATTACHMENT_DIR` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -83,6 +84,66 @@ func TestPlaintextEndpointNeedsSayingSo(t *testing.T) {
 				t.Fatalf("reported in the clear as %v, wanted %v", bucket.InTheClear(), each.clear)
 			}
 		})
+	}
+}
+
+// The names the directory store is configured by.
+var directoryNames = SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+	AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP", Key: "OPENPSIRT_DIRECTORY_KEY",
+	Secret: "OPENPSIRT_DIRECTORY_SECRET", Token: "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
+}
+
+// Credentials configured by halves are refused, naming the store's own
+// settings, rather than dropped in favor of whatever identity the environment
+// offers.
+func TestHalfACredentialIsRefused(t *testing.T) {
+	for _, each := range []struct {
+		name                     string
+		endpoint                 string
+		key, secret, token, says string
+	}{
+		{name: "a key alone", key: "key", says: "OPENPSIRT_DIRECTORY_KEY and OPENPSIRT_DIRECTORY_SECRET"},
+		{name: "a secret alone", secret: "secret", says: "OPENPSIRT_DIRECTORY_KEY and OPENPSIRT_DIRECTORY_SECRET"},
+		{name: "a key and a blank secret", key: "key", secret: "  ",
+			says: "OPENPSIRT_DIRECTORY_KEY and OPENPSIRT_DIRECTORY_SECRET"},
+		{name: "a token alone", token: "token", says: "OPENPSIRT_DIRECTORY_SESSION_TOKEN is set without"},
+		{name: "a whole pair", key: "key", secret: "secret"},
+		{name: "a whole pair and a token", key: "key", secret: "secret", token: "token"},
+		{name: "a token beside a name in the endpoint", token: "token",
+			endpoint: (&url.URL{Scheme: "http", User: url.UserPassword("name", "word"), Host: "127.0.0.1:9000"}).String()},
+		{name: "nothing, which is the environment's identity"},
+	} {
+		t.Run(each.name, func(t *testing.T) {
+			_, err := NewBucket(context.Background(), BucketConfig{
+				Endpoint: each.endpoint, Bucket: "advisories", Region: "us-east-1",
+				Key: each.key, Secret: each.secret, Token: each.token,
+				Names: directoryNames,
+			})
+			if each.says == "" {
+				if err != nil {
+					t.Fatalf("refused: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("accepted, and the configured credential would go unused")
+			}
+			if !strings.Contains(err.Error(), each.says) {
+				t.Fatalf("the refusal does not name the settings: %v", err)
+			}
+		})
+	}
+}
+
+// The refusal of a plaintext endpoint names the allowance of the store it is
+// about, since the attachment and directory stores are allowed separately.
+func TestThePlaintextRefusalNamesItsOwnStore(t *testing.T) {
+	_, err := NewBucket(context.Background(), BucketConfig{
+		Endpoint: "http://objects.example.com", Bucket: "advisories", Region: "us-east-1",
+		Names: directoryNames,
+	})
+	if err == nil || !strings.Contains(err.Error(), "set OPENPSIRT_DIRECTORY_ALLOW_HTTP") {
+		t.Fatalf("refused as %v", err)
 	}
 }
 

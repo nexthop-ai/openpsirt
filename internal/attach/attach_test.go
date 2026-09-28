@@ -6,10 +6,12 @@ package attach_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -46,40 +48,44 @@ const (
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
+	dbtest.Each(t, func(t *testing.T, db *database.DB) { fn(t, setUp(t, db)) })
+}
 
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+// setUp builds the fixture in one database.
+func setUp(t *testing.T, db *database.DB) *fixture {
+	t.Helper()
+	ctx := t.Context()
+	dbtest.Reset(t, db)
 
-		root := t.TempDir()
-		files, err := attach.NewFiles(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f := &fixture{
-			db: db, store: attach.NewStore(db.DB, files), files: files, root: root,
-			product: product.ID, target: target.ID,
-		}
-		f.issue = f.anIssue(t, identity, access.Public)
-		fn(t, f)
-	})
+	cat := catalog.NewStore(db.DB)
+	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	files, err := attach.NewFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &fixture{
+		db: db, store: attach.NewStore(db.DB, files), files: files, root: root,
+		product: product.ID, target: target.ID,
+	}
+	f.issue = f.anIssue(t, identity, access.Public)
+	return f
 }
 
 // anIssue records a vulnerability and one place it sits at, at a visibility.
@@ -393,6 +399,62 @@ func TestAnUploadTooBigOrWithNoRoomIsRefused(t *testing.T) {
 		}
 		if len(entries) != 0 {
 			t.Errorf("a refused upload left %d entries behind", len(entries))
+		}
+	})
+}
+
+// Two uploads arriving together cannot both take the last of the room.
+//
+// Each checks the room inside the transaction that records it, and a check
+// that does not wait for the other writer reads a total without the other's
+// file in it. Both pass, both commit, and the store ends over its quota.
+func TestTwoUploadsTogetherCannotBothTakeTheLastRoom(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		f := setUp(t, db)
+		who := f.who(t, access.PublicTriage)
+		body := strings.Repeat("x", 600)
+		const quota = 1000
+
+		// The first to reach the insert waits for the second to reach it too,
+		// or gives up once it is plain the second is waiting on the first.
+		var mu sync.Mutex
+		arrived := 0
+		both := make(chan struct{})
+		attach.BeforeRecord(f.store, func() {
+			mu.Lock()
+			arrived++
+			if arrived == 2 {
+				close(both)
+			}
+			mu.Unlock()
+			select {
+			case <-both:
+			case <-time.After(2 * time.Second):
+			}
+		})
+
+		errs := make(chan error, 2)
+		for range 2 {
+			go func() {
+				_, err := f.store.Upload(t.Context(), who,
+					attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "evidence.log",
+					strings.NewReader(body), int64(len(body)), roomy, quota, plenty, false)
+				errs <- err
+			}()
+		}
+		stored, full := 0, 0
+		for range 2 {
+			switch err := <-errs; {
+			case err == nil:
+				stored++
+			case errors.Is(err, attach.ErrNoRoom):
+				full++
+			default:
+				t.Fatalf("an upload failed: %v", err)
+			}
+		}
+		if stored != 1 || full != 1 {
+			t.Fatalf("%d stored and %d refused for room, where one fits", stored, full)
 		}
 	})
 }

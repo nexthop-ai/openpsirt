@@ -152,6 +152,10 @@ update.
 Work that waits reads what it decides from **after** its turn comes. Anything
 the work decides from is fetched inside the thing that serializes it.
 
+One row of the table is a lock rather than a lease. An upload updates it inside
+its transaction to serialize the check of the room left, and nothing takes it
+(`DESIGN-attachments.md` § Quota and removal).
+
 ## Backlog refusal
 
 New work is refused once the queue for its kind is deeper than a limit an

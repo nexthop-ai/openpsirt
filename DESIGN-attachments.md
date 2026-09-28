@@ -123,6 +123,14 @@ Both backends store exactly the number of bytes they are told to expect. A body
 shorter or longer is refused and nothing is stored, so an upload's digest is
 always of the whole file.
 
+### Store credentials
+
+| Rule | |
+|---|---|
+| Configured credentials win over the environment's | An operator who names a key means that key |
+| A key without its secret, a secret without its key, and a session token with no key and no name in the endpoint are refused at startup | Dropped, the process runs as whatever identity the environment offers, and nothing says the configured one went unused |
+| A refusal names the settings of the store it is about | The attachment store and the provider directory's store are configured alike under two prefixes, and a message naming the other store's setting sends the operator to settings that are fine |
+
 ### The filesystem store
 
 The same store holds attachments in development and the published provider
@@ -195,6 +203,14 @@ stored, so both survive the redirect.
 Both bounds are checked twice: before anything is carried, so an upload that
 cannot be kept is refused rather than transferred and discarded; and inside the
 writing transaction, because the first answer was read before the bytes were.
+
+The second check is serialized across uploads. A total read beside another
+upload's uncommitted row does not include it, so two uploads arriving together
+would both fit and both commit. Each writing transaction first updates one
+fixed row of the lease table, which holds no value and which nothing takes as
+a lease; the update is what makes the next upload wait for this one to commit
+before it reads the total. Uploads are serialized per deployment while a quota
+or a share is set, and each holds the lock for two reads and an insert.
 
 Attaching is triage work rather than read work. Tested as a read — whether the
 subject may see the issue the file hangs off — a role granting nothing but the

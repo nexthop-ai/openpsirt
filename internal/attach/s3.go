@@ -62,6 +62,15 @@ type BucketConfig struct {
 	// unless an operator says otherwise, because what it exposes is not
 	// visible from the configuration that turns it on (REQ-70).
 	AllowHTTP bool
+	// Names are the settings this store is configured by, which a refusal
+	// names: two stores are configured alike, and a refusal naming the other
+	// store's setting sends an operator to one that is fine.
+	Names SettingNames
+}
+
+// SettingNames are the environment variables one store is configured by.
+type SettingNames struct {
+	AllowHTTP, Key, Secret, Token string
 }
 
 // NewBucket returns a store, or nil where the deployment configured none.
@@ -81,10 +90,19 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	}
 	// Configured credentials win over whatever the environment offers. An
 	// operator who names a key means that key, and silently preferring an
-	// instance role would be the tool deciding who it is.
-	if settings.Key != "" && settings.Secret != "" {
+	// instance role would be the tool deciding who it is. So half a pair is
+	// refused rather than dropped: dropped, the process runs as whatever
+	// identity the environment has, and nothing says the key went unused.
+	key, secret := strings.TrimSpace(settings.Key), strings.TrimSpace(settings.Secret)
+	if (key == "") != (secret == "") {
+		return nil, fmt.Errorf("%s and %s are set together or not at all",
+			settings.Names.Key, settings.Names.Secret)
+	}
+	token := strings.TrimSpace(settings.Token)
+	credentialed := key != ""
+	if credentialed {
 		options = append(options, awsconfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(settings.Key, settings.Secret, settings.Token)))
+			credentials.NewStaticCredentialsProvider(key, secret, token)))
 	}
 	inTheClear, plain := false, false
 	endpoint := strings.TrimSpace(settings.Endpoint)
@@ -96,18 +114,18 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		}
 		// A name and password in the address are taken out of it and handed
 		// over as credentials, which is also what makes the signing
-		// well-defined. The client is given the address without them, because
-		// every failure it reports carries the address it was given, and a
-		// startup reachability failure is printed to standard error, where a
+		// well-defined. The client is given the address without them, so
+		// nothing it reports can carry them to standard error, where a
 		// container runtime captures it into a log store.
 		//
 		// A configured key still wins, for the reason above.
 		if parsed.User != nil {
-			if settings.Key == "" && settings.Secret == "" {
+			if !credentialed {
 				password, _ := parsed.User.Password()
 				options = append(options, awsconfig.WithCredentialsProvider(
 					credentials.NewStaticCredentialsProvider(
-						parsed.User.Username(), password, settings.Token)))
+						parsed.User.Username(), password, token)))
+				credentialed = true
 			}
 			parsed.User = nil
 			endpoint = parsed.String()
@@ -130,9 +148,16 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 			// source.
 			return nil, fmt.Errorf(
 				"object store endpoint must be https, or loopback for development: %s"+
-					" — set OPENPSIRT_ATTACHMENT_ALLOW_HTTP to accept it on this network",
-				shown)
+					" — set %s to accept it on this network",
+				shown, settings.Names.AllowHTTP)
 		}
+	}
+	// A session token belongs to a key. With neither a key nor a name in the
+	// endpoint it is dropped, and the process runs as the environment's
+	// identity with nothing saying so.
+	if token != "" && !credentialed {
+		return nil, fmt.Errorf("%s is set without %s and %s",
+			settings.Names.Token, settings.Names.Key, settings.Names.Secret)
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, options...)
 	if err != nil {
