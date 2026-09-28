@@ -190,31 +190,52 @@ func debianOrder(a, b string) (int, bool) {
 // characters. A word an advisory wrote where a version belongs — "unfixed",
 // "TBD", a sentence — fails both.
 func splitDebian(v string) (epoch, upstream, revision string, ok bool) {
-	epoch = "0"
-	epochStated := false
-	if at := strings.Index(v, ":"); at >= 0 {
-		if !digits(v[:at]) {
-			return "", "", "", false
-		}
-		epoch, v, epochStated = v[:at], v[at+1:], true
-	}
-	revised := false
-	if at := strings.LastIndex(v, "-"); at >= 0 {
-		upstream, revision, revised = v[:at], v[at+1:], true
-	} else {
-		upstream = v
-	}
-	if upstream == "" || !isDigit(upstream[0]) {
+	cut, ok := splitEVR(v)
+	if !ok {
 		return "", "", "", false
 	}
 	// The upstream version may hold a hyphen where a revision follows it, and
 	// a colon where an epoch precedes it, which is Debian policy's own rule.
 	// The revision holds neither.
-	if !debianCharacters(upstream, revised, epochStated) ||
-		!debianCharacters(revision, false, false) {
+	if !debianCharacters(cut.version, cut.released, cut.epochStated) ||
+		!debianCharacters(cut.release, false, false) {
 		return "", "", "", false
 	}
-	return epoch, upstream, revision, true
+	return cut.epoch, cut.version, cut.release, true
+}
+
+// evr is a version cut into its epoch, its version and its release, the
+// shape Debian and RPM share.
+type evr struct {
+	epoch, version, release string
+	// epochStated and released say whether the text stated an epoch and a
+	// release, which is what decides whether the version may hold a colon
+	// or a hyphen of its own.
+	epochStated, released bool
+}
+
+// splitEVR cuts a version the way Debian and RPM both do: the epoch runs to
+// the first colon and is digits, zero where none is stated; the release
+// follows the last hyphen; and the version between them begins with a digit.
+// Which characters each part may hold is each format's own rule, asked by the
+// caller.
+func splitEVR(v string) (evr, bool) {
+	cut := evr{epoch: "0"}
+	if at := strings.Index(v, ":"); at >= 0 {
+		if !digits(v[:at]) {
+			return evr{}, false
+		}
+		cut.epoch, v, cut.epochStated = v[:at], v[at+1:], true
+	}
+	if at := strings.LastIndex(v, "-"); at >= 0 {
+		cut.version, cut.release, cut.released = v[:at], v[at+1:], true
+	} else {
+		cut.version = v
+	}
+	if cut.version == "" || !isDigit(cut.version[0]) {
+		return evr{}, false
+	}
+	return cut, true
 }
 
 // debianCharacters says whether every character is one a Debian version part

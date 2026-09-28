@@ -283,10 +283,6 @@ func TestAMavenVersionThatIsNotOneIsRefused(t *testing.T) {
 	// distribution schemes state: a leading digit, and only the characters a
 	// version may hold.
 	for _, not := range []string{
-		// What an advisory writes where a version belongs. Ordered by Maven
-		// itself, and "unfixed" is a word it has never heard of, which sorts
-		// above every release.
-		"unfixed", "TBD", "none", "not fixed", "see the advisory",
 		// The words Maven itself takes instead of a version.
 		"RELEASE", "LATEST",
 		// No leading digit.

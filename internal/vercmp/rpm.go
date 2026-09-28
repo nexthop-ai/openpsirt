@@ -46,25 +46,11 @@ func rpmOrder(a, b string) (int, bool) {
 // every part is drawn from the characters a version may hold. A word an
 // advisory wrote where a version belongs fails both.
 func splitRPM(v string) (epoch, version, release string, ok bool) {
-	epoch = "0"
-	if at := strings.Index(v, ":"); at >= 0 {
-		if !digits(v[:at]) {
-			return "", "", "", false
-		}
-		epoch, v = v[:at], v[at+1:]
-	}
-	if at := strings.LastIndex(v, "-"); at >= 0 {
-		version, release = v[:at], v[at+1:]
-	} else {
-		version = v
-	}
-	if version == "" || !isDigit(version[0]) {
+	cut, ok := splitEVR(v)
+	if !ok || !rpmCharacters(cut.version) || !rpmCharacters(cut.release) {
 		return "", "", "", false
 	}
-	if !rpmCharacters(version) || !rpmCharacters(release) {
-		return "", "", "", false
-	}
-	return epoch, version, release, true
+	return cut.epoch, cut.version, cut.release, true
 }
 
 // rpmCharacters says whether every character is one an RPM version may hold.
