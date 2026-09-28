@@ -22,7 +22,7 @@ import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { at as choicesAt, type Choice, unwrap, whichOf } from "../api/queries";
+import { at as choicesAt, unwrap, whichOf } from "../api/queries";
 import { mayOf, useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
@@ -30,10 +30,11 @@ import { Weaknesses } from "../ui/Weakness";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
 import { Decide, said, type Recorded } from "../ui/Decide";
-import { useKept } from "../ui/Saved";
 import { Because } from "../ui/Outcome";
-import { fromAt, listQuery, where, windowFor, withinVariant } from "./list";
-import { buildFindingsAt, componentAt, findingAt, issueAt, productFindingsAt } from "../app/routes";
+import { useFindingNeighbors } from "./findingNeighbors";
+import { useDecisionPrefill } from "./findingPrefill";
+import { FindingWhich } from "./FindingWhich";
+import { buildFindingsAt, componentAt, issueAt, productFindingsAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
@@ -94,17 +95,6 @@ function whyNone(reason: string | undefined): string {
   }
 }
 
-// pickedFrom is this page's address with one choice made, keeping the list it
-// was opened from.
-function pickedFrom(params: URLSearchParams, choice: Choice): string {
-  const next = new URLSearchParams(params);
-  for (const key of ["version", "ecosystem", "namespace"]) next.delete(key);
-  next.set("version", choice.version);
-  if (choice.ecosystem) next.set("ecosystem", choice.ecosystem);
-  if (choice.namespace) next.set("namespace", choice.namespace);
-  return next.toString();
-}
-
 export function Finding() {
   const {
     product = "",
@@ -120,12 +110,8 @@ export function Finding() {
   // namespaces.
   const ecosystem = params.get("ecosystem") ?? "";
   const namespace = params.get("namespace") ?? "";
-  // The list this was opened from, carried as one value. Working a filtered
-  // list meant returning to it and finding your place after every decision;
-  // with the list's own address in hand, the row before and the row after are
-  // a link — under the same filters, in the same order. Present and empty is a
-  // list that asked for everything, which walks like any other; absent is no
-  // list at all, and then there is no order for this to be next in.
+  // The list this was opened from, carried as one value, so the row before and
+  // the row after are a link under the same filters, in the same order.
   const walking = params.has("from");
   const from = params.get("from") ?? "";
   const who = useWho();
@@ -137,43 +123,15 @@ export function Finding() {
   const form = useRef<HTMLDivElement>(null);
   // The place the confirmation is drawn. It sits at the head of the screen,
   // above everything the finding says, and the button that produces it is at
-  // the foot of the decision form — so somebody pressing submit was left
-  // looking at the form they had just sent, with the answer a page and a half
-  // above them and nothing saying anything had happened.
+  // the foot of the decision form, a page and a half below — so the screen is
+  // brought to it once something is recorded.
   const confirmation = useRef<HTMLDivElement>(null);
   // The finding the screen is on. A params-only change does not remount it,
   // so anything below that belongs to one finding has to say which.
   const oneFinding = `${vulnerability}|${component}|${version}`;
-  // The decision form's starting point, and how many times it has been given
-  // one. Starting from something is a fresh form rather than an edit to the one
-  // on screen, so the count is what the form is mounted against — two prefills
-  // carrying the same words are still two, and the second has to take.
-  const [prefill, setPrefill] = useState<{
-    // The finding it was started on. Walking to the next one is a fresh form:
-    // without this, one decision recorded would leave the count above zero for
-    // the rest of the walk and the rule would quietly stop filling anything in.
-    at: string;
-    n: number;
-    from: {
-      outcome?: string;
-      justification?: string;
-      reasoning?: string;
-      // The length of the deferral it offers, which the form turns into a date
-      // as it opens. Only a prepared rule carries one: a length is what a rule
-      // means by "put this off for a quarter", and a date saved months ago is
-      // not.
-      deferDays?: number;
-      // Cited, never applied: what a VEX document said is not this claim, and
-      // this is what lets a later revision to it be noticed.
-      fromStatement?: number;
-    } | null;
-  }>({ at: oneFinding, n: 0, from: null });
-  // The statement started from on the finding being read, which is nothing on
-  // one the count was not raised on.
-  const own = prefill.at === oneFinding ? prefill : { at: oneFinding, n: 0, from: null };
-  function startFrom(from: (typeof prefill)["from"]) {
-    setPrefill({ at: oneFinding, n: own.n + 1, from });
-  }
+  const rule = params.get("rule") ?? "";
+  const prefill = useDecisionPrefill(product, oneFinding, rule);
+  const { startFrom } = prefill;
   const [reclassifying, setReclassifying] = useState(false);
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
   // The rest of what belongs to one finding, put back on walking to the next:
@@ -184,125 +142,12 @@ export function Finding() {
     setExtending(null);
     setReclassifying(false);
   });
-  // The saved filter this was opened under, where it is one that prepares a
-  // claim. The address names the filter rather than repeating what it says, so
-  // what a rule prepares is decided in one place — and a link somebody sends
-  // prepares nothing for the person who opens it, because the filters are
-  // personal and a name they have not kept is a name that is not there.
-  const rule = params.get("rule") ?? "";
-  const rules = useKept(product, rule !== "");
-  // The claim that filter prepares, in the words the form takes, and whether it
-  // prepares something no form can be submitted from. A rule prepares a claim
-  // and a person proposes it: this fills the form in and nothing else.
-  const offered = useMemo(() => {
-    const one = (rules.data?.items ?? []).find((each) => each.name === rule);
-    if (!one?.prepares) return { from: null, lengthless: false };
-    const it = one.prepares;
-    // A deferral is the one outcome that needs a date, and the date is worked
-    // out from the length. Kept without one — which every deferral saved
-    // before there was a field for it was — it would fill a form that cannot
-    // be submitted, under a banner saying the filter prepared it.
-    if (it.outcome === "deferred" && !it.defer_days) return { from: null, lengthless: true };
-    return {
-      from: {
-        outcome: it.outcome,
-        justification: it.justification ?? "",
-        reasoning: it.reasoning,
-        ...(it.defer_days ? { deferDays: it.defer_days } : {}),
-      },
-      lengthless: false,
-    };
-  }, [rules.data, rule]);
-  const prepared = offered.from;
-  // The form's opening values, and the thing it is mounted against. Somebody
-  // who has started from something on this finding has said which prefill they
-  // want, so theirs wins and clearing it clears the rule's too — the rule fills
-  // a form nobody has answered yet, not one somebody is working in.
-  const opening = own.n > 0 ? own.from : prepared;
-  const opened =
-    own.n > 0 ? `own:${oneFinding}:${own.n}` : `rule:${prepared ? rule : ""}:${oneFinding}`;
-  // Held until what the rule prepares is known, because a form that opens
-  // blank and refills itself a moment later loses whatever somebody put in it
-  // first — which is what a reloaded or bookmarked link does, having no
-  // answer already in hand.
-  const settled = rule === "" || !rules.isPending;
-
-  const list = useMemo(() => new URLSearchParams(from), [from]);
-  // Through the same guard the list applies: what is specific to a variant is
-  // a question about one, and an address carrying the filter without a variant
-  // is refused by the server — which would take the previous and next row with
-  // it rather than the filter.
-  const listed = useMemo(
-    () => withinVariant(listQuery(list), Boolean(list.get("variant"))),
-    [list],
-  );
-  // Widened by one at each end, so that stepping off a page finds the row on
-  // the next one rather than stopping at a boundary the reader never chose.
-  const span = useMemo(() => windowFor(listed.offset, listed.limit), [listed]);
-  const neighbors = useQuery({
-    enabled: walking,
-    queryKey: ["walk", product, from],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/findings", {
-          params: { path: { product }, query: { ...listed, ...span, ...where(list) } },
-        }),
-      ),
-  });
-  const walk = useMemo(() => {
-    const items = neighbors.data?.items ?? [];
-    // By what the row is rather than by where it sat: the list is read afresh
-    // here, and a row may have moved or gone since it was drawn.
-    const i = items.findIndex(
-      (row) =>
-        row.vulnerability === vulnerability &&
-        row.component === component &&
-        (row.version ?? "") === version &&
-        (!ecosystem || (row.ecosystem ?? "") === ecosystem) &&
-        (!namespace || (row.namespace ?? "") === namespace),
-    );
-    if (i < 0) return null;
-    function step(j: number) {
-      const row = items[j];
-      if (!row) return null;
-      return {
-        row,
-        to: findingAt(
-          {
-            product,
-            stream: row.stream || (list.get("stream") ?? ""),
-            variant: row.variant || (list.get("variant") ?? ""),
-          },
-          row,
-          // The neighbor is handed the list at the page it sits on, so a walk
-          // that crosses a boundary leaves the list where the reader now is.
-          fromAt(from, span.offset + j, listed.limit),
-          // And the rule the list was opened under, or walking to the next
-          // finding would quietly stop filling the form in.
-          rule,
-        ),
-      };
-    }
-    return {
-      at: span.offset + i,
-      total: neighbors.data?.total ?? 0,
-      previous: step(i - 1),
-      next: step(i + 1),
-    };
-  }, [
-    neighbors.data,
-    span,
-    listed.limit,
-    list,
+  const walk = useFindingNeighbors(
+    { product, vulnerability, component, version, ecosystem, namespace },
+    walking,
     from,
     rule,
-    product,
-    vulnerability,
-    component,
-    version,
-    ecosystem,
-    namespace,
-  ]);
+  );
 
   const finding = useQuery({
     queryKey: ["finding", at, version, ecosystem, namespace],
@@ -364,30 +209,7 @@ export function Finding() {
     const carrying = choicesAt(finding.error, "carrying");
     const choices = carrying.length > 0 ? carrying : choicesAt(finding.error, "component");
     if (choices.length > 0) {
-      return (
-        <div className="card">
-          <h3>Which {component}</h3>
-          <p className="reading" style={{ marginBottom: 10 }}>
-            This build ships more than one.
-          </p>
-          <ul className="refs">
-            {choices.map((choice) => (
-              <li key={`${choice.version} ${choice.ecosystem ?? ""} ${choice.namespace ?? ""}`}>
-                <Link className="linkish id" to={`?${pickedFrom(params, choice)}`}>
-                  {choice.version}
-                </Link>
-                {choice.ecosystem && (
-                  <span className="hint">
-                    {choice.namespace
-                      ? `${choice.ecosystem}/${choice.namespace}`
-                      : choice.ecosystem}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
+      return <FindingWhich component={component} choices={choices} params={params} />;
     }
     return <Failed error={finding.error} what="This finding could not be read." />;
   }
@@ -1108,13 +930,13 @@ export function Finding() {
                 that prepares nothing, and the silent form looks identical.
                 The absence of a rule is meant to be silent; not finding out
                 is not. */}
-            {rule !== "" && rules.isError && (
+            {prefill.ruleUnread && (
               <div className="alert">
                 <strong>Your saved filter “{rule}” could not be read</strong>
                 <span>Nothing was filled in.</span>
               </div>
             )}
-            {offered.lengthless && (
+            {prefill.lengthless && (
               <div className="alert">
                 <strong>“{rule}” prepares a deferral with no length</strong>
                 <span>
@@ -1123,7 +945,7 @@ export function Finding() {
                 </span>
               </div>
             )}
-            {own.n === 0 && prepared && (
+            {prefill.untouched && prefill.prepared && (
               <div className="alert info">
                 <strong>Filled in from “{rule}”</strong>
                 <span>
@@ -1139,7 +961,7 @@ export function Finding() {
                 </button>
               </div>
             )}
-            {settled && (
+            {prefill.settled && (
               <div ref={form}>
                 <Decide
                   at={{ ...at, version, ecosystem, namespace }}
@@ -1170,14 +992,14 @@ export function Finding() {
                     );
                   }}
                   extending={extending}
-                  prefill={opening}
+                  prefill={prefill.opening}
                   // Remounted when what is being decided changes, not only when
                   // a prefill arrives. Changing scope on a build-scoped screen
                   // is a parameter change rather than a navigation, so the form
                   // stayed mounted and kept the previous build's answers in its
                   // fields — an outcome and a justification about one variant,
                   // offered against another.
-                  key={`${opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
+                  key={`${prefill.opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
                 />
               </div>
             )}
