@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -359,7 +360,9 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, s
 			ColumnExpr("sc.id").
 			Where("sc.id = ?", scanID).
 			Where("sc.target_id = ?", targetID).
-			Where("sc.credential = ?", subject.Identity).
+			// The sender as ingest records it: a key by its identifier, so a
+			// person or another key sharing its name reads nothing here.
+			Where("sc.credential = ?", "key:"+strconv.FormatInt(subject.ID, 10)).
 			Exists(ctx)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read who sent scan %d: %w", scanID, err)
