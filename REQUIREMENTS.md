@@ -88,6 +88,7 @@ inputs.
 | REQ-13 | Every finding records what produced it — which scanner, which version, which database, and how the match was made | "Why is this here" is unanswerable afterwards otherwise, and a scanner upgrade changes results |
 | REQ-14 | Static analysis and fuzzing findings are intended scope. **Not built** | The finding model carries a kind from the start, so a second kind needs no rewrite |
 | REQ-78 | Where a report links to a patch that is a commit in a git repository, the deployment keeps a copy of that repository's history and looks up which branches contain the commit, and labels the patch link with them. It runs in the background, highest-severity issues first, is off unless the deployment turns it on, and never fetches from an address inside this network or a host an administrator excluded | One fix is backported as a separate commit to each maintained branch, and a report lists those commits without saying which is which |
+| REQ-82 | Each issue's published and last-modified dates are read from a public vulnerability database, asked about each issue in the background, since the scanner supplies neither | Time to fix measured from public disclosure is what a customer or an auditor asks for, and the date the scanner first saw an issue in a build is not that figure |
 
 ### 3.4 The tracked unit
 
@@ -245,7 +246,6 @@ Asked for, and deliberately not built.
 | **SSVC as a vocabulary over the ranking** | This tool's audience asks for CSAF, VEX, CVSS and exploitation data. Adopting a named framework is a standing commitment to track it as it revises |
 | **Detecting abandoned dependencies to explain a finding with no fix** | Measured on a real image: of 1,125 findings with no fix, 1,113 are distribution packages. The maintainer is Debian, which is not dead |
 | **"Contained another way" as an outcome of its own** | Already sayable as not-applicable with the standard justification for existing mitigations. VEX puts this distinction in the justification rather than the status |
-| **Storing when a vulnerability was disclosed** | Nothing the scanner reports supplies it: it says when a fix appeared, never when the issue did. Other sources do carry it, so acquiring it means a second source consulted per issue — a capability rather than a field, and one to decide on as a capability |
 | **Versions inside the identity of a place** | The top-level version changes every build, so every decision would lapse nightly |
 | **Backport tracking through pull requests tagged with a target branch** | Assumes commit and pull-request linkage we do not have. The same picture is derived from scans (REQ-35) |
 | **A reverse proxy at the ingress as the only sign-in** | Works in Kubernetes, does not travel to self-hosted or local development |
