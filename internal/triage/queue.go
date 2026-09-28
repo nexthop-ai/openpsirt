@@ -107,23 +107,41 @@ const outlierRows = 20
 func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	productID int64) (int, error) {
 
-	q := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		GroupExpr("de.claim_id").
-		Where("de.product_id = ?", productID)
-	q = approvableBy(waiting(q, s.now()), subject, "de")
-	// Their own claims are not waiting on them, which is what the queue means
-	// by waiting: approving your own is refused, so counting them would be
-	// counting work nobody can do.
-	q = q.Where("de.proposed_by <> ?", subject.ID)
-	q = q.Where("NOT EXISTS (?)", notApprovableBy(
-		s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
-			Where(`"other".claim_id = de.claim_id`), subject, `"other"`))
+	// The queue's own statement, so the two cannot count different things.
+	q := s.waitingClaims(subject, QueueFilter{ProductID: productID})
 	total, err := s.db.NewSelect().TableExpr(`(?) AS "waiting_here"`, q).Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what is waiting here: %w", err)
 	}
 	return total, nil
+}
+
+// waitingClaims is the claims with a waiting row this person may act on, one
+// row per claim with the newest of its rows. Grouped in the statement rather
+// than afterwards, so a page is a page of claims and a count counts claims.
+func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.SelectQuery {
+	q := s.db.NewSelect().Model((*Decision)(nil)).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`MAX(de.id) AS "newest"`).
+		GroupExpr("de.claim_id")
+	q = approvableBy(waiting(q, s.now()), subject, "de")
+	// One product where the caller named one, and whatever else the reader
+	// narrowed by. A claim is decided in a product, so this narrows the same
+	// way every other list does — and zero is every product, which is what the
+	// queue screen asks for.
+	q = filter.narrow(q, subject)
+	// Whose claims. Their own are not waiting on them: approving your own is
+	// refused, so counting them would be counting work nobody can do. Mine
+	// asks for exactly those instead, in the same statement, so the count and
+	// the page cannot disagree about which question was asked.
+	if filter.Mine {
+		q = q.Where("de.proposed_by = ?", subject.ID)
+	} else {
+		q = q.Where("de.proposed_by <> ?", subject.ID)
+	}
+	return q.Where("NOT EXISTS (?)", notApprovableBy(
+		s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
+			Where(`"other".claim_id = de.claim_id`), subject, `"other"`))
 }
 
 // QueueFilter narrows the review queue. The zero value is every claim waiting
@@ -225,34 +243,8 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueFilter,
 	limit, offset int) ([]Waiting, int, error) {
 
-	mine := filter.Mine
 	limit = database.AList.Of(limit)
-
-	// The claims with a waiting row this person may act on, ordered by the
-	// newest row in each. Grouped in the statement rather than here, so a
-	// page is a page of claims and the count counts claims.
-	waitingClaims := func() *bun.SelectQuery {
-		q := s.db.NewSelect().Model((*Decision)(nil)).
-			ColumnExpr(`de.claim_id AS "claim_id"`).
-			ColumnExpr(`MAX(de.id) AS "newest"`).
-			GroupExpr("de.claim_id")
-		q = approvableBy(waiting(q, s.now()), subject, "de")
-		// One product where the caller named one, and whatever else the
-		// reader narrowed by. A claim is decided in a product, so this
-		// narrows the same way every other list does — and zero is every
-		// product, which is what the queue screen asks for.
-		q = filter.narrow(q, subject)
-		// Whose claims. The same statement either way, so the count and the
-		// page cannot disagree about which question was asked.
-		if mine {
-			q = q.Where("de.proposed_by = ?", subject.ID)
-		} else {
-			q = q.Where("de.proposed_by <> ?", subject.ID)
-		}
-		return q.Where("NOT EXISTS (?)", notApprovableBy(
-			s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
-				Where(`"other".claim_id = de.claim_id`), subject, `"other"`))
-	}
+	waitingClaims := func() *bun.SelectQuery { return s.waitingClaims(subject, filter) }
 
 	page, err := s.pageClaims(ctx, subject, waitingClaims, limit, offset, "what is waiting")
 	if err != nil {
