@@ -1052,10 +1052,12 @@ reintroduce it.
 | Rule | Reason |
 |---|---|
 | A password parameter in the query is redacted pair by pair, as written | The query parser drops a pair it cannot decode, so a malformed escape would leave the password neither found nor replaced |
-| A server URL with an `@` past its authority and no user, or with a fragment, is refused | A password holding an unescaped `/`, `?` or `#` still parses, with the password split across host, path, query or fragment where redaction does not look. The refusal names the scheme and host and asks for percent-encoding |
+| A server URL with an `@` in its path or in a query parameter's name, a fragment, or no `//` after the scheme is refused | A password holding an unescaped `/`, `?` or `#` still parses, with the password split across host, path, query or fragment where redaction does not look. An `@` in a query parameter's value is a user name a driver reads from the query, and is accepted |
 | Every error from opening a connection has each spelling of each credential taken out | A driver describes the connection string it was given, and its own redaction covers the user information only |
-| A refusal to parse names the scheme, the host and the kind of fault | The parser's own message quotes the text it could not read, which is the URL |
-| The upgrade rehearsal hands the URL to a container through the environment | An argument is readable by every local user and is written to the rehearsal's log |
+| A refusal names the scheme, the host and the kind of fault, and asks for percent-encoding | The parser's own message quotes the text it could not read, which is the URL |
+| The host is named only where one `@`, with no `=` or `&` before it, or none at all, says where it begins, and only when it is shaped like a host | With a second `@`, or one after a query parameter's name, what follows the `@` may be the password |
+| The upgrade rehearsal reads the URL from the environment and hands it to a container through the environment | An argument is readable by every local user and is written to the rehearsal's log |
+| A URL the parser refuses is judged by the database package before any other parser reads it | Every other parser quotes the text it could not read |
 
 The rule is written down rather than left as a habit because the failure is
 invisible: nothing breaks, no test fails, and the leak lives in a system nobody

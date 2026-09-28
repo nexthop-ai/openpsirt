@@ -4,7 +4,11 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.1.0 -engine postgres -url postgres://… -dir .demo/rehearsal
+//	rehearsal -from v0.1.0 -engine postgres -dir .demo/rehearsal
+//
+// A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
+// the test suite reads, so the password is never on the command line. -url
+// names one instead.
 //
 // The release seeds its own database: its image is built from its own tag,
 // and its own demo targets declare the products, upload the inventories, let
@@ -88,7 +92,7 @@ func main() {
 	var keep bool
 	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.1.0")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
-	flag.StringVar(&r.adminURL, "url", "", "the engine's URL; the rehearsal makes a database of its own beside the one named")
+	flag.StringVar(&r.adminURL, "url", "", "the engine's URL, when not OPENPSIRT_TEST_<ENGINE>_URL; the rehearsal makes a database of its own beside the one named")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
 	flag.StringVar(&r.grype, "grype", "", "the scanner's database directory, shared between runs")
 	flag.StringVar(&r.image, "image", "openpsirt-rehearsal:current", "this tree's image")
@@ -99,8 +103,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: rehearsal -from vX.Y.Z -engine sqlite|postgres|mysql|mariadb [-url …]")
 		os.Exit(2)
 	}
+	r.adminURL = engineURL(r.adminURL, r.engine, os.Getenv)
 	if r.engine != "sqlite" && r.adminURL == "" {
-		fmt.Fprintf(os.Stderr, "%s needs -url: the rehearsal makes its database beside the one it names\n", r.engine)
+		fmt.Fprintf(os.Stderr, "%s needs %s or -url: the rehearsal makes its database beside the one it names\n",
+			r.engine, engineVariable(r.engine))
 		os.Exit(2)
 	}
 	abs, err := filepath.Abs(dir)
@@ -320,6 +326,20 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 // upgrade (docs/configuration.md, Upgrading).
 var notes = map[string]bool{"v0.1.0": true}
 
+// engineVariable is the environment variable holding an engine's URL.
+func engineVariable(engine string) string {
+	return "OPENPSIRT_TEST_" + strings.ToUpper(engine) + "_URL"
+}
+
+// engineURL is the URL named on the command line, or else the one the
+// environment holds for the engine.
+func engineURL(named, engine string, getenv func(string) string) string {
+	if named != "" || engine == "sqlite" {
+		return named
+	}
+	return getenv(engineVariable(engine))
+}
+
 // database makes an empty database for the release to build, and works out
 // how a container and this process each reach it.
 func (r *run) database(ctx context.Context) error {
@@ -327,6 +347,12 @@ func (r *run) database(ctx context.Context) error {
 		r.appURL = "sqlite:///data/dev.db"
 		r.hostURL = "sqlite://" + filepath.Join(r.demo, "data", "dev.db")
 		return nil
+	}
+	// Parsed by the database package first. The URL parser's own error
+	// quotes the text it could not read, and that text holds the password.
+	target, err := database.ParseURL(r.adminURL)
+	if err != nil {
+		return err
 	}
 	u, err := url.Parse(r.adminURL)
 	if err != nil {
@@ -339,10 +365,6 @@ func (r *run) database(ctx context.Context) error {
 	inside.Host = "host.docker.internal:" + u.Port()
 	r.appURL = inside.String()
 
-	target, err := database.ParseURL(r.adminURL)
-	if err != nil {
-		return err
-	}
 	db, err := database.Open(ctx, target)
 	if err != nil {
 		return err

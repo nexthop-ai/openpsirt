@@ -74,3 +74,26 @@ func TestTheReleaseWrapperPassesTheDatabaseThroughTheEnvironment(t *testing.T) {
 		t.Errorf("docker's environment does not carry the rehearsal database: %q", env)
 	}
 }
+
+func TestTheEngineURLIsReadFromTheEnvironmentRatherThanTheCommandLine(t *testing.T) {
+	// A command line is readable by every local user for the whole run.
+	env := map[string]string{"OPENPSIRT_TEST_POSTGRES_URL": "postgres://app:" + rehearsalSecret + "@db/x"}
+	if got := engineURL("", "postgres", func(name string) string { return env[name] }); got != env["OPENPSIRT_TEST_POSTGRES_URL"] {
+		t.Errorf("the environment's URL was not read: %q", got)
+	}
+	if got := engineURL("postgres://named/x", "postgres", func(string) string { return "" }); got != "postgres://named/x" {
+		t.Errorf("a URL named on the command line was not used: %q", got)
+	}
+}
+
+func TestAnUnreadableEngineURLIsNotRepeatedBack(t *testing.T) {
+	// The URL parser quotes the text it could not read, password included.
+	r := &run{engine: "postgres", adminURL: "postgres://u:pa%zz@db/x"}
+	err := r.database(t.Context())
+	if err == nil {
+		t.Fatal("a URL with a malformed escape was accepted")
+	}
+	if strings.Contains(err.Error(), "pa%zz") {
+		t.Errorf("the error repeats the credential: %v", err)
+	}
+}

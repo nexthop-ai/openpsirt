@@ -107,17 +107,13 @@ func ParseURL(raw string) (Target, error) {
 		return Target{}, fmt.Errorf("unsupported database %q: want one of postgres, mysql, mariadb, sqlite", u.Scheme)
 	}
 	// A password holding an unescaped "/", "?" or "#" still parses: the
-	// authority ends at that character, the user name and part of the
-	// password become the host, and the rest lands in the path, the query or
-	// the fragment — none of which redaction treats as a credential. An "@"
-	// past the authority, with no user parsed, is that shape, and a fragment
-	// has no meaning to any driver.
-	if engine != SQLite {
-		_, rest, _ := strings.Cut(raw, "://")
-		if (u.User == nil && strings.Contains(rest, "@")) || u.Fragment != "" {
-			return Target{}, fmt.Errorf("database URL is not a URL: %s: percent-encode "+
-				"/ ? # @ in the user name and password", parseFailure(raw, nil))
-		}
+	// authority ends at that character, part of the credential becomes the
+	// host, and the rest lands in the path, the query or the fragment — none
+	// of which redaction treats as a credential. That shape is judged by where
+	// the stray "@" lands.
+	if engine != SQLite && strayCredential(u) {
+		return Target{}, fmt.Errorf("database URL is not a URL: %s: percent-encode "+
+			"/ ? # @ in the user name and password", parseFailure(raw, nil))
 	}
 	// Normalize the scheme into the URL the driver receives. Passed through
 	// unchanged, "POSTGRES://" is rejected by pgx, which falls back to
@@ -331,6 +327,25 @@ func transport(u *url.URL) string {
 	return "&tls=preferred"
 }
 
+// strayCredential reports whether a server URL has user information that
+// spilled past its authority.
+//
+// An "@" in the path, or in a query key, is the rest of a user name and
+// password cut short by an unescaped "/" or "?": a split password lands in a
+// key. A query value may hold an "@", because drivers read a user name from
+// the query, and `?user=app@corp` is a user name rather than a spill. A
+// fragment has no meaning to any driver and is where a password cut at "#"
+// lands. An opaque URL, a scheme followed by a colon and no slashes, puts
+// the whole of the user information outside anything redaction reads.
+func strayCredential(u *url.URL) bool {
+	stray := u.Opaque != "" || u.Fragment != "" || strings.Contains(u.EscapedPath(), "@")
+	for _, pair := range strings.Split(u.RawQuery, "&") {
+		key, _, _ := strings.Cut(pair, "=")
+		stray = stray || strings.Contains(key, "@")
+	}
+	return stray
+}
+
 // parseFailure describes a URL the parser refused without repeating it.
 //
 // The parser names what it objected to, which for a malformed escape is the
@@ -343,21 +358,7 @@ func parseFailure(raw string, err error) string {
 	if rest == "" {
 		scheme = ""
 	}
-	// The host is what follows the last "@", up to the path. The "@" is found
-	// before the path is cut away, because a password may contain a slash:
-	// cutting at the first slash first leaves the "@" beyond the cut, so the
-	// userinfo is mistaken for the host and the credential is printed. A
-	// base64-shaped generated password contains one routinely.
-	//
-	// The cost of the order is a URL carrying no credential whose path
-	// contains an "@": its last path segment is named as the host. That is a
-	// wrong diagnostic rather than a disclosure, which is the direction to
-	// err in.
-	authority := rest
-	if at := strings.LastIndex(rest, "@"); at >= 0 {
-		authority = rest[at+1:]
-	}
-	host, _, _ := strings.Cut(authority, "/")
+	host := hostOf(rest)
 	var urlErr *url.Error
 	kind := "could not be parsed"
 	if errors.As(err, &urlErr) {
@@ -371,10 +372,48 @@ func parseFailure(raw string, err error) string {
 		}
 	}
 	where := "the URL"
-	if scheme != "" || host != "" {
+	switch {
+	case host != "":
 		where = fmt.Sprintf("the %s URL for %q", scheme, host)
+	case scheme != "":
+		where = fmt.Sprintf("the %s URL", scheme)
 	}
 	return where + " " + kind
+}
+
+// hostOf is the host of a URL the parser refused, or nothing when the text
+// does not say which part is the host without guessing.
+//
+// The host follows the one "@" that ends the user information, and the "@"
+// is found before the path is cut away, because a password may contain a
+// slash. With more than one "@", or with an "=" or "&" before it, the "@" may
+// sit in a query value — a password parameter — and what follows it is the
+// credential rather than a host. Then no host is named, which is a less
+// useful message rather than a disclosure. A host is also only named when it
+// is shaped like one: letters, digits, dots, hyphens, colons and brackets.
+func hostOf(rest string) string {
+	authority := rest
+	switch strings.Count(rest, "@") {
+	case 0:
+	case 1:
+		at := strings.Index(rest, "@")
+		if strings.ContainsAny(rest[:at], "=&") {
+			return ""
+		}
+		authority = rest[at+1:]
+	default:
+		return ""
+	}
+	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+		authority = authority[:end]
+	}
+	for _, r := range authority {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' ||
+			strings.ContainsRune(".-:[]", r)) {
+			return ""
+		}
+	}
+	return authority
 }
 
 // secretParams are query parameters that carry a credential. Drivers accept
@@ -465,6 +504,11 @@ func (s scrubbed) Unwrap() error { return s.err }
 // that leaves this package with a driver's error inside it goes through here.
 // Longer spellings are replaced first, so a shorter one inside a longer one
 // leaves no fragment behind.
+//
+// There is no floor on length. A short or common password is replaced
+// wherever it appears, so a password of `postgres` turns `user=postgres` into
+// `user=xxxxx`, and a one-letter password mangles every word holding that
+// letter. A garbled message is the cost of never printing the password.
 func scrub(err error, target Target) error {
 	if err == nil || len(target.secrets) == 0 {
 		return err

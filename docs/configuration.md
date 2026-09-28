@@ -42,7 +42,7 @@ database is already current. A database built by any build between releases is
 recreated.
 
 Read the sections for the release you are coming from, and every section after
-it: from v0.1.0, read all four.
+it: from v0.1.0, read all five.
 
 ### Every upgrade
 
@@ -98,6 +98,14 @@ Also read after an upgrade from v0.1.0 or v0.2.0.
 |---|---|
 | `triage.together-cap` bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read `triage.review-issues` (200 issues) and `triage.agreed-issues` (2,000 issues). Those three, and recording a flaw or adding builds to one, read `triage.write-ceiling` (50,000 findings). A value set on `triage.together-cap` is not carried to them | Where `triage.together-cap` was changed, set the new limits under Settings, Triage |
 
+### From v0.4.0
+
+Also read after an upgrade from v0.1.0, v0.2.0 or v0.3.0.
+
+| Change | What to do |
+|---|---|
+| `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
+
 ## Serving
 
 | Variable | Meaning | Default |
@@ -118,7 +126,7 @@ writes `text`.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_DATABASE_URL` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
+| `OPENPSIRT_DATABASE_URL` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. A `/`, `?`, `#` or `@` in the user name or password is percent-encoded, as `%2F`, `%3F`, `%23` and `%40`, and a URL holding one unencoded is refused. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
 | `OPENPSIRT_AUTO_MIGRATE` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and `openpsirt migrate status` says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created | `true` |
 | `OPENPSIRT_DB_MAX_OPEN` | Most connections open at once | `25` |
 | `OPENPSIRT_DB_MAX_IDLE` | Most connections kept open idle | `25` |

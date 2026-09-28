@@ -229,6 +229,12 @@ func TestACredentialNeverLeavesThePackage(t *testing.T) {
 			"postgres://app@127.0.0.1:1/x?password=s3cr%zz&connect_timeout=1", "s3cr"},
 		{"an encoded password parameter", "postgres://app@127.0.0.1:1/x?password=s3%2Fcret&connect_timeout=1", "s3"},
 		{"a TLS key password", "postgres://app@127.0.0.1:1/x?sslpassword=k3yp4ss&connect_timeout=1", "k3yp4ss"},
+		{"a password parameter the driver quotes back",
+			"postgres://app@127.0.0.1:1/x?password=s3cret&connect_timeout=never", "s3cret"},
+		{"an at sign in the password, before a slash", "postgres://app:p@ss/word@127.0.0.1:1/x", "ss/word"},
+		{"an opaque URL", "postgres:app:s3cret@127.0.0.1:1/x", "s3cret"},
+		{"a number sign in a password parameter", "postgres://127.0.0.1:1?password=s3cr#t", "s3cr"},
+		{"an at sign in a password parameter", "postgres://127.0.0.1:1/x?password=ab@cd%zz", "cd"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			target, err := ParseURL(c.raw)
@@ -252,6 +258,37 @@ func TestACredentialNeverLeavesThePackage(t *testing.T) {
 				t.Errorf("the connection error carries the credential: %v", err)
 			}
 		})
+	}
+}
+
+func TestAnAtSignInAQueryValueIsNotAStrayCredential(t *testing.T) {
+	// Drivers read a user name and a password from the query, and a user name
+	// holding an "@" is written there as it is.
+	target, err := ParseURL("postgres://db.internal/x?user=app@corp&password=hunter2")
+	if err != nil {
+		t.Fatalf("a user name in the query was refused: %v", err)
+	}
+	if strings.Contains(target.Redacted, "hunter2") {
+		t.Errorf("the logged URL carries the password: %q", target.Redacted)
+	}
+}
+
+func TestARefusalNamesAHostOnlyWhereTheTextSaysWhichPartIsTheHost(t *testing.T) {
+	for _, c := range []struct {
+		raw, want string
+	}{
+		{"postgres://app:12/34@db.internal:5432/x", `the postgres URL for "db.internal:5432"`},
+		{"postgres://db.internal?password=s3cr#t", `the postgres URL for "db.internal"`},
+		{"postgres://app:p@ss/word@db:5432/x", "the postgres URL could"},
+		{"postgres://u:p%zz@db/x?password=ab@cd", "the postgres URL has"},
+	} {
+		_, err := ParseURL(c.raw)
+		if err == nil {
+			t.Fatalf("%s was accepted", c.raw)
+		}
+		if !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: the refusal does not say %q: %v", c.raw, c.want, err)
+		}
 	}
 }
 
