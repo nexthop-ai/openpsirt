@@ -142,6 +142,12 @@ and never arriving.
 | The flaw was seen before upstream released anything | **The fix.** Counting from the sighting sets a deadline against a version that did not exist, which is the common case for an inventory made of distribution packages |
 | The issue became exploited later | The learning. Counted from the opening, an issue exploited after six months lands three days before anybody knew |
 
+The same rule governs every writer. A scan counts it per finding, and an edited
+window rewrites every open deadline as three passes, one per moment, each over
+the rows for which that moment is the latest. A fix dated later than the
+moment it is weighed at has not arrived: a scan weighs it at the run's start
+and the rewrite at the time of the edit.
+
 A finding with no deadline states which reason applies:
 
 | Reason | Reported as | Precedence |
@@ -186,7 +192,7 @@ only be met by waiting.
 | A scan opening a finding, or answering one already open | The one deadline rule, with either exploitation signal |
 | A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
 | A record of this product being attacked, set or cleared | The recount, with either signal |
-| An edited window | The sweep that removes clocks passes over an exploited refusal |
+| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the line passes over either signal |
 
 A scanner that did not answer is not upstream saying no. Reading silence as
 "no fix exists" is a claim about the world made out of a gap in a report, and it

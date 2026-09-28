@@ -480,6 +480,43 @@ func whenOpened(column string, moments []time.Time, window time.Duration) (strin
 	return said + " END", args
 }
 
+// clockStart is one of the three moments a deadline is counted from, with the
+// condition under which it is the latest of the three for a row — the one
+// Deadline counts from.
+type clockStart struct {
+	column string
+	// from is the condition, over columns under the prefix given.
+	from func(prefix string) string
+	args []any
+}
+
+// clockStarts is Deadline's rule as three disjoint conditions, one per moment:
+// the opening, when exploitation was learned, and when the fix became
+// available, where that is no later than now. A tie goes to the earlier in
+// that order, so every row is written by exactly one pass.
+func clockStarts(now time.Time) []clockStart {
+	return []clockStart{
+		{column: "opened_at", args: []any{now}, from: func(p string) string {
+			return "NOT (" + p + "exploited_learned_at IS NOT NULL AND " +
+				p + "exploited_learned_at > " + p + "opened_at)" +
+				" AND NOT (" + p + "fixed_at IS NOT NULL AND " + p + "fixed_at <= ? AND " +
+				p + "fixed_at > " + p + "opened_at)"
+		}},
+		{column: "exploited_learned_at", args: []any{now}, from: func(p string) string {
+			return p + "exploited_learned_at IS NOT NULL AND " +
+				p + "exploited_learned_at > " + p + "opened_at" +
+				" AND NOT (" + p + "fixed_at IS NOT NULL AND " + p + "fixed_at <= ? AND " +
+				p + "fixed_at > " + p + "exploited_learned_at)"
+		}},
+		{column: "fixed_at", args: []any{now}, from: func(p string) string {
+			return p + "fixed_at IS NOT NULL AND " + p + "fixed_at <= ? AND " +
+				p + "fixed_at > " + p + "opened_at" +
+				" AND (" + p + "exploited_learned_at IS NULL OR " +
+				p + "fixed_at > " + p + "exploited_learned_at)"
+		}},
+	}
+}
+
 // Recompute rewrites the deadline on every open finding.
 //
 // The windows are the ones a scanned finding is held to. A flaw recorded in our
@@ -491,9 +528,11 @@ func whenOpened(column string, moments []time.Time, window time.Duration) (strin
 // will edit deadlines, and a deadline that ignores the number you just typed
 // is worse than a slow query.
 //
-// Written as one statement per run and band rather than one per finding. A
-// deadline is the run's start plus a fixed number of days, so every finding
-// opened by one run and rated the same way lands on the same instant: the
+// Written as one statement per moment and band rather than one per finding. A
+// deadline is the moment its clock started plus a fixed number of days — the
+// latest of the opening, the learning of exploitation and the fix's arrival,
+// as Deadline counts it — so every finding whose clock started at one moment
+// and rated the same way lands on the same instant: the
 // arithmetic happens here, in Go, and the statement writes a constant. That
 // keeps it portable — no engine agrees on how to add days to a timestamp — and
 // it is a handful of statements rather than hundreds of thousands: the
@@ -527,6 +566,10 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		return 0, fmt.Errorf("read how far the findings run: %w", err)
 	}
 
+	// The moment a fix date is weighed against, as Deadline weighs it against
+	// the moment a scan observed it: a fix dated later than now has not
+	// arrived, whatever the feed says.
+	now := s.now().UTC()
 	changed := 0
 	for _, productID := range products {
 		// The flaws recorded here, on their own windows and counted from
@@ -535,33 +578,6 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		changed += own
 		if err != nil {
 			return changed, err
-		}
-
-		// The distinct moments something opened in this product, off the
-		// findings themselves. This walked the runs and joined back for the
-		// timestamp, which asked the question in terms of the thing that
-		// usually answers it rather than the thing that always does: a
-		// finding a person opened has no run, so its deadline was never
-		// rewritten when the policy changed.
-		//
-		// The same cardinality either way — every finding a run opened
-		// carries that run's start — so this is one table fewer rather than
-		// more rows.
-		var opened []time.Time
-		err = s.db.NewSelect().
-			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr("f.opened_at").
-			Where("f.closed_at IS NULL").
-			Where("st.product_id = ?", productID).
-			GroupExpr("f.opened_at").
-			Scan(ctx, &opened)
-		if err != nil {
-			return changed, fmt.Errorf("read when what is still open was opened: %w", err)
-		}
-		if len(opened) == 0 {
-			continue
 		}
 
 		// Bands as predicates on the rating, in the same order For() decides
@@ -581,13 +597,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			}
 		}
 		bands := []band{
-			// Exploited with nothing recorded to count from. The opening is
-			// what is left, which is what a row marked exploited before the
-			// moment was recorded falls back to; the rest are rewritten in a
-			// pass of their own below, keyed on the learning.
 			{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Where("urgency_exploited = ?", true).
-					Where("exploited_learned_at IS NULL")
+				return q.Where("urgency_exploited = ?", true)
 			}},
 			{windows.Critical, rated("critical")},
 			{windows.High, rated("high")},
@@ -597,94 +608,66 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			{windows.Medium, rated("medium")},
 		}
 
-		// The slice is the outer loop, and the moments are carried into the
-		// statement rather than looped over.
-		//
-		// The other way round, the statement count was moments × bands ×
-		// slices: a product scanned nightly for a year holds about 1,800
-		// distinct moments, so five builds and twenty-one slices came to
-		// 189,000 statements — against this function's own note promising a
-		// handful — almost all of them matching nothing, because one moment
-		// lives in one slice. The half-hour the caller allows expired partway
-		// and left the estate split between the old policy and the new with
-		// nothing to retry it.
-		for from := int64(0); from <= highest; from += recomputeSlice {
-			for _, each := range bands {
-				for start := 0; start < len(opened); start += database.BatchSize {
-					chunk := opened[start:min(start+database.BatchSize, len(opened))]
-					said, args := whenOpened("opened_at", chunk, each.window)
-					query := s.db.NewUpdate().
-						Model((*Finding)(nil)).
-						Set("due_at = "+database.AsTimestamp(s.db, said), args...).
-						Where("id > ?", from).
-						Where("id <= ?", from+recomputeSlice).
-						Where("opened_at IN (?)", bun.List(chunk)).
-						Where("closed_at IS NULL").
-						Where("kind <> ?", Entered).
-						Where(inThisProduct, productID)
-					result, err := each.where(query).Exec(ctx)
-					if err != nil {
-						return changed, fmt.Errorf("rewrite deadlines: %w", err)
-					}
-					n, err := database.Affected(result)
-					if err != nil {
-						return changed, fmt.Errorf("rewrite deadlines: %w", err)
-					}
-					changed += int(n)
-					// Cancellation is honored between slices rather than only
-					// at the end, so shutting down during a rewrite stops
-					// promptly and leaves the rest for the next scan or the
-					// next edit.
-					if err := ctx.Err(); err != nil {
-						return changed, err
-					}
-				}
+		for _, start := range clockStarts(now) {
+			// The distinct moments the clock starts at in this product, off
+			// the findings themselves: a finding a person opened has no run,
+			// and its deadline is rewritten when the policy changes too.
+			var moments []time.Time
+			err = s.db.NewSelect().
+				TableExpr(`"finding" AS "f"`).
+				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+				ColumnExpr("f."+start.column).
+				Where("f.closed_at IS NULL").
+				Where("st.product_id = ?", productID).
+				Where(start.from("f."), start.args...).
+				GroupExpr("f."+start.column).
+				Scan(ctx, &moments)
+			if err != nil {
+				return changed, fmt.Errorf("read when the clock started on what is open: %w", err)
 			}
-		}
+			if len(moments) == 0 {
+				continue
+			}
 
-		// And the exploited rows, counted from when exploitation was learned
-		// rather than from when the finding opened. Six months after a
-		// finding opens, a few days from the learning is a deadline somebody
-		// can meet and a few days from the opening is one already in the past.
-		var learned []time.Time
-		err = s.db.NewSelect().
-			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr("f.exploited_learned_at").
-			Where("f.closed_at IS NULL").
-			Where("f.urgency_exploited = ?", true).
-			Where("f.exploited_learned_at IS NOT NULL").
-			Where("st.product_id = ?", productID).
-			GroupExpr("f.exploited_learned_at").
-			Scan(ctx, &learned)
-		if err != nil {
-			return changed, fmt.Errorf("read when exploitation was learned: %w", err)
-		}
-		for from := int64(0); from <= highest; from += recomputeSlice {
-			for start := 0; start < len(learned); start += database.BatchSize {
-				chunk := learned[start:min(start+database.BatchSize, len(learned))]
-				said, args := whenOpened("exploited_learned_at", chunk, windows.Exploited)
-				result, err := s.db.NewUpdate().
-					Model((*Finding)(nil)).
-					Set("due_at = "+database.AsTimestamp(s.db, said), args...).
-					Where("id > ?", from).
-					Where("id <= ?", from+recomputeSlice).
-					Where("exploited_learned_at IN (?)", bun.List(chunk)).
-					Where("urgency_exploited = ?", true).
-					Where("closed_at IS NULL").
-					Where("kind <> ?", Entered).
-					Where(inThisProduct, productID).Exec(ctx)
-				if err != nil {
-					return changed, fmt.Errorf("rewrite deadlines: %w", err)
-				}
-				n, err := database.Affected(result)
-				if err != nil {
-					return changed, fmt.Errorf("rewrite deadlines: %w", err)
-				}
-				changed += int(n)
-				if err := ctx.Err(); err != nil {
-					return changed, err
+			// The slice is the outer loop, and the moments are carried into
+			// the statement rather than looped over, so the statement count
+			// is slices × bands × chunks of moments. One moment lives in one
+			// slice far more often than not: a product scanned nightly for a
+			// year holds about 1,800 distinct moments, and a statement per
+			// moment and slice came to 189,000 statements for five builds.
+			for from := int64(0); from <= highest; from += recomputeSlice {
+				for _, each := range bands {
+					for first := 0; first < len(moments); first += database.BatchSize {
+						chunk := moments[first:min(first+database.BatchSize, len(moments))]
+						said, args := whenOpened(start.column, chunk, each.window)
+						query := s.db.NewUpdate().
+							Model((*Finding)(nil)).
+							Set("due_at = "+database.AsTimestamp(s.db, said), args...).
+							Where("id > ?", from).
+							Where("id <= ?", from+recomputeSlice).
+							Where(start.column+" IN (?)", bun.List(chunk)).
+							Where(start.from(""), start.args...).
+							Where("closed_at IS NULL").
+							Where("kind <> ?", Entered).
+							Where(inThisProduct, productID)
+						result, err := each.where(query).Exec(ctx)
+						if err != nil {
+							return changed, fmt.Errorf("rewrite deadlines: %w", err)
+						}
+						n, err := database.Affected(result)
+						if err != nil {
+							return changed, fmt.Errorf("rewrite deadlines: %w", err)
+						}
+						changed += int(n)
+						// Cancellation is honored between slices rather than
+						// only at the end, so shutting down during a rewrite
+						// stops promptly and leaves the rest for the next scan
+						// or the next edit.
+						if err := ctx.Err(); err != nil {
+							return changed, err
+						}
+					}
 				}
 			}
 		}
@@ -867,14 +850,16 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			continue
 		}
 		// Everything this product holds that the line does not admit, and is
-		// not known-exploited — being exploited is a fact about the world
-		// rather than a rating, and no line sets it aside.
+		// not exploited — being exploited is a fact rather than a rating, and
+		// no line sets it aside, whether the world reported it or this
+		// product recorded being attacked.
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
 			Set("due_at = NULL").
 			Where("closed_at IS NULL").
 			Where("due_at IS NOT NULL").
 			Where("urgency_exploited = ?", false).
+			Where("urgency_exploited_here = ?", false).
 			Where(inThisProduct, productID).
 			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS "v" `+
 				rating.Here+` WHERE `+rating.BandExpr+` IN (?))`, productID, bun.List(words)).
