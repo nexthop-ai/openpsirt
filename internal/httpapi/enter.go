@@ -194,6 +194,12 @@ func registerEntry(api huma.API, in Ingest) {
 			case errors.Is(err, finding.ErrAlreadyJudged):
 				return nil, huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
 			}
+			// A summary the writing policy refuses, answered with where to
+			// look, as every other piece of writing is.
+			var faults markdown.Faults
+			if errors.As(err, &faults) {
+				return nil, refusedText(faults)
+			}
 			return nil, refusedFinding(in, err)
 		}
 

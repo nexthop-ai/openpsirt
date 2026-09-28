@@ -101,6 +101,10 @@ in the handler that happens to be the first caller. That is what makes the
 policy hold for every path into the column, and a column written by two paths
 is only as bounded as the laxer of the two.
 
+Every route answering a refusal of the policy answers 422 with a detail per
+fault, each naming the line it is on. A route that falls through to its fault
+arm answers 500 for the caller's own writing, which tells them nothing to fix.
+
 Submission and sanitizing must agree on what survives. A link accepted at
 submission and deleted by the sanitizer is a link when it is written and plain
 text when it is read, with nothing reporting the difference.

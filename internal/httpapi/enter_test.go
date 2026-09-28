@@ -716,9 +716,14 @@ func TestARecordedSummaryGoesThroughTheSamePolicyAsAJustification(t *testing.T) 
 				"The socket answers early. [detail](javascript:alert(1))"},
 			{"raw markup", "The socket answers early.<script>alert(1)</script>"},
 		} {
+			// Refused as the writing it is, naming the line, as a justification
+			// is: not a fault at our end.
 			got := asPerson(t, r, "private-triage", http.MethodPost, at, body(each.summary))
-			if got.Code < 400 {
-				t.Errorf("%s was accepted in a recorded summary: %d", each.why, got.Code)
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("%s in a recorded summary answered %d: %s",
+					each.why, got.Code, got.Body.String())
+			} else if !strings.Contains(got.Body.String(), "line 1") {
+				t.Errorf("the refusal of %s does not say where: %s", each.why, got.Body.String())
 			}
 		}
 
