@@ -356,8 +356,12 @@ func (s *Store) rename(ctx context.Context, identity *Identity, username string)
 // mismatched identifier is exactly what protects a name that moved between
 // people, so clearing it automatically would undo the protection at the moment
 // it was working.
+//
+// Somebody with no identifier pinned is ErrNothingMatched, and nothing is
+// written: there is no pin to clear, and a row already waiting keeps the
+// window it was granted with.
 func (s *Store) UnbindIdentifier(ctx context.Context, personID int64) error {
-	if _, err := s.db.NewUpdate().Model((*Identity)(nil)).
+	result, err := s.db.NewUpdate().Model((*Identity)(nil)).
 		// The provider goes with the identifier it issued. Left behind, it
 		// still names a provider this deployment is moving away from, and the
 		// startup check reads that as bindings nobody withdrew — so unbinding
@@ -368,10 +372,11 @@ func (s *Store) UnbindIdentifier(ctx context.Context, personID int64) error {
 		// window which lapsed while it was bound is redeemable by nobody.
 		Set("subject = NULL").Set("provider = NULL").Set("bound_at = NULL").
 		Set("claimable_until = ?", s.now().Truncate(time.Microsecond).Add(s.window())).
-		Where("person_id = ?", personID).Exec(ctx); err != nil {
+		Where("person_id = ?", personID).Where("subject IS NOT NULL").Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("unbind how they sign in: %w", err)
 	}
-	return nil
+	return matched(result, "unbind how they sign in", "they have no identifier bound")
 }
 
 // window is how long an authorization this store writes stays redeemable.

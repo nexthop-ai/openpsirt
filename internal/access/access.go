@@ -28,7 +28,8 @@
 // hands back every finding the person was dealing with in that product. Every
 // revocation here takes access away, and every one reads what it matched:
 // grants, estate grants, group bindings, a group's administration, team
-// memberships, case collaborators, personal tokens and pipeline keys.
+// memberships, case collaborators, personal tokens, pipeline keys and a
+// pinned identifier.
 package access
 
 import (

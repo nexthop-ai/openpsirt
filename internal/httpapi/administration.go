@@ -684,7 +684,8 @@ func registerAdministration(api huma.API, a Administering) {
 			"that issued it, so every account pinned to the old one is refused once a new one is " +
 			"configured: the name matches and the identifier does not.\n\n" +
 			"It re-opens the window a pinned identifier closes, in which whoever arrives under " +
-			"that username is taken to be its holder. Do it when you expect them to sign in.",
+			"that username is taken to be its holder. Do it when you expect them to sign in.\n\n" +
+			"Somebody with no identifier pinned answers 404 and records nothing.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
@@ -698,7 +699,10 @@ func registerAdministration(api huma.API, a Administering) {
 			if err != nil {
 				return noSuchPerson()
 			}
-			if err := store.UnbindIdentifier(ctx, person.ID); err != nil {
+			switch err := store.UnbindIdentifier(ctx, person.ID); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return huma.Error404NotFound("they have no identifier bound")
+			case err != nil:
 				return wentWrong(a.Logger, "cannot unbind how they sign in", err)
 			}
 			if err := noted(ctx, tx, trail.Account, in.Identity,

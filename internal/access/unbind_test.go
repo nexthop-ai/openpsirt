@@ -77,6 +77,9 @@ func TestUnbindingAnIdentifierGrantsNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		alice := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
+			t.Fatal(err)
+		}
 		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -98,6 +101,9 @@ func TestUnbindingAnIdentifierKeepsWhatTheyHold(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		alice := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
+			t.Fatal(err)
+		}
 		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -107,6 +113,27 @@ func TestUnbindingAnIdentifierKeepsWhatTheyHold(t *testing.T) {
 		}
 		if !subject.Reads(access.Public, f.products["sonic"]) {
 			t.Error("unbinding took her role with it")
+		}
+	})
+}
+
+// Somebody with nothing pinned has nothing to unbind. Answered as a withdrawal
+// it did not make, the trail would record one.
+func TestUnbindingSomebodyWithNothingBoundMatchesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		alice := authorized(t, f, "alice", "alice")
+		if err := f.store.UnbindIdentifier(ctx, alice.ID); !errors.Is(err, access.ErrNothingMatched) {
+			t.Errorf("unbinding somebody never pinned answered %v", err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.UnbindIdentifier(ctx, alice.ID); !errors.Is(err, access.ErrNothingMatched) {
+			t.Errorf("unbinding somebody already unbound answered %v", err)
 		}
 	})
 }

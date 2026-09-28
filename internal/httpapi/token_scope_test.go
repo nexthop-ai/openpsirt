@@ -89,3 +89,41 @@ func TestAWithdrawnTokenIsStillListedAndSaysSo(t *testing.T) {
 		}
 	})
 }
+
+// A withdrawal of something already withdrawn, or never there, is not found,
+// and leaves no row in the trail. Answered as success, it records a withdrawal
+// that did not happen.
+func TestAWithdrawalThatMatchesNothingIsNotFoundAndRecordsNothing(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if made := asPerson(t, r, "private", http.MethodPost, "/v1/tokens",
+			`{"name":"nightly","lifetime":"24h"}`); made.Code != http.StatusCreated {
+			t.Fatalf("minting answered %d: %s", made.Code, made.Body.String())
+		}
+		if gone := asPerson(t, r, "private", http.MethodDelete, "/v1/tokens/nightly", ""); gone.Code >= 300 {
+			t.Fatalf("withdrawing answered %d: %s", gone.Code, gone.Body.String())
+		}
+		// Recorded, with no identifier pinned.
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"unpinned"}`); made.Code >= 300 {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+
+		var before changed
+		read(t, r, "admin", "/v1/administration/changes?limit=1", &before)
+		for _, again := range []struct{ who, what, path string }{
+			{"private", "their own token, withdrawn again", "/v1/tokens/nightly"},
+			{"admin", "somebody's token, withdrawn again", "/v1/people/private/tokens/nightly"},
+			{"admin", "an identifier nobody pinned", "/v1/people/unpinned/identifier"},
+		} {
+			if got := asPerson(t, r, again.who, http.MethodDelete, again.path, ""); got.Code != http.StatusNotFound {
+				t.Errorf("%s answered %d, want 404: %s", again.what, got.Code, got.Body.String())
+			}
+		}
+		var after changed
+		read(t, r, "admin", "/v1/administration/changes?limit=1", &after)
+		if after.Total != before.Total {
+			t.Errorf("withdrawals that matched nothing left %d rows in the trail",
+				after.Total-before.Total)
+		}
+	})
+}
