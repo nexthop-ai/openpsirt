@@ -428,6 +428,9 @@ function Administered() {
   // order, and asking for the next page of a list that only grows at the top
   // is how a row is seen twice or not at all.
   const [showing, setShowing] = useState(50);
+  // Past what the route answers in one request, the file is how the rest is
+  // read; asking for more would be refused and take the section with it.
+  const longest = CHANGES_MOST;
   const changes = useQuery({
     queryKey: ["administered", from, to, showing],
     queryFn: async () =>
@@ -518,19 +521,27 @@ function Administered() {
         <p className="hint noprint">
           Showing the newest {rows.length.toLocaleString()} of{" "}
           {(changes.data?.total ?? 0).toLocaleString()}.{" "}
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={changes.isFetching}
-            onClick={() => setShowing((shown) => shown + 100)}
-          >
-            Show more
-          </button>
+          {showing < longest ? (
+            <button
+              type="button"
+              className="btn quiet"
+              disabled={changes.isFetching}
+              onClick={() => setShowing((shown) => Math.min(shown + 100, longest))}
+            >
+              Show more
+            </button>
+          ) : (
+            <>The file holds every one.</>
+          )}
         </p>
       )}
     </div>
   );
 }
+
+// The most change-history rows one request is answered with. The route
+// refuses a larger page.
+export const CHANGES_MOST = 200;
 
 // The address the change history comes from as a file, built the way the
 // record's own link is: the screen's period straight from the address, so the

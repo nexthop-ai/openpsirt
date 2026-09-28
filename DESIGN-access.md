@@ -1040,6 +1040,7 @@ record, because it is the same question one layer up.
 | **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
 | **It is read over a period, and leaves as a file** | An access review asks what changed in the stretch a certificate covers. Capped at fifty rows, undated and unexportable, that question was answered a page at a time on a screen and could not leave it. Asked for no period it answers about everything it holds |
+| On screen it grows to the most one request answers | Two hundred rows, newest first; past that the section says the file holds every one. A larger page is refused, and a screen asking for one draws the whole section as a failure |
 
 ### Recorded writes
 
