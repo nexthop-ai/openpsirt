@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
@@ -24,20 +24,16 @@ import (
 // record that somebody was told, which is exactly what an auditor wants after a
 // leak — and restoring the role brings the line back, because they were told.
 func TestWithdrawingTheRoleTakesAwayWhatItLetSomebodyBeTold(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
@@ -107,9 +103,9 @@ func TestWithdrawingTheRoleTakesAwayWhatItLetSomebodyBeTold(t *testing.T) {
 // what a case grant is — so the pair is what reaches the line, and widening it
 // to the product would hand them the rest of that product's embargo list.
 func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		guest, err := rights.Ensure(ctx, "guest@example.com", "Guest", nil, nil)
@@ -120,11 +116,7 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "SONIC-2026-7002", Severity: "high"},
 			{Identifier: "SONIC-2026-7003", Severity: "high"},
@@ -168,7 +160,6 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 func TestSomethingUndisclosedThatNamesNoProductIsRefused(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		person, err := access.NewStore(db.DB).Ensure(ctx, "someone@example.com", "Someone", nil, nil)
 		if err != nil {
@@ -194,9 +185,9 @@ func TestSomethingUndisclosedThatNamesNoProductIsRefused(t *testing.T) {
 // this one exists so a leak can be investigated, which is the only reason to
 // look at what was sent to another person.
 func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil, nil)
@@ -211,11 +202,7 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		// Everything the ordinary reader could hold, so that being refused is
 		// about not administering rather than about holding nothing.
 		if err := rights.GrantRole(ctx, nosy.ID, product.ID, access.PrivateTriage); err != nil {
@@ -262,9 +249,9 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 // read leaves nothing. Both routes reach the same rows and only one of them is
 // accountable.
 func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil, nil)
@@ -285,11 +272,7 @@ func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateRead); err != nil {
 			t.Fatal(err)
 		}

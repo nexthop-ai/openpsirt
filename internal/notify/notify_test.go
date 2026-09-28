@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
@@ -34,7 +34,6 @@ func eachWithDB(t *testing.T,
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		mine, err := rights.Ensure(ctx, "me@example.com", "Me", nil, nil)
@@ -458,17 +457,14 @@ func TestNothingIsMailedAboutAConditionThatHasAlreadyCleared(t *testing.T) {
 // A standing condition that comes to be about undisclosed work is stored as
 // such, though its key and its words have not moved.
 func TestAStandingConditionTakesUpWhetherItIsUndisclosed(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		who, err := access.NewStore(db.DB).Ensure(ctx, "me@example.com", "Me", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		store := notify.NewStore(db.DB)
 		for _, private := range []bool{false, true} {
 			if _, _, err := store.Reconcile(ctx, who.ID, notify.QueueUntaken, []notify.Holds{{

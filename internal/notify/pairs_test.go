@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -30,20 +31,17 @@ type team struct {
 	claims  int
 }
 
-func aTeam(t *testing.T, db *database.DB, names ...string) *team {
+func aTeam(t *testing.T, w *fixture.World, names ...string) *team {
 	t.Helper()
+	db := w.DB
 	ctx := t.Context()
-	dbtest.Reset(t, db)
 	rights := access.NewStore(db.DB)
 	admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	aScannedTarget(t, db)
-	product, err := catalog.NewStore(db.DB).ProductByName(ctx, "sonic")
-	if err != nil {
-		t.Fatal(err)
-	}
+	aScannedTarget(t, w)
+	product := w.Product
 	tm := &team{db: db, product: product.ID, admin: admin, people: map[string]*access.Account{}}
 	for _, name := range names {
 		person, err := rights.Ensure(ctx, name+"@example.com", name, nil, nil)
@@ -138,8 +136,8 @@ func (tm *team) thresholds(t *testing.T, share, approvers *int) {
 }
 
 func TestOnePairAgreeingToMostOfAProductsWorkIsRaised(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		// Both directions count toward the one pair: nine of ten.
 		tm.agreed(t, "ana", "ben", 5, 3)
 		tm.agreed(t, "ben", "ana", 4, 3)
@@ -168,8 +166,8 @@ func TestOnePairAgreeingToMostOfAProductsWorkIsRaised(t *testing.T) {
 }
 
 func TestAPairIsNotRaisedUnderTheShare(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		// Seven of ten, under the four in five that ships.
 		tm.agreed(t, "ana", "ben", 7, 3)
 		tm.agreed(t, "cat", "ana", 3, 3)
@@ -180,8 +178,8 @@ func TestAPairIsNotRaisedUnderTheShare(t *testing.T) {
 }
 
 func TestAPairIsNotRaisedInATeamTooSmallForItToBeAChoice(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben")
 		tm.agreed(t, "ana", "ben", 10, 3)
 		if body := tm.heard(t, tm.admin); body != "" {
 			t.Errorf("two people who are the whole team raised %q", body)
@@ -197,8 +195,8 @@ func TestAPairIsNotRaisedInATeamTooSmallForItToBeAChoice(t *testing.T) {
 }
 
 func TestAProductsOwnShareIsTheOneAsked(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		tm.agreed(t, "ana", "ben", 9, 3)
 		tm.agreed(t, "cat", "ana", 1, 3)
 		share := 95
@@ -210,8 +208,8 @@ func TestAProductsOwnShareIsTheOneAsked(t *testing.T) {
 }
 
 func TestAPairIsCountedOverTheReportsPeriod(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		// A pattern the team has since moved away from is not a control
 		// failing today. Counted over the whole record, the old pair is
 		// fifty of sixty and past the share.
@@ -225,8 +223,8 @@ func TestAPairIsCountedOverTheReportsPeriod(t *testing.T) {
 }
 
 func TestOldAgreementsDoNotDiluteAPairsShareNow(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		// Four months ago the work was spread; this quarter one pair did it.
 		tm.agreed(t, "cat", "ben", 20, 120)
 		tm.agreed(t, "ana", "ben", 9, 3)
@@ -238,8 +236,8 @@ func TestOldAgreementsDoNotDiluteAPairsShareNow(t *testing.T) {
 }
 
 func TestAPairIsNotRaisedOverTooFewClaims(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		// Every claim, and a handful of them.
 		tm.agreed(t, "ana", "ben", 9, 3)
 		if body := tm.heard(t, tm.admin); body != "" {
@@ -253,8 +251,9 @@ func TestAPairIsNotRaisedOverTooFewClaims(t *testing.T) {
 }
 
 func TestAShareOfExactlyTheThresholdIsRaised(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		tm := aTeam(t, db, "ana", "ben", "cat")
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		tm := aTeam(t, w, "ana", "ben", "cat")
 		// Eight of ten is the four in five that ships.
 		tm.agreed(t, "ana", "ben", 8, 3)
 		tm.agreed(t, "cat", "ana", 2, 3)
@@ -263,7 +262,8 @@ func TestAShareOfExactlyTheThresholdIsRaised(t *testing.T) {
 		}
 		// And a product asking for every agreement is told when it is.
 		dbtest.Reset(t, db)
-		tm = aTeam(t, db, "ana", "ben", "cat")
+		w = fixture.New(t, db)
+		tm = aTeam(t, w, "ana", "ben", "cat")
 		tm.agreed(t, "ana", "ben", 10, 3)
 		all := 100
 		tm.thresholds(t, &all, nil)

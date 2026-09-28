@@ -12,8 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
@@ -25,9 +24,9 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 	// reaches one arm: read a week and more ago, read recently, never read
 	// and configured long ago, never read and configured today, and one
 	// withdrawn. Then the product is retired.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
 		if err != nil {
@@ -37,11 +36,8 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		aScannedTarget(t, db)
-		product, err := catalog.NewStore(db.DB).ProductByName(ctx, "sonic")
-		if err != nil {
-			t.Fatal(err)
-		}
+		aScannedTarget(t, w)
+		product := w.Product
 		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}

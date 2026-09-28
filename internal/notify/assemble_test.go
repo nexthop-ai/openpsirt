@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -28,38 +26,23 @@ import (
 // without this, deleting that branch would put the identifier and component of
 // an embargoed finding into outbound mail and nothing would fail.
 func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		holder, err := rights.Ensure(ctx, "holder@example.com", "Hana Holder", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "Hardware Platform Images")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		// Undisclosed work is what a private role reaches, and reaching it is
 		// what makes withholding it a decision rather than an accident of
 		// visibility.
 		if err := rights.GrantRole(ctx, holder.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-8001", Severity: "medium"},
 			{Identifier: "SONIC-2026-8002", Severity: "critical"},
@@ -142,20 +125,16 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 // not, and moves the reader's stamp to before it read even when the message
 // is refused.
 func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		reader, err := rights.Ensure(ctx, "reader@example.com", "Rhea Reader", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		for _, role := range []access.Role{access.PublicTriage, access.PrivateTriage} {
 			if err := rights.GrantRole(ctx, reader.ID, product.ID, role); err != nil {
 				t.Fatal(err)
@@ -170,18 +149,7 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 			Where("id = ?", reader.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		for i, each := range []struct {
 			identifier, component string
 			visibility            access.Visibility
@@ -248,35 +216,20 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 // A digest leaves out everything its reader was told about, however much that
 // is, and says nothing was cut when nothing was.
 func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		holder, err := rights.Ensure(ctx, "holder@example.com", "Hana Holder", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		if err := rights.GrantRole(ctx, holder.ID, product.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 
 		// More than one page of the told, and one thing nobody said.
 		const held = 60

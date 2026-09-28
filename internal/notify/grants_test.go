@@ -12,9 +12,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -37,15 +36,12 @@ type split struct {
 	places    int
 }
 
-func aSplit(t *testing.T, db *database.DB) *split {
+func aSplit(t *testing.T, w *fixture.World) *split {
 	t.Helper()
+	db := w.DB
 	ctx := t.Context()
-	dbtest.Reset(t, db)
-	target := aScannedTarget(t, db)
-	product, err := catalog.NewStore(db.DB).ProductByName(ctx, "sonic")
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := aScannedTarget(t, w)
+	product := w.Product
 	named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 		{Identifier: "CVE-2026-4242", Severity: "high"},
 	})
@@ -180,8 +176,9 @@ func saying(bodies []string, phrases ...string) []string {
 }
 
 func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		s := aSplit(t, db)
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		s := aSplit(t, w)
 		proposer := s.person(t, "proposer", access.PublicTriage, access.PrivateTriage)
 		privateReader := s.person(t, "private-reader", access.PrivateRead, access.Approver)
 		privateTriager := s.person(t, "private-triager", access.PrivateTriage, access.Approver)
@@ -226,8 +223,9 @@ func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 }
 
 func TestAProposerWhoReadsOnlyPartOfAClaimIsNotToldItIsTheirTurn(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		s := aSplit(t, db)
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		s := aSplit(t, w)
 		privateOnly := s.person(t, "private-only", access.PrivateTriage)
 		both := s.person(t, "both", access.PublicTriage, access.PrivateTriage)
 
@@ -264,31 +262,11 @@ func TestAProposerWhoReadsOnlyPartOfAClaimIsNotToldItIsTheirTurn(t *testing.T) {
 }
 
 func TestACriticalOnAReleaseIsNotToldToWhoeverTriagesOnlyUndisclosedWork(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		rights := access.NewStore(db.DB)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tag, err := cat.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		released, err := cat.TargetFor(ctx, tag.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
+		released := w.TargetFor(w.Tag, w.Customer)
 		privateTriager := recordPerson(t, rights, "private@example.com", false,
 			product.ID, access.PrivateTriage)
 		publicTriager := recordPerson(t, rights, "public@example.com", false,
@@ -308,9 +286,10 @@ func TestACriticalOnAReleaseIsNotToldToWhoeverTriagesOnlyUndisclosedWork(t *test
 }
 
 func TestATeamQueueReachesEachMemberAtTheVisibilityTheyRead(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		s := aSplit(t, db)
+		s := aSplit(t, w)
 		privateReader := s.person(t, "private-reader", access.PrivateRead)
 		publicReader := s.person(t, "public-reader", access.PublicRead)
 		admin := s.person(t, "admin")
