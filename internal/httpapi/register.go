@@ -240,6 +240,7 @@ func registerRegister(api huma.API, in Ingest) {
 
 	// And as a file, because a register is the report most likely to be
 	// wanted whole.
+	streams := newStreamSlots(in.DB)
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-disposition-register", Method: http.MethodGet,
 		Path:    path + ".{format}",
@@ -313,7 +314,12 @@ func registerRegister(api huma.API, in Ingest) {
 			},
 		}
 		name := "register-" + strings.ToLower(input.Product+"-"+input.Stream+"-"+input.Variant)
+		release, err := streams.take()
+		if err != nil {
+			return nil, err
+		}
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			defer release()
 			writeExport(writer, input.Format, name, out)
 		}}, nil
 	})

@@ -11,8 +11,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
 // An export writes every row even where its reader's own page is smaller than
@@ -203,4 +207,84 @@ func tail(body string) string {
 		return body
 	}
 	return "…" + body[len(body)-200:]
+}
+
+// A streamed export gives its connection back at the ceiling, however slowly
+// its reader drains it.
+//
+// The write deadline only fires for a reader that stops. One that takes a row
+// every so often keeps it moving, and the cursor holds a connection for as
+// long as that takes. On SQLite that connection is the whole pool. The reader
+// here blocks on the second row, as a socket to a slow client does, and the
+// connection has to be free again while it is still blocked.
+func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		blocked := make(chan struct{})
+		unblock := make(chan struct{})
+		out := Exporting{
+			Header: []string{"n"},
+			Stream: func(ctx context.Context, each func([]string) error) error {
+				rows, err := db.DB.DB.QueryContext(ctx, "WITH RECURSIVE n(i) AS "+
+					"(SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000) SELECT i FROM n")
+				if err != nil {
+					return err
+				}
+				defer func() { _ = rows.Close() }()
+				for rows.Next() {
+					var i int
+					if err := rows.Scan(&i); err != nil {
+						return err
+					}
+					if err := each([]string{fmt.Sprint(i)}); err != nil {
+						return err
+					}
+				}
+				return rows.Err()
+			},
+		}
+		written := 0
+		done := make(chan error, 1)
+		go func() {
+			done <- streamed(t.Context(), out, func([][]string) {
+				written++
+				if written == 2 {
+					close(blocked)
+					<-unblock
+				}
+			}, func() {}, 50*time.Millisecond)
+		}()
+		<-blocked
+		deadline := time.Now().Add(5 * time.Second)
+		for db.DB.DB.Stats().InUse != 0 {
+			if time.Now().After(deadline) {
+				close(unblock)
+				t.Fatal("the cursor still holds its connection well past the ceiling")
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		close(unblock)
+		if err := <-done; err == nil {
+			t.Error("an export cut at the ceiling was reported as complete")
+		}
+	})
+}
+
+// Streamed exports past the slots are refused rather than queued for a
+// connection.
+func TestStreamedExportsPastTheSlotsAreRefused(t *testing.T) {
+	slots := make(streamSlots, 1)
+	release, err := slots.take()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := slots.take(); err == nil {
+		t.Error("a second stream was let through a single slot")
+	}
+	release()
+	again, err := slots.take()
+	if err != nil {
+		t.Errorf("a released slot was not given back: %v", err)
+	} else {
+		again()
+	}
 }
