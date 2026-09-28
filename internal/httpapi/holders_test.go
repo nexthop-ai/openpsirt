@@ -71,6 +71,17 @@ func TestWhoMayHoldWorkIsPeopleAndTeams(t *testing.T) {
 			t.Errorf("the team shows as %q, want what was typed", narrowed[0]["name"])
 		}
 
+		// The limit bounds the whole answer, teams included.
+		for _, name := range []string{"network", "storage"} {
+			if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+				`{"name":"`+name+`"}`); made.Code >= 300 {
+				t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
+			}
+		}
+		if capped := read(t, "triager", "?limit=2"); len(capped) != 2 {
+			t.Errorf("a limit of two answered %d rows: %v", len(capped), capped)
+		}
+
 		// A term matching nothing is an empty list rather than everybody,
 		// which is the failure a picker makes by ignoring what it cannot use.
 		if none := read(t, "triager", "?q=zzzznothing"); len(none) != 0 {

@@ -85,13 +85,16 @@ func registerHolders(api huma.API, in Ingest) {
 		}
 		// Narrowed by the same term, and asked for one more than the share so
 		// that a deployment past the share can be told from one at it.
-		teams, err := store.Teams(ctx, input.Term, teamShare+1)
+		// No more of them than the limit either, which bounds the whole
+		// answer.
+		share := min(teamShare, input.Limit)
+		teams, err := store.Teams(ctx, input.Term, share+1)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "which teams there are could not be read", err)
 		}
-		moreTeams := len(teams) > teamShare
+		moreTeams := len(teams) > share
 		if moreTeams {
-			teams = teams[:teamShare]
+			teams = teams[:share]
 		}
 
 		out := &listOutput[HolderBody]{}
