@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
+import { apiBuildPath } from "../list";
 import { useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -386,14 +388,8 @@ function RegisterState({ state }: { state?: string }) {
 // already has.
 function fileAt(
   at: { product: string; stream: string; variant: string },
-  format: string,
+  format: "csv" | "json",
   asked: URLSearchParams,
 ): string {
-  const query = asked.toString();
-  return (
-    `/v1/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}/register.${format}` +
-    (query ? `?${query}` : "")
-  );
+  return exportAt(apiBuildPath(at) + "/register", format, asked);
 }

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
 import { findingsPath, scopeQuery, useScope } from "../../app/scope";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
@@ -558,7 +559,10 @@ export function Overview() {
 // The address the repeatedly-deferred list comes from as a file. A link
 // somebody follows rather than a request this page makes, narrowed the way the
 // panel above it is.
-function repeatsFile(product: string, format: string): string {
-  const asked = product ? `?product=${encodeURIComponent(product)}` : "";
-  return `/v1/deferrals/repeated.${format}${asked}`;
+function repeatsFile(product: string, format: "csv" | "json"): string {
+  return exportAt(
+    "/v1/deferrals/repeated",
+    format,
+    new URLSearchParams(product ? { product } : {}),
+  );
 }

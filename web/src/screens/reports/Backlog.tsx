@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
 import { scopeQuery, useScope } from "../../app/scope";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
@@ -61,7 +62,7 @@ export function Backlog() {
   // Drawn, it is a zero somebody reads as a quiet week.
   const flows = points.slice(1);
   const asked = new URLSearchParams({ ...scope, weeks: String(weeks) }).toString();
-  const file = (format: string) => `/v1/trend.${format}${asked ? `?${asked}` : ""}`;
+  const file = (format: "csv" | "json") => exportAt("/v1/trend", format, asked);
 
   return (
     <Sheet
