@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -233,6 +234,51 @@ func TestOnlyAnAdministratorMovesSomebodyElsesWork(t *testing.T) {
 		}
 		if moved.Moved == 0 {
 			t.Error("releasing an absent person's work moved nothing")
+		}
+	})
+}
+
+// Handing somebody's work to a named person hands them everything it covers,
+// so a recipient not cleared for the undisclosed part of it is refused and
+// nothing moves.
+func TestHandingWorkOverDoesNotDiscloseItToTheRecipient(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		ctx := t.Context()
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		if got := asPerson(t, r, "private-dispatcher", http.MethodPut, at,
+			`{"person":"private-triage"}`); got.Code != http.StatusNoContent {
+			t.Fatal(got.Body.String())
+		}
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("visibility = ?", access.Private).
+			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		over := "/v1/people/private-triage/assignments/hand-back"
+		got := asPerson(t, r, "admin", http.MethodPost, over, `{"to":"triager"}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("undisclosed work handed to somebody who may not read it answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		held, err := r.db.DB.NewSelect().Table("finding").
+			Where("closed_at IS NULL").
+			Where(`assigned_to IN (SELECT party_id FROM "person" WHERE identity = ?)`,
+				"private-triage").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held == 0 {
+			t.Error("a refused hand-over moved the work anyway")
+		}
+
+		// Somebody cleared for it takes it.
+		if got := asPerson(t, r, "admin", http.MethodPost, over,
+			`{"to":"private-dispatcher"}`); got.Code != http.StatusOK {
+			t.Fatalf("a hand-over to somebody cleared for it answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }

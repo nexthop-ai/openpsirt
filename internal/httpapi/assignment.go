@@ -698,6 +698,8 @@ func refusedFinding(in Ingest, err error) error {
 		return noSuchFinding()
 	case errors.Is(err, finding.ErrSamePerson):
 		return asked(in.Logger, err)
+	case errors.Is(err, finding.ErrRecipientMayNotRead):
+		return huma.Error422UnprocessableEntity(finding.ErrRecipientMayNotRead.Error())
 	}
 	return wentWrong(in.Logger, "that could not be recorded", err)
 }

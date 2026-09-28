@@ -250,7 +250,7 @@ it is assigned, and not in anybody's own because they are not here.
 | Operation | Meaning |
 |---|---|
 | Releasing | Nobody is dealing with it, and it goes back where it can be picked up. The honest answer when who takes it on has not been decided |
-| Handing over | Says who is dealing with it now |
+| Handing over | Says who is dealing with it now. Refused whole where any of it is undisclosed in a product where the recipient may not read undisclosed work, asked inside the transaction that moves it; the hand-over would be the disclosure |
 
 Only an administrator does either; a person hands back their own by assigning it
 to nobody.
