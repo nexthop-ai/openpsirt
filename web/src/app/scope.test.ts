@@ -68,17 +68,17 @@ describe("where a selection's findings live", () => {
   });
 
   it("keeps a filter apart from the levels the address already carries", () => {
-    const overdue = { overdue: "true" };
+    const overdue = { running: "overdue" };
     expect(findingsPath({ product: "sonic", stream: "master" }, false, overdue)).toBe(
-      "/products/sonic/findings?stream=master&overdue=true",
+      "/products/sonic/findings?stream=master&running=overdue",
     );
     expect(findingsPath({ product: "sonic" }, false, overdue)).toBe(
-      "/products/sonic/findings?overdue=true",
+      "/products/sonic/findings?running=overdue",
     );
     expect(
       findingsPath({ product: "sonic", stream: "master", variant: "broadcom" }, false, overdue),
-    ).toBe(`${BUILD}/findings?overdue=true`);
-    expect(findingsPath({}, false, overdue)).toBe("/findings?overdue=true");
+    ).toBe(`${BUILD}/findings?running=overdue`);
+    expect(findingsPath({}, false, overdue)).toBe("/findings?running=overdue");
   });
 
   it("reads a filter back as its own parameter on a partial scope", () => {

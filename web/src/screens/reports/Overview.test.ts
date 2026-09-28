@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { appeared, byProduct, openFor } from "./Overview";
+import { UNNARROWED } from "../../app/scope";
+import { byProduct, openFor } from "./Overview";
 
 // The parameters an address carries, one list per name.
 function query(path: string): Record<string, string[]> {
@@ -14,12 +15,16 @@ function query(path: string): Record<string, string[]> {
 
 const branch = { product: "sonic", stream: "master" };
 
+// The list's own defaults lifted, because no bucket applies them.
+const everything = query(`?${UNNARROWED}`);
+
 describe("an aging bucket's link", () => {
   it("asks for the youngest bucket by its end alone", () => {
     expect(query(openFor(branch, 0, 7))).toEqual({
       stream: ["master"],
       open_under: ["7"],
       below: ["yes"],
+      ...everything,
     });
   });
 
@@ -29,6 +34,7 @@ describe("an aging bucket's link", () => {
       open_for: ["7"],
       open_under: ["28"],
       below: ["yes"],
+      ...everything,
     });
   });
 
@@ -37,6 +43,7 @@ describe("an aging bucket's link", () => {
       stream: ["master"],
       open_for: ["90"],
       below: ["yes"],
+      ...everything,
     });
   });
 
@@ -47,23 +54,7 @@ describe("an aging bucket's link", () => {
       open_for: ["28"],
       open_under: ["90"],
       below: ["yes"],
-    });
-  });
-});
-
-describe("the list behind what appeared", () => {
-  it("closes where the period does", () => {
-    expect(query(appeared(branch, "2026-01-01", "2026-04-01"))).toEqual({
-      stream: ["master"],
-      opened_after: ["2026-01-01"],
-      opened_before: ["2026-04-01"],
-    });
-  });
-
-  it("opens from the beginning where the period names only its end", () => {
-    expect(query(appeared(branch, "", "2026-04-01"))).toEqual({
-      stream: ["master"],
-      opened_before: ["2026-04-01"],
+      ...everything,
     });
   });
 });

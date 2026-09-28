@@ -309,9 +309,10 @@ beside it already get.
 | **In progress** | How much each person and team holds, with the reader's own row first. The panel is about the shape of the work rather than about one person, and it stays that way — but reading your own row off a list of colleagues, where it may fall below the three this shows, is why somebody who works here went elsewhere to find out |
 
 Every figure opens the list it counts, narrowed the way the figure was counted —
-the aging buckets, the fixed and appeared counts, both deadline tiles. A number
-nobody can act on from where they read it sends somebody to build the same
-question by hand, and the question they build is not always the same one.
+the aging buckets and both deadline tiles. A number nobody can act on from where
+they read it sends somebody to build the same question by hand, and the question
+they build is not always the same one. A figure counting anything closed opens
+nothing, because the findings list holds what is open (`DESIGN-reporting.md`).
 
 ## The findings list
 

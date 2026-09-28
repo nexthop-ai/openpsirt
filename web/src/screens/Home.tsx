@@ -979,13 +979,15 @@ function Status() {
   const builds = scanning.data?.items ?? [];
   // The rows in hand, for the three this names. The figures below come from
   // the response instead: the server counts them across the whole answer and
-  // cuts the page afterwards, and a build out of support belongs on neither
-  // side of a coverage figure — silence there is expected. Counted from the
-  // page, this said "195 of 200" for any estate past two hundred builds and
-  // put a release nothing had scanned in a year on the covered side.
+  // cuts the page afterwards. A build out of support or out of use belongs on
+  // neither side of a coverage figure, because silence there is expected, and
+  // the covered side is the server's own count of builds scanned and not
+  // quiet — the figure the coverage report shows under the same name.
   const quiet = builds.filter((b) => b.quiet);
   const unsupported = scanning.data?.unsupported ?? 0;
-  const live = (scanning.data?.total ?? 0) - unsupported;
+  const retired = scanning.data?.retired ?? 0;
+  const live = (scanning.data?.total ?? 0) - unsupported - retired;
+  const scanned = scanning.data?.scanned ?? 0;
   const quietTotal = scanning.data?.quiet ?? 0;
   // The most recent arrival across every build, which is what the line says.
   // The first row that has one is not it: this list is ordered longest-silent
@@ -1024,7 +1026,7 @@ function Status() {
           <span className="what">Builds being scanned</span>
           <span className="when">
             <Count of={scanning}>
-              {() => `${(live - quietTotal).toLocaleString()} of ${live.toLocaleString()}`}
+              {() => `${scanned.toLocaleString()} of ${live.toLocaleString()}`}
             </Count>
           </span>
         </li>

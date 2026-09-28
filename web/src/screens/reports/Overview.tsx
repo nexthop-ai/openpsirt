@@ -69,23 +69,11 @@ export function openFor(
   const asked = new URLSearchParams(extra);
   if (days > 0) asked.set("open_for", String(days));
   if (until > 0) asked.set("open_under", String(until));
-  // The bucket counts everything open, including what the product's line keeps
-  // out — so the list it opens has to as well, or the two numbers disagree.
+  // The bucket counts everything open: below the product's line, on tags,
+  // past end of life and whatever is planned. So the list it opens takes none
+  // of its own defaults either, or the two numbers disagree.
   asked.set("below", "yes");
-  return findingsPath(at, false, asked);
-}
-
-// The findings list, narrowed to what appeared in a stretch. Nothing is added
-// for a side the stretch leaves open.
-export function appeared(
-  at: Parameters<typeof findingsPath>[0],
-  began: string,
-  ended: string,
-): string {
-  return findingsPath(at, false, {
-    ...(began ? { opened_after: began } : {}),
-    ...(ended ? { opened_before: ended } : {}),
-  });
+  return findingsPath(at, true, asked);
 }
 
 // What the sections that are counted by product alone say they cover. Their
@@ -198,9 +186,9 @@ export function Overview() {
         ) : (
           <>
             <div className="kpis" style={{ marginTop: 8 }}>
-              {/* "Appeared" opens the list it counts. "Fixed" opens nothing:
-                  what it counts is closed, and the findings list holds only
-                  what is open. */}
+              {/* Neither opens a list. "Fixed" counts what closed, and
+                  "Appeared" counts what closed since as well as what is still
+                  open, and the findings list holds only what is open. */}
               <div className="kpi">
                 <span className="l">Fixed</span>
                 <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
@@ -208,11 +196,11 @@ export function Overview() {
                   distinct issues that went away · a version carrying the issue forward is not a fix
                 </span>
               </div>
-              <Link className="kpi" to={appeared(at, began, endExclusive(period.to))}>
+              <div className="kpi">
                 <span className="l">Appeared</span>
                 <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
                 <span className="d">distinct issues, same window and unit as fixed</span>
-              </Link>
+              </div>
             </div>
 
             <h4 style={{ marginTop: 14 }}>Average time to fix</h4>

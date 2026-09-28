@@ -14,6 +14,12 @@ import { Sheet } from "./Sheet";
 import { PeriodPicker, asked, coveringPeriod, periodAsked, stated } from "./Window";
 import { Wide } from "../../ui/Wide";
 
+// The findings list, narrowed to what "Plainly late" counts: open and past its
+// deadline, on every build the rate reads, planned work included.
+export function plainlyLate(at: Parameters<typeof findingsPath>[0]): string {
+  return findingsPath(at, true, { running: "overdue" });
+}
+
 // The work that met the dates policy set for it, and the work that did not.
 //
 // The question a manager asks first, and it was answered by one figure with
@@ -98,7 +104,7 @@ export function Compliance() {
               </div>
               <Link
                 className="kpi"
-                to={findingsPath(at, false, { overdue: "true" })}
+                to={plainlyLate(at)}
                 aria-label="Open what is overdue"
               >
                 <span className="l">Plainly late</span>
