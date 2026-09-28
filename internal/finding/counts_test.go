@@ -71,37 +71,58 @@ func TestCountingWhatIsOpenAgreesWithTheListAndCarriesVisibility(t *testing.T) {
 
 func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 	// The three levels answer different questions and must not answer each
-	// other's. The issue is open in two releases of one product, built as one
-	// variant, so each level has a different number of buckets and each
+	// other's. The issue is open in four builds of one product: three
+	// releases, and two variants of the first. So the product level has one
+	// bucket, the variant level two and the stream level three, and each
 	// bucket is keyed by what that level names.
 	//
-	// Verified by grouping every level by the stream's column: the product
-	// and variant levels then answer two buckets keyed by streams.
+	// Verified by grouping every level by the stream's column, and by
+	// swapping the product and variant levels: each answers the wrong number
+	// of buckets.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
+		builds := []int64{
+			f.target,
+			f.anotherVariant(t, "mellanox"),
+			f.anotherBuild(t, "v2"),
+			f.anotherBuild(t, "v3"),
 		}
-		release := f.anotherBuild(t, "v2")
-		f.shippedTo(t, release, twoConsumers())
-		if _, err := f.store.Apply(ctx, release, f.runOn(t, release), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
+		for _, build := range builds {
+			f.shippedTo(t, build, twoConsumers())
+			if _, err := f.store.Apply(ctx, build, f.runOn(t, build), []finding.Reported{
+				found("CVE-2026-1", libnl),
+			}); err != nil {
+				t.Fatal(err)
+			}
 		}
 		who := f.holding(t, access.PublicRead)
 
+		keys := func(level finding.Level) []int64 {
+			seen := map[int64]bool{}
+			for _, build := range builds {
+				scope := f.scopeOf(t, build)
+				switch level {
+				case finding.ByProduct:
+					seen[*scope.ProductID] = true
+				case finding.ByStream:
+					seen[*scope.StreamID] = true
+				case finding.ByVariant:
+					seen[*scope.VariantID] = true
+				}
+			}
+			out := make([]int64, 0, len(seen))
+			for key := range seen {
+				out = append(out, key)
+			}
+			return out
+		}
 		for _, want := range []struct {
 			level   finding.Level
 			buckets int
-			holds   int64
 		}{
-			{finding.ByProduct, 1, f.productID},
-			{finding.ByStream, 2, *f.scope.StreamID},
-			{finding.ByVariant, 1, *f.scope.VariantID},
+			{finding.ByProduct, 1},
+			{finding.ByStream, 3},
+			{finding.ByVariant, 2},
 		} {
 			counts, err := f.store.OpenBy(ctx, who, finding.Scope{}, want.level)
 			if err != nil {
@@ -111,8 +132,10 @@ func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 				t.Errorf("level %d grouped into %d buckets, want %d: %v",
 					want.level, len(counts), want.buckets, counts)
 			}
-			if counts[want.holds] == 0 {
-				t.Errorf("level %d has no bucket for %d: %v", want.level, want.holds, counts)
+			for _, key := range keys(want.level) {
+				if counts[key] == 0 {
+					t.Errorf("level %d has no bucket for %d: %v", want.level, key, counts)
+				}
 			}
 		}
 
