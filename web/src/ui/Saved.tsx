@@ -272,7 +272,7 @@ export function Saved({
                   week after it was saved. */}
               {outcome === "deferred" && (
                 <label className="field">
-                  <span>For how long</span>
+                  <span className="l">For how long</span>
                   <input
                     {...notACredential}
                     type="number"
@@ -289,7 +289,7 @@ export function Saved({
                 </label>
               )}
               <label className="field" style={{ flexBasis: "100%" }}>
-                <span>In these words</span>
+                <span className="l">In these words</span>
                 <textarea
                   {...notACredential}
                   rows={3}
