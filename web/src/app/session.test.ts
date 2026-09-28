@@ -70,8 +70,7 @@ describe("signing out", () => {
 });
 
 // What somebody may do in a product is found whatever capitals the product
-// was typed with, as the server finds it. Three screens asked it three ways,
-// and one of them compared exactly.
+// was typed with, as the server finds it.
 describe("what somebody may do in a product", () => {
   it("is found whatever the capitals", () => {
     const who = { reach: [{ product: "sonic", may_hide: true }] } as unknown as Who;
