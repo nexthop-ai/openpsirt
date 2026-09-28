@@ -578,6 +578,20 @@ func (s *Store) RetiredWithin(ctx context.Context, db bun.IDB,
 	return s.retired(ctx, db, builds)
 }
 
+// distinctIDs is a list of identifiers with repeats dropped, in the order
+// first named.
+func distinctIDs(ids []int64) []int64 {
+	seen := make(map[int64]bool, len(ids))
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // buildsOf narrows a list of builds to the ones belonging to this product.
 //
 // A build of somebody else's product is refused rather than dropped: naming
@@ -588,6 +602,9 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	if len(builds) == 0 {
 		return nil, nil
 	}
+	// A build named twice is one build, and compared by count a repeat read
+	// as a build of another product.
+	builds = distinctIDs(builds)
 	var here []int64
 	err := db.NewSelect().
 		TableExpr(`"target" AS "tg"`).

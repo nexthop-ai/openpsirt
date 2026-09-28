@@ -589,6 +589,7 @@ in a comparison exactly as a reported one does.
 |---|---|
 | Every build is resolved before anything is written | A component name one build holds and another does not is a question about which builds are affected, so it is refused and names the build rather than recorded against some of them and silently not the rest |
 | One product | The identifier is minted per product, so a flaw in two products is two records |
+| A build named twice is one build, here and wherever a request names builds for a fix | Two rows at one place are two findings for one flaw (REQ-17), and a repeat compared by count against the product's builds reads as a build of another product |
 | What one recording writes is held to the write ceiling alone | Recording a flaw adds findings and hides none, so the review-sized limits on a judgment do not apply. The ceiling, 50,000 findings by default, guards against a runaway write, and adding builds to a flaw later is held to it the same way |
 | Every row gets the same embargo, rank and deadline | They are the same flaw. A build added later copies them, or the newest build would get a later deadline for the same flaw |
 | What carries it is a component of the build, or the build itself | Naming nothing puts it on the root, which is honest where the flaw is in how the pieces fit together. Naming something the build does not hold is refused |

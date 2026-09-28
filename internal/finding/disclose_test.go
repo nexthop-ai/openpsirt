@@ -29,10 +29,10 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		row := rows[0]
-		if err != nil {
-			t.Fatal(err)
+		if len(rows) == 0 {
+			t.Fatal("recording a flaw returned no rows")
 		}
+		row := rows[0]
 		if row.DiscloseAt == nil {
 			t.Fatal("an undisclosed finding has no end to its embargo")
 		}
@@ -78,10 +78,10 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		disclosed := discloseds[0]
-		if err != nil {
-			t.Fatal(err)
+		if len(discloseds) == 0 {
+			t.Fatal("recording a flaw returned no rows")
 		}
+		disclosed := discloseds[0]
 		if disclosed.DiscloseAt != nil {
 			t.Errorf("a public finding carries an embargo ending %s", disclosed.DiscloseAt)
 		}
@@ -135,10 +135,10 @@ func (f *fixture) embargoed(t *testing.T, who access.Subject) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	row := rows[0]
-	if err != nil {
-		t.Fatal(err)
+	if len(rows) == 0 {
+		t.Fatal("recording a flaw returned no rows")
 	}
+	row := rows[0]
 	return row.VulnerabilityID
 }
 
