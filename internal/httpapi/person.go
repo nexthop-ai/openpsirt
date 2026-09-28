@@ -160,7 +160,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 		for _, change := range changes {
 			body.Held = append(body.Held, HeldChangeBody{
-				At: change.At.Format(time.RFC3339), By: who[change.Person()],
+				At: stamp(change.At), By: who[change.Person()],
 				About: change.Name, Was: orBlank(change.Was), Now: orBlank(change.Became),
 			})
 		}

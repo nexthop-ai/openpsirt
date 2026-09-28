@@ -350,6 +350,10 @@ refused what its policy forbids at submission (REQ-67), so the text is known-goo
 under the rules in force when it was written; rules written since are the
 renderer's to apply. The rules are in `DESIGN-text.md`.
 
+A moment is stated in UTC, in RFC 3339, in a response and in its file alike. A
+driver hands back a time in the process's own zone, so a moment is converted
+before it is written rather than formatted behind a literal `Z`.
+
 ## Addresses and labels
 
 A product, a person and a team each answer to two strings: the one that

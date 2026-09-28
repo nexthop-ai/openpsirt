@@ -214,7 +214,7 @@ func registerTrail(api huma.API, in Ingest) {
 		out.Body.Items = make([]ChangeBody, 0, len(changes))
 		for _, change := range changes {
 			body := ChangeBody{
-				At: change.At.Format("2006-01-02T15:04:05Z"), Actor: string(change.Actor),
+				At: stamp(change.At), Actor: string(change.Actor),
 				By: people.identity(change.Person()), ByName: people.label(change.Person()),
 				Kind: string(change.Kind), About: change.Name,
 				Unset: change.Was == nil, Cleared: change.Became == nil,

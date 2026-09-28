@@ -1084,3 +1084,40 @@ func TestACaseIsRecordedByTheNamesItResolvedTo(t *testing.T) {
 		}
 	})
 }
+
+// The list of administrative changes and its file state a change's moment
+// alike, in UTC.
+//
+// The list formatted the time the driver handed back behind a literal Z. A
+// driver hands back a time in the process's own zone, so on a deployment not
+// running in UTC the list was off by the zone's offset and disagreed with the
+// file, which converts first. Run with TZ set to a zone other than UTC to see
+// the difference.
+func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+			`{"value":"high"}`); got.Code >= 300 {
+			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
+		}
+		var trail struct {
+			Items []struct {
+				At string `json:"at"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/administration/changes?kind=setting&limit=1", &trail)
+		file := asPerson(t, r, "admin", http.MethodGet,
+			"/v1/administration/changes.csv?kind=setting", "")
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := rowsUnder(lines)
+		at := indexOf(body[0], "at")
+		if at < 0 || len(body) < 2 || len(trail.Items) != 1 {
+			t.Fatalf("no change to compare: list %+v, file %v", trail.Items, body)
+		}
+		if trail.Items[0].At != body[1][at] {
+			t.Errorf("the list says %s and the file says %s", trail.Items[0].At, body[1][at])
+		}
+	})
+}
