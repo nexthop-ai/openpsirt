@@ -56,13 +56,14 @@ summing:
 | Deferred | *Every* open place is covered by a standing deferral. One covering some of a group leaves the rest running |
 | Overdue | Anything open is past its date and uncovered |
 
-Two closure reasons are not resolutions, and a velocity figure counting them
+Three closure reasons are not resolutions, and a velocity figure counting them
 measures churn:
 
 | Reason | Why it is not a resolution |
 |---|---|
 | `superseded` | The component's version moved and the issue came with it. Counting it as resolved draws a line saying work was completed while the same chart's new line rises by exactly as much |
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
+| `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.

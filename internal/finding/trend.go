@@ -148,6 +148,9 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// the opening side.
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
+		// A record taken back as invalid was never present, so it is in no
+		// step's open set.
+		Where("COALESCE(f.closed_because, '') <> ?", Invalid).
 		// Only what can fall in the range. A finding opened after the last
 		// point contributes to nothing, and one closed before the first
 		// contributes to nothing either — reading the whole table to discard
@@ -214,25 +217,25 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	for i := range open {
 		open[i] = map[int64]string{}
 	}
-	// Issues that stopped being present without explanation, per step.
-	// The scanner going quiet is a fault to investigate rather than a fix,
-	// so it is held back from the resolved count even though the issue has
-	// left the set.
+	// Issues that stopped being present by a closure that is not a fix, per
+	// step. The scanner going quiet is a fault to investigate, and a
+	// superseded row is replaced rather than fixed, so each is held back from
+	// the resolved count even though the issue has left the set. Which
+	// closures count as a fix is Resolving's list, the one the remediation
+	// figures read.
 	quiet := make([]map[int64]bool, steps)
 	for i := range quiet {
 		quiet[i] = map[int64]bool{}
 	}
 
 	for _, row := range rows {
-		// The step an unexplained disappearance falls in, worked out once
-		// from the moment rather than by walking the steps looking for it.
-		// Inside the loop below it did not depend on the step it sat in, so a
-		// row that went quiet re-walked every bucket once per step — steps
-		// squared per row, writing the same true each time, and at the
-		// hundred-and-four steps this accepts that is eleven thousand
-		// iterations to record one fact.
+		// The step a disappearance that is not a fix falls in, worked out
+		// once from the moment rather than by walking the steps looking for
+		// it: a walk per row is steps squared per row, eleven thousand
+		// iterations at the hundred-and-four steps this accepts, to record
+		// one fact.
 		if row.ClosedAt != nil && row.ClosedAt.After(since) &&
-			Closure(row.ClosedBecause) == Unexplained {
+			!Closure(row.ClosedBecause).Resolves() {
 
 			if at := int(row.ClosedAt.Sub(since) / step); at >= 0 && at < steps {
 				// A moment exactly on a boundary belongs to the step it ends,
