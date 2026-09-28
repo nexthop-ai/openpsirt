@@ -34,17 +34,16 @@ export type Point = {
 // The four bands, folded the way the server folds them.
 //
 // The server ranks, filters and clocks on four bands and reports the trend in
-// the six words a feed uses. Something has to fold, and done twice it has two
-// answers: "unknown" counted as low here, and a medium everywhere the server
-// looks at it — the severity filter, the triage floor, the order, the
-// deadline. Home then says 1,415 low where the list agrees on 38, and a
-// thousand findings are one thing on one screen and another on the next.
+// the six words a feed uses. Folded here the way the server folds, because a
+// rating with no word is treated as a medium rather than dismissed as a low,
+// and the screen has no business disagreeing with what the deadline is set
+// from: counted as low, one real deployment read 1,415 low on the front page
+// where the list agreed on 38.
 //
-// Folded here to match, because a rating with no word is treated as a medium
-// rather than dismissed as a low, and the screen has no business disagreeing
-// with what the deadline is set from.
+// Seeded from the ladder, so every band the chart draws a series for is a key
+// of every row, and a split always sums to its count.
 export function folded(by: Record<string, number>): Record<string, number> {
-  const out: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+  const out: Record<string, number> = Object.fromEntries(LADDER.map((band) => [band, 0]));
   for (const [word, count] of Object.entries(by)) {
     switch (word) {
       case "critical":
@@ -63,9 +62,8 @@ export function folded(by: Record<string, number>): Record<string, number> {
   return out;
 }
 
-// Derived from the ladder rather than written beside it. Spelled out, a rung
-// added to the ladder drew no band here and the split stopped summing to the
-// count printed next to it — which is the one thing a split has to do.
+// Derived from the ladder rather than written beside it, so a rung added to the
+// ladder is a band here and the split still sums to the count beside it.
 const BANDS = LADDER.map((key) => ({ key, color: COLORS[key] }));
 
 const tip = {
@@ -216,14 +214,7 @@ function paceLabel(points: Point[]): string {
 // worse, and one line cannot show that.
 export function Mix({ points }: { points: Point[] }) {
   const data = points.map((p) => {
-    const by = folded(p.by_severity ?? {});
-    return {
-      at: day(p.at),
-      critical: by.critical ?? 0,
-      high: by.high ?? 0,
-      medium: by.medium ?? 0,
-      low: by.low ?? 0,
-    };
+    return { at: day(p.at), ...folded(p.by_severity ?? {}) };
   });
   if (data.length === 0) return null;
   return (
@@ -309,13 +300,9 @@ export type Release = Body<"ReleaseBody">;
 // requests.
 export function Across({ releases }: { releases: Release[] }) {
   const data = releases.map((r) => {
-    const by = folded(r.by_severity ?? {});
     return {
       at: [r.stream, r.variant].filter(Boolean).join(" · "),
-      critical: by.critical ?? 0,
-      high: by.high ?? 0,
-      medium: by.medium ?? 0,
-      low: by.low ?? 0,
+      ...folded(r.by_severity ?? {}),
     };
   });
   if (data.length === 0) return null;
