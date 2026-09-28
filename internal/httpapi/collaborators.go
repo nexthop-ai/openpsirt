@@ -109,14 +109,20 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			}
 			about := named + " · " + issued
 			var person *access.Account
+			var added bool
 			if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				rights := access.NewStore(tx)
 				var err error
 				if person, err = rights.ByIdentity(ctx, input.Identity); err != nil {
-					return noSuchPerson()
+					return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 				}
-				if err := rights.AddToCase(ctx, product, issue, person.ID, subject.ID); err != nil {
+				if added, err = rights.AddToCase(ctx, product, issue, person.ID, subject.ID); err != nil {
 					return wentWrong(in.Logger, "they could not be brought in", err)
+				}
+				// Somebody already on the case is not brought in again, so
+				// nothing is recorded and nobody is told.
+				if !added {
+					return nil
 				}
 				if err := noted(ctx, tx, trail.Case,
 					about+" · "+person.Identity,
@@ -126,6 +132,9 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				return nil
 			}); err != nil {
 				return nil, err
+			}
+			if !added {
+				return &struct{}{}, nil
 			}
 			// Told at once, and told what it is about. Nothing
 			// leaving this deployment carries detail about an
@@ -180,7 +189,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				rights := access.NewStore(tx)
 				person, err := rights.ByIdentity(ctx, input.Identity)
 				if err != nil {
-					return noSuchPerson()
+					return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 				}
 				switch err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); {
 				case errors.Is(err, access.ErrNothingMatched):

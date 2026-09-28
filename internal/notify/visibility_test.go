@@ -133,7 +133,7 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 			t.Fatal(err)
 		}
 		theirs, other := ids["SONIC-2026-7002"], ids["SONIC-2026-7003"]
-		if err := rights.AddToCase(ctx, product.ID, theirs, guest.ID, granter.ID); err != nil {
+		if _, err := rights.AddToCase(ctx, product.ID, theirs, guest.ID, granter.ID); err != nil {
 			t.Fatal(err)
 		}
 

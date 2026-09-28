@@ -481,3 +481,50 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 		}
 	})
 }
+
+// Bringing in somebody already on the case succeeds and changes nothing: no
+// second trail row, and no second notification.
+//
+// On PostgreSQL the second insert is refused by the one-live-grant index
+// inside the act's transaction, and a refused statement aborts the
+// transaction around it, so the read asking whether the grant stands failed
+// and the route answered 500.
+func TestBringingSomebodyInTwiceChangesNothingTheSecondTime(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+		person, err := r.rights.Ensure(ctx, "ana", "Ana Ruiz", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.Claim(ctx, person.ID, "ana"); err != nil {
+			t.Fatal(err)
+		}
+
+		at := "/v1/products/mine/issues/" + embargoed + "/collaborators/ana"
+		for i := range 2 {
+			if got := asPerson(t, r, "private-triage", http.MethodPut, at, ""); got.Code != http.StatusNoContent {
+				t.Fatalf("bringing them in, time %d, answered %d: %s", i+1, got.Code, got.Body.String())
+			}
+		}
+
+		var trail struct {
+			Items []struct {
+				About string `json:"about"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/administration/changes?kind=case", &trail)
+		if len(trail.Items) != 1 {
+			t.Errorf("bringing somebody in twice left %d trail rows: %+v", len(trail.Items), trail.Items)
+		}
+		told, err := r.db.DB.NewSelect().Table("notification").
+			Where("person_id = ?", person.ID).Where("kind = ?", "brought-in").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if told != 1 {
+			t.Errorf("they were told %d times that they were brought in", told)
+		}
+	})
+}

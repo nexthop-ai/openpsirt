@@ -43,26 +43,22 @@ func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) 
 		Source: Assigned, Active: true,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(grant).Exec(ctx); err != nil {
-		// Granting what is already granted is not a failure. Asked as a count
-		// rather than written as an upsert: the clause that would express it
-		// is spelled differently on each of the four engines, and
-		// engine-specific SQL belongs in the database package rather than
-		// here (REQ-71).
-		return s.alreadyThere(ctx, err,
-			fmt.Sprintf("grant %q across every product", role),
-			func(ctx context.Context) (bool, error) {
-				// In force, like every other question about what somebody
-				// holds. A row set aside by a change of mode grants nothing,
-				// so reporting success on one would tell an administrator they
-				// had granted something that does not exist.
-				n, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
-					Where("person_id = ?", personID).Where("role = ?", role).
-					Where("active = ?", true).Count(ctx)
-				return n > 0, err
-			})
-	}
-	return nil
+	// Granting what is already granted is not a failure. Asked as a count
+	// rather than written as an upsert: the clause that would express it is
+	// spelled differently on each of the four engines, and engine-specific SQL
+	// belongs in the database package rather than here (REQ-71).
+	_, err := s.insertOnce(ctx, fmt.Sprintf("grant %q across every product", role), grant,
+		func(ctx context.Context) (bool, error) {
+			// In force, like every other question about what somebody holds.
+			// A row set aside by a change of mode grants nothing, so reporting
+			// success on one would tell an administrator they had granted
+			// something that does not exist.
+			n, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
+				Where("person_id = ?", personID).Where("role = ?", role).
+				Where("active = ?", true).Count(ctx)
+			return n > 0, err
+		})
+	return err
 }
 
 // WithdrawEstateRole takes one back.

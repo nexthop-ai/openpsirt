@@ -40,29 +40,27 @@ type Collaborator struct {
 	LivePerson *int64 `bun:"live_person_id"`
 }
 
-// AddToCase brings somebody into one case.
+// AddToCase brings somebody into one case, and reports whether it did.
 //
 // Adding somebody who is already on it is not a failure: the unique index
 // refuses the second row, and the state the caller asked for is the state that
-// holds. Granting a role behaves the same way, for the same reason.
+// holds. It reports false, because nothing changed, so the caller neither
+// records nor announces a grant that already stood.
 func (s *Store) AddToCase(ctx context.Context, productID, vulnerabilityID, personID,
-	by int64) error {
+	by int64) (bool, error) {
 
 	row := &Collaborator{
 		ProductID: productID, VulnerabilityID: vulnerabilityID, PersonID: personID,
 		AddedBy: by, AddedAt: s.now().Truncate(time.Microsecond),
 		LivePerson: &personID,
 	}
-	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-		return s.alreadyThere(ctx, err, "bring them into that case",
-			func(ctx context.Context) (bool, error) {
-				// A live grant, which is what the index holds one of per
-				// person per case: a withdrawn row keeps the record and grants
-				// nothing, so it is not a reason to report success.
-				return s.onCase(ctx, productID, vulnerabilityID, personID)
-			})
-	}
-	return nil
+	return s.insertOnce(ctx, "bring them into that case", row,
+		func(ctx context.Context) (bool, error) {
+			// A live grant, which is what the index holds one of per person per
+			// case: a withdrawn row keeps the record and grants nothing, so it
+			// is not a reason to report success.
+			return s.onCase(ctx, productID, vulnerabilityID, personID)
+		})
 }
 
 // RemoveFromCase withdraws the grant, keeping the row.

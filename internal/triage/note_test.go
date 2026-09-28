@@ -268,7 +268,7 @@ func TestSomebodyBroughtOntoACaseReachesItsNotes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.AddToCase(ctx, f.product, f.issue, person.ID, f.proposer); err != nil {
+		if _, err := rights.AddToCase(ctx, f.product, f.issue, person.ID, f.proposer); err != nil {
 			t.Fatal(err)
 		}
 		brought, err := rights.Resolve(ctx, "collaborator")

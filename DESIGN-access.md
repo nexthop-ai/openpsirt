@@ -1238,6 +1238,7 @@ private access.
 | The grant is asked wherever a row is read, not only where a list is narrowed | A grant that shows a row in a list and refuses it when opened is a grant with no content. The list narrowing asked it and three reads by identifier did not, so a collaborator saw their case among the decisions and could open none of them |
 | Asked once the row is in hand | It needs the issue, which a bare product-and-visibility rule cannot see. That is the opposite order from a name somebody typed, and safe for the same reason it is necessary: the row is already established as existing |
 | Adding somebody is an access change | It lands in the administration trail, tells them at once in the area inside the application, and the finding shows how many collaborators it has. It stops meaning anything at disclosure |
+| Adding somebody already on the case changes nothing | No trail row and no notification, because no grant moved. Each would otherwise record an access change that did not happen |
 | Whoever reads the product the case is in manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo. A collaborator is not that reader: the grant is one issue, so it carries the finding and not the list of who else was brought in |
 | The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator is refused the path to the component their own case sits in, and the finding answers as though it were not there |
 | Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faults on the row the grant exists to open |
@@ -1354,4 +1355,6 @@ notice the absence and say so.
 - Naming every address as a trusted source is refused. It reaches the same
   place as naming none, through the setting that is supposed to be the guard.
 - Granting a role somebody already holds succeeds. An administrator scripting
-  grants should not have to check first.
+  grants should not have to check first. The refused insert stands on a
+  savepoint of its own, because on PostgreSQL a refused statement aborts the
+  transaction around it and the act that granted would fail with it.
