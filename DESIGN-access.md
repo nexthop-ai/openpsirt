@@ -703,7 +703,7 @@ miss the case this exists for and refuse the one it does not care about.
 
 | Rule | Reason |
 |---|---|
-| Discovery asks for the issuer exactly as the operator wrote it | A provider's discovery document is compared with it character for character, and some providers publish their issuer with a trailing slash. Trimmed first, such a provider can never be configured |
+| Discovery asks for the issuer as the operator wrote it, and again as the provider publishes it where the two differ only by a trailing slash | A provider's discovery document is compared with the question character for character. Some providers publish their issuer with the slash and most without, and an operator writes whichever they copied. A difference beyond the slash is refused at startup |
 | The issuer is recorded without a trailing slash | Identities stay attributed to one provider whichever spelling an operator writes |
 
 | Rule | Reason |

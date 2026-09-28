@@ -356,40 +356,56 @@ func TestAGroupsClaimIsReadUnderTheNameItReports(t *testing.T) {
 	}
 }
 
-func TestAnIssuerIsDiscoveredAsItsProviderSpellsIt(t *testing.T) {
+func TestAnIssuerIsTheSameProviderWithOrWithoutATrailingSlash(t *testing.T) {
 	// A provider compares the issuer it publishes with the one it was asked
-	// about exactly, and some publish theirs with a trailing slash. The
-	// identities it issues are recorded against the issuer without one, so an
-	// operator adding or dropping the slash names the same provider.
-	p := standing(t)
-	p.document = map[string]any{"issuer": p.URL + "/"}
-	p.claims["iss"] = p.URL + "/"
-	cfg := func(issuer string) OIDCConfig {
-		return OIDCConfig{
-			Name: "acme", Issuer: issuer, ClientID: "a-client", ClientSecret: "a-secret",
-			UsernameClaim: "preferred_username", client: p.Client(),
+	// about exactly. Some publish theirs with a trailing slash and most
+	// without, and an operator writes whichever they copied. The identities it
+	// issues are recorded against the issuer without one, so both spellings
+	// name the same provider.
+	for _, published := range []string{"/", ""} {
+		p := standing(t)
+		p.document = map[string]any{"issuer": p.URL + published}
+		p.claims["iss"] = p.URL + published
+		cfg := func(issuer string) OIDCConfig {
+			return OIDCConfig{
+				Name: "acme", Issuer: issuer, ClientID: "a-client", ClientSecret: "a-secret",
+				UsernameClaim: "preferred_username", client: p.Client(),
+			}
+		}
+		for _, written := range []string{p.URL + "/", p.URL} {
+			adapter, err := NewOIDC(t.Context(), cfg(written))
+			if err != nil {
+				t.Errorf("published %q, written %q: could not be configured: %v",
+					p.URL+published, written, err)
+				continue
+			}
+			if adapter.Issuer() != p.URL {
+				t.Errorf("identities are recorded against %q, want %q", adapter.Issuer(), p.URL)
+			}
+			_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
+			if err != nil {
+				t.Fatal(err)
+			}
+			p.claims["nonce"] = pending.Nonce
+			p.claims["preferred_username"] = "ana"
+			if _, err := adapter.Complete(t.Context(), "a-code", pending, "https://here.example/back"); err != nil {
+				t.Errorf("published %q, written %q: a token was refused: %v",
+					p.URL+published, written, err)
+			}
 		}
 	}
-	adapter, err := NewOIDC(t.Context(), cfg(p.URL+"/"))
-	if err != nil {
-		t.Fatalf("an issuer published with a trailing slash could not be configured: %v", err)
-	}
-	if adapter.Issuer() != p.URL {
-		t.Errorf("identities are recorded against %q, want %q", adapter.Issuer(), p.URL)
-	}
-	_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.claims["nonce"] = pending.Nonce
-	p.claims["preferred_username"] = "ana"
-	if _, err := adapter.Complete(t.Context(), "a-code", pending, "https://here.example/back"); err != nil {
-		t.Errorf("a token from an issuer spelled with a slash was refused: %v", err)
-	}
+}
 
-	// The comparison is the provider's, and the spelling it did not publish
-	// is refused at startup rather than at every sign-in.
-	if _, err := NewOIDC(t.Context(), cfg(p.URL)); err == nil {
+func TestAnIssuerDifferingByMoreThanASlashIsRefused(t *testing.T) {
+	// The comparison is the provider's, and a spelling that names another
+	// path is refused at startup rather than at every sign-in.
+	p := standing(t)
+	p.document = map[string]any{"issuer": p.URL + "/tenant-a"}
+	_, err := NewOIDC(t.Context(), OIDCConfig{
+		Name: "acme", Issuer: p.URL, ClientID: "a-client", ClientSecret: "a-secret",
+		UsernameClaim: "preferred_username", client: p.Client(),
+	})
+	if err == nil {
 		t.Error("an issuer spelled differently from what the provider publishes was accepted")
 	}
 }

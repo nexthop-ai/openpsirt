@@ -10,6 +10,7 @@ package signin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -132,11 +133,18 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		guarded = outward.Guarded(issuer.Hostname())
 	}
 	ctx = oidc.ClientContext(ctx, guarded)
-	// Asked as the operator wrote it. The provider's own discovery document
-	// is compared with it exactly, and some providers publish their issuer
-	// with a trailing slash; the well-known path is built without it either
-	// way.
+	// Asked as the operator wrote it, and asked again as the provider
+	// publishes it where the two differ only by a trailing slash. The
+	// provider's discovery document is compared with the question exactly,
+	// some providers publish their issuer with the slash and most without, and
+	// an operator writes whichever they copied. The well-known path is built
+	// without it either way.
 	provider, err := oidc.NewProvider(ctx, strings.TrimSpace(cfg.Issuer))
+	var mismatch *oidc.IssuerMismatchError
+	if errors.As(err, &mismatch) &&
+		strings.TrimRight(mismatch.Provided, "/") == strings.TrimRight(mismatch.Discovered, "/") {
+		provider, err = oidc.NewProvider(ctx, mismatch.Discovered)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("discover the %q provider: %w", cfg.Name, err)
 	}
