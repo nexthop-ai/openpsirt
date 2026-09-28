@@ -94,7 +94,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |
 | Keep the screen's short list of weakness names? | The screen shows a short list in plain words. Published advisories use the full CWE catalog |
 | Offer saved filters on the all-products findings list? | Saved filters belong to one product, so the list the home screen's tiles open has none |
 | Have the server list the package kinds present? | The package-kind filter is a fixed list. A kind missing from it is reachable only by editing the address |
