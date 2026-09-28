@@ -14,10 +14,9 @@ import { Wide } from "../ui/Wide";
 
 // One person, whole.
 //
-// Four questions that were answerable only by reading four screens against
-// each other, and two of them could not be asked at all: what somebody was
-// told while holding a role that has since been withdrawn, and how much of the
-// record rests on this one person.
+// Four questions in one place, two of them asked nowhere else: what somebody
+// was told while holding a role that has since been withdrawn, and how much of
+// the record rests on this one person.
 //
 // The record of what they were told is not narrowed by what they may read now.
 // That is the point of asking: a line about an undisclosed finding, sent while
@@ -29,7 +28,12 @@ export function Person() {
   // The way back to the list of everybody is offered to somebody who may open
   // it, which is an administrator. A link that lands on a screen whose every
   // control is refused is a door into a room with nothing in it.
+  //
+  // Recording that somebody left, and bringing them back, is an
+  // administrator's too. An auditor reads this screen, and both controls are
+  // disabled for them with the reason on hover.
   const me = useWho();
+  const admin = !!me.data?.admin;
   const queries = useQueryClient();
   const about = useQuery({
     queryKey: ["person", identity],
@@ -68,7 +72,7 @@ export function Person() {
         <p>
           <span className="id">{who.identity}</span>
           {(who.admin || who.admin_by_configuration) && <> · administers this deployment</>}
-          {me.data?.admin && (
+          {admin && (
             <>
               {" "}
               · <Link to="/people">All users</Link>
@@ -92,7 +96,12 @@ export function Person() {
             Since {stamp(who.deactivated_at)}. Signed out and unassigned. Their record and roles are
             kept.
           </p>
-          <button type="button" onClick={() => leaving.mutate(false)} disabled={leaving.isPending}>
+          <button
+            type="button"
+            onClick={() => leaving.mutate(false)}
+            disabled={!admin || leaving.isPending}
+            title={admin ? undefined : ADMINS_ONLY}
+          >
             Bring them back
           </button>
         </section>
@@ -283,7 +292,12 @@ export function Person() {
           <p className="hint">
             Not a deletion. Roles are kept, so reinstating does not mean granting again.
           </p>
-          <button type="button" onClick={() => leaving.mutate(true)} disabled={leaving.isPending}>
+          <button
+            type="button"
+            onClick={() => leaving.mutate(true)}
+            disabled={!admin || leaving.isPending}
+            title={admin ? undefined : ADMINS_ONLY}
+          >
             Record that they have left
           </button>
         </section>
@@ -291,6 +305,8 @@ export function Person() {
     </>
   );
 }
+
+const ADMINS_ONLY = "Only an administrator records who has left";
 
 // The same shape the record's own trail table uses: the day and the minute,
 // which is the resolution somebody correlating a grant with a message needs,

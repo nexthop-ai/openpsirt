@@ -1502,7 +1502,8 @@ Leaving is recorded here, at the foot, and says what it does before it is done:
 refused at every way in, sessions ended, work handed back, nothing deleted and
 no role withdrawn. Once it is recorded the screen says so at the top rather than
 at the foot — every other number on it reads differently once somebody has gone
-— and offers bringing them back.
+— and offers bringing them back. Both acts are an administrator's; an auditor
+reading the screen sees both disabled, with the reason on hover.
 
 ## A release, gathered
 
@@ -1614,6 +1615,8 @@ the three left the credentials on a screen that did not mention them.
 | A person's name and their address are recorded here | Both are on the record and neither could be typed: the whole mail path could never reach anybody created through the interface, and what the person was told when they went looking was that an administrator has to record one |
 | An address stated empty clears it; an address left out is left alone | Coming off mail is not coming off the tool, and a screen that cannot tell the two apart makes one of them unreachable |
 | A control an auditor may not use is disabled and says why | Hidden, it teaches nobody that it exists; live, it is a button that can only reach a refusal. Only a signed-in administrator mints or withdraws a credential — a credential cannot create another |
+| A role chip carries its withdraw mark for an administrator only, and only where roles are assigned here | The row's Manage control is disabled for everybody else with the reason on hover, so the mark on every chip would be a second way to say the same refusal |
+| The teams screen offers its controls to an administrator only | Membership is listed to nobody else. A non-administrator reaching it by address sees the team names, no control, and a dash where the members would be rather than a team with nobody on it |
 | The credentials panel is drawn for an administrator only | Both of its reads are administrator-only, and its one empty state says nothing is issued — so an auditor, whom the rail admits here, was told a deployment holding keys had none. The same shape the webhooks panel is gated for |
 | The branch and the variant on a key are offered from what the product holds | A key names a build that exists: both are resolved through the catalog and refused unless declared. Offered rather than restricting, because the server is what refuses and a name declared between the two requests is not one this should decline. Choosing a product clears them, since a branch belongs to one |
 | The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |

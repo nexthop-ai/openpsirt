@@ -339,9 +339,9 @@ export function People({ who: me }: { who: Who }) {
                       ) : (
                         <span className="variants">
                           {/* Every role they hold is a capability, so they reach
-                            no product at all. It was accepted in silence,
-                            which reads as working until they sign in to an
-                            empty tool. */}
+                            no product at all. Nothing refuses that shape, and
+                            it reads as working until they sign in to an empty
+                            tool. */}
                           {person.sees_nothing && (
                             <span
                               className="vchip nothing"
@@ -366,7 +366,7 @@ export function People({ who: me }: { who: Who }) {
                                 ? "every product"
                                 : (held.product_name ?? held.product)}{" "}
                               · {called(held.role)}
-                              {held.source === "assigned" && (
+                              {held.source === "assigned" && me.admin && !cannotManage && (
                                 <>
                                   {" "}
                                   <button
@@ -572,6 +572,9 @@ export function People({ who: me }: { who: Who }) {
           )}
           . Roles are assigned here or derived from sign-in groups, never both.
         </p>
+        {bindings.isError && (
+          <Failed error={bindings.error} what="The group bindings could not be read." />
+        )}
         {(bindings.data?.items ?? []).length > 0 && (
           <Wide style={{ marginTop: 10 }}>
             <table>
@@ -601,11 +604,9 @@ export function People({ who: me }: { who: Who }) {
       </div>
 
       {/* Administrators only, and the panel as a whole. Both of its reads are
-          administrator-only, so an auditor — whom the rail admits here — got a
-          403 for each and the only empty branch below drew "Nothing is issued."
-          against a deployment holding twelve keys. A silent wrong answer, to
-          the one reader whose job is reviewing them. The same shape the
-          webhooks panel is gated for. */}
+          administrator-only, and an auditor — whom the rail admits here —
+          would be refused each of them. The same shape the webhooks panel is
+          gated for. */}
       {me.admin && <Credentials me={me} />}
 
       <Declare
@@ -734,7 +735,14 @@ function Credentials({ me }: { me: Who }) {
         <Failed error={withdrawToken.error} what="That token could not be withdrawn." />
       )}
 
-      {keyRows.length === 0 && tokenRows.length === 0 ? (
+      {keys.isError || tokens.isError ? (
+        <Failed
+          error={keys.isError ? keys.error : tokens.error}
+          what="The keys and tokens could not be read."
+        />
+      ) : keys.isPending || tokens.isPending ? (
+        <Loading />
+      ) : keyRows.length === 0 && tokenRows.length === 0 ? (
         <p className="hint" style={{ margin: 0 }}>
           Nothing is issued.
         </p>
