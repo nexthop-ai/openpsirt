@@ -15,8 +15,8 @@
 // each binary gets a database of its own, named for the package, dropped and
 // created on first use and migrated once.
 // Packages therefore share nothing and can run in parallel; tests within a
-// package share the database, and one pool of connections to it, and empty it
-// between them with Reset.
+// package share the database, and one pool of connections to it, and the
+// harness empties it before each of them.
 //
 // A package whose tests start from the same rows declares them once as a
 // Seeded template. On SQLite the seed is applied to the template before the
@@ -45,6 +45,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
@@ -97,10 +98,9 @@ func candidates() []candidate {
 // Each runs fn once against every database available, as a subtest.
 //
 // The database arrives migrated and empty of the previous test's rows.
-// Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per run, and each server database is either migrated on
-// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
-// Reset only where a test leaves rows a later one must not see.
+// SQLite copies a template that was migrated once per run, and a server
+// database is migrated once per binary and emptied before every test, so a
+// test needs neither a schema.Up nor a Reset of its own.
 //
 // This is for a test that pins what a query does: every portability defect
 // found so far was a query behaving differently on one engine, so a store
@@ -115,10 +115,9 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // Alone is Each for a test that cannot run beside another in its package.
 //
 // The database arrives migrated and empty of the previous test's rows.
-// Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per run, and each server database is either migrated on
-// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
-// Reset only where a test leaves rows a later one must not see.
+// SQLite copies a template that was migrated once per run, and a server
+// database is migrated once per binary and emptied before every test, so a
+// test needs neither a schema.Up nor a Reset of its own.
 //
 // A test qualifies where it changes something the whole process shares —
 // an environment variable, the working directory — rather than one that is
@@ -133,10 +132,9 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // Two runs fn against SQLite and PostgreSQL only.
 //
 // The database arrives migrated and empty of the previous test's rows.
-// Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per run, and each server database is either migrated on
-// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
-// Reset only where a test leaves rows a later one must not see.
+// SQLite copies a template that was migrated once per run, and a server
+// database is migrated once per binary and emptied before every test, so a
+// test needs neither a schema.Up nor a Reset of its own.
 //
 // This is for a test that pins something above the store — routing, which
 // role reaches which endpoint, the shape of a response — where the queries
@@ -176,10 +174,9 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // Only runs fn against one engine.
 //
 // The database arrives migrated and empty of the previous test's rows.
-// Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per run, and each server database is either migrated on
-// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
-// Reset only where a test leaves rows a later one must not see.
+// SQLite copies a template that was migrated once per run, and a server
+// database is migrated once per binary and emptied before every test, so a
+// test needs neither a schema.Up nor a Reset of its own.
 //
 // The narrowest of the three, and it needs the narrowest reason: not "the
 // other engines are slow" but "the other engines cannot disagree". What
@@ -316,15 +313,15 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 			if err != nil {
 				t.Fatalf("connect to the %s database for this package: %v", c.name, err)
 			}
+			// The package's one database on this server holds whatever the
+			// previous test, or the previous run, left: the per-test copy
+			// SQLite takes has no counterpart on a server. So it is emptied
+			// before every test, and seeded again where there is a seed.
+			if err := clear(t.Context(), db); err != nil {
+				t.Fatalf("empty the %s database for this test: %v", c.name, err)
+			}
 			var made any
 			if seed != nil {
-				// The package's one database on this server holds whatever
-				// the previous test left, so it is emptied and seeded again
-				// for each test: the copy that makes the seed free on SQLite
-				// has no counterpart on a server.
-				if err := clear(t.Context(), db); err != nil {
-					t.Fatalf("empty the %s database before seeding it: %v", c.name, err)
-				}
 				if made, err = seed.server(t.Context(), db); err != nil {
 					t.Fatalf("seed the %s database: %v", c.name, err)
 				}
@@ -548,9 +545,9 @@ func templateName() (string, error) {
 // older fingerprints named are dropped as the new one is created, so a server
 // does not accumulate them.
 //
-// A reused database still holds the last run's rows, so it is emptied here —
-// the first test in a package must see the same empty database whether or not
-// somebody ran it before.
+// A reused database is emptied by the first test that runs on it, as every
+// test's database is. One whose migrations stopped part way is built again,
+// described at prepareServer.
 //
 // Two runs of the same package from the same checkout against the same server
 // at once would collide; nothing here prevents that, and it is stated so it is
@@ -561,52 +558,119 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 	if own, ok := serverURLs[engine]; ok {
 		return own, nil
 	}
+	name, err := packageDatabaseName()
+	if err != nil {
+		return "", err
+	}
+	own, err := prepareServer(context.Background(), engine, base, name)
+	if err != nil {
+		return "", err
+	}
+	serverURLs[engine] = own
+	return own, nil
+}
+
+// prepareServer leaves the database called name, on the server base names,
+// migrated to the schema this build expects, and returns its URL.
+//
+// A kept database is used as it stands where it holds that schema whole. A
+// run killed while it migrated leaves one holding less — a version short of
+// the expected one, or no version at all — and that database is dropped and
+// built again rather than migrated forward: on MySQL and MariaDB a schema
+// statement commits on its own, so a migration interrupted part way leaves
+// statements applied that no recorded version accounts for.
+func prepareServer(ctx context.Context, engine database.Engine, base, name string) (string, error) {
 	// Parsed by the database package first: its refusal never repeats the
 	// URL, and the plain parser's quotes it, password included.
 	target, err := database.ParseURL(base)
 	if err != nil {
 		return "", err
 	}
-	parsed, err := url.Parse(base)
+	own, err := databaseURL(base, engine, name)
 	if err != nil {
 		return "", fmt.Errorf("parse the %s URL at %s", engine, target.Redacted)
 	}
-	name, err := packageDatabaseName()
-	if err != nil {
-		return "", err
-	}
-
-	ctx := context.Background()
 	admin, err := database.Open(ctx, target)
 	if err != nil {
 		return "", fmt.Errorf("open %s: %w", target.Redacted, err)
 	}
+	defer func() { _ = admin.Close() }()
 	kept, err := ensureDatabase(ctx, admin, engine, name)
 	if err != nil {
-		_ = admin.Close()
 		return "", err
 	}
 	transient(ctx, admin, engine)
-	if err := admin.Close(); err != nil {
+	if kept {
+		if whole(ctx, own) {
+			return own, nil
+		}
+		if err := rebuild(ctx, admin, name); err != nil {
+			return "", err
+		}
+	}
+	if err := migrateFresh(own); err != nil {
 		return "", err
 	}
+	return own, nil
+}
 
+// databaseURL is the URL of the database called name on the server base
+// names.
+func databaseURL(base string, engine database.Engine, name string) (string, error) {
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
 	parsed.Path = "/" + name
 	if engine == database.Postgres {
 		query := parsed.Query()
 		query.Set("options", "-c synchronous_commit=off")
 		parsed.RawQuery = query.Encode()
 	}
-	own := parsed.String()
-	if kept {
-		if err := clearFresh(own); err != nil {
-			return "", err
-		}
-	} else if err := migrateFresh(own); err != nil {
-		return "", err
+	return parsed.String(), nil
+}
+
+// whole reports whether the database at url holds every migration this build
+// carries. A database that cannot say is not whole: it is one this harness
+// made, and building it again costs a migration.
+func whole(ctx context.Context, url string) bool {
+	target, err := database.ParseURL(url)
+	if err != nil {
+		return false
 	}
-	serverURLs[engine] = own
-	return own, nil
+	db, err := database.Open(ctx, target)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = db.Close() }()
+	applied, err := schema.Version(ctx, db)
+	if err != nil {
+		return false
+	}
+	expected, err := schema.Expected()
+	return err == nil && applied == expected
+}
+
+// rebuild drops the database called name and creates it empty.
+//
+// The drop is tried again for a few seconds. PostgreSQL refuses to drop a
+// database while a session is connected to it, and a connection closed a
+// moment ago may still hold its session on the server.
+func rebuild(ctx context.Context, admin *database.DB, name string) error {
+	var err error
+	for range 50 {
+		if _, err = admin.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+name+`"`); err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if err != nil {
+		return fmt.Errorf("drop %s, which an interrupted run left half built: %w", name, err)
+	}
+	if _, err := admin.ExecContext(ctx, `CREATE DATABASE "`+name+`"`); err != nil {
+		return fmt.Errorf("create %s again: %w", name, err)
+	}
+	return nil
 }
 
 // serverConnection is a handle on the one pool every test in this binary uses
@@ -616,11 +680,11 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 //
 // One pool rather than one per test, because a PostgreSQL connection is a
 // process of its own on the server, and a new one knows nothing of the schema.
-// Its first statement against the schema costs 43 ms and the same
-// statement on a warm connection 3.4 ms: the API package spends 90 s on
-// PostgreSQL with a pool per test and 48 s with one.
+// Its first statement against the schema costs 43 ms and the same statement
+// on a warm connection 3.4 ms: the API package spends 90 s on PostgreSQL with a
+// pool per test and 48 s with one.
 // Tests in a package run one after another on a server, so sharing the pool
-// shares nothing a test can see — the rows are emptied between tests.
+// shares nothing a test can see: the rows are emptied before each test.
 //
 // Each call wraps the pool in a query builder of its own. A test may add a
 // query hook to the handle it is given, to count statements, and a hook added
@@ -783,25 +847,6 @@ func packagePrefix(name string) string {
 }
 
 var notIdentifier = regexp.MustCompile(`[^a-z0-9_]+`)
-
-// clearFresh empties the database at url and closes it. Used where the
-// connection the tests will run on does not exist yet.
-func clearFresh(url string) error {
-	target, err := database.ParseURL(url)
-	if err != nil {
-		return err
-	}
-	ctx := context.Background()
-	db, err := database.Open(ctx, target)
-	if err != nil {
-		return fmt.Errorf("open %s: %w", target.Redacted, err)
-	}
-	if err := clear(ctx, db); err != nil {
-		_ = db.Close()
-		return fmt.Errorf("empty %s: %w", target.Redacted, err)
-	}
-	return db.Close()
-}
 
 // migrateFresh applies every migration to the database at url and closes it.
 func migrateFresh(url string) error {
@@ -1015,8 +1060,8 @@ func Reset(t *testing.T, db *database.DB) {
 	}
 }
 
-// clear is Reset without a test to fail: the harness empties a database it
-// kept from an earlier run before any test sees it.
+// clear is Reset without a test to fail: the harness empties a server
+// database with it before every test.
 func clear(ctx context.Context, db *database.DB) error {
 	// One transaction, not a statement per table. SQLite in its default mode
 	// syncs the file at every commit, and a commit per table between every pair
