@@ -13871,6 +13871,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -13923,6 +13924,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -13943,6 +13945,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -13958,6 +13961,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -14019,6 +14023,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -14131,6 +14136,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -14370,6 +14376,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -14422,6 +14429,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -14442,6 +14450,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -14457,6 +14466,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -14518,6 +14528,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -14630,6 +14641,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -17054,6 +17066,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -17106,6 +17119,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -17126,6 +17140,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -17141,6 +17156,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -17202,6 +17218,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -17314,6 +17331,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -17667,6 +17685,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -17719,6 +17738,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -17739,6 +17759,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -17754,6 +17775,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -17815,6 +17837,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -17927,6 +17950,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -18200,6 +18224,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -18252,6 +18277,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -18272,6 +18298,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -18287,6 +18314,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -18348,6 +18376,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -18460,6 +18489,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -18744,6 +18774,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -18796,6 +18827,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -18816,6 +18848,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -18831,6 +18864,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -18892,6 +18926,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -19004,6 +19039,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -19301,6 +19337,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -19353,6 +19390,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -19373,6 +19411,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -19388,6 +19427,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -19449,6 +19489,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -19561,6 +19602,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query

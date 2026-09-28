@@ -12,6 +12,27 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
+func TestAWordNamedTwiceInARepeatableFilterIsRefused(t *testing.T) {
+	// Each word of a repeatable filter becomes a member of a list bound into
+	// the statement, so the set of legal words is only a bound on its length
+	// where a word may appear once.
+	twoReach(t, func(t *testing.T, r *reach) {
+		for _, query := range []string{
+			"state=agreed&state=agreed",
+			"outcome=wont-fix&outcome=wont-fix",
+			"assigned=me&assigned=me",
+			"fix_state=fixed&fix_state=fixed",
+			"support=in-support&support=in-support",
+			"vex_status=affected&vex_status=affected",
+		} {
+			got := asPerson(t, r, "triager", http.MethodGet, "/v1/products/mine/findings?"+query, "")
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("?%s answered %d, want 422", query, got.Code)
+			}
+		}
+	})
+}
+
 func TestTheFiltersATriagerReachesFor(t *testing.T) {
 	// Every filter the server offered was on the screen and the screen was
 	// still not enough to assemble a day's work out of.
