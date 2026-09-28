@@ -976,39 +976,40 @@ function Credentials({ me }: { me: Who }) {
   );
 }
 
-// The label shown instead of somebody's identity, and the control that records
-// it. Cleared by saving it empty, which is what leaves the identity showing.
-function Named({
-  person,
+// One value somebody edits in place: what it reads as now with a control to
+// change it, and while changing, a box with Save and Cancel. Saving it empty
+// clears it. What it reads as is the caller's.
+function InlineEdit({
+  value,
+  type,
+  placeholder,
   busy,
   onSet,
+  children,
 }: {
-  person: { display_name?: string };
+  value: string;
+  type: "text" | "email";
+  placeholder: string;
   busy: boolean;
-  onSet: (name: string) => void;
+  onSet: (value: string) => void;
+  children: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(person.display_name ?? "");
+  const [draft, setDraft] = useState(value);
 
   if (!editing) {
     return (
       <>
-        {person.display_name ? (
-          person.display_name
-        ) : (
-          <span style={{ color: "var(--faint)" }} title="The identity is shown instead">
-            none
-          </span>
-        )}{" "}
+        {children}{" "}
         <button
           type="button"
           className="linkish noprint"
           onClick={() => {
-            setDraft(person.display_name ?? "");
+            setDraft(value);
             setEditing(true);
           }}
         >
-          {person.display_name ? "Change" : "Add"}
+          {value ? "Change" : "Add"}
         </button>
       </>
     );
@@ -1016,9 +1017,9 @@ function Named({
   return (
     <span className="controls">
       <input
-        type="text"
+        type={type}
         value={draft}
-        placeholder="Ashwin Rao"
+        placeholder={placeholder}
         onChange={(event) => setDraft(event.target.value)}
       />
       <button
@@ -1039,6 +1040,36 @@ function Named({
   );
 }
 
+// The label shown instead of somebody's identity, and the control that records
+// it. Cleared by saving it empty, which is what leaves the identity showing.
+function Named({
+  person,
+  busy,
+  onSet,
+}: {
+  person: { display_name?: string };
+  busy: boolean;
+  onSet: (name: string) => void;
+}) {
+  return (
+    <InlineEdit
+      value={person.display_name ?? ""}
+      type="text"
+      placeholder="Ashwin Rao"
+      busy={busy}
+      onSet={onSet}
+    >
+      {person.display_name ? (
+        person.display_name
+      ) : (
+        <span style={{ color: "var(--faint)" }} title="The identity is shown instead">
+          none
+        </span>
+      )}
+    </InlineEdit>
+  );
+}
+
 // The address somebody is reached at outside the application, and the control
 // that records it.
 //
@@ -1056,62 +1087,29 @@ function Reachable({
   busy: boolean;
   onSet: (email: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(person.email ?? "");
-
-  if (!editing) {
-    return (
-      <>
-        {person.email ? (
-          <span className="id">{person.email}</span>
-        ) : (
-          <span style={{ color: "var(--faint)" }} title="They get no mail from this deployment">
-            none
-          </span>
-        )}
-        {person.email_source === "provider" && (
-          <>
-            {" "}
-            <span className="hint" title="A later sign-in may replace it">
-              from the provider
-            </span>
-          </>
-        )}{" "}
-        <button
-          type="button"
-          className="linkish noprint"
-          onClick={() => {
-            setDraft(person.email ?? "");
-            setEditing(true);
-          }}
-        >
-          {person.email ? "Change" : "Add"}
-        </button>
-      </>
-    );
-  }
   return (
-    <span className="controls">
-      <input
-        type="email"
-        value={draft}
-        placeholder="ashwin@example.com"
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <button
-        type="button"
-        className="btn"
-        disabled={busy}
-        onClick={() => {
-          onSet(draft.trim());
-          setEditing(false);
-        }}
-      >
-        Save
-      </button>
-      <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
-        Cancel
-      </button>
-    </span>
+    <InlineEdit
+      value={person.email ?? ""}
+      type="email"
+      placeholder="ashwin@example.com"
+      busy={busy}
+      onSet={onSet}
+    >
+      {person.email ? (
+        <span className="id">{person.email}</span>
+      ) : (
+        <span style={{ color: "var(--faint)" }} title="They get no mail from this deployment">
+          none
+        </span>
+      )}
+      {person.email_source === "provider" && (
+        <>
+          {" "}
+          <span className="hint" title="A later sign-in may replace it">
+            from the provider
+          </span>
+        </>
+      )}
+    </InlineEdit>
   );
 }
