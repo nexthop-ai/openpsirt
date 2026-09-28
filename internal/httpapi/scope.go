@@ -36,6 +36,11 @@ type ScopeQuery struct {
 // until a product is chosen, and guessing which product was meant is how a
 // number quietly answers a different question from the one on screen.
 func scoped(ctx context.Context, in Ingest, subject access.Subject, q ScopeQuery) (finding.Scope, error) {
+	// Here rather than in each caller, so a route reaching the store through
+	// this cannot forget it.
+	if in.DB == nil {
+		return finding.Scope{}, noDatabase(in.Logger)
+	}
 	scope, sees, err := resolveScope(ctx, in, subject, q)
 	if err != nil {
 		return finding.Scope{}, err
