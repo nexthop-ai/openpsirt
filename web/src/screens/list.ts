@@ -276,7 +276,7 @@ type ClosedParameter =
 // mistyped word in a saved link would draw the list as a failure. Dropped here
 // it widens the list by that one filter instead, and the chip above the list
 // still names it, because the chips read the address.
-export function pick<K extends ClosedParameter>(name: K, values: string[]): Word<K>[] {
+function pick<K extends ClosedParameter>(name: K, values: string[]): Word<K>[] {
   const allowed = WORDS[name] as Record<string, true>;
   return values.filter((value): value is Word<K> => Object.hasOwn(allowed, value));
 }

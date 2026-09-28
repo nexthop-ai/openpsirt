@@ -10,7 +10,7 @@
 // tests reach passes, as it does in the server's check.
 //
 // It reads the names other files import — an import or re-export clause, a
-// destructured dynamic import, and a lazily loaded screen's `m.Name` — rather
+// destructured dynamic import, and a screen loaded on demand as `m.Name` — rather
 // than every word, so a local of the same name, a heading or a comment is not
 // taken for an importer. It does not resolve paths: a name imported from any
 // module counts for every module exporting it.
@@ -54,7 +54,7 @@ export function importedBy(text) {
       }
     }
   }
-  if (/\blazy\(/.test(text)) for (const [, name] of text.matchAll(lazily)) names.add(name);
+  if (/\bimport\(/.test(text)) for (const [, name] of text.matchAll(lazily)) names.add(name);
   return names;
 }
 

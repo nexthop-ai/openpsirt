@@ -36,9 +36,9 @@ describe("an export in the web source", () => {
     expect(found).toEqual(["a.ts: Step"]);
   });
 
-  it("counts a lazily loaded screen as imported", () => {
+  it("counts a screen loaded on demand as imported", () => {
     const names = importedBy(
-      'const Home = lazy(() => import("./Home").then((m) => ({ default: m.Home })));',
+      'const Home = retrying(() => import("./Home").then((m) => m.Home));',
     ) as Set<string>;
     expect(names.has("Home")).toBe(true);
   });
