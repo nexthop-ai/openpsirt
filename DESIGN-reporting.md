@@ -496,7 +496,9 @@ so the pairs section raises a condition only past two thresholds: a share of a
 product's agreements, among at least a set number of people who may approve.
 Both are settings a product may override. `DESIGN-notifications.md` § Concentrated
 approval pairs holds the rule, and why a pair counted without the
-second threshold would be an alert nobody can clear (REQ-49).
+second threshold would be an alert nobody can clear (REQ-49). Each pair's share
+is of every decision a standing agreement covers, counted apart from the list,
+so a list cut at its limit does not raise the shares of the pairs it kept.
 
 Four filters: who proposed it, who has a standing agreement on it, which issue,
 and which component. An agreement later taken back does not match the approver

@@ -233,3 +233,31 @@ func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
 		}
 	})
 }
+
+// A pair's share is of everything agreed, not of the pairs listed.
+//
+// The list is cut at the limit, and a share taken of the pairs left standing
+// reports one pair of two as holding everything, which is the concentration
+// the report exists to find, and it is not there.
+func TestAPairsShareIsOfEverythingAgreed(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		for _, each := range []struct{ who, issue string }{
+			{"triager", "CVE-2026-9999"}, {"private-triage", "CVE-2026-1000"},
+		} {
+			claim, _ := r.claimed(t, each.who, each.issue, "linux-image", dismissal)
+			r.agreed(t, claim)
+		}
+
+		out := scrutiny(t, r, "private-triage", "?limit=1")
+		if len(out.Pairs) != 1 {
+			t.Fatalf("%d pairs listed under a limit of one", len(out.Pairs))
+		}
+		if out.Agreed != 2 {
+			t.Errorf("agreed is %d, want both pairs' rows", out.Agreed)
+		}
+		if out.Pairs[0].Share != 50 {
+			t.Errorf("one pair of two equal ones holds %d%% of what was agreed", out.Pairs[0].Share)
+		}
+	})
+}
