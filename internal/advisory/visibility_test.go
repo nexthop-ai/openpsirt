@@ -187,3 +187,60 @@ func TestAnIssuanceIsReadAtTheVisibilityOfWhatItNamed(t *testing.T) {
 		}
 	})
 }
+
+func TestWhatWentOutIsReadAtEveryFlawTheAdvisoryEverCovered(t *testing.T) {
+	// An issuance describes what the advisory covered when it went out, and
+	// taking a flaw off afterwards does not take it out of what was published.
+	// A reader who may not see that flaw is shown neither the row nor the
+	// document, whether the advisory now covers nothing or covers something
+	// else they may see.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		undisclosed := f.recorded(t, f.master)
+		emptied := f.issuedOver(t, [2]string{"sonic", undisclosed})
+		if err := f.store.Drop(ctx, f.who, emptied, "sonic", undisclosed); err != nil {
+			t.Fatalf("taking the flaw off %s: %v", emptied, err)
+		}
+
+		elsewhere := f.recorded(t, f.tagged)
+		repointed := f.issuedOver(t, [2]string{"sonic", elsewhere})
+		if _, err := f.store.Add(ctx, f.who, repointed, "switchd", f.disclosed(t, f.other)); err != nil {
+			t.Fatalf("adding a disclosed flaw to %s: %v", repointed, err)
+		}
+		if err := f.store.Drop(ctx, f.who, repointed, "sonic", elsewhere); err != nil {
+			t.Fatalf("taking the flaw off %s: %v", repointed, err)
+		}
+
+		readers := map[string]access.Subject{
+			"a public reader of sonic": access.NewPerson(f.second.ID, f.second.Identity, false,
+				map[int64][]access.Role{f.product: {access.PublicRead}}, 0),
+			"a public reader of switchd": access.NewPerson(f.second.ID, f.second.Identity, false,
+				map[int64][]access.Role{f.otherProduct: {access.PublicRead}}, 0),
+		}
+		for who, subject := range readers {
+			got := f.reachedBy(t, subject, emptied, repointed)
+			for _, name := range []string{emptied, repointed} {
+				if got.published[name] {
+					t.Errorf("%s was reported as published to %s", name, who)
+				}
+				if got.sent[name] {
+					t.Errorf("%s was among the documents sent to %s", name, who)
+				}
+			}
+		}
+
+		// A private reader of sonic saw the flaw each went out about, so the
+		// refusals above are the flaw and not the fixture.
+		privately := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{
+				f.product:      {access.PrivateRead},
+				f.otherProduct: {access.PublicRead},
+			}, 0)
+		got := f.reachedBy(t, privately, emptied, repointed)
+		for _, name := range []string{emptied, repointed} {
+			if !got.published[name] {
+				t.Errorf("%s was not reported as published to a private reader of sonic", name)
+			}
+		}
+	})
+}
