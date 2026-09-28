@@ -138,6 +138,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make release-check VERSION=vX.Y.Z` | That the release a tag names was frozen and the tree still ships what it froze. The release workflow runs it before it builds anything |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
+| `make engines-clean` | Drops the test databases no running test holds, on every configured server. See § Test databases |
 | `make measure` | Measurements rather than gates. Behind a build tag |
 | `make sbom-shape` | The reader over a full-size inventory, decompressed from a committed fixture. Inside `check` |
 
@@ -409,18 +410,49 @@ migration tests do not. A server CI starts is new every run, so there it keeps
 nothing and builds every schema; the runner's disk makes that cheaper than a
 workstation's, and the migrations package takes 25 s there against 109 s.
 
-What makes reuse safe is the name. Below 1.0 a schema change edits what
+A server database belongs to a package and a slot, and a test binary leases
+the slot for as long as it runs.
+
+| Part of the name | Why |
+|---|---|
+| The package's own name, cut to 24 characters | A person reading the server's list sees which package each database belongs to |
+| A hash of the package's import path | Two packages cut to the same readable name hold different databases |
+| The slot's number | Two runs of one package at once hold different databases |
+| A fingerprint of the migration sources | An edited migration names a different database rather than reusing a stale one |
+
+The checkout a package is tested from is not in the name. Every checkout shares
+a package's slots, so a server holds as many databases per package as the most
+runs of it that were alive at once.
+
+| Slot rule | Why |
+|---|---|
+| A binary leases one slot per server, the lowest no other binary of its package holds | Slots stay few, and the lowest is the one most likely to hold a database already |
+| The lease is a lock the server keeps for one connection: a named lock on MySQL and MariaDB, a session advisory lock on PostgreSQL | A binary that exits or crashes closes the connection, and the server releases the lock with it |
+| Each slot is asked for without waiting | Two binaries starting at once are granted different slots, and neither waits on the other |
+| The lock is keyed on the package and the slot | Packages share slot numbers, so a run of the whole tree holds slot 1 of every package |
+| On PostgreSQL the lock belongs to the database the configured URL names | An advisory lock is scoped to one database, so a run and a clean agree when they name the same one |
+| Thirty-two slots per package | A binary finding every one held refuses in words |
+
+The fingerprint is recorded in the name. Below 1.0 a schema change edits what
 declares the thing rather than adding a migration beside it, so the applied
-version does not move and only the content of the migrations tells one
-schema from another. The name therefore carries a fingerprint of the migration
-sources: an edited migration names a different database rather than reusing a
-stale one, and the databases the older fingerprints named are dropped as the new
-one is created, so a server does not accumulate them.
+version does not move and only the content of the migrations tells one schema
+from another. A slot's databases named by another fingerprint are dropped as
+this build's is created, and the lease makes that safe: nobody else is using the
+slot.
 
 | A kept database | What the harness does |
 |---|---|
 | At the version this build's migrations end at | Uses it; the first test empties it as every test does |
 | At any other version, or none | Drops it and builds it again. A run killed while it migrated leaves one, and on MySQL and MariaDB a schema statement commits on its own, so the part a migration applied before it stopped is recorded by no version |
+
+`make engines-clean` drops the harness's databases on every configured server
+whose slot nobody holds, and is safe while other checkouts run their tests.
+
+| Step | Why |
+|---|---|
+| Each database's slot lock is taken without waiting, on the clean's own connection | A held lock is a running binary using the database, and it is left |
+| The database is dropped while the clean holds the lock, and the lock released after | A binary starting meanwhile is refused that slot and takes another, so nothing it uses is dropped under it |
+| A database whose name carries no slot is dropped | Its lock is one no binary takes |
 
 The race detector runs on SQLite alone. A Go data race does not vary by database
 engine, and the detector's cost is in-process work — which is most of what
@@ -857,5 +889,7 @@ generated address rather than at the organization's.
 | Branch protection is not enforced | The gate runs on every pull request but nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for early development, and it needs revisiting before outside contributions |
 | The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
 | The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer running the gate and a merge being blocked check different things |
+| A test database is named for its slot, never its checkout | A name carrying the checkout outlives the checkout. Measured on one workstation running many short-lived worktrees: about 750 databases and 55,000 tables per MySQL and MariaDB server, and every information-schema question slowed with them |
+| The clean trusts the slot lock alone | A database somebody uses without holding its slot's lock — one made by hand, or by a harness that names databases another way — is dropped while in use |
 | A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
 | `README.md` and `docs/index.md` are compared, from their scope to the end of their features, with link targets set aside | Neither can include the other, and the same list maintained twice drifts. Each links to the other pages by its own path |

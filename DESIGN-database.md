@@ -90,6 +90,7 @@ Engine-specific code is confined to these places:
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped, and PostgreSQL refuses to write it into a timestamp column. The cast target differs: PostgreSQL takes a zoned timestamp, MySQL and MariaDB a six-digit datetime, and SQLite stores text and takes none |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
+| Leasing the harness's slots | A test binary holds a lock the server keeps for its connection, and the two families spell it differently: a named lock on MySQL and MariaDB, an advisory lock on PostgreSQL, whose key is a number |
 | Listing the harness's own databases | PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | Listing the tables of the harness's SQLite schema | SQLite keeps its schema in a catalog of its own. The servers are asked the same question through the information schema |
 | Commit durability on the harness servers | A global setting on the two MySQL-protocol servers, relaxed so the suite runs faster. PostgreSQL asks per session in the connection string, so it has nothing to branch on |

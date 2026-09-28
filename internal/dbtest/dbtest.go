@@ -12,8 +12,8 @@
 // binary in a run migrates one file and keeps it in the temporary directory,
 // every other binary reads it, and each test copies it — a copy is
 // milliseconds where a migration is most of a second. On the three servers
-// each binary gets a database of its own, named for the package, dropped and
-// created on first use and migrated once.
+// each binary gets a database of its own, named for the package and for a slot
+// the binary leases, and kept between runs; see serverDatabase.
 // Packages therefore share nothing and can run in parallel; tests within a
 // package share the database, and one pool of connections to it, and the
 // harness empties it before each of them.
@@ -39,7 +39,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -402,6 +401,9 @@ var (
 	serverMu   sync.Mutex
 	serverURLs = map[database.Engine]string{}
 	serverDBs  = map[database.Engine]*database.DB{}
+	// serverLeases is the slot this binary holds on each server, kept so the
+	// connection holding its lock stays open for the life of the process.
+	serverLeases = map[database.Engine]*lease{}
 )
 
 // sqliteTestPragmas is what a test database adds to the pragmas every SQLite
@@ -529,9 +531,15 @@ func templateName() (string, error) {
 }
 
 // serverDatabase gives this binary its own database on the server the
-// configured URL names, migrated and empty. Named for the package so that two
-// packages never share tables, and for the checkout so that two worktrees do
-// not either.
+// configured URL names, migrated and empty. Named for the package, so that two
+// packages never share tables, and for a slot this binary leases, so that two
+// runs of one package at once never share them either.
+//
+// The slot is the lowest one no other binary of this package holds on that
+// server, and the lease lasts as long as the process: its lock lives with a
+// connection nothing closes, so a binary that exits or crashes gives it back.
+// Every checkout shares a package's slots, so a server holds as many databases
+// per package as the most runs of it there have been at once.
 //
 // The database is kept between runs and reused. Applying the migrations is
 // nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
@@ -541,31 +549,34 @@ func templateName() (string, error) {
 // fingerprint of the migration sources: a schema change edits what declares
 // the thing rather than adding a migration beside it, so the applied
 // version does not move and only the content tells one schema from another. An
-// edited migration therefore names a different database, and the databases the
-// older fingerprints named are dropped as the new one is created, so a server
-// does not accumulate them.
+// edited migration therefore names a different database, and the slot's
+// databases the other fingerprints named are dropped as the new one is
+// created, which the lease makes safe: nobody else is using the slot.
 //
 // A reused database is emptied by the first test that runs on it, as every
 // test's database is. One whose migrations stopped part way is built again,
 // described at prepareServer.
-//
-// Two runs of the same package from the same checkout against the same server
-// at once would collide; nothing here prevents that, and it is stated so it is
-// not discovered.
 func serverDatabase(engine database.Engine, base string) (string, error) {
 	serverMu.Lock()
 	defer serverMu.Unlock()
 	if own, ok := serverURLs[engine]; ok {
 		return own, nil
 	}
-	name, err := packageDatabaseName()
+	fingerprint, err := migrations.Fingerprint()
+	if err != nil {
+		return "", fmt.Errorf("fingerprint the migrations: %w", err)
+	}
+	ctx := context.Background()
+	held, err := takeSlot(ctx, engine, base, packagePath())
 	if err != nil {
 		return "", err
 	}
-	own, err := prepareServer(context.Background(), engine, base, name)
+	own, err := prepareServer(ctx, engine, base, databaseName(packagePath(), held.slot, fingerprint))
 	if err != nil {
+		_ = held.release(ctx)
 		return "", err
 	}
+	serverLeases[engine] = held
 	serverURLs[engine] = own
 	return own, nil
 }
@@ -711,7 +722,7 @@ func serverConnection(engine database.Engine, own string) (*database.DB, error) 
 	return &database.DB{DB: bun.NewDB(pool.DB.DB, pool.Dialect()), Server: pool.Server}, nil
 }
 
-// ensureDatabase leaves exactly one database for this package and checkout on
+// ensureDatabase leaves exactly one database for this package and slot on
 // the server: the one named, created if it is not there. It reports whether
 // the database was already present, which is the difference between migrating
 // it and emptying it.
@@ -726,7 +737,7 @@ func ensureDatabase(ctx context.Context, admin *database.DB, engine database.Eng
 			kept = true
 			continue
 		}
-		// Built by migrations this checkout no longer has. Quoted, as every
+		// Built by migrations this build does not have. Quoted, as every
 		// identifier is; the MySQL connections accept the standard quote.
 		if _, err := admin.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+other+`"`); err != nil {
 			return false, fmt.Errorf("drop the database an older schema left: %w", err)
@@ -803,55 +814,13 @@ func databasesFor(ctx context.Context, admin *database.DB, engine database.Engin
 	return names, nil
 }
 
-// packageDatabaseName names a database for the package this binary tests:
-// the package's own name for a person reading the server's list, a hash of its
-// import path and of the directory it is tested from, and a hash of the
-// migrations that build the schema inside it.
-//
-// The directory is in the hash because the import path is not enough. Two
-// checkouts of this repository — a second worktree, say — hold the same
-// package at the same import path, and pointed at the same servers they would
-// get the same name, so one would drop the other's database while in use.
-// A test binary runs in the directory of the package it tests, and that
-// directory includes the checkout's path, which tells the two apart.
-func packageDatabaseName() (string, error) {
-	path := os.Args[0]
+// packagePath is the import path of the package this binary tests.
+func packagePath() string {
 	if info, ok := debug.ReadBuildInfo(); ok && info.Path != "" {
-		path = info.Path
+		return info.Path
 	}
-	dir, err := os.Getwd()
-	if err != nil {
-		dir = ""
-	}
-	schema, err := migrations.Fingerprint()
-	if err != nil {
-		return "", fmt.Errorf("fingerprint the migrations: %w", err)
-	}
-	return databaseName(path, dir, schema), nil
+	return os.Args[0]
 }
-
-// databaseName is the name for the package at path, tested from dir, with a
-// schema built by the migrations that fingerprint identifies. Short enough for
-// every engine's limit on identifier length.
-func databaseName(path, dir, fingerprint string) string {
-	base := strings.TrimSuffix(filepath.Base(path), ".test")
-	base = notIdentifier.ReplaceAllString(strings.ToLower(base), "_")
-	if len(base) > 24 {
-		base = base[:24]
-	}
-	sum := sha256.Sum256([]byte(path + "\x00" + dir))
-	schema := sha256.Sum256([]byte(fingerprint))
-	return "openpsirt_t_" + base + "_" + hex.EncodeToString(sum[:3]) + "_" + hex.EncodeToString(schema[:3])
-}
-
-// packagePrefix is everything in a name before the schema's fingerprint: this
-// package, in this checkout. Every database under it was built for these tests,
-// by one set of migrations or another.
-func packagePrefix(name string) string {
-	return name[:strings.LastIndex(name, "_")+1]
-}
-
-var notIdentifier = regexp.MustCompile(`[^a-z0-9_]+`)
 
 // migrateFresh applies every migration to the database at url and closes it.
 func migrateFresh(url string) error {
