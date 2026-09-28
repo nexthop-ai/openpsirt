@@ -118,7 +118,14 @@ export function Disclosing() {
         <p>Embargoes running out, soonest first. Reaching a date discloses nothing on its own.</p>
         <label className="field" style={{ marginLeft: "auto" }}>
           <span>Within</span>
-          <select value={days} onChange={(event) => setDays(event.target.value)}>
+          <select
+            value={days}
+            onChange={(event) => {
+              // A narrowed list starts at its own beginning.
+              setDays(event.target.value);
+              setOffset(0);
+            }}
+          >
             <option value="">The whole embargo window</option>
             <option value="7">Within 7 days</option>
             <option value="30">Within 30 days</option>

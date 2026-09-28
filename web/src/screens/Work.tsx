@@ -91,10 +91,13 @@ export function Work() {
   });
   const held = team ? theTeams : theirs;
 
+  // Every change of tab or holder is another list, which starts at its own
+  // beginning: a page into one list is past the end of a shorter one.
   function go(next: string) {
     const now = new URLSearchParams(params);
     if (next === "due") now.delete("tab");
     else now.set("tab", next);
+    now.delete("offset");
     setParams(now);
   }
 
@@ -170,6 +173,7 @@ export function Work() {
                 const now = new URLSearchParams(params);
                 now.delete("person");
                 now.delete("team");
+                now.delete("offset");
                 setParams(now);
               }}
             >
@@ -197,6 +201,7 @@ export function Work() {
             const now = new URLSearchParams(params);
             now.delete("person");
             now.delete("team");
+            now.delete("offset");
             now.set(isTeam ? "team" : "person", name);
             setParams(now);
           }}
@@ -356,7 +361,13 @@ function Held({
   if (query.isError) {
     return <Failed error={query.error} what="The assigned work could not be read." />;
   }
-  if (rows.length === 0) return <Empty title={empty} detail={detail} />;
+  if (total === 0) return <Empty title={empty} detail={detail} />;
+  // A page past the end of what is held, from an address kept from another
+  // list: the way back is the pager rather than a statement that nothing is
+  // held.
+  if (rows.length === 0) {
+    return <Paged shown={0} total={total} offset={offset} limit={PAGE} onGo={onGo} />;
+  }
 
   return (
     <>
