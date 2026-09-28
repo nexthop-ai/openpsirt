@@ -13,6 +13,7 @@ import { Paged } from "../../ui/Paged";
 import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
+import { DISMISSING } from "../../ui/outcomes";
 import { Sheet } from "./Sheet";
 import {
   PeriodPicker,
@@ -36,17 +37,6 @@ const WINDOWS = [7, 30, 90] as const;
 // lists. Both are pages of something larger, and both say so underneath.
 const NEWEST = 20;
 const REPEATS = 50;
-
-// The outcomes that dismiss, and so the ones that need a second person. Named
-// together because "what has been argued away" is asked of all of them at
-// once, and asked of some it answers about part of the program while reading
-// as the whole.
-const DISMISSALS: ("not-applicable" | "mismatched" | "wont-fix" | "already-fixed")[] = [
-  "not-applicable",
-  "mismatched",
-  "wont-fix",
-  "already-fixed",
-];
 
 // Severity words worst first, the way every other list here orders them. A
 // word the ladder does not hold sorts last, which is where "unrated" belongs
@@ -133,7 +123,9 @@ export function Overview() {
         await api.GET("/v1/audit", {
           params: {
             query: {
-              outcome: DISMISSALS,
+              // Every dismissing outcome at once: asked of some, the answer
+              // is about part of the program while reading as the whole.
+              outcome: DISMISSING,
               state: ["approved" as const],
               // The window this report states, so the sheet does not carry a
               // header saying ninety days over a list that ignores it. Dated

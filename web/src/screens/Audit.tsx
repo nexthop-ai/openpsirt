@@ -13,6 +13,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Because, labeled } from "../ui/Outcome";
+import { dismisses, type Outcome } from "../ui/outcomes";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
@@ -29,31 +30,23 @@ type Judged = Body<"JudgedBody">;
 
 // Nothing ticked is every judgment, so there is no entry for it: "any" is an
 // empty set rather than a value somebody picks.
-const OUTCOMES = [
-  ["not-applicable", "dismissed — not applicable"],
-  // A claim that the scanner matched something that is not here. It hides risk
-  // the way the other dismissals do and, unlike them, nothing expires it — so
-  // it is the one an auditor most wants to be able to list on its own.
-  ["mismatched", "dismissed — wrong match"],
-  ["wont-fix", "dismissed — will not fix"],
-  // The fifth outcome, and the one an auditor most wants to check: a claim
-  // that a distribution already backported the fix is checkable against the
-  // packager's own record, and it was missing from this list while the API
-  // took it.
-  ["already-fixed", "dismissed — already fixed here"],
-  ["deferred", "deferred"],
-  // The two that promise work rather than dismissing it. They hide risk until
-  // the date they named, which is exactly what an auditor is checking, and the
-  // API took them while this list did not offer them.
-  ["upgrade-needed", "upgrade planned"],
-  ["patch-needed", "backport planned"],
-  ["affected", "affected"],
-] as const;
-
-// The dismissals, which are the outcomes that require a second person. The
-// exception report is asked of one of these, because asked of everything it
-// returns a large and entirely legitimate population.
-const DISMISSALS = new Set(["not-applicable", "mismatched", "wont-fix", "already-fixed"]);
+//
+// Keyed by every outcome the server records, so one it adds is a compile error
+// here until the filter offers it. A wrong match hides risk and nothing expires
+// it; an already-fixed claim is checkable against the packager's own record;
+// the two promises hide risk until the date they named. Each is one an auditor
+// lists on its own.
+const OUTCOME_SAID: Record<Outcome, string> = {
+  "not-applicable": "dismissed — not applicable",
+  mismatched: "dismissed — wrong match",
+  "wont-fix": "dismissed — will not fix",
+  "already-fixed": "dismissed — already fixed here",
+  deferred: "deferred",
+  "upgrade-needed": "upgrade planned",
+  "patch-needed": "backport planned",
+  affected: "affected",
+};
+const OUTCOMES = Object.entries(OUTCOME_SAID) as [Outcome, string][];
 
 const STATES = [
   ["approved", "agreed"],
@@ -143,16 +136,9 @@ export function Audit() {
               ...(products.length > 0 ? { product: products } : {}),
               ...(outcomes.length > 0
                 ? {
-                    outcome: outcomes as (
-                      | "affected"
-                      | "not-applicable"
-                      | "mismatched"
-                      | "deferred"
-                      | "wont-fix"
-                      | "already-fixed"
-                      | "upgrade-needed"
-                      | "patch-needed"
-                    )[],
+                    outcome: outcomes.filter((each): each is Outcome =>
+                      Object.hasOwn(OUTCOME_SAID, each),
+                    ),
                   }
                 : {}),
               ...(alone ? { alone: true } : {}),
@@ -181,7 +167,9 @@ export function Audit() {
   // outcome asked for is a dismissal. Mixed with a deferral it returns a large
   // and entirely legitimate population, and saying otherwise over those rows
   // would be telling an auditor a control had failed when it had not.
-  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => DISMISSALS.has(each));
+  // The exception report is asked of dismissals alone: asked of everything it
+  // returns a large and entirely legitimate population.
+  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => dismisses(each));
   const asked = [
     products.length > 0 ? products.join(", ") : "every product you can see",
     said(OUTCOMES, outcomes),

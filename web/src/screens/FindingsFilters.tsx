@@ -3,6 +3,7 @@
 
 import { FLOORS } from "../ui/severities";
 import { labeled } from "../ui/Outcome";
+import type { Outcome } from "../ui/outcomes";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
@@ -76,8 +77,8 @@ export const STATES = [
 
 // The outcomes this filter offers, labeled from the one map rather than
 // beside the tokens here: a second spelling of a word somebody picks and then
-// reads back is how the two stop agreeing, which is what happened to the
-// decision form's "Backport needed".
+// reads back is how the two stop agreeing. Typed against the server's own
+// outcomes, so a word it does not record is a compile error.
 export const OUTCOMES: readonly (readonly [string, string])[] = [
   ["", "Any"],
   ...(
@@ -90,7 +91,7 @@ export const OUTCOMES: readonly (readonly [string, string])[] = [
       "already-fixed",
       "upgrade-needed",
       "patch-needed",
-    ] as const
+    ] as const satisfies readonly Outcome[]
   ).map((each) => [each, labeled(each)] as const),
 ];
 

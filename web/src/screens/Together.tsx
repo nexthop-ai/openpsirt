@@ -17,7 +17,14 @@ import { Crumbs } from "../ui/Crumbs";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { JUSTIFICATIONS, reasonOffered, reasonsFor, type Justification } from "../ui/Outcome";
+import {
+  JUSTIFICATIONS,
+  labeled,
+  reasonOffered,
+  reasonsFor,
+  type Justification,
+} from "../ui/Outcome";
+import { needsJustification as statesReason } from "../ui/outcomes";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
 
@@ -32,6 +39,18 @@ const PAGE = 500;
 type Claimed = NonNullable<
   paths["/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions"]["post"]["requestBody"]
 >["content"]["application/json"];
+
+// The outcomes one bulk claim may record, in the order the form offers them.
+// Keyed by the request's own union, so an outcome the endpoint gains or drops
+// is a compile error here rather than an option that is missing or refused.
+const OFFERED: Record<Claimed["outcome"], true> = {
+  "not-applicable": true,
+  mismatched: true,
+  "wont-fix": true,
+  affected: true,
+  deferred: true,
+  "already-fixed": true,
+};
 
 // A place a claim left out because a decision already stands there.
 type Skipped = Body<"SkippedBody">;
@@ -426,7 +445,7 @@ function Claim({
   // refused, naming the decision, unless the person asks to leave it out.
   const [skipDecided, setSkipDecided] = useState(false);
 
-  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  const needsJustification = statesReason(outcome);
   // A correction carries past every version bump, so it takes only the two
   // reasons that say something is not there. The endpoint refuses the rest,
   // and a reason chosen under another outcome is clamped rather than sent.
@@ -459,14 +478,11 @@ function Claim({
             value={outcome}
             onChange={(event) => setOutcome(event.target.value as Claimed["outcome"])}
           >
-            <option value="not-applicable">Not applicable</option>
-            <option value="mismatched">Wrong match</option>
-            <option value="wont-fix">Will not fix</option>
-            <option value="affected">Affected</option>
-            {/* The two bulk cases that were missing: a bump scheduled for the
-                next release, and a distribution's backport. */}
-            <option value="deferred">Deferred</option>
-            <option value="already-fixed">Already fixed</option>
+            {(Object.keys(OFFERED) as Claimed["outcome"][]).map((each) => (
+              <option key={each} value={each}>
+                {labeled(each)}
+              </option>
+            ))}
           </select>
         </label>
 
