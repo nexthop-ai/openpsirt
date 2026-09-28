@@ -4,12 +4,14 @@
 package sbom_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
 // claims parses a suppression document written inline in a test.
@@ -119,6 +121,8 @@ func TestQualifiersDoNotStopAClaimMatching(t *testing.T) {
 }
 
 func TestAClaimWithoutAVersionCoversEveryVersion(t *testing.T) {
+	// One claim, however many places its component sits: the fan-out is done
+	// where findings are.
 	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
 	 "products": [{"@id": "pkg:deb/sonic/frr"}]}`))
 	for _, version := range []string{"10.5.4-sonic-0", "10.6.1-sonic-2"} {
@@ -157,16 +161,148 @@ func TestAClaimAgainstASourceTreeIsAsGoodAsItsName(t *testing.T) {
 	}
 }
 
-func TestAClaimReachesEveryVersionOfWhatItNames(t *testing.T) {
-	// One claim, however many places its component sits — the fan-out is done
-	// where findings are, not here.
-	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
-	 "products": [{"@id": "pkg:deb/debian/libc6"}]}`))
-	for _, version := range []string{"2.41", "2.36"} {
-		shipped := graph.Described{Purl: "pkg:deb/debian/libc6@" + version, Name: "libc6", Version: version}
-		if !got[0].Covers(shipped) {
-			t.Errorf("a claim naming no version missed %s", version)
+func TestAClaimMatchesThePackageHoweverEitherSideSpellsIt(t *testing.T) {
+	// Identity decodes escapes and lowercases the type, because one real image
+	// carries the same package spelled both ways. A claim compared as written
+	// would say two packages where identity says one.
+	for _, tc := range []struct{ claim, shipped string }{
+		{"pkg:deb/debian/acl@2.3.2-2+b1", "pkg:deb/debian/acl@2.3.2-2%2Bb1?arch=amd64"},
+		{"pkg:deb/debian/acl@2.3.2-2%2Bb1", "pkg:deb/debian/acl@2.3.2-2+b1"},
+		{"pkg:npm/%40babel/core@7.0.0", "pkg:npm/@babel/core@7.0.0"},
+		{"pkg:npm/@babel/core", "pkg:npm/%40babel/core@7.0.0"},
+		{"pkg:DEB/debian/acl@2.3.2", "pkg:deb/debian/acl@2.3.2"},
+		{"PKG:deb/debian/acl@2.3.2", "pkg:deb/debian/acl@2.3.2"},
+		{"pkg:Generic/acl@2.3.2", "pkg:deb/debian/acl@2.3.2"},
+	} {
+		got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
+		 "products": [{"@id": "`+tc.claim+`"}]}`))
+		if !got[0].Covers(graph.Described{Purl: tc.shipped, Name: "acl", Version: "2.3.2"}) {
+			t.Errorf("a claim on %s missed %s", tc.claim, tc.shipped)
 		}
+	}
+	// Still one version and one package.
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
+	 "products": [{"@id": "pkg:deb/debian/acl@2.3.2-2+b1"}]}`))
+	for _, other := range []string{"pkg:deb/debian/acl@2.3.2-2%2Bb2", "pkg:deb/debian/attr@2.3.2-2%2Bb1"} {
+		if got[0].Covers(graph.Described{Purl: other}) {
+			t.Errorf("a claim on acl 2.3.2-2+b1 covered %s", other)
+		}
+	}
+}
+
+func TestAClaimOnAVersionReachesAComponentStatingItOutsideTheIdentifier(t *testing.T) {
+	// An inventory may state the version beside a package identifier that
+	// names none.
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
+	 "products": [{"@id": "pkg:deb/debian/libc6@2.41"}]}`))
+	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/libc6", Version: "2.41"}) {
+		t.Error("a claim on 2.41 missed a component whose version is stated beside its identifier")
+	}
+	if got[0].Covers(graph.Described{Purl: "pkg:deb/debian/libc6", Version: "2.36"}) {
+		t.Error("a claim on 2.41 covered 2.36")
+	}
+}
+
+func TestTheVersionATargetNamesIsTheIdentifiersWhereItStatesOne(t *testing.T) {
+	for _, tc := range []struct {
+		target sbom.Target
+		want   string
+	}{
+		{sbom.Target{Name: "appliance", Version: "4.2"}, "4.2"},
+		{sbom.Target{Purl: "pkg:deb/debian/libc6@2.41", Version: "9"}, "2.41"},
+		{sbom.Target{Purl: "pkg:deb/debian/libc6", Version: "9"}, "9"},
+	} {
+		if got := tc.target.VersionNamed(); got != tc.want {
+			t.Errorf("%+v names version %q, want %q", tc.target, got, tc.want)
+		}
+	}
+}
+
+func TestTheComponentATargetNamesIsThePackagesName(t *testing.T) {
+	// A statement is stored against the name of the component it is about, so
+	// the qualifiers, the subpath, the namespace and the escapes are not part
+	// of it.
+	for _, tc := range []struct{ purl, want string }{
+		{"pkg:oci/alpine?repository_url=index.docker.io/library", "alpine"},
+		{"pkg:deb/debian/frr?arch=amd64", "frr"},
+		{"pkg:golang/x/y@v1?vcs_url=git%2Bhttps://github.com/x/y.git@abc", "y"},
+		{"pkg:generic/my%20lib", "my lib"},
+		{"pkg:npm/@babel/core", "core"},
+		{"pkg:deb/debian/frr@10.5#src/lib", "frr"},
+	} {
+		if got := (sbom.Target{Purl: tc.purl}).ComponentNamed(); got != tc.want {
+			t.Errorf("%s names component %q, want %q", tc.purl, got, tc.want)
+		}
+	}
+	if got := (sbom.Target{Purl: "pkg:deb/debian/frr", Name: "frr-shim"}).ComponentNamed(); got != "frr-shim" {
+		t.Errorf("a target with a name of its own names %q", got)
+	}
+}
+
+func TestAClaimAboutComponentsInsideAProductTargetsTheComponents(t *testing.T) {
+	// A product with subcomponents is what shipped, and the subcomponents are
+	// what the statement is about.
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:oci/image@sha256%3Aabc",
+	   "subcomponents": [{"@id": "pkg:deb/debian/openssl@3.0.14"}, {"@id": "thrift"}]}]}`))
+	if len(got[0].Targets) != 2 {
+		t.Fatalf("the claim points at %+v", got[0].Targets)
+	}
+	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
+		t.Error("a claim about a component inside a product missed the component")
+	}
+	if !got[0].Covers(graph.Described{Name: "thrift", Version: "0.14.1"}) {
+		t.Error("a subcomponent named without a package identifier missed the component of that name")
+	}
+	if got[0].Covers(graph.Described{Purl: "pkg:oci/image@sha256%3Aabc"}) {
+		t.Error("a claim about a component inside a product was read as a claim about the product")
+	}
+	if got := got[0].Targets[0].ComponentNamed(); got != "openssl" {
+		t.Errorf("the statement is stored against %q", got)
+	}
+
+	// A product without subcomponents is the thing the statement is about.
+	alone := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:deb/debian/openssl@3.0.14"}]}`))
+	if !alone[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14"}) {
+		t.Error("a claim about a product alone missed it")
+	}
+}
+
+func TestThisDeploymentsOwnExportReadsBackAsClaimsAboutItsComponents(t *testing.T) {
+	// One deployment's output is another's input, so a document this one
+	// exports reads back as claims about the components it named.
+	body, err := json.Marshal(vex.Statements{
+		Context: "https://openvex.dev/ns/v0.2.0", ID: "urn:x", Version: 1,
+		Statements: []vex.Statement{{
+			Vulnerability: vex.Issue{Name: "CVE-2026-1"},
+			Products: []vex.Shipped{{ID: "pkg:generic/product@1.0",
+				Subcomponents: []vex.Inside{{ID: "pkg:deb/debian/openssl@3.0.14"}}}},
+			Status: "not_affected",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := claims(t, string(body))
+	if len(got) != 1 || len(got[0].Targets) != 1 {
+		t.Fatalf("read back as %+v", got)
+	}
+	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
+		t.Errorf("the exported claim points at %+v rather than the component", got[0].Targets)
+	}
+}
+
+func TestSubcomponentsAreChargedAgainstTheProductLimit(t *testing.T) {
+	inside := strings.TrimSuffix(strings.Repeat(`{"@id": "pkg:deb/debian/x@1"},`, 5), ",")
+	body := statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:oci/image", "subcomponents": [` + inside + `]}]}`)
+	if _, err := sbom.ReadSuppressions(strings.NewReader(body), sbom.Limits{MaxComponents: 5}); err != nil {
+		t.Fatalf("five subcomponents at a bound of five: %v", err)
+	}
+	_, err := sbom.ReadSuppressions(strings.NewReader(body), sbom.Limits{MaxComponents: 4})
+	if err == nil || !strings.Contains(err.Error(), "product limit") {
+		t.Errorf("five subcomponents at a bound of four: %v", err)
 	}
 }
 

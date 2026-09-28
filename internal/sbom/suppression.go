@@ -124,19 +124,32 @@ func (t Target) ComponentNamed() string {
 	if t.Name != "" {
 		return t.Name
 	}
-	name := t.Purl
-	if cut := strings.LastIndex(name, "@"); cut > 0 {
-		name = name[:cut]
+	return nameOf(t.Purl)
+}
+
+// nameOf is the name a package identifier gives its package: decoded, and
+// without the namespace, the version, the qualifiers or the subpath. An
+// identifier that is not a package identifier is named by its last path
+// segment, which is the most it says.
+func nameOf(purl string) string {
+	if name := graph.PartsOfPurl(purl).Name; name != "" {
+		return name
 	}
-	if cut := strings.LastIndex(name, "/"); cut > 0 {
-		name = name[cut+1:]
+	base, _ := graph.PackageOf(purl)
+	if slash := strings.LastIndex(base, "/"); slash >= 0 {
+		return base[slash+1:]
 	}
-	return name
+	return base
 }
 
 // Covers reports whether a claim's target is the component described.
+//
+// Both identifiers are reduced as identity reduces them before they are
+// compared. A claim is written as the package and the version, while the same
+// package in an inventory carries the architecture it was built for and may
+// spell an escape the other way.
 func (t Target) Covers(d graph.Described) bool {
-	base, version := purlParts(t.Purl)
+	base, version := graph.PackageOf(t.Purl)
 	if version == "" {
 		version = t.Version
 	}
@@ -145,14 +158,12 @@ func (t Target) Covers(d graph.Described) bool {
 		// most that can be said is that a component of that name, or a fork
 		// of one, is what was meant. The producer's automatically extracted
 		// claims name source trees rather than packages, so this is the
-		// ordinary case rather than the exception — read as "matches
-		// nothing", every one of them was accepted, stored and silently had
-		// no effect.
+		// ordinary case rather than the exception.
 		//
 		// The version the document stated outside the identifier is still a
 		// version it stated: a publisher naming no package names one in the
-		// branch its product sits in, and dropped here a claim about one
-		// release of an appliance answers for every release of it.
+		// branch its product sits in, and a claim about one release of an
+		// appliance does not answer for every release of it.
 		return coversNamed(t.Name, version, d)
 	}
 	if strings.HasPrefix(base, "pkg:generic/") {
@@ -160,7 +171,7 @@ func (t Target) Covers(d graph.Described) bool {
 		// an identifier rather than as a bare name.
 		return coversNamed(strings.TrimPrefix(base, "pkg:generic/"), version, d)
 	}
-	componentBase, componentVersion := purlParts(d.Purl)
+	componentBase, componentVersion := graph.PackageOf(d.Purl)
 	if componentBase != base {
 		return false
 	}
@@ -179,11 +190,11 @@ func (t Target) Covers(d graph.Described) bool {
 // "or a fork of one" half: a build knows which packages came out of a tree and
 // we do not.
 //
-// A version the claim stated is still a version it stated. Read as an
-// unversioned claim, a statement about openssl 1.0.2 suppressed the live
-// finding on openssl 3.5.1 — and the version is compared against what the
-// component was built from as well as against its own, because a claim about a
-// source tree is most often about what the component was derived from.
+// A version the claim stated is still a version it stated: a statement about
+// openssl 1.0.2 says nothing about openssl 3.5.1. The version is compared
+// against what the component was built from as well as against its own,
+// because a claim about a source tree is most often about what the component
+// was derived from.
 func coversNamed(named, version string, d graph.Described) bool {
 	if !equalName(named, d.Name) && !equalName(named, d.UpstreamName) {
 		return false
@@ -202,28 +213,6 @@ func (s Suppression) Covers(d graph.Described) bool {
 		}
 	}
 	return false
-}
-
-// purlParts splits a package identifier into what it names and the version it
-// names, discarding the qualifiers and the subpath.
-//
-// Qualifiers have to go: a claim is written as the package and the version,
-// while the same package in an inventory carries the architecture it was built
-// for. Comparing the two as written would match nothing.
-func purlParts(purl string) (base, version string) {
-	base = strings.TrimSpace(purl)
-	if cut := strings.IndexAny(base, "?#"); cut >= 0 {
-		base = base[:cut]
-	}
-	// The version is what follows the last "@" — but only when there is
-	// something before it. A scoped name in some ecosystems begins with one
-	// ("pkg:npm/@babel/core"), and splitting there would leave a claim naming
-	// a package type and a version of "babel/core", matching nothing and
-	// saying nothing about why.
-	if at := strings.LastIndex(base, "@"); at > 0 && base[at-1] != '/' {
-		base, version = base[:at], base[at+1:]
-	}
-	return base, version
 }
 
 // equalName compares names the way an identifier does, which is without regard

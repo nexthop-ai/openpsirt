@@ -38,11 +38,10 @@ func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 	if err := v.read(); err != nil {
 		return nil, fmt.Errorf("reading suppressions: %w", err)
 	}
-	// A document that fired both vocabularies is not either of them. Half-read
-	// it was accepted and the OpenVEX statements were dropped without a word,
-	// because the CSAF result is returned and the other list is discarded —
-	// the operator is told the upload worked and the claims are simply absent.
-	// The inventory side already refuses this and says why.
+	// A document that fired both vocabularies is not either of them. Read as
+	// one, the other's statements would be dropped without a word while the
+	// upload reports success. The inventory side refuses the same and says
+	// why.
 	if v.csaf != nil && len(v.claims) > 0 {
 		return nil, fmt.Errorf("suppressions state both OpenVEX and CSAF-VEX, " +
 			"so which format the document is cannot be settled")
@@ -78,7 +77,7 @@ type suppressions struct {
 // name charges one more identifier this document makes the reader hold.
 //
 // The same bound and the same reason as the CSAF reader's: the claim count
-// counts statements, so one statement pointing at ten million products was
+// counts statements, so one statement pointing at ten million products is
 // under it. Charged on the way in, because what a bound has to stop is the
 // walk.
 func (v *suppressions) name() error {
@@ -209,49 +208,89 @@ func (v *suppressions) vulnerability(claim *Suppression) error {
 }
 
 // products reads what a claim points at.
+//
+// A product with subcomponents is a claim about those components inside it:
+// the product is what shipped, and the subcomponents are what the statement
+// is about. So the subcomponents are the targets where there are any, and the
+// product only where there are none. This deployment's own export states
+// every claim that way, with the build as the product.
 func (v *suppressions) products(claim *Suppression) error {
 	return v.b.array(func() error {
-		var target Target
-		purl, err := v.b.stringOrObject(func(key string) error {
-			switch key {
-			case "@id":
-				value, err := v.b.str()
-				target.Purl = value
-				return err
-			case "identifiers":
-				return v.b.object(func(kind string) error {
-					if kind != "purl" {
-						return v.b.skip()
-					}
-					value, err := v.b.str()
-					if target.Purl == "" {
-						target.Purl = value
-					}
+		var inside []Target
+		product, err := v.product(func() error {
+			return v.b.array(func() error {
+				one, err := v.product(nil)
+				if err != nil || one.Purl == "" {
 					return err
-				})
-			default:
-				return v.b.skip()
-			}
+				}
+				if err := v.name(); err != nil {
+					return err
+				}
+				inside = append(inside, subcomponent(one.Purl))
+				return nil
+			})
 		})
 		if err != nil {
 			return err
 		}
-		if target.Purl == "" {
-			target.Purl = purl
+		if len(inside) > 0 {
+			claim.Targets = append(claim.Targets, inside...)
+			return nil
 		}
-		if target.Purl == "" {
+		if product.Purl == "" {
 			return nil
 		}
 		if err := v.name(); err != nil {
 			return err
 		}
-		base, _ := purlParts(target.Purl)
-		if slash := strings.LastIndex(base, "/"); slash >= 0 {
-			target.Name = base[slash+1:]
-		}
-		claim.Targets = append(claim.Targets, target)
+		product.Name = nameOf(product.Purl)
+		claim.Targets = append(claim.Targets, product)
 		return nil
 	})
+}
+
+// product reads one product or subcomponent: its identifier, written as a
+// string or as an object carrying it, and the subcomponents where the caller
+// reads them.
+func (v *suppressions) product(subcomponents func() error) (Target, error) {
+	var target Target
+	id, err := v.b.stringOrObject(func(key string) error {
+		switch {
+		case key == "@id":
+			value, err := v.b.str()
+			target.Purl = value
+			return err
+		case key == "identifiers":
+			return v.b.object(func(kind string) error {
+				if kind != "purl" {
+					return v.b.skip()
+				}
+				value, err := v.b.str()
+				if target.Purl == "" {
+					target.Purl = value
+				}
+				return err
+			})
+		case key == "subcomponents" && subcomponents != nil:
+			return subcomponents()
+		default:
+			return v.b.skip()
+		}
+	})
+	if target.Purl == "" {
+		target.Purl = id
+	}
+	return target, err
+}
+
+// subcomponent is the target a subcomponent names. A package identifier is
+// matched as one; anything else is the name of a component with no package
+// identifier, which is how this deployment's export names one.
+func subcomponent(id string) Target {
+	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(id)), "pkg:") {
+		return Target{Name: strings.TrimSpace(id)}
+	}
+	return Target{Purl: id, Name: nameOf(id)}
 }
 
 // into reads one string into a status.

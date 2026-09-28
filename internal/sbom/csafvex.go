@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // Reading CSAF-VEX, the second of the two shapes a supplier's VEX as evidence
@@ -598,7 +600,7 @@ func (r *csafReader) product() (string, error) {
 	}
 	// The version inside the identifier where there is one, so that a branch
 	// above cannot overwrite what the document already stated precisely.
-	_, one.version = purlParts(one.purl)
+	_, one.version = graph.PackageOf(one.purl)
 	r.tree[id] = one
 	return id, nil
 }
@@ -981,9 +983,6 @@ func targetOf(at named) Target {
 	// The name off the identifier where the document gave one, for the same
 	// reason the OpenVEX reader takes it: a name a person wrote beside a purl
 	// is prose, and the identifier is the key.
-	base, _ := purlParts(target.Purl)
-	if slash := strings.LastIndex(base, "/"); slash >= 0 {
-		target.Name = base[slash+1:]
-	}
+	target.Name = nameOf(target.Purl)
 	return target
 }
