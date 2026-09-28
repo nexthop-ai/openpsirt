@@ -42,6 +42,14 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+		// Asked for what is out of support while nothing is, the answer is
+		// empty rather than unnarrowed.
+		if _, n, err := f.store.Groups(ctx, f.holding(t, access.PublicRead), f.wholeProduct(), 50, 0,
+			finding.Filter{Workable: finding.Working(nil, []string{finding.PastEndOfLife})}); err != nil {
+			t.Fatal(err)
+		} else if n != 0 {
+			t.Errorf("out of support, with nothing out of support, kept %d rows", n)
+		}
 		cat := catalog.NewStore(f.db.DB)
 		gone, err := cat.StreamByName(ctx, f.productID, "release-1.x")
 		if err != nil {

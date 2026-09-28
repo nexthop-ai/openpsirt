@@ -345,6 +345,11 @@ func TestAnAdvisoryWithNoNameOfItsOwnIsRefusedByTheStore(t *testing.T) {
 				Source: finding.FromVex, Identifier: "EXSA-2026:1", Publisher: "Example"}},
 			{"a document of no kind", finding.Supplied{Publisher: "Example"}},
 			{"a document naming nobody", finding.Supplied{Source: finding.FromVex}},
+			{"an advisory name longer than the column", finding.Supplied{
+				Source: finding.FromAdvisory, Publisher: "Example",
+				Identifier: strings.Repeat("x", finding.MostDocumentName+1)}},
+			{"a publisher longer than the column", finding.Supplied{
+				Source: finding.FromVex, Publisher: strings.Repeat("x", finding.MostPublisher+1)}},
 		} {
 			if _, _, err := f.store.RecordStatements(ctx, who, f.productID, each.from,
 				nil); err == nil {
@@ -418,13 +423,18 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 			claims); err != nil {
 			t.Fatal(err)
 		}
-		// The same slice, the way a retry hands it back.
-		recorded, _, err := f.store.RecordStatements(ctx, who, f.productID, from, claims)
+		// The same slice, the way a retry hands it back. Under another digest,
+		// so the pass sets the first aside and writes the claims again rather
+		// than finding the same bytes already held and writing nothing.
+		again := from
+		again.Digest = "sha256:two"
+		recorded, superseded, err := f.store.RecordStatements(ctx, who, f.productID, again, claims)
 		if err != nil {
 			t.Fatalf("recording the same claims again: %v", err)
 		}
-		if recorded != len(claims) {
-			t.Errorf("the second pass recorded %d of %d", recorded, len(claims))
+		if recorded != len(claims) || superseded != len(claims) {
+			t.Errorf("the second pass recorded %d and set aside %d, want %d of each",
+				recorded, superseded, len(claims))
 		}
 	})
 }
