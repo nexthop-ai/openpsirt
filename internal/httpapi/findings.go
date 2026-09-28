@@ -745,6 +745,7 @@ func ratingBodies(ratings []finding.CVSS) []RatingBody {
 type EvidenceBody struct {
 	Vulnerability string   `json:"vulnerability"`
 	Aliases       []string `json:"aliases,omitempty" doc:"Other names the same issue is known by"`
+	AliasesByHand []string `json:"aliases_by_hand,omitempty" doc:"The other names somebody recorded by hand, which are the ones that may be removed"`
 	Severity      string   `json:"severity,omitempty" doc:"As the data rates it. A word"`
 	// Assessed is our own rating, where somebody has recorded one.
 	// Both are carried and both are shown: a rating of ours put where the
@@ -1015,7 +1016,8 @@ func registerFindingDetail(api huma.API, in Ingest) {
 
 func evidenceBody(e finding.Evidence) EvidenceBody {
 	body := EvidenceBody{
-		Vulnerability: e.Vulnerability, Aliases: e.Aliases, Severity: e.Severity,
+		Vulnerability: e.Vulnerability, Aliases: e.Aliases, AliasesByHand: e.AliasesByHand,
+		Severity: e.Severity,
 		Assessed: e.Assessed,
 		Score:    float64(e.ScoreCenti) / 100, Vector: e.Vector,
 		ScoreVersion: e.ScoreVersion, ScoreSource: e.ScoreSource, ScoreKind: e.ScoreKind,

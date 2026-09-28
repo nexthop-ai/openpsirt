@@ -416,7 +416,7 @@ Tests on each of the four engines:
 | A v0.2.0 database, a row in every table | Upgraded, every column, index and constraint matches a database that walked the chain empty, and every value it held is still there. Rolled back, it is the schema the v0.2.0 tag built, still holding them. Upgraded again, it matches the empty one |
 | A v0.1.0 database, a row in every table | Carried through migrations 37 and 38, it matches a database that walked the chain empty, and holds what it held |
 | Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
-| v0.3.0's declarations | Each table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
+| v0.3.0's declarations | Each table the release declares, each built beside the real one under a scratch name, are described exactly as the chain builds them: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
 | Renamed and unread settings | The threshold under v0.1.0's name, from a v0.1.0 and a v0.2.0 database, reads under the new name afterwards and the old row is gone; set under both names, the new one stands; the patch branch switch is gone; rolled back, the threshold is still under the name v0.2.0 reads |
 
 ### The v0.5.0 upgrade
@@ -424,24 +424,28 @@ Tests on each of the four engines:
 Migration 39. The administrative trail gains the actor of each change, and the
 person beside it takes a null where the actor is configuration. PostgreSQL,
 MySQL and MariaDB alter the table where it stands; SQLite rebuilds it from the
-release's declaration.
+release's declaration. Each name an issue answers to gains whether a person
+typed it, a column added with its default on all four engines.
 
 | In v0.4.0 | After the upgrade |
 |---|---|
 | A trail row | A person's, keeping its person |
+| A name an issue answers to | Not typed by a person, whoever recorded it: v0.4.0 kept nothing beside the name saying so |
 | An administrator named in configuration, whose administration no group derived | Administration granted here cleared. They administer through the name, as `DESIGN-access.md` § The administration trail and the section on configuration's administration describe |
 | Any other account | Unchanged |
 
 Rolled back, the actor goes and the person refuses a null again. A row
 configuration wrote goes with it, because v0.4.0 has no place for a change no
 person made. Every named administrator's administration granted here is set
-again, which is where v0.4.0 reads the name.
+again, which is where v0.4.0 reads the name. Which names a person typed goes
+with its column, and the names stay.
 
 | Test, on each of the four engines | What it holds |
 |---|---|
 | A v0.4.0 database with named, derived and granted administrators | Upgraded, only the named-only one's grant here is cleared, and they still administer. Rolled back, every named one's grant is set |
 | A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
-| v0.5.0's declarations | The trail as the release declares it, built beside the real one under a scratch name, is described exactly as the chain builds it |
+| A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was. Rolled back, the column is gone and the names remain |
+| v0.5.0's declarations | The trail and the names an issue answers to as the release declares them, each built beside the real one under a scratch name, are described exactly as the chain builds them |
 
 ### Release records
 

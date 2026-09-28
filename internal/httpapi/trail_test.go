@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // changed is the trail as an administrator reads it.
@@ -386,8 +388,35 @@ var administrativeActs = []trailedAct{
 		// reporting that name resolves to this issue.
 		id: "add-alias", what: "another name for an issue", who: "private-triage",
 		method: http.MethodPut,
-		path:   "/v1/products/mine/issues/{issue}/aliases/CVE-2026-40001",
-		kind:   "alias", about: "{issue}",
+		// A GitHub advisory rather than a CVE, so the issue stays filed under
+		// the name the acts after this one address it by.
+		path: "/v1/products/mine/issues/{issue}/aliases/GHSA-5c4j-5f6m-7q8r",
+		kind: "alias", about: "{issue}",
+	},
+	{
+		// Removed as recording it was: it changes what a later scan means.
+		// The name is recorded through the store, which writes no row, so
+		// the one row counted is the removal's.
+		id: "remove-alias", what: "a name recorded by hand taken off an issue", who: "private-triage",
+		kind: "alias", about: "{issue}",
+		drive: func(t *testing.T, r *reach, seen *seeded) *httptest.ResponseRecorder {
+			ctx := t.Context()
+			const name = "GHSA-2c4j-5f6m-7q8r"
+			issues := finding.NewVulnerabilities(r.db.DB)
+			issue, err := issues.ByName(ctx, seen.issue)
+			if err != nil {
+				t.Fatal(err)
+			}
+			who, err := r.rights.Resolve(ctx, "private-triage")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := issues.AlsoKnownAs(ctx, who, issue, name); err != nil {
+				t.Fatalf("recording the name to remove: %v", err)
+			}
+			return asPerson(t, r, "private-triage", http.MethodDelete,
+				seen.fill("/v1/products/mine/issues/{issue}/aliases/"+name), "")
+		},
 	},
 	{
 		id: "upload-vex-statements", what: "what a publisher says about a component",

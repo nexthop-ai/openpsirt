@@ -55,7 +55,7 @@ components:
             - array
             - "null"
         told_total:
-          description: "The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
+          description: "The number of things they were told about products you hold a role on, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
           format: int64
           type: integer
       required:
@@ -3154,6 +3154,13 @@ components:
           type: string
         aliases:
           description: Other names the same issue is known by
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        aliases_by_hand:
+          description: The other names somebody recorded by hand, which are the ones that may be removed
           items:
             type: string
           type:
@@ -15652,7 +15659,7 @@ paths:
       description: |-
         Returns one person: the roles in force for them, every grant and withdrawal against them, how much of the triage record they proposed and agreed to, and what this deployment has told them.
 
-        `told` includes what they have already acknowledged and what has since cleared, because the question it answers is what was sent rather than what is waiting. It is not narrowed by what they may read now: a line about an undisclosed finding, sent while they held the role that reached it, is exactly what an investigation is looking for.
+        `told` includes what they have already acknowledged and what has since cleared, because the question it answers is what was sent rather than what is waiting. It is not narrowed by what they may read now: a line about an undisclosed finding, sent while they held the role that reached it, is exactly what an investigation is looking for. It is narrowed by what you hold: only lines about products you hold a role on, and undisclosed ones only where you read undisclosed work.
 
         `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
 
@@ -20041,6 +20048,53 @@ paths:
           - private-triage
         note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
   /v1/products/{product}/issues/{vulnerability}/aliases/{alias}:
+    delete:
+      description: |-
+        Removes a name somebody recorded by hand for this issue.
+
+        From here on a scan reporting that name no longer resolves here. Findings that did resolve here through it split back out on the next scan that reports it, under an issue of their own.
+
+        Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported, and the name the issue is filed under, answer 422. A name the issue does not answer to answers 404.
+
+        Requires: public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
+      operationId: remove-alias
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: vulnerability
+          required: true
+          schema:
+            type: string
+        - description: The name to remove, as it is written
+          in: path
+          name: alias
+          required: true
+          schema:
+            description: The name to remove, as it is written
+            maxLength: 191
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Remove another name for an issue
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: Also asks for triage in every other product the issue is open in.
     put:
       description: |-
         Records that this issue is also known by another identifier — a CVE or a GHSA assigned after we minted our own.
@@ -20048,6 +20102,8 @@ paths:
         Nothing about the finding, the decisions or the approvals moves, because they are keyed on the issue rather than on what it is called. What changes is that the name travels with it: a report arriving under the new name resolves here rather than opening a second issue, the finding shows it, and the advisory carries it in the field a reader looks in — which is the one lookup a published advisory exists to serve.
 
         A name is identity, and identity is deployment-wide. From here on a scan of any product reporting that name resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused rather than partly done.
+
+        Only on a flaw recorded here: an issue a scan reported answers 422, because its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.
 
         Recording a name it already goes by succeeds and changes nothing.
 

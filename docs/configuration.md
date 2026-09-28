@@ -114,6 +114,12 @@ going back to v0.4.0.
 | Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
 | Recording that an advisory went out takes a triage role on every product it covers. In v0.4.0 a triage role on any product was enough | Grant the publisher triage on each product their advisories cover |
 | A filter taking words from a set refuses a word named twice with a 422, and a filter of product names takes at most 200. A saved filter repeating a word opens as a 422 | Save the filter again without the repeat |
+| What somebody was told, read from their page by an administrator or an auditor, holds only lines about products the reader holds a role on. In v0.4.0 it also held the disclosed lines about every other product | Grant the reader the product where they investigate a person's notices |
+| Another name for an issue is recorded only on a flaw recorded here, and only as a CVE or a GitHub advisory. In v0.4.0 any text was taken on any issue | Nothing. A scanner's issue takes its other names from the scans |
+
+| After the upgrade from v0.4.0 | |
+|---|---|
+| A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
 
 | After the upgrade from v0.4.0 | |
 |---|---|

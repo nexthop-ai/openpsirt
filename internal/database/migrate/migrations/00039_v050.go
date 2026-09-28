@@ -55,12 +55,22 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     administrative trail holds a grant made here that moved the column, and
 //     none made while the name already had. They administer through the name
 //     for as long as it stays in configuration.
+//   - Each name an issue answers to records whether a person typed it. Every
+//     name v0.4.0 holds takes the declared default and reads as not typed:
+//     v0.4.0 kept the act in the administrative trail and nothing beside the
+//     name. A column added with its default, which all four engines add where
+//     the table stands.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+
+	if err := u.change(aliasV050(t), change{table: "vulnerability_alias",
+		add: []added{{column: "by_hand"}}}); err != nil {
+		return err
+	}
 
 	if err := u.change(trailV050(t), change{table: "admin_change",
 		add:   []added{{column: "actor", fill: "'person'"}},
@@ -80,6 +90,8 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 // The name is written back into the administration column, which is where
 // v0.4.0 reads it. A trail row configuration wrote has no person, which
 // v0.4.0 has no place for, so it goes with the column that says who acted.
+// Whether a person typed each name an issue answers to goes with its column,
+// and the names stay.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if _, err := tx.NewRaw(`UPDATE "person" SET "is_admin" = ? WHERE "is_bootstrap" = ?`,
 		true, true).Exec(ctx); err != nil {
@@ -91,6 +103,10 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+	// Which names a person typed goes with its column. The names stay.
+	if err := u.run([]string{`ALTER TABLE "vulnerability_alias" DROP COLUMN "by_hand"`}); err != nil {
+		return err
+	}
 	trail := narrowing{table: "admin_change",
 		forget:  `DELETE FROM "admin_change" WHERE "actor" = 'configuration'`,
 		columns: []string{"actor"}}
