@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -27,19 +27,7 @@ func limitedIngest(t *testing.T, limits sbom.Limits, fn func(t *testing.T, f *in
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
+		product := fixture.New(t, db).Product
 		rights := access.NewStore(db.DB)
 		_, secret, err := rights.NewKey(ctx, "nightly", access.Scope{ProductID: product.ID})
 		if err != nil {
@@ -53,7 +41,8 @@ func limitedIngest(t *testing.T, limits sbom.Limits, fn func(t *testing.T, f *in
 		})
 		fn(t, &ingestFixture{
 			handler: handler, db: db, queue: q, key: secret,
-			path: "/v1/products/sonic/streams/master/variants/broadcom/scans",
+			path: "/v1/products/" + fixture.ProductName + "/streams/" + fixture.BranchName +
+				"/variants/" + fixture.CustomerVariant + "/scans",
 		})
 	})
 }
