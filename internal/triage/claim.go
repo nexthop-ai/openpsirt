@@ -5,6 +5,7 @@ package triage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -51,12 +52,11 @@ type Claim struct {
 	// Outcome is what the claim says, held once because one act is one
 	// argument.
 	//
-	// These were on the row. A judgment reaching forty-four places was
-	// forty-four copies of one sentence, each revisable on its own — so
-	// revising one returned that row to the queue and left the other
-	// forty-three saying the old thing while the claim read as agreed. Every
-	// one of them was constant across every row of every claim in the measured
-	// deployment, and nothing has ever produced a claim whose rows differ.
+	// Held on the claim rather than on each row: a judgment reaching many
+	// places held per row is many copies of one sentence, each revisable on
+	// its own, and revising one would leave the rest saying the old thing
+	// while the claim read as agreed. In the measured deployment every one of
+	// these was constant across every row of every claim.
 	Outcome Outcome `bun:"outcome,notnull"`
 	// Justification is one of the recognized reasons, for the outcome that
 	// claims something does not apply — where which reason it is *is* the
@@ -275,18 +275,18 @@ var ErrNotExtendable = errors.New("that claim cannot be extended")
 // Everything it turns on is read inside the transaction that writes: whether
 // the source is approved, and what it was a claim about.
 func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
-	proposals []Proposal, cap int) ([]*Decision, error) {
+	proposals []Proposal) ([]*Decision, error) {
 
 	if len(proposals) == 0 {
 		return nil, nil
-	}
-	if err := allowed(subject, proposals, cap, s.now()); err != nil {
-		return nil, err
 	}
 
 	var recorded []*Decision
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
 
 		source, err := within.extendable(ctx, subject, from, proposals)
 		if err != nil {
@@ -532,11 +532,20 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
+		// Matched on what was read: still waiting, and still this claim's. A
+		// row an approval or a withdrawal moved since is not set aside over
+		// it, and the whole act is taken again.
+		moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
 			Set("claim_id = ?", returned.ID).
 			Set("sent_back_at = ?", now).
-			Where("id IN (?)", bun.List(returning)).Exec(ctx); err != nil {
+			Where("id IN (?)", bun.List(returning)).
+			Where("claim_id = ?", claim.ID).
+			Where("state = ?", Proposed).Exec(ctx)
+		if err != nil {
 			return nil, fmt.Errorf("set rows aside: %w", err)
+		}
+		if err := movedAll(moved, len(returning), "set rows aside"); err != nil {
+			return nil, err
 		}
 		// The reason travels as a comment on the claim the rows went into, the
 		// way sending back records it: the author needs the words, and a
@@ -733,13 +742,20 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 		return nil, err
 	}
 	now := s.now().Truncate(time.Microsecond)
-	if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
+	// Matched on what was read, as setting rows aside is.
+	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
 		Set("claim_id = ?", held.ID).
 		// With their author, which is what they are: they leave the review
 		// queue until the argument for them is stated again.
 		Set("sent_back_at = ?", now).
-		Where("id IN (?)", bun.List(rows)).Exec(ctx); err != nil {
+		Where("id IN (?)", bun.List(rows)).
+		Where("claim_id = ?", claim.ID).
+		Where("state = ?", Proposed).Exec(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("hold those rows back: %w", err)
+	}
+	if err := movedAll(moved, len(holding), "hold those rows back"); err != nil {
+		return nil, err
 	}
 	if err := s.sayOn(ctx, subject, held.ID, because, now); err != nil {
 		return nil, err
@@ -884,4 +900,18 @@ func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID i
 		}
 	}
 	return claim, rows, nil
+}
+
+// movedAll reads an update that matched on what the transaction read. Fewer
+// rows than were read means some moved since, which is a lost race for the
+// retry helper to take again.
+func movedAll(result sql.Result, want int, doing string) error {
+	n, err := database.Affected(result)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	if n != int64(want) {
+		return fmt.Errorf("%s: %w", doing, database.ErrGoAgain)
+	}
+	return nil
 }

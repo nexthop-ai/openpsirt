@@ -200,7 +200,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	product, stream, variant string, undisclosed bool) (*Statements, error) {
 
 	if !who.Stated() {
-		return nil, errNoPublisher
+		return nil, ErrNoPublisher
 	}
 	named, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
@@ -216,13 +216,13 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	return s.document(ctx, who, named, target, visible)
 }
 
-// errNoPublisher says the deployment has not been told who it publishes as.
+// ErrNoPublisher says the deployment has not been told who it publishes as.
 //
 // Asked by the two acts that build a document, and not by the read of what has
 // gone out. That read names no author and assembles nothing, so refusing it
 // answers a question nobody asked with a sentence about a field the answer
 // does not carry.
-var errNoPublisher = errors.New("this deployment has not said who it publishes as, " +
+var ErrNoPublisher = errors.New("this deployment has not said who it publishes as, " +
 	"so a document has nobody to name as its author")
 
 // locate resolves the build a document is asked for and refuses anybody who

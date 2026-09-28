@@ -7,7 +7,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -100,6 +102,102 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 			t.Errorf("somebody holding no read role exported the register: %d", refused.Code)
 		}
 	})
+}
+
+// Register exports held open by slow readers take the slots, and the next one
+// is refused with a time to ask again rather than queued for a connection.
+// The slots are a fifth of the pool and at least one, so on SQLite, whose pool
+// is one connection, one export takes the only slot.
+func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register.csv"
+		ask := func() *http.Request {
+			req := httptest.NewRequest(http.MethodGet, at, nil)
+			req.Header.Set(testHeader, "triager")
+			fromOurOwnPage(req)
+			return req
+		}
+
+		var held []*heldOpen
+		var finishing []chan struct{}
+		defer func() {
+			for i, w := range held {
+				close(w.release)
+				<-finishing[i]
+			}
+		}()
+		var refused *heldOpen
+		for range 64 {
+			w := &heldOpen{header: http.Header{}, started: make(chan struct{}),
+				release: make(chan struct{})}
+			finished := make(chan struct{})
+			go func() {
+				defer close(finished)
+				r.handler.ServeHTTP(w, ask())
+			}()
+			select {
+			case <-w.started:
+				held = append(held, w)
+				finishing = append(finishing, finished)
+				continue
+			case <-finished:
+				refused = w
+			}
+			break
+		}
+		if refused == nil {
+			t.Fatal("64 exports held open at once, and none was refused")
+		}
+		if refused.code != http.StatusServiceUnavailable {
+			t.Fatalf("an export past the slots answered %d", refused.code)
+		}
+		if refused.header.Get("Retry-After") == "" {
+			t.Error("an export past the slots was not told when to ask again")
+		}
+		// A fifth of the pool, and at least one: SQLite's pool is one
+		// connection, so there it is one.
+		if open := r.db.DB.DB.Stats().MaxOpenConnections; open > 0 && len(held) != max(1, open/5) {
+			t.Errorf("%d exports held open at once over a pool of %d", len(held), open)
+		}
+
+		// A slot given back is taken by the next export, which is written whole.
+		close(held[0].release)
+		<-finishing[0]
+		held, finishing = held[1:], finishing[1:]
+		got := asPerson(t, r, "triager", http.MethodGet, at, "")
+		if got.Code != http.StatusOK || !contains(got.Body.String(), "CVE-2026-9999") {
+			t.Errorf("an export after a slot was given back answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+// heldOpen is a response whose reader stops at the first byte of a successful
+// body until it is released, as a slow client's socket does.
+type heldOpen struct {
+	header  http.Header
+	code    int
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (h *heldOpen) Header() http.Header { return h.header }
+func (h *heldOpen) WriteHeader(code int) {
+	if h.code == 0 {
+		h.code = code
+	}
+}
+func (h *heldOpen) Write(b []byte) (int, error) {
+	if h.code == 0 {
+		h.code = http.StatusOK
+	}
+	if h.code == http.StatusOK {
+		h.once.Do(func() { close(h.started) })
+		<-h.release
+	}
+	return len(b), nil
 }
 
 func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
@@ -322,6 +420,11 @@ func TestTheRegisterNarrows(t *testing.T) {
 		}
 		if named := rows(t, "?component=linux-image"); len(named) != 2 {
 			t.Errorf("narrowed to the component both sit on, %d rows", len(named))
+		}
+		// A component name somebody types is matched without regard to
+		// capitals.
+		if named := rows(t, "?component=Linux-Image"); len(named) != 2 {
+			t.Errorf("narrowed to the component typed in capitals, %d rows", len(named))
 		}
 		if elsewhere := rows(t, "?component=nothing-is-called-this"); len(elsewhere) != 0 {
 			t.Errorf("a component the build does not hold kept %d rows", len(elsewhere))

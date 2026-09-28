@@ -89,7 +89,7 @@ inferred from a rule, so adding a route never adds an exception.
 | 204 | Done, with nothing worth saying |
 | 400 | A query parameter the operation does not take. The refusal names it |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
-| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a retirement of something already retired, a name another row already holds |
+| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was being generated, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written |
 
 Not found and not yours are one answer. A product somebody holds nothing on is
@@ -349,6 +349,10 @@ A caller receives the source and renders it themselves. The server has already
 refused what its policy forbids at submission (REQ-67), so the text is known-good
 under the rules in force when it was written; rules written since are the
 renderer's to apply. The rules are in `DESIGN-text.md`.
+
+A moment is stated in UTC, in RFC 3339, in a response and in its file alike. A
+driver hands back a time in the process's own zone, so a moment is converted
+before it is written rather than formatted behind a literal `Z`.
 
 ## Addresses and labels
 

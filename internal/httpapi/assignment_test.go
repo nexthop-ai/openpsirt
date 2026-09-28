@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -237,6 +238,51 @@ func TestOnlyAnAdministratorMovesSomebodyElsesWork(t *testing.T) {
 	})
 }
 
+// Handing somebody's work to a named person hands them everything it covers,
+// so a recipient not cleared for the undisclosed part of it is refused and
+// nothing moves.
+func TestHandingWorkOverDoesNotDiscloseItToTheRecipient(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		ctx := t.Context()
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		if got := asPerson(t, r, "private-dispatcher", http.MethodPut, at,
+			`{"person":"private-triage"}`); got.Code != http.StatusNoContent {
+			t.Fatal(got.Body.String())
+		}
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("visibility = ?", access.Private).
+			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		over := "/v1/people/private-triage/assignments/hand-back"
+		got := asPerson(t, r, "admin", http.MethodPost, over, `{"to":"triager"}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("undisclosed work handed to somebody who may not read it answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		held, err := r.db.DB.NewSelect().Table("finding").
+			Where("closed_at IS NULL").
+			Where(`assigned_to IN (SELECT party_id FROM "person" WHERE identity = ?)`,
+				"private-triage").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held == 0 {
+			t.Error("a refused hand-over moved the work anyway")
+		}
+
+		// Somebody cleared for it takes it.
+		if got := asPerson(t, r, "admin", http.MethodPost, over,
+			`{"to":"private-dispatcher"}`); got.Code != http.StatusOK {
+			t.Fatalf("a hand-over to somebody cleared for it answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
 // scannedAlso is a second build of the same product, holding the same issue at
 // the same place, with the library at the given version.
 func (r *reach) scannedAlso(t *testing.T, variant, version string) {
@@ -432,6 +478,66 @@ func TestATeamsQueueCanBeOpened(t *testing.T) {
 		read(t, r, "triager", "/v1/teams/no-such-team/assignments", &queue)
 		if queue.Total != 0 {
 			t.Errorf("a team nobody declared holds %d pieces of work", queue.Total)
+		}
+	})
+}
+
+// Deactivating somebody again hands back whatever they still hold.
+//
+// The hand-back runs after the deactivation commits, so a failure there leaves
+// work with somebody who has left. Asking again found nothing to deactivate
+// and returned before handing anything back, so the work stayed held.
+func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scanned(t)
+		at := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		if got := asPerson(t, r, "triager", http.MethodPut, at,
+			`{"person":"triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
+		}
+		var held []int64
+		if err := r.db.DB.NewSelect().Table("finding").Column("assigned_to").
+			Where("assigned_to IS NOT NULL").Scan(ctx, &held); err != nil || len(held) == 0 {
+			t.Fatalf("nothing was assigned to begin with: %v", err)
+		}
+		first := asPerson(t, r, "admin", http.MethodPut, "/v1/people/triager/deactivation", "")
+		if first.Code != http.StatusOK {
+			t.Fatalf("deactivating answered %d: %s", first.Code, first.Body.String())
+		}
+		if !strings.Contains(first.Body.String(), `"released":1`) {
+			t.Errorf("deactivating somebody handed back nothing they held: %s", first.Body.String())
+		}
+
+		// What a hand-back that failed after the deactivation leaves behind.
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("assigned_to = ?", held[0]).Where("closed_at IS NULL").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		got := asPerson(t, r, "admin", http.MethodPut, "/v1/people/triager/deactivation", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("deactivating again answered %d: %s", got.Code, got.Body.String())
+		}
+		var again struct {
+			Released int64 `json:"released"`
+			Already  bool  `json:"already"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &again); err != nil {
+			t.Fatal(err)
+		}
+		if !again.Already || again.Released == 0 {
+			t.Errorf("deactivating again answered already=%v, released=%d",
+				again.Already, again.Released)
+		}
+		still, err := r.db.DB.NewSelect().Table("finding").
+			Where("assigned_to IS NOT NULL").Where("closed_at IS NULL").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if still != 0 {
+			t.Errorf("%d findings are still held by somebody who has left", still)
 		}
 	})
 }

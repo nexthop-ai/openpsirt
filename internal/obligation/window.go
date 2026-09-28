@@ -24,6 +24,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -241,9 +242,15 @@ func productsNamed(ctx context.Context, tx bun.IDB, names []string) ([]int64, []
 	}
 	folded := make([]string, 0, len(names))
 	seen := map[string]bool{}
-	for _, name := range names {
-		name = strings.ToLower(strings.TrimSpace(name))
-		if name == "" || seen[name] {
+	for _, typed := range names {
+		name := catalog.Matching(typed)
+		// A blank name is a name nobody declared, refused like any other:
+		// dropped, a list holding only blanks declares a window over every
+		// product.
+		if name == "" {
+			return nil, nil, fmt.Errorf("%w: %q", ErrNoSuchProduct, typed)
+		}
+		if seen[name] {
 			continue
 		}
 		seen[name] = true

@@ -521,9 +521,9 @@ func registerAdministration(api huma.API, a Administering) {
 							"a role is held against one product or across every product, not both")
 					}
 					if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
-						return huma.Error400BadRequest(err.Error())
+						return asked(a.Logger, err)
 					}
-					if err := noted(ctx, db, trail.Role, in.Body.Identity+" on every product",
+					if err := noted(ctx, db, trail.Role, person.Identity+" on every product",
 						nil, trail.Said(hold.Role, true)); err != nil {
 						return notRecorded(a.Logger, err)
 					}
@@ -538,16 +538,16 @@ func registerAdministration(api huma.API, a Administering) {
 					return undeclared(a.Logger, err, "that product could not be looked up")
 				}
 				if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
-					return huma.Error400BadRequest(err.Error())
+					return asked(a.Logger, err)
 				}
-				if err := noted(ctx, db, trail.Role, in.Body.Identity+" on "+hold.Product,
+				if err := noted(ctx, db, trail.Role, person.Identity+" on "+product.Name,
 					nil, trail.Said(hold.Role, true)); err != nil {
 					return notRecorded(a.Logger, err)
 				}
 			}
 
 			if before == nil {
-				if err := noted(ctx, db, trail.Account, in.Body.Identity, nil,
+				if err := noted(ctx, db, trail.Account, person.Identity, nil,
 					trail.Said("recorded", true)); err != nil {
 					return notRecorded(a.Logger, err)
 				}
@@ -558,7 +558,7 @@ func registerAdministration(api huma.API, a Administering) {
 				if held.asked == nil || held.was == *held.asked {
 					continue
 				}
-				if err := noted(ctx, db, trail.Account, in.Body.Identity,
+				if err := noted(ctx, db, trail.Account, person.Identity,
 					trail.Said(held.what, held.was),
 					trail.Said(held.what, *held.asked)); err != nil {
 					return notRecorded(a.Logger, err)
@@ -617,7 +617,7 @@ func registerAdministration(api huma.API, a Administering) {
 				return err
 			}
 			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			product, err := names.ProductByName(ctx, in.Product)
 			if err != nil {
@@ -641,7 +641,7 @@ func registerAdministration(api huma.API, a Administering) {
 			case err != nil:
 				return wentWrong(a.Logger, "cannot withdraw the role", err)
 			}
-			if err := noted(ctx, tx, trail.Role, in.Identity+" on "+in.Product,
+			if err := noted(ctx, tx, trail.Role, person.Identity+" on "+product.Name,
 				trail.Said(in.Role, true), nil); err != nil {
 				return notRecorded(a.Logger, err)
 			}
@@ -701,7 +701,7 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			person, err := store.ByIdentity(ctx, in.Identity)
 			if err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			switch err := store.UnbindIdentifier(ctx, person.ID); {
 			case errors.Is(err, access.ErrNothingMatched):
@@ -709,7 +709,7 @@ func registerAdministration(api huma.API, a Administering) {
 			case err != nil:
 				return wentWrong(a.Logger, "cannot unbind how they sign in", err)
 			}
-			if err := noted(ctx, tx, trail.Account, in.Identity,
+			if err := noted(ctx, tx, trail.Account, person.Identity,
 				trail.Said("identifier bound", true),
 				trail.Said("identifier bound", false)); err != nil {
 				return notRecorded(a.Logger, err)
@@ -754,7 +754,7 @@ func registerAdministration(api huma.API, a Administering) {
 				return err
 			}
 			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			role := access.Role(in.Role)
 			if !role.Valid() {
@@ -766,7 +766,7 @@ func registerAdministration(api huma.API, a Administering) {
 			case err != nil:
 				return wentWrong(a.Logger, "cannot withdraw the role", err)
 			}
-			if err := noted(ctx, tx, trail.Role, in.Identity+" on every product",
+			if err := noted(ctx, tx, trail.Role, person.Identity+" on every product",
 				trail.Said(in.Role, true), nil); err != nil {
 				return notRecorded(a.Logger, err)
 			}

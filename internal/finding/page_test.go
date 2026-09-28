@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -164,6 +165,14 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 				func(g *group) bool { return components[g.component] == swss.Name }},
 			{"without one", finding.Filter{Exclude: []string{libnl.Name}},
 				func(g *group) bool { return components[g.component] != libnl.Name }},
+			// A component name somebody types is matched without regard to
+			// capitals.
+			{"one component, typed in capitals", finding.Filter{Components: []string{strings.ToUpper(libnl.Name)}},
+				func(g *group) bool { return components[g.component] == libnl.Name }},
+			{"without one, typed in capitals", finding.Filter{Exclude: []string{strings.ToUpper(libnl.Name)}},
+				func(g *group) bool { return components[g.component] != libnl.Name }},
+			{"inside one container, typed in capitals", finding.Filter{Under: strings.ToUpper(swss.Name)},
+				func(g *group) bool { return g.consumer[swssID] }},
 			{"one kind", finding.Filter{Ecosystems: []string{"deb"}}, func(*group) bool { return true }},
 			{"another kind", finding.Filter{Ecosystems: []string{"golang"}}, func(*group) bool { return false }},
 			{"inside one container", finding.Filter{Under: swss.Name},

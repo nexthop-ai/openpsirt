@@ -456,5 +456,11 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 			t.Errorf("a publisher exactly the width of the column answered %d: %s",
 				got.Code, got.Body.String())
 		}
+		// The width is in characters. A name of 191 that takes two bytes each
+		// fits the column, and counted in bytes it was refused.
+		if got := r.vexed(t, "admin", strings.Repeat("é", 191), document); got.Code != http.StatusCreated {
+			t.Errorf("a publisher of 191 characters outside ASCII answered %d: %s",
+				got.Code, got.Body.String())
+		}
 	})
 }

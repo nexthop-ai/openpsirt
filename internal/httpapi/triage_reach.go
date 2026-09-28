@@ -146,7 +146,10 @@ func registerReachAcross(api huma.API, in Ingest) {
 			return nil, err
 		}
 		places, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target, issue, at)
-		if err != nil || len(places) == 0 {
+		if err != nil {
+			return nil, absent(in.Logger, err, "those places could not be looked up", noSuchFinding)
+		}
+		if len(places) == 0 {
 			return nil, noSuchFinding()
 		}
 		reach, err := finding.NewStore(in.DB.DB).ReachingAcross(ctx, subject, places, target)

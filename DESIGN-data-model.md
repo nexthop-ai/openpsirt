@@ -75,6 +75,7 @@ decisions from.
 |---|---|
 | The parent can be filled in afterwards (REQ-15) | A pipeline that does not know declares the tag without it, and release readiness then reports that nothing has ever been released from the branch — indistinguishable from a branch that shipped nothing. Declaring the tag again with the branch named records it |
 | Naming a different branch is refused | A tag is one frozen point |
+| Only a tag has a parent, and it is a branch of the same product | A tag under a tag, a release under itself, and a branch in another product are lines that do not exist. Declaring and filling in ask the same check |
 
 ## Release dates
 
@@ -231,6 +232,17 @@ the alternative, and it makes the rule a property of the deployment.
 An identity a sign-in provider hands over is compared exactly. It is not typed
 here and not ours to reinterpret; deciding that two accounts are one person
 merges access nobody granted.
+
+A component name is the producer's, and it is stored, reported and linked in
+the producer's spelling. Where a person types one — in an address, or in a
+filter — it is matched on the fold stored beside the name.
+
+| Rule | |
+|---|---|
+| A typed component name is matched without regard to capitals | Through the stored fold, the same one the routing rules and the search match on |
+| Two components whose names differ only in capitals are both what the name means | A lookup naming one component answers with the "which did you mean?" choices; a filter keeps both |
+| The producer's own spelling names the one spelled that way | Every link is built from the stored name, so a link reaches its component rather than the choices |
+| A clash in capitals alone, at one version, ecosystem and namespace, is reached only by its own spelling | The choices tell components apart by those three, and two components differing in nothing else cannot be told apart by them |
 
 ## Engine differences
 

@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -224,7 +225,7 @@ func kindOf(choice graph.Choice) map[string]string {
 // first is something the caller can fix by saying which one, and the second is
 // not. Telling them apart discloses nothing — whoever is asking has already
 // been authorized to read this build.
-func ambiguousOrMissing(err error) error {
+func ambiguousOrMissing(logger *slog.Logger, err error) error {
 	// The choices as structured detail rather than a sentence listing them. A
 	// real image ships one library at fifteen versions, and fifteen of them in
 	// prose is a paragraph nobody reads — as a list the screen can offer each
@@ -243,7 +244,7 @@ func ambiguousOrMissing(err error) error {
 		return severalComponents(several,
 			"?version= and, where two share a version, &ecosystem= and &namespace=")
 	}
-	return noSuchFinding()
+	return absent(logger, err, "that component could not be looked up", noSuchFinding)
 }
 
 // severalComponents offers every way a name could be meant, and says how to
@@ -296,7 +297,10 @@ func absent(logger *slog.Logger, err error, reading string, missing func() error
 		errors.Is(err, access.ErrNoSuchTeam),
 		errors.Is(err, access.ErrNoSuchToken),
 		errors.Is(err, finding.ErrNoSuchRun),
-		errors.Is(err, access.ErrNoSuchPerson):
+		errors.Is(err, finding.ErrNoOpenFinding),
+		errors.Is(err, attach.ErrNoSuchIssue),
+		errors.Is(err, access.ErrNoSuchPerson),
+		errors.Is(err, graph.ErrNoComponent):
 		return missing()
 	default:
 		return wentWrong(logger, reading, err)

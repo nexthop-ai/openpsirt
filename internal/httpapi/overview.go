@@ -83,15 +83,10 @@ func registerOverview(api huma.API, in Ingest) {
 		Description: "One product, with each of its builds: what is open, how much is overdue, " +
 			"how much is exploited, how much nobody has claimed anything about, how much is " +
 			"answered at every place, and when a scan last arrived.\n\n" +
-			"Counted as issues at components, the unit every other count here uses. A " +
-			"component reached twenty ways carries the same issue twenty times, so counting " +
-			"rows would make a build look twenty times worse than the list somebody opens " +
-			"next.\n\n" +
-			"\"Undecided\" and \"agreed\" are the findings list's own words, by the same " +
-			"definition and read from the same expression: undecided means no place has a " +
-			"decision, agreed means every place is answered by one that stands. Two screens " +
-			"with two definitions of \"decided\" is how they come to disagree in front of " +
-			"somebody.\n\n" +
+			"Counted as issues at components, the unit every other count here uses.\n\n" +
+			"\"Undecided\" and \"agreed\" mean what they mean on the findings list: " +
+			"undecided means no place has a decision, agreed means every place is answered by " +
+			"one that stands.\n\n" +
 			"A build whose release is out of support says so rather than reading as one that " +
 			"stopped being scanned: those are different facts and only one of them is a fault.",
 		Tags: []string{"Catalog"},

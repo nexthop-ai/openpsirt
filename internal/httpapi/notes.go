@@ -175,7 +175,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, WasSaidBody{
 				Version: row.Ordinal, Body: row.Body,
-				ReplacedAt: row.ReplacedAt.Format(time.RFC3339),
+				ReplacedAt: row.ReplacedAt.UTC().Format(time.RFC3339),
 			})
 		}
 		return out, nil
@@ -226,7 +226,7 @@ func noteAbout(ctx context.Context, in Ingest, subject access.Subject,
 	issues := finding.NewVulnerabilities(in.DB.DB)
 	issue, err := issues.ByName(ctx, vulnerability)
 	if err != nil {
-		return 0, 0, "", noSuchNote()
+		return 0, 0, "", absent(in.Logger, err, "the issue could not be looked up", noSuchNote)
 	}
 	filed, err := issues.NamesByID(ctx, []int64{issue})
 	if err != nil {
@@ -252,10 +252,10 @@ func notesOut(ctx context.Context, in Ingest, notes []triage.IssueNote) (*listOu
 			ID: note.ID, Body: note.Body,
 			WrittenBy:     who.identity(note.WrittenBy),
 			WrittenByName: who.label(note.WrittenBy),
-			WrittenAt:     note.WrittenAt.Format(time.RFC3339),
+			WrittenAt:     note.WrittenAt.UTC().Format(time.RFC3339),
 		}
 		if note.EditedAt != nil {
-			body.EditedAt = note.EditedAt.Format(time.RFC3339)
+			body.EditedAt = note.EditedAt.UTC().Format(time.RFC3339)
 		}
 		out.Body.Items = append(out.Body.Items, body)
 	}
@@ -274,7 +274,7 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 	visibility, err := store.NoteVisibility(ctx, note.ProductID, note.VulnerabilityID)
 	if err != nil {
 		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
-		return nil
+		return markdown.Mentions(note.Body)
 	}
 	dropped, err := mentioned(ctx, in, subject, mentionTarget{
 		ProductID: note.ProductID, VulnerabilityID: note.VulnerabilityID,

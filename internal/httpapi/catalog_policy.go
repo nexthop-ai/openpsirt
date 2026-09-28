@@ -19,12 +19,12 @@ import (
 
 // Stating policy on what exists.
 //
-// The four levers that change what the tool reports without anything being
-// scanned: the line a product triages at, a product's end of life, a
-// release's details and a stream's end of life. Each of them moves what
-// carries a deadline at all, so each queues a rewrite away from the request
-// — and that is why they are together rather than filed beside the
-// declarations they sit on.
+// Per-product policy that changes what the tool reports without anything
+// being scanned. Three of these move what carries a deadline at all, so each
+// queues a rewrite away from the request: the line a product triages at, a
+// product's end of life and a stream's end of life. A release's details and a
+// product's pair thresholds move no deadline and queue nothing; they sit here
+// as the same kind of policy rather than beside the declarations they amend.
 func registerCatalogPolicy(api huma.API, d Declaring) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-product-pair-thresholds", Method: http.MethodPut,

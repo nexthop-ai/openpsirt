@@ -954,8 +954,14 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		}
 	} else if err := permitted(subject, plan.proposals, s.now()); err != nil {
 		return Reaffirmed{}, err
-	} else if err := r.Bounds.check(plan.proposals); err != nil {
-		return Reaffirmed{}, err
+	} else {
+		limits, err := r.Bounds.within(ctx, s.db)
+		if err != nil {
+			return Reaffirmed{}, err
+		}
+		if err := limits.check(plan.proposals); err != nil {
+			return Reaffirmed{}, err
+		}
 	}
 	return s.writeReaffirm(ctx, plan)
 }

@@ -63,7 +63,7 @@ func (f *fixture) proposes(t *testing.T, who access.Subject, places ...triage.Pl
 			By:            who.ID, NeedsApproval: true,
 		})
 	}
-	recorded, err := f.store.ProposeMany(t.Context(), who, proposals, triage.DefaultTogetherCap)
+	recorded, err := f.store.ProposeMany(t.Context(), who, proposals)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestSomebodyBroughtOntoACaseReadsTheFindingsOfTheirOwnClaim(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.AddToCase(ctx, f.product, f.issue, person.ID, f.proposer); err != nil {
+		if _, err := rights.AddToCase(ctx, f.product, f.issue, person.ID, f.proposer); err != nil {
 			t.Fatal(err)
 		}
 		brought, err := rights.Resolve(ctx, "collaborator")

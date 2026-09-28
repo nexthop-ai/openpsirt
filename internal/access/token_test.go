@@ -382,7 +382,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.AddToTeam(ctx, team.ID, person.ID, person.ID); err != nil {
+		if _, err := f.store.AddToTeam(ctx, team.ID, person.ID, person.ID); err != nil {
 			t.Fatal(err)
 		}
 		// Brought into one case here, and one over there. Real issues,
@@ -395,10 +395,10 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 		mine, theirs := issues["CVE-2026-0001"], issues["CVE-2026-0002"]
-		if err := f.store.AddToCase(ctx, here, mine, person.ID, person.ID); err != nil {
+		if _, err := f.store.AddToCase(ctx, here, mine, person.ID, person.ID); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.AddToCase(ctx, elsewhere, theirs, person.ID, person.ID); err != nil {
+		if _, err := f.store.AddToCase(ctx, elsewhere, theirs, person.ID, person.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -600,7 +600,7 @@ func TestAReadingTokenCannotWriteOnItsOwnersCase(t *testing.T) {
 			t.Fatal(err)
 		}
 		issue := issues["SONIC-2026-8100"]
-		if err := f.store.AddToCase(ctx, f.products["sonic"], issue, person.ID, person.ID); err != nil {
+		if _, err := f.store.AddToCase(ctx, f.products["sonic"], issue, person.ID, person.ID); err != nil {
 			t.Fatal(err)
 		}
 

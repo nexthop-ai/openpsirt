@@ -51,10 +51,11 @@ func TestAnIngestKeyIsCreatedWithItsScope(t *testing.T) {
 
 		// A name is what an upload records as its sender and what a
 		// revocation names, so two keys may not share one.
+		// Refused as the conflict it is, not as a fault at our end.
 		again := asPerson(t, r, "admin", http.MethodPost, "/v1/keys",
 			`{"name":"nightly-mine","product":"mine"}`)
-		if again.Code == http.StatusCreated {
-			t.Error("two keys were created under one name")
+		if again.Code != http.StatusConflict {
+			t.Errorf("a second key under one name answered %d: %s", again.Code, again.Body.String())
 		}
 	})
 }

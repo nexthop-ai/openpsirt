@@ -101,7 +101,7 @@ func registerAssignMatching(api huma.API, in Ingest) {
 		case input.Body.Person != "":
 			person, err := rights.ByIdentity(ctx, input.Body.Person)
 			if err != nil {
-				return nil, noSuchPerson()
+				return nil, absent(in.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			party := person.PartyID
 			to, whoToTell = &party, person.ID
@@ -123,7 +123,8 @@ func registerAssignMatching(api huma.API, in Ingest) {
 		case input.Body.Team != "":
 			team, err := rights.TeamByName(ctx, input.Body.Team)
 			if err != nil {
-				return nil, noSuchTeamNamed(input.Body.Team)
+				return nil, absent(in.Logger, err, "that team could not be looked up",
+					func() error { return noSuchTeamNamed(input.Body.Team) })
 			}
 			party := team.PartyID
 			to = &party

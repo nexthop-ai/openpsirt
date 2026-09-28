@@ -913,11 +913,9 @@ export interface paths {
          * List earlier revisions of a comment
          * @description Every version of a comment that has been replaced, oldest first. The comment itself carries what it says now.
          *
-         *     A comment is part of the record that goes public at disclosure, so what it said before has to be recoverable: an edit that overwrites leaves a record somebody can read and nobody can check.
+         *     Answers only where you may read what the comment is about, which is the rule for reading the comment itself.
          *
-         *     Answers only where you may read what the comment is about — the same rule as reading the comment itself, asked of the decision rather than of the comment, because two rules for one question is one rule out of step.
-         *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-comment-history"];
         put?: never;
@@ -1075,13 +1073,11 @@ export interface paths {
          * List what is approaching disclosure
          * @description Returns findings nobody has announced whose embargo is running out, soonest first, and the ones whose date has already arrived.
          *
-         *     Before the date, not on it. The date arriving is the last moment to act on something rather than the first useful warning, and a list that only ever showed what was already past would be a list of decisions somebody has already failed to make.
+         *     Nothing here discloses anything. Reaching the date escalates: the row appears and the people who can act on it are told.
          *
-         *     Nothing here discloses anything. Reaching the date escalates: the row appears and the people who can act on it are told. Publishing embargoed detail because a timer expired is the wrong default — if the fix is not ready, disclosing anyway is a decision a person makes.
+         *     A product you may not read undisclosed work in contributes nothing to it, not even a count.
          *
-         *     Every row is undisclosed by definition, so this list is a disclosure in its own right: a product you may not read undisclosed work in contributes nothing to it, not even a count.
-         *
-         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length — the screen opened on thirty days against a ninety-day policy and drew nothing while five embargoes were running.
+         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length.
          *
          *     Requires: private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
          */
@@ -1105,9 +1101,7 @@ export interface paths {
          * List disclosure-date movements waiting for a second person
          * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Every act is here, and `act` says which each one is.
          *
-         *     Without this there is nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
-         *
-         *     Your own requests are here too, marked as yours. You cannot agree to one — the endpoint refuses it — but a proposer looking for what is holding a case up should not have their own request hidden from them.
+         *     Your own requests are here too, marked as yours. You cannot agree to one.
          *
          *     Agree with `POST /v1/disclosure-movements/{id}/approval`.
          *
@@ -2473,9 +2467,9 @@ export interface paths {
          * Export the findings list
          * @description The findings list as a file: every row the same filters would show, not one page of them.
          *
-         *     Read with your own visibility, as it streams. It is the same query the screen reads, paged and written out as it goes — there is no point at which a whole unnarrowed list exists to be filtered afterwards, which is the failure an export is the easiest place in a codebase to make.
+         *     Read with your own visibility, as it streams. It is the same query the screen reads, paged and written out as it goes.
          *
-         *     The line this deployment triages at is stated in the file, because a spreadsheet opened six months later has nothing else to say that everything below it was never in there.
+         *     The line this deployment triages at is stated in the file.
          *
          *     Takes every filter the findings list takes.
          *
@@ -3145,9 +3139,9 @@ export interface paths {
          * Show how one product is doing
          * @description One product, with each of its builds: what is open, how much is overdue, how much is exploited, how much nobody has claimed anything about, how much is answered at every place, and when a scan last arrived.
          *
-         *     Counted as issues at components, the unit every other count here uses. A component reached twenty ways carries the same issue twenty times, so counting rows would make a build look twenty times worse than the list somebody opens next.
+         *     Counted as issues at components, the unit every other count here uses.
          *
-         *     "Undecided" and "agreed" are the findings list's own words, by the same definition and read from the same expression: undecided means no place has a decision, agreed means every place is answered by one that stands. Two screens with two definitions of "decided" is how they come to disagree in front of somebody.
+         *     "Undecided" and "agreed" mean what they mean on the findings list: undecided means no place has a decision, agreed means every place is answered by one that stands.
          *
          *     A build whose release is out of support says so rather than reading as one that stopped being scanned: those are different facts and only one of them is a fault.
          *
@@ -3477,7 +3471,7 @@ export interface paths {
          * List the rules that route work to teams
          * @description The standing rules for this product, in the order they are tried.
          *
-         *     First match wins, and which rule placed a finding is recorded on the finding: an unwritten precedence is forgettable, and the question it answers — where did this come from — is asked months later by somebody who was not there.
+         *     First match wins, and which rule placed a finding is recorded on the finding.
          *
          *     Requires: public-triage or private-triage on the product
          */
@@ -3487,11 +3481,11 @@ export interface paths {
          * Add a rule that routes work to a team
          * @description Records a standing rule and queues it against what is already open.
          *
-         *     It matches on component identity as well as on a place in the tree. The source package is the key that matters: one rule naming it catches every binary package built from it, wherever they sit — a kernel is one source package appearing at many places under many consumers, and a subtree rule would need a line per place and would still miss tomorrow's.
+         *     It matches on component identity as well as on a place in the tree. A rule naming a source package catches every binary package built from it, wherever they sit.
          *
          *     It places only work nobody holds. A human assignment always wins, and adding a rule never takes something out of somebody's hands.
          *
-         *     Turning one on is a bulk write, so it is queued rather than done here: one rule naming a source package sweeps thousands of existing findings, and saving a form must not hold a transaction open across the estate. The reply says the rule was recorded, not that the sweep has finished.
+         *     Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished.
          *
          *     Requires: assigner on the product. A rule hands work to somebody, continuously, on behalf of whoever wrote it.
          */
@@ -3513,7 +3507,7 @@ export interface paths {
          * Preview what a routing rule would catch
          * @description Answers what a rule with these keys matches, without recording anything: the components it names, how many pieces of work sit at them, and how many of those nobody holds.
          *
-         *     A rule whose reach nobody can see before saving is a rule that sweeps the estate on a guess, and one naming something nothing is called places nothing, silently — which is the worst way for a rule to be wrong, because it still looks like a rule. `*` matches any run of characters in either key.
+         *     `*` matches any run of characters in either key.
          *
          *     It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
          *
@@ -4353,9 +4347,9 @@ export interface paths {
          * List every known vulnerability in a build and its disposition
          * @description One row per issue and place in this build, with its state, what was claimed, who claimed it, who agreed, when each of those happened, its deadline and whether that was met.
          *
-         *     The complement of the audit list, not a variant of it. The audit list says what was decided; an auditor's first question is what was *known*, decided or not — so `undecided` rows are in here, and closed ones too. A register of only what is still open answers a different question.
+         *     Every issue known in the build, decided or not: `undecided` rows are in here, and closed ones too. The audit list is what was decided.
          *
-         *     Current state, and no `as_of`. Reconstructing the view as of a past date was asked for and refused: each row already carries the dates that evidence what is being checked, and a reconstruction would be a second answer about the past that has to be kept honest against the first.
+         *     Current state only; there is no `as_of`. Each row carries the dates of what happened to it.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -4877,9 +4871,9 @@ export interface paths {
          *
          *     A period or a rolling window. `from` and `to` name a stretch — a quarter, a financial year — and `days` is the rolling window ending now. They are two ways of saying when, so only one may be sent. What is aging is a statement about now whatever period was asked for: how long something has been open is answered by the clock.
          *
-         *     A closure only counts as a fix if the issue actually went away. An upgrade that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
+         *     A closure counts as a fix only where the issue went away. An upgrade that carried the issue into the next version, and a finding a scanner stopped reporting, are not counted.
          *
-         *     Counted in issues, not in places. One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
+         *     Counted in issues, not in places.
          *
          *     Asked for neither a period nor a window, this is the last 30 days.
          *
@@ -5139,7 +5133,7 @@ export interface paths {
          *
          *     `quiet_days` is measured from the last arrival, or from when the build was declared where nothing has ever been filed against it — `last_received_at` is empty in that case, which is a different situation from a scan that failed.
          *
-         *     A build whose release is out of support is in the file, marked `retired`, and is never reported as quiet: silence there is expected. Leaving it out and saying nothing would be a different answer.
+         *     A build whose release is out of support is in the file, marked `out_of_support`, and is never reported as quiet. A build taken out of use is marked `retired` and is never reported as quiet either.
          *
          *     The threshold `quiet` was computed against is stated in the file.
          *
@@ -5537,11 +5531,7 @@ export interface paths {
          *
          *     Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build. A team that owns one area asks for its own three lines this way.
          *
-         *     Three series rather than one, because separately they are three numbers and together they say whether the team is keeping pace: new consistently outrunning resolved is a growing backlog.
-         *
-         *     Split by severity because a total that barely moves while its critical share rises is getting worse, and a single line hides exactly that.
-         *
-         *     Worked out when it is asked for. Nothing is precomputed or refreshed on a schedule until a measurement says it has to be.
+         *     Worked out when it is asked for.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -5591,11 +5581,11 @@ export interface paths {
          * Show what each release shipped with
          * @description One point per tagged release of one product, oldest first, with what is open against it now.
          *
-         *     The axis follows what is being viewed. A branch is scanned nightly and has continuous data, so a calendar reads correctly on it. A tag never moves again, and releases months apart make a calendar count read as slow drift rather than the step change it was — the gaps are the chart's whole shape and they are gaps in nothing.
+         *     The axis is the sequence of releases, not the calendar.
          *
-         *     Answered against today's vulnerability data, not as of the day each was cut. That is what re-scanning a shipped release is for.
+         *     Answered against today's vulnerability data, not as of the day each was cut.
          *
-         *     No rates here. How many appeared and were resolved between two releases is an artifact of how far apart somebody cut them; rates always plot on calendar. And a product must be named: two products' tags interleave by date and mean nothing side by side.
+         *     No rates here; the calendar trend has them. A product must be named.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -7335,7 +7325,7 @@ export interface components {
             /** @description Whether the agreement was carried forward from an earlier claim rather than given for this one */
             agreement_carried?: boolean;
             approved_at?: string;
-            /** @description The people who agreed. Two different people is the whole of the control, so both names are carried rather than a count */
+            /** @description The people who agreed, by name */
             approved_by?: string;
             closed?: string;
             /**
@@ -7366,7 +7356,7 @@ export interface components {
             proposed_by?: string;
             severity?: string;
             /**
-             * @description The decision state. undecided is the row every other report leaves out and the one an auditor is looking for
+             * @description The decision state. undecided is a row nobody has decided anything about
              * @enum {string}
              */
             state: "undecided" | "waiting" | "agreed" | "lapsed";
@@ -13787,7 +13777,10 @@ export interface operations {
                 product?: string;
                 /** @description Limit to judgments this team's members proposed, by team name */
                 team?: string;
+                /** @description The most rows to return */
                 limit?: number;
+                /** @description How many rows to skip, in the order the report is sorted */
+                offset?: number;
             };
             header?: never;
             path?: never;

@@ -135,7 +135,7 @@ func registerObligations(api huma.API, in Ingest) {
 			for _, due := range entry.Windows {
 				window, _ := windowFor(subject, due.Window)
 				body.Windows = append(body.Windows, DueBody{
-					Window: window, EndsAt: due.EndsAt.Format(time.RFC3339),
+					Window: window, EndsAt: due.EndsAt.UTC().Format(time.RFC3339),
 					Passed: due.Passed, Near: due.Near, Answered: due.Answered,
 				})
 			}
@@ -347,7 +347,7 @@ func windowFor(subject access.Subject, window obligation.Window) (WindowBody, bo
 	body := WindowBody{
 		ID: window.ID, Name: window.Name, Hours: window.Hours,
 		Products:   []string{},
-		DeclaredAt: window.DeclaredAt.Format(time.RFC3339),
+		DeclaredAt: window.DeclaredAt.UTC().Format(time.RFC3339),
 	}
 	if window.LeadHours != nil {
 		body.LeadHours = *window.LeadHours
@@ -378,9 +378,9 @@ func toldBodies(told []obligation.Told, windows map[int64]string,
 	out := make([]NoticeBody, 0, len(told))
 	for _, one := range told {
 		body := NoticeBody{
-			ID: one.ID, Recipient: one.Recipient, ToldAt: one.ToldAt.Format(time.RFC3339),
+			ID: one.ID, Recipient: one.Recipient, ToldAt: one.ToldAt.UTC().Format(time.RFC3339),
 			Said: one.Said, RecordedBy: people[one.RecordedBy],
-			RecordedAt: one.RecordedAt.Format(time.RFC3339),
+			RecordedAt: one.RecordedAt.UTC().Format(time.RFC3339),
 		}
 		if one.WindowID != nil {
 			body.WindowID, body.Window = *one.WindowID, windows[*one.WindowID]

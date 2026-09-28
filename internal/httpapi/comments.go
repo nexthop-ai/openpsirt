@@ -53,10 +53,10 @@ func registerComments(api huma.API, in Ingest) {
 				ID: comment.ID, Body: comment.Body,
 				WrittenBy:     who.identity(comment.WrittenBy),
 				WrittenByName: who.label(comment.WrittenBy),
-				WrittenAt:     comment.WrittenAt.Format(time.RFC3339),
+				WrittenAt:     comment.WrittenAt.UTC().Format(time.RFC3339),
 			}
 			if comment.EditedAt != nil {
-				body.EditedAt = comment.EditedAt.Format(time.RFC3339)
+				body.EditedAt = comment.EditedAt.UTC().Format(time.RFC3339)
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
@@ -99,14 +99,10 @@ func registerComments(api huma.API, in Ingest) {
 		Summary: "List earlier revisions of a comment",
 		Description: "Every version of a comment that has been replaced, oldest first. " +
 			"The comment itself carries what it says now.\n\n" +
-			"A comment is part of the record that goes public at disclosure, so what it said " +
-			"before has to be recoverable: an edit that overwrites leaves a record somebody " +
-			"can read and nobody can check.\n\n" +
-			"Answers only where you may read what the comment is about — the same rule as " +
-			"reading the comment itself, asked of the decision rather than of the comment, " +
-			"because two rules for one question is one rule out of step.",
+			"Answers only where you may read what the comment is about, which is the rule " +
+			"for reading the comment itself.",
 		Tags: []string{"Triage"},
-	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*listOutput[WasSaidBody], error) {
 		subject, store, err := triaging(ctx, in)
@@ -122,7 +118,7 @@ func registerComments(api huma.API, in Ingest) {
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, WasSaidBody{
 				Version: row.Ordinal, Body: row.Body,
-				ReplacedAt: row.ReplacedAt.Format(time.RFC3339),
+				ReplacedAt: row.ReplacedAt.UTC().Format(time.RFC3339),
 			})
 		}
 		return out, nil

@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"time"
 
@@ -129,5 +130,5 @@ func spreadBodies(all []triage.Spread) []SpreadBody {
 }
 
 func inDays(d time.Duration) float64 {
-	return float64(int64(d.Hours()/24*10)) / 10
+	return math.Round(d.Hours()/24*10) / 10
 }

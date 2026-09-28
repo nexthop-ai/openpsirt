@@ -940,14 +940,14 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		// resolving the name on its own answers about whichever was interned
 		// first — for two of the three rows, an issue it does not carry.
 		component, err := componentCarrying(ctx, in, subject, target.ID, issue,
-			input.Component, input.choice(), ambiguousOrMissing)
+			input.Component, input.choice(), func(err error) error { return ambiguousOrMissing(in.Logger, err) })
 		if err != nil {
 			return nil, err
 		}
 
 		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, target.ID, issue, component)
 		if err != nil {
-			return nil, noSuchFinding()
+			return nil, absent(in.Logger, err, "that finding could not be read", noSuchFinding)
 		}
 		body := evidenceBody(*evidence)
 		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {

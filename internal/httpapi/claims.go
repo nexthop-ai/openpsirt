@@ -254,19 +254,14 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// The bounds an answer about many issues is held to, read the way every other
-		// path reads it. Only a promise goes through unbounded, and which of
-		// the two this is comes from the claim being re-made rather than from
-		// the request.
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
+		// Held to the deployment's bounds, which the store reads inside the
+		// write. Only a promise goes through unbounded, and which of the two
+		// this is comes from the claim being re-made rather than from the
+		// request.
 		made, err := store.ReaffirmClaim(ctx, subject, triage.ReaffirmingClaim{
 			PreviousClaimID: input.ID,
 			Reasoning:       input.Body.Reasoning,
 			By:              subject.ID,
-			Bounds:          bounds,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {
@@ -281,7 +276,7 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 func claimBody(c triage.Claim, proposedBy, proposedByName string) ClaimBody {
 	body := ClaimBody{
 		ID: c.ID, Kind: string(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
-		ProposedAt: c.ProposedAt.Format(time.RFC3339),
+		ProposedAt: c.ProposedAt.UTC().Format(time.RFC3339),
 		Elsewhere:  c.Elsewhere,
 	}
 	if c.DerivedFrom != nil {
@@ -484,7 +479,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			NeedsApproval:   one.Decision.NeedsApproval,
 			ProposedBy:      who.identity(one.Claim.ProposedBy),
 			ProposedByName:  who.label(one.Claim.ProposedBy),
-			ProposedAt:      one.Claim.ProposedAt.Format(time.RFC3339),
+			ProposedAt:      one.Claim.ProposedAt.UTC().Format(time.RFC3339),
 			Places:          one.Places, Builds: one.Builds,
 			Elsewhere: one.Claim.Elsewhere,
 		}
@@ -493,10 +488,10 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		}
 		if one.ApprovedAt != nil {
 			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
-			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
+			body.ApprovedAt = one.ApprovedAt.UTC().Format(time.RFC3339)
 		}
 		if one.SentBackAt != nil {
-			body.SentBackAt = one.SentBackAt.Format(time.RFC3339)
+			body.SentBackAt = one.SentBackAt.UTC().Format(time.RFC3339)
 		}
 		standingOut = append(standingOut, body)
 	}
@@ -510,7 +505,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome),
 			Justification: justification(orBlank(said.Justification)),
 			ProposedBy:    who.identity(d.ProposedBy), ProposedByName: who.label(d.ProposedBy),
-			ProposedAt: d.ProposedAt.Format(time.RFC3339),
+			ProposedAt: d.ProposedAt.UTC().Format(time.RFC3339),
 			Ended:      string(d.State),
 			About:      orBlank(d.ComponentUpstreamVersion),
 			Reasoning:  one.Reasoning,
@@ -522,7 +517,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			body.DeferredUntil = said.DeferredUntil.Format(time.DateOnly)
 		}
 		if d.EndedAt != nil {
-			body.EndedAt = d.EndedAt.Format(time.RFC3339)
+			body.EndedAt = d.EndedAt.UTC().Format(time.RFC3339)
 		}
 		if one.ApprovedBy != 0 {
 			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
@@ -539,7 +534,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		}
 		if one.ApprovedAt != nil {
 			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
-			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
+			body.ApprovedAt = one.ApprovedAt.UTC().Format(time.RFC3339)
 		}
 		similarOut = append(similarOut, body)
 	}
@@ -559,7 +554,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		}
 		if one.ApprovedAt != nil {
 			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
-			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
+			body.ApprovedAt = one.ApprovedAt.UTC().Format(time.RFC3339)
 		}
 		elsewhereOut = append(elsewhereOut, body)
 	}

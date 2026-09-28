@@ -23,7 +23,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { at as choicesAt, type Choice, unwrap, whichOf } from "../api/queries";
-import { useWho } from "../app/session";
+import { mayOf, useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
 import { Weaknesses } from "../ui/Weakness";
@@ -323,7 +323,7 @@ export function Finding() {
   // is about the product and takes triage at either visibility. Read once:
   // asked at each control, the copies drift and one of them ends up offering a
   // button that answers 403.
-  const here = who.data?.reach.find((r) => r.product === product);
+  const here = mayOf(who.data, product);
   const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const places = useMemo(() => it?.places ?? [], [it]);
   // A place is the component and what pulls it in; two chains reaching the

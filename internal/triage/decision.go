@@ -360,14 +360,11 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 // leaves a finding that is neither answered nor open with nothing saying which
 // places were which. The same holds across builds, where one judgment covers a
 // place in each of several.
-func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposals []Proposal,
-	cap int) ([]*Decision, error) {
+func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
+	proposals []Proposal) ([]*Decision, error) {
 
 	if len(proposals) == 0 {
 		return nil, nil
-	}
-	if err := allowed(subject, proposals, cap, s.now()); err != nil {
-		return nil, err
 	}
 	if err := oneArgument(proposals); err != nil {
 		return nil, err
@@ -376,6 +373,9 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 	var recorded []*Decision
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
 		// Asked per place rather than once for the set: the threshold reads
 		// the claim, and two places of one finding can differ in what they
 		// carry. Re-worked on every attempt, against the policy and the

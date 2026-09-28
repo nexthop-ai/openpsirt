@@ -103,18 +103,16 @@ func (s *Store) Bind(ctx context.Context, group string, productID int64, role Ro
 		GroupName: group, ProductID: productID, Role: role,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to %q", group, role),
-			func(ctx context.Context) (bool, error) {
-				// The row's presence, which is what the index refused.
-				// A binding has nothing to be in force: it grants at each
-				// member's next sign-in and holds nothing of its own.
-				return s.db.NewSelect().Model((*Binding)(nil)).
-					Where("group_name = ?", group).Where("product_id = ?", productID).
-					Where("role = ?", role).Exists(ctx)
-			})
-	}
-	return nil
+	_, err := s.insertOnce(ctx, fmt.Sprintf("bind %q to %q", group, role), binding,
+		func(ctx context.Context) (bool, error) {
+			// The row's presence, which is what the index refused. A binding
+			// has nothing to be in force: it grants at each member's next
+			// sign-in and holds nothing of its own.
+			return s.db.NewSelect().Model((*Binding)(nil)).
+				Where("group_name = ?", group).Where("product_id = ?", productID).
+				Where("role = ?", role).Exists(ctx)
+		})
+	return err
 }
 
 // Unbind removes one mapping.
@@ -161,15 +159,13 @@ func (s *Store) BindOver(ctx context.Context, group string, over Over) error {
 		GroupName: group, Grants: over,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to %q", group, over),
-			func(ctx context.Context) (bool, error) {
-				return s.db.NewSelect().Model((*AdminBinding)(nil)).
-					Where("group_name = ?", group).
-					Where("grants = ?", over).Exists(ctx)
-			})
-	}
-	return nil
+	_, err := s.insertOnce(ctx, fmt.Sprintf("bind %q to %q", group, over), binding,
+		func(ctx context.Context) (bool, error) {
+			return s.db.NewSelect().Model((*AdminBinding)(nil)).
+				Where("group_name = ?", group).
+				Where("grants = ?", over).Exists(ctx)
+		})
+	return err
 }
 
 // UnbindOver takes one back, for the things unbinding cannot lock anybody out
@@ -397,7 +393,11 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		}
 		// The mapping authorized them, so the way they arrived is recorded and
 		// pinned now rather than waiting for a second sign-in.
-		if err := s.Claim(ctx, person.ID, who.Username); err != nil {
+		// A name somebody else holds is a refusal, as any arrival nothing
+		// authorized is: asking again cannot change it.
+		if err := s.Claim(ctx, person.ID, who.Username); errors.Is(err, ErrNameTaken) {
+			return nil, ErrDenied
+		} else if err != nil {
 			return nil, err
 		}
 		if _, err := s.match(ctx, who); err != nil {

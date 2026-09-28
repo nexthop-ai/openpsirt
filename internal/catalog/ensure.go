@@ -124,18 +124,15 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 			existing.RetiredAt = nil
 			back = true
 		}
-		// Filling in one that was never stated is not a change. It was
-		// left out, and there was no way to supply it afterwards — so a tag
-		// declared without it stayed that way, and release readiness, which
-		// asks what was cut from this branch, reported that nothing had ever
-		// been released. Recording it later is the same act as recording it at
-		// the time, arriving late.
+		// Filling in one that was never stated is not a change. Without it
+		// a tag declared with no parent stays that way, and release
+		// readiness, which asks what was cut from this branch, reports that
+		// nothing has ever been released. Recording it later is the same act
+		// as recording it at the time, arriving late, and it is held to the
+		// same check as filling it in anywhere else.
 		if parentID != nil && existing.ParentID == nil {
-			if _, err := s.db.NewUpdate().Model((*Stream)(nil)).
-				Set("parent_id = ?", *parentID).
-				Where("id = ?", existing.ID).
-				Where("parent_id IS NULL").Exec(ctx); err != nil {
-				return nil, false, fmt.Errorf("record what %q was cut from: %w", name, err)
+			if err := s.FillInParent(ctx, existing.ID, *parentID); err != nil {
+				return nil, false, fmt.Errorf("%q: %w", name, err)
 			}
 			existing.ParentID = parentID
 			return existing, back, nil

@@ -127,3 +127,29 @@ func TestTheOnePlaceA404MayPublishAnErrorsTextSaysWhy(t *testing.T) {
 		}
 	}
 }
+
+func TestWhatCountsAsAnArmThatAnswers404WhateverTheErrorWas(t *testing.T) {
+	for _, c := range []struct {
+		what string
+		body string
+		want bool
+	}{
+		{"the shape itself", "\tif err != nil {\n\t\treturn nil, noSuchPerson()\n\t}", true},
+		{"assigned in the condition", "\tif team, err = s.TeamByName(ctx, n); err != nil {\n" +
+			"\t\treturn noSuchTeamNamed(n)\n\t}", true},
+		{"a fixed sentence", "\tif err != nil {\n\t\treturn huma.Error404NotFound(\"gone\")\n\t}", true},
+		{"with a comment between", "\tif err != nil {\n\t\t// Not there.\n\t\treturn nil, noSuchFinding()\n\t}", true},
+		{"or'd with an emptiness", "\tif err != nil || len(p) == 0 {\n\t\treturn nil, noSuchFinding()\n\t}", true},
+		{"as the fourth of four values", "\tif err != nil || len(all) == 0 {\n\t\treturn nil, 0, 0, noSuchFinding()\n\t}", true},
+		{"as the fourth of four, one a string", "\tif err != nil {\n\t\treturn 0, 0, \"\", noSuchNote()\n\t}", true},
+		{"as the fifth of five, one a struct", "\tif err != nil {\n\t\treturn Subject{}, nil, 0, \"\", noSuchPerson()\n\t}", true},
+
+		{"the helper that splits the two", "\tif err != nil {\n\t\treturn nil, absent(l, err, \"x\", noSuchPerson)\n\t}", false},
+		{"an arm that asked which error it was", "\tif errors.Is(err, ErrNoSuchTeam) {\n\t\treturn noSuchTeamNamed(n)\n\t}", false},
+		{"an arm that answers a fault", "\tif err != nil {\n\t\treturn nil, wentWrong(l, \"x\", err)\n\t}", false},
+	} {
+		if got := len(collapses(c.body)) > 0; got != c.want {
+			t.Errorf("%s: reported=%v, want %v:\n%s", c.what, got, c.want, c.body)
+		}
+	}
+}

@@ -554,7 +554,7 @@ func registerTriage(api huma.API, in Ingest) {
 				Finding:   named[i].Finding,
 			}
 			if row.When != nil {
-				entry.When = row.When.Format(time.RFC3339)
+				entry.When = row.When.UTC().Format(time.RFC3339)
 			}
 			if row.By != 0 {
 				entry.By, entry.ByName = who.identity(row.By), who.label(row.By)
@@ -768,12 +768,7 @@ func registerProposing(api huma.API, in Ingest) {
 		}
 
 		proposal := triage.Proposal{
-			Place: triage.Place{
-				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
-				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
-				OnTag: at.OnTag,
-			},
+			Place:         placeOf(*at),
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Justification),
 			Mitigation:    input.Body.Mitigation,

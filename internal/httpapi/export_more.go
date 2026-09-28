@@ -174,6 +174,9 @@ func registerComparisonExport(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
 		from, to, err := input.targets(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err

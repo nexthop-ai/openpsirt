@@ -76,3 +76,33 @@ func TestUnbindingTheLastAdministratorsGroupIsRefusedAndChangesNothing(t *testin
 		}
 	})
 }
+
+// Unbinding something held over the deployment refuses a product, as binding
+// it does. A request naming a product asked about a grant on that product,
+// and answering it by removing the deployment-wide one removes something
+// nobody asked to have removed.
+func TestUnbindingOverTheDeploymentRefusesAProduct(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if err := r.rights.BindOver(t.Context(), "auditors", access.Audits); err != nil {
+			t.Fatal(err)
+		}
+		got := asPerson(t, r, "admin", http.MethodDelete,
+			"/v1/roles/bindings?group=auditors&role=audit&product=mine", "")
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("unbinding with a product answered %d: %s", got.Code, got.Body.String())
+		}
+		var listed struct {
+			Items []struct {
+				Group string `json:"group"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/roles/bindings", &listed)
+		found := false
+		for _, row := range listed.Items {
+			found = found || row.Group == "auditors"
+		}
+		if !found {
+			t.Error("a refused unbind took the deployment-wide binding away")
+		}
+	})
+}

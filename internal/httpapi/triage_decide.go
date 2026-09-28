@@ -271,13 +271,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		for i, places := range reached {
 			for _, place := range places {
 				proposal := triage.Proposal{
-					Place: triage.Place{
-						ProductID: place.ProductID, VulnerabilityID: place.VulnerabilityID,
-						PlaceIdentity: place.PlaceIdentity, Visibility: place.Visibility,
-						ComponentUpstream: place.ComponentUpstream,
-						ConsumerUpstream:  place.ConsumerUpstream,
-						OnTag:             place.OnTag,
-					},
+					Place:         placeOf(place),
 					Outcome:       triage.Outcome(input.Body.Outcome),
 					Justification: triage.Justification(input.Body.Justification),
 					Mitigation:    input.Body.Mitigation,
@@ -301,9 +295,9 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		// nobody can point at afterwards.
 		var recorded []*triage.Decision
 		if input.Body.Extends != 0 {
-			recorded, err = store.Extend(ctx, subject, input.Body.Extends, proposals, limit)
+			recorded, err = store.Extend(ctx, subject, input.Body.Extends, proposals)
 		} else {
-			recorded, err = store.ProposeMany(ctx, subject, proposals, limit)
+			recorded, err = store.ProposeMany(ctx, subject, proposals)
 		}
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
@@ -348,7 +342,10 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 		return nil, 0, 0, err
 	}
 	all, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target, issue, at)
-	if err != nil || len(all) == 0 {
+	if err != nil {
+		return nil, 0, 0, absent(in.Logger, err, "those places could not be looked up", noSuchFinding)
+	}
+	if len(all) == 0 {
 		return nil, 0, 0, noSuchFinding()
 	}
 
@@ -379,12 +376,7 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 	}
 	ask := make([]triage.Place, 0, len(places))
 	for _, place := range places {
-		ask = append(ask, triage.Place{
-			ProductID: place.ProductID, VulnerabilityID: place.VulnerabilityID,
-			PlaceIdentity: place.PlaceIdentity, Visibility: place.Visibility,
-			ComponentUpstream: place.ComponentUpstream,
-			ConsumerUpstream:  place.ConsumerUpstream,
-		})
+		ask = append(ask, placeOf(place))
 	}
 	left, err := store.Undecided(ctx, ask)
 	if err != nil {
@@ -440,8 +432,7 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which,
-		ambiguousOrMissing)
+	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which, func(err error) error { return ambiguousOrMissing(in.Logger, err) })
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -469,7 +460,22 @@ func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
 
 	at, err := finding.NewStore(in.DB.DB).PlaceFor(ctx, subject, target.ID, issue, place)
 	if err != nil {
-		return nil, 0, noSuchFinding()
+		return nil, 0, absent(in.Logger, err, "that place could not be looked up", noSuchFinding)
 	}
 	return at, target.ID, nil
+}
+
+// placeOf is the place a decision is about, as the finding there states it.
+//
+// One spelling for every route. Whether the place sits in a tag build is read
+// from the finding rather than supplied, and a route that leaves it out makes
+// a dated outcome on a release built once, which the store refuses on every
+// other route.
+func placeOf(d finding.Deciding) triage.Place {
+	return triage.Place{
+		ProductID: d.ProductID, VulnerabilityID: d.VulnerabilityID,
+		PlaceIdentity: d.PlaceIdentity, Visibility: d.Visibility,
+		ComponentUpstream: d.ComponentUpstream, ConsumerUpstream: d.ConsumerUpstream,
+		OnTag: d.OnTag,
+	}
 }

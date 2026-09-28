@@ -755,6 +755,9 @@ and a store that wraps both alike makes every caller above it wrong at once.
 | Absence is a sentinel each package words for itself | A caller matches on the sentinel through the wrapping. Matching on a message is the same mistake as reading an engine's error text |
 | A failed read names the act, and the act reaches the log | "Look up product 12" is what an operator needs. What the driver said is not a thing to publish |
 | One helper, not a rule people remember | Made by hand at every call site, it is made differently at most of them |
+| A handler's error arm asks which error it holds before it answers 404 | An arm answering 404 for any error turns an outage into "that does not exist", and inside a transaction it drops the cause the retry helper reads. A gate reports an arm whose first statement answers 404 whatever the error was |
+| A read that fills in part of an answer fails the answer | Left out, a field reads as its absence: a limit as no limit, a narrowed token as one reaching everything, a release note as leaving nothing out |
+| A credential that cannot be looked up is a fault | Answered 503 with a time to ask again, and logged. Answered as not authorized, an outage sends every caller to sign in again |
 
 Two readers of one two-column select telling the two apart differently is the
 ordinary shape: `TargetFor` and `ExistingTarget` are that select, and a caller
@@ -811,15 +814,27 @@ transaction began, or carried over from the attempt that failed, describes a
 world that no longer exists. Anything a closure uses but does not fetch is a
 defect.
 
+| Read inside the write | What it decides |
+|---|---|
+| The limits on an act answering many issues | Whether the act is refused. A limit a caller left unset is the deployment's setting |
+| How many findings one judgment may write | Whether a judgment across many places, or an extension of an agreed one, is refused |
+| The longest a personal token may last | The ceiling the new token is held to |
+| Whether the writer may write a note about an issue | Whether the note is written |
+| Where each added build holds a recorded flaw's component | Which rows the flaw opens. A build that stopped shipping it is refused |
+| What each part of a build is called, on recording that its VEX document went out | Whether the document names the build as it is now called; a rename in between is refused and asked again |
+
+A read made before the transaction as an early refusal is repeated inside it;
+the one inside decides.
+
 A statement that fails inside a transaction is not always recoverable. On
 PostgreSQL a failed statement aborts the whole transaction: every command after
 it is refused until the block ends, whatever the caller made of the failure. So
 a statement whose failure is the ordinary answer — an insert refused by a
 primary key, where being refused is how a second replica learns the row is
-already there — cannot sit inside a transaction with the work that follows it.
-It runs on its own, and what needs the retry goes in the transaction. Three of
-the four engines carry on after a failed statement, so the quick loop never
-sees this.
+already there — cannot sit bare inside a transaction. It stands on a savepoint
+of its own, rolled back on refusal, and the transaction carries on; SAVEPOINT is
+plain SQL on all four engines. Three of the four engines carry on after a failed
+statement without one, so the quick loop never sees this.
 
 An act is one transaction, and an act is what a person asked for. Recording
 somebody and granting them the roles named, declaring a team and putting people
@@ -855,7 +870,9 @@ exist:
 The third is a named error the retry helper recognizes, beside the engine codes
 it reads. The condition is one a query expresses rather than one an engine
 reports — a conditional update that matched nothing because another writer moved
-the row — so nothing in a driver's vocabulary says it.
+the row — so nothing in a driver's vocabulary says it. A handler answers it as
+a fault that carries it: the helper reads the cause and goes again, and where
+nothing goes again the caller is told 500 in words of the handler's own.
 
 The joining spelling is a named helper rather than an `if` on the handle's type,
 because written by hand it reads as a fallback to writing outside a transaction.
@@ -896,6 +913,13 @@ The damage is in the record rather than in the value: the row ends up holding
 what the last writer wrote, and the trail says that writer replaced something
 nothing ever held. That is the settings trail, where "who raised the floor to
 critical, and from what" is the question being asked of it.
+
+| Write | What it matches on beside the key |
+|---|---|
+| Agreeing to or withdrawing a rating | The state the claim was read in |
+| Holding rows of a claim back, and setting them aside | Still waiting, and still the claim they were read from |
+| Filling in what a tag was cut from | An empty parent; a lost race reads back what won and refuses a different branch |
+| Changing a setting | The value read |
 
 A locking read — `SELECT ... FOR UPDATE` — is the other answer, and is not used
 for this: it is spelled per engine, and the condition works the same on all

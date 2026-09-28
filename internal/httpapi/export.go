@@ -15,6 +15,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -71,11 +72,13 @@ type Exporting struct {
 	// the re-sorting on top of that.
 	//
 	// The cost is a database connection held for as long as the response
-	// takes, where a paged reader gives one back between pages. That
-	// is bounded by the write deadline below, which moves with the writing
-	// rather than with the request: a reader that has stopped reading loses
-	// the connection after exportStall, and one that is keeping up holds it
-	// for the seconds the file takes.
+	// takes, where a paged reader gives one back between pages. Three bounds
+	// hold it. The write deadline moves with the writing: a reader that has
+	// stopped reading loses the connection after exportStall. The cursor is
+	// closed at exportCeiling however steadily the file is being read, so a
+	// reader draining just fast enough to keep the deadline moving gives the
+	// connection back all the same. And only so many streams run at once,
+	// which streamSlots decides from the size of the pool.
 	Stream func(ctx context.Context, each func([]string) error) error
 }
 
@@ -135,6 +138,50 @@ const exportPage = 200
 // client that has stopped reading still reaches it; an export that is making
 // progress is no longer punished for being large.
 const exportStall = 2 * time.Minute
+
+// exportCeiling is the longest a streamed export holds its cursor open.
+//
+// A reader that takes a page every two minutes keeps exportStall from ever
+// firing, and the cursor, with its connection, is held for as long as the file
+// takes at that pace: about 41 hours for a build of 249,288 places. On SQLite
+// that connection is the whole pool, so every other request waits behind it.
+// The measured file takes 1.9 seconds to read from the database, so the
+// ceiling leaves an honest download on a slow link room to finish. A file cut
+// at the ceiling carries the incomplete marker.
+const exportCeiling = 10 * time.Minute
+
+// streamSlots bounds how many streamed exports hold a connection at once.
+//
+// A fifth of the pool, and at least one: the rest of the pool is left for
+// every other request. SQLite's pool is one connection, so its one slot is the
+// whole of it for as long as the stream runs, which exportCeiling bounds.
+type streamSlots chan struct{}
+
+// exportStreams is the number of slots where the pool states no size.
+const exportStreams = 5
+
+func newStreamSlots(db *database.DB) streamSlots {
+	n := exportStreams
+	if db != nil {
+		if open := db.DB.DB.Stats().MaxOpenConnections; open > 0 {
+			n = max(1, open/5)
+		}
+	}
+	return make(streamSlots, n)
+}
+
+// take claims a slot, or refuses with a time to ask again. The release is
+// called once the stream has finished writing.
+func (s streamSlots) take() (func(), error) {
+	select {
+	case s <- struct{}{}:
+		return func() { <-s }, nil
+	default:
+		return nil, huma.ErrorWithHeaders(
+			huma.Error503ServiceUnavailable("too many exports are being written at once; ask again shortly"),
+			http.Header{"Retry-After": []string{"30"}})
+	}
+}
 
 // writing extends the response's deadline for as long as an export keeps
 // producing.
@@ -329,18 +376,7 @@ func eachPage(ctx context.Context, out Exporting,
 	page func(rows [][]string), between func()) error {
 
 	if out.Stream != nil {
-		// Written one at a time, and flushed every so often rather than every
-		// row: a flush is a write to the socket, and a quarter of a million of
-		// them costs more than the query did.
-		written := 0
-		return out.Stream(ctx, func(row []string) error {
-			page([][]string{row})
-			written++
-			if written%exportPage == 0 {
-				between()
-			}
-			return nil
-		})
+		return streamed(ctx, out, page, between, exportCeiling)
 	}
 	for offset := 0; ; {
 		rows, err := out.Rows(ctx, exportPage, offset)
@@ -354,6 +390,39 @@ func eachPage(ctx context.Context, out Exporting,
 		offset += len(rows)
 		between()
 	}
+}
+
+// streamed walks a streamed export, closing its cursor at the ceiling.
+//
+// Written one at a time, and flushed every so often rather than every row: a
+// flush is a write to the socket, and a quarter of a million of them costs
+// more than the query did.
+//
+// The ceiling is a deadline on the context the cursor was opened with, so the
+// driver closes the cursor and returns its connection when it passes, even
+// while a write to a slow reader is still blocked.
+func streamed(ctx context.Context, out Exporting,
+	page func(rows [][]string), between func(), ceiling time.Duration) error {
+
+	ctx, cancel := context.WithTimeout(ctx, ceiling)
+	defer cancel()
+	written := 0
+	err := out.Stream(ctx, func(row []string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		page([][]string{row})
+		written++
+		if written%exportPage == 0 {
+			between()
+		}
+		return nil
+	})
+	if err == nil {
+		// A cursor closed by the ceiling can end as though it ran out of rows.
+		err = ctx.Err()
+	}
+	return err
 }
 
 // inert stops a spreadsheet reading a value as a formula.
@@ -442,12 +511,8 @@ func registerExport(api huma.API, in Ingest) {
 		Description: "The findings list as a file: every row the same filters would show, not " +
 			"one page of them.\n\n" +
 			"Read with your own visibility, as it streams. It is the same query the screen " +
-			"reads, paged and written out as it goes — there is no point at which a whole " +
-			"unnarrowed list exists to be filtered afterwards, which is the failure an export " +
-			"is the easiest place in a codebase to make.\n\n" +
-			"The line this deployment triages at is stated in the file, because a spreadsheet " +
-			"opened six months later has nothing else to say that everything below it was " +
-			"never in there.\n\n" +
+			"reads, paged and written out as it goes.\n\n" +
+			"The line this deployment triages at is stated in the file.\n\n" +
 			"Takes every filter the findings list takes.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {

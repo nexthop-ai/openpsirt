@@ -83,7 +83,7 @@ func registerBulk(api huma.API, in Ingest) {
 		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
 			input.choice())
 		if err != nil {
-			return nil, ambiguousOrMissing(err)
+			return nil, ambiguousOrMissing(in.Logger, err)
 		}
 
 		// One call, which counts both. Two calls run the whole narrowing again
@@ -219,7 +219,7 @@ func registerBulk(api huma.API, in Ingest) {
 		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
 			input.choice())
 		if err != nil {
-			return nil, ambiguousOrMissing(err)
+			return nil, ambiguousOrMissing(in.Logger, err)
 		}
 
 		until, err := deferredUntil(string(input.Body.Outcome), input.Body.DeferredUntil)
@@ -258,11 +258,6 @@ func registerBulk(api huma.API, in Ingest) {
 				"no issue is filed under " + strings.Join(clipped(unknown), ", "))
 		}
 
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
-
 		// The places are resolved inside the write, not here. Reading
 		// them first and passing them in would authorize this against
 		// rows as they stood before the transaction, and would let a
@@ -282,7 +277,7 @@ func registerBulk(api huma.API, in Ingest) {
 			// is the case a second pair of eyes exists for, and the short
 			// deferral that stands on its own is a claim about one finding.
 			NeedsApproval: true,
-		}, bounds)
+		}, triage.Bounds{})
 		if err != nil {
 			if errors.Is(err, triage.ErrNothingOpen) {
 				return nil, huma.Error404NotFound(

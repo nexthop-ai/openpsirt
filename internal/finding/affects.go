@@ -77,11 +77,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		wanted[target] = true
 	}
 
-	// Everything filed now, and the flaw's subject. Read before the transaction
-	// because resolving a component is a walk of a build's graph, and because
-	// a build that does not hold it has to be refused before anything is
-	// written — which is what recording already does for the same reason. The
-	// transaction reads the set again and writes against that.
+	// Everything filed now, and the flaw's subject, asked once before the
+	// transaction as an early refusal: a build that does not hold it is
+	// refused naming it before anything opens. What is written rests on the
+	// same questions asked again inside, because a retry runs against a
+	// database that has moved.
 	standing, err := s.filedAgainst(ctx, productID, vulnerabilityID)
 	if err != nil {
 		return nil, err
@@ -93,21 +93,13 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	// Resolved in every build being added, so a name one of them does not hold
-	// is a refusal naming it rather than a build listed as affected with
-	// nothing there.
-	opening := map[int64]int64{}
-	names := map[int64]string{}
 	for target := range wanted {
 		if standingAt(standing, target) {
 			continue
 		}
-		componentID, name, err := carrying(ctx, s.db, target, Entering{Component: component})
-		if err != nil {
+		if _, _, err := carrying(ctx, s.db, target, Entering{Component: component}); err != nil {
 			return nil, err
 		}
-		opening[target] = componentID
-		names[target] = name
 	}
 
 	now := s.now().UTC().Truncate(time.Microsecond)
@@ -182,6 +174,14 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}
 
+		// The flaw's subject and where each added build holds it, read here:
+		// a build that stopped shipping the component since the early check
+		// is refused rather than given a finding under its root.
+		component, err := (&Store{db: tx, now: s.now}).ComponentName(ctx, rows[0].ComponentID)
+		if err != nil {
+			return err
+		}
+
 		// Widening first. A build added and then immediately closed by the
 		// same call is not something to guard against — the two sets are
 		// disjoint by construction — and doing the opening first means a
@@ -191,11 +191,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			if here[target] {
 				continue
 			}
-			componentID, held := opening[target]
-			if !held {
-				// Resolved before the transaction and not found now: the set
-				// moved under a retry. Reported rather than guessed at.
-				return fmt.Errorf("the builds changed while this was being written; try again")
+			componentID, name, err := carrying(ctx, tx, target, Entering{Component: component})
+			if err != nil {
+				return err
 			}
 			// One row per place, as recording it did: where the component
 			// sits comes from the build's own graph, so a flaw filed against
@@ -211,7 +209,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 					"and one action here writes %d", ErrTooManyPlaces, opened, cap)
 			}
 			for _, sitting := range sittings {
-				row := openIn(target, vulnerabilityID, componentID, names[target],
+				row := openIn(target, vulnerabilityID, componentID, name,
 					sitting, &rows[0], now)
 				if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
 					return fmt.Errorf("record it against another build: %w", err)

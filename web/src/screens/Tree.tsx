@@ -16,7 +16,7 @@ import { Failed } from "../ui/Failed";
 import { sharedVersion } from "../ui/versions";
 import { Crumbs } from "../ui/Crumbs";
 import { Icon } from "../ui/Icons";
-import { useWho } from "../app/session";
+import { mayOf, useWho } from "../app/session";
 import { useReseed } from "../ui/reseed";
 
 // The counts beneath a node, worst first, as one bar whose widths are them.
@@ -114,7 +114,7 @@ export function Tree() {
   if (who.isError) {
     return <Failed error={who.error} what="Your reach here could not be read." />;
   }
-  if (who.data && !who.data.reach.some((each) => each.product === product)) return <Yours />;
+  if (who.data && !mayOf(who.data, product)) return <Yours />;
   return <Whole />;
 }
 

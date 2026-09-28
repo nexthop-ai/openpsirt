@@ -838,9 +838,12 @@ func registerReceipts(api huma.API, in Ingest) {
 		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
 		out := &ReceiptsOutput{}
 		out.Body.Items = []ReceiptBody{}
-		if err != nil {
+		switch {
+		case errors.Is(err, catalog.ErrNotFound):
 			// Declared, and nothing has ever been filed against it.
 			return out, nil
+		case err != nil:
+			return nil, wentWrong(in.Logger, "that build could not be looked up", err)
 		}
 
 		// A key sees the receipts for what it sent and nothing more. Reading
@@ -1185,9 +1188,9 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			"`quiet_days` is measured from the last arrival, or from when the build was " +
 			"declared where nothing has ever been filed against it — `last_received_at` is " +
 			"empty in that case, which is a different situation from a scan that failed.\n\n" +
-			"A build whose release is out of support is in the file, marked `retired`, and is " +
-			"never reported as quiet: silence there is expected. Leaving it out and saying " +
-			"nothing would be a different answer.\n\n" +
+			"A build whose release is out of support is in the file, marked `out_of_support`, " +
+			"and is never reported as quiet. A build taken out of use is marked `retired` and " +
+			"is never reported as quiet either.\n\n" +
 			"The threshold `quiet` was computed against is stated in the file.",
 		Tags: []string{"Scans"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {

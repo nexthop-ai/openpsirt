@@ -58,7 +58,7 @@ func attachmentBody(a *attach.Attachment) AttachmentBody {
 	out := AttachmentBody{
 		Token: a.Token, Reference: markdown.Attachment + ":" + a.Token,
 		Filename: a.Filename, ContentType: a.ContentType, Size: a.SizeBytes,
-		Inline: a.Inline(), UploadedAt: a.UploadedAt.Format(time.RFC3339),
+		Inline: a.Inline(), UploadedAt: a.UploadedAt.UTC().Format(time.RFC3339),
 	}
 	if a.Redacted() {
 		out.Redacted = true
@@ -141,7 +141,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		}
 		productID, vulnerabilityID, err := files.Issue(ctx, subject, input.Product, input.Vulnerability)
 		if err != nil {
-			return nil, huma.Error404NotFound(attach.ErrNoSuchIssue.Error())
+			return nil, absent(in.Logger, err, "that issue could not be looked up",
+				func() error { return huma.Error404NotFound(attach.ErrNoSuchIssue.Error()) })
 		}
 
 		maxSize, quota, share, err := attachmentLimits(ctx, in)
@@ -200,7 +201,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		}
 		productID, vulnerabilityID, err := files.Issue(ctx, subject, input.Product, input.Vulnerability)
 		if err != nil {
-			return nil, huma.Error404NotFound(attach.ErrNoSuchIssue.Error())
+			return nil, absent(in.Logger, err, "that issue could not be looked up",
+				func() error { return huma.Error404NotFound(attach.ErrNoSuchIssue.Error()) })
 		}
 		rows, err := files.ForIssue(ctx, subject, productID, vulnerabilityID)
 		if err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Find returns one attachment, if the asker may read the issue it hangs off.
@@ -206,7 +207,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 		return fmt.Errorf("read an attachment: %w", err)
 	}
 	if row.Redacted() {
-		return ErrGone
+		return s.removeRedacted(ctx, row.ObjectKey)
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -235,10 +236,27 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 		}
 		return nil
 	})
+	if errors.Is(err, ErrGone) {
+		return s.removeRedacted(ctx, row.ObjectKey)
+	}
 	if err != nil {
 		return err
 	}
 	return s.files.Delete(ctx, row.ObjectKey)
+}
+
+// removeRedacted removes the bytes of a file already marked redacted, and
+// answers ErrGone once they are gone.
+//
+// The row is marked before the bytes go, so a delete that failed leaves a
+// marked row over bytes still in the store. Asking again is how that
+// finishes: deleting what is already gone is not an error, so the repeat is
+// safe whoever marked it.
+func (s *Store) removeRedacted(ctx context.Context, key string) error {
+	if err := s.files.Delete(ctx, key); err != nil {
+		return fmt.Errorf("remove a redacted file: %w", err)
+	}
+	return ErrGone
 }
 
 // Sweep removes uploads nothing ever referred to.
@@ -368,19 +386,9 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 	err = s.db.NewSelect().
 		TableExpr(`"vulnerability" AS "v"`).
 		ColumnExpr("v.id").
-		// Against the folded column rather than a function of the
-		// identifier, which is what the column is for: both sides are
-		// folded the same way on the way in, so this is an equality an
-		// index can be used for.
-		Where("v.identifier_folded = ?", strings.ToLower(strings.TrimSpace(identifier))).
-		// Bounded and ordered, because the folded column carries an index
-		// and no uniqueness rule: the unique constraint is on the
-		// content-derived identity, which two rows whose folded names agree
-		// can differ in. Unbounded, which row answered was the engine's
-		// choice, so the same request listed a different issue's files on
-		// one engine than on another.
-		OrderExpr("v.id").
-		Limit(1).
+		// Against the folded column, folded by the one rule the column was
+		// written with, so this is an equality on a unique column.
+		Where("v.identifier_folded = ?", finding.FoldIdentifier(identifier)).
 		Scan(ctx, &issue)
 	if database.IsNoRows(err) {
 		return 0, 0, ErrNoSuchIssue

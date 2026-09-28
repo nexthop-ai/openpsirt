@@ -225,7 +225,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			product, err := catalog.NewStore(in.DB.DB).
 				VisibleProduct(ctx, subject, input.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 			}
 			filter.ProductIDs = []int64{product.ID}
 		}
@@ -388,7 +388,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 				ID: revision.ID, Ordinal: revision.Ordinal, Body: revision.Body,
 				WrittenBy:     who.identity(revision.WrittenBy),
 				WrittenByName: who.label(revision.WrittenBy),
-				WrittenAt:     revision.WrittenAt.Format(time.RFC3339),
+				WrittenAt:     revision.WrittenAt.UTC().Format(time.RFC3339),
 			})
 		}
 		return out, nil
@@ -439,10 +439,10 @@ func registerTriageReading(api huma.API, in Ingest) {
 				ID: approval.ID, RevisionID: approval.RevisionID,
 				ApprovedBy:     who.identity(approval.ApprovedBy),
 				ApprovedByName: who.label(approval.ApprovedBy),
-				ApprovedAt:     approval.ApprovedAt.Format(time.RFC3339),
+				ApprovedAt:     approval.ApprovedAt.UTC().Format(time.RFC3339),
 			}
 			if approval.WithdrawnAt != nil {
-				body.WithdrawnAt = approval.WithdrawnAt.Format(time.RFC3339)
+				body.WithdrawnAt = approval.WithdrawnAt.UTC().Format(time.RFC3339)
 			}
 			if approval.Batch != nil {
 				body.Batch = *approval.Batch
@@ -515,7 +515,7 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 			Reasoning:      reasoning[decision.ID],
 			ProposedBy:     who.identity(decision.ProposedBy),
 			ProposedByName: who.label(decision.ProposedBy),
-			ProposedAt:     decision.ProposedAt.Format(time.RFC3339),
+			ProposedAt:     decision.ProposedAt.UTC().Format(time.RFC3339),
 			AgeDays:        int(store.Age(&decision).Hours() / 24),
 		})
 	}
@@ -604,11 +604,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		place := triage.Place{
-			ProductID: where.ProductID, VulnerabilityID: where.VulnerabilityID,
-			PlaceIdentity: where.PlaceIdentity, Visibility: where.Visibility,
-			ComponentUpstream: where.ComponentUpstream, ConsumerUpstream: where.ConsumerUpstream,
-		}
+		place := placeOf(*where)
 
 		standing, err := store.Applying(ctx, place)
 		if err != nil {
@@ -685,13 +681,9 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 
 		made, err := store.Reaffirm(ctx, subject, triage.Reaffirmation{
 			PreviousID: input.Body.Previous,
-			Place: triage.Place{
-				ProductID: where.ProductID, VulnerabilityID: where.VulnerabilityID,
-				PlaceIdentity: where.PlaceIdentity, Visibility: where.Visibility,
-				ComponentUpstream: where.ComponentUpstream, ConsumerUpstream: where.ConsumerUpstream,
-			},
-			Reasoning: input.Body.Reasoning,
-			By:        subject.ID,
+			Place:      placeOf(*where),
+			Reasoning:  input.Body.Reasoning,
+			By:         subject.ID,
 		})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)

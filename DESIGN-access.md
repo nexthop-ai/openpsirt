@@ -250,7 +250,7 @@ it is assigned, and not in anybody's own because they are not here.
 | Operation | Meaning |
 |---|---|
 | Releasing | Nobody is dealing with it, and it goes back where it can be picked up. The honest answer when who takes it on has not been decided |
-| Handing over | Says who is dealing with it now |
+| Handing over | Says who is dealing with it now. Refused whole where any of it is undisclosed in a product where the recipient may not read undisclosed work, asked inside the transaction that moves it; the hand-over would be the disclosure |
 
 Only an administrator does either; a person hands back their own by assigning it
 to nobody.
@@ -321,6 +321,7 @@ Its own column beside administration, not a role.
 | Derived and stamped like administration | Only what a group gave is taken back by a group, and the stamp is what bounds the flag for a credential that never signs in. Without it somebody a group made an auditor, who minted a year-long token and then left, would go on auditing through it |
 | No bootstrap arm | Configuration names an administrator, which is the documented way back into a deployment nobody can administer. Nobody is locked out by holding no audit permission |
 | Unbinding it counts nothing | Administration is refused where it would leave nobody able to administer. Nothing else held over the deployment can lock anybody out |
+| Binding or unbinding it names no product | A product named asks about a grant on that product, and one held over the deployment is not. Both refuse it rather than acting on the deployment-wide grant |
 
 ## Somebody who has left
 
@@ -342,7 +343,7 @@ Recorded by an administrator, as a date on the person.
 | Sessions are ended rather than left to expire | Roles are re-read at sign-in, so withdrawing one takes effect then. This is what makes leaving immediate instead |
 | Everything they held is handed back | Work held by somebody who is gone is work nobody is doing, and it does not look like it |
 | Granting what is already held succeeds, and only where the insert was refused as a duplicate | Five paths ran a second query on *any* insert failure and reported success if a row was there — including a failure caused by a concurrent insert that was then rolled back. What "already held" means is the part that differs, so it stays with each caller: a grant asks whether it is in force, a binding asks whether the row exists |
-| Deactivating somebody who has already left succeeds and moves nothing | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted |
+| Deactivating somebody who has already left succeeds and moves no date | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted. It still hands back whatever they hold, because the hand-back runs after the deactivation commits, and asking again is how one that failed is finished |
 | An administrator may not deactivate themselves | It leaves nobody able to undo it, and the bootstrap account is often the one doing it |
 | Coming back does not return their work | Somebody else may have picked it up, and reassigning it would take it off them silently |
 
@@ -431,11 +432,10 @@ numbers are shown because the gap between them is the thing worth knowing.
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
 | A pattern naming most of a build is refused | A rule says where in the tree something sits, and a bare glob is not that. Refused when it is written and again at the preview, the way a rule matching nothing is refused: a rule that quietly applied to part of what it names is worse than one nobody could save. The subtree is one recursive walk per build rather than one per named component — it was tens of thousands of round trips inside one request, from a route anybody who may triage the product can reach |
 
-A rule matches without regard to capitals and asks the engine to fold. It is the
-one place that does: everywhere a person types a name it is normalized on the
-way in, but a component name is whatever a producer's inventory called it and
-the spelling is worth keeping, so there is no normalized copy to compare
-against.
+A rule matches without regard to capitals. Its keys are folded by the rule the
+component names they are matched against were folded with, and cut to the same
+width; a key longer than that width could never match and is refused when the
+rule is written.
 
 Turning a rule on is a bulk write. One rule naming a source package sweeps
 thousands of existing unowned issues across every place each sits at, so the
@@ -537,6 +537,7 @@ may not read this answer alike.
 | Rule | |
 |---|---|
 | **The names typed are resolved, not looked for in a page of the picker** | The two ask the same rule and are asked different questions: the picker narrows by what somebody is typing and takes a page, and a mention has names in hand. Answered from the picker's first hundred readers by identity, a mention of anybody sorting past them reached nobody — every time, growing with the deployment — and the author was told the name matched nobody at all |
+| A notification that fails reports the names it did not reach | The name it failed on and every name after it, or every name where who may be told could not be read. The words are kept either way, and a failure answered as success tells the author somebody was told who was not |
 | Nobody is offered for being an administrator | Administering the catalog is not reading its findings. Offered, an administrator holding nothing on a product was a legitimate mention target on an undisclosed finding there, and the notice told them undisclosed work exists in a product they may not open. One who wants to be mentionable grants themselves a read role |
 | Somebody who has left is not offered | They are refused at sign-in, so the mention reaches a person who will never see it |
 | **The picker is a staff directory for one product, deliberately** | Anybody who may read findings there can list who else holds a read role on it. That is the smallest set that makes mentioning work at all — a picker that answered nothing would be a control nobody can use — and it is bounded to one product rather than to the deployment. Recorded because it reads like a leak to somebody finding it for the first time, and is not one |
@@ -1060,7 +1061,7 @@ record, because it is the same question one layer up.
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
 | A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration, a team membership, a place on a case, a personal token, a pipeline key and a pinned identifier all take something away, and all of them read what they matched. Revoking one already revoked, or unbinding somebody with nothing pinned, is refused as not found |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
-| **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
+| **What a change is about is composed from the names it resolved to** | A person's history is read by the identity as stored, so a row composed from "Ana" as typed is missing from the history of "ana". A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
 | **It is read over a period, and leaves as a file** | An access review asks what changed in the stretch a certificate covers. Capped at fifty rows, undated and unexportable, that question was answered a page at a time on a screen and could not leave it. Asked for no period it answers about everything it holds |
 | On screen it grows to the most one request answers | Two hundred rows, newest first; past that the section says the file holds every one. A larger page is refused, and a screen asking for one draws the whole section as a failure |
@@ -1238,6 +1239,7 @@ private access.
 | The grant is asked wherever a row is read, not only where a list is narrowed | A grant that shows a row in a list and refuses it when opened is a grant with no content. The list narrowing asked it and three reads by identifier did not, so a collaborator saw their case among the decisions and could open none of them |
 | Asked once the row is in hand | It needs the issue, which a bare product-and-visibility rule cannot see. That is the opposite order from a name somebody typed, and safe for the same reason it is necessary: the row is already established as existing |
 | Adding somebody is an access change | It lands in the administration trail, tells them at once in the area inside the application, and the finding shows how many collaborators it has. It stops meaning anything at disclosure |
+| Adding somebody already on the case changes nothing | No trail row and no notification, because no grant moved. Each would otherwise record an access change that did not happen |
 | Whoever reads the product the case is in manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo. A collaborator is not that reader: the grant is one issue, so it carries the finding and not the list of who else was brought in |
 | The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator is refused the path to the component their own case sits in, and the finding answers as though it were not there |
 | Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faults on the row the grant exists to open |
@@ -1354,4 +1356,6 @@ notice the absence and say so.
 - Naming every address as a trusted source is refused. It reaches the same
   place as naming none, through the setting that is supposed to be the guard.
 - Granting a role somebody already holds succeeds. An administrator scripting
-  grants should not have to check first.
+  grants should not have to check first. The refused insert stands on a
+  savepoint of its own, because on PostgreSQL a refused statement aborts the
+  transaction around it and the act that granted would fail with it.

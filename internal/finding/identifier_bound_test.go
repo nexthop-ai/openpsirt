@@ -16,7 +16,7 @@ func TestALongIdentifierOutsideASCIIStaysStorableAfterItIsCut(t *testing.T) {
 	// MariaDB refuse it in strict mode, so the whole scan would fail to
 	// record on three engines of four.
 	identifier := strings.Repeat("é", 200)
-	if folded := foldIdentifier(identifier); !utf8.ValidString(folded) {
+	if folded := FoldIdentifier(identifier); !utf8.ValidString(folded) {
 		t.Errorf("the folded identifier is not valid UTF-8: %q", folded)
 	}
 	if named := normalize(identifier); !utf8.ValidString(named) {

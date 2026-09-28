@@ -31,6 +31,10 @@ type Scrutiny struct {
 	Bulk []BulkApproval
 	// Pairs is the same two people, over and over.
 	Pairs []Pairing
+	// Agreed is every decision a standing agreement covers, over every pair
+	// rather than the ones Pairs was cut to. A share is taken of it, and a
+	// share of the pairs shown overstates each of them once the list is cut.
+	Agreed int
 	// Lapsed is agreements standing from somebody who no longer holds the
 	// right to give them. Correct behavior — an approval is a fact about a
 	// moment — and still a list somebody wants.
@@ -242,6 +246,18 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	if capped(len(pairs)) {
 		out.Capped, pairs = true, pairs[:limit]
 	}
+	// The whole the shares are taken of: the same rows the pairs count,
+	// ungrouped and uncut.
+	agreed, err := narrow(s.db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
+		Join(`JOIN "person" AS "pr" ON pr.id = de.proposed_by`).
+		Join(`JOIN "person" AS "ape" ON ape.id = ap.approved_by`).
+		Where("ap.withdrawn_at IS NULL")).Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count what standing agreements cover: %w", err)
+	}
+	out.Agreed = agreed
 	for _, row := range pairs {
 		out.Pairs = append(out.Pairs, Pairing{
 			Proposer: row.Proposer, Approver: row.Approver,

@@ -607,7 +607,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, fmt.Errorf("read where this sits: %w", err)
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no open finding is recorded there")
+		return nil, ErrNoOpenFinding
 	}
 
 	var issue Vulnerability

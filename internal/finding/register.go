@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -304,7 +305,7 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			bun.List(r.Outcomes))
 	}
 	if r.Component != "" {
-		q = q.Where("c.name = ?", r.Component)
+		q = q.Where("c.name_folded = ?", graph.Folded(r.Component))
 	}
 	if r.Issue != "" {
 		q = q.Where("v.identifier = ?", r.Issue)

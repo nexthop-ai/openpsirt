@@ -527,8 +527,11 @@ func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
 // whole of what this is for.
 func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool) (Subject, error) {
 	person, err := s.ByIdentity(ctx, identity)
-	if err != nil {
+	if errors.Is(err, ErrNoSuchPerson) {
 		return Subject{}, ErrDenied
+	}
+	if err != nil {
+		return Subject{}, err
 	}
 	// Somebody who has left holds whatever they held, and reaches none of
 	// it. Checked here because every way a person gets in comes through
@@ -667,42 +670,57 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	return subject, nil
 }
 
-// alreadyThere turns a refused insert into success where the state the caller
-// asked for already holds.
+// insertOnce writes a row whose refusal is a unique index, and turns that
+// refusal into success where the state the caller asked for already holds. It
+// reports whether it wrote the row.
 //
-// Every grant path wrote this out, and none of them asked what the failure was
-// — so any insert error at all became success as long as a row was there,
-// including one caused by a concurrent insert that was then rolled back. The
-// question is only ever asked of a uniqueness violation, which is the one
-// failure that means "somebody got there first".
+// The question is only ever asked of a uniqueness violation, which is the one
+// failure that means "somebody got there first". Any other insert error is the
+// caller's to hear.
+//
+// The insert stands on a savepoint of its own. On PostgreSQL a refused
+// statement aborts the transaction around it, so the read that asks whether
+// the state holds would fail, and so would everything the caller writes
+// after it. Rolled back to the savepoint, the transaction carries on. Outside
+// a transaction the savepoint is a transaction of its own, which changes
+// nothing. SAVEPOINT is plain SQL on all four engines.
 //
 // The predicate stays the caller's, because what "already holds" means is the
 // one part that genuinely differs: a grant asks whether it is in force, a
 // binding asks whether the row exists, and each says why beside itself.
 //
 // With the row there and the predicate saying no, the caller hears what
-// happened rather than the driver's constraint message — which is what an
-// administrator was shown for an operation the endpoint documents as
-// idempotent.
+// happened rather than the driver's constraint message.
 //
-// The other way round is also in this package: AddToTeam reads and writes
-// inside one transaction instead. Either is defensible; this is the one for a
-// write whose refusal is a unique index rather than a row it has to see first.
-func (s *Store) alreadyThere(ctx context.Context, insertErr error, what string,
-	present func(context.Context) (bool, error)) error {
+// AddToTeam reads and writes inside one transaction instead. This is the shape
+// for a write whose refusal is a unique index rather than a row it has to see
+// first.
+func (s *Store) insertOnce(ctx context.Context, what string, row any,
+	present func(context.Context) (bool, error)) (bool, error) {
 
-	if !database.IsDuplicate(insertErr) {
-		return fmt.Errorf("%s: %w", what, insertErr)
-	}
-	there, err := present(ctx)
+	sp, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("%s: %w", what, err)
+		return false, fmt.Errorf("%s: %w", what, err)
 	}
-	if there {
-		return nil
+	if _, err := sp.NewInsert().Model(row).Exec(ctx); err != nil {
+		_ = sp.Rollback()
+		if !database.IsDuplicate(err) {
+			return false, fmt.Errorf("%s: %w", what, err)
+		}
+		there, err := present(ctx)
+		if err != nil {
+			return false, fmt.Errorf("%s: %w", what, err)
+		}
+		if there {
+			return false, nil
+		}
+		return false, fmt.Errorf("%s: it is already recorded and is not in force, so it "+
+			"cannot be granted again from here", what)
 	}
-	return fmt.Errorf("%s: it is already recorded and is not in force, so it "+
-		"cannot be granted again from here", what)
+	if err := sp.Commit(); err != nil {
+		return false, fmt.Errorf("%s: %w", what, err)
+	}
+	return true, nil
 }
 
 // GrantRole gives somebody a role on a product.
@@ -715,18 +733,15 @@ func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role R
 		Source: Assigned, Active: true,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(grant).Exec(ctx); err != nil {
-		// Granting what somebody already holds is not a failure. In force,
-		// like every other question about what somebody holds: a row set aside
-		// by a change of mode grants nothing, so reporting success on one
-		// would tell an administrator they had granted something that does not
-		// exist.
-		return s.alreadyThere(ctx, err, fmt.Sprintf("grant %q", role),
-			func(ctx context.Context) (bool, error) {
-				return s.holds(ctx, personID, productID, role)
-			})
-	}
-	return nil
+	// Granting what somebody already holds is not a failure. In force, like
+	// every other question about what somebody holds: a row set aside by a
+	// change of mode grants nothing, so reporting success on one would tell an
+	// administrator they had granted something that does not exist.
+	_, err := s.insertOnce(ctx, fmt.Sprintf("grant %q", role), grant,
+		func(ctx context.Context) (bool, error) {
+			return s.holds(ctx, personID, productID, role)
+		})
+	return err
 }
 
 func (s *Store) holds(ctx context.Context, personID, productID int64, role Role) (bool, error) {
@@ -788,7 +803,7 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 	key := new(Key)
 	err := s.db.NewSelect().Model(key).Where("secret_hash = ?", hashSecret(secret)).Scan(ctx)
 	if err != nil {
-		return Subject{}, ErrDenied
+		return Subject{}, database.FromRead(err, ErrDenied, "look up a key")
 	}
 	if key.RevokedAt != nil {
 		return Subject{}, ErrDenied
@@ -1004,10 +1019,10 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 
 	// A request for who may read something undisclosed is itself about
 	// undisclosed work, and the answer is the one every other read gives:
-	// nothing. Asked here rather than only at the two handlers that call it,
-	// because a third endpoint over this query would answer for everybody —
-	// which is the rule this project does not bend, and the gate was written
-	// out at each caller instead of being carried on the query.
+	// nothing. Asked here rather than only at the handlers that call it,
+	// because an endpoint over this query that forgot to ask would answer for
+	// everybody, and visibility is carried on the query rather than written
+	// out at each caller.
 	if !subject.Reads(visibility, productID) {
 		return nil, nil
 	}
@@ -1131,9 +1146,7 @@ func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int
 // than an empty condition to be filled in.
 func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQuery {
 	// The roles enough to read at this visibility, asked of the rule
-	// rather than of a list. It was the same four lines as rolesReading, in
-	// the same package, one of them named and one not — which is how "may
-	// read" comes to mean two things.
+	// rather than of a list: one spelling, so "may read" means one thing.
 	enough := rolesReading(productID, visibility)
 	if len(enough) == 0 {
 		return nil

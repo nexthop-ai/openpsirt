@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -98,23 +99,34 @@ func registerWhoAmI(api huma.API, in Ingest) {
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{},
 		}
-		if threshold, err := deferralThreshold(ctx, in); err == nil {
-			body.DeferralDays = int(threshold.Hours() / 24)
+		// Each of these fails the answer rather than being left out. Omitted, a
+		// limit reads to the interface as no limit at all.
+		threshold, err := deferralThreshold(ctx, in)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "your limits could not be read", err)
 		}
+		body.DeferralDays = int(threshold.Hours() / 24)
 		if in.DB != nil {
-			if cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-				triage.DefaultTogetherCap); err == nil {
-				body.BulkCap = cap
+			cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
+				triage.DefaultTogetherCap)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "your limits could not be read", err)
 			}
+			body.BulkCap = cap
 		}
 		// The digest they asked for, where they are a person and this process
 		// has somewhere to read it from. A credential asks for nothing and is
-		// sent nothing.
+		// sent nothing, and neither is a person with no account row of their
+		// own, which is somebody a trusted proxy asserted.
 		if in.DB != nil && subject.Kind == access.Person {
-			if me, err := access.NewStore(in.DB.DB).ByIdentity(ctx, subject.Identity); err == nil {
+			me, err := access.NewStore(in.DB.DB).ByIdentity(ctx, subject.Identity)
+			switch {
+			case err == nil:
 				body.Digest = me.Digest
 				body.DigestUnassigned = me.DigestUnassigned
 				body.Reachable = strings.TrimSpace(me.Email) != ""
+			case !errors.Is(err, access.ErrNoSuchPerson):
+				return nil, wentWrong(in.Logger, "who you are could not be read", err)
 			}
 		}
 

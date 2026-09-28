@@ -36,7 +36,7 @@ func TestBringingSomebodyIntoACaseTwiceLeavesOneGrant(t *testing.T) {
 		issue := interned["CVE-2026-1"]
 
 		for i := range 2 {
-			if err := f.store.AddToCase(ctx, product, issue, person.ID, granter.ID); err != nil {
+			if _, err := f.store.AddToCase(ctx, product, issue, person.ID, granter.ID); err != nil {
 				t.Fatalf("bringing them in, attempt %d: %v", i+1, err)
 			}
 		}

@@ -181,10 +181,12 @@ func New(db *database.DB, opts Options) *Queue {
 
 // Add puts work on the queue, refusing it when the backlog is already too deep.
 //
-// The depth and the insert go in one transaction, so the count the refusal
-// rests on is the count at the moment of the write rather than one taken
-// beforehand, and a commit a cluster refuses is tried again rather than
-// reported as work that could not be queued.
+// The depth and the insert go in one transaction, and a commit a cluster
+// refuses is tried again rather than reported as work that could not be
+// queued. The cap is back-pressure rather than an exact bound: producers
+// adding at the same moment each count what has committed, so the backlog can
+// pass it by as many as are adding at once. Holding it exactly takes a lock
+// per kind, which is engine-specific.
 func (q *Queue) Add(ctx context.Context, kind, reference string) (*Job, error) {
 	var job *Job
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {

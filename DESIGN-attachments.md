@@ -230,7 +230,7 @@ way out.
 
 | Operation | Order | Reason |
 |---|---|---|
-| Redaction | Row, then file | A file removed with nothing saying so reads as a store that lost it |
+| Redaction | Row, then file | A file removed with nothing saying so reads as a store that lost it. A delete that fails leaves the row marked over bytes still stored; asking again deletes them before answering that the file is gone |
 | Reaper | Row, then file | The row carries the guard, and a guard run after the unlink can only fail to clean up after the loss it exists to prevent. Text naming the file between the reaper's page and its delete leaves the bytes gone, the delete matching nothing, and the record standing over nothing, reported as a collection that happened |
 
 Inverting the reaper's order inverts which side can be orphaned. Bytes

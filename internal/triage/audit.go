@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // Judged is one judgment as an auditor reads it: what was decided, about what,
@@ -111,7 +112,8 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
 			` WHERE cf.vulnerability_id = de.vulnerability_id`+
-			` AND cf.place_identity = de.place_identity AND cc.name = ?)`, f.Component)
+			` AND cf.place_identity = de.place_identity AND cc.name_folded = ?)`,
+			graph.Folded(f.Component))
 	}
 	// One build, with the build's own product required to be the one that
 	// made the judgment: a place identity carries no product, so the match

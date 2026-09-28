@@ -24,6 +24,12 @@ import (
 // they were its fault is how a driver's error text ends up on a screen.
 var ErrSamePerson = errors.New("that would hand their work to themselves")
 
+// ErrRecipientMayNotRead says work was handed to somebody not cleared to read
+// all of it: some of it is undisclosed in a product where they may read only
+// what has been disclosed. The hand-over would be the disclosure.
+var ErrRecipientMayNotRead = errors.New("some of this has not been disclosed and they may " +
+	"not read undisclosed work there, so handing it to them would be the disclosure")
+
 // moveWork is the write itself, apart from the answering: which rows move, and
 // what they move to.
 //
@@ -426,6 +432,11 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 	now := s.now().UTC().Truncate(time.Microsecond)
 	var moved int64
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		if to != nil {
+			if err := mayReadAllOf(ctx, tx, from, *to); err != nil {
+				return err
+			}
+		}
 		update := tx.NewUpdate().Model((*Finding)(nil)).
 			Where("assigned_to = ?", from).
 			Where("closed_at IS NULL")
@@ -445,6 +456,51 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 		return nil
 	})
 	return moved, err
+}
+
+// mayReadAllOf refuses a hand-over whose recipient may not read the
+// undisclosed part of what it moves.
+//
+// Asked per product, of the products where the work being moved holds
+// something undisclosed, and inside the transaction that moves it. A party no
+// person holds reads nothing undisclosed.
+func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
+	var products []int64
+	if err := tx.NewSelect().
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr("DISTINCT st.product_id").
+		Where(`tg.id IN (SELECT f.target_id FROM "finding" AS "f"
+			WHERE f.assigned_to = ? AND f.closed_at IS NULL AND f.visibility = ?)`,
+			from, access.Private).
+		Scan(ctx, &products); err != nil {
+		return fmt.Errorf("read where their undisclosed work is: %w", err)
+	}
+	if len(products) == 0 {
+		return nil
+	}
+	var people []int64
+	if err := tx.NewSelect().Model((*access.Account)(nil)).
+		Column("id").
+		Where("party_id = ?", to).
+		Limit(1).
+		Scan(ctx, &people); err != nil {
+		return fmt.Errorf("read who is taking the work on: %w", err)
+	}
+	if len(people) == 0 {
+		return ErrRecipientMayNotRead
+	}
+	rights := access.NewStore(tx)
+	for _, product := range products {
+		reads, err := rights.PersonReads(ctx, people[0], product, access.Private)
+		if err != nil {
+			return err
+		}
+		if !reads {
+			return ErrRecipientMayNotRead
+		}
+	}
+	return nil
 }
 
 // Holding is how much work one party has, and how much of it is late.

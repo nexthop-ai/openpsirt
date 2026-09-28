@@ -57,12 +57,12 @@ func TestALostRaceReachesTheRetryHelper(t *testing.T) {
 
 // TestAFaultKeepsItsCauseForTheRetryHelper pins the other half of going again.
 //
-// Every act that became a transaction reports a store failure as a refusal, and
-// a refusal built fresh wraps nothing — so the helper that opened the
-// transaction asked "is this worth going again" of an error with no cause in
-// it, and contention in the middle of an act was reported to an administrator
-// rather than taken again. Contention at the commit still retried, because that
-// comes back from the driver itself, which is what made the gap quiet.
+// Every act that is a transaction reports a store failure as a refusal, and a
+// refusal built fresh wraps nothing — so the helper that opened the
+// transaction would ask "is this worth going again" of an error with no cause
+// in it, and contention in the middle of an act would reach an administrator
+// rather than be taken again. Contention at the commit comes back from the
+// driver itself and retries either way, which is what makes the gap quiet.
 func TestAFaultKeepsItsCauseForTheRetryHelper(t *testing.T) {
 	// Something the retry helper recognizes, asked for by name rather than
 	// built from a driver's own type: which code each engine calls contention
@@ -88,6 +88,29 @@ func TestAFaultKeepsItsCauseForTheRetryHelper(t *testing.T) {
 		t.Errorf("a fault answers %d", status.GetStatus())
 	}
 	if strings.Contains(status.Error(), "withdraw the role:") {
+		t.Errorf("what the store wrote is what the caller is told: %q", status.Error())
+	}
+}
+
+// A lost race handed to the refusal a store's sentence gets reaches the retry
+// helper too. Recording a person maps its store errors through it, inside the
+// transaction that would take the act again. Where nothing takes it again —
+// no transaction around it, or none left to try — it is a 500 in words of our
+// own, never the store's.
+func TestALostRaceIsNotAnsweredAsTheCallersMistake(t *testing.T) {
+	lost := fmt.Errorf("record %q: %w", "ana", database.ErrGoAgain)
+	got := asked(nil, lost)
+	if !database.WorthRetrying(got) {
+		t.Errorf("a lost race came back as %v, which the retry helper does not take again", got)
+	}
+	var status huma.StatusError
+	if !errors.As(got, &status) {
+		t.Fatalf("a lost race carries no status for the framework to write: %v", got)
+	}
+	if status.GetStatus() != http.StatusInternalServerError {
+		t.Errorf("a lost race answers %d", status.GetStatus())
+	}
+	if strings.Contains(status.Error(), "race") || strings.Contains(status.Error(), "ana") {
 		t.Errorf("what the store wrote is what the caller is told: %q", status.Error())
 	}
 }

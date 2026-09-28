@@ -100,7 +100,7 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 				Now:        finding.SeverityWord(row.Now),
 			}
 			if row.LapsedAt != nil {
-				entry.LapsedAt = row.LapsedAt.Format(time.RFC3339)
+				entry.LapsedAt = row.LapsedAt.UTC().Format(time.RFC3339)
 			}
 			out.Body.Items = append(out.Body.Items, entry)
 		}
@@ -141,13 +141,9 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
 		made, err := store.ReaffirmMany(ctx, subject, triage.ReaffirmingMany{
 			ClaimIDs: input.Body.Claims, Reasoning: input.Body.Reasoning,
-			By: subject.ID, Bounds: bounds,
+			By: subject.ID,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {

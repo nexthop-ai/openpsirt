@@ -279,7 +279,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *http.Request) (Subject, *Se
 		}
 		person, err := r.store.MatchProxy(ctx, who.Username)
 		if err != nil {
-			return Subject{}, nil, ErrDenied
+			return Subject{}, nil, err
 		}
 		subject, err := r.store.Resolve(ctx, person.Identity)
 		// Reported as a browser arrival with no session of ours behind it. The

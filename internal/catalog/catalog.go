@@ -214,7 +214,7 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 		return nil, err
 	}
 
-	p := &Product{Name: matching(name), DisplayName: displayName, CreatedAt: now()}
+	p := &Product{Name: Matching(name), DisplayName: displayName, CreatedAt: now()}
 	if _, err := s.db.NewInsert().Model(p).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("declare product %q: %w", name, err)
 	}
@@ -307,17 +307,14 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 // than stored: a cycle here is a comparison that never returns, and a tag
 // under a tag is a line that does not exist.
 func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error {
-	if parent == streamID {
-		return fmt.Errorf("a release cannot be cut from itself")
+	var child Stream
+	if err := s.db.NewSelect().Model(&child).Column("kind", "product_id").
+		Where("id = ?", streamID).Scan(ctx); err != nil {
+		return missingOr(err, fmt.Sprintf("release %d", streamID),
+			fmt.Sprintf("look up what release %d is", streamID))
 	}
-	var kind Kind
-	if err := s.db.NewSelect().Model((*Stream)(nil)).Column("kind").
-		Where("id = ?", parent).Scan(ctx, &kind); err != nil {
-		return missingOr(err, fmt.Sprintf("release %d", parent),
-			fmt.Sprintf("look up what release %d is", parent))
-	}
-	if kind != Branch {
-		return fmt.Errorf("a release is cut from a branch, and that is a %s", kind)
+	if err := s.validParent(ctx, child.Kind, streamID, child.ProductID, parent); err != nil {
+		return err
 	}
 	// Only where nothing stands, asked in the write rather than before it: a
 	// check and a write that are two statements are two moments, and what is
@@ -344,8 +341,36 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 		if stood != nil && *stood == parent {
 			return nil
 		}
-		return fmt.Errorf("this release already says what it was cut from, and a release " +
-			"came from wherever it came from")
+		return fmt.Errorf("%w: this release already says what it was cut from, and a "+
+			"release came from wherever it came from", ErrDiffers)
+	}
+	return nil
+}
+
+// validParent refuses a parent a release cannot have: one for anything but a
+// tag, the release itself, anything but a branch, or a branch of another
+// product. childID is zero for a release not yet recorded.
+//
+// One check for declaring and for filling in, so a parent the second refuses
+// is never recorded by the first.
+func (s *Store) validParent(ctx context.Context, childKind Kind, childID, productID, parent int64) error {
+	if childKind != Tag {
+		return fmt.Errorf("only a tag is cut from a branch, and this is a %s", childKind)
+	}
+	if parent == childID {
+		return fmt.Errorf("a release cannot be cut from itself")
+	}
+	var from Stream
+	if err := s.db.NewSelect().Model(&from).Column("kind", "product_id").
+		Where("id = ?", parent).Scan(ctx); err != nil {
+		return missingOr(err, fmt.Sprintf("release %d", parent),
+			fmt.Sprintf("look up what release %d is", parent))
+	}
+	if from.Kind != Branch {
+		return fmt.Errorf("a release is cut from a branch, and that is a %s", from.Kind)
+	}
+	if from.ProductID != productID {
+		return fmt.Errorf("a release is cut from a branch of its own product")
 	}
 	return nil
 }
@@ -646,7 +671,7 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 // ProductByName finds a product, or reports that it was never declared.
 func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error) {
 	p := new(Product)
-	err := s.db.NewSelect().Model(p).Where("name = ?", matching(name)).Scan(ctx)
+	err := s.db.NewSelect().Model(p).Where("name = ?", Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("product %q: %w", name, ErrNotFound)
@@ -669,9 +694,14 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 	} else if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
+	if parentID != nil {
+		if err := s.validParent(ctx, kind, 0, productID, *parentID); err != nil {
+			return nil, err
+		}
+	}
 
 	st := &Stream{
-		ProductID: productID, Name: matching(name), DisplayName: strings.TrimSpace(name),
+		ProductID: productID, Name: Matching(name), DisplayName: strings.TrimSpace(name),
 		Kind: kind, ParentID: parentID, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(st).Exec(ctx); err != nil {
@@ -684,7 +714,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 func (s *Store) StreamByName(ctx context.Context, productID int64, name string) (*Stream, error) {
 	st := new(Stream)
 	err := s.db.NewSelect().Model(st).
-		Where("product_id = ?", productID).Where("name = ?", matching(name)).Scan(ctx)
+		Where("product_id = ?", productID).Where("name = ?", Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("stream %q: %w", name, ErrNotFound)
@@ -713,7 +743,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 	}
 
 	v := &Variant{
-		ProductID: productID, Name: matching(name), DisplayName: strings.TrimSpace(name),
+		ProductID: productID, Name: Matching(name), DisplayName: strings.TrimSpace(name),
 		CustomerFacing: customerFacing, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(v).Exec(ctx); err != nil {
@@ -726,7 +756,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 func (s *Store) VariantByName(ctx context.Context, productID int64, name string) (*Variant, error) {
 	v := new(Variant)
 	err := s.db.NewSelect().Model(v).
-		Where("product_id = ?", productID).Where("name = ?", matching(name)).Scan(ctx)
+		Where("product_id = ?", productID).Where("name = ?", Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("variant %q: %w", name, ErrNotFound)
@@ -871,7 +901,7 @@ func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 // constraint means the same thing everywhere.
 //
 // The spelling somebody typed is kept beside it and is what gets shown back.
-func matching(name string) string {
+func Matching(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 

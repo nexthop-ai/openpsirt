@@ -6,6 +6,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -63,7 +64,7 @@ func registerTokens(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "cannot list your tokens", err)
 		}
-		return tokenList(ctx, names, tokens, nil)
+		return tokenList(ctx, in.Logger, names, tokens, nil)
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -111,15 +112,6 @@ func registerTokens(api huma.API, in Ingest) {
 			lifetime = parsed
 		}
 
-		ceiling := access.MaxTokenLifetime
-		if in.DB != nil {
-			ceiling, err = setting.NewStore(in.DB.DB).
-				Duration(ctx, setting.MaxTokenLifetime, access.MaxTokenLifetime)
-			if err != nil {
-				return nil, wentWrong(in.Logger, "cannot read how long a token may last", err)
-			}
-		}
-
 		// Absent and empty are different requests arriving as one value: a
 		// non-nil, zero-length slice, stored as NULL, which means every role
 		// its owner holds — so a script asking for a token that carries
@@ -147,7 +139,13 @@ func registerTokens(api huma.API, in Ingest) {
 		var token *access.Token
 		var secret string
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
-			var err error
+			// The ceiling is read in the transaction that mints, so a retry
+			// holds the token to the ceiling in force when it lands.
+			ceiling, err := setting.NewStore(tx).
+				Duration(ctx, setting.MaxTokenLifetime, access.MaxTokenLifetime)
+			if err != nil {
+				return wentWrong(in.Logger, "cannot read how long a token may last", err)
+			}
 			token, secret, err = access.NewStore(tx).NewToken(ctx, subject.ID,
 				input.Body.Name, productID, holds, lifetime, ceiling)
 			if err != nil {
@@ -261,7 +259,8 @@ func mine(ctx context.Context, in Ingest) (access.Subject, *access.Store, *catal
 }
 
 // tokenList renders tokens, naming the products they are narrowed to.
-func tokenList(ctx context.Context, names *catalog.Store, tokens []access.Token, owners map[int64]string) (*listOutput[TokenBody], error) {
+func tokenList(ctx context.Context, logger *slog.Logger, names *catalog.Store, tokens []access.Token,
+	owners map[int64]string) (*listOutput[TokenBody], error) {
 	out := &listOutput[TokenBody]{}
 	out.Body.Items = make([]TokenBody, 0, len(tokens))
 	for _, token := range tokens {
@@ -285,11 +284,15 @@ func tokenList(ctx context.Context, names *catalog.Store, tokens []access.Token,
 		if token.ProductID != nil {
 			// The address, for the reason KeyBody carries it: minting
 			// resolves this field, and a display name resolves to nothing.
-			if product, err := names.ProductByID(ctx, *token.ProductID); err == nil {
-				body.Product = product.Name
-				if product.DisplayName != product.Name {
-					body.ProductDisplayName = product.DisplayName
-				}
+			// A product that cannot be read is a failed list, never a token
+			// listed as reaching everything.
+			product, err := names.ProductByID(ctx, *token.ProductID)
+			if err != nil {
+				return nil, wentWrong(logger, "the product a token is narrowed to could not be read", err)
+			}
+			body.Product = product.Name
+			if product.DisplayName != product.Name {
+				body.ProductDisplayName = product.DisplayName
 			}
 		}
 		out.Body.Items = append(out.Body.Items, body)

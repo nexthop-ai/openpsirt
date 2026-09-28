@@ -24,12 +24,12 @@ import (
 // TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists pins the split every
 // shared resolver makes.
 //
-// A read that could not be made was answered as an authoritative negative at
-// forty sites: 404 "no product is declared by that name", "nothing has been
-// scanned there", "no open finding is recorded there". So an outage told every
-// authenticated caller that their products, builds and findings were gone —
-// and seven of those bodies carried the driver's own message, which is the
-// database host, port and driver handed to whoever asked.
+// A read that could not be made is not an authoritative negative. Answered as
+// "no product is declared by that name", "nothing has been scanned there" or
+// "no open finding is recorded there", an outage tells every authenticated
+// caller that their products, builds and findings are gone — and a body
+// carrying the driver's own message hands whoever asked the database host,
+// port and driver.
 //
 // Whoever is asking is resolved against a database that works, so what fails
 // is the handler's own read and not sign-in. The rest of the server is given
@@ -53,9 +53,8 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"issueHere", "/v1/products/mine/streams/master/variants/broadcom/findings/" +
 				"CVE-2026-9999/components/libnl-3-200"},
 			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
-			// The arms that were still answering per route rather than through
-			// the helper, so an unreachable database told an authenticated
-			// caller their run, person, token or notification did not exist.
+			// Arms that answer per route rather than through the helper: a
+			// run, a person, a token, a notification.
 			{"a run on a build", "/v1/products/mine/streams/master/variants/broadcom/runs/1"},
 			{"a token of your own", "/v1/tokens"},
 			{"a branch named in a selection",
@@ -66,6 +65,16 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"the catalog's own reader", "/v1/products/mine/streams"},
 			{"the build lookup a document is generated from",
 				"/v1/products/mine/streams/master/variants/broadcom/vex"},
+			// Lookups that fill in part of an answer, where a failure must
+			// not read as a name that reaches nothing or a field that holds
+			// nothing.
+			{"a build's readiness",
+				"/v1/products/mine/streams/master/variants/broadcom/readiness"},
+			{"an issue's attachments", "/v1/products/mine/issues/CVE-2026-9999/attachments"},
+			{"the limits the interface draws with", "/v1/session/me"},
+			{"a product the record narrows to", "/v1/decisions?product=mine"},
+			{"the chains your own work sits on",
+				"/v1/products/mine/streams/master/variants/broadcom/components/mine"},
 		} {
 			req := httptest.NewRequest(http.MethodGet, c.path, nil)
 			req.Header.Set(testHeader, "reader")
@@ -108,6 +117,16 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 // answer of their own, which is a different arm and not this one.
 func overAClosedDatabase(t *testing.T, r *reach, logged slog.Handler) http.Handler {
 	t.Helper()
+	return overAClosedDatabaseAs(t, r, logged,
+		publisher.Named{Name: "Example Networks", Namespace: "https://example.test"})
+}
+
+// overAClosedDatabaseAs is overAClosedDatabase for a deployment publishing as
+// somebody else, or as nobody.
+func overAClosedDatabaseAs(t *testing.T, r *reach, logged slog.Handler,
+	who publisher.Named) http.Handler {
+
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "gone.db")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -135,9 +154,31 @@ func overAClosedDatabase(t *testing.T, r *reach, logged slog.Handler) http.Handl
 	handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Ingest{
 		DB: gone, Queue: queue.New(gone, queue.DefaultOptions()), Files: files,
 		Access:    access.NewResolver(r.rights, access.Trust{Header: testHeader, From: sources}),
-		Publisher: publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
+		Publisher: who,
 	})
 	return handler
+}
+
+// A read that needs no publisher, failing where none is configured, is a
+// fault. The missing publisher is a refusal of its own, and answering every
+// other failure with it hands the caller the error's text as a conflict.
+func TestAFailedReadWithNoPublisherIsAFault(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		handler := overAClosedDatabaseAs(t, r, &counting{}, publisher.Named{})
+		req := httptest.NewRequest(http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/vex/issuance", nil)
+		req.Header.Set(testHeader, "reader")
+		fromOurOwnPage(req)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("what has gone out, over a database nobody can reach, answered %d: %s",
+				rec.Code, rec.Body.String())
+		}
+		if strings.Contains(strings.ToLower(rec.Body.String()), "database is closed") {
+			t.Errorf("the driver's message reached the body: %s", rec.Body.String())
+		}
+	})
 }
 
 // counting is a log handler that keeps how many lines were written and none of
@@ -154,3 +195,52 @@ func (c *counting) Handle(context.Context, slog.Record) error {
 }
 func (c *counting) WithAttrs([]slog.Attr) slog.Handler { return c }
 func (c *counting) WithGroup(string) slog.Handler      { return c }
+
+// A credential that cannot be looked up is a fault, not a stranger.
+//
+// Answered as "not authorized", an outage sends every caller to sign in again,
+// which cannot help, and nothing is logged. Here the resolver itself reads the
+// database nobody can reach.
+func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		path := filepath.Join(t.TempDir(), "gone.db")
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		target, err := database.ParseURL("sqlite://" + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gone, err := database.Open(context.Background(), target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := gone.Close(); err != nil {
+			t.Fatal(err)
+		}
+		sources, err := access.ParseSources("192.0.2.1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		logged := &counting{}
+		handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Ingest{
+			DB: gone, Queue: queue.New(gone, queue.DefaultOptions()),
+			Access: access.NewResolver(access.NewStore(gone.DB),
+				access.Trust{Header: testHeader, From: sources}),
+		})
+		req := httptest.NewRequest(http.MethodGet, "/v1/session/me", nil)
+		req.Header.Set(testHeader, "reader")
+		fromOurOwnPage(req)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Errorf("a caller who could not be looked up answered %d: %s", rec.Code, rec.Body.String())
+		}
+		if strings.Contains(strings.ToLower(rec.Body.String()), "database is closed") {
+			t.Errorf("the driver's message reached the body: %s", rec.Body.String())
+		}
+		if logged.lines == 0 {
+			t.Error("a caller who could not be looked up was not logged")
+		}
+	})
+}

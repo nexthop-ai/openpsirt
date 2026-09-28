@@ -301,6 +301,13 @@ func TestARuleNamingMostOfABuildIsRefused(t *testing.T) {
 		} else if !errors.Is(err, finding.ErrTooBroad) {
 			t.Errorf("the preview refused with %q", err)
 		}
+		// Capitals change nothing about how much a key reaches. The rule is
+		// matched folded, so its breadth is measured folded.
+		if _, err := narrow.AddRule(ctx, who, f.productID, where, "shouted", "", "LIB*"); err == nil {
+			t.Error("a rule naming most of the build in capitals was saved")
+		} else if !errors.Is(err, finding.ErrTooBroad) {
+			t.Errorf("a rule in capitals refused with %q", err)
+		}
 
 		// A pattern naming a place is still a rule.
 		if _, err := narrow.AddRule(ctx, who, f.productID, where, "the library",

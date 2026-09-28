@@ -10,7 +10,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -123,10 +122,9 @@ func registerReadiness(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		named, err := catalog.NewStore(in.DB.DB).
-			LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 
 		ready, err := finding.NewStore(in.DB.DB).
@@ -190,7 +188,7 @@ func buildCounts(s finding.Standing) BuildCountsBody {
 		Medium: s.ByBand["medium"], Low: s.ByBand["low"],
 	}
 	if s.LastScanned != nil {
-		body.LastScannedAt = s.LastScanned.Format(time.RFC3339)
+		body.LastScannedAt = s.LastScanned.UTC().Format(time.RFC3339)
 	}
 	return body
 }

@@ -346,7 +346,7 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 	if person != "" {
 		who, err := rights.ByIdentity(ctx, person)
 		if err != nil {
-			return nil, noSuchPerson()
+			return nil, absent(in.Logger, err, "that person could not be looked up", noSuchPerson)
 		}
 		if strictest == access.Private {
 			reads, err := rights.PersonReads(ctx, who.ID, productID, strictest)
@@ -364,7 +364,8 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 	}
 	found, err := rights.TeamByName(ctx, team)
 	if err != nil {
-		return nil, noSuchTeamNamed(team)
+		return nil, absent(in.Logger, err, "that team could not be looked up",
+			func() error { return noSuchTeamNamed(team) })
 	}
 	reads, err := teamMayHold(ctx, rights, found.ID, productID, strictest)
 	if err != nil {

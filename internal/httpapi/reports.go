@@ -77,13 +77,7 @@ func registerReports(api huma.API, in Ingest) {
 			"`beneath` keeps a component and everything under it, which needs a branch and a " +
 			"variant naming exactly one build. A team that owns one area asks for its own " +
 			"three lines this way.\n\n" +
-			"Three series rather than one, because separately they are three numbers and " +
-			"together they say whether the team is keeping pace: new consistently outrunning " +
-			"resolved is a growing backlog.\n\n" +
-			"Split by severity because a total that barely moves while its critical share rises " +
-			"is getting worse, and a single line hides exactly that.\n\n" +
-			"Worked out when it is asked for. Nothing is precomputed or refreshed on a schedule " +
-			"until a measurement says it has to be.",
+			"Worked out when it is asked for.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
@@ -279,17 +273,9 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		Summary: "Show what each release shipped with",
 		Description: "One point per tagged release of one product, oldest first, with what is " +
 			"open against it now.\n\n" +
-			"The axis follows what is being viewed. A branch is scanned nightly and has " +
-			"continuous data, so a calendar reads correctly on it. A tag never moves again, and " +
-			"releases months apart make a calendar count read as slow drift rather than the " +
-			"step change it was — the gaps are the chart's whole shape and they are gaps in " +
-			"nothing.\n\n" +
-			"Answered against today's vulnerability data, not as of the day each was cut. " +
-			"That is what re-scanning a shipped release is for.\n\n" +
-			"No rates here. How many appeared and were resolved between two releases is an " +
-			"artifact of how far apart somebody cut them; rates always plot on calendar. And a " +
-			"product must be named: two products' tags interleave by date and mean nothing side " +
-			"by side.",
+			"The axis is the sequence of releases, not the calendar.\n\n" +
+			"Answered against today's vulnerability data, not as of the day each was cut.\n\n" +
+			"No rates here; the calendar trend has them. A product must be named.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
@@ -331,7 +317,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		out.Body.Items = make([]ReleasePointBody, 0, len(points))
 		for _, point := range points {
 			out.Body.Items = append(out.Body.Items, ReleasePointBody{
-				Stream: point.Stream, Cut: point.Cut.Format(time.RFC3339),
+				Stream: point.Stream, Cut: point.Cut.UTC().Format(time.RFC3339),
 				StreamName: point.StreamName,
 				Open:       point.Open, BySeverity: point.BySeverity,
 			})
@@ -395,17 +381,25 @@ func registerNotes(api huma.API, in Ingest) {
 		// produced it — a vulnerability database ships bad data and is
 		// corrected, and "which data said so" is then the question. A run that
 		// has not finished is not an answer.
-		if last, err := findings.LatestRun(ctx, subject, to); err == nil && last != nil {
+		last, err := findings.LatestRun(ctx, subject, to)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "what the later build was measured with could not be read", err)
+		}
+		if last != nil {
 			about.Scanner = strings.TrimSpace(last.Scanner + " " + last.ScannerVersion)
 			about.Database = last.DatabaseVersion
 			if last.FinishedAt != nil {
 				about.At = *last.FinishedAt
 			}
 		}
+		// A note that cannot say how much was left out is not one to hand a
+		// customer: without the count it reads as leaving nothing out.
 		if !input.IncludePrivate {
-			if left, err := findings.OmittedFixes(ctx, subject, from, to); err == nil {
-				about.Omitted = left
+			left, err := findings.OmittedFixes(ctx, subject, from, to)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "what was left out could not be counted", err)
 			}
+			about.Omitted = left
 		}
 		notes := finding.Notes(about, comparison)
 		return &huma.StreamResponse{Body: func(hc huma.Context) {
@@ -593,12 +587,8 @@ func registerCarrying(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		bounds, err := boundsFor(ctx, in)
-		if err != nil {
-			return nil, err
-		}
 		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
-			fromTarget.ID, toTarget.ID, input.Body.Decisions, bounds)
+			fromTarget.ID, toTarget.ID, input.Body.Decisions, triage.Bounds{})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}

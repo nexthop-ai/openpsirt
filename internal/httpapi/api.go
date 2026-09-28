@@ -30,6 +30,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -195,6 +196,14 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 				err = access.ErrDenied
 			} else {
 				subject, session, err = in.Access.Resolve(r.Context(), r)
+			}
+			if err != nil && !errors.Is(err, access.ErrDenied) {
+				// A credential that could not be looked up is a fault, not
+				// a stranger. Logged, and answered in words that say
+				// nothing about the caller or the database.
+				in.logger().Error("who is asking could not be resolved", "error", err)
+				unavailable(w)
+				return
 			}
 			if err != nil {
 				// Refused here rather than in a handler, so that nothing
@@ -465,6 +474,13 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	// in the record, and what they were told.
 	registerPerson(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
+		// Deactivating somebody hands back what they were dealing with.
+		Findings: func() *finding.Store {
+			if in.DB == nil {
+				return nil
+			}
+			return finding.NewStore(in.DB.DB)
+		},
 	})
 	// The destinations this deployment posts to.
 	registerOutbound(api, in, Administering{
@@ -544,20 +560,29 @@ func asked(logger *slog.Logger, err error) error {
 	if errors.Is(err, access.ErrDenied) {
 		return huma.Error403Forbidden("not authorized")
 	}
-	if database.FromEngine(err) {
+	// A lost race is a fault that carries its cause: the transaction around
+	// the act reads the cause and takes it again, and a caller with no
+	// transaction around it, or one out of attempts, is answered 500 in words
+	// of our own and logged. Answered as a refusal it is a 422 telling the
+	// caller to go again, and the retry helper never sees it.
+	if errors.Is(err, database.ErrGoAgain) || database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
+	}
+	// Writing the policy refused, a detail per fault, each naming its line.
+	var faults markdown.Faults
+	if errors.As(err, &faults) {
+		return refusedText(faults)
 	}
 	return huma.Error422UnprocessableEntity(err.Error())
 }
 
 // noDatabase is the answer when this process has no database behind it.
 //
-// One sentence rather than twenty-one. Every handler guards against it,
-// because a nil pointer inside one is worse than a refusal, and a guard per
-// handler invents its own wording — "cannot read findings", "cannot record
-// decisions", "cannot list teams" — which reads as twenty-one conditions and
-// is one. Unlogged, the only trace of a deployment wired up wrong is a 500
-// with a sentence in it.
+// One sentence for every handler. Each guards against it, because a nil
+// pointer inside one is worse than a refusal, and a guard that words it for
+// itself reads as many conditions where there is one. Logged, because
+// otherwise the only trace of a deployment wired up wrong is a 500 with a
+// sentence in it.
 //
 // It says nothing about what the caller asked for, because the caller did not
 // cause it and cannot fix it: this is a process that came up without the thing
@@ -603,6 +628,15 @@ const openPrefix = "/v1/sign-in/"
 // outsider whether a name or a key is real.
 func refuse(w http.ResponseWriter) {
 	Problem(w, http.StatusUnauthorized, "not authorized")
+}
+
+// unavailable answers a request whose caller could not be looked up.
+//
+// Not a refusal: telling somebody they are not authorized because the
+// database did not answer sends them to sign in again, which cannot help.
+func unavailable(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "30")
+	Problem(w, http.StatusServiceUnavailable, "this could not be answered just now; try again shortly")
 }
 
 // Problem writes a refusal in the shape every other refusal here takes.

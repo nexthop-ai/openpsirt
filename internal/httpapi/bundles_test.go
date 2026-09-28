@@ -4,9 +4,11 @@
 package httpapi_test
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -973,6 +975,35 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 		if got := detail.Claim.Selection.Matched; got != 1 {
 			t.Errorf("a term holding a percent reached %d issues, want the one whose "+
 				"text holds it", got)
+		}
+	})
+}
+
+// The fix-bundle file is the list: for one build it states no build count, as
+// the list does, and it carries whether the bundle closes something this
+// product was exploited through.
+func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		got := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/fix-bundles.csv?stream=master&variant=broadcom", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
+		}
+		lines, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := rowsUnder(lines)
+		builds, here := indexOf(body[0], "builds"), indexOf(body[0], "exploited here")
+		if builds < 0 || here < 0 {
+			t.Fatalf("the file has no builds or exploited here column: %v", body[0])
+		}
+		if len(body) < 2 {
+			t.Fatal("the file holds no bundle")
+		}
+		if body[1][builds] != "" {
+			t.Errorf("one build's file states a build count of %q", body[1][builds])
 		}
 	})
 }

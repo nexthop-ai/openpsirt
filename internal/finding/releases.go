@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -227,6 +228,7 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 	var rows []struct {
 		Version string `bun:"version"`
 		Purl    string `bun:"purl"`
+		Name    string `bun:"name"`
 	}
 	err = s.db.NewSelect().
 		Distinct().
@@ -234,18 +236,30 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`c.name AS "name"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
-		Where("c.name = ?", name).
+		// Matched as the component lookup matches a typed name: on the
+		// fold, with the producer's own spelling naming the one spelled so.
+		Where("c.name_folded = ?", graph.Folded(name)).
 		Where("f.visibility IN (?)", bun.List(visible)).
-		OrderExpr("c.version, c.purl").
+		OrderExpr("c.version, c.purl, c.name").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which versions carry this issue: %w", err)
 	}
+	spelled := 0
+	for _, row := range rows {
+		if row.Name == strings.TrimSpace(name) {
+			spelled++
+		}
+	}
 	choices := make([]graph.Choice, 0, len(rows))
 	for _, row := range rows {
+		if spelled > 0 && spelled < len(rows) && row.Name != strings.TrimSpace(name) {
+			continue
+		}
 		choices = append(choices, graph.ChoiceOf(row.Version, row.Purl))
 	}
 	return choices, nil

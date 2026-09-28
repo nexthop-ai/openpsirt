@@ -162,11 +162,9 @@ func registerScrutiny(api huma.API, in Ingest) {
 				ApprovedAt: stamp(row.ApprovedAt), Claims: row.Claims, Rows: row.Rows,
 			})
 		}
-		// The whole a share is taken of. Every row a standing agreement covers,
-		// which is exactly what the pairs add up to.
-		for _, row := range got.Pairs {
-			out.Body.Agreed += row.Rows
-		}
+		// The whole a share is taken of: every row a standing agreement
+		// covers, over every pair and not only the ones listed.
+		out.Body.Agreed = got.Agreed
 		out.Body.Pairs = make([]PairingBody, 0, len(got.Pairs))
 		for _, row := range got.Pairs {
 			share := 0

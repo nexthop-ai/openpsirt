@@ -160,7 +160,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 		for _, change := range changes {
 			body.Held = append(body.Held, HeldChangeBody{
-				At: change.At.Format(time.RFC3339), By: who[change.Person()],
+				At: stamp(change.At), By: who[change.Person()],
 				About: change.Name, Was: orBlank(change.Was), Now: orBlank(change.Became),
 			})
 		}
@@ -191,7 +191,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		body.ToldTotal = toldTotal
 		for _, row := range told {
 			body.Told = append(body.Told, ToldBody{
-				At: row.CreatedAt.Format(time.RFC3339), Kind: string(row.Kind),
+				At: row.CreatedAt.UTC().Format(time.RFC3339), Kind: string(row.Kind),
 				Body: row.Body, Link: row.Link, Private: row.Private,
 				Read: row.ReadAt != nil, Cleared: row.ClearedAt != nil,
 			})
@@ -231,7 +231,7 @@ func orAbsent(at *time.Time) string {
 	if at == nil {
 		return ""
 	}
-	return at.Format(time.RFC3339)
+	return at.UTC().Format(time.RFC3339)
 }
 
 // registerDeactivation is somebody leaving, and somebody coming back.
@@ -304,8 +304,11 @@ func registerDeactivation(api huma.API, a Administering) {
 				// one. A second call finds nothing to move and writes no
 				// second row.
 				again, err := rights.ByIdentity(ctx, input.Identity)
-				if err == nil && again.DeactivatedAt != nil {
-					out.Body.Since = again.DeactivatedAt.Format(time.RFC3339)
+				if err != nil {
+					return wentWrong(a.Logger, "when they left could not be read", err)
+				}
+				if again.DeactivatedAt != nil {
+					out.Body.Since = again.DeactivatedAt.UTC().Format(time.RFC3339)
 				}
 				return nil
 			}
@@ -326,13 +329,14 @@ func registerDeactivation(api huma.API, a Administering) {
 		}); err != nil {
 			return nil, err
 		}
-		if out.Body.Already {
-			return out, nil
-		}
 		// Handed back for the reason losing a last role hands work back: work
 		// held by somebody who is gone is work nobody is doing, and it does
 		// not look like it. Outside the act, like the release a withdrawal
 		// does, because it is bounded by how much they were holding.
+		//
+		// On a repeat as well. The hand-back runs after the deactivation has
+		// committed, so a failure here leaves work held by somebody who has
+		// left, and asking again is how it is finished.
 		if a.Findings != nil {
 			if findings := a.Findings(); findings != nil {
 				released, err := findings.Release(ctx, subject, person.PartyID)

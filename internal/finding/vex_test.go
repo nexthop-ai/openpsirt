@@ -16,7 +16,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 	// columns. Spelled as a LOWER() the engine performs, the four do not
 	// agree: SQLite folds ASCII and nothing else, so a component named with
 	// any letter outside it matches on three engines and not on the fourth,
-	// and which one a deployment runs decided whether the statement was seen.
+	// and which one a deployment runs would decide whether the statement is seen.
 	// Folded on write instead, the comparison is the same everywhere and the
 	// index over the three columns is usable.
 	each(t, func(t *testing.T, f *fixture) {
@@ -95,6 +95,39 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		if _, err := f.store.SaidAbout(ctx, stranger, f.productID+9999, issue,
 			[]string{"CVE-2026-1"}, component, ""); err == nil {
 			t.Error("a product nobody holds anything on answered with statements")
+		}
+	})
+}
+
+// A component named past the width of the column that holds its fold is cut
+// there, as the component's own fold is, so the statement is recorded and
+// found rather than refused by the engine.
+func TestAVexStatementAboutALongNameIsFoldedToTheComponentsWidth(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		long := "lib" + strings.Repeat("Ü", 250)
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+			finding.Supplied{Source: finding.FromVex, Publisher: "Debian",
+				Document: "dsa.json", Digest: "sha256:one"}, []finding.Statement{{
+				Vulnerability: "CVE-2026-1", Component: long,
+				Status: "not_affected", Justification: "vulnerable_code_not_in_execute_path",
+				Statement: "The affected function is never reached in our build.",
+			}}); err != nil {
+			t.Fatalf("a statement about a long name was refused: %v", err)
+		}
+		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+			[]string{"CVE-2026-1"}, strings.ToUpper(long), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != 1 {
+			t.Errorf("asking about the long name found %d statements, want the one", len(said))
 		}
 	})
 }

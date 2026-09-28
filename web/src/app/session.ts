@@ -98,8 +98,13 @@ export function useWho() {
 // mayOf finds what somebody can do in one product. Absent means they cannot
 // reach it at all, which a screen should treat as not-there rather than as
 // forbidden — the same answer the server gives.
+//
+// Matched without regard to capitals, as the server matches a product name
+// somebody typed: an address typed with other capitals names the same product.
+// Every screen asks this one question through here.
 export function mayOf(who: Who | null | undefined, product: string): Can | undefined {
-  return who?.reach.find((each) => each.product === product);
+  const named = product.toLowerCase();
+  return who?.reach.find((each) => each.product.toLowerCase() === named);
 }
 
 // Signing out, as a sequence rather than as a click handler.

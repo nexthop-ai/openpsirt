@@ -182,7 +182,7 @@ func registerGraph(api huma.API, in Ingest) {
 				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
 			})
 		if err != nil {
-			return nil, ambiguousOrMissing(err)
+			return nil, ambiguousOrMissing(in.Logger, err)
 		}
 		return &struct{ Body AroundBody }{Body: AroundBody{
 			Above: neighbors(above), Below: neighbors(below),

@@ -24,18 +24,11 @@ import { Loading } from "../ui/Loading";
 import { Because, labeled } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
-import { useWho } from "../app/session";
+import { mayOf, useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { pathTo } from "./list";
 import { issuesIn, toggled } from "./outliers";
-
-// The comparison between a product's two spellings: a name people type is
-// matched without regard to capitals, which is the rule the server applies to
-// the identifier and the displayed name alike.
-function same(name?: string): string {
-  return (name ?? "").toLowerCase();
-}
 
 // The stripe down the card, which says the claim's state before anybody reads
 // a word of it. Three colors and no fourth: waiting, in force, and finished
@@ -448,12 +441,8 @@ function Answer({
 
   // The claim names its product by the name that addresses it, which is what
   // somebody's reach is keyed on.
-  const named = same(claim.place.product);
-  const mayAgree = (who.data?.reach ?? []).some(
-    (each) =>
-      same(each.product) === named &&
-      (claim.undisclosed ? each.agrees_private : each.agrees_public),
-  );
+  const here = mayOf(who.data, claim.place.product ?? "");
+  const mayAgree = !!(claim.undisclosed ? here?.agrees_private : here?.agrees_public);
   if (mine || !mayAgree || !live(claim.happened)) return null;
   const busy = approve.isPending || reject.isPending;
   const failed = approve.error ?? reject.error;

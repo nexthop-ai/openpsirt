@@ -111,7 +111,7 @@ func registerVEX(api huma.API, in Ingest) {
 			for _, one := range gone {
 				out.Body.Items = append(out.Body.Items, VEXIssuanceBody{
 					Version: one.Ordinal, Digest: one.Digest, IssuedBy: one.IssuedBy,
-					IssuedAt: one.IssuedAt.Format(time.RFC3339),
+					IssuedAt: one.IssuedAt.UTC().Format(time.RFC3339),
 				})
 			}
 			return out, nil
@@ -166,7 +166,7 @@ func registerVEX(api huma.API, in Ingest) {
 				VEXIssuanceBody: VEXIssuanceBody{
 					Version: recorded.Ordinal, Digest: recorded.Digest,
 					IssuedBy: subject.Identity,
-					IssuedAt: recorded.IssuedAt.Format(time.RFC3339),
+					IssuedAt: recorded.IssuedAt.UTC().Format(time.RFC3339),
 				},
 				Document: json.RawMessage(recorded.Document),
 			}}, nil
@@ -254,6 +254,9 @@ func vexRefused(in Ingest, err error, what string) error {
 		return asked(in.Logger, err)
 	case errors.Is(err, catalog.ErrNotFound), errors.Is(err, access.ErrDenied):
 		return noSuchProduct()
+	case errors.Is(err, vex.ErrRenamed):
+		// The caller's to ask again, and the sentence says so.
+		return huma.Error409Conflict(vex.ErrRenamed.Error())
 	case errors.Is(err, vex.ErrTooLarge):
 		// Something to narrow rather than something broken, and the sentence
 		// says which build and what the limit is. Answered as a fault it is a
@@ -261,10 +264,10 @@ func vexRefused(in Ingest, err error, what string) error {
 		// caller can act on in the log. Recording that one went out generates
 		// the document too, so it refuses the same way.
 		return huma.Error422UnprocessableEntity(err.Error())
-	// Asked of the publisher directly. A wrapper of its own in the package
-	// that answers it spells one predicate two ways in one file, and the
-	// wrapper is the half nothing executes.
-	case !in.Publisher.Stated():
+	// The store's own refusal, and nothing else. Asked of the configuration
+	// instead, every failure of a read that needs no publisher answers 409
+	// carrying its text wherever none is configured.
+	case errors.Is(err, vex.ErrNoPublisher):
 		// A configuration gap rather than a bad request, and named as one:
 		// whoever is asking cannot fix it from here, and an operator can.
 		return huma.Error409Conflict(err.Error())

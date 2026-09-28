@@ -48,12 +48,12 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 		}
 
 		for _, who := range []int64{cleared.ID, plain.ID} {
-			if err := f.store.AddToTeam(ctx, team.ID, who, admin.ID); err != nil {
+			if _, err := f.store.AddToTeam(ctx, team.ID, who, admin.ID); err != nil {
 				t.Fatal(err)
 			}
 		}
 		// Said twice, it asserts the same thing.
-		if err := f.store.AddToTeam(ctx, team.ID, plain.ID, admin.ID); err != nil {
+		if _, err := f.store.AddToTeam(ctx, team.ID, plain.ID, admin.ID); err != nil {
 			t.Errorf("adding somebody already on the team was refused: %v", err)
 		}
 		members, err := f.store.MembersOf(ctx, team.ID)
@@ -110,7 +110,7 @@ func TestARetiredTeamStopsTakingWorkAndKeepsItsName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.AddToTeam(ctx, team.ID, admin.ID, admin.ID); err != nil {
+		if _, err := f.store.AddToTeam(ctx, team.ID, admin.ID, admin.ID); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.RetireTeam(ctx, team.ID); err != nil {

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { signOut } from "./session";
+import { mayOf, signOut } from "./session";
+import type { Who } from "./session";
 import { belongTo, keep, restore } from "./drafts";
 
 // The sequence a sign-out runs, and its order.
@@ -65,5 +66,15 @@ describe("signing out", () => {
         0,
       );
     }
+  });
+});
+
+// What somebody may do in a product is found whatever capitals the product
+// was typed with, as the server finds it.
+describe("what somebody may do in a product", () => {
+  it("is found whatever the capitals", () => {
+    const who = { reach: [{ product: "sonic", may_hide: true }] } as unknown as Who;
+    expect(mayOf(who, "SONiC")?.may_hide).toBe(true);
+    expect(mayOf(who, "other")).toBeUndefined();
   });
 });

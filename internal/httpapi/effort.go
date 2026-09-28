@@ -52,7 +52,8 @@ func registerEffort(api huma.API, in Ingest) {
 		Period
 		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
 		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, by team name"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most rows to return"`
+		Offset  int    `query:"offset" minimum:"0" doc:"How many rows to skip, in the order the report is sorted"`
 	}) (*overPeriod[SpentBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -69,7 +70,8 @@ func registerEffort(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		rows, err := triage.NewStore(in.DB.DB).Effort(ctx, subject, only, since, until, input.Limit)
+		rows, total, err := triage.NewStore(in.DB.DB).Effort(ctx, subject, only, since, until,
+			input.Limit, input.Offset)
 		if err != nil {
 			return nil, refused(in.Logger, err, "cannot read where the work went")
 		}
@@ -84,7 +86,7 @@ func registerEffort(api huma.API, in Ingest) {
 				Promised: row.Promised, Dismissed: row.Dismissed, Deferred: row.Deferred,
 			})
 		}
-		out.Body.Total = len(out.Body.Items)
+		out.Body.Total = total
 		return out, nil
 	})
 }

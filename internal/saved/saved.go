@@ -123,7 +123,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	if cap <= 0 {
 		cap = setting.DefaultSavedPerPerson
 	}
-	matched := strings.ToLower(strings.TrimSpace(name))
+	matched := matching(name)
 	if matched == "" {
 		return nil, fmt.Errorf("a saved filter needs a name")
 	}
@@ -285,7 +285,7 @@ func (s *Store) ForgetFilter(ctx context.Context, personID, productID int64, nam
 	res, err := s.db.NewDelete().Model((*Filter)(nil)).
 		Where("person_id = ?", personID).
 		Where("product_id = ?", productID).
-		Where("name = ?", strings.ToLower(strings.TrimSpace(name))).
+		Where("name = ?", matching(name)).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("forget that filter: %w", err)
@@ -298,4 +298,10 @@ func (s *Store) ForgetFilter(ctx context.Context, personID, productID int64, nam
 		return ErrNoSuchFilter
 	}
 	return nil
+}
+
+// matching is a filter's name as it is stored and looked up. Saving and
+// forgetting both go through it, so the two cannot come to fold differently.
+func matching(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }

@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -75,10 +76,13 @@ func registerUpward(api huma.API, in Ingest) {
 			// hold nothing, which is not the same sentence.
 			named, err := names.Locate(ctx, input.Product, input.Stream, input.Variant)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, absent(in.Logger, err, "that build could not be looked up", noSuchProduct)
 			}
 			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
 			if err != nil {
+				if !errors.Is(err, catalog.ErrNotFound) {
+					return nil, wentWrong(in.Logger, "that build could not be looked up", err)
+				}
 				if subject.Sees(named.ProductID) {
 					return nil, nothingScannedThere()
 				}

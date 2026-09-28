@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 )
@@ -93,7 +94,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	product, stream, variant string) (*Issuance, error) {
 
 	if !who.Stated() {
-		return nil, errNoPublisher
+		return nil, ErrNoPublisher
 	}
 	named, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
@@ -165,7 +166,15 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			}
 			return err
 		}
-		return nil
+		// The names the document states, confirmed unchanged in the write
+		// that records it. The document is generated before the transaction,
+		// so a rename committing in between would otherwise record a document
+		// naming the build by a name it no longer has. Each check is a write
+		// matching the name read, which also holds the row against a rename
+		// until this commits. Taken after the number, so a second issuance
+		// for the build is refused its number by the constraint rather than
+		// left waiting on these rows while this one waits on it.
+		return stillNamed(ctx, tx, named)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("record that it went out: %w", err)
@@ -395,4 +404,38 @@ func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, wha
 		return false, fmt.Errorf("read whether anything has gone out for this %s: %w", what, err)
 	}
 	return issued, nil
+}
+
+// ErrRenamed is a build renamed while its document was being generated. The
+// document names what it had been called, so it is not recorded; asking again
+// generates one under the name it has now.
+var ErrRenamed = errors.New("the build was renamed while its document was being written; ask again")
+
+// stillNamed confirms each part of a build is still called what it was when
+// its document was generated.
+func stillNamed(ctx context.Context, tx bun.IDB, named *catalog.Named) error {
+	for _, level := range []struct {
+		model any
+		id    int64
+		name  string
+	}{
+		{(*catalog.Product)(nil), named.ProductID, named.Product},
+		{(*catalog.Stream)(nil), named.StreamID, named.Stream},
+		{(*catalog.Variant)(nil), named.VariantID, named.Variant},
+	} {
+		result, err := tx.NewUpdate().Model(level.model).
+			Set("name = name").
+			Where("id = ?", level.id).Where("name = ?", level.name).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("confirm what the build is called: %w", err)
+		}
+		n, err := database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("confirm what the build is called: %w", err)
+		}
+		if n == 0 {
+			return ErrRenamed
+		}
+	}
+	return nil
 }

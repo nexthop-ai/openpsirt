@@ -55,9 +55,7 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "list-routing-rules", Method: http.MethodGet, Path: path,
 		Summary: "List the rules that route work to teams",
 		Description: "The standing rules for this product, in the order they are tried.\n\n" +
-			"First match wins, and which rule placed a finding is recorded on the finding: " +
-			"an unwritten precedence is forgettable, and the question it answers — where did " +
-			"this come from — is asked months later by somebody who was not there.",
+			"First match wins, and which rule placed a finding is recorded on the finding.",
 		Tags: []string{"Administration"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -108,10 +106,7 @@ func registerRouting(api huma.API, in Ingest) {
 		Description: "Answers what a rule with these keys matches, without recording " +
 			"anything: the components it names, how many pieces of work sit at them, and how " +
 			"many of those nobody holds.\n\n" +
-			"A rule whose reach nobody can see before saving is a rule that sweeps the " +
-			"estate on a guess, and one naming something nothing is called places nothing, " +
-			"silently — which is the worst way for a rule to be wrong, because it still looks " +
-			"like a rule. `*` matches any run of characters in either key.\n\n" +
+			"`*` matches any run of characters in either key.\n\n" +
 			"It does not account for the rules already there. First match wins, so what " +
 			"this catches is what it would place only where no earlier rule claimed it first.",
 		Tags: []string{"Administration"},
@@ -169,17 +164,13 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "add-routing-rule", Method: http.MethodPost, Path: path,
 		Summary: "Add a rule that routes work to a team",
 		Description: "Records a standing rule and queues it against what is already open.\n\n" +
-			"It matches on component identity as well as on a place in the tree. The " +
-			"source package is the key that matters: one rule naming it catches every binary " +
-			"package built from it, wherever they sit — a kernel is one source package " +
-			"appearing at many places under many consumers, and a subtree rule would need a " +
-			"line per place and would still miss tomorrow's.\n\n" +
+			"It matches on component identity as well as on a place in the tree. A rule " +
+			"naming a source package catches every binary package built from it, wherever " +
+			"they sit.\n\n" +
 			"It places only work nobody holds. A human assignment always wins, and " +
 			"adding a rule never takes something out of somebody's hands.\n\n" +
-			"Turning one on is a bulk write, so it is queued rather than done here: one " +
-			"rule naming a source package sweeps thousands of existing findings, and saving " +
-			"a form must not hold a transaction open across the estate. The reply says the " +
-			"rule was recorded, not that the sweep has finished.",
+			"Applying it to what is open is queued rather than done here. The reply says " +
+			"the rule was recorded, not that the sweep has finished.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "A rule hands work to somebody, continuously, on behalf of whoever wrote it.",
 		[]access.Role{access.Assigner}...), func(ctx context.Context, input *struct {
@@ -187,8 +178,8 @@ func registerRouting(api huma.API, in Ingest) {
 		Body    struct {
 			Name     string `json:"name" minLength:"1" maxLength:"120"`
 			Team     string `json:"team" minLength:"1" doc:"The team work lands on, by name"`
-			Upstream string `json:"upstream,omitempty" doc:"A source package name"`
-			Beneath  string `json:"beneath,omitempty" doc:"A component name, matching it and everything under it"`
+			Upstream string `json:"upstream,omitempty" maxLength:"191" doc:"A source package name"`
+			Beneath  string `json:"beneath,omitempty" maxLength:"191" doc:"A component name, matching it and everything under it"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
 		subject, product, _, err := routable(ctx, in, input.Product)
@@ -200,7 +191,7 @@ func registerRouting(api huma.API, in Ingest) {
 		if err := changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
 			var err error
 			if team, err = access.NewStore(tx).TeamByName(ctx, input.Body.Team); err != nil {
-				return noSuchTeamNamed(input.Body.Team)
+				return absent(in.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(input.Body.Team) })
 			}
 			if rule, err = finding.NewStore(tx).AddRule(ctx, subject, product, team.ID,
 				input.Body.Name, input.Body.Upstream, input.Body.Beneath); err != nil {

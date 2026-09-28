@@ -339,6 +339,7 @@ a manager has to answer without any of the others.
 | What a judgment was about is reached through the findings at its place | A decision names a place rather than a component. A judgment about something since removed still names what it was about, which is what a report about where the time went has to keep |
 | Dated by when a judgment was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
 | It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's. The team is picked on the sheet, from the teams that exist |
+| It pages, and its total counts every row before the limit | A total taken off the page reads a list cut at the limit as complete, and with no offset the rows past the largest page could not be read at all |
 
 ## Triage latency
 
@@ -415,7 +416,7 @@ deadline, and whether the deadline was met.
 | It narrows by what stands, by outcome, by component, by issue, and to one side of the history | An auditor asks "what has nobody decided" and "show me the dismissals", which are ways of reading the same complete answer rather than different questions. The count is of the narrowed list, because counted over the build a narrowed page says how many rows the build holds and every later offset is a page of a different list |
 | It still applies no triage line, whatever else is asked of it | That is what it is for, and a filter that could hide part of the build would make it the findings list at a second address |
 | A state word it does not recognize keeps nothing | A filter that silently widens is how a register reads as complete about rows it left out. The route's own vocabulary refuses one at the door; this is the guard behind it |
-| Provenance never fails the report | A build nothing has finished scanning is the one somebody is most likely asking about, so what cannot be read is absent rather than an error |
+| Provenance missing never fails the report, and provenance unreadable does | A build nothing has finished scanning is the one somebody is most likely asking about, so no upload means no block and no finished run means a block without one. A read that failed is a fault: an absent block would say nothing was uploaded |
 
 Current state, with no `as_of`. Reconstructing the view as of a past date is
 refused on two grounds. Each row carries the timestamps that evidence the thing
@@ -496,7 +497,9 @@ so the pairs section raises a condition only past two thresholds: a share of a
 product's agreements, among at least a set number of people who may approve.
 Both are settings a product may override. `DESIGN-notifications.md` § Concentrated
 approval pairs holds the rule, and why a pair counted without the
-second threshold would be an alert nobody can clear (REQ-49).
+second threshold would be an alert nobody can clear (REQ-49). Each pair's share
+is of every decision a standing agreement covers, counted apart from the list,
+so a list cut at its limit does not raise the shares of the pairs it kept.
 
 Four filters: who proposed it, who has a standing agreement on it, which issue,
 and which component. An agreement later taken back does not match the approver
@@ -711,6 +714,8 @@ stops is one somebody reads as whole.
 | Every CSV record is the header's width, statements and markers included | CSV has no comment convention: the `#` opening those two is a data character, and a narrow record makes the document one a conformant reader refuses. Every test here had the field-count check turned off, which is the check that would have said so |
 | One document uses one key convention | The stated fact's key was written with underscores and every column name kept the spaces it is read with on paper, so the same file named its fields two ways |
 | A column of numbers says nothing where there is no number | An unscored finding written as a zero sorted with the genuinely 0.0-rated ones at the bottom of a release meeting's file, and every filter asking for a score below anything took it |
+| A streamed file holds its cursor ten minutes at most, and is cut there with the incomplete marker | A reader draining just fast enough to keep the write deadline moving otherwise holds a database connection for as long as the file takes at its pace: about 41 hours for a build of 249,288 places, against 1.9 seconds to read them. On SQLite that connection is the whole pool |
+| Streamed files running at once are a fifth of the pool, at least one; one more is refused with 503 and a time to ask again | The rest of the pool stays with every other request |
 | A refusal is answered before the first byte | A stream's status is gone by the time the store can refuse, so a refusal arriving there could only be said in the file — which said the export stopped early, with a 200 in front of it |
 | The cross-product list states no single line | Each product applies its own |
 | The findings list offers its file whether or not a product is picked | The two lists are two endpoints and the filters mean the same on both, so offering the control on one and not the other left one narrowing reachable as a file and the other not, for no reason a reader could see. The spanning file drops the filters a single build resolves, the same narrowing the screen's own read applies |
@@ -720,6 +725,7 @@ stops is one somebody reads as whole.
 | The deadline report needed an offset before it could be a file | What somebody exports a deadline report for is precisely the part they have not read. Paging it also needed the build in the ordering, since an arbitrary order between pages repeats one row and skips another |
 | The comparison is one file with a column naming which of the three parts a row belongs to | Three files are three things to keep together by hand. It is read whole rather than paged, because a comparison is a single answer computed from two builds at once |
 | The inventory comparison is read whole, like the findings comparison | It is one answer computed from two builds at once. A name held at several versions has them joined in one cell per side, so a row is still one name |
+| A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is what is waiting on you | Your own claims are not in it |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
 
