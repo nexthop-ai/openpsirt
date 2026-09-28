@@ -576,7 +576,7 @@ disposition register have sections above.
 | The destination of the effort | The subjects of the judgments in a period, most argued first, with what came out of them. It has a section of its own above |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
-| Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible |
+| Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
 
 An issuance carries no visibility of its own, so a row of the last of those is
 narrowed by the flaw it was written about. Reading one as public because it has
