@@ -120,7 +120,9 @@ export function Streams() {
       ),
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ["streams", product] });
-      void queries.invalidateQueries({ queryKey: ["trend"] });
+      // The release-over-release charts on the front page read the dates.
+      void queries.invalidateQueries({ queryKey: ["home", "trend"] });
+      void queries.invalidateQueries({ queryKey: ["home", "release-trend"] });
     },
   });
 

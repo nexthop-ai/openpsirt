@@ -273,6 +273,7 @@ checks.
 | Stylelint | CSS correctness: unknown properties, duplicate selectors, notation. Nothing about whitespace |
 | `npm run classes` | Three questions about class names, below |
 | `npm run copy` | A paragraph, hint or empty-state detail on a screen putting more than 20 words up at once. `DESIGN-interface.md` § Screen copy says what it measures |
+| Query keys, in the web tests | An invalidation whose key no read's key starts with. The query cache matches an invalidation by prefix, so a key nothing reads refreshes nothing, and a control that saved looks as though it did not. Compared as far as each key is literal |
 
 Formatting belongs to one tool. Stylelint's whitespace rules are off rather than
 left to disagree with Prettier.

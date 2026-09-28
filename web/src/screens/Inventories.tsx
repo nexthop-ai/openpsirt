@@ -76,6 +76,10 @@ export function Inventories() {
         </span>
       </div>
 
+      {scanning.isError && (
+        <Failed error={scanning.error} what="Which builds have gone quiet could not be read." />
+      )}
+
       {quiet.map((build) => (
         <div
           className="alert"
@@ -258,7 +262,7 @@ export function Inventories() {
               <span className="l">Vulnerability data</span>
             </div>
             <div className="score">
-              <span className="n">{on(measured.ran_at) ?? "—"}</span>
+              <span className="n">{on(measured.ran_at) || "—"}</span>
               <span className="l">Last run</span>
             </div>
           </div>
