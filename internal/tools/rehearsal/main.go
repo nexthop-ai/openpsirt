@@ -148,7 +148,8 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 		}
 	}
 	var err error
-	if r.log, err = os.Create(filepath.Join(r.work, "rehearsal.log")); err != nil {
+	if r.log, err = os.OpenFile(filepath.Join(r.work, "rehearsal.log"), //nolint:gosec // G304: a name this tool chose, under its own directory
+		os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600); err != nil {
 		return nil, err
 	}
 	// The release's demo mounts its own directory for the scanner's database.
@@ -359,6 +360,9 @@ func (r *run) database(ctx context.Context) error {
 // what they make, points the application at the rehearsal database, and lets
 // the proxy the release configured still reach the application by the name it
 // wrote into its configuration.
+//
+// The database URL carries a password, so it reaches docker through the
+// environment and never as an argument, which every local user can read.
 func (r *run) wrapper() (string, error) {
 	path := filepath.Join(r.work, "docker")
 	script := `#!/usr/bin/env bash
@@ -368,7 +372,7 @@ for a in "$@"; do
     openpsirt-demo) a=` + app + ` ;;
     openpsirt-demo-proxy) a=` + proxy + ` ;;
     openpsirt-demo:*) a="` + app + `:${a#openpsirt-demo:}" ;;
-    OPENPSIRT_DATABASE_URL=*) a="OPENPSIRT_DATABASE_URL=$REHEARSAL_DB" ;;
+    OPENPSIRT_DATABASE_URL=*) export OPENPSIRT_DATABASE_URL="$REHEARSAL_DB"; a=OPENPSIRT_DATABASE_URL ;;
   esac
   args+=("$a")
 done
@@ -525,7 +529,10 @@ func (r *run) container(extra ...string) []string {
 		"-v", filepath.Join(r.demo, "data") + ":/data",
 		"-v", r.grype + ":/var/cache/openpsirt/grype",
 		"-v", filepath.Join(r.demo, "repositories") + ":/var/cache/openpsirt/repositories",
-		"-e", "OPENPSIRT_DATABASE_URL=" + r.appURL,
+		// Named without a value, so docker takes it from the environment
+		// withDatabase sets: an argument is readable by every local user and
+		// is written to the log.
+		"-e", "OPENPSIRT_DATABASE_URL",
 		"-e", "OPENPSIRT_ADDR=0.0.0.0:8080",
 		"-e", "OPENPSIRT_PLAIN_HTTP=1",
 		"-e", "OPENPSIRT_BOOTSTRAP_ADMINS=" + admin,
@@ -539,9 +546,14 @@ func (r *run) container(extra ...string) []string {
 	return append(args, extra...)
 }
 
+// withDatabase is the environment a container run takes its database from.
+func (r *run) withDatabase() []string {
+	return []string{"OPENPSIRT_DATABASE_URL=" + r.appURL}
+}
+
 func (r *run) migrate(ctx context.Context, action string) error {
 	args := r.container("--rm", r.image, "migrate", action)
-	return r.cmd(ctx, "", nil, "docker", args...)
+	return r.cmd(ctx, "", r.withDatabase(), "docker", args...)
 }
 
 // version asks this tree's binary where the schema stands.
@@ -549,6 +561,7 @@ func (r *run) version(ctx context.Context) (int64, error) {
 	var out bytes.Buffer
 	c := exec.CommandContext(ctx, "docker", r.container("--rm", r.image, "migrate", "status")...) //nolint:gosec // G204: arguments this tool built itself
 	c.Stdout, c.Stderr = &out, r.log
+	c.Env = append(os.Environ(), r.withDatabase()...)
 	if err := c.Run(); err != nil {
 		return 0, fmt.Errorf("migrate status: %w", err)
 	}
@@ -563,7 +576,7 @@ func (r *run) version(ctx context.Context) (int64, error) {
 // reaches it by the name it was configured with.
 func (r *run) serve(ctx context.Context) error {
 	args := r.container("-d", "--name", app, "--network-alias", "openpsirt-demo", r.image)
-	if err := r.cmd(ctx, "", nil, "docker", args...); err != nil {
+	if err := r.cmd(ctx, "", r.withDatabase(), "docker", args...); err != nil {
 		return err
 	}
 	// The proxy resolved the application's address when it started, and this

@@ -334,7 +334,7 @@ func Open(t *testing.T, url string) *database.DB {
 	t.Helper()
 	target, err := database.ParseURL(url)
 	if err != nil {
-		t.Fatalf("parse %q: %v", url, err)
+		t.Fatalf("parse the database URL: %v", err)
 	}
 	db, err := database.Open(context.Background(), target)
 	if err != nil {
@@ -502,19 +502,21 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 	if own, ok := serverURLs[engine]; ok {
 		return own, nil
 	}
+	// Parsed by the database package first: its refusal never repeats the
+	// URL, and the plain parser's quotes it, password included.
+	target, err := database.ParseURL(base)
+	if err != nil {
+		return "", err
+	}
 	parsed, err := url.Parse(base)
 	if err != nil {
-		return "", fmt.Errorf("parse %s: %w", engine, err)
+		return "", fmt.Errorf("parse the %s URL at %s", engine, target.Redacted)
 	}
 	name, err := packageDatabaseName()
 	if err != nil {
 		return "", err
 	}
 
-	target, err := database.ParseURL(base)
-	if err != nil {
-		return "", err
-	}
 	ctx := context.Background()
 	admin, err := database.Open(ctx, target)
 	if err != nil {
@@ -680,8 +682,8 @@ func databasesFor(ctx context.Context, admin *database.DB, engine database.Engin
 //
 // The directory is in the hash because the import path is not enough. Two
 // checkouts of this repository — a second worktree, say — hold the same
-// package at the same import path, and pointed at the same servers they got
-// the same name, so one dropped the other's database while it was in use.
+// package at the same import path, and pointed at the same servers they would
+// get the same name, so one would drop the other's database while in use.
 // A test binary runs in the directory of the package it tests, and that
 // directory includes the checkout's path, which tells the two apart.
 func packageDatabaseName() (string, error) {
@@ -764,11 +766,10 @@ func migrateFresh(url string) error {
 // Tables is every table the migrations make, in an order safe to delete from.
 //
 // Exported so that a test about the schema as a whole can be about the schema
-// as a whole. The full-rollback test named a handful of them by hand and
-// passed over the rest, so a Down that forgot its DROP was caught for whichever
-// tables somebody had thought of — and the list this returns is the one a test
-// in this package holds to the migrated schema in both directions, which is
-// what makes it the whole of them rather than what was remembered.
+// as a whole. A test naming a handful of tables by hand catches a Down that
+// forgot its DROP only for the tables somebody thought of. The list this
+// returns is the one a test in this package holds to the migrated schema in
+// both directions, which makes it the whole of them.
 func Tables() []string { return slices.Clone(tables) }
 
 // tables lists every table, in an order safe to delete from: children before

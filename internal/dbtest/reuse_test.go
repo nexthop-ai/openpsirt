@@ -17,7 +17,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// The harness has two paths and only one of them had ever run.
+// The harness has two paths, and an ordinary run reaches only one of them.
 //
 // A server database is created and migrated on first use, and kept between
 // runs because applying the migrations is nearly the whole cost of a server
@@ -170,7 +170,7 @@ func openAdmin(t *testing.T, base string) *database.DB {
 	t.Helper()
 	target, err := database.ParseURL(base)
 	if err != nil {
-		t.Fatalf("parse %q: %v", base, err)
+		t.Fatalf("parse the database URL: %v", err)
 	}
 	admin, err := database.Open(context.Background(), target)
 	if err != nil {

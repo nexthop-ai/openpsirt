@@ -4,6 +4,8 @@
 package database
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -208,6 +210,70 @@ func TestAPasswordContainingASlashIsNotMistakenForTheHost(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "db.internal:5432") {
 		t.Errorf("the error does not name the host it could not reach: %v", err)
+	}
+}
+
+func TestACredentialNeverLeavesThePackage(t *testing.T) {
+	// The redacted URL is logged on every start, and an error from opening a
+	// connection reaches stderr. Neither carries the password, however the
+	// URL spells it: in the userinfo with a delimiter left unescaped, or as a
+	// query parameter, well formed or not.
+	for _, c := range []struct {
+		what, raw, secret string
+	}{
+		{"a slash in the password, before digits", "postgres://app:12/34@127.0.0.1:1/x", "34@"},
+		{"a question mark in the password", "postgres://app:12?34@127.0.0.1:1/x", "34@"},
+		{"a number sign in the password", "postgres://app:12#34@127.0.0.1:1/x", "34@"},
+		{"a password parameter", "postgres://app@127.0.0.1:1/x?password=s3cret&connect_timeout=1", "s3cret"},
+		{"a password parameter with a malformed escape",
+			"postgres://app@127.0.0.1:1/x?password=s3cr%zz&connect_timeout=1", "s3cr"},
+		{"an encoded password parameter", "postgres://app@127.0.0.1:1/x?password=s3%2Fcret&connect_timeout=1", "s3"},
+		{"a TLS key password", "postgres://app@127.0.0.1:1/x?sslpassword=k3yp4ss&connect_timeout=1", "k3yp4ss"},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			target, err := ParseURL(c.raw)
+			if err != nil {
+				if strings.Contains(err.Error(), c.secret) {
+					t.Errorf("the refusal carries the credential: %v", err)
+				}
+				return
+			}
+			if strings.Contains(target.Redacted, c.secret) {
+				t.Errorf("the logged URL carries the credential: %q", target.Redacted)
+			}
+			// Nothing listens on port 1, so this fails in the driver: parsing
+			// what it was given, or connecting.
+			db, err := Open(t.Context(), target)
+			if err == nil {
+				_ = db.Close()
+				t.Fatal("a connection to a port nothing listens on succeeded")
+			}
+			if strings.Contains(err.Error(), c.secret) {
+				t.Errorf("the connection error carries the credential: %v", err)
+			}
+		})
+	}
+}
+
+func TestADriverErrorQuotingTheCredentialIsScrubbed(t *testing.T) {
+	// A driver describes what it was given, and its own redaction covers the
+	// userinfo only. Every spelling of each credential leaves the error, and
+	// the error it wraps is still reachable.
+	target, err := ParseURL("postgres://app:p%40ss@db:5432/x?sslpassword=k3y%2Fpass&sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cause := errors.New("driver")
+	quoted := fmt.Errorf("cannot parse `password=p@ss sslpassword=k3y/pass` "+
+		"(from p%%40ss and k3y%%2Fpass): %w", cause)
+	got := scrub(quoted, target)
+	for _, secret := range []string{"p@ss", "p%40ss", "k3y/pass", "k3y%2Fpass"} {
+		if strings.Contains(got.Error(), secret) {
+			t.Errorf("the scrubbed error carries %q: %v", secret, got)
+		}
+	}
+	if !errors.Is(got, cause) {
+		t.Errorf("the scrubbed error no longer wraps what the driver said: %v", got)
 	}
 }
 
