@@ -17,8 +17,9 @@ const queries = new QueryClient({
   // held for five minutes and is not refetched on focus. Without this the
   // first sign that the session is gone is a write.
   //
-  // The identity read itself resolves its own 401 to "nobody is signed in"
-  // rather than throwing, so it never reaches this and this cannot start a
+  // The identity read itself resolves its own 401 rather than throwing — to
+  // "nobody is signed in", or to the identity already held after raising the
+  // ended session itself — so it never reaches this and this cannot start a
   // loop through it.
   queryCache: new QueryCache({
     onError: (error) => {

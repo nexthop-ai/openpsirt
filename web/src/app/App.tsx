@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Suspense, lazy, useEffect, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useSyncExternalStore } from "react";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -9,6 +9,7 @@ import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
+import { retrying } from "./retrying";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
@@ -24,58 +25,47 @@ import { Variants } from "../screens/Variants";
 // Split by route, so a screen carries the weight of what it actually needs.
 // The findings list has to stay usable against a full-size product and has no
 // business downloading a charting library; the markdown renderer is only
-// needed where somebody reads or writes a justification.
-const Home = lazy(() => import("../screens/Home").then((m) => ({ default: m.Home })));
-const Finding = lazy(() => import("../screens/Finding").then((m) => ({ default: m.Finding })));
-const Tree = lazy(() => import("../screens/Tree").then((m) => ({ default: m.Tree })));
-const Compare = lazy(() => import("../screens/Compare").then((m) => ({ default: m.Compare })));
-const Inbox = lazy(() => import("../screens/Inbox").then((m) => ({ default: m.Inbox })));
-const InboxReport = lazy(() =>
-  import("../screens/InboxReport").then((m) => ({ default: m.InboxReport })),
+// needed where somebody reads or writes a justification. A screen whose chunk
+// failed to arrive is asked for again when the boundary around it is.
+const Home = retrying(() => import("../screens/Home").then((m) => m.Home));
+const Finding = retrying(() => import("../screens/Finding").then((m) => m.Finding));
+const Tree = retrying(() => import("../screens/Tree").then((m) => m.Tree));
+const Compare = retrying(() => import("../screens/Compare").then((m) => m.Compare));
+const Inbox = retrying(() => import("../screens/Inbox").then((m) => m.Inbox));
+const InboxReport = retrying(() => import("../screens/InboxReport").then((m) => m.InboxReport));
+const InventoryCompare = retrying(() =>
+  import("../screens/InventoryCompare").then((m) => m.InventoryCompare),
 );
-const InventoryCompare = lazy(() =>
-  import("../screens/InventoryCompare").then((m) => ({ default: m.InventoryCompare })),
+const InventoryChanges = retrying(() =>
+  import("../screens/InventoryChanges").then((m) => m.InventoryChanges),
 );
-const InventoryChanges = lazy(() =>
-  import("../screens/InventoryChanges").then((m) => ({ default: m.InventoryChanges })),
+const People = retrying(() => import("../screens/People").then((m) => m.People));
+const Work = retrying(() => import("../screens/Work").then((m) => m.Work));
+const Queue = retrying(() => import("../screens/Queue").then((m) => m.Queue));
+const Decision = retrying(() => import("../screens/Decision").then((m) => m.Decision));
+const Claim = retrying(() => import("../screens/Claim").then((m) => m.Claim));
+const Together = retrying(() => import("../screens/Together").then((m) => m.Together));
+const Me = retrying(() => import("../screens/Me").then((m) => m.Me));
+const Issue = retrying(() => import("../screens/Issue").then((m) => m.Issue));
+const Teams = retrying(() => import("../screens/Teams").then((m) => m.Teams));
+const AutoAssignment = retrying(() =>
+  import("../screens/AutoAssignment").then((m) => m.AutoAssignment),
 );
-const People = lazy(() => import("../screens/People").then((m) => ({ default: m.People })));
-const Work = lazy(() => import("../screens/Work").then((m) => ({ default: m.Work })));
-const Queue = lazy(() => import("../screens/Queue").then((m) => ({ default: m.Queue })));
-const Decision = lazy(() => import("../screens/Decision").then((m) => ({ default: m.Decision })));
-const Claim = lazy(() => import("../screens/Claim").then((m) => ({ default: m.Claim })));
-const Together = lazy(() => import("../screens/Together").then((m) => ({ default: m.Together })));
-const Me = lazy(() => import("../screens/Me").then((m) => ({ default: m.Me })));
-const Issue = lazy(() => import("../screens/Issue").then((m) => ({ default: m.Issue })));
-const Teams = lazy(() => import("../screens/Teams").then((m) => ({ default: m.Teams })));
-const AutoAssignment = lazy(() =>
-  import("../screens/AutoAssignment").then((m) => ({ default: m.AutoAssignment })),
-);
-const Disclosing = lazy(() =>
-  import("../screens/Disclosing").then((m) => ({ default: m.Disclosing })),
-);
-const Obligations = lazy(() =>
-  import("../screens/Obligations").then((m) => ({ default: m.Obligations })),
-);
-const Upgrades = lazy(() => import("../screens/Upgrades").then((m) => ({ default: m.Upgrades })));
-const Inventories = lazy(() =>
-  import("../screens/Inventories").then((m) => ({ default: m.Inventories })),
-);
-const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
-const System = lazy(() => import("../screens/System").then((m) => ({ default: m.System })));
-const Audit = lazy(() => import("../screens/Audit").then((m) => ({ default: m.Audit })));
-const Reports = lazy(() =>
-  import("../screens/reports/Catalog").then((m) => ({ default: m.Catalog })),
-);
-const Report = lazy(() => import("../screens/reports/Report").then((m) => ({ default: m.Report })));
-const Record = lazy(() => import("../screens/Record").then((m) => ({ default: m.Record })));
-const Person = lazy(() => import("../screens/Person").then((m) => ({ default: m.Person })));
-const Stream = lazy(() => import("../screens/Stream").then((m) => ({ default: m.Stream })));
-const Advisories = lazy(() =>
-  import("../screens/Advisories").then((m) => ({ default: m.Advisories })),
-);
-const Advisory = lazy(() => import("../screens/Advisory").then((m) => ({ default: m.Advisory })));
-const VEX = lazy(() => import("../screens/VEX").then((m) => ({ default: m.VEX })));
+const Disclosing = retrying(() => import("../screens/Disclosing").then((m) => m.Disclosing));
+const Obligations = retrying(() => import("../screens/Obligations").then((m) => m.Obligations));
+const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
+const Inventories = retrying(() => import("../screens/Inventories").then((m) => m.Inventories));
+const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
+const System = retrying(() => import("../screens/System").then((m) => m.System));
+const Audit = retrying(() => import("../screens/Audit").then((m) => m.Audit));
+const Reports = retrying(() => import("../screens/reports/Catalog").then((m) => m.Catalog));
+const Report = retrying(() => import("../screens/reports/Report").then((m) => m.Report));
+const Record = retrying(() => import("../screens/Record").then((m) => m.Record));
+const Person = retrying(() => import("../screens/Person").then((m) => m.Person));
+const Stream = retrying(() => import("../screens/Stream").then((m) => m.Stream));
+const Advisories = retrying(() => import("../screens/Advisories").then((m) => m.Advisories));
+const Advisory = retrying(() => import("../screens/Advisory").then((m) => m.Advisory));
+const VEX = retrying(() => import("../screens/VEX").then((m) => m.VEX));
 
 const build = "/products/:product/streams/:stream/variants/:variant";
 
@@ -167,7 +157,9 @@ export function App() {
   // sends somebody who is signed in back through their identity provider —
   // where there is exactly one, without even a button to press — over what is
   // usually a transient failure.
-  if (who.isError) {
+  // A failed refetch keeps the identity already held, and the screen with it:
+  // a person already working is not sent to a failure page over one read.
+  if (who.isError && !who.data) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <div style={{ maxWidth: 520 }}>

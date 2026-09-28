@@ -29,10 +29,14 @@ describe("where somebody was", () => {
     // The store is the browser's and a person may write to it. What comes out
     // goes straight into a scroll call, so anything that is not a position is
     // the top of the page rather than an argument nothing checked.
-    window.sessionStorage.setItem("openpsirt.place./a", "not a number");
+    window.sessionStorage.setItem(
+      "openpsirt.place",
+      JSON.stringify({ "/a": { y: "not a number", at: 1 }, "/b": { y: -4000, at: 2 } }),
+    );
     expect(placeOf("/a")).toBe(0);
-    window.sessionStorage.setItem("openpsirt.place./b", "-4000");
     expect(placeOf("/b")).toBe(0);
+    window.sessionStorage.setItem("openpsirt.place", "not json");
+    expect(placeOf("/a")).toBe(0);
   });
 
   it("forgets every page at once", () => {
@@ -49,13 +53,21 @@ describe("where somebody was", () => {
 
   it("does not grow without bound as somebody reads list after list", () => {
     for (let i = 0; i < 40; i++) markPlace(`/list-${i}`, i * 10);
-    let kept = 0;
-    for (let i = 0; i < window.sessionStorage.length; i++) {
-      if (window.sessionStorage.key(i)?.startsWith("openpsirt.place.")) kept++;
-    }
-    expect(kept).toBeLessThanOrEqual(12);
+    const kept = Object.keys(JSON.parse(window.sessionStorage.getItem("openpsirt.place") ?? "{}"));
+    expect(kept.length).toBe(12);
     // The most recent is the one worth having: it is the list somebody just
     // came from.
     expect(placeOf("/list-39")).toBe(390);
+    expect(placeOf("/list-28")).toBe(280);
+    expect(placeOf("/list-27")).toBe(0);
+  });
+
+  it("keeps a page marked again as recent, whatever order it was first marked in", () => {
+    markPlace("/first", 50);
+    for (let i = 0; i < 11; i++) markPlace(`/list-${i}`, i * 10);
+    markPlace("/first", 60);
+    markPlace("/one-more", 70);
+    expect(placeOf("/first")).toBe(60);
+    expect(placeOf("/list-0")).toBe(0);
   });
 });

@@ -1349,6 +1349,8 @@ application never makes one.
 | Restored after the rows are drawn | Scrolling a page that is a few hundred pixels tall clamps to the bottom, so the restore lands somewhere arbitrary and reads as a fault in the list |
 | Written as somebody scrolls, not as they leave | A route change unmounts the screen, and an unmount is too late to read a position the browser has already moved |
 | A handful of pages, and anything that is not a position is the top | The store is the browser's and a person may edit it, and the value goes straight into a scroll call. An unbounded map in storage grows for as long as the tab is open |
+| The handful kept are the ones marked last | Each place carries when it was marked, and the oldest go. The order a browser lists its storage in is not the order things were written, so trimming by it can drop the list somebody just came from, every time |
+| Back and Forward do not scroll the frame to the top | Every other arrival starts at the top of the screen. On Back the list owns where it opens, and a scroll to the top before its rows arrive is recorded as where somebody was |
 | Cleared with everything else the session holds | The next person on this browser does not land in the middle of somebody else's page |
 
 ### Answer placement
@@ -1401,6 +1403,7 @@ the address.
 |---|---|
 | The inner boundary is inside the frame | A screen that throws leaves the rail, the scope bar and the way to another screen where they are. Without one, React unmounts the whole tree and what is left is a blank page with nothing to press |
 | It is keyed on the address | Walking away from a screen that threw clears it, rather than carrying one screen's failure to every other |
+| Try again loads a screen whose code failed to arrive | A screen's code is loaded when it is first drawn, and a failed load is otherwise held until the page is reloaded. Loaded again when Try again is pressed and not before, so code that cannot arrive is not asked for without end |
 | It logs as well as drawing | A boundary that only draws swallows the stack that was going to the console, which takes away what a developer needs and leaves a sentence a reader cannot act on |
 | A number from the address is checked where it is read | `Number("lastweek")` is not a wrong figure — it is a date arithmetic that throws on the render path and takes the sheet down. The window a report is asked for is a whole number of days inside the range the sheets offer, or the sheet's own default |
 | A cookie is decoded where it can be and passed on where it cannot | The decode runs in the middleware every write goes through, so one malformed cookie set by anything on this host failed every write in the application |
@@ -1416,6 +1419,7 @@ row they had open are not a draft.
 | Rule | |
 |---|---|
 | It is noticed once, where the client is built | Recognizing it at each call site is how the one that forgets shows "not authorized" against a button somebody just pressed |
+| The identity read keeps the identity it held | A refetch refused for want of a session raises the way back in over the screen and keeps who was signed in, and a refetch that fails keeps the screen. Only a first read answers "nobody is signed in" or draws the failure in place of the frame |
 | A sign-in carries the address it began at, query as well as path | A findings list *is* its filters, and coming back to the same path with none of them is coming back to a different screen |
 | Re-authenticating without leaving the page is not what this does | The requirement allows for that: where a redirect is unavoidable, the draft is saved first and the person returns to what they were writing. It is unavoidable here — a provider sign-in is a redirect to somebody else's host, which cannot be framed and increasingly cannot be done silently in a hidden frame either |
 | Where the address is checked is the server, not here | A sign-in that sends a browser wherever a parameter says makes this deployment's own domain vouch for somebody else's page; see `DESIGN-access.md` |
