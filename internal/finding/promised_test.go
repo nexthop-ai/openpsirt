@@ -13,8 +13,8 @@ import (
 
 // Where two promises to upgrade stand over one component in one build, the
 // date and the version reported are one promise's: the latest date, and the
-// version that promise names. Aggregated apart, the latest date came with the
-// version sorting first as text, which "1.10" does before "1.9".
+// version that promise names. "1.10" sorts before "1.9" as text, so a version
+// chosen apart from its date is a different promise's.
 func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

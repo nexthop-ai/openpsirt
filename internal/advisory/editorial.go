@@ -458,9 +458,8 @@ func (s *Store) agreed(ctx context.Context, row *Advisory) ([]Approval, error) {
 //
 // So a document a second person agrees to is the publisher's settled word,
 // published or not; one that has gone out with nobody agreeing to what it
-// says now is published and still being worked on, which is the third status
-// and the one that could not be expressed at all while this was read from the
-// embargo; and anything else is being written.
+// says now is published and still being worked on, which is the third status;
+// and anything else is being written.
 func statusOf(issued, agreed bool) string {
 	switch {
 	case agreed:

@@ -48,8 +48,7 @@ var ErrExists = errors.New("already declared")
 // or a read that could not be made.
 //
 // One spelling, because the two answers differ by a status code at every
-// caller and the distinction was made by hand at each of them — where it was
-// made at all. A reader that wraps every failure alike hands a caller "that
+// caller. A reader that wraps every failure alike hands a caller "that
 // does not exist" for a database it could not reach, and a caller that trusts
 // it says so to whoever asked.
 //

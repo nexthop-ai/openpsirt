@@ -602,8 +602,8 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	if len(builds) == 0 {
 		return nil, nil
 	}
-	// A build named twice is one build, and compared by count a repeat read
-	// as a build of another product.
+	// A build named twice is one build. The check below compares how many
+	// were named against how many are in this product.
 	builds = distinctIDs(builds)
 	var here []int64
 	err := db.NewSelect().

@@ -45,6 +45,12 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 		t.Fatal("the base filter asks something of a group, so this checks nothing")
 	}
 
+	// Set nowhere below. Each is a sort, a release narrowing applied where
+	// the builds are resolved, or a condition on a row.
+	unset := map[string]bool{
+		"BundleSort": true, "SortBy": true, "Floor": true, "Workable": true,
+		"Origin": true, "AcrossVariants": true,
+	}
 	now, one := time.Now(), int64(1)
 	typ := reflect.TypeOf(Filter{})
 	examined, grouped := 0, 0
@@ -79,6 +85,13 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 		case *[]access.Visibility:
 			*v = []access.Visibility{access.Public}
 		default:
+			// A field of a named type this does not know how to set. The
+			// ones named here write no condition over a group; any other is
+			// a field nothing examines, which is how a new group condition
+			// would pass unseen.
+			if !unset[field.Name] {
+				t.Errorf("%s is of a type this does not set, so nothing examines it", field.Name)
+			}
 			continue
 		}
 		examined++

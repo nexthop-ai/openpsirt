@@ -283,18 +283,14 @@ func OffTheClock(product string, now time.Time) (string, []any) {
 // own, which is the whole thing a second pair of eyes exists to prevent.
 //
 // And not one that was sent back. Only a claim needing nobody can be both
-// sent back and standing, and it went on suppressing the finding while the
-// record said it had been returned — with the notice to its author saying, in
-// those words, that it applied to nothing until it was revised. Sending back
+// sent back and standing. Its author is told it applies to nothing until it
+// is revised, so it suppresses nothing until then. Sending back
 // is not a state of its own, but it is a statement that nobody is relying on
 // this yet.
 //
-// Said in one place because it was spelled several ways, and two of those
-// tested only that a claim existed. A proposal nobody had agreed to therefore
-// counted as an answer: it took a finding out of the overdue figure and it
-// raised a notice saying a deferral was about to end when nothing was in
-// force. The sent-back half arrived the same way and landed on one caller's
-// own copy, which left the other six reading a returned claim as standing.
+// Said in one place, because every reader asking whether a claim answers a
+// finding asks this: a proposal nobody has agreed to answers nothing, in the
+// overdue figure, in a notice about a deferral ending, and everywhere else.
 // Pair it with whatever says the claim still applies — `live_key IS NOT NULL`
 // where any version will do, KeyMatches where the versions matter.
 func InForce() (string, []any) {
@@ -796,8 +792,8 @@ func (s *Store) clearPastEndOfLife(ctx context.Context) (int, error) {
 // clearClockOn takes the deadline off every open finding in these releases.
 //
 // The two passes above differ in which releases they are about and in what a
-// failure says; the write is one statement, and it was written twice. They
-// stay two passes, because Recompute argues for that explicitly: a release can
+// failure says; the write is this one statement. They are two passes because
+// Recompute argues for that explicitly: a release can
 // be both a tag and out of support, and one pass merging the lists would
 // report one number where the receipt says which rule ended the clock.
 //

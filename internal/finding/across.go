@@ -596,9 +596,10 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
 	}
-	// The latest promise stands where there are several: a replanned date is
-	// the one that stands, and ties go to the later claim. A promise naming a
-	// version stands over one naming none, which says nothing about where to.
+	// One promise stands where there are several. A promise naming a version
+	// stands over one naming none, which says nothing about where to; then the
+	// latest date, since a replanned date is the one that stands; then the
+	// later claim.
 	type standing struct {
 		promise
 		claim int64

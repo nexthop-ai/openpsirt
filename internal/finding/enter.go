@@ -335,10 +335,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		}
 
 		// Bounded by what is written rather than by what was asked for. The
-		// request bounds how many builds it may name and one build was one
-		// row, so that was the whole bound; a component that two things pull
-		// in is two rows per build, and a widely vendored one across a long
-		// list of builds is a large write from a small request.
+		// request bounds how many builds it may name, but a component that
+		// two things pull in is two rows per build, and a widely vendored one
+		// across a long list of builds is a large write from a small request.
 		cap, err := setting.NewStore(tx).Count(ctx,
 			setting.WriteCeiling, setting.DefaultWriteCeiling)
 		if err != nil {
