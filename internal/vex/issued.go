@@ -125,15 +125,6 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// the earlier moment, so what went out reads as having gone out
 		// before the revision it follows.
 		issuedAt := s.now().UTC().Truncate(time.Microsecond)
-		// The names the document states, confirmed unchanged in the write
-		// that records it. The document is generated before the transaction,
-		// so a rename committing in between would otherwise record a document
-		// naming the build by a name it no longer has. Each check is a write
-		// matching the name read, which also holds the row against a rename
-		// until this commits.
-		if err := stillNamed(ctx, tx, named); err != nil {
-			return err
-		}
 		// Built inside, because an insert writes the generated identifier
 		// back into the model and the ordinal below is read from the
 		// database. A retry of a rolled-back attempt would re-insert a model
@@ -175,7 +166,15 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			}
 			return err
 		}
-		return nil
+		// The names the document states, confirmed unchanged in the write
+		// that records it. The document is generated before the transaction,
+		// so a rename committing in between would otherwise record a document
+		// naming the build by a name it no longer has. Each check is a write
+		// matching the name read, which also holds the row against a rename
+		// until this commits. Taken after the number, so a second issuance
+		// for the build is refused its number by the constraint rather than
+		// left waiting on these rows while this one waits on it.
+		return stillNamed(ctx, tx, named)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("record that it went out: %w", err)
