@@ -332,3 +332,134 @@ func licenseOf(t *testing.T, f *fixture, identity string) string {
 	}
 	return said
 }
+
+func TestAQualifierOneDescriptionLacksIsTakenFromAnother(t *testing.T) {
+	// Identity drops qualifiers, so two descriptions of one package can
+	// differ in them, and they are what a scanner picks advisories with.
+	for _, c := range []struct {
+		kept, other, want string
+	}{
+		// What the build's own record lacks, from the installed copy.
+		{
+			"pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64",
+			"pkg:deb/debian/linux-image@6.12.41-1?arch=amd64&distro=debian-13&upstream=linux",
+			"pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64&distro=debian-13&upstream=linux",
+		},
+		// A qualifier already stated stands, whatever the other says, and a
+		// key is compared without regard to capitals.
+		{
+			"pkg:deb/debian/acl@2.3.2-2?Distro=debian-12",
+			"pkg:deb/debian/acl@2.3.2-2?distro=debian-13&arch=amd64",
+			"pkg:deb/debian/acl@2.3.2-2?Distro=debian-12&arch=amd64",
+		},
+		// None stated yet, and a subpath stays last.
+		{
+			"pkg:deb/debian/acl@2.3.2-2#src",
+			"pkg:deb/debian/acl@2.3.2-2?distro=debian-13#other",
+			"pkg:deb/debian/acl@2.3.2-2?distro=debian-13#src",
+		},
+		// An empty value says nothing.
+		{"pkg:deb/debian/acl@2.3.2-2", "pkg:deb/debian/acl@2.3.2-2?distro=", "pkg:deb/debian/acl@2.3.2-2"},
+		// Nothing to add.
+		{"pkg:deb/debian/acl@2.3.2-2?arch=amd64", "pkg:deb/debian/acl@2.3.2-2", "pkg:deb/debian/acl@2.3.2-2?arch=amd64"},
+		// A component with no identifier is not given one.
+		{"", "pkg:deb/debian/acl@2.3.2-2?distro=debian-13", ""},
+	} {
+		kept := graph.Described{Purl: c.kept, Name: "x", Version: "1"}
+		kept.FillFrom(graph.Described{Purl: c.other})
+		if kept.Purl != c.want {
+			t.Errorf("%s filled from %s\n  is %s\n  want %s", c.kept, c.other, kept.Purl, c.want)
+		}
+	}
+}
+
+func TestALaterReportFillsInWhatAScannerMatchesOn(t *testing.T) {
+	// The scanner is given the stored row. A component first interned without
+	// the qualifiers that select its distribution's advisories was otherwise
+	// never matched, however many later reports stated them.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		components := graph.NewComponents(f.db.DB)
+		bare := graph.Described{
+			Purl: "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64",
+			Name: "linux-image", Version: "6.12.41-1",
+			UpstreamName: "private-sonic-linux-kernel",
+		}
+		if _, err := components.Intern(ctx, []graph.Described{bare}); err != nil {
+			t.Fatal(err)
+		}
+
+		stated := bare
+		stated.Purl = "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64&distro=debian-13&upstream=linux"
+		stated.CPE = "cpe:2.3:a:linux-image:linux-image:6.12.41-1:*:*:*:*:*:*:*"
+		stated.UpstreamName = "linux"
+		if _, err := components.Intern(ctx, []graph.Described{stated}); err != nil {
+			t.Fatal(err)
+		}
+		want := bare
+		want.Purl, want.CPE = stated.Purl, stated.CPE
+		got := identifiedBy(t, f, bare.Identity())
+		if got.Purl != want.Purl || got.CPE != want.CPE {
+			t.Errorf("after a report stating them, the row is identified by\n  %s\n  %s", got.Purl, got.CPE)
+		}
+		// The source package the row already named stands, and the fold key
+		// follows the distribution the row now states.
+		if got.UpstreamName != "private-sonic-linux-kernel" {
+			t.Errorf("the source package was overwritten with %q", got.UpstreamName)
+		}
+		if got.FoldKey != want.FoldKey() {
+			t.Error("the fold key was not worked out again from the filled row")
+		}
+
+		// Nothing overwrites a qualifier once stored.
+		other := bare
+		other.Purl = "pkg:deb/sonic/linux-image@6.12.41-1?arch=arm64&distro=debian-12"
+		if _, err := components.Intern(ctx, []graph.Described{other}); err != nil {
+			t.Fatal(err)
+		}
+		if got := identifiedBy(t, f, bare.Identity()); got.Purl != want.Purl {
+			t.Errorf("a later report overwrote the identifier with %s", got.Purl)
+		}
+	})
+}
+
+// identifiedBy reads back what a component is stored as.
+func identifiedBy(t *testing.T, f *fixture, identity string) graph.Component {
+	t.Helper()
+	var row graph.Component
+	err := f.db.DB.NewSelect().Model(&row).
+		Column("purl", "cpe", "upstream_name", "fold_key").
+		Where("identity = ?", identity).
+		Scan(t.Context())
+	if err != nil {
+		t.Fatalf("read the component: %v", err)
+	}
+	return row
+}
+
+func TestTheScannerIsHandedWhatALaterInventoryStated(t *testing.T) {
+	// The symptom rather than the row: a build whose inventory once described
+	// its kernel without a distribution is scanned from what is stored, and a
+	// later inventory stating one is what that scan has to see.
+	each(t, func(t *testing.T, f *fixture) {
+		kernel := func(purl string) graph.Snapshot {
+			image := graph.Described{Purl: purl, Name: "linux-image", Version: "6.12.41-1"}
+			return graph.Snapshot{
+				Root:         root,
+				Components:   []graph.Described{image},
+				Dependencies: []graph.Dependency{{Parent: root, Child: image}},
+			}
+		}
+		applied(t, f, kernel("pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64"))
+		stated := "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64&distro=debian-13&upstream=linux"
+		applied(t, f, kernel(stated))
+
+		listed, err := f.store.CurrentComponents(t.Context(), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 1 || listed[0].Purl != stated {
+			t.Errorf("the scanner is handed %+v, want the one component as %s", listed, stated)
+		}
+	})
+}
