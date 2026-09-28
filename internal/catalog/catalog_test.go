@@ -331,9 +331,8 @@ func TestWhatAScanIsFiledAgainstIgnoresCapitals(t *testing.T) {
 func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 	// Release readiness asks what was cut from this branch, so a tag declared
 	// without saying leaves the branch reporting that nothing has ever been
-	// released from it. There was no way to supply it later: re-declaring with
-	// the parent was refused as a contradiction, which it is not — nothing had
-	// been said for it to contradict.
+	// released from it. Re-declaring it with the parent fills that in: nothing
+	// has been said for it to contradict.
 	//
 	// A claim that it came from a *different* branch stays refused, because a
 	// tag is one frozen point and it came from wherever it came from.
@@ -386,6 +385,68 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		// Moving it to a different branch is still a contradiction.
 		if _, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &other.ID); err == nil {
 			t.Error("a tag was moved to a branch it was not cut from")
+		}
+	})
+}
+
+// A parent declaring records is one filling in would accept: a branch of the
+// same product, under a tag. The same check guards both, so no row holds a
+// parent the other path would refuse.
+func TestAReleaseIsCutOnlyFromABranchOfItsOwnProduct(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, store *catalog.Store) {
+		ctx := t.Context()
+		product, err := store.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		elsewhere, err := store.DeclareProduct(ctx, "other", "Other")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := store.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		foreign, err := store.DeclareStream(ctx, elsewhere.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tag, err := store.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
+		if err != nil {
+			t.Fatalf("a tag cut from a branch of its own product was refused: %v", err)
+		}
+
+		for _, c := range []struct {
+			what   string
+			name   string
+			kind   catalog.Kind
+			parent int64
+		}{
+			{"a tag cut from a tag", "v1.1", catalog.Tag, tag.ID},
+			{"a branch cut from a branch", "next", catalog.Branch, branch.ID},
+			{"a tag cut from another product's branch", "v1.2", catalog.Tag, foreign.ID},
+		} {
+			if _, err := store.DeclareStream(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
+				t.Errorf("%s was recorded", c.what)
+			}
+			if _, _, err := store.EnsureStream(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
+				t.Errorf("%s was recorded through ensuring", c.what)
+			}
+			if _, err := store.StreamByName(ctx, product.ID, c.name); err == nil {
+				t.Errorf("%s left a row behind", c.what)
+			}
+		}
+
+		// Filling in afterwards answers the same.
+		bare, err := store.DeclareStream(ctx, product.ID, "v2.0", catalog.Tag, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := store.EnsureStream(ctx, product.ID, "v2.0", catalog.Tag, &tag.ID); err == nil {
+			t.Error("a tag was filled in as cut from a tag")
+		}
+		if err := store.FillInParent(ctx, bare.ID, foreign.ID); err == nil {
+			t.Error("a tag was filled in as cut from another product's branch")
 		}
 	})
 }

@@ -75,6 +75,7 @@ decisions from.
 |---|---|
 | The parent can be filled in afterwards (REQ-15) | A pipeline that does not know declares the tag without it, and release readiness then reports that nothing has ever been released from the branch — indistinguishable from a branch that shipped nothing. Declaring the tag again with the branch named records it |
 | Naming a different branch is refused | A tag is one frozen point |
+| Only a tag has a parent, and it is a branch of the same product | A tag under a tag, a release under itself, and a branch in another product are lines that do not exist. Declaring and filling in ask the same check |
 
 ## Release dates
 

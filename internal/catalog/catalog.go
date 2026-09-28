@@ -307,17 +307,14 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 // than stored: a cycle here is a comparison that never returns, and a tag
 // under a tag is a line that does not exist.
 func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error {
-	if parent == streamID {
-		return fmt.Errorf("a release cannot be cut from itself")
+	var child Stream
+	if err := s.db.NewSelect().Model(&child).Column("kind", "product_id").
+		Where("id = ?", streamID).Scan(ctx); err != nil {
+		return missingOr(err, fmt.Sprintf("release %d", streamID),
+			fmt.Sprintf("look up what release %d is", streamID))
 	}
-	var kind Kind
-	if err := s.db.NewSelect().Model((*Stream)(nil)).Column("kind").
-		Where("id = ?", parent).Scan(ctx, &kind); err != nil {
-		return missingOr(err, fmt.Sprintf("release %d", parent),
-			fmt.Sprintf("look up what release %d is", parent))
-	}
-	if kind != Branch {
-		return fmt.Errorf("a release is cut from a branch, and that is a %s", kind)
+	if err := s.validParent(ctx, child.Kind, streamID, child.ProductID, parent); err != nil {
+		return err
 	}
 	// Only where nothing stands, asked in the write rather than before it: a
 	// check and a write that are two statements are two moments, and what is
@@ -344,8 +341,36 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 		if stood != nil && *stood == parent {
 			return nil
 		}
-		return fmt.Errorf("this release already says what it was cut from, and a release " +
-			"came from wherever it came from")
+		return fmt.Errorf("%w: this release already says what it was cut from, and a "+
+			"release came from wherever it came from", ErrDiffers)
+	}
+	return nil
+}
+
+// validParent refuses a parent a release cannot have: one for anything but a
+// tag, the release itself, anything but a branch, or a branch of another
+// product. childID is zero for a release not yet recorded.
+//
+// One check for declaring and for filling in, so a parent the second refuses
+// is never recorded by the first.
+func (s *Store) validParent(ctx context.Context, childKind Kind, childID, productID, parent int64) error {
+	if childKind != Tag {
+		return fmt.Errorf("only a tag is cut from a branch, and this is a %s", childKind)
+	}
+	if parent == childID {
+		return fmt.Errorf("a release cannot be cut from itself")
+	}
+	var from Stream
+	if err := s.db.NewSelect().Model(&from).Column("kind", "product_id").
+		Where("id = ?", parent).Scan(ctx); err != nil {
+		return missingOr(err, fmt.Sprintf("release %d", parent),
+			fmt.Sprintf("look up what release %d is", parent))
+	}
+	if from.Kind != Branch {
+		return fmt.Errorf("a release is cut from a branch, and that is a %s", from.Kind)
+	}
+	if from.ProductID != productID {
+		return fmt.Errorf("a release is cut from a branch of its own product")
 	}
 	return nil
 }
@@ -668,6 +693,11 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 		return nil, fmt.Errorf("stream %q: %w", name, ErrExists)
 	} else if !errors.Is(err, ErrNotFound) {
 		return nil, err
+	}
+	if parentID != nil {
+		if err := s.validParent(ctx, kind, 0, productID, *parentID); err != nil {
+			return nil, err
+		}
 	}
 
 	st := &Stream{
