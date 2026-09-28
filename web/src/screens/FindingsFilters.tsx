@@ -715,13 +715,6 @@ export function Filters({
             onChange={(event) => set("proposed_after", event.target.value)}
           />
         </Field>
-        <Field label="Closed after" hint="Includes closed findings">
-          <input
-            type="date"
-            value={at("closed_after")}
-            onChange={(event) => set("closed_after", event.target.value)}
-          />
-        </Field>
       </Group>
 
       <Group legend="Other">

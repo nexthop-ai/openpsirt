@@ -153,16 +153,30 @@ func TestTheListFiltersOnWhenThingsHappened(t *testing.T) {
 		if got := count(t, "opened_before="+yesterday); got != 0 {
 			t.Errorf("opened before yesterday is %d rows", got)
 		}
-		// And as an age: seeded this second, it is younger than a day, so a
-		// bucket of the youngest holds it and nothing older does.
-		if got := count(t, "open_under=1"); got != 1 {
-			t.Errorf("open for under a day is %d rows, want the one seeded now", got)
-		}
-		if got := count(t, "open_under=1&opened_after="+tomorrow); got != 0 {
-			t.Errorf("an age and a date together kept %d rows, want the tighter of the two", got)
-		}
 		if got := count(t, "opened_before="+tomorrow+"&open_for=1"); got != 0 {
 			t.Errorf("a date and an age together kept %d rows, want the tighter of the two", got)
+		}
+		// And as an age, bounded on both sides: opened three days ago, it is
+		// under four days old and not under two.
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("opened_at = ?", time.Now().UTC().AddDate(0, 0, -3)).
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := count(t, "open_under=2"); got != 0 {
+			t.Errorf("open for under two days is %d rows, want none of one opened three days ago", got)
+		}
+		if got := count(t, "open_under=4"); got != 1 {
+			t.Errorf("open for under four days is %d rows, want the one opened three days ago", got)
+		}
+		if got := count(t, "open_for=2&open_under=4"); got != 1 {
+			t.Errorf("open between two and four days is %d rows, want the one opened three days ago", got)
+		}
+		if got := count(t, "open_for=4&open_under=5"); got != 0 {
+			t.Errorf("open between four and five days is %d rows, want none", got)
+		}
+		if got := count(t, "open_under=4&opened_after="+tomorrow); got != 0 {
+			t.Errorf("an age and a date together kept %d rows, want the tighter of the two", got)
 		}
 		// Nothing has been claimed about, so nothing was proposed after
 		// anything.

@@ -427,7 +427,9 @@ the same side keep the tighter of the two.
 
 Closed after is accepted and reaches nothing on the findings lists: they read
 open rows only, so a group closed in the window is never in them. A figure
-counting what closed therefore opens nothing.
+counting what closed therefore opens nothing, and the filter panel does not
+offer it. An address that carries it still shows it among the filters in force,
+where it can be taken off.
 
 ## Known issues at release
 

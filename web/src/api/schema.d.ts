@@ -11209,8 +11209,8 @@ export interface components {
             /** @description The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it */
             declared_as?: string;
             /**
-             * Format: int64
-             * @description The total this place has been put off for, in days, across every deferral recorded about it, taken back ones included for the span they stood
+             * Format: double
+             * @description The total this place has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood
              */
             deferred_days?: number;
             /** @description Name this when recording a decision about it */
@@ -13896,13 +13896,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -14006,13 +14006,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -15754,13 +15754,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -15915,13 +15915,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -16038,13 +16038,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -16166,13 +16166,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -16292,13 +16292,13 @@ export interface operations {
                 sent_back?: boolean;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
                 /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;

@@ -390,10 +390,10 @@ type Narrowing struct {
 	Weakness     []string    `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
 	SentBack     bool        `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
 	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
-	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
+	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here on or after this date, as 2026-03-31"`
 	OpenedBefore string      `query:"opened_before" doc:"Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included"`
 	OpenedByRun  int64       `query:"opened_by_run" minimum:"1" doc:"Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it"`
-	ClosedAfter  string      `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
+	ClosedAfter  string      `query:"closed_after" doc:"Accepted and matches nothing: this list holds open rows only"`
 	DecidedAfter string      `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
 	Said         []vexStatus `query:"vex_status,explode" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
 	Reassessed   bool        `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`

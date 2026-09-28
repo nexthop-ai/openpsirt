@@ -9470,9 +9470,9 @@ components:
           description: "The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"
           type: string
         deferred_days:
-          description: The total this place has been put off for, in days, across every deferral recorded about it, taken back ones included for the span they stood
-          format: int64
-          type: integer
+          description: The total this place has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood
+          format: double
+          type: number
         place:
           description: Name this when recording a decision about it
           type: string
@@ -13995,12 +13995,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -14018,12 +14018,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
@@ -14468,12 +14468,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -14491,12 +14491,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
@@ -17126,12 +17126,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -17149,12 +17149,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
@@ -17713,12 +17713,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -17736,12 +17736,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
@@ -18220,12 +18220,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -18243,12 +18243,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
@@ -18738,12 +18738,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -18761,12 +18761,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
@@ -19269,12 +19269,12 @@ paths:
             type:
               - array
               - "null"
-        - description: Keep only what was first seen here after this date, as 2026-03-31
+        - description: Keep only what was first seen here on or after this date, as 2026-03-31
           explode: false
           in: query
           name: opened_after
           schema:
-            description: Keep only what was first seen here after this date, as 2026-03-31
+            description: Keep only what was first seen here on or after this date, as 2026-03-31
             type: string
         - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
           explode: false
@@ -19292,12 +19292,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+        - description: "Accepted and matches nothing: this list holds open rows only"
           explode: false
           in: query
           name: closed_after
           schema:
-            description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
+            description: "Accepted and matches nothing: this list holds open rows only"
             type: string
         - description: Keep only what somebody claimed something about after this date
           explode: false
