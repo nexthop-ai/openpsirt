@@ -21,6 +21,7 @@ func StatementsV050(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
 		"admin_change":        trailV050(t),
+		"graph_node":          graphNodeV050(t),
 		"vulnerability_alias": aliasV050(t),
 	}
 }

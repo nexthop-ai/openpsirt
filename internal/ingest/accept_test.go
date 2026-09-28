@@ -5,6 +5,7 @@ package ingest_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -15,6 +16,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -26,27 +30,112 @@ import (
 func each(t *testing.T, fn func(t *testing.T, s *ingest.Store, targetID int64)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
+		fn(t, ingest.NewStore(db.DB), aTarget(t, db))
+	})
+}
 
-		cat := catalog.NewStore(db.DB)
-		p, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+// aTarget empties the database and declares one variant to file scans
+// against.
+func aTarget(t *testing.T, db *database.DB) int64 {
+	t.Helper()
+	ctx := t.Context()
+	dbtest.Reset(t, db)
+	cat := catalog.NewStore(db.DB)
+	p, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	br, err := cat.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := cat.DeclareVariant(ctx, p.ID, "broadcom", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := cat.TargetFor(ctx, br.ID, v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return target.ID
+}
+
+func TestTwoUploadsOfOneFileRacingToWriteAnswerThatItIsHeld(t *testing.T) {
+	// Both pass the check before either has written. The loser's insert meets
+	// the other's row, and it is answered the way sending the file twice is,
+	// on every engine where two writers can be in flight at once. SQLite
+	// serializes writers and never races.
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		target := aTarget(t, db)
+		upload := arriving(target, "raced", time.Now().UTC().Add(-time.Hour))
+
+		first, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		br, err := cat.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
+		defer func() { _ = first.Rollback() }()
+		if _, outcome, err := ingest.NewStore(first).Record(ctx, upload); err != nil || outcome != ingest.Accept {
+			t.Fatalf("the first upload: %v %v", outcome, err)
+		}
+
+		type answer struct {
+			outcome ingest.Outcome
+			err     error
+		}
+		second := make(chan answer, 1)
+		go func() {
+			var got answer
+			got.err = database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
+				var err error
+				_, got.outcome, err = ingest.NewStore(tx).Record(ctx, upload)
+				return err
+			})
+			second <- got
+		}()
+		// Long enough for the second to have decided and to be waiting on the
+		// first's row.
+		time.Sleep(500 * time.Millisecond)
+		if err := first.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		got := <-second
+		if got.err != nil || got.outcome != ingest.AlreadyHave {
+			t.Errorf("the second upload was answered %v, %v; want that the file is held",
+				got.outcome, got.err)
+		}
+	})
+}
+
+func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
+	// The second finds no row to replace and inserts after the first has. The
+	// build's refusal is recorded either way, so that is not a failure.
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		target := aTarget(t, db)
+		sender := access.NewPipeline(1, "ci", access.Scope{})
+
+		first, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		v, err := cat.DeclareVariant(ctx, p.ID, "broadcom", true)
-		if err != nil {
+		defer func() { _ = first.Rollback() }()
+		if err := ingest.NewStore(first).Refused(ctx, sender,
+			ingest.Refusal{TargetID: target, Reason: "first"}); err != nil {
 			t.Fatal(err)
 		}
-		target, err := cat.TargetFor(ctx, br.ID, v.ID)
-		if err != nil {
+		second := make(chan error, 1)
+		go func() {
+			second <- ingest.NewStore(db.DB).Refused(ctx, sender,
+				ingest.Refusal{TargetID: target, Reason: "second"})
+		}()
+		time.Sleep(500 * time.Millisecond)
+		if err := first.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		fn(t, ingest.NewStore(db.DB), target.ID)
+		if err := <-second; err != nil {
+			t.Errorf("the refusal that lost the race reports %v", err)
+		}
 	})
 }
 

@@ -301,6 +301,14 @@ are in, and a count including it says one more than the inventory lists.
 Derived from what the component is — the package identifier where the producer
 emits one, name and version where it does not — and hashed to a fixed width.
 
+The two bases are hashed apart: each is marked with which it is, and a name is
+separated from its version by a byte no name holds.
+
+| Rule | Reason |
+|---|---|
+| A name shaped like a package identifier is not that package | Hashed in one space, a component named `pkg:npm/lodash` at `4.17.22` with no identifier is the real package's row. Whichever arrives first decides for every product whether that row carries an identifier a scanner can match |
+| A separator inside a name or a version moves nothing across | Joined by `@`, the name `a@b` at `c` is the name `a` at `b@c` |
+
 Identifiers the file supplies are not used. Nothing guarantees they are stable
 between builds or consistent between producers, and an identity that moves takes
 every triage decision attached to it along.
@@ -417,8 +425,8 @@ from the next description that does. Nothing is overwritten: two producers
 disagreeing is not something a reader can settle.
 
 The same rule holds across reports. A stored component is filled in by a later
-report describing it, because the scanner is given the stored row rather than
-the document that arrived.
+report describing it, because the scanner takes what a build did not state from
+the stored row.
 
 | Filled in where the stored row lacks it | Reason |
 |---|---|
@@ -446,6 +454,17 @@ second.
 
 It is captured at ingest because a scan file is not kept once read. What is
 discarded there is recoverable only by asking the producer to build again.
+
+What one build states about a component is that build's, and is held on its
+node.
+
+| Held on the node | Reason |
+|---|---|
+| The package identifier as the build stated it, qualifiers included, and the platform enumeration. A scanner is given these, with what the build did not state taken from the component | A distribution qualifier decides which advisories a scanner matches, and two products ship one package version built for two distribution releases |
+
+A build restating an identifier writes its node where it stands and opens and
+closes nothing: the component has not changed. Every other node an unchanged
+build holds is left alone.
 
 ## History as intervals
 

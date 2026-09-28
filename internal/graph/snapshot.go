@@ -32,6 +32,14 @@ type Node struct {
 	IsRoot       bool   `bun:"is_root,notnull"`
 	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
 	ClosedScanID *int64 `bun:"closed_scan_id"`
+	// Purl and CPE are the identifiers this build stated for the component,
+	// as it stated them: the package identifier with its qualifiers, and the
+	// platform enumeration. The component row is shared by every product
+	// that ships the package, and what one build states about its
+	// distribution or its enumeration is not what another does. A scanner is
+	// given these.
+	Purl string `bun:"purl,nullzero"`
+	CPE  string `bun:"cpe,nullzero"`
 }
 
 // Edge is one component depending on another.
@@ -164,12 +172,12 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			return err
 		}
 
-		wanted := map[int64]bool{} // component id -> is root
-		wanted[ids[root.Identity()]] = true
+		wanted := map[int64]stated{}
+		wanted[ids[root.Identity()]] = stated{isRoot: true}
 		for _, d := range snap.Components {
 			id := ids[d.Identity()]
 			if _, already := wanted[id]; !already {
-				wanted[id] = false
+				wanted[id] = stated{purl: strings.TrimSpace(d.Purl), cpe: strings.TrimSpace(d.CPE)}
 			}
 		}
 
@@ -216,24 +224,50 @@ func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error
 // that file is not kept for a moving line: a nightly scan is superseded the
 // next night. Re-scanning a year-old release against today's vulnerability
 // data works from this, which is why what is not stored can never be scanned.
+//
+// The identifiers are the ones this build stated, from its node. What the
+// build did not state is taken from the shared row, which later reports fill
+// in, and nothing the build stated is replaced by it: the row carries what
+// other products stated, and a scanner given another product's distribution
+// in place of this build's matches the wrong advisories.
 func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Described, error) {
-	var rows []Component
-	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN "graph_node" AS "n" ON n.component_id = c.id`).
+	var rows []struct {
+		Name            string `bun:"name"`
+		Version         string `bun:"version"`
+		UpstreamName    string `bun:"upstream_name"`
+		UpstreamVersion string `bun:"upstream_version"`
+		Purl            string `bun:"purl"`
+		CPE             string `bun:"cpe"`
+		SharedPurl      string `bun:"shared_purl"`
+		SharedCPE       string `bun:"shared_cpe"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		ColumnExpr(`c.name AS "name"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.upstream_name AS "upstream_name"`).
+		ColumnExpr(`c.upstream_version AS "upstream_version"`).
+		ColumnExpr(`n.purl AS "purl"`).
+		ColumnExpr(`n.cpe AS "cpe"`).
+		ColumnExpr(`c.purl AS "shared_purl"`).
+		ColumnExpr(`c.cpe AS "shared_cpe"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
-		Scan(ctx)
+		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what a target contains: %w", err)
 	}
 
 	described := make([]Described, 0, len(rows))
 	for _, row := range rows {
-		described = append(described, Described{
+		stated := Described{
 			Purl: row.Purl, CPE: row.CPE, Name: row.Name, Version: row.Version,
 			UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
-		})
+		}
+		stated.FillFrom(Described{Purl: row.SharedPurl, CPE: row.SharedCPE})
+		described = append(described, stated)
 	}
 	return described, nil
 }

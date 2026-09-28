@@ -151,6 +151,8 @@ contents. Parsing is expensive; refusing is not.
 | An upload taken and not readable is not one we hold | Otherwise the identical bytes can never be sent again, however the reason they could not be read is put right. Such a submission is taken again on the row that already describes it: one row per set of bytes, carrying what became of the live attempt at them, and the documents of the attempt that failed are replaced by the ones arriving now |
 | Equal build times are refused, unless the inventory is the one held | Two different documents claiming one build time is a coin toss over which picture is current. The same inventory at that time with different judgments beside it is not a second picture: it is the one held, with what the build argues about it changed, which is why it was sent again. The later arrival is the one in force |
 | Ordering is by build time, not arrival | A few minutes of clock skew is tolerated, because build machines are seconds out rather than hours |
+| Two uploads of one file racing to write are answered as a file already held | Both pass the check before either writes, and the loser's insert meets the other's row. The act is run again in a fresh transaction, where the check finds the row. Read in the failed one, PostgreSQL has aborted the transaction and MySQL and MariaDB read a snapshot without the row |
+| Two refusals of one build racing to write are one recorded refusal | The loser finds no row to replace and meets the other's insert. The refusal is recorded either way |
 | A document stating no build time is dated when it arrives, and the answer says so | Both formats leave the build time optional, and cyclonedx-maven writes none. The arrival is the only order such a build has. Dated as the zero time it would be older than every real one, so the first would be taken and every later scan of that variant refused as not newer |
 | Timestamps are rounded to what the database keeps | Go carries nanoseconds and no supported engine stores them, so without rounding a value written and read back is fractionally *older* than the one in memory: a scan compares as newer than itself, and a second file claiming the same build time is accepted. A latent fault on every engine, exposed by one and passed by the others on timing luck |
 
@@ -218,7 +220,9 @@ them up.
 | Hazard | Guard |
 |---|---|
 | A scan reaches the reader after a newer one has been applied | An overtaken scan is not applied, and that is recorded rather than treated as a failure. Applying it would replace today's picture with yesterday's and reopen everything the newer one closed |
-| The newer one may not have been read yet, and may then fail | Once a scan has failed, the newest that still stands is read again, where the build does not already show it and nothing is on its way to reading it. A scan can be read more than once, and the latest reading is what its receipt reports |
+| A newer scan arrives while an older one is parsed | Asked again in the transaction that applies, after the target row is taken, as well as before the parse. A parse takes minutes, and the answer read before it describes a build that has moved |
+| The newer one may not have been read yet, and may then fail | Once a scan has failed for the last time, the newest that still stands is read again, where the build does not already show it and nothing is on its way to reading it. A scan can be read more than once, and the latest reading is what its receipt reports |
+| A read fails and its retry succeeds | The failed attempt marks the scan failed, so its receipt says so while the retry waits. The attempt that applies it makes it accepted again, clears the failure, and makes it the newest the build holds, in the transaction that applies it. The scan it overtook is not read again while a retry is to come: it would be applied first and reopen what the newer one closes |
 | Two applies for one target interleaving | Applying takes the target row first — an ordinary update, so every engine takes the lock and the second worker waits. Both would otherwise read the same open rows, compute the same difference and write it |
 
 ## Parsing
@@ -758,7 +762,14 @@ nothing could read.
 
 What was filed against a build can be asked for, newest first, each reporting how
 far it got: taken and not yet read, read and awaiting a vulnerability scan,
-done, or refused with the reason. A key sees the uploads it sent itself.
+done, or refused with the reason. A key sees the uploads it sent itself
+(REQ-44).
+
+| Rule | Reason |
+|---|---|
+| A sender is recorded as a key or a person, and its identifier | A key's name is unique among keys and a person's identity among people, so one name can be both. Recorded as a name, a key named like a person reads that person's uploads back as its own |
+| Which sender a key is narrowed to is decided in the store, from the subject | A narrowing a handler passes in is one the next handler forgets, and a pipeline sees its whole product, so the product check alone does not stop it |
+| A read whose job died is failed on the receipt | The job's last error is the reason, and a fixed sentence where it recorded none. The scan row is not always marked: marking it can be what failed |
 
 The four states are this deployment's, not the queue's. Reading and scanning are
 two jobs with different rhythms, and a producer has no business knowing which
