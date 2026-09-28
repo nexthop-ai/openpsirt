@@ -714,10 +714,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Having("MAX(f.closed_at) > ?", *f.ClosedAfter)
 	}
 	if f.ProposedAfter != nil {
+		where, args := f.product()
 		q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS "de"
-			WHERE de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND de.proposed_at > ?)`, *f.ProposedAfter)
+			WHERE `+DecisionAt(where)+`
+			  AND de.proposed_at > ?)`, append(args, *f.ProposedAfter)...)
 	}
 	if f.LikelihoodAtLeast > 0 {
 		q = q.Where("f.vulnerability_id IN (?)",
@@ -1188,6 +1188,29 @@ const (
 // upgradeNeeded is the outcome that promises a move, named here so the
 // filter and the triage package cannot drift on the spelling.
 const upgradeNeeded = "upgrade-needed"
+
+// DecisionAt is the one spelling of a decision `de` being about the finding
+// `f`: the same product, the same issue and the same place.
+//
+// A place identity carries no product, so a correlation on the issue and the
+// place alone matches a decision made in every product that ships the same
+// component under the same consumer. Every query relating a finding to its
+// decisions composes this rather than writing the three terms out, and adds
+// its own condition on liveness, versions and state beside it.
+//
+// product is how the query names the finding's product: a bound number, or
+// the stream it has joined. Anything else is a programming error, because it
+// is placed in the statement as written.
+func DecisionAt(product string) string {
+	switch product {
+	case "?", "st.product_id":
+	default:
+		panic("finding.DecisionAt: " + product + " is not a product the statement names")
+	}
+	return "de.product_id = " + product +
+		" AND de.vulnerability_id = f.vulnerability_id" +
+		" AND de.place_identity = f.place_identity"
+}
 
 // coversHere says a decision row `de` is about the finding it was correlated
 // with by issue and place, for the counts behind the state a row carries and

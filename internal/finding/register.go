@@ -356,10 +356,7 @@ func (s *Store) registerJoins(productID int64,
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		// The one decision on the record at the place, or none.
-		Join(`LEFT JOIN "decision" AS "de" ON de.product_id = ?
-			AND de.vulnerability_id = f.vulnerability_id
-			AND de.place_identity = f.place_identity
-			AND `+onTheRecordHere, productID).
+		Join(`LEFT JOIN "decision" AS "de" ON `+DecisionAt("?")+` AND `+onTheRecordHere, productID).
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`)
 }
 

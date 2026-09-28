@@ -504,11 +504,9 @@ type evidenceRow struct {
 //
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
-const standingHere = `FROM "decision" AS "de"
+var standingHere = `FROM "decision" AS "de"
 	JOIN "claim" AS "cl" ON cl.id = de.claim_id
-	WHERE de.product_id = ?
-	  AND de.vulnerability_id = f.vulnerability_id
-	  AND de.place_identity = f.place_identity
+	WHERE ` + DecisionAt("?") + `
 	  AND de.live_key IS NOT NULL
 	  AND ` + KeyMatches + `
 	ORDER BY CASE WHEN cl.outcome = '` + Mismatched + `'

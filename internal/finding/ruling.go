@@ -336,9 +336,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 		Where("f.suppressed_by IS NULL").
 		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			WHERE de.product_id = st.product_id
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
+			WHERE `+DecisionAt("st.product_id")+`
 			  AND de.live_key IS NOT NULL
 			  AND `+KeyMatches+`
 			  AND `+standing+`

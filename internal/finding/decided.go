@@ -98,8 +98,6 @@ func standsAs(product string, state decisionState) string {
 func decidedAs(product string, state decisionState) string {
 	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de"
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			WHERE de.product_id = ` + product + `
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
+			WHERE ` + DecisionAt(product) + `
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
 }

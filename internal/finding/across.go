@@ -574,9 +574,7 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`JOIN "decision" AS "de" ON de.product_id = st.product_id`+
-			" AND de.vulnerability_id = f.vulnerability_id"+
-			" AND de.place_identity = f.place_identity").
+		Join(`JOIN "decision" AS "de" ON `+DecisionAt("st.product_id")).
 		// The argument, which is where the outcome and the promise live: one
 		// act is one argument, and the rows underneath say where it lands.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).

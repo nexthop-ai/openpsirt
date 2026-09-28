@@ -264,9 +264,7 @@ func OffTheClock(product string, now time.Time) (string, []any) {
 	standing, held := InForce()
 	return `EXISTS (SELECT 1 FROM "decision" AS "de"
 		JOIN "claim" AS "cl" ON cl.id = de.claim_id
-		WHERE de.product_id = ` + product + `
-		  AND de.vulnerability_id = f.vulnerability_id
-		  AND de.place_identity = f.place_identity
+		WHERE ` + DecisionAt(product) + `
 		  AND ` + KeyMatches + `
 		  AND ` + standing + `
 		  AND (cl.deferred_until IS NULL OR cl.deferred_until > ?))`,
