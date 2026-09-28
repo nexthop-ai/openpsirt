@@ -382,7 +382,7 @@ function Whole() {
               {" "}
               ·{" "}
               <Link
-                to={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}/variants/${encodeURIComponent(variant)}/match-coverage`}
+                to={`${buildPath({ product, stream, variant })}/match-coverage`}
                 title="The scanner can't match these, so nothing will be found in them."
               >
                 {(top.data?.unmatched ?? 0).toLocaleString()} unmatched

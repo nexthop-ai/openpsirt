@@ -12,6 +12,9 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
 import { Wide } from "../ui/Wide";
+import { own } from "../ui/own";
+import { exportAt } from "../api/exports";
+import { apiBuildPath } from "./list";
 
 const PAGE = 200;
 
@@ -112,17 +115,17 @@ export function MatchCoverage() {
                   type="button"
                   className="chip"
                   aria-pressed={reason === one.reason}
-                  title={REASONS[one.reason]?.fix}
+                  title={own(REASONS, one.reason)?.fix}
                   onClick={() => pick(one.reason)}
                 >
-                  {REASONS[one.reason]?.label ?? one.reason} {one.count.toLocaleString()}
+                  {own(REASONS, one.reason)?.label ?? one.reason} {one.count.toLocaleString()}
                 </button>
               ))}
           </div>
 
           <p className="hint">
-            Download <a href={fileAt(product, stream, variant, "csv", reason)}>CSV</a> ·{" "}
-            <a href={fileAt(product, stream, variant, "json", reason)}>JSON</a>.
+            Download <a href={fileAt({ product, stream, variant }, "csv", reason)}>CSV</a> ·{" "}
+            <a href={fileAt({ product, stream, variant }, "json", reason)}>JSON</a>.
           </p>
 
           <Wide>
@@ -150,8 +153,8 @@ export function MatchCoverage() {
                     </td>
                     <td className="id">{row.version || "—"}</td>
                     <td className="id hint">{row.purl || row.cpe || "—"}</td>
-                    <td title={REASONS[row.reason]?.fix}>
-                      {REASONS[row.reason]?.label ?? row.reason}
+                    <td title={own(REASONS, row.reason)?.fix}>
+                      {own(REASONS, row.reason)?.label ?? row.reason}
                     </td>
                   </tr>
                 ))}
@@ -171,18 +174,15 @@ export function MatchCoverage() {
   );
 }
 
-// The address the file comes from.
+// The address the file comes from, asking what the screen asked.
 function fileAt(
-  product: string,
-  stream: string,
-  variant: string,
-  format: string,
+  at: { product: string; stream: string; variant: string },
+  format: "csv" | "json",
   reason: string,
 ): string {
-  return (
-    `/v1/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}/match-coverage.${format}` +
-    (reason ? `?reason=${encodeURIComponent(reason)}` : "")
+  return exportAt(
+    apiBuildPath(at) + "/match-coverage",
+    format,
+    reason ? new URLSearchParams({ reason }) : undefined,
   );
 }

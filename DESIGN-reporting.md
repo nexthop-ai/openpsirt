@@ -631,7 +631,7 @@ holds the files that are reachable nowhere else.
 | The frame does not print | The rail, the tab bar, the floating action and the menu go, and the grid that places them is flattened, so a page carries no empty column where the rail was. The narrow-screen shape applies to a screen and not to a sheet of paper narrower than it |
 | What is about to go out of support is asked for, and comes back as its own list | The day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, with nobody having decided anything. A warning and an exposure are two things: one is a date somebody can still act before. Asked for, because a second population appearing unasked changes what every figure on the report counts |
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
-| An entry may point at a screen rather than owning a page | Nine do: release readiness, upgrade plan status, match coverage, carried patches, holder workload, embargo and disclosure, the exception report, release comparison, and administrative changes. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
+| An entry may point at a screen rather than owning a page | Eleven do: release readiness, upgrade plan status, match coverage, carried patches, holder workload, embargo and disclosure, the exception report, standing corrections, administrative changes, shipping with known issues, and release comparison. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
 | An entry that points at a build's screen asks for a whole build | Six screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing, so it says which picker to touch instead |
 | The question with no name is asked on the findings list, not on a panel of the catalog's own | A panel offering the findings list's filter panel and the findings list's query is that screen at a second address, and the copy is the poorer one: it passed an empty tag list, so it offered fewer filters than the screen it copied. The catalog points at the list instead |
 | The catalog offers only the files reachable nowhere else | Two are: what is running out of time, and the VEX document. Every other file is offered on the screen that answers for it and carries that screen's filters, so a second unfiltered link beside it is a worse copy of the same answer |
@@ -823,6 +823,10 @@ severity word for the triage floor; on or off for upstream currency.
 
 ## Limits
 
+- A distribution's binary named differently from its source package matches
+  nothing without `upstream`. The identifier does not say whether the names
+  differ, so the match coverage report does not list it. A SONiC kernel image
+  with `distro` alone matched 0.
 - An export answers the question the list beside it answers, embedding the same
   filters rather than re-declaring them. A filter the list applied and the
   export dropped produced eight rows on screen and seven thousand in the file,
