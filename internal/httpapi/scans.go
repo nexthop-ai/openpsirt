@@ -40,6 +40,10 @@ import (
 
 // Ingest carries everything the upload endpoint runs on.
 type Ingest struct {
+	// Chats is the chat platforms this deployment holds a credential for,
+	// which a destination and a person's own chat settings are checked
+	// against.
+	Chats  []string
 	DB     *database.DB
 	Queue  *queue.Queue
 	Limits sbom.Limits

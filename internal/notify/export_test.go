@@ -5,7 +5,9 @@ package notify
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 )
 
 // SweepBatch is how many notifications one sweep carries.
@@ -42,4 +44,56 @@ func TrustForTest(s *Signal, client *http.Client) {
 	client.CheckRedirect = s.client.CheckRedirect
 	client.Transport = &outboundGuard{inner: client.Transport}
 	s.client = client
+}
+
+// SlackForTest is a bot pointed at a test server, through a client that
+// trusts its certificate and keeps the guard that refuses anything but https.
+func SlackForTest(token, api string, client *http.Client) *SlackBot {
+	client.Transport = &outboundGuard{inner: client.Transport}
+	return newSlack(token, api, client)
+}
+
+// ZulipForTest is a bot on a test server, on the same terms.
+func ZulipForTest(site, email, key string, client *http.Client) *ZulipBot {
+	client.Transport = &outboundGuard{inner: client.Transport}
+	return newZulip(site, email, key, client)
+}
+
+// SharedKinds is the table of kinds a channel carries, so a test can hold it
+// against every kind there is.
+func SharedKinds() map[Kind]bool { return sharedKinds }
+
+// NoteOf composes a note from notifications, as a sweep would for one reader.
+func NoteOf(rows []Notification, products []string, baseURL string) Note {
+	notings := make([]noting, len(rows))
+	for i := range rows {
+		notings[i] = noting{Notification: rows[i]}
+		if i < len(products) {
+			notings[i].Product = products[i]
+		}
+	}
+	return noteOf(notings, baseURL)
+}
+
+// AtMostInANote is how many lines a note lists.
+const AtMostInANote = atMostInANote
+
+// SlackText and ZulipText are a note in each platform's markup.
+func SlackText(n Note) string { return slackText(n) }
+func ZulipText(n Note) string { return zulipText(n) }
+
+// Plain is a note as plain text, which is what a test reads.
+func (n Note) Plain() string {
+	var b strings.Builder
+	b.WriteString(n.Heading)
+	for _, line := range n.Lines {
+		b.WriteString("\n" + line.Text)
+		if line.Link != "" {
+			b.WriteString(" " + line.Link)
+		}
+	}
+	if n.More > 0 {
+		fmt.Fprintf(&b, "\nand %d more", n.More)
+	}
+	return b.String()
 }

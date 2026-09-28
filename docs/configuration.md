@@ -26,6 +26,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
 | [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
 | Webhooks | Off | Adding a destination under Settings |
+| [Chat](#chat) | Off | `OPENPSIRT_SLACK_TOKEN`, or the three Zulip settings |
 | [Attachments](#attachment-storage) | Off | `OPENPSIRT_ATTACHMENT_BUCKET`, or `OPENPSIRT_ATTACHMENT_DIR` for a trial |
 | [Advisory generation](#advisory-publication) | Off | `OPENPSIRT_PUBLISHER_NAME` and `OPENPSIRT_PUBLISHER_NAMESPACE`, both |
 | [The published advisory directory](#the-published-advisory-directory) | Off | `OPENPSIRT_DIRECTORY_URL` and a bucket or directory to write to, with advisory generation on |
@@ -259,6 +260,82 @@ and a link.
 
 On the Helm chart these are the `mail` values, and the password goes in a
 Secret the chart makes or one you name.
+
+## Chat
+
+Slack and Zulip, each through a bot this deployment holds the credential for.
+A bot posts to the channels an administrator names under Settings, and sends
+people direct messages.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `OPENPSIRT_SLACK_TOKEN` | A Slack app's bot token, beginning `xoxb-` | unset |
+| `OPENPSIRT_ZULIP_SITE` | The Zulip server's https address, e.g. `https://chat.example.com` | unset |
+| `OPENPSIRT_ZULIP_EMAIL` | The bot's address, as Zulip shows it | unset |
+| `OPENPSIRT_ZULIP_KEY` | The bot's API key | unset |
+
+The three Zulip settings are set together or not at all, and anything else is
+refused at startup.
+
+| Where it goes | What it carries |
+|---|---|
+| A person, directly | What is their own — work assigned to them, a note naming them, a claim sent back — and what is about a product or a team where no channel carries it. On by default; each person can turn it off, or ask for what the channels carry as well |
+| A team's channel | What is about work in that team's queue |
+| A product's channel | What is about that product and no team's channel carries |
+| The deployment's channel | What is about anything and no narrower channel carries |
+
+A channel belonging to a product or a team says nothing about a finding nobody
+has announced, because nothing here can see who sits in it. The deployment's
+channel says that there is something, and links to the application. A
+person is found by the address recorded against them in OpenPSIRT, and
+somebody the platform has no account for is sent mail and nothing in chat.
+
+Each minute, what one person or one channel has to be told arrives as one
+message, however many things it covers. Anything more than a day old is left in
+the application.
+
+### Slack
+
+Create an app at <https://api.slack.com/apps> from this manifest, install it in
+the workspace, and set `OPENPSIRT_SLACK_TOKEN` to its bot token.
+
+```yaml
+display_information:
+  name: OpenPSIRT
+features:
+  bot_user:
+    display_name: OpenPSIRT
+  app_home:
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - users:read.email
+```
+
+| Scope | Used for |
+|---|---|
+| `chat:write` | Posting to a channel and sending a person a direct message |
+| `users:read.email` | Finding a person by their address |
+
+Add the app to each channel it posts to, private or public. A destination names
+the channel by its ID, such as `C0123ABCD`, which is at the foot of the
+channel's details.
+
+### Zulip
+
+Create a generic bot under Personal settings › Bots, and set
+`OPENPSIRT_ZULIP_SITE`, `OPENPSIRT_ZULIP_EMAIL` and `OPENPSIRT_ZULIP_KEY` to the
+server, the bot's address and its API key.
+Subscribe the bot to each private channel it posts to. The bot finds people by
+the address OpenPSIRT holds, so the organization lets it see addresses, under
+Organization permissions › Who can access user email addresses. A destination
+names the channel, and a topic, which is `OpenPSIRT` where it names none.
+
+On the Helm chart these are the `chat` values, and the token and the key go in
+a Secret the chart makes or one you name.
 
 ## Advisory publication
 

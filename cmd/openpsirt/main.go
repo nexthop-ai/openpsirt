@@ -282,6 +282,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// else the deployment stated. What a scan was about is folded in as the
 	// pass runs, because that comes from the database rather than from here.
 	ours := currency.Ourselves(cfg.PublisherNamespace, cfg.UpstreamInternal)
+	// The chat platforms this deployment holds a credential for, which a
+	// destination and a person's own settings are checked against.
+	chats := chatPlatforms(cfg, logger)
 	handler, _ := httpapi.New(logger, db.Validate, httpapi.Ingest{
 		DB: db, Queue: work, Replica: name,
 		Interface: httpapi.Interface{Files: pages},
@@ -312,6 +315,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		Ours:          ours,
 		Excluded:      cfg.OutboundExcluded,
 		PatchBranches: cfg.PatchBranches,
+		Chats:         notify.Offering(chats),
 	})
 
 	// Every replica serves, reads and scans. Separate worker deployments would
@@ -384,6 +388,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// nothing where nothing is: the destinations are read each cycle, so
 	// adding one takes effect without a redeploy.
 	outward := notify.NewSignal(db.DB, cfg.BaseURL, logger, name)
+	// Channel posts and direct messages on the chat platforms this deployment
+	// holds a credential for. Nil where it holds none, which is ordinary.
+	talk := notify.NewTalk(db.DB, chats, cfg.BaseURL, logger, name)
 	// Removes uploads nothing ever referred to. Nil where this deployment
 	// holds no files, which is ordinary.
 	keeper := attach.NewKeeper(db.DB, files, logger, 0)
@@ -408,7 +415,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
-		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
+		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing,
 		undertaker: undertaker, publish: writer, suppliers: suppliers,
 		branches: branches,
 	})
@@ -649,8 +656,10 @@ type passes struct {
 	watch    *notify.Watch
 	post     *notify.Post
 	outward  *notify.Signal
-	keeper   *attach.Keeper
-	routing  *finding.Sweeper
+	// talk carries notifications to chat. Nil where no platform is configured.
+	talk    *notify.Talk
+	keeper  *attach.Keeper
+	routing *finding.Sweeper
 	// undertaker sets aside work whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
@@ -711,6 +720,9 @@ func (p passes) loops() []loop {
 	// so these two guards are the ones that say something.
 	if p.post != nil {
 		all = append(all, loop{"send mail", p.post.Run, 0})
+	}
+	if p.talk != nil {
+		all = append(all, loop{"send what is owed to chat", p.talk.Run, 0})
 	}
 	if p.keeper != nil {
 		all = append(all, loop{"sweep unattached files", p.keeper.Run, 0})
@@ -977,6 +989,28 @@ func mailChannel(cfg config.Config, logger *slog.Logger) notify.Channel {
 	}
 	logger.Info("mail is configured", "server", cfg.MailServer, "from", cfg.MailFrom)
 	return mail
+}
+
+// chatPlatforms is the chat platforms an operator configured, which is often
+// none. Each is logged, the way mail is, because none is ordinary and has to be
+// said out loud.
+func chatPlatforms(cfg config.Config, logger *slog.Logger) []notify.Chat {
+	var chats []notify.Chat
+	// Checked as the concrete type before it becomes the interface: a typed
+	// nil pointer handed to an interface is not nil.
+	if slack := notify.NewSlack(cfg.SlackToken); slack != nil {
+		chats = append(chats, slack)
+	}
+	if zulip := notify.NewZulip(cfg.ZulipSite, cfg.ZulipEmail, cfg.ZulipKey); zulip != nil {
+		chats = append(chats, zulip)
+	}
+	if len(chats) == 0 {
+		logger.Info("no chat platform is configured, so nothing is sent to chat")
+	}
+	for _, chat := range chats {
+		logger.Info("chat is configured", "platform", chat.Platform())
+	}
+	return chats
 }
 
 // noteStoreInTheClear says what a plaintext object store costs, at every start

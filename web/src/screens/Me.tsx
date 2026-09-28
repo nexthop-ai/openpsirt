@@ -95,6 +95,15 @@ export function Me() {
         onSet={() => void queries.invalidateQueries({ queryKey: ["whoami"] })}
       />
 
+      {me.chat && (
+        <Chat
+          direct={me.chat.direct}
+          shared={me.chat.shared}
+          reachable={!!me.reachable}
+          onSet={() => void queries.invalidateQueries({ queryKey: ["whoami"] })}
+        />
+      )}
+
       <Tokens />
     </>
   );
@@ -170,6 +179,73 @@ function Digest({
               onChange={(event) => set.mutate({ digest: on, unassigned: event.target.checked })}
             />
             Include findings nobody owns
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Direct messages in chat, which are on until turned off, and what the
+// channels carry, which is off until asked for. Drawn only where the
+// deployment offers a chat platform.
+function Chat({
+  direct,
+  shared,
+  reachable,
+  onSet,
+}: {
+  direct: boolean;
+  shared: boolean;
+  reachable: boolean;
+  onSet: () => void;
+}) {
+  const set = useMutation({
+    mutationFn: async (body: { direct: boolean; shared?: boolean }) =>
+      unwrap(await api.PUT("/v1/session/me/chat", { body })),
+    onSuccess: onSet,
+  });
+
+  return (
+    <div className="card">
+      <h3>Chat</h3>
+      <p className="reading" style={{ marginBottom: 8 }}>
+        Your own work as it happens, found by your email address.
+      </p>
+      {set.error != null && <Failed error={set.error} what="That could not be changed." />}
+      {!reachable ? (
+        <p className="alert" style={{ margin: 0 }}>
+          <strong>No address is recorded for you.</strong>
+          <span>An administrator has to record one before chat can find you.</span>
+        </p>
+      ) : (
+        <div className="filters">
+          <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={direct}
+              disabled={set.isPending}
+              onChange={(event) =>
+                set.mutate({
+                  direct: event.target.checked,
+                  shared: shared && event.target.checked,
+                })
+              }
+            />
+            Send me direct messages
+          </label>
+          <label
+            style={{ display: "flex", gap: 7, alignItems: "center" }}
+            title="For when you are not in the channels"
+          >
+            <input
+              type="checkbox"
+              checked={shared}
+              // Refused by the server without direct messages, so not offered.
+              disabled={!direct || set.isPending}
+              onChange={(event) => set.mutate({ direct, shared: event.target.checked })}
+            />
+            Also send me what the channels get
           </label>
         </div>
       )}

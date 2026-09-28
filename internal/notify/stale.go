@@ -486,6 +486,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			Link:      fmt.Sprintf("/work?tab=people&team=%s", url.QueryEscape(row.TeamName)),
 			Private:   private,
 			ProductID: &row.ProductID,
+			TeamID:    &row.TeamID,
 		}
 		for _, personID := range members {
 			at := reach[personID][row.ProductID]

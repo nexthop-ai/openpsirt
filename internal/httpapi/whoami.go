@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -44,6 +45,13 @@ type CanBody struct {
 	MayApproveRulings bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
 }
 
+// ChatBody is what somebody is sent in chat.
+type ChatBody struct {
+	Platforms []string `json:"platforms" doc:"The chat platforms this deployment offers"`
+	Direct    bool     `json:"direct" doc:"They are sent direct messages: what is their own, and what no channel carries"`
+	Shared    bool     `json:"shared" doc:"What a channel carries is sent to them directly as well"`
+}
+
 // WhoBody is the caller, as the caller.
 type WhoBody struct {
 	Identity string    `json:"identity" doc:"The identity this deployment holds for them"`
@@ -61,6 +69,9 @@ type WhoBody struct {
 	// digest is a switch that changes nothing, and a screen should say so
 	// rather than offer it.
 	Reachable bool `json:"reachable,omitempty" doc:"An address is recorded for them, so anything can be sent at all"`
+	// Chat is what they chose about chat, where this deployment offers any.
+	// A screen offering the switches has to know both.
+	Chat *ChatBody `json:"chat,omitempty" doc:"The chat platforms this deployment offers and what they chose, where it offers any"`
 	// DeferralDays is the deployment's threshold, which a screen has to know
 	// before somebody writes a date rather than after they submit one: a
 	// deferral under it takes effect at once and one over it waits for a
@@ -127,6 +138,16 @@ func registerWhoAmI(api huma.API, in Ingest) {
 				body.Reachable = strings.TrimSpace(me.Email) != ""
 			case !errors.Is(err, access.ErrNoSuchPerson):
 				return nil, wentWrong(in.Logger, "who you are could not be read", err)
+			}
+			// A read that fails fails the answer. Left out, the chat field
+			// tells an administrator no platform is configured, which sends
+			// them to fix the wrong thing.
+			if len(in.Chats) > 0 {
+				chose, err := notify.NewStore(in.DB.DB).ChatChoicesOf(ctx, subject)
+				if err != nil {
+					return nil, wentWrong(in.Logger, "what you chose about chat could not be read", err)
+				}
+				body.Chat = &ChatBody{Platforms: in.Chats, Direct: chose.Direct, Shared: chose.Shared}
 			}
 		}
 

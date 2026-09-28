@@ -4,6 +4,7 @@
 import { notACredential } from "../ui/noautofill";
 import { AdvisorySources } from "./AdvisorySources";
 import { Webhooks } from "./Webhooks";
+import { ChatChannels } from "./ChatChannels";
 import { useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ADMIN_TABS, SECTIONS, tabOf, tally, type Tab } from "./settingsTabs";
@@ -78,6 +79,8 @@ export function Settings({ who }: { who: Who }) {
 
       {tab === "webhooks" ? (
         <Webhooks />
+      ) : tab === "chat" ? (
+        <ChatChannels platforms={who.chat?.platforms ?? []} />
       ) : tab === "suppliers" ? (
         <AdvisorySources />
       ) : (

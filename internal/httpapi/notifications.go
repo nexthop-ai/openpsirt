@@ -184,6 +184,49 @@ func registerDigest(api huma.API, in Ingest) {
 	})
 }
 
+// registerChatChoices is the two switches a person sets for themselves about
+// chat.
+func registerChatChoices(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "set-chat", Method: http.MethodPut, Path: "/v1/session/me/chat",
+		Summary: "Choose what is sent to you in chat",
+		Description: "Turns direct messages on or off, and says whether what a chat channel " +
+			"carries is sent to you directly as well.\n\n" +
+			"Direct messages are on until turned off. They carry what is your own — work " +
+			"assigned to you, a note naming you, a claim sent back — and what is about a " +
+			"product or a team where no channel carries it. `shared` sends you what the " +
+			"channels carry as well, for somebody who does not sit in them; it is off until " +
+			"asked for, and asking for it without `direct` is refused.\n\n" +
+			"You are found on a chat platform by the address recorded against you, which " +
+			"`GET /v1/session/me` reports as `reachable`. Refused where this deployment " +
+			"offers no chat platform, which `GET /v1/session/me` reports as `chat`.",
+		Tags: []string{"Notifications"}, DefaultStatus: http.StatusNoContent,
+	}, ownSubject, ""), func(ctx context.Context, input *struct {
+		Body struct {
+			Direct bool `json:"direct" doc:"Whether you are sent direct messages"`
+			Shared bool `json:"shared,omitempty" doc:"Whether what a channel carries is sent to you directly as well"`
+		}
+	}) (*struct{}, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if subject.Kind != access.Person || in.DB == nil {
+			return nil, huma.Error403Forbidden("only a person chooses what is sent to them")
+		}
+		if len(in.Chats) == 0 {
+			return nil, huma.Error409Conflict("no chat platform is configured here, " +
+				"so there is nothing to choose")
+		}
+		if err := notify.NewStore(in.DB.DB).SetChatChoices(ctx, subject, notify.ChatChoices{
+			Direct: input.Body.Direct, Shared: input.Body.Shared,
+		}); err != nil {
+			return nil, asked(in.Logger, err)
+		}
+		return &struct{}{}, nil
+	})
+}
+
 // findingPath is where a notification about one finding points.
 //
 // Spelled once here rather than at each producer: it is the address the

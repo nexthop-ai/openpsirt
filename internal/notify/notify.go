@@ -303,6 +303,9 @@ type Notification struct {
 	// marked private carries a product or is refused.
 	ProductID       *int64 `bun:"product_id"`
 	VulnerabilityID *int64 `bun:"vulnerability_id"`
+	// TeamID is the team whose queue this is about, where it is about one. A
+	// chat channel belonging to a team is sent what names its team.
+	TeamID *int64 `bun:"team_id"`
 	// Concerns is what an event was about, where it was about a finding. Not
 	// About above, which carries a condition's identity and deduplicates on
 	// it; this is never matched on for uniqueness, and exists so a digest can
@@ -415,6 +418,8 @@ type Holds struct {
 	// read narrows by.
 	ProductID       *int64
 	VulnerabilityID *int64
+	// TeamID is the team whose queue this is about, where it is about one.
+	TeamID *int64
 }
 
 // Reconcile makes the open conditions of one kind, for one person, exactly
@@ -476,7 +481,8 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 				if row.Body == still.Body && row.Link == still.Link &&
 					row.Private == still.Private &&
 					sameID(row.ProductID, still.ProductID) &&
-					sameID(row.VulnerabilityID, still.VulnerabilityID) {
+					sameID(row.VulnerabilityID, still.VulnerabilityID) &&
+					sameID(row.TeamID, still.TeamID) {
 					continue
 				}
 				if _, err := tx.NewUpdate().Model((*Notification)(nil)).
@@ -485,6 +491,7 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 					Set("private = ?", still.Private).
 					Set("product_id = ?", still.ProductID).
 					Set("vulnerability_id = ?", still.VulnerabilityID).
+					Set("team_id = ?", still.TeamID).
 					Where("id = ?", row.ID).Exec(ctx); err != nil {
 					return fmt.Errorf("say what a standing condition says now: %w", err)
 				}
@@ -511,7 +518,7 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 				PersonID: personID, Kind: kind, Lifetime: Condition,
 				About: about, AboutOpen: &key,
 				Body: h.Body, Link: h.Link, Private: h.Private,
-				ProductID: h.ProductID, VulnerabilityID: h.VulnerabilityID,
+				ProductID: h.ProductID, VulnerabilityID: h.VulnerabilityID, TeamID: h.TeamID,
 				CreatedAt: now,
 			}
 			// Each insert stands on its own savepoint, because carrying on

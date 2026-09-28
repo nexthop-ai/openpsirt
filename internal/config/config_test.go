@@ -52,6 +52,10 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		// what a coordinated disclosure runs on, and it goes silently off.
 		{"MAIL_SERVER", "smtp.example.test:587"},
 		{"MAIL_FROM", "psirt@example.test"},
+		// A Zulip bot is its server, its address and its key together, and
+		// any one alone reaches nothing.
+		{"ZULIP_SITE", "https://chat.example.test"},
+		{"ZULIP_KEY", "k"},
 		// The standard permits exactly six words here and the value reaches
 		// the document verbatim, so a typo produces advisories that fail
 		// validation wherever anybody takes them — the one use a generated
@@ -419,5 +423,23 @@ func TestTheInternalNamesAreReadAsAList(t *testing.T) {
 	}
 	if strings.Join(c.UpstreamInternal, "|") != "a|b" {
 		t.Errorf("read as %q, want [a b]", c.UpstreamInternal)
+	}
+}
+
+func TestAZulipServerIsReachedOverHTTPSAlone(t *testing.T) {
+	// The bot's key goes with every request, so a server over plain http is
+	// refused rather than handed it.
+	t.Setenv("OPENPSIRT_ZULIP_EMAIL", "bot@chat.example.test")
+	t.Setenv("OPENPSIRT_ZULIP_KEY", "k")
+	for _, site := range []string{"http://chat.example.test", "chat.example.test",
+		"https://user:pass@chat.example.test"} {
+		t.Setenv("OPENPSIRT_ZULIP_SITE", site)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OPENPSIRT_ZULIP_SITE") {
+			t.Errorf("a Zulip server at %q answered %v, want it refused by name", site, err)
+		}
+	}
+	t.Setenv("OPENPSIRT_ZULIP_SITE", "https://chat.example.test")
+	if _, err := Load(); err != nil {
+		t.Errorf("a whole Zulip configuration was refused: %v", err)
 	}
 }

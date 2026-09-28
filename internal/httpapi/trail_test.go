@@ -587,6 +587,7 @@ var outsideTheTrail = map[string]string{
 	"forget-filter":                 "their own saved filters",
 	"save-filter":                   "their own saved filters",
 	"set-digest":                    "their own mail",
+	"set-chat":                      "their own chat messages",
 	"sign-out":                      "their own session",
 
 	// The catalog says what exists. Declaring something new changes nothing

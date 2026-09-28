@@ -25,7 +25,7 @@ build is recreated.
 | Advisories | CSAF advisories with editorial states and a second person's agreement, a CSAF provider directory, and per-build OpenVEX documents with a revision chain |
 | Obligations | Records of exploitation, the windows they may oblige, and the notices given |
 | Reporting | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
-| Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, and operational alerts |
+| Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, Slack and Zulip channels and direct messages, and operational alerts |
 | Web interface | Every screen above, embedded into the binary and served from it |
 | Packaging | A container image and a Helm chart for `linux/amd64`, and binary archives for Linux on amd64 and arm64 |
 
@@ -40,7 +40,7 @@ build is recreated.
 | Disclosure | A report from outside ruled a duplicate of a flaw found here starts no disclosure date. Coordinating an embargo with a peer vendor or a coordinator |
 | Advisories | Sending one anywhere, signing the provider directory, the VEX profile of the CSAF document, a CVSS 4.0 score in the document, and prose of the deployment's own beyond the title |
 | Remediation | Opening or updating an item in an external tracker; a link somebody typed is stored. One view of a promise to upgrade across every build it names |
-| Notifications | Chat adapters and an HTML part in mail |
+| Notifications | Microsoft Teams and Google Chat, and an HTML part in mail |
 | Interface | Narrowing the review queue by what kind of thing is waiting |
 | Database | Purging old rows and partitioning tables |
 | Packaging | Images for any architecture but `amd64` |

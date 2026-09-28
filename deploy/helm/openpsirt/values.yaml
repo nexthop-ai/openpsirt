@@ -197,6 +197,25 @@ mail:
   existingSecret: ""
   existingSecretKey: "mail-password"
 
+# Chat: a Slack app's bot and a Zulip bot, either or both. Absent is ordinary.
+# Which channels receive what is set under Settings, and whether a person is
+# sent direct messages is their own setting.
+chat:
+  slack:
+    # The bot token, beginning xoxb-. Set it here and the chart puts it in a
+    # Secret, or name one you manage yourself.
+    token: ""
+    existingSecret: ""
+    existingSecretKey: "slack-token"
+  zulip:
+    # The server's https address and the bot's address, with its key: all
+    # three, or none. One without the others fails at render.
+    site: ""
+    email: ""
+    key: ""
+    existingSecret: ""
+    existingSecretKey: "zulip-key"
+
 # Schema changes are applied at startup by default, which makes an upgrade
 # just a deployment. Turn this off to run "openpsirt migrate up" yourself,
 # under different credentials, at a time you choose.

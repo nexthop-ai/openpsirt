@@ -67,8 +67,9 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 
 		store := notify.NewStore(db.DB)
 		const secret = "a-shared-secret-long-enough"
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat", notify.Everything,
-			server.URL, secret); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: secret,
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Tell(ctx, notify.Telling{
@@ -157,8 +158,9 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 		defer server.Close()
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat", notify.Everything,
-			server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Tell(ctx, notify.Telling{
@@ -238,8 +240,9 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 		defer server.Close()
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat", notify.Everything,
-			server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		// The shape a disclosure notice takes: every part of what it is about
@@ -314,8 +317,9 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 		store := notify.NewStore(db.DB)
 		// Paging takes what is worth interrupting somebody for, and nothing
 		// else — which is the whole reason a destination names a kind.
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "paging", string(notify.CriticalOnRelease),
-			server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "paging", Kind: string(notify.CriticalOnRelease), URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Tell(ctx, notify.Telling{
@@ -335,12 +339,14 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 
 		// A kind nothing is of is refused rather than stored as a
 		// destination that never receives anything. Case is folded first.
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "typo", "asigned",
-			server.URL, "a-shared-secret-long-enough"); err == nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "typo", Kind: "asigned", URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err == nil {
 			t.Error("a destination was stored for a kind nothing is of")
 		}
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "folded", " Assigned ",
-			server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "folded", Kind: " Assigned ", URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Errorf("a kind written in capitals was refused: %v", err)
 		}
 	})
@@ -364,8 +370,9 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 
 		store := notify.NewStore(db.DB)
 		// Refused where it is configured, which is the first of the two.
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "plain", notify.Everything,
-			server.URL, "a-shared-secret-long-enough"); err == nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "plain", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err == nil {
 			t.Fatal("a plain http destination was accepted")
 		}
 		// And refused again where the request is made, which is the one that
@@ -373,7 +380,7 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		// from a build that did not refuse it, or somebody editing the
 		// database. The row is written directly here for exactly that reason.
 		if _, err := db.DB.NewInsert().Model(&notify.Outbound{
-			Name: "plain", Kind: notify.Everything, URL: server.URL,
+			Name: "plain", Kind: notify.Everything, Platform: notify.Webhook, URL: server.URL,
 			Secret: "a-shared-secret-long-enough", CreatedBy: who.ID,
 			CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
 		}).Exec(ctx); err != nil {
@@ -419,8 +426,9 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 		defer server.Close()
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "everything", string(notify.Everything),
-			server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "everything", Kind: string(notify.Everything), URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -479,8 +487,9 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		}
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, admin), "chat", notify.Everything,
-			"https://chat.example.test/hook", "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: "https://chat.example.test/hook", Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -488,8 +497,9 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		if _, err := store.Destinations(ctx, asks(t, db, other)); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("reading where things go as a non-administrator answered %v", err)
 		}
-		if _, err := store.AddDestination(ctx, asks(t, db, other), "theirs", notify.Everything,
-			"https://elsewhere.example.test/hook", "a-shared-secret-long-enough"); !errors.Is(err, access.ErrDenied) {
+		if _, err := store.AddDestination(ctx, asks(t, db, other), notify.Destination{
+			Name: "theirs", Kind: notify.Everything, URL: "https://elsewhere.example.test/hook", Secret: "a-shared-secret-long-enough",
+		}, nil); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("configuring a destination as a non-administrator answered %v", err)
 		}
 		if err := store.RetireDestination(ctx, asks(t, db, other), "chat",
@@ -536,9 +546,9 @@ func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
 		defer server.Close()
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "paging",
-			string(notify.CriticalOnRelease), server.URL,
-			"a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "paging", Kind: string(notify.CriticalOnRelease), URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -597,8 +607,9 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, first), "chat",
-			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, first), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -669,8 +680,9 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, admin), "chat",
-			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		held := []notify.Holds{{
@@ -737,8 +749,9 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, ana), "chat",
-			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, ana), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		held := []notify.Holds{{
@@ -816,8 +829,9 @@ func TestADestinationSaysWhyItLastFailed(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, admin), "chat",
-			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
@@ -872,8 +886,9 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, first), "chat",
-			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, first), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -940,8 +955,9 @@ func TestTwoUploadsAreTwoThingsToCarry(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat",
-			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
 			t.Fatal(err)
 		}
 

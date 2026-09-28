@@ -46,6 +46,9 @@ export type Who = {
   digest?: boolean;
   digest_unassigned?: boolean;
   reachable?: boolean;
+  // The chat platforms this deployment offers and what they chose, where it
+  // offers any.
+  chat?: { platforms: string[]; direct: boolean; shared: boolean };
   // The deployment's deferral threshold, in days. A screen taking a date
   // needs it while the date is being chosen: which side of it a date falls on
   // decides whether a second person has to agree, and reading that off the

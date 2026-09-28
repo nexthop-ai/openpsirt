@@ -351,6 +351,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerAudit(api, in)
 	registerNotifications(api, in)
 	registerDigest(api, in)
+	registerChatChoices(api, in)
 	registerSession(api, in)
 	registerTokens(api, in)
 	registerFindingDetail(api, in)

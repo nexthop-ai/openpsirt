@@ -26,6 +26,7 @@ export const SECTIONS = Object.entries(NAMES) as [Section, string][];
 // their endpoints refuse anybody else.
 export const ADMIN_TABS = [
   ["webhooks", "Webhooks"],
+  ["chat", "Chat"],
   ["suppliers", "Suppliers"],
 ] as const;
 

@@ -15,6 +15,7 @@ describe("the settings tabs", () => {
   it("keeps an administrator's tab from anybody else", () => {
     expect(tabOf("webhooks", true)).toBe("webhooks");
     expect(tabOf("webhooks", false)).toBe("deadlines");
+    expect(tabOf("chat", false)).toBe("deadlines");
   });
   it("counts what somebody stored, and otherwise what a tab holds", () => {
     const items = [

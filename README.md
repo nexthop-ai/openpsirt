@@ -322,8 +322,12 @@ says what turns each on.
 - Nothing leaving this deployment about an undisclosed finding carries detail:
   no identifier, no component, no summary. It says there is something, and
   links to it
-- Every channel sits behind one interface, and delivery is queued and retried.
-  The channels are mail and a signed webhook
+- What is said is composed once for every channel, and delivery is queued and
+  retried. The channels are mail, a signed webhook, and Slack and Zulip
+- Chat carries every notification as it happens, a minute's worth as one
+  message. Somebody's own work goes to them directly; the rest goes to the
+  narrowest channel for its team, its product or the deployment, and a channel
+  narrower than the deployment hears nothing about undisclosed work
 - Operational alerts are their own category. A condition clears itself once it
   stops holding, and an event is acknowledged. They cover a build that stopped
   being scanned, vulnerability data that stopped moving, an upload that moved

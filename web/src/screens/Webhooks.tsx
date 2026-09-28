@@ -102,7 +102,8 @@ export function Webhooks() {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["outbound"] }),
   });
 
-  const rows = sent.data?.items ?? [];
+  // A chat channel is configured on its own tab.
+  const rows = (sent.data?.items ?? []).filter((row) => row.platform === "webhook");
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -225,7 +226,7 @@ export function WebhookDelivery() {
 
   return (
     <section className="panel">
-      <h3>Webhook delivery</h3>
+      <h3>Webhook and chat delivery</h3>
       <p className="hint" style={{ marginTop: 0 }}>
         Whether what this deployment posts is arriving. They are configured under Settings.
       </p>
@@ -234,7 +235,10 @@ export function WebhookDelivery() {
       ) : sent.isError ? (
         <Failed error={sent.error} what="Webhook delivery could not be read." />
       ) : rows.length === 0 ? (
-        <NoWebhooks />
+        <Empty
+          title="Nothing is posted anywhere."
+          detail="Webhooks and chat channels are configured under Settings."
+        />
       ) : (
         <Wide>
           <table>
@@ -242,6 +246,7 @@ export function WebhookDelivery() {
               <tr>
                 <th>Name</th>
                 <th>Kind</th>
+                <th>Where</th>
                 <th>Sent</th>
                 <th>Failing</th>
                 <th>Last error</th>
@@ -252,6 +257,7 @@ export function WebhookDelivery() {
                 <tr key={`${row.name} ${row.kind}`} className="row">
                   <td className="id">{row.name}</td>
                   <td>{kindOf(row.kind)}</td>
+                  <td className="id">{row.platform === "webhook" ? row.host : row.channel}</td>
                   <td>{(row.sent ?? 0).toLocaleString()}</td>
                   <td>
                     <Failing row={row} />
