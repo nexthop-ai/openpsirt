@@ -143,16 +143,15 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 	if len(lapsed) == 0 {
 		return out, nil
 	}
+	// Committed, so what lapsed is reported even when reading who to tell
+	// fails part way.
 	out.Rows = int64(len(lapsed))
-	told, err := s.proposersOf(ctx, lapsed)
-	if err != nil {
-		return Lapsed{}, err
-	}
+	told, err := s.proposersOfAll(ctx, lapsed, database.InBulk.Most)
 	for i := range told {
 		told[i].RatedWorse = true
 	}
 	out.Told = told
-	return out, nil
+	return out, err
 }
 
 // coversSomething keeps the decisions an open finding in their product still

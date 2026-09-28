@@ -87,6 +87,25 @@ func TestRevivingAClaimWhosePlaceIsTakenNamesTheClaimStandingThere(t *testing.T)
 	})
 }
 
+func TestAProposerWhoseRowsSpanSeveralReadsIsToldOnce(t *testing.T) {
+	// A sweep lapsing more rows than one read names reads who to tell in
+	// pieces. One person is one notice however the rows fall.
+	each(t, func(t *testing.T, f *fixture) {
+		made := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
+		ids := []int64{made[2].ID, made[0].ID, made[1].ID}
+		told, err := f.store.ProposersOfAll(t.Context(), ids, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(told) != 1 {
+			t.Fatalf("one proposer came back as %d entries: %+v", len(told), told)
+		}
+		if told[0].Rows != 3 || told[0].DecisionID != made[0].ID {
+			t.Errorf("told %+v, want three rows represented by decision %d", told[0], made[0].ID)
+		}
+	})
+}
+
 func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 	// A lapse records when and why a row stopped applying. Withdrawing the
 	// claim afterwards is about the rows still standing.

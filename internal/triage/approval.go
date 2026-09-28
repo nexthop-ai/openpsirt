@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -452,6 +453,33 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 			ProductID: first.ProductID, VulnerabilityID: first.VulnerabilityID,
 			Rows: len(rows), Undisclosed: undisclosed,
 		})
+	}
+	return told, nil
+}
+
+// proposersOfAll is proposersOf over a set of any size: read chunk rows at a
+// time and merged, so a person is one entry however many chunks their
+// rows fall in. The representative is their earliest row.
+func (s *Store) proposersOfAll(ctx context.Context, ids []int64, chunk int) ([]ForPerson, error) {
+	sorted := slices.Clone(ids)
+	slices.Sort(sorted)
+	at := map[int64]int{}
+	var told []ForPerson
+	for start := 0; start < len(sorted); start += chunk {
+		chunk, err := s.proposersOf(ctx, sorted[start:min(start+chunk, len(sorted))])
+		if err != nil {
+			return told, err
+		}
+		for _, one := range chunk {
+			i, seen := at[one.PersonID]
+			if !seen {
+				at[one.PersonID] = len(told)
+				told = append(told, one)
+				continue
+			}
+			told[i].Rows += one.Rows
+			told[i].Undisclosed = told[i].Undisclosed || one.Undisclosed
+		}
 	}
 	return told, nil
 }
