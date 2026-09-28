@@ -312,11 +312,12 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 
 	// Proposed and withdrawn are both read off the decision. Withdrawn is
 	// dated by the proposal for the same reason the audit is: a claim belongs
-	// to the window it was argued in.
+	// to the window it was argued in. Both count claims, as agreements do: a
+	// claim writes a row per place and is one piece of work.
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 			ColumnExpr(`de.proposed_by AS "person"`).
-			ColumnExpr(`COUNT(*) AS "number"`).
+			ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "number"`).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
 		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
@@ -326,7 +327,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 			ColumnExpr(`de.proposed_by AS "person"`).
-			ColumnExpr(`COUNT(*) AS "number"`).
+			ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "number"`).
 			Where("de.state = ?", Withdrawn).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")

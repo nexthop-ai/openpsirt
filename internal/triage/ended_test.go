@@ -149,6 +149,38 @@ func TestASimilarClaimCountsEveryIssueItCovers(t *testing.T) {
 	})
 }
 
+func TestWhatAPersonGotThroughIsCountedInClaims(t *testing.T) {
+	// One argument over many places is one piece of work, whether it was
+	// made, agreed to or taken back. Counted per row, a bulk proposer reads
+	// as forty-five times busier than the approver of the same claim.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		kept := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
+		if err := agreeTo(ctx, f.store, f.reviewer, kept[0].ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		dropped := f.claimsMany(t, f.places("under-d", "under-e"))
+		if err := f.store.Withdraw(ctx, f.triager, dropped[0].ClaimID); err != nil {
+			t.Fatal(err)
+		}
+
+		measured, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{}, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]triage.Worked{}
+		for _, one := range measured.Throughput {
+			got[one.Person] = one
+		}
+		if p := got["proposer"]; p.Proposed != 2 || p.Withdrawn != 1 {
+			t.Errorf("the proposer made %d claims and withdrew %d, want 2 and 1", p.Proposed, p.Withdrawn)
+		}
+		if a := got["approver"]; a.Approved != 1 {
+			t.Errorf("the approver agreed to %d claims, want 1", a.Approved)
+		}
+	})
+}
+
 func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 	// A lapse records when and why a row stopped applying. Withdrawing the
 	// claim afterwards is about the rows still standing.
