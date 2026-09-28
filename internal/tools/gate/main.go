@@ -166,6 +166,11 @@ func tiers(touched []string) map[tier]bool {
 		if t == api || t == engines {
 			reached[code] = true
 		}
+		// The interface's route table is read by a Go test as well as the
+		// interface's own, which holds the server's links to it.
+		if file == routeTable {
+			reached[code] = true
+		}
 		fmt.Fprintf(os.Stderr, "gate: %s -> %s\n", file, name(t))
 	}
 	return reached
@@ -174,6 +179,9 @@ func tiers(touched []string) map[tier]bool {
 func name(t tier) string {
 	return [...]string{"documents", "web", "code", "api", "engines", "everything"}[t]
 }
+
+// routeTable is the interface's table of the addresses it answers.
+const routeTable = "web/src/app/routes.json"
 
 // storage is where the queries, the schema and the harness the tests share
 // live. A change under any of these is portability work whatever it looks

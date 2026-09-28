@@ -42,6 +42,15 @@ describe("an address put together from parts", () => {
     expect(found("const to = `${inbox}/${encodeURIComponent(reference)}`;")).toEqual(["${}/${}"]);
   });
 
+  it("is reported where a query is glued onto an address built elsewhere", () => {
+    expect(found("const to = `${findingsPath(at)}?${asked}`;")).toEqual(["${}?${}"]);
+    expect(found('const to = `${path}${path.includes("?") ? "&" : "?"}q=${term}`;')).toEqual([
+      "${}${}q=${}",
+    ]);
+    expect(found("const to = `${path}&only=${only}`;")).toEqual(["${}&only=${}"]);
+    expect(found("const asked = `Remove ${name}?`;")).toEqual([]);
+  });
+
   it("is not reported where it is an address of the API", () => {
     expect(found(`const file = apiBuildPath(at) + "/vex";`)).toEqual([]);
     expect(found("const file = `${apiBuildPath(at)}/pending-upgrades.${format}`;")).toEqual([]);
@@ -49,6 +58,11 @@ describe("an address put together from parts", () => {
       found("const base = apiBuildPath(at) + `/vex`;\nconst one = `${base}/issuance/${v}`;"),
     ).toEqual([]);
     expect(found("const where = `/v1/products/${encodeURIComponent(p)}`;")).toEqual([]);
+    expect(
+      found(
+        'const base = all ? "/v1/findings" : `/v1/products/${p}`;\nconst to = `${base}.csv?${q}`;',
+      ),
+    ).toEqual([]);
   });
 
   it("is not reported where it is a React key or an address elsewhere", () => {

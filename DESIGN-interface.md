@@ -109,9 +109,11 @@ server's notification links are tested against it (`DESIGN-notifications.md`
 
 | Rule | |
 |---|---|
-| An address put together from parts is put together in one module, from the table | A part is escaped for a path segment there and nowhere else. A name holding a slash or a question mark otherwise becomes a second segment or a query, and the link opens a screen about something else |
+| Every route in the table is mounted by the router | A table entry with no screen behind it passes every other check here and lands on the not-found screen |
+| An address put together from parts is put together in one module, from the table | A part is escaped for a path segment there and nowhere else. A name holding a slash or a question mark otherwise becomes a second segment or a query, and the link opens a screen about something else. A query added to an address built elsewhere is put together there too |
 | A builder names the parameters it sets | A caller passes a product, a build or a version, never a query string. The findings list, the audit record, the dependency tree and the two comparisons take a query, because those screens write their filters into their own address |
-| A component link carries the build it was reached from, and the version where the row has one | The component screen opens on the graph somebody was looking at rather than the first one, and a name at two versions is two components |
+| A component link carries the build it was reached from, and the version where the row has one | The component screen opens on the graph somebody was looking at rather than the first one, and a name at two versions is two components. A row of the by-upgrade view names binaries under one source version and carries none |
+| A build's screen moved to another build keeps the address's own segments | A segment holding an escaped slash stays one segment. The router's match hands the tail back with the slash restored, so the tail is cut from the address as it stands |
 | An address written out whole is matched against the table | Path and query parameters both. An address the router does not know lands on the not-found screen, and a parameter the screen does not read opens it on its default |
 | Every parameter the table lists is read by the screen its route renders | The screen is found by reading the router, and every module it reaches is searched for a read of the parameter. A table promising a parameter nothing acts on is the dead link in a second place |
 | An API address is not an address into the page | One under `/v1`, or one joined onto the call that builds the API's build prefix, is the API document's to describe |

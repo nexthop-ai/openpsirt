@@ -583,8 +583,7 @@ function Search({ at }: { at: Scoped }) {
             // search. The list answers that across every product a reader
             // can see as readily as within one, so with no product picked the
             // term still reaches a list rather than being dropped.
-            const path = findingsPath(at);
-            navigate(`${path}${path.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}`);
+            navigate(findingsPath(at, false, { q: term }));
           })
           .catch(() => {
             setLooking(false);

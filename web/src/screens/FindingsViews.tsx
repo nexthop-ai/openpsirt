@@ -221,7 +221,7 @@ export function ByComponent({
                     <Link
                       className="linkish id"
                       title={`Open ${name}`}
-                      to={componentAt(at.product, name, undefined, at)}
+                      to={componentAt(at.product, name, row.version, at)}
                     >
                       {name}
                     </Link>

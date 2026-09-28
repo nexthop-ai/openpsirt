@@ -5,11 +5,12 @@ import { describe, expect, it } from "vitest";
 import * as routes from "./routes";
 import { findingAt } from "./routes";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { table, unrouted } from "../../scripts/addresses.mjs";
+import { app, mountedIn, table, unrouted } from "../../scripts/addresses.mjs";
 
 // Awkward on purpose: a separator of every kind an address has, so a part
 // left unescaped moves a segment or starts a query and fails the match.
-const odd = "a/b c?d#e&f=g%";
+// The fragment mark comes last, because everything after it is not checked.
+const odd = "a/b c?d&f=g%#e";
 const build = { product: odd, stream: odd, variant: odd };
 
 // One call of every builder, with every part it takes. The set of names is
@@ -45,18 +46,28 @@ const SAMPLES: Record<string, () => string[]> = {
   upgradesAt: () => [routes.upgradesAt(build)],
   matchCoverageAt: () => [routes.matchCoverageAt(build)],
   vexAt: () => [routes.vexAt(build)],
-  sameScreenAt: () => [routes.sameScreenAt(build, ""), routes.sameScreenAt(build, "components")],
+  sameScreenAt: () => [
+    routes.sameScreenAt(build, ""),
+    routes.sameScreenAt(build, "components"),
+    routes.sameScreenAt(build, "findings/CVE-1/components/a%2Fb"),
+  ],
   sameProductScreenAt: () => [routes.sameProductScreenAt(odd, "/inbox")],
   claimAt: () => [routes.claimAt(7)],
   decisionAt: () => [routes.decisionAt(7)],
   issueAt: () => [routes.issueAt(odd)],
   personAt: () => [routes.personAt(odd)],
   advisoryAt: () => [routes.advisoryAt(odd)],
-  reportAt: () => [routes.reportAt(odd), routes.reportAt(odd, { days: "90" })],
+  reportAt: () => [routes.reportAt(odd)],
   settingsAt: () => [routes.settingsAt(odd)],
   reviewQueueAt: () => [routes.reviewQueueAt(), routes.reviewQueueAt({ product: odd, mine: true })],
   recordAt: () => [routes.recordAt(odd, odd)],
   auditAt: () => [routes.auditAt({ alone: "true", outcome: odd })],
+  requeried: () => [
+    routes.requeried(
+      routes.productFindingsAt(odd, { q: odd }),
+      new URLSearchParams({ state: odd }),
+    ),
+  ],
   refiled: () => [routes.refiled(routes.issueAt("CVE-1"), "CVE-1", odd)],
 };
 
@@ -85,10 +96,17 @@ describe("every address the interface builds", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it("is each pattern of the router, with every part in place", () => {
-    for (const [name, pattern] of Object.entries(routes.ROUTES)) {
-      expect(pattern, name).toBe(table()[name].path);
-    }
+  it("is mounted by the router, every one", () => {
+    const mounted = mountedIn(app());
+    expect(mounted.length, "the router mounts no route, so this checked nothing").toBeGreaterThan(
+      0,
+    );
+    expect([...new Set(mounted)].sort()).toEqual(Object.keys(table()).sort());
+  });
+
+  it("reads which routes the router mounts", () => {
+    expect(mountedIn(`<Route path={ROUTES.home} element={<Home />} />`)).toEqual(["home"]);
+    expect(mountedIn(`<Route path="/elsewhere" element={<Home />} />`)).toEqual([]);
   });
 });
 

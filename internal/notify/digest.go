@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Digest is what one person is told daily, assembled but not yet carried.
@@ -94,7 +95,7 @@ func (d Digest) Message(baseURL string) Message {
 		}
 		text.WriteString(d.Withheld.said())
 	}
-	if where := link(baseURL, "/"); where != "" {
+	if where := link(baseURL, weblink.Home()); where != "" {
 		text.WriteString("\n" + where + "\n")
 	}
 	return Message{Subject: "Your daily digest", Text: text.String()}

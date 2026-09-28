@@ -157,6 +157,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check`, `spdx` |
+| the interface's route table | the Go tier as well as the interface's, because a Go test holds the server's links to it |
 | Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |

@@ -4,7 +4,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import type { Body } from "../api/client";
-import { allFindingsAt } from "../app/routes";
+import { allFindingsAt, requeried } from "../app/routes";
 import type { operations } from "../api/schema";
 
 // The findings list, apart from the screen that draws it.
@@ -148,8 +148,7 @@ export function widened(path: string, params: URLSearchParams): string {
   const base = cut < 0 ? path : path.slice(0, cut);
   const own = cut < 0 ? "" : path.slice(cut + 1);
   for (const [key, value] of new URLSearchParams(own)) rest.append(key, value);
-  const query = rest.toString();
-  return query ? `${base}?${query}` : base;
+  return requeried(base, rest);
 }
 
 // withParam sets one value, or takes the key out where there is none.

@@ -95,6 +95,9 @@ function leftmost(node) {
 // one of those.
 function isAPI(node, declared, seen = new Set()) {
   const left = leftmost(node);
+  if (ts.isConditionalExpression(left)) {
+    return isAPI(left.whenTrue, declared, seen) && isAPI(left.whenFalse, declared, seen);
+  }
   if (ts.isCallExpression(left)) {
     const callee = left.expression;
     return ts.isIdentifier(callee) && /^api[A-Z]/.test(callee.text);
@@ -151,13 +154,33 @@ function isKey(node) {
   return Boolean(at && ts.isJsxAttribute(at) && at.name.getText() === "key");
 }
 
-// addressesIn reads one source file: every address it writes out whole that
-// the router does not answer, every address it puts together from parts, and
-// how many literals it examined.
 function parse(text, file) {
   return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
+// Whether a string glues a query onto an address it did not build: a template
+// opening on a substitution with a part that starts a query or adds to one,
+// or the query mark itself chosen by a condition inside it. A question mark
+// that ends a template is prose.
+function gluesAQuery(node) {
+  if (!ts.isTemplateExpression(node) || node.head.text !== "") return false;
+  const spans = node.templateSpans;
+  const mark = (text) => /^[?&]([a-z_]+=|$)/.test(text);
+  const chosen = (expression) =>
+    ts.isConditionalExpression(expression) &&
+    [expression.whenTrue, expression.whenFalse].every(
+      (branch) => ts.isStringLiteral(branch) && ["?", "&"].includes(branch.text),
+    );
+  return spans.some(
+    (span, i) =>
+      chosen(span.expression) ||
+      (mark(span.literal.text) && (i < spans.length - 1 || span.literal.text.length > 1)),
+  );
+}
+
+// addressesIn reads one source file: every address it writes out whole that
+// the router does not answer, every address it puts together from parts, and
+// how many literals it examined.
 export function addressesIn(routes, text, file = "x.tsx", source = parse(text, file)) {
   const found = [];
   let examined = 0;
@@ -175,12 +198,13 @@ export function addressesIn(routes, text, file = "x.tsx", source = parse(text, f
       examined++;
       const opens = /^\/[a-z$]/.test(literal) || /^\$\{\}\/[a-z]/.test(literal);
       const relative = /^(\/|\$\{\})/.test(literal);
-      if ((opens || (relative && escapesASegment(node))) && !API.test(literal)) {
+      const glued = gluesAQuery(node);
+      if ((opens || glued || (relative && escapesASegment(node))) && !API.test(literal)) {
         const at = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const api = underAPI(node, declared);
         if (api === true || isKey(node)) {
           // An API address, which the API document describes.
-        } else if (api === false || ts.isTemplateExpression(node) || !opens) {
+        } else if (api === false || ts.isTemplateExpression(node) || !opens || glued) {
           found.push({ at, address: literal, why: "put together outside routes.ts" });
         } else if (!/\.[a-z]+$/.test(literal.split(/[?#]/)[0])) {
           // Whole, and not a file the page loads.
@@ -238,7 +262,6 @@ function isFile(at) {
   }
 }
 
-// Every module one module reaches through relative imports, itself included.
 // The modules one module imports by a relative path, by the file each names.
 function importsOf(file, text) {
   const out = [];
@@ -282,6 +305,17 @@ export function screensOf(appText) {
     if (module) screens.set(m[1], module);
   }
   return screens;
+}
+
+// mountedIn is every route name the router mounts, as the name it reads out of
+// the table.
+export function mountedIn(appText) {
+  return [...appText.matchAll(/<Route path=\{ROUTES\.(\w+)\}/g)].map((m) => m[1]);
+}
+
+// The router's own source.
+export function app() {
+  return readFileSync(path.join(src, "app", "App.tsx"), "utf8");
 }
 
 // unread is every query parameter the table lists for a route that nothing the

@@ -127,8 +127,9 @@ func TestAnAddressIsHeldToTheRouteTable(t *testing.T) {
 }
 
 // Awkward on purpose: a separator of every kind an address has, so a part
-// left unescaped moves a segment or starts a query and fails the match.
-const odd = "a/b c?d#e&f=g%"
+// left unescaped moves a segment or starts a query and fails the match. The
+// fragment mark comes last, because everything after it is not checked.
+const odd = "a/b c?d&f=g%#e"
 
 // Every address the server builds is one the web application answers, asking
 // only for what the screen there reads.
@@ -158,7 +159,7 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		"Finding":             func() string { return weblink.Finding(odd, odd, odd, odd, odd, odd) },
 		"Inventories":         func() string { return weblink.Inventories(odd, odd, odd) },
 		"InventoryChanges":    func() string { return weblink.InventoryChanges(odd, odd, odd, 7) },
-		"Report":              func() string { return weblink.Report(odd, "90") },
+		"Report":              func() string { return weblink.Report(odd, odd) },
 	}
 
 	// Every builder the package exports has a sample above, and every sample
@@ -230,8 +231,10 @@ func contains(list []string, name string) bool {
 
 // handSpelled is every string literal in one Go source file that spells an
 // address into the web application: one opening on a segment some route opens
-// with. An API path is under /v1, and so is everything joined onto one, and a
-// route handed to the API router carries braces, so none of those is one.
+// with, and the front page's "/" where it is handed to the function that makes
+// a link absolute. An API path is under /v1, and so is everything joined onto
+// one, and a route handed to the API router carries braces, so none of those
+// is one.
 func handSpelled(name string, source []byte, opening map[string]bool) ([]string, int, error) {
 	parsed, err := parser.ParseFile(token.NewFileSet(), name, source, 0)
 	if err != nil {
@@ -242,6 +245,9 @@ func handSpelled(name string, source []byte, opening map[string]bool) ([]string,
 	ast.Inspect(parsed, func(node ast.Node) bool {
 		if joined, ok := node.(*ast.BinaryExpr); ok && joined.Op == token.ADD && underAPI(joined) {
 			return false
+		}
+		if call, ok := node.(*ast.CallExpr); ok && linksFront(call) {
+			found = append(found, "/")
 		}
 		lit, ok := node.(*ast.BasicLit)
 		if !ok || lit.Kind != token.STRING {
@@ -261,6 +267,22 @@ func handSpelled(name string, source []byte, opening map[string]bool) ([]string,
 		return true
 	})
 	return found, examined, nil
+}
+
+// linksFront says whether a call hands the literal "/" to the function that
+// makes a path into an absolute link. A bare "/" is too common a string to
+// read as an address anywhere else.
+func linksFront(call *ast.CallExpr) bool {
+	name, ok := call.Fun.(*ast.Ident)
+	if !ok || name.Name != "link" {
+		return false
+	}
+	for _, arg := range call.Args {
+		if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING && lit.Value == `"/"` {
+			return true
+		}
+	}
+	return false
 }
 
 // underAPI says whether a joined string opens on the API's prefix.
@@ -308,6 +330,9 @@ func TestAHandSpelledAddressIsFound(t *testing.T) {
 		{`package x; var link = base + "/products/" + product`, true},
 		{`package x; var file = "/etc/openpsirt"`, false},
 		{`package x; var link = weblink.Claim(id)`, false},
+		{`package x; var front = link(baseURL, "/")`, true},
+		{`package x; var front = link(baseURL, weblink.Home())`, false},
+		{`package x; var parts = strings.Split(path, "/")`, false},
 	} {
 		found, _, err := handSpelled("x.go", []byte(tc.source), opening)
 		if err != nil {

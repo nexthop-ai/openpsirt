@@ -184,7 +184,7 @@ export const decisionAt = (id: number) => at("decision", { id });
 export const issueAt = (vulnerability: string) => at("issue", { vulnerability });
 export const personAt = (identity: string) => at("person", { identity });
 export const advisoryAt = (advisory: string | number) => at("advisory", { advisory });
-export const reportAt = (report: string, query?: Query) => at("report", { report }, query);
+export const reportAt = (report: string) => at("report", { report });
 export const settingsAt = (section: string) => at("settingsSection", { section });
 
 // The review queue, for one product, or opened on the claims somebody made
@@ -203,6 +203,13 @@ export const recordAt = (product: string, from?: string) =>
 
 // The record of judgments, asked a question.
 export const auditAt = (query?: Query) => at("audit", {}, query);
+
+// An address built here, with its query replaced, for a list moved to another
+// scope with the filters it carried.
+export function requeried(address: string, query: URLSearchParams): string {
+  const cut = address.indexOf("?");
+  return withQuery(cut < 0 ? address : address.slice(0, cut), query);
+}
 
 // The same address with one issue's name in place of another, where a screen
 // is reached by a name that no longer files what it shows.

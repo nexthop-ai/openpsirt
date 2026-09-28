@@ -444,7 +444,8 @@ function Sits({
   const above = around.data?.above ?? [];
   const below = around.data?.below ?? [];
   const carrying = below.filter((each) => (each.findings ?? 0) > 0);
-  const componentHere = (name: string) => componentAt(product, name, undefined, scope);
+  const componentHere = (name: string, version?: string) =>
+    componentAt(product, name, version, scope);
 
   return (
     <div>
@@ -490,7 +491,7 @@ function Sits({
                 {above.slice(0, 3).map((parent, i) => (
                   <span key={(parent.component ?? "") + i}>
                     {i > 0 && ", "}
-                    <Link className="id" to={componentHere(parent.component ?? "")}>
+                    <Link className="id" to={componentHere(parent.component ?? "", parent.version)}>
                       {parent.component}
                     </Link>
                   </span>
@@ -548,7 +549,10 @@ function Sits({
                         {carrying.slice(0, SHOWN).map((each, i) => (
                           <tr key={(each.component ?? "") + i}>
                             <td>
-                              <Link className="id" to={componentHere(each.component ?? "")}>
+                              <Link
+                                className="id"
+                                to={componentHere(each.component ?? "", each.version)}
+                              >
                                 {each.component}
                               </Link>{" "}
                               <span className="hint">{each.version}</span>
@@ -558,7 +562,9 @@ function Sits({
                                 its own, so the second is what says whether the
                                 branch is worth opening. */}
                             <td className="num">
-                              <Link to={componentHere(each.component ?? "")}>{each.findings}</Link>
+                              <Link to={componentHere(each.component ?? "", each.version)}>
+                                {each.findings}
+                              </Link>
                             </td>
                             <td className="num" style={{ color: "var(--faint)" }}>
                               {(each.beneath ?? 0) > (each.findings ?? 0)
@@ -583,7 +589,17 @@ function Sits({
                 )}
               </>
             )}
-            <Link className="linkish" to={treeAt(scope, { at: component })}>
+            <Link
+              className="linkish"
+              to={treeAt(scope, {
+                at: component,
+                ...whichOf({
+                  version: pkg.version,
+                  ecosystem: here.ecosystem,
+                  namespace: pkg.namespace,
+                }),
+              })}
+            >
               Open in the tree →
             </Link>
           </li>

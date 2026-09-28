@@ -56,10 +56,6 @@ export function blockingPath(at: Parameters<typeof findingsPath>[0]): string {
   return findingsPath(at, true, asked);
 }
 
-function withOnly(path: string, only: string): string {
-  return `${path}${path.includes("?") ? "&" : "?"}only=${only}`;
-}
-
 // One home page, assembled from what this person holds. Five figures that
 // follow the scope, each with what it would say without one beside it, then the
 // work — what is pending, what is in progress, what lapsed — then the trends,
@@ -550,7 +546,7 @@ function Figures({
         <button
           type="button"
           className={`kpi${known(exploited) && (exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
-          onClick={() => navigate(withOnly(findingsPath(at, true), "exploited"))}
+          onClick={() => navigate(findingsPath(at, true, { only: "exploited" }))}
         >
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited

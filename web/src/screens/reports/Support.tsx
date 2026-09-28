@@ -252,12 +252,12 @@ function fileAt(format: "csv" | "json", asked: string): string {
 function endingAt(product: string, stream: string, kind: string): string {
   const asked = new URLSearchParams({ stream });
   asked.set("on", kind === "tag" ? "tag" : "branch");
-  return `${findingsPath({ product })}?${asked.toString()}`;
+  return findingsPath({ product }, false, asked);
 }
 
 function openAt(product: string, stream: string, kind: string): string {
   const asked = new URLSearchParams({ stream });
   asked.set("on", kind === "tag" ? "tag" : "branch");
   asked.set("support", "past-eol");
-  return `${findingsPath({ product })}?${asked.toString()}`;
+  return findingsPath({ product }, false, asked);
 }

@@ -139,6 +139,17 @@ describe("changing scope stays on the screen", () => {
     ).toBe("/products/sonic/streams/202411/variants/mellanox/components");
   });
 
+  it("keeps a segment that carries an escaped slash as one segment", () => {
+    const tail = "/findings/CVE-1/components/github.com%2Fsirupsen%2Flogrus";
+    expect(
+      rescoped(`/products/sonic/streams/master/variants/broadcom${tail}`, {
+        product: "sonic",
+        stream: "202411",
+        variant: "mellanox",
+      }),
+    ).toBe(`/products/sonic/streams/202411/variants/mellanox${tail}`);
+  });
+
   it("narrows the wider list onto the build it was given", () => {
     expect(
       rescoped("/products/sonic/findings", {
