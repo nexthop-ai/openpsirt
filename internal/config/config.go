@@ -131,34 +131,13 @@ type Config struct {
 	ZulipSite  string
 	ZulipEmail string
 	ZulipKey   string
-	// AttachmentBucket is where files hanging off an issue are kept, and
-	// absent is ordinary: with none of this set, attachments are off and
-	// everything else works . An operator who wants none should not have
-	// to run a bucket.
-	//
-	// AttachmentBucket is what turns the object store on. Endpoint is what
-	// a self-hosted store needs and a cloud one does not; credentials are
-	// optional, because a deployment on a cloud provider gets a rotating
-	// role from its environment rather than a key somebody stored.
-	//
-	// AttachmentDir is the development backend, for running the tool
-	// without standing an object store up first — one process and one
-	// disk, so never a production option. The bucket wins where both are
-	// set.
-	AttachmentBucket    string
-	AttachmentEndpoint  string
-	AttachmentRegion    string
-	AttachmentKey       string
-	AttachmentSecret    string
-	AttachmentToken     string
-	AttachmentPathStyle bool
-	// AttachmentAllowHTTP permits a plaintext endpoint that is not this
-	// machine, for a store on a network an operator accepts that on. Off
-	// unless it is set, and distinct from PlainHTTP, which is about how this
-	// application is served and loosens cookies rather than anything about
-	// where attachments are kept (REQ-70).
-	AttachmentAllowHTTP bool
-	AttachmentDir       string
+	// Attachments is where files hanging off an issue are kept, and absent
+	// is ordinary: with none of it set, attachments are off and everything
+	// else works. An operator who wants none should not have to run a
+	// bucket. Its directory on disk is the development backend, for running
+	// the tool without standing an object store up first — one process and
+	// one disk, so never a production option.
+	Attachments Store
 
 	// The bounds a scan file is read within. Each is what a deployment may
 	// lower or raise; left unset, the reader's own defaults apply, which
@@ -229,26 +208,15 @@ type Config struct {
 	// knows — every address the directory states about itself, and the
 	// address each document states for itself, is built from it. Checked and
 	// given its trailing slash here, so that nothing below joins a name to it
-	// twice over. The rest is where the files are put, and mirrors the attachment
-	// store because it is the same store with a different destination: the
-	// bucket is what turns the object store on, credentials are optional
-	// where the environment supplies a role, and the directory on disk is
-	// the one a web server on this machine reads.
+	// twice over. Directory is where the files are put, and its directory on
+	// disk is the one a web server on this machine reads.
 	//
 	// A store of its own rather than the attachment bucket. Attachments are
 	// in no public bucket and every fetch of one is authorized (REQ-70);
 	// these files are served to anybody, so putting them in one place would
 	// mean a bucket that is both.
-	DirectoryURL       string
-	DirectoryBucket    string
-	DirectoryEndpoint  string
-	DirectoryRegion    string
-	DirectoryKey       string
-	DirectorySecret    string
-	DirectoryToken     string
-	DirectoryPathStyle bool
-	DirectoryAllowHTTP bool
-	DirectoryDir       string
+	DirectoryURL string
+	Directory    Store
 	// DirectoryList and DirectoryMirror are what the deployment tells
 	// aggregators it is content with. The standard reads an answer it cannot
 	// get as listed and not mirrored, which is what these default to.
@@ -315,6 +283,30 @@ type Config struct {
 
 const envPrefix = "OPENPSIRT_"
 
+// Store is where one object store, or one directory on disk, keeps files.
+//
+// Bucket is what turns the object store on, and it wins where a directory is
+// named too. Endpoint is what a self-hosted store needs and a cloud one does
+// not; credentials are optional, because a deployment on a cloud provider
+// gets a rotating role from its environment rather than a key somebody
+// stored. PathStyle follows the endpoint, because path style is what a
+// self-hosted store is usually addressed by and a provider usually is not.
+// AllowHTTP permits a plaintext endpoint that is not this machine, and has no
+// default of its own: what it allows has to be somebody's decision rather
+// than a consequence of another setting. It is distinct from PlainHTTP, which
+// is about how this application is served (REQ-70).
+type Store struct {
+	Bucket    string
+	Endpoint  string
+	Region    string
+	Key       string
+	Secret    string
+	Token     string
+	PathStyle bool
+	AllowHTTP bool
+	Dir       string
+}
+
 // Load reads configuration from the environment.
 //
 // A value that is set and cannot be read is a startup error naming the
@@ -359,36 +351,32 @@ func Load() (Config, error) {
 		ScannerMaxMatches:    r.number("SCANNER_MAX_MATCHES", 0),
 		ScannerMaxReferences: r.number("SCANNER_MAX_REFERENCES", 0),
 
-		AttachmentBucket:   env("ATTACHMENT_BUCKET", ""),
-		AttachmentEndpoint: env("ATTACHMENT_ENDPOINT", ""),
-		AttachmentRegion:   env("ATTACHMENT_REGION", ""),
-		AttachmentKey:      env("ATTACHMENT_KEY", ""),
-		AttachmentSecret:   env("ATTACHMENT_SECRET", ""),
-		AttachmentToken:    env("ATTACHMENT_SESSION_TOKEN", ""),
-		AttachmentDir:      env("ATTACHMENT_DIR", ""),
-		// Path style is what a self-hosted store is usually addressed by and
-		// a provider usually is not, so it follows the endpoint rather than
-		// having a default of its own.
-		AttachmentPathStyle: r.boolean("ATTACHMENT_PATH_STYLE",
-			env("ATTACHMENT_ENDPOINT", "") != ""),
-		// No default of its own, and it follows nothing: what it allows has to
-		// be somebody's decision rather than a consequence of another setting.
-		AttachmentAllowHTTP: r.boolean("ATTACHMENT_ALLOW_HTTP", false),
-		DirectoryURL:        env("DIRECTORY_URL", ""),
-		DirectoryBucket:     env("DIRECTORY_BUCKET", ""),
-		DirectoryEndpoint:   env("DIRECTORY_ENDPOINT", ""),
-		DirectoryRegion:     env("DIRECTORY_REGION", ""),
-		DirectoryKey:        env("DIRECTORY_KEY", ""),
-		DirectorySecret:     env("DIRECTORY_SECRET", ""),
-		DirectoryToken:      env("DIRECTORY_SESSION_TOKEN", ""),
-		DirectoryDir:        env("DIRECTORY_DIR", ""),
-		// Both follow the endpoint the way the attachment store's do, and
-		// for the same reasons: path style is what a self-hosted store
-		// usually wants, and accepting a plaintext one has to be somebody's
-		// decision rather than a consequence of another setting.
-		DirectoryPathStyle: r.boolean("DIRECTORY_PATH_STYLE",
-			env("DIRECTORY_ENDPOINT", "") != ""),
-		DirectoryAllowHTTP: r.boolean("DIRECTORY_ALLOW_HTTP", false),
+		// Each name is a literal at its read, which is what the check that
+		// every setting is documented reads; the two stores share the shape
+		// they are read into.
+		Attachments: Store{
+			Bucket:    env("ATTACHMENT_BUCKET", ""),
+			Endpoint:  env("ATTACHMENT_ENDPOINT", ""),
+			Region:    env("ATTACHMENT_REGION", ""),
+			Key:       env("ATTACHMENT_KEY", ""),
+			Secret:    env("ATTACHMENT_SECRET", ""),
+			Token:     env("ATTACHMENT_SESSION_TOKEN", ""),
+			PathStyle: r.boolean("ATTACHMENT_PATH_STYLE", env("ATTACHMENT_ENDPOINT", "") != ""),
+			AllowHTTP: r.boolean("ATTACHMENT_ALLOW_HTTP", false),
+			Dir:       env("ATTACHMENT_DIR", ""),
+		},
+		DirectoryURL: env("DIRECTORY_URL", ""),
+		Directory: Store{
+			Bucket:    env("DIRECTORY_BUCKET", ""),
+			Endpoint:  env("DIRECTORY_ENDPOINT", ""),
+			Region:    env("DIRECTORY_REGION", ""),
+			Key:       env("DIRECTORY_KEY", ""),
+			Secret:    env("DIRECTORY_SECRET", ""),
+			Token:     env("DIRECTORY_SESSION_TOKEN", ""),
+			PathStyle: r.boolean("DIRECTORY_PATH_STYLE", env("DIRECTORY_ENDPOINT", "") != ""),
+			AllowHTTP: r.boolean("DIRECTORY_ALLOW_HTTP", false),
+			Dir:       env("DIRECTORY_DIR", ""),
+		},
 		// The standard's own reading of an answer nobody gave.
 		DirectoryList:          r.boolean("DIRECTORY_LIST", true),
 		DirectoryMirror:        r.boolean("DIRECTORY_MIRROR", false),
@@ -565,7 +553,7 @@ func Load() (Config, error) {
 	// same way: the files are written, every address in them is a name with
 	// nothing in front of it, and nothing says so. The other way round writes
 	// nothing anywhere.
-	if (strings.TrimSpace(c.DirectoryBucket) != "" || strings.TrimSpace(c.DirectoryDir) != "") &&
+	if (strings.TrimSpace(c.Directory.Bucket) != "" || strings.TrimSpace(c.Directory.Dir) != "") &&
 		c.DirectoryURL == "" {
 		return Config{}, fmt.Errorf(
 			"OPENPSIRT_DIRECTORY_URL: set it alongside OPENPSIRT_DIRECTORY_BUCKET or " +

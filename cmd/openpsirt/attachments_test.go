@@ -91,11 +91,11 @@ func TestTheRefusalNamesTheWayThrough(t *testing.T) {
 		cfg   config.Config
 	}{
 		{"OPENPSIRT_ATTACHMENT_ALLOW_HTTP", attachmentStore,
-			config.Config{AttachmentEndpoint: withPassword, AttachmentBucket: "attachments",
-				AttachmentRegion: "us-east-1"}},
+			config.Config{Attachments: config.Store{Endpoint: withPassword, Bucket: "attachments",
+				Region: "us-east-1"}}},
 		{"OPENPSIRT_DIRECTORY_ALLOW_HTTP", directoryStore,
-			config.Config{DirectoryEndpoint: withPassword, DirectoryBucket: "advisories",
-				DirectoryRegion: "us-east-1"}},
+			config.Config{Directory: config.Store{Endpoint: withPassword, Bucket: "advisories",
+				Region: "us-east-1"}}},
 	} {
 		t.Run(each.store, func(t *testing.T) {
 			_, err := each.open(context.Background(), each.cfg, slog.New(slog.DiscardHandler))
