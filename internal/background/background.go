@@ -16,6 +16,10 @@
 // of what it collected, a count of what it sent and a count of what failed, a
 // line per unit of work. A helper owning the logging would have to be told all
 // of that, which is the call site written out again with a worse vocabulary.
+//
+// A worker taking queued work runs the same timer through Drain, which also
+// holds the one rule the workers share: a failure that is only the process
+// shutting down is not reported.
 package background
 
 import (
@@ -50,4 +54,31 @@ func Every(ctx context.Context, interval, fallback time.Duration, pass func(cont
 		pass(ctx)
 		timer.Reset(interval)
 	}
+}
+
+// Drain runs once on the timer Every keeps, as many times in a row as it
+// reports more to do, so a backlog drains at the speed of the work rather
+// than at the speed of the poll.
+//
+// A failure ends the pass and is handed to failed, unless the context has
+// ended: work cut short by shutdown is handed back and taken again later,
+// which is no fault in the work or in the process. What succeeded is once's
+// to report, since each worker reports a different thing.
+func Drain(ctx context.Context, interval, fallback time.Duration,
+	once func(context.Context) (more bool, err error), failed func(error)) {
+
+	Every(ctx, interval, fallback, func(ctx context.Context) {
+		for {
+			more, err := once(ctx)
+			if err != nil {
+				if ctx.Err() == nil {
+					failed(err)
+				}
+				return
+			}
+			if !more {
+				return
+			}
+		}
+	})
 }
