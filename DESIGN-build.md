@@ -745,6 +745,38 @@ Built with mkdocs-material and published to GitHub Pages, with sets versioned by
 | The site's default is `latest` once a release carries it, and `main` until then | The root of the site is what a visitor reads first, and unreleased documentation there describes a version nobody can install |
 | A push to `main` sets the default to `latest` where a set carries it, and to `main` where none does | Set on every merge, so a default another run moved is put back rather than left until the next release |
 
+### Release version
+
+A page names the release a reader deploys as `{{ release }}`, and the build
+writes the version in. No page names a release by hand.
+
+| Build | Version written in |
+|---|---|
+| A release tag, published by the release workflow | The tag's own version, passed to the build as `DOCS_RELEASE`. A release candidate's pages name the candidate |
+| `main`, published on every push | The newest release tag reachable from the commit, release candidates left out |
+| The CI check and a local `make docs-site` | The same as `main` |
+| None of those resolves | The build fails. A blank or a default version is a command somebody copies |
+
+A version is `X.Y.Z` or `X.Y.Z-rc.N`, with or without a leading `v`, and
+anything else in `DOCS_RELEASE` fails the build. Every workflow that builds the
+site checks out full history, because a shallow checkout carries no tags.
+
+A test in `internal/docs` fails on a release version written by hand in
+`README.md`, `SECURITY.md` or any page under `docs/`.
+
+| Not reported | Why |
+|---|---|
+| The upgrade notes in the configuration page: a `From vX.Y.Z` heading and everything beneath it | Past releases are their subject |
+| Four numeric parts, or a version running on into a letter | A network address, and a third party's package version |
+| The versions an example on one page shows, listed by page in the test | A third party's version or a customer's tag |
+
+`README.md` is not built by the site, so it names no version at all. The
+compatibility notes on it and on the site say that a database built by any
+tagged release is upgraded in place, which holds while every release's
+migrations are kept (`DESIGN-database.md` § Migrations).
+
+### Environment variables
+
 The configuration page lists every environment variable the process reads, with
 its meaning and default. A variable that is set and cannot be read stops the
 process with the variable named rather than falling back.

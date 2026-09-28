@@ -30,6 +30,7 @@ local.mk
 .DS_Store
 # Docs build
 /site/
+__pycache__/
 # Build output
 #
 # Every package here is run with "go run", so a binary in the tree came from
