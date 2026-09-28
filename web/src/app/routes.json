@@ -4,7 +4,7 @@
   "unassigned": { "path": "/unassigned" },
   "findings": {
     "path": "/findings",
-    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "on", "only", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "exploited", "fixable", "on", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
   },
   "claim": { "path": "/claims/:id" },
   "decision": { "path": "/decisions/:id" },
@@ -16,7 +16,7 @@
   "variants": { "path": "/products/:product/variants" },
   "productFindings": {
     "path": "/products/:product/findings",
-    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "on", "only", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "exploited", "fixable", "on", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
   },
   "productComponent": {
     "path": "/products/:product/components/:component",
@@ -24,7 +24,7 @@
   },
   "buildFindings": {
     "path": "/products/:product/streams/:stream/variants/:variant/findings",
-    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "on", "only", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "exploited", "fixable", "on", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
   },
   "finding": {
     "path": "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component",

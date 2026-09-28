@@ -32,7 +32,7 @@ export function Support() {
   // The distance ahead to warn. Nothing by default, because this report is
   // about what has already gone and a second population appearing unasked would
   // change what the figures at the top of it count.
-  const within = boundedAsked(params, "within", FURTHEST, 0);
+  const within = boundedAsked(params.get("within"), FURTHEST, 0);
   const ended = useQuery({
     queryKey: ["out-of-support", scope, within],
     queryFn: async () =>

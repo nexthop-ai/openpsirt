@@ -46,9 +46,9 @@ describe("the window a sheet was asked for", () => {
   });
 
   it("reads another parameter against a bound of its own", () => {
-    expect(boundedAsked(asked("weeks=104"), "weeks", 104, 13)).toBe(104);
-    expect(boundedAsked(asked("weeks=105"), "weeks", 104, 13)).toBe(13);
-    expect(boundedAsked(asked("days=7"), "weeks", 104, 13)).toBe(13);
+    expect(boundedAsked(asked("weeks=104").get("weeks"), 104, 13)).toBe(104);
+    expect(boundedAsked(asked("weeks=105").get("weeks"), 104, 13)).toBe(13);
+    expect(boundedAsked(asked("days=7").get("weeks"), 104, 13)).toBe(13);
   });
 });
 

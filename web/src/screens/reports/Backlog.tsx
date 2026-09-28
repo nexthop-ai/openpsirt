@@ -40,7 +40,7 @@ export function Backlog() {
   const [params] = useSearchParams();
   // A value outside the range falls back to a quarter, and a fraction is cut
   // to its whole number of weeks.
-  const weeks = boundedAsked(params, "weeks", 104, 13);
+  const weeks = boundedAsked(params.get("weeks"), 104, 13);
 
   const trend = useQuery({
     queryKey: ["backlog", scope, weeks],

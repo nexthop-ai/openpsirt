@@ -28,13 +28,10 @@ const LONGEST = 3650;
 // window it cannot answer for. So anything that is not a number from one to
 // the most the sheet offers falls back to what the sheet asked for, and a
 // fraction is cut to its whole number.
-export function boundedAsked(
-  params: URLSearchParams,
-  name: string,
-  most: number,
-  fallback: number,
-): number {
-  const asked = params.get(name);
+//
+// Handed the parameter's value rather than its name, so each screen's read of
+// the address is written where the route table's check can see it.
+export function boundedAsked(asked: string | null, most: number, fallback: number): number {
   if (asked === null) return fallback;
   const n = Number(asked);
   if (!Number.isFinite(n) || n < 1 || n > most) return fallback;
@@ -43,7 +40,7 @@ export function boundedAsked(
 
 // daysAsked is the window in days the address asks for.
 export function daysAsked(params: URLSearchParams, fallback: number): number {
-  return boundedAsked(params, "days", LONGEST, fallback);
+  return boundedAsked(params.get("days"), LONGEST, fallback);
 }
 
 // windowStart is when a window began, as the date the lists and the record
