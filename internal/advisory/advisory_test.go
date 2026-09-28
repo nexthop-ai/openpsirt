@@ -548,7 +548,7 @@ func (f *fixture) pointsAt(t *testing.T, identifier, advisory string,
 	}
 }
 
-func TestAFlawAssessedUnderAnUncarriedSchemeStatesNoScore(t *testing.T) {
+func TestAFlawAssessedUnderAnUncarriedSchemeStatesItsScoreInWords(t *testing.T) {
 	// The standard's score object has a field for a version 2 score and a
 	// version 3 score, and version 4 arrives with its next version. The
 	// number is held and shown here; a document that put it in the version 3
@@ -580,8 +580,18 @@ func TestAFlawAssessedUnderAnUncarriedSchemeStatesNoScore(t *testing.T) {
 				if got := len(doc.Vulnerabilities[0].Scores); got != c.scores {
 					t.Fatalf("the document states %d scores, want %d", got, c.scores)
 				}
+				// The score it has no field for is stated in words instead,
+				// and one it has a field for is not stated twice.
+				stated := scoreNotes(doc.Vulnerabilities[0].Notes)
 				if c.scores == 0 {
+					if len(stated) != 1 || !strings.Contains(stated[0].Text, c.vector) ||
+						!strings.Contains(stated[0].Text, "10.0") {
+						t.Fatalf("the document states the score as %+v, want one note with the vector", stated)
+					}
 					return
+				}
+				if len(stated) != 0 {
+					t.Errorf("a carried score is also stated as %+v", stated)
 				}
 				// The version the field states is one its schema knows.
 				if v := doc.Vulnerabilities[0].Scores[0].CVSSv3.Version; v != "3.1" {
@@ -625,7 +635,21 @@ func TestAFlawRatedUnderBothGenerationsStatesTheOneTheDocumentCarries(t *testing
 		if got := scores[0].CVSSv3; got.VectorString != three || got.BaseScore != 8.1 {
 			t.Errorf("the document states %+v, want the version 3 rating", got)
 		}
+		if stated := scoreNotes(doc.Vulnerabilities[0].Notes); len(stated) != 0 {
+			t.Errorf("the version 4 score is stated as %+v beside a carried one", stated)
+		}
 	})
+}
+
+// scoreNotes is the notes stating a score in words.
+func scoreNotes(notes []advisory.Note) []advisory.Note {
+	var stated []advisory.Note
+	for _, note := range notes {
+		if strings.HasPrefix(note.Title, "CVSS ") {
+			stated = append(stated, note)
+		}
+	}
+	return stated
 }
 
 func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {

@@ -235,9 +235,9 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 // carriedByCSAF is the scoring schemes a CSAF 2.0 document has a field for.
 //
 // The standard's score object holds a version 2 score and a version 3 score,
-// and version 4 arrives with CSAF 2.1. So a flaw assessed under version 4 is
-// published with no score at all: the number is recorded and shown here, and
-// the document states what it has a place to state.
+// and version 4 arrives with CSAF 2.1, which is a draft. So a flaw assessed
+// under version 4 alone is published with no score object, and its score is
+// stated in words on a note instead (scoreNoteFor).
 var carriedByCSAF = map[string]bool{"3.0": true, "3.1": true}
 
 // scoresFor is what the flaw scored, stated for every release the document
@@ -245,8 +245,7 @@ var carriedByCSAF = map[string]bool{"3.0": true, "3.1": true}
 //
 // The rating the document has a field for. An issue rated under version 4
 // and version 3 is published with its version 3 score, and one rated under
-// version 4 alone is published with none: the number is recorded and shown
-// here, and the document states what it has a place to state. The ratings
+// version 4 alone is published with none, and a note instead. The ratings
 // held for the issue are asked newest first, and the issue's own vector last,
 // which is where a flaw assessed here records the one it was given.
 //
@@ -261,17 +260,8 @@ func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []
 	if len(products) == 0 {
 		return nil
 	}
-	vectors := make([]string, 0, len(ratings)+1)
-	for _, rating := range ratings {
-		vectors = append(vectors, rating.Vector)
-	}
-	vectors = append(vectors, issue.Vector)
-	for _, vector := range vectors {
-		if strings.TrimSpace(vector) == "" {
-			continue
-		}
-		scored, err := finding.Score(vector)
-		if err != nil || scored == nil || !carriedByCSAF[scored.Scheme()] {
+	for _, scored := range scoredOf(issue, ratings) {
+		if !carriedByCSAF[scored.Scheme()] {
 			continue
 		}
 		return []Score{{
@@ -285,6 +275,52 @@ func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []
 		}}
 	}
 	return nil
+}
+
+// scoreNoteFor states in words a score the document has no field for.
+//
+// Stated only where no carried rating is held, so a flaw assessed under version 4
+// alone still tells a reader how bad it is. A note is prose: a consumer's
+// tooling does not read a score from it, and a person does.
+func scoreNoteFor(issue *finding.Vulnerability, ratings []finding.CVSS) *Note {
+	held := scoredOf(issue, ratings)
+	for _, scored := range held {
+		if carriedByCSAF[scored.Scheme()] {
+			return nil
+		}
+	}
+	if len(held) == 0 {
+		return nil
+	}
+	scored := held[0]
+	return &Note{
+		Category: "other",
+		Title:    "CVSS " + scored.Scheme() + " score",
+		Text: fmt.Sprintf("CVSS %s base score %.1f, %s: %s. CSAF 2.0 has no field for this version.",
+			scored.Scheme(), float64(scored.ScoreCenti)/100, scored.Severity, scored.Vector),
+	}
+}
+
+// scoredOf is every rating held for the issue that scores, newest first and
+// the issue's own vector last.
+func scoredOf(issue *finding.Vulnerability, ratings []finding.CVSS) []*finding.Scored {
+	vectors := make([]string, 0, len(ratings)+1)
+	for _, rating := range ratings {
+		vectors = append(vectors, rating.Vector)
+	}
+	vectors = append(vectors, issue.Vector)
+	var scored []*finding.Scored
+	for _, vector := range vectors {
+		if strings.TrimSpace(vector) == "" {
+			continue
+		}
+		one, err := finding.Score(vector)
+		if err != nil || one == nil {
+			continue
+		}
+		scored = append(scored, one)
+	}
+	return scored
 }
 
 // remediationsFor is what a reader can do, from what is true now.

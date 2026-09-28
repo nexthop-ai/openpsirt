@@ -1244,6 +1244,11 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		return err
 	}
 	vulnerability.Scores = scoresFor(issue, ratings, rated)
+	if vulnerability.Scores == nil {
+		if note := scoreNoteFor(issue, ratings); note != nil {
+			vulnerability.Notes = append(vulnerability.Notes, *note)
+		}
+	}
 	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
 
 	a.vulnerabilities = append(a.vulnerabilities, vulnerability)
