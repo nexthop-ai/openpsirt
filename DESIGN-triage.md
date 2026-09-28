@@ -1394,9 +1394,9 @@ reasoning at all.
 |---|---|
 | Only what was offered may be carried | Naming a judgment the preview classified as already applying, or as covering nothing here, is refused rather than skipped: a caller that got the set wrong should hear so |
 | The place is read from the new line, never copied from the old claim | The versions are what a decision is keyed on and they are the thing that moved |
-| A deferral carries the date it had | Quietly moving it forward would be the tool making the judgment it is asking for. The total it has already run for is shown beside it, because that is what agreeing to it again agrees to |
+| A dated judgment carries what it said | A deferral keeps its date, and a promise keeps its date and the version it moves to. Quietly moving a date forward would be the tool making the judgment it is asking for, and a promise without its date is refused on every write path. The total a deferral has already run for is shown beside it, because that is what agreeing to it again agrees to |
 | **A judgment whose date has gone by is not offered** | It carries its date rather than having it moved forward, so carrying one that has run out writes a claim finished the moment it lands. Offering it is offering something the act behind the button turns down |
-| **What is carried is checked like anything else written** | It built a claim and went straight to the writer, so nothing asked whether what it carried could be said at all — and the place it built never read whether the new line was a tag, which is the one rule this act can break that no other can |
+| What is carried is checked like anything else written | The place it builds records whether the new line is a tag, so a dated judgment carried onto a release built once is refused as it is when proposed there |
 | Bounded, and written in one transaction | Carrying six judgments is one act, and half of it landing is a line nobody can tell from one somebody chose that way |
 
 ## Not built

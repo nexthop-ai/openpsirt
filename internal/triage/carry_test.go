@@ -72,6 +72,59 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 	})
 }
 
+func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
+	// A promise to upgrade or patch is refused without its date, and an
+	// upgrade without the version it moves to, so a carry that left them
+	// behind could never land.
+	for _, outcome := range []triage.Outcome{triage.UpgradeNeeded, triage.PatchNeeded} {
+		t.Run(string(outcome), func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				by := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(time.Second)
+				proposal := triage.Proposal{
+					Place: f.at(), Outcome: outcome, CommittedTo: &by,
+					Reasoning: "Moving the package forward.", By: f.proposer,
+					NeedsApproval: true,
+				}
+				if outcome == triage.UpgradeNeeded {
+					proposal.UpgradeTo = "1.3.0"
+				}
+				promised, err := f.store.Propose(ctx, f.triager, proposal)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := agreeTo(ctx, f.store, f.reviewer, promised.ClaimID, ""); err != nil {
+					t.Fatal(err)
+				}
+				was := f.anotherLineOf(t, catalog.Branch, "main", "1.2.3", "4.5.6")
+				next := f.anotherLineOf(t, catalog.Branch, "next", "1.2.4", "4.5.6")
+
+				carried, err := f.store.Carry(ctx, f.triager, was, next,
+					[]int64{promised.ID}, triage.DefaultBounds())
+				if err != nil {
+					t.Fatalf("carrying a promise: %v", err)
+				}
+				if carried != 1 {
+					t.Fatalf("carried %d, want 1", carried)
+				}
+				var landed triage.Claim
+				if err := f.db.DB.NewSelect().Model(&landed).
+					Where("cl.id <> ?", promised.ClaimID).
+					OrderExpr("cl.id DESC").Limit(1).Scan(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if landed.CommittedTo == nil || landed.CommittedTo.Format(time.DateOnly) != by.Format(time.DateOnly) {
+					t.Errorf("the carried promise is due %v, want %v", landed.CommittedTo, by)
+				}
+				if outcome == triage.UpgradeNeeded &&
+					(landed.UpgradeTo == nil || *landed.UpgradeTo != "1.3.0") {
+					t.Errorf("the carried upgrade moves to %v, want 1.3.0", landed.UpgradeTo)
+				}
+			})
+		})
+	}
+}
+
 func TestOnlyWhatTheNewLineWasOfferedMayBeCarried(t *testing.T) {
 	// A judgment that already applies has nothing to agree to, and one
 	// covering nothing here has nothing to apply to. Refused rather than
@@ -165,9 +218,16 @@ func TestSomebodyWhoMayNotDecideHereCarriesNothing(t *testing.T) {
 // where it would land.
 func (f *fixture) anotherLine(t *testing.T, stream, component, consumer string) int64 {
 	t.Helper()
+	return f.anotherLineOf(t, catalog.Tag, stream, component, consumer)
+}
+
+// anotherLineOf is anotherLine for a stream of the given kind. A dated
+// judgment is refused on a tag, so carrying one needs a branch.
+func (f *fixture) anotherLineOf(t *testing.T, kind catalog.Kind, stream, component, consumer string) int64 {
+	t.Helper()
 	ctx := t.Context()
 	cat := catalog.NewStore(f.db.DB)
-	declared, err := cat.DeclareStream(ctx, f.product, stream, catalog.Tag, nil)
+	declared, err := cat.DeclareStream(ctx, f.product, stream, kind, nil)
 	if err != nil {
 		t.Fatalf("declare %s: %v", stream, err)
 	}
