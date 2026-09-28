@@ -306,3 +306,21 @@ func (f *fixture) openedLongAgo(t *testing.T) string {
 	}
 	return identifier
 }
+
+// An issue is named in an advisory however it is capitalized. Identifiers are
+// case-insensitive in every scheme that issues them, and the issue was matched
+// exactly against the stored spelling, so a name typed in lower case was no
+// such issue.
+func TestAnIssueIsAddedToAnAdvisoryWhateverItsCapitals(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		made, err := f.store.Mint(t.Context(), f.who, issuer, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Add(t.Context(), f.who, made.Identifier,
+			"sonic", strings.ToLower(identifier)); err != nil {
+			t.Errorf("adding %q in lower case: %v", identifier, err)
+		}
+	})
+}

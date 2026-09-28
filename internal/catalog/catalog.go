@@ -214,7 +214,7 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 		return nil, err
 	}
 
-	p := &Product{Name: matching(name), DisplayName: displayName, CreatedAt: now()}
+	p := &Product{Name: Matching(name), DisplayName: displayName, CreatedAt: now()}
 	if _, err := s.db.NewInsert().Model(p).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("declare product %q: %w", name, err)
 	}
@@ -646,7 +646,7 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 // ProductByName finds a product, or reports that it was never declared.
 func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error) {
 	p := new(Product)
-	err := s.db.NewSelect().Model(p).Where("name = ?", matching(name)).Scan(ctx)
+	err := s.db.NewSelect().Model(p).Where("name = ?", Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("product %q: %w", name, ErrNotFound)
@@ -671,7 +671,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 	}
 
 	st := &Stream{
-		ProductID: productID, Name: matching(name), DisplayName: strings.TrimSpace(name),
+		ProductID: productID, Name: Matching(name), DisplayName: strings.TrimSpace(name),
 		Kind: kind, ParentID: parentID, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(st).Exec(ctx); err != nil {
@@ -684,7 +684,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 func (s *Store) StreamByName(ctx context.Context, productID int64, name string) (*Stream, error) {
 	st := new(Stream)
 	err := s.db.NewSelect().Model(st).
-		Where("product_id = ?", productID).Where("name = ?", matching(name)).Scan(ctx)
+		Where("product_id = ?", productID).Where("name = ?", Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("stream %q: %w", name, ErrNotFound)
@@ -713,7 +713,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 	}
 
 	v := &Variant{
-		ProductID: productID, Name: matching(name), DisplayName: strings.TrimSpace(name),
+		ProductID: productID, Name: Matching(name), DisplayName: strings.TrimSpace(name),
 		CustomerFacing: customerFacing, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(v).Exec(ctx); err != nil {
@@ -726,7 +726,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 func (s *Store) VariantByName(ctx context.Context, productID int64, name string) (*Variant, error) {
 	v := new(Variant)
 	err := s.db.NewSelect().Model(v).
-		Where("product_id = ?", productID).Where("name = ?", matching(name)).Scan(ctx)
+		Where("product_id = ?", productID).Where("name = ?", Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("variant %q: %w", name, ErrNotFound)
@@ -871,7 +871,7 @@ func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 // constraint means the same thing everywhere.
 //
 // The spelling somebody typed is kept beside it and is what gets shown back.
-func matching(name string) string {
+func Matching(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 

@@ -478,7 +478,7 @@ func registerRevocation(api huma.API, a Administering) {
 			case err != nil:
 				return wentWrong(a.Logger, "cannot revoke a token", err)
 			}
-			if err := noted(ctx, tx, trail.Credential, in.Identity+" · "+in.Name,
+			if err := noted(ctx, tx, trail.Credential, person.Identity+" · "+token.Name,
 				trail.Said("in force", true), nil); err != nil {
 				return notRecorded(a.Logger, err)
 			}
@@ -511,7 +511,7 @@ func registerRevocation(api huma.API, a Administering) {
 			if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
 				return wentWrong(a.Logger, "cannot end the sessions", err)
 			}
-			if err := noted(ctx, tx, trail.Account, in.Identity,
+			if err := noted(ctx, tx, trail.Account, person.Identity,
 				nil, trail.Said("sessions ended", true)); err != nil {
 				return notRecorded(a.Logger, err)
 			}

@@ -184,6 +184,7 @@ components:
           type: string
         beneath:
           description: A component name, matching it and everything under it
+          maxLength: 191
           type: string
         name:
           maxLength: 120
@@ -195,6 +196,7 @@ components:
           type: string
         upstream:
           description: A source package name
+          maxLength: 191
           type: string
       required:
         - name

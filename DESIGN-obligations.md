@@ -111,7 +111,7 @@ moment an attack became known.
 | A name and a length in whole hours, from one hour to a year | The shortest windows in force anywhere are a day, and a day is too coarse to count one in. Zero reads as unset everywhere, so it is refused rather than stored |
 | A warning, where the window names one: whole hours before the end, at least one and fewer than the window runs | A day's window and a fortnight's want warnings of different sizes, so each says its own. A warning at or before the window opens says nothing the condition raised when the record stands has not |
 | Limited to named products, or every product where it names none | Which window applies where is the administrator's statement. One deployment can ship a product under an obligation beside one that is under none, and a window over both raises alerts for the product it never applied to |
-| A product nobody declared refuses the whole window, naming it | A window silently applying to fewer products than were named is quiet about the one that was meant |
+| A product nobody declared refuses the whole window, naming it | A window silently applying to fewer products than were named is quiet about the one that was meant. A blank name is one nobody declared; dropped, a list of blanks declares a window over every product |
 | A change restates the whole window | Name, length, warning and products are all replaced, so a warning or a product list left off is removed |
 | Names are unique among the windows in force, without regard to capitals | A notice names the window it answers, and two in force under one name make that ambiguous |
 | Retired rather than deleted | A notice keeps naming the window it answered. Retiring releases the name, so it may be declared again |

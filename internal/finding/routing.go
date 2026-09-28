@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -63,6 +64,14 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 		return nil, fmt.Errorf("a rule that matches nothing places nothing: " +
 			"name a source package, a place in the tree, or both")
 	}
+	// The columns a key is matched against are cut to the folded width, so a
+	// longer key could never match and would place nothing, silently.
+	for _, key := range []string{upstream, beneath} {
+		if utf8.RuneCountInString(key) > database.NameWidth {
+			return nil, fmt.Errorf("a key is at most %d characters, the width of the "+
+				"names it is matched against", database.NameWidth)
+		}
+	}
 	// A rule reaching most of a build is refused when it is written, not left
 	// to be discovered by the sweep that runs it every pass. Asked here rather
 	// than only at the preview, which is the handler's and which a second
@@ -81,7 +90,7 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 		// of that attempt's answers.
 		rule = &Routing{
 			ProductID: productID, TeamID: teamID, Name: strings.TrimSpace(name),
-			Upstream: strings.ToLower(upstream), Beneath: strings.ToLower(beneath),
+			Upstream: graph.Folded(upstream), Beneath: graph.Folded(beneath),
 			CreatedBy: by.ID, CreatedAt: createdAt,
 		}
 		// Scanned into a value rather than read through a cursor. A cursor
@@ -377,8 +386,7 @@ type Catches struct {
 func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	productID int64, upstream, beneath string, sample int) (Catches, error) {
 
-	upstream, beneath = strings.ToLower(strings.TrimSpace(upstream)),
-		strings.ToLower(strings.TrimSpace(beneath))
+	upstream, beneath = graph.Folded(upstream), graph.Folded(beneath)
 	if upstream == "" && beneath == "" {
 		return Catches{}, nil
 	}

@@ -382,7 +382,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.AddToTeam(ctx, team.ID, person.ID, person.ID); err != nil {
+		if _, err := f.store.AddToTeam(ctx, team.ID, person.ID, person.ID); err != nil {
 			t.Fatal(err)
 		}
 		// Brought into one case here, and one over there. Real issues,

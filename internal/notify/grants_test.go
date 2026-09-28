@@ -322,7 +322,7 @@ func TestATeamQueueReachesEachMemberAtTheVisibilityTheyRead(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, who := range []int64{privateReader, publicReader} {
-				if err := s.rights.AddToTeam(ctx, made.ID, who, admin); err != nil {
+				if _, err := s.rights.AddToTeam(ctx, made.ID, who, admin); err != nil {
 					t.Fatal(err)
 				}
 			}

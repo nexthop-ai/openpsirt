@@ -432,11 +432,10 @@ numbers are shown because the gap between them is the thing worth knowing.
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
 | A pattern naming most of a build is refused | A rule says where in the tree something sits, and a bare glob is not that. Refused when it is written and again at the preview, the way a rule matching nothing is refused: a rule that quietly applied to part of what it names is worse than one nobody could save. The subtree is one recursive walk per build rather than one per named component — it was tens of thousands of round trips inside one request, from a route anybody who may triage the product can reach |
 
-A rule matches without regard to capitals and asks the engine to fold. It is the
-one place that does: everywhere a person types a name it is normalized on the
-way in, but a component name is whatever a producer's inventory called it and
-the spelling is worth keeping, so there is no normalized copy to compare
-against.
+A rule matches without regard to capitals. Its keys are folded by the rule the
+component names they are matched against were folded with, and cut to the same
+width; a key longer than that width could never match and is refused when the
+rule is written.
 
 Turning a rule on is a bulk write. One rule naming a source package sweeps
 thousands of existing unowned issues across every place each sits at, so the
@@ -1062,7 +1061,7 @@ record, because it is the same question one layer up.
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
 | A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration, a team membership, a place on a case, a personal token, a pipeline key and a pinned identifier all take something away, and all of them read what they matched. Revoking one already revoked, or unbinding somebody with nothing pinned, is refused as not found |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
-| **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
+| **What a change is about is composed from the names it resolved to** | A person's history is read by the identity as stored, so a row composed from "Ana" as typed is missing from the history of "ana". A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
 | **It is read over a period, and leaves as a file** | An access review asks what changed in the stretch a certificate covers. Capped at fifty rows, undated and unexportable, that question was answered a page at a time on a screen and could not leave it. Asked for no period it answers about everything it holds |
 | On screen it grows to the most one request answers | Two hundred rows, newest first; past that the section says the file holds every one. A larger page is refused, and a screen asking for one draws the whole section as a failure |

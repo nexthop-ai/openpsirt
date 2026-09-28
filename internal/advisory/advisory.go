@@ -502,8 +502,10 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 	identifier string) (*finding.Vulnerability, *finding.Finding, error) {
 
 	var issue finding.Vulnerability
+	// The folded column, folded the way it was stored, so an identifier
+	// typed with other capitals is the same issue.
 	err := s.db.NewSelect().Model(&issue).
-		Where("identifier = ?", identifier).
+		Where("identifier_folded = ?", finding.FoldIdentifier(identifier)).
 		Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, nil, database.FromRead(err, ErrNoSuchIssue,

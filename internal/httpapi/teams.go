@@ -145,16 +145,21 @@ func registerTeams(api huma.API, a Administering) {
 				if err != nil {
 					return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 				}
-				if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
+				added, err := store.AddToTeam(ctx, team.ID, person.ID, by.ID)
+				if err != nil {
 					return wentWrong(a.Logger, "cannot put somebody on a team", err)
 				}
 				// Recorded here as well as on the route that adds one later.
 				// Somebody put on a team at the moment it is declared is on it
 				// the same way, and a trail that has one and not the other is
-				// a trail somebody has to know the history of to read.
-				if err := noted(ctx, tx, trail.Team, team.Name+" · "+identity,
-					nil, trail.Said("a member", true)); err != nil {
-					return notRecorded(a.Logger, err)
+				// a trail somebody has to know the history of to read. Keyed
+				// on the identity as stored, which is what a person's history
+				// is read by, and only where somebody was added.
+				if added {
+					if err := noted(ctx, tx, trail.Team, team.Name+" · "+person.Identity,
+						nil, trail.Said("a member", true)); err != nil {
+						return notRecorded(a.Logger, err)
+					}
 				}
 			}
 			if body, err = teamBody(ctx, store, *team); err != nil {
@@ -232,10 +237,16 @@ func registerTeams(api huma.API, a Administering) {
 			if err != nil {
 				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
-			if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
+			added, err := store.AddToTeam(ctx, team.ID, person.ID, by.ID)
+			if err != nil {
 				return wentWrong(a.Logger, "cannot put somebody on a team", err)
 			}
-			if err := noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
+			// Nothing is recorded where nothing changed, and what is recorded
+			// is keyed on the identity as stored.
+			if !added {
+				return nil
+			}
+			if err := noted(ctx, tx, trail.Team, team.Name+" · "+person.Identity,
 				nil, trail.Said("a member", true)); err != nil {
 				return notRecorded(a.Logger, err)
 			}
@@ -280,7 +291,7 @@ func registerTeams(api huma.API, a Administering) {
 			case err != nil:
 				return wentWrong(a.Logger, "cannot take somebody off a team", err)
 			}
-			if err := noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
+			if err := noted(ctx, tx, trail.Team, team.Name+" · "+person.Identity,
 				trail.Said("a member", true), nil); err != nil {
 				return notRecorded(a.Logger, err)
 			}

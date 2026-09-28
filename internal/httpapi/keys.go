@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -130,7 +131,10 @@ func registerKeys(api huma.API, a Administering) {
 			}
 
 			key, minted, err := store.NewKey(ctx, in.Body.Name, scope)
-			if err != nil {
+			switch {
+			case database.IsDuplicate(err):
+				return huma.Error409Conflict("a key already has that name")
+			case err != nil:
 				return wentWrong(a.Logger, "cannot issue a credential", err)
 			}
 			name, secret = key.Name, minted

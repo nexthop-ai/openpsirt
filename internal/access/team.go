@@ -242,8 +242,9 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 	return err
 }
 
-// AddToTeam puts somebody on a team. Saying it twice is not an error: what is
-// being asserted is that they are on it.
+// AddToTeam puts somebody on a team, and reports whether it did. Saying it
+// twice is not an error: what is being asserted is that they are on it, and
+// the second reports false because nothing changed.
 //
 // Read then written rather than as one upsert, because there is no portable
 // spelling of one — two of the four engines want ON CONFLICT and the other two
@@ -251,8 +252,10 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 // Both statements in one transaction, so what the read saw is what the write
 // writes against; two administrators adding the same person at once resolve
 // against the primary key.
-func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) error {
+func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool, error) {
+	added := false
 	add := func(ctx context.Context, db bun.IDB) error {
+		added = false
 		on, err := db.NewSelect().Model((*Membership)(nil)).
 			Where("team_id = ?", teamID).Where("person_id = ?", personID).Count(ctx)
 		if err != nil {
@@ -265,12 +268,13 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) error
 			TeamID: teamID, PersonID: personID,
 			AddedAt: s.now().Truncate(time.Microsecond), AddedBy: by,
 		}).Exec(ctx)
+		added = err == nil
 		return err
 	}
 	if err := database.Within(ctx, s.db, add); err != nil {
-		return fmt.Errorf("put that person on the team: %w", err)
+		return false, fmt.Errorf("put that person on the team: %w", err)
 	}
-	return nil
+	return added, nil
 }
 
 // RemoveFromTeam takes somebody off a team. What they have already taken is

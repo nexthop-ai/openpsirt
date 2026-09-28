@@ -38,7 +38,7 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 			Where("identity = ?", "triager").Scan(ctx, &member); err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.AddToTeam(ctx, team.ID, member, member); err != nil {
+		if _, err := rights.AddToTeam(ctx, team.ID, member, member); err != nil {
 			t.Fatal(err)
 		}
 

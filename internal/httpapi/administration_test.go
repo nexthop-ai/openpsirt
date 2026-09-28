@@ -470,3 +470,53 @@ func TestTheUserListSaysWhereSomebodyIsReached(t *testing.T) {
 		t.Error("ada is not in the list of people")
 	})
 }
+
+// The trail keys an administrative change on the names as stored, whatever
+// capitals the request typed them in, and records a membership only where it
+// changed.
+//
+// A person's history is read by their stored identity, compared exactly on
+// PostgreSQL, so a row keyed on "Ana" is missing from the history of "ana".
+// And putting somebody on a team they are already on recorded a second time
+// that they joined.
+func TestTheTrailNamesWhatWasChangedAsItIsStored(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"Ana","holds":[{"product":"MINE","role":"public-read"}]}`); got.Code != http.StatusCreated {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"platform"}`); got.Code >= 300 {
+			t.Fatalf("declaring a team answered %d: %s", got.Code, got.Body.String())
+		}
+		for _, typed := range []string{"ANA", "ana"} {
+			if got := asPerson(t, r, "admin", http.MethodPut,
+				"/v1/teams/platform/members/"+typed, ""); got.Code != http.StatusNoContent {
+				t.Fatalf("putting %s on the team answered %d: %s", typed, got.Code, got.Body.String())
+			}
+		}
+
+		var trail struct {
+			Items []struct {
+				About string `json:"about"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/administration/changes?kind=role", &trail)
+		if len(trail.Items) != 1 || trail.Items[0].About != "ana on mine" {
+			t.Errorf("the role granted is recorded as %+v, want \"ana on mine\"", trail.Items)
+		}
+		read(t, r, "admin", "/v1/administration/changes?kind=team", &trail)
+		members := 0
+		for _, row := range trail.Items {
+			if strings.Contains(row.About, " · ") {
+				members++
+				if row.About != "platform · ana" {
+					t.Errorf("the membership is recorded as %q, want \"platform · ana\"", row.About)
+				}
+			}
+		}
+		if members != 1 {
+			t.Errorf("putting somebody on a team twice recorded %d memberships", members)
+		}
+	})
+}

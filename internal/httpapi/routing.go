@@ -178,8 +178,8 @@ func registerRouting(api huma.API, in Ingest) {
 		Body    struct {
 			Name     string `json:"name" minLength:"1" maxLength:"120"`
 			Team     string `json:"team" minLength:"1" doc:"The team work lands on, by name"`
-			Upstream string `json:"upstream,omitempty" doc:"A source package name"`
-			Beneath  string `json:"beneath,omitempty" doc:"A component name, matching it and everything under it"`
+			Upstream string `json:"upstream,omitempty" maxLength:"191" doc:"A source package name"`
+			Beneath  string `json:"beneath,omitempty" maxLength:"191" doc:"A component name, matching it and everything under it"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
 		subject, product, _, err := routable(ctx, in, input.Product)
