@@ -8,6 +8,7 @@ import { Failed } from "./Failed";
 import { Loading } from "./Loading";
 import { Markdown } from "./Markdown";
 import { initials } from "./initials";
+import { at } from "./when";
 
 // A conversation about one thing, however that thing is addressed.
 //
@@ -22,7 +23,7 @@ import { initials } from "./initials";
 // query, the two mutations and the history read arrive as props rather than
 // being built here from a word.
 
-export type Said = {
+type Said = {
   id?: number;
   body?: string;
   written_by?: string;
@@ -31,11 +32,10 @@ export type Said = {
   edited_at?: string;
 };
 
-// said is how a moment on a thread is written. One helper rather than the same
-// slice at four sites: it is the line most likely to need a real fix, and a
-// timezone correction that lands in one of four places is not a correction.
-export function said(at?: string): string {
-  return (at ?? "").replace("T", " ").slice(0, 16);
+// said is how a moment on a thread is written: to the minute, in UTC and
+// saying so, as every moment quoted across time zones is.
+export function said(moment?: string): string {
+  return at(moment);
 }
 
 export function Thread({
@@ -180,7 +180,7 @@ export function Thread({
   );
 }
 
-export type Version = { version?: number; body?: string; replaced_at?: string };
+type Version = { version?: number; body?: string; replaced_at?: string };
 
 // A piece's earlier wording, before it was changed.
 //
@@ -206,6 +206,69 @@ function Earlier({ history }: { history: UseQueryResult<{ items?: Version[] | nu
           <Markdown source={row.body ?? ""} />
         </div>
       ))}
+    </div>
+  );
+}
+
+// Rewriting one piece of a thread in place.
+//
+// Only its author can, which the server enforces; the button is offered only
+// to them so that nobody is invited into a refusal. What it said before is
+// kept and readable behind the "edited" mark.
+//
+// No draft is saved. A draft exists so a half-written thought survives a
+// sign-out; this one starts as text that is already stored, so keeping a copy
+// of it would offer somebody their own words back as an unsent draft.
+//
+// The write is the caller's, as the thread's other endpoints are: a comment
+// and a note differ in where they are saved and in nothing drawn here.
+export function EditPiece({
+  id,
+  was,
+  label,
+  useEdit,
+  onDone,
+  about,
+  undisclosed,
+}: {
+  id: number;
+  was: string;
+  label: string;
+  useEdit: () => {
+    mutate: (piece: { id: number; body: string }, then: { onSuccess: () => void }) => void;
+    error: unknown;
+    isPending: boolean;
+  };
+  onDone: () => void;
+  about: { product: string; vulnerability: string };
+  undisclosed?: boolean;
+}) {
+  const [text, setText] = useState(was);
+  const edit = useEdit();
+  return (
+    <div className="field" style={{ margin: 0, maxWidth: "78ch" }}>
+      <Editor
+        value={text}
+        onChange={setText}
+        rows={4}
+        label={label}
+        attachTo={about}
+        mentions={mentioning(about.product, undisclosed)}
+      />
+      {edit.error != null && <Failed error={edit.error} what="That could not be changed." />}
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={!text.trim() || text === was || edit.isPending}
+          onClick={() => edit.mutate({ id, body: text }, { onSuccess: onDone })}
+        >
+          Save
+        </button>
+        <button type="button" className="btn quiet" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -114,8 +114,8 @@ export function Suggest({
             //
             // Two answers, because an empty box is not a search that found
             // nothing. A control opening on focus offers the whole list, so
-            // where the deployment holds none it was reporting a search
-            // nobody had made.
+            // where the deployment holds none it says so rather than
+            // reporting a search nobody made.
             <li className="hint">
               {value.trim() === ""
                 ? "There are none of these yet."

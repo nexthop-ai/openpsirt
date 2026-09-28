@@ -1,14 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// The severity ladder, in one place.
-//
-// It was written out five times in the interface and three more in the server,
-// under seven names and with three different memberships — four words in some,
-// six in others, and one list with "everything" on the front for the triage
-// floor. Three copies of an ordering is three chances for a word added to one
-// to be missing from the others, which reads as a rating that sorts one way
-// and filters another.
+// The severity ladder, in one place. A copy of an ordering is a chance for a
+// word added to one to be missing from another, which reads as a rating that
+// sorts one way and filters another.
 
 // BANDS is the four rated words, worst first: the order a report reads in and
 // the order somebody looks for.
@@ -39,7 +34,7 @@ export const RECORDABLE = [...BANDS, "negligible", "none"] as const;
 // rather than in the ladder above.
 export const THE_LINE = ["everything", ...FLOORS] as const;
 
-export type Band = (typeof BANDS)[number];
+type Band = (typeof BANDS)[number];
 
 // COLORS is the token each band is drawn in.
 //
@@ -72,15 +67,13 @@ export const BELOW_LOW = ["negligible", "none"] as const;
 
 // bandOf is the band a rating is drawn in: one of the four, or "unrated".
 //
-// One answer, because there were four for the same row. A finding whose
-// vulnerability carries no severity was counted as a medium by the chart, drawn
-// as a low by the badge, given a low's stripe by the card, and given its own
-// band by the tree strip — four answers about one nothing, on one screen.
+// One answer for the badge, the card and the tree strip, so a finding whose
+// vulnerability carries no severity is unrated on all three. The chart folds
+// it into medium, the way the server ranks it.
 //
-// Rated negligible is not unrated. The two were folded together here and
-// nowhere else: the server ranks both of the words below low inside the low
-// band, and a reader was told nobody had looked at a finding somebody had
-// looked at and dismissed.
+// Rated negligible is not unrated: the server ranks both of the words below
+// low inside the low band, and "unrated" would tell a reader nobody had looked
+// at a finding somebody looked at and dismissed.
 export function bandOf(word: string | null | undefined): string {
   if (isBand(word ?? "")) return word as string;
   if ((BELOW_LOW as readonly string[]).includes(word ?? "")) return "low";

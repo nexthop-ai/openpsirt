@@ -145,3 +145,6 @@ function magnitude(seconds: number): string {
   const n = Math.floor(seconds / size);
   return `${n} ${unit}${n === 1 ? "" : "s"}`;
 }
+
+// Milliseconds in a day, for arithmetic over dates the server sends in UTC.
+export const DAY_MS = 86_400_000;

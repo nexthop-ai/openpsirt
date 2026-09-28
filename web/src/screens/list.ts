@@ -276,7 +276,7 @@ type ClosedParameter =
 // mistyped word in a saved link would draw the list as a failure. Dropped here
 // it widens the list by that one filter instead, and the chip above the list
 // still names it, because the chips read the address.
-export function pick<K extends ClosedParameter>(name: K, values: string[]): Word<K>[] {
+function pick<K extends ClosedParameter>(name: K, values: string[]): Word<K>[] {
   const allowed = WORDS[name] as Record<string, true>;
   return values.filter((value): value is Word<K> => Object.hasOwn(allowed, value));
 }
@@ -293,7 +293,7 @@ function one<K extends ClosedParameter>(name: K, value: string): Word<K> | undef
 // minimum is 1. The address is somebody else's text like any other, and a
 // value outside what the server takes is a parameter to leave off rather than
 // one to send wrong.
-export function num(raw: string | null, least: number, most: number): number | undefined {
+function num(raw: string | null, least: number, most: number): number | undefined {
   if (raw === null || raw.trim() === "") return undefined;
   const asked = Number(raw);
   if (!Number.isFinite(asked) || asked < least || asked > most) return undefined;
@@ -306,7 +306,7 @@ export function num(raw: string | null, least: number, most: number): number | u
 // so the summary above the list can offer one chip each and take one back off.
 // A comma-joined value is still read, because that is how it was written
 // before and an address somebody saved should still open the list they saved.
-export function hiddenIn(params: URLSearchParams): string[] {
+function hiddenIn(params: URLSearchParams): string[] {
   return [
     ...new Set(
       params
@@ -481,9 +481,29 @@ export function withinVariant(query: ReturnType<typeof listQuery>, named: boolea
   return rest;
 }
 
-// A row's own identity, for finding it again in a list read afresh.
+// A row's own identity, for finding it again in a list read afresh, and the
+// key a selection, a preview and the list's own elements are held by. It is
+// the grain the server groups the list by: one issue at one fold, in one
+// product on the list that spans products.
 export function identityOf(row: Row): string {
-  return `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
+  return `${row.product ?? ""} ${row.vulnerability} ${row.fold}`;
+}
+
+// The prefix one build's screens live under, which every address under a
+// build shares. Written once, because a copy cannot be checked against the
+// router or against another copy.
+export function buildPath(at: { product: string; stream: string; variant: string }): string {
+  return (
+    `/products/${encodeURIComponent(at.product)}` +
+    `/streams/${encodeURIComponent(at.stream)}` +
+    `/variants/${encodeURIComponent(at.variant)}`
+  );
+}
+
+// The same prefix under the API, for an address a browser fetches directly: a
+// file to download, a document to open.
+export function apiBuildPath(at: { product: string; stream: string; variant: string }): string {
+  return "/v1" + buildPath(at);
 }
 
 // The address a row opens. The version is part of it: a component name is
@@ -493,22 +513,11 @@ export function identityOf(row: Row): string {
 // needs nothing here and cannot collide with a name the finding screen already
 // uses.
 //
-// Opened through a saved filter that prepares a claim, the
-// filter's name travels too, and the finding fills its decision form from what
-// that filter prepares. The name rather than the words: the filter is the one
-// place deciding what it says, and a copy in an address is a second one that
-// goes stale the moment somebody saves over the name.
-// The prefix one build's screens live under. Every address under a build
-// shares, written once: four screens spelled it out by hand, and the copies
-// cannot be checked against the router or against each other.
-export function buildPath(at: { product: string; stream: string; variant: string }): string {
-  return (
-    `/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}`
-  );
-}
-
+// Opened through a saved filter that prepares a claim, the filter's name
+// travels too, and the finding fills its decision form from what that filter
+// prepares. The name rather than the words: the filter is the one place
+// deciding what it says, and a copy in an address is a second one that goes
+// stale the moment somebody saves over the name.
 export function pathTo(
   at: { product: string; stream: string; variant: string },
   // Only the three fields the address is built from, so that what a caller has
@@ -571,11 +580,9 @@ export function fromAt(from: string, absolute: number, limit: number): string {
 // The page a list is on, kept in its address.
 //
 // The offset lives in the address for the reason every filter does: a page
-// somebody sends is the page they were looking at. Five screens each had
-// their own copy of this — read the offset, clone the parameters, delete it
-// or set it, write them back — and the rule that keeps a first page's address
-// clean, deleting rather than setting zero, was five chances to write
-// `?offset=0` into a link.
+// somebody sends is the page they were looking at. One copy, because the rule
+// that keeps a first page's address clean — deleting rather than setting zero
+// — is a chance at every copy to write `?offset=0` into a link.
 export function usePaging(): { offset: number; go: (to: number) => void } {
   const [params, setParams] = useSearchParams();
   const offset = num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0;

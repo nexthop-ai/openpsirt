@@ -294,22 +294,32 @@ a.kpi:hover {
 .sev.exploited {
   --c: var(--sev-exploited);
 }
-.sev.critical {
+/* One arm per band, for the chip, the bar and the key alike, so a band is
+   colored in one place. Unrated has an arm of its own: on the neutral base a
+   badge reading "Unrated" draws as a low. */
+.sev.critical,
+.sevbar > i.critical,
+.sevkey > span > i.critical {
   --c: var(--sev-critical);
 }
-.sev.high {
+.sev.high,
+.sevbar > i.high,
+.sevkey > span > i.high {
   --c: var(--sev-high);
 }
-.sev.medium {
+.sev.medium,
+.sevbar > i.medium,
+.sevkey > span > i.medium {
   --c: var(--sev-medium);
 }
-.sev.low {
+.sev.low,
+.sevbar > i.low,
+.sevkey > span > i.low {
   --c: var(--sev-low);
 }
-/* The word every unrated finding is drawn with. Without an arm it fell to the
-   neutral base, so a badge reading "Unrated" was painted as a low — and the
-   chart beside it counts the same row as a medium. */
-.sev.unrated {
+.sev.unrated,
+.sevbar > i.unrated,
+.sevkey > span > i.unrated {
   --c: var(--sev-unrated);
 }
 
@@ -517,7 +527,7 @@ a.kpi:hover {
 }
 .tomove button {
   display: flex;
-  gap: 10px;
+  gap: var(--gap-loose);
   align-items: baseline;
   width: 100%;
   text-align: left;
@@ -633,24 +643,16 @@ a.kpi:hover {
   overflow: hidden;
   background: var(--line);
 }
+/* A segment and a swatch are painted in the band's color from the arm above,
+   and in nothing where they carry no band. */
+.sevbar,
+.sevkey {
+  --c: transparent;
+}
 .sevbar > i {
   display: block;
   min-width: 3px;
-}
-.sevbar > i.critical {
-  background: var(--sev-critical);
-}
-.sevbar > i.high {
-  background: var(--sev-high);
-}
-.sevbar > i.medium {
-  background: var(--sev-medium);
-}
-.sevbar > i.low {
-  background: var(--sev-low);
-}
-.sevbar > i.unrated {
-  background: var(--sev-unrated);
+  background: var(--c);
 }
 .sevkey {
   display: flex;
@@ -671,21 +673,7 @@ a.kpi:hover {
   height: 8px;
   border-radius: 2px;
   flex: none;
-}
-.sevkey > span > i.critical {
-  background: var(--sev-critical);
-}
-.sevkey > span > i.high {
-  background: var(--sev-high);
-}
-.sevkey > span > i.medium {
-  background: var(--sev-medium);
-}
-.sevkey > span > i.low {
-  background: var(--sev-low);
-}
-.sevkey > span > i.unrated {
-  background: var(--sev-unrated);
+  background: var(--c);
 }
 
 /* The row a screen is currently about, in a table listing several. */
@@ -693,20 +681,10 @@ tr.row.on > td {
   background: var(--raised);
 }
 
+/* The facts grid, a row tighter: a judgment on the audit sheet is one of many
+   stacked, and reads as a block. */
 .judgment .facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
   gap: 3px 12px;
-  margin: 0 0 8px;
-  font-size: var(--step--1);
-}
-.judgment .facts dt {
-  color: var(--muted);
-  font-size: 11px;
-  padding-top: 2px;
-}
-.judgment .facts dd {
-  margin: 0;
 }
 .judgment .reasoning {
   border-top: 1px solid var(--line);
@@ -872,7 +850,7 @@ button.vchip {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--gap-loose);
   margin-bottom: 10px;
   font-size: var(--step--1);
   color: var(--muted);
@@ -880,7 +858,7 @@ button.vchip {
 .controls label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-tight);
 }
 .controls input[type="date"],
 .controls select {
@@ -918,11 +896,11 @@ button.vchip {
 .seg button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-tight);
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 1px 0 rgb(0 0 0 / 4%);
+  box-shadow: var(--shadow);
   cursor: pointer;
   padding: 4px 10px;
   font-size: var(--step--1);
@@ -972,12 +950,12 @@ button.vchip {
 .choice-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 8px;
+  gap: var(--gap);
   max-width: 36rem;
 }
 .choice-card {
   display: flex;
-  gap: 10px;
+  gap: var(--gap-loose);
   align-items: flex-start;
   text-align: left;
   border: 1px solid var(--line-strong);
@@ -1029,7 +1007,7 @@ button.vchip {
    lands — and `aria-busy` says the same thing to a reader who cannot see the
    dimming. */
 .listing[aria-busy="true"] {
-  opacity: 0.55;
+  opacity: var(--dim);
 }
 @media (prefers-reduced-motion: no-preference) {
   .listing {
@@ -1046,7 +1024,7 @@ button.vchip {
 .loading {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap);
 }
 .loading::before {
   content: "";
@@ -1077,13 +1055,6 @@ button.vchip {
   margin-bottom: 14px;
 }
 
-.floor {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-  font-size: var(--step--1);
-}
 .advanced {
   display: flex;
   flex-wrap: wrap;
@@ -1138,7 +1109,7 @@ button.vchip {
    off the input and put nowhere, there was no focus state at all. */
 .searchbox:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--ring);
 }
 .searchbox input {
   border: 0;
@@ -1276,7 +1247,7 @@ th.num {
 .findings .compline {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--gap);
   white-space: nowrap;
 }
 /* A value that a reader treats as one word, whatever the browser's line
@@ -1351,7 +1322,7 @@ th.num {
 .peek {
   border: 1px solid var(--line-strong);
   background: var(--surface);
-  border-radius: 6px;
+  border-radius: var(--radius);
   width: 22px;
   height: 22px;
   cursor: pointer;
@@ -1419,21 +1390,28 @@ button.edited {
 .suggest {
   position: relative;
 }
-.suggestions {
+/* The one shape every list dropping from a control takes: suggestions under a
+   field, the choices under a picker, the filters under a filter button. Each
+   keeps its own width, padding and layout below. */
+.suggestions,
+.choicelist,
+.filterlist {
   position: absolute;
   z-index: var(--z-dropdown);
   top: calc(100% + 3px);
   left: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.suggestions {
   right: 0;
   margin: 0;
   padding: 4px;
   list-style: none;
   max-height: 240px;
   overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
 }
 .suggestions li {
   margin: 0;
@@ -1580,7 +1558,7 @@ select:focus,
 textarea:focus,
 input:not([type="checkbox"], [type="radio"], [type="file"]):focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--ring);
 }
 textarea {
   min-height: 116px;
@@ -1681,23 +1659,6 @@ textarea:disabled {
   color: var(--ink);
   font-weight: 600;
 }
-.tab {
-  border: 1px solid transparent;
-  border-bottom: 0;
-  background: none;
-  padding: 5px 12px;
-  border-radius: var(--radius) var(--radius) 0 0;
-  cursor: pointer;
-  font-size: var(--step--1);
-  color: var(--muted);
-  font-family: inherit;
-}
-.tab[aria-selected="true"] {
-  background: var(--surface);
-  border-color: var(--line-strong);
-  color: var(--ink);
-  font-weight: 600;
-}
 .rendered {
   padding: 11px 12px;
   font-size: var(--step--1);
@@ -1728,23 +1689,6 @@ textarea:disabled {
 }
 .rendered a {
   color: var(--accent);
-}
-
-.warn {
-  display: flex;
-  gap: var(--gap);
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-left: 3px solid var(--sev-high);
-  background: color-mix(in oklab, var(--sev-high) 9%, transparent);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  font-size: var(--step--1);
-}
-.warn .where {
-  flex: none;
-  color: var(--sev-high);
-  font-weight: 600;
-  font-family: var(--mono);
 }
 
 .tabs2 {
@@ -1912,23 +1856,15 @@ textarea:disabled {
 }
 .choicesat:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--ring);
 }
 .choicelist {
-  position: absolute;
-  z-index: var(--z-dropdown);
-  top: calc(100% + 3px);
-  left: 0;
   min-width: 100%;
   white-space: nowrap;
   display: flex;
   flex-direction: column;
   gap: var(--gap-tight);
   padding: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
   max-height: 260px;
   overflow-y: auto;
 }
@@ -1937,7 +1873,7 @@ textarea:disabled {
    than which rows show, so it sits above the filters rather than among them. */
 .viewtabs {
   display: flex;
-  gap: 18px;
+  gap: var(--gap-room);
   border-bottom: 1px solid var(--line);
   margin-bottom: 10px;
   /* Wraps rather than scrolls. A box scrolling on one axis scrolls on both,
@@ -1982,7 +1918,7 @@ textarea:disabled {
 .filterbtn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-tight);
   font: inherit;
   font-size: var(--step--1);
   color: var(--ink);
@@ -1998,7 +1934,7 @@ textarea:disabled {
 }
 .filterbtn:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--ring);
   outline: none;
 }
 .filterbtn .k,
@@ -2013,23 +1949,15 @@ textarea:disabled {
   background: var(--raised);
 }
 .filterlist {
-  position: absolute;
-  z-index: var(--z-dropdown);
-  top: calc(100% + 4px);
-  left: 0;
   min-width: max(100%, 190px);
   display: flex;
   flex-direction: column;
   padding: 5px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
 }
 .filteritem {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap);
   font: inherit;
   font-size: var(--step--1);
   color: var(--ink);
@@ -2177,19 +2105,6 @@ textarea:disabled {
   font-weight: 700;
 }
 
-/* The four that came from screens.css.
-   They style components in ui/ that many screens draw, which is what this
-   file is for — the other file's own first line says it holds "shapes that
-   belong to one screen", and a chart drawn by the front page, four report
-   sheets and a component page belongs to none. Moving them earlier in the
-   cascade changes nothing unless a per-screen rule of equal specificity was
-   relying on losing to one of them, which was checked rule by rule. */
-
-.readiness {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
 /* ---------- which locations a decision covers ---------- */
 
 .scopebox {
@@ -2240,7 +2155,7 @@ textarea:disabled {
   align-items: center;
   gap: var(--gap-tight);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: var(--step--1);
 }
 .scopebox .grp:hover {

@@ -35,9 +35,18 @@ import { Wide } from "../ui/Wide";
 
 // One row as both panels read it, from the document the server publishes
 // rather than restated here: a hand-copied shape compiles perfectly while
-// missing whatever the server grew since, which is the bug the readiness rows
-// in this same change were carrying.
+// missing whatever the server grew since.
 type Destination = Body<"OutboundBody">;
+
+// What both panels say where no webhook is configured.
+function NoWebhooks() {
+  return (
+    <Empty
+      title="No webhooks."
+      detail="Notifications stay inside the application, and mail goes where an address is recorded."
+    />
+  );
+}
 
 function useDestinations() {
   return useQuery({
@@ -113,10 +122,7 @@ export function Webhooks() {
       ) : sent.isError ? (
         <Failed error={sent.error} what="The webhooks could not be read." />
       ) : rows.length === 0 ? (
-        <Empty
-          title="No webhooks."
-          detail="Notifications stay inside the application, and mail goes where an address is recorded."
-        />
+        <NoWebhooks />
       ) : (
         <Wide>
           <table>
@@ -228,10 +234,7 @@ export function WebhookDelivery() {
       ) : sent.isError ? (
         <Failed error={sent.error} what="Webhook delivery could not be read." />
       ) : rows.length === 0 ? (
-        <Empty
-          title="No webhooks."
-          detail="Notifications stay inside the application, and mail goes where an address is recorded."
-        />
+        <NoWebhooks />
       ) : (
         <Wide>
           <table>

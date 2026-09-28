@@ -10,8 +10,7 @@ import { humaneBytes, readBytes, writeBytes } from "./bytes";
 //
 // That is why this is tested rather than left to read correctly: a wrong
 // multiplier here is an upload bound off by 1024, and it looks right on the
-// screen either way. Its twin, the duration composer, has ten tests; this had
-// none.
+// screen either way.
 describe("a size between what the server stores and what somebody reads", () => {
   it("round trips each unit", () => {
     for (const [count, unit, stored] of [

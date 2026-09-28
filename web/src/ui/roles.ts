@@ -3,11 +3,10 @@
 
 // The roles, with what each allows — the same words the API reference uses.
 //
-// A bare token in a list is what showing a justification in words fixed, and
-// the same defect was here: `private-triage` and
-// `private-read` differ by one word in a select, and what they differ by is
-// whether somebody can decide about findings nobody has announced. The label
-// says what it is; the meaning says what granting it does.
+// Words rather than bare tokens: `private-triage` and `private-read` differ by
+// one word in a select, and what they differ by is whether somebody can decide
+// about findings nobody has announced. The label says what it is; the meaning
+// says what granting it does.
 export const ROLES = [
   {
     role: "public-read",
@@ -58,10 +57,9 @@ export function called(role?: string): string {
   return ROLES.find((each) => each.role === role)?.label ?? role ?? "";
 }
 
-// A role's own reach. Approver and assigner are
-// capabilities bounded by what their holder may read, so granted alone they
-// reach nothing — which was accepted in silence and read as working until
-// somebody signed in to an empty tool.
+// A role's own reach. Approver and assigner are capabilities bounded by what
+// their holder may read, so granted alone they reach nothing, and somebody
+// signs in to an empty tool.
 function reaches(role?: string): boolean {
   return ROLES.find((each) => each.role === role)?.grants ?? true;
 }

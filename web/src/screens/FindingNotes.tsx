@@ -5,8 +5,8 @@
 //
 // The thread that is here whether or not anybody has decided anything. The
 // comments beside it hang off a claim, and the box for one appears only where
-// a claim already exists — so the first person to say anything had to record a
-// judgment in order to say it.
+// a claim already exists, so this is where the first person says anything
+// without recording a judgment.
 //
 // It says what it is about, in words, above the thread. It is read beside
 // a row that may be one of eleven the same issue sits on, so "this issue in
@@ -20,8 +20,7 @@ import { api } from "../api/client";
 import { notYours, unwrap } from "../api/queries";
 import { useEditNote, useNote } from "../api/mutations";
 import { Failed } from "../ui/Failed";
-import { Thread } from "../ui/Thread";
-import { Editor, mentioning } from "../ui/Editor";
+import { EditPiece, Thread } from "../ui/Thread";
 
 export function Notes({
   product,
@@ -83,9 +82,11 @@ export function Notes({
         adding={note}
         onAdd={(body, done) => note.mutate({ product, vulnerability, body }, { onSuccess: done })}
         edit={(piece, done) => (
-          <EditNote
+          <EditPiece
             id={piece.id ?? 0}
             was={piece.body ?? ""}
+            label="Note"
+            useEdit={useEditNote}
             about={about}
             undisclosed={undisclosed}
             onDone={done}
@@ -105,57 +106,6 @@ function useNoteHistory(id: number) {
     queryFn: async () =>
       unwrap(await api.GET("/v1/notes/{id}/history", { params: { path: { id } } })),
   });
-}
-
-// Rewriting a note in place.
-//
-// Only its author can, which the server enforces; the button is offered only
-// to them so that nobody is invited into a refusal.
-//
-// No draft is saved. A draft exists so a half-written thought survives a
-// sign-out; this one starts as text that is already stored, so keeping a copy
-// of it would offer somebody their own note back as an unsent draft.
-function EditNote({
-  id,
-  was,
-  onDone,
-  about,
-  undisclosed,
-}: {
-  id: number;
-  was: string;
-  onDone: () => void;
-  about: { product: string; vulnerability: string };
-  undisclosed?: boolean;
-}) {
-  const [text, setText] = useState(was);
-  const edit = useEditNote();
-  return (
-    <div className="field" style={{ margin: 0, maxWidth: "78ch" }}>
-      <Editor
-        value={text}
-        onChange={setText}
-        rows={4}
-        label="Note"
-        attachTo={about}
-        mentions={mentioning(about.product, undisclosed)}
-      />
-      {edit.error != null && <Failed error={edit.error} what="That could not be changed." />}
-      <div className="actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={!text.trim() || text === was || edit.isPending}
-          onClick={() => edit.mutate({ id, body: text }, { onSuccess: onDone })}
-        >
-          Save
-        </button>
-        <button type="button" className="btn quiet" onClick={onDone}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
 }
 
 // The same thread, on the screen that spans products.

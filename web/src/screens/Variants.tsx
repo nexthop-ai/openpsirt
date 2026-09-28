@@ -10,7 +10,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { buildPath } from "./list";
-import { AddButton, Declare, Field } from "../ui/Declare";
+import { AddButton, Declare, FacingField, Field } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -234,18 +234,7 @@ export function Variants() {
           placeholder="broadcom"
           hint="What builds and scans call it"
         />
-        <div className="field">
-          <label htmlFor="edit-facing">Ships to customers</label>
-          <select
-            id="edit-facing"
-            value={editFacing ? "yes" : "no"}
-            onChange={(event) => setEditFacing(event.target.value === "yes")}
-          >
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-          <span className="hint">Feeds how urgent a finding here is</span>
-        </div>
+        <FacingField id="edit-facing" value={editFacing} onChange={setEditFacing} />
       </Declare>
 
       {/* A refused retirement is said. Without it the button re-enables and
@@ -262,9 +251,8 @@ export function Variants() {
         ok="Add variant"
         hint="Declared once per product, not per release, so win, windows and win32 do not become three variants."
       >
-        {/* The label wraps the input, as every other field here does. Beside
-            it with no htmlFor and no id, a screen reader announced a text
-            field with no name at all. */}
+        {/* The label wraps the input, as every other field here does, so a
+            screen reader names the field. */}
         <label className="field">
           <span>Product</span>
           <input {...notACredential} type="text" value={product} disabled />
@@ -276,17 +264,7 @@ export function Variants() {
           placeholder="broadcom"
           hint="The build's target: chip, architecture or OS"
         />
-        <div className="field">
-          <label htmlFor="declare-facing">Ships to customers</label>
-          <select
-            id="declare-facing"
-            value={facing ? "yes" : "no"}
-            onChange={(event) => setFacing(event.target.value === "yes")}
-          >
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </div>
+        <FacingField id="declare-facing" value={facing} onChange={setFacing} />
       </Declare>
     </>
   );

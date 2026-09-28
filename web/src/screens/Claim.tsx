@@ -13,7 +13,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
-import { Outward } from "../ui/Outward";
+import { Elsewhere } from "../ui/Elsewhere";
 import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
 import { Happened } from "./QueueMine";
@@ -386,65 +386,15 @@ function Reaffirm({
   );
 }
 
-// The place this is being argued about or worked on outside here.
-//
-// Anybody who may argue about the claim may set it: a link is a note about
-// where the conversation is rather than a judgment, and needing a second
-// person for it would leave it unset. Nothing is ever fetched from it.
-function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () => void }) {
-  const point = useMutation({
-    mutationFn: async (to: string) =>
-      unwrap(
-        await api.PUT("/v1/claims/{id}/elsewhere", {
-          params: { path: { id } },
-          body: { elsewhere: to },
-        }),
-      ),
-    onSuccess: onSet,
-  });
-
-  return (
-    <p className="hint" style={{ margin: "10px 0 0" }}>
-      {where ? (
-        <>
-          Being worked on at{" "}
-          {/* Typed here rather than supplied by a scanner, and still a string
-              that becomes somewhere to click — so it is judged the same way a
-              scanner's reference is, by the one component that judges. */}
-          <Outward href={where} />
-          {". "}
-        </>
-      ) : (
-        "Nothing here says where this is being worked on. "
-      )}
-      <button
-        type="button"
-        className="linkish"
-        onClick={() => {
-          const to = window.prompt(
-            "The place this is being worked on: a ticket, a thread, a change. Nothing is ever sent to it.",
-            where,
-          );
-          if (to !== null) point.mutate(to.trim());
-        }}
-      >
-        {where ? "Change it" : "Link it"}
-      </button>
-      {point.error != null && <Failed error={point.error} what="That could not be recorded." />}
-    </p>
-  );
-}
-
 // The reasoning as it stands, and the two acts anybody who may argue about it
 // has.
 //
 // Not the author's alone. The server asks whether the subject may decide
 // about each row of the claim and nothing about who wrote it, which is what
 // the act-and-needs table says: propose, revise and withdraw all ask for
-// triage on the product at the finding's visibility. Gated on authorship
-// here, a triager reading a colleague's stale claim had no way to revise or
-// withdraw it on this screen and every way to do it from the finding — the
-// same person, the same claim, two answers.
+// triage on the product at the finding's visibility. Gated on authorship,
+// this screen would refuse a triager what the finding allows them: the same
+// person, the same claim, two answers.
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
@@ -579,8 +529,8 @@ function Answer({
 // look like the rest, and they become a claim of their own carrying the
 // argument they were made under.
 //
-// The same signals an approver is shown, for the same reason — whoever wrote a
-// bulk claim faces the same choice, and had nothing to choose with.
+// The same signals an approver is shown, for the same reason: whoever wrote a
+// bulk claim faces the same choice.
 function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHeld: () => void }) {
   const split = useSplitClaim();
   const [holding, setHolding] = useState<Set<number>>(new Set());

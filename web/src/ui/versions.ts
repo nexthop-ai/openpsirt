@@ -13,9 +13,9 @@
 // it once above the level and leaves it off those rows.
 export function sharedVersion(kids: { version: string }[]): string {
   // Components with no version are left out of the decision. They draw
-  // nothing either way, and counting them as disagreement is how this missed
-  // the case it was written for: the switch image's root has one child with
-  // no version beside twenty-nine containers all carrying the same stamp.
+  // nothing either way, and counted as disagreement they hide a real case: a
+  // switch image's root with one child with no version beside twenty-nine
+  // containers all carrying the same stamp.
   const versioned = kids.filter((kid) => kid.version !== "");
   // One entry is not a level. A single component's version is its own, and
   // moving it above the row would say something about a level of one.

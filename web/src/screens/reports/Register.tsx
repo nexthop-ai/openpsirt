@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
+import { apiBuildPath } from "../list";
 import { useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -15,7 +17,7 @@ import { Paged } from "../../ui/Paged";
 import { Severity } from "../../ui/Severity";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
-import { STATES, type Stands, said } from "../../ui/states";
+import { STATES, type Stands, drawn, said } from "../../ui/states";
 import { Wide } from "../../ui/Wide";
 
 // The share of the register one page holds. The server's own ceiling is five
@@ -361,24 +363,13 @@ function MeasuredWith({
   );
 }
 
-// The decision standing at one place, in the words the sheet uses.
-//
-// Four states, and a state this does not know shown as it arrived. A register
-// is read by somebody checking the record against what shipped, so a column of
-// wire tokens is the tool showing its storage rather than answering.
+// The decision standing at one place, in the words and colors every screen
+// draws a state with. A register is read by somebody checking the record
+// against what shipped, so a column of wire tokens is the tool showing its
+// storage rather than answering; a state the table does not know is still
+// shown as it arrived.
 function RegisterState({ state }: { state?: string }) {
-  switch (state) {
-    case "undecided":
-      return <span className="state open">nobody has said</span>;
-    case "lapsed":
-      return <span className="state lapsed">no longer stands</span>;
-    case "waiting":
-      return <span className="state waiting">waiting for a second person</span>;
-    case "agreed":
-      return <span className="state agreed">agreed</span>;
-    default:
-      return state ? <span className="hint">{state}</span> : null;
-  }
+  return state ? <span className={`state ${drawn(state)}`}>{said(state)}</span> : null;
 }
 
 // The address the file comes from. A link somebody follows rather than a
@@ -386,14 +377,8 @@ function RegisterState({ state }: { state?: string }) {
 // already has.
 function fileAt(
   at: { product: string; stream: string; variant: string },
-  format: string,
+  format: "csv" | "json",
   asked: URLSearchParams,
 ): string {
-  const query = asked.toString();
-  return (
-    `/v1/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}/register.${format}` +
-    (query ? `?${query}` : "")
-  );
+  return exportAt(apiBuildPath(at) + "/register", format, asked);
 }

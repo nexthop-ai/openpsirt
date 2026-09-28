@@ -29,6 +29,7 @@ import {
   type Look,
 } from "./look";
 import type { Who } from "./session";
+import { useClickAway } from "../ui/away";
 
 // The badge beside the Unassigned entry, asked as the list itself asks it.
 //
@@ -662,14 +663,7 @@ function Me({ who }: { who: Who }) {
     else clearLook();
   }
 
-  useEffect(() => {
-    if (!open) return;
-    function away(event: MouseEvent) {
-      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
-  }, [open]);
+  useClickAway(box, open, () => setOpen(false));
 
   return (
     <div className="me" ref={box}>

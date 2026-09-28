@@ -16,7 +16,7 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
-  background: rgb(8 12 20 / 55%);
+  background: var(--backdrop);
   display: none;
   align-items: flex-start;
   justify-content: center;
@@ -55,7 +55,8 @@
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-.sheet .shut {
+.sheet .shut,
+.drawer .shut {
   margin-left: auto;
   border: 1px solid var(--line-strong);
   background: var(--surface);
@@ -89,9 +90,9 @@
 }
 /* ---------- adding something: a floating action and a drawer ---------- */
 
-/* Fixed, so it floats. Positioned against the document it was anchored to the
-   bottom of the page rather than of the window, which on a findings list about
-   five thousand pixels tall is a control nobody scrolled to. */
+/* Fixed, so it floats at the bottom of the window. Against the document it
+   sits at the bottom of the page, which on a findings list about five thousand
+   pixels tall is a control nobody scrolls to. */
 .fab {
   position: fixed;
   right: 26px;
@@ -127,20 +128,17 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-scrim);
-  background: rgb(8 12 20 / 35%);
+  background: var(--scrim);
   display: none;
 }
 .scrim.open {
   display: block;
 }
 
-/* Against the viewport, not the document.
-   The nearest positioned ancestor is the application frame, which grows with
-   the content — so the drawer's height became the whole page: its header, with
-   Close in it, sat at the top of the document and its footer, with submit, at
-   the bottom, and on a scrolled page neither was on screen. Escape and a click
-   on the scrim still dismissed it, so it was not a trap; it was a panel whose
-   own two controls could not be reached.
+/* Fixed, against the viewport. The nearest positioned ancestor is the
+   application frame, which grows with the content, so a drawer positioned
+   against it is as tall as the page and puts Close and submit off screen on a
+   scrolled one.
    Fixed makes it a containing block for anything absolutely positioned inside
    it, which is the right answer here, and it already establishes a stacking
    context through z-index. */
@@ -180,17 +178,6 @@
   font-size: var(--step-1);
   font-weight: 600;
   letter-spacing: -0.01em;
-}
-.drawer .shut {
-  margin-left: auto;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  border-radius: var(--radius);
-  cursor: pointer;
-  padding: 3px 9px;
-  font-size: var(--step--1);
-  color: var(--muted);
-  font-family: inherit;
 }
 .drawer .dbody {
   padding: 18px;

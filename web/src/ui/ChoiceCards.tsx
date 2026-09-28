@@ -11,7 +11,7 @@ import { useRef, type KeyboardEvent } from "react";
 // the arrow keys move through the options and pick as they go, and Home and
 // End reach the ends. With nothing picked the first option takes the stop.
 
-export type ChoiceCard<T extends string> = {
+type ChoiceCard<T extends string> = {
   value: T;
   label: string;
   // What picking it does, in a few words.

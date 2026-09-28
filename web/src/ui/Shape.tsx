@@ -14,10 +14,10 @@ import { ROLLED } from "./severities";
 // one line the key is dropped and the title carries it, because five legends
 // down a table say the same thing five times.
 //
-// Shared rather than owned by one screen: the component view drew this and the
-// dependency tree drew a chip per band from the same `Record<string, number>`,
-// which answered "which bands are present" — the fact a reader least needs —
-// and said nothing about where the weight was.
+// Shared rather than owned by one screen: the component view and the
+// dependency tree both draw it, because a chip per band answers "which bands
+// are present" — the fact a reader least needs — and says nothing about where
+// the weight is.
 export function Shape({ by, key_ = true }: { by?: Record<string, number>; key_?: boolean }) {
   const there = ROLLED.filter((band) => (by ?? {})[band]);
   if (there.length === 0) return null;

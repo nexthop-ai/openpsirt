@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Loading } from "../ui/Loading";
-import { on } from "../ui/when";
+import { at, on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { usePaging } from "./list";
@@ -13,6 +13,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Because, labeled } from "../ui/Outcome";
+import { dismisses, type Outcome } from "../ui/outcomes";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
@@ -29,31 +30,23 @@ type Judged = Body<"JudgedBody">;
 
 // Nothing ticked is every judgment, so there is no entry for it: "any" is an
 // empty set rather than a value somebody picks.
-const OUTCOMES = [
-  ["not-applicable", "dismissed — not applicable"],
-  // A claim that the scanner matched something that is not here. It hides risk
-  // the way the other dismissals do and, unlike them, nothing expires it — so
-  // it is the one an auditor most wants to be able to list on its own.
-  ["mismatched", "dismissed — wrong match"],
-  ["wont-fix", "dismissed — will not fix"],
-  // The fifth outcome, and the one an auditor most wants to check: a claim
-  // that a distribution already backported the fix is checkable against the
-  // packager's own record, and it was missing from this list while the API
-  // took it.
-  ["already-fixed", "dismissed — already fixed here"],
-  ["deferred", "deferred"],
-  // The two that promise work rather than dismissing it. They hide risk until
-  // the date they named, which is exactly what an auditor is checking, and the
-  // API took them while this list did not offer them.
-  ["upgrade-needed", "upgrade planned"],
-  ["patch-needed", "backport planned"],
-  ["affected", "affected"],
-] as const;
-
-// The dismissals, which are the outcomes that require a second person. The
-// exception report is asked of one of these, because asked of everything it
-// returns a large and entirely legitimate population.
-const DISMISSALS = new Set(["not-applicable", "mismatched", "wont-fix", "already-fixed"]);
+//
+// Keyed by every outcome the server records, so one it adds is a compile error
+// here until the filter offers it. A wrong match hides risk and nothing expires
+// it; an already-fixed claim is checkable against the packager's own record;
+// the two promises hide risk until the date they named. Each is one an auditor
+// lists on its own.
+const OUTCOME_SAID: Record<Outcome, string> = {
+  "not-applicable": "dismissed — not applicable",
+  mismatched: "dismissed — wrong match",
+  "wont-fix": "dismissed — will not fix",
+  "already-fixed": "dismissed — already fixed here",
+  deferred: "deferred",
+  "upgrade-needed": "upgrade planned",
+  "patch-needed": "backport planned",
+  affected: "affected",
+};
+const OUTCOMES = Object.entries(OUTCOME_SAID) as [Outcome, string][];
 
 const STATES = [
   ["approved", "agreed"],
@@ -92,11 +85,9 @@ export function Audit() {
   // of history. It is what the standing-corrections view is built on, where
   // the whole point is that nothing expires them.
   const inForce = params.get("in_force") === "true";
-  // A page of the record rather than a cap on it. It asked for five hundred
-  // and said "narrow the dates to print the rest", which is a search dressed
-  // as an answer: an auditor reading a year cannot narrow to something they
-  // have not read yet, and the rows past the cap were unreachable from this
-  // screen entirely.
+  // A page of the record rather than a cap on it: an auditor reading a year
+  // cannot narrow to something they have not read yet, so every row is
+  // reachable a page at a time.
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -143,16 +134,10 @@ export function Audit() {
               ...(products.length > 0 ? { product: products } : {}),
               ...(outcomes.length > 0
                 ? {
-                    outcome: outcomes as (
-                      | "affected"
-                      | "not-applicable"
-                      | "mismatched"
-                      | "deferred"
-                      | "wont-fix"
-                      | "already-fixed"
-                      | "upgrade-needed"
-                      | "patch-needed"
-                    )[],
+                    // Sent as asked: a word the server does not record is
+                    // refused, rather than dropped here while the sheet's
+                    // header still prints it.
+                    outcome: outcomes as Outcome[],
                   }
                 : {}),
               ...(alone ? { alone: true } : {}),
@@ -181,7 +166,9 @@ export function Audit() {
   // outcome asked for is a dismissal. Mixed with a deferral it returns a large
   // and entirely legitimate population, and saying otherwise over those rows
   // would be telling an auditor a control had failed when it had not.
-  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => DISMISSALS.has(each));
+  // The exception report is asked of dismissals alone: asked of everything it
+  // returns a large and entirely legitimate population.
+  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => dismisses(each));
   const asked = [
     products.length > 0 ? products.join(", ") : "every product you can see",
     said(OUTCOMES, outcomes),
@@ -288,7 +275,7 @@ export function Audit() {
         <h1>OpenPSIRT — record of judgments</h1>
         <p>
           {asked} · {total.toLocaleString()} {total === 1 ? "judgment" : "judgments"} · taken{" "}
-          {new Date().toISOString().slice(0, 16).replace("T", " ")}Z
+          {at(new Date().toISOString())}
         </p>
         {/* Which of them this sheet holds. A printed page that says "1,842
             judgments" over a hundred rows is a page nobody can check against
@@ -472,8 +459,7 @@ function Administered() {
       <div className="screen-head">
         <h3>Change history</h3>
         <span style={{ marginLeft: "auto" }} className="noprint">
-          {/* The record an access review is written from, as a file. It was
-              capped at fifty rows on a screen and could not leave it. */}
+          {/* The record an access review is written from, as a file. */}
           <a className="btn quiet" href={changesAt(params, "csv")}>
             CSV
           </a>{" "}
@@ -500,7 +486,7 @@ function Administered() {
           <tbody>
             {rows.map((row, i) => (
               <tr key={`${row.at} ${row.about} ${i}`}>
-                <td className="id">{(row.at ?? "").slice(0, 16).replace("T", " ")}</td>
+                <td className="id">{at(row.at)}</td>
                 <td>
                   {row.actor === "configuration" ? (
                     <span className="hint" title="The deployment's startup configuration">
@@ -672,9 +658,8 @@ function Judgment({ row }: { row: Judged }) {
           </>
         )}
 
-        {/* The one field that checks an already-fixed claim, and it was
-            returned and never drawn: what the packager's own record has to
-            agree with. */}
+        {/* The one field that checks an already-fixed claim: what the
+            packager's own record has to agree with. */}
         {row.fixed_version && (
           <>
             <dt>Fixed in</dt>

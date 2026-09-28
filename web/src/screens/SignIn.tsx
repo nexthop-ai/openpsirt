@@ -46,7 +46,7 @@ const triedKey = "signin-forwarded";
 // One value, exported, so that the screen and the sign-out button cannot drift
 // apart: a test asserting the address sign-out actually goes to is what catches
 // one of them changing.
-export const signedOut = "signed-out";
+const signedOut = "signed-out";
 export const signedOutHere = "/?" + signedOut;
 
 function alreadyTried(): boolean {
@@ -100,7 +100,7 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
 // after a session ended under them. The words differ because the situation
 // does: one is arriving, the other is being interrupted.
 // The dark wordmark, named once. It is committed and symlinked into the web
-// root and was referenced by nothing at all.
+// root.
 const LOOKS = "/brand/logo-dark.svg";
 
 export function SignIn({ resuming }: { resuming?: boolean }) {

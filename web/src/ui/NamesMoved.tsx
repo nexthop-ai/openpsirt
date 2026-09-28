@@ -9,7 +9,7 @@ export type Kind = "" | "removed" | "added" | "changed";
 
 // One name two inventories hold differently: an upload against the one before
 // it, or one build against another.
-export type NameMoved = {
+type NameMoved = {
   name?: string;
   change?: string;
   before?: string[] | null;

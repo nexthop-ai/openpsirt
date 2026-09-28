@@ -35,7 +35,7 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-rail-scrim);
-  background: rgb(8 12 20 / 35%);
+  background: var(--scrim);
 }
 
 /* A screen, not a page: a portrait sheet of paper is narrower than this, and
@@ -108,11 +108,6 @@
   .detail {
     grid-template-columns: 1fr;
   }
-  /* Five rules stood here restating what the 900px query above already
-     applies — a phone layout fixed by appending a corrected copy rather than
-     editing the rule where it lives. Anything under 780 is under 900, so they
-     changed nothing and read as though they did. What is left in this block is
-     what only a phone needs. */
 }
 
 /* ---------- tinted backgrounds, mixed from the color they tint ---------- */
@@ -265,7 +260,7 @@ a {
   background: var(--raised);
   border: 1px solid var(--line);
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   overflow-x: auto;
   margin: 0 0 8px;
   font-size: 0.95em;
@@ -395,7 +390,7 @@ a {
   max-width: min(100%, 640px);
   max-height: 480px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius);
   display: block;
   margin: 8px 0;
 }
@@ -407,7 +402,7 @@ a {
   padding: 12px 14px;
   background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   font-family: var(--mono);
   font-size: var(--step--1);
   line-height: 1.55;

@@ -19,11 +19,9 @@ describe("what a notification is called", () => {
     expect(label("obligation-open")).toBe("window after an attack running");
     expect(label("obligation-near")).toBe("window after an attack ending soon");
     expect(label("obligation-passed")).toBe("window after an attack passed");
-    // The one of the ten this list left out.
     expect(label("critical-on-release")).toBe("critical on a release");
-    // Each of the four staleness conditions says what has stopped rather than
-    // what took place; a row that read "claim-waiting" is the word a machine
-    // matches on.
+    // Each staleness condition says what has stopped rather than what took
+    // place; "claim-waiting" is the word a machine matches on.
     expect(label("claim-waiting")).toBe("waiting for a second person");
     expect(label("sent-back-waiting")).toBe("sent back and not revised");
     expect(label("deferral-ending")).toBe("deferral running out");

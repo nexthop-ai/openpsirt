@@ -16,7 +16,7 @@
 // kernel image are a memory leak, a race, improper locking and a double free,
 // and none of them was named.
 
-export type Named = { id: string; name: string };
+type Named = { id: string; name: string };
 
 export const COMMON: Named[] = [
   { id: "CWE-20", name: "Improper input validation" },

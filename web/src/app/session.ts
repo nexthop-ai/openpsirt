@@ -8,7 +8,7 @@ import { forgetAll, forgetSession } from "./drafts";
 import { sessionEnded } from "./ended";
 import { rememberForward, signedOutHere } from "../screens/SignIn";
 
-export type Can = {
+type Can = {
   product: string;
   name: string;
   // Either visibility. Each is its own grant, so reading or triaging one

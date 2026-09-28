@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
 import { scopeQuery, useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -175,8 +176,8 @@ export function Coverage() {
 // The address the file comes from. A link somebody follows rather than a
 // request this page makes, so the browser fetches it with the session it
 // already has.
-function fileAt(format: string, asked: string): string {
-  return `/v1/scanning.${format}${asked ? `?${asked}` : ""}`;
+function fileAt(format: "csv" | "json", asked: string): string {
+  return exportAt("/v1/scanning", format, asked);
 }
 
 function scansAt(product: string, stream: string, variant: string): string {

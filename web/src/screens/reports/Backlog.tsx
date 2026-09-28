@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
 import { scopeQuery, useScope } from "../../app/scope";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
@@ -19,9 +20,8 @@ import { BANDS } from "../../ui/severities";
 
 // The direction of the backlog, and the kind of thing making it move.
 //
-// The first question a manager asks, and it was a panel on the home screen
-// at a fixed twelve weeks — no name, no window, no file, and no way to ask
-// it of anything but the selection the shell happened to be on.
+// The first question a manager asks, with a name, a window, a file, and the
+// scope it is asked of.
 //
 // The two flows are what a backlog is read for. Ten arriving and ten answered
 // is a team keeping pace where both are low, and a team losing ground where
@@ -36,7 +36,7 @@ const WEEKS = [4, 13, 26, 52, 104] as const;
 // weeksAsked is the window the address asks for, checked rather than trusted:
 // it reaches the server, which refuses what it cannot answer, and a value that
 // is not a whole number of weeks in range falls back to a quarter.
-export function weeksAsked(params: URLSearchParams, fallback = 13): number {
+function weeksAsked(params: URLSearchParams, fallback = 13): number {
   const asked = params.get("weeks");
   if (asked === null) return fallback;
   const weeks = Number(asked);
@@ -61,7 +61,7 @@ export function Backlog() {
   // Drawn, it is a zero somebody reads as a quiet week.
   const flows = points.slice(1);
   const asked = new URLSearchParams({ ...scope, weeks: String(weeks) }).toString();
-  const file = (format: string) => `/v1/trend.${format}${asked ? `?${asked}` : ""}`;
+  const file = (format: "csv" | "json") => exportAt("/v1/trend", format, asked);
 
   return (
     <Sheet

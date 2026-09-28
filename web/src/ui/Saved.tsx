@@ -1,7 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { reasonOffered, reasonsFor } from "./Outcome";
+import { labeled, reasonOffered, reasonsFor } from "./Outcome";
+import { needsJustification as statesReason } from "./outcomes";
 import { notACredential } from "./noautofill";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,22 +11,23 @@ import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 
-export type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
+type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
 
 // The outcomes a saved filter may prepare, driven off the generated request
 // type rather than retyped as options. Fewer than a person may record one at a
 // time, and which are left out is the domain's statement rather than this
 // screen's. Written as a record so a word the domain gains and this does not
-// is a compile error, and so is one kept here after the domain drops it.
+// is a compile error, and so is one kept here after the domain drops it. Each
+// is labeled from the one map every other screen reads.
 type InBulk = Body<"PreparedBody">["outcome"];
 
-const PREPARES: Record<InBulk, string> = {
-  "not-applicable": "Not applicable",
-  mismatched: "Wrong match",
-  deferred: "Deferred",
-  "wont-fix": "Will not fix",
-  "already-fixed": "Already fixed",
-  affected: "Affected",
+const PREPARES: Record<InBulk, true> = {
+  "not-applicable": true,
+  mismatched: true,
+  deferred: true,
+  "wont-fix": true,
+  "already-fixed": true,
+  affected: true,
 };
 export type Kept = Body<"SavedBody">;
 
@@ -108,7 +110,7 @@ export function Saved({
   // The two outcomes whose claim is which recognized reason applies, and the
   // reasons each may state. A correction carries past every version bump, so
   // the three reasons a bump can change are not among the ones it offers.
-  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  const needsJustification = statesReason(outcome);
   const reasons = reasonsFor(outcome);
   // Dropped rather than carried when the outcome moves under it: a correction
   // takes only the reasons no version bump can answer, and a rule prepared
@@ -246,9 +248,9 @@ export function Saved({
                 <span className="l">It would say</span>
                 <select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
                   <option value="">Select one</option>
-                  {Object.entries(PREPARES).map(([word, label]) => (
+                  {Object.keys(PREPARES).map((word) => (
                     <option key={word} value={word}>
-                      {label}
+                      {labeled(word)}
                     </option>
                   ))}
                 </select>

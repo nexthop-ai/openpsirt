@@ -1020,7 +1020,8 @@ filter takes and by the same definition:
 
 Some places approved and the rest never decided, with nothing waiting or lapsed,
 is none of the four: the row carries no state, and the interface labels it partly
-decided.
+decided. Every screen draws it in the waiting color, from the one table that
+draws the four.
 
 Undecided is nothing standing, not nothing ever said. Read as "no decision row
 covers this place" it leaves a withdrawn claim in no state at all: the row a

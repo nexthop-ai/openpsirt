@@ -1,6 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { own } from "../ui/own";
+
 // What the advisory screens work out, apart from what draws them.
 
 // The editorial statuses, with the word on screen and what reaching it means.
@@ -29,14 +31,8 @@ const said: Record<string, { label: string; tone: string; means: string }> = {
 };
 
 // This table's entry for a word, or nothing.
-//
-// Asked through a guard rather than by indexing: an object literal inherits
-// from the prototype, so a server-supplied word naming a member of it —
-// `constructor`, `toString` — comes back as a function, and the optional
-// chain that guards the lookup does not guard the field read after it.
 export function standing(status?: string): (typeof said)[string] | undefined {
-  const word = status ?? "";
-  return Object.hasOwn(said, word) ? said[word] : undefined;
+  return own(said, status);
 }
 
 // The status as a reader sees it. A word this table does not know is shown as
@@ -58,7 +54,7 @@ export function agreeing(people: number): string {
 }
 
 // What has to happen before an advisory can go out.
-export type Missing = "" | "flaws" | "agreement";
+type Missing = "" | "flaws" | "agreement";
 
 // Nothing named comes first: an advisory covering no flaw generates no
 // document at all, so an agreement is not the next thing to go looking for.
@@ -70,7 +66,7 @@ export function missing(covers: number, agreed: number): Missing {
 
 // One flaw somebody may name on this advisory, and whether it is fixed
 // wherever it was found.
-export type Nameable = { vulnerability: string; summary: string; fixed: boolean };
+type Nameable = { vulnerability: string; summary: string; fixed: boolean };
 
 // The flaws recorded in a product that this advisory does not already name
 // there.

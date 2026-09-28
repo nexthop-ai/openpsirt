@@ -20,11 +20,10 @@ type Changed = {
 
 // One run of the scanner, and the change it made.
 //
-// A receipt says a run happened; nothing said what it did. A row reading
+// A receipt says a run happened; this says what it did. A row reading
 // "scanned · 7,604 opened" is a number with no shape: opened *what*, and is
 // any of it urgent. Somebody looking at a build that jumped by four thousand
-// overnight is asking which of them matter, and the answer was a findings list
-// with no way to narrow to that run.
+// overnight is asking which of them matter.
 export function Run() {
   const { product = "", stream = "", variant = "", run = "" } = useParams();
   const at = { product, stream, variant, run: Number(run) };
@@ -157,8 +156,8 @@ function Shape({
   // what is open.
   to?: string;
 }) {
-  // Read off the ladder rather than listed here. Written out, a rung added
-  // to it was a row this strip never drew.
+  // Read off the ladder rather than listed here, so a rung added to it is a
+  // row this strip draws.
   const bands: [string, number][] = BANDS.map((word) => [word, changed?.[word] ?? 0]);
   const total = changed?.total ?? 0;
   return (

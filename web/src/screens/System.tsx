@@ -14,14 +14,11 @@ import { WebhookDelivery } from "./Webhooks";
 
 // The deployment's own state, rather than what it has found.
 //
-// Three things were built and reachable from nothing. Work the queue gave
-// up on had an endpoint and a retry route and no screen; what is waiting and
-// the bound that refuses more of it were settable and shown nowhere; and where
-// this deployment sends what it has to say was configurable only by calling
-// the API by hand.
+// Work the queue gave up on, with its retry; what is waiting and the bound
+// that refuses more of it; and whether what this deployment sends is arriving.
 //
-// An operator's screen rather than an auditor's, which is not where it
-// started: what a worker reported can quote what the job was about. That is
+// An operator's screen rather than an auditor's: what a worker reported can
+// quote what the job was about. That is
 // not one of the deployment's own records.
 //
 // They are one screen because they are one question — is this deployment

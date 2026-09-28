@@ -11,6 +11,7 @@ import { Empty } from "../ui/Empty";
 import { called } from "../ui/roles";
 import { useWho } from "../app/session";
 import { Wide } from "../ui/Wide";
+import { at as minute } from "../ui/when";
 
 // One person, whole.
 //
@@ -311,9 +312,9 @@ export function Person() {
 
 const ADMINS_ONLY = "Only an administrator records who has left";
 
-// The same shape the record's own trail table uses: the day and the minute,
-// which is the resolution somebody correlating a grant with a message needs,
-// and no more.
+// The same shape the record's own trail table uses: the day and the minute in
+// UTC, which is the resolution somebody correlating a grant with a message
+// needs, and no more.
 function stamp(at?: string): string {
-  return (at ?? "").slice(0, 16).replace("T", " ");
+  return minute(at);
 }

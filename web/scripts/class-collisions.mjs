@@ -22,7 +22,7 @@ import { emits, positionedModifiers, rulesIn, styleless as unstyled } from "./cl
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = import.meta.dirname;
 const src = path.join(here, "..", "src");
 
 async function stylesheets(dir) {

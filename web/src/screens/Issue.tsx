@@ -18,9 +18,8 @@ import { Wide } from "../ui/Wide";
 // One issue, everywhere it sits.
 //
 // The work starts from an issue as often as from a product. "A critical
-// just landed in openssl — which of our products ship an affected version" was
-// a question asked one product at a time, and at a dozen products that is the
-// first thing anybody complains about.
+// just landed in openssl — which of our products ship an affected version" is
+// answered here once rather than a product at a time.
 //
 // One row per build and component, not per place: the same component in
 // two builds is two things somebody ships, and sixty places of it in one build
@@ -119,10 +118,8 @@ export function Issue() {
         </div>
       )}
 
-      {/* The one output of this tool that leaves the company, and until now
-          the one output nobody here could make: both endpoints answered and
-          nothing called them. Per product, because that is the grain of the
-          document. */}
+      {/* The one output of this tool that leaves the company. Per product,
+          because that is the grain of the document. */}
       {products.length > 0 && (
         <IssueAdvisory
           vulnerability={it?.vulnerability ?? ""}

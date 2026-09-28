@@ -203,11 +203,6 @@ function whole(at: Scoped): string | null {
   return "Pick a product, a branch or tag, and a variant: this is about one build.";
 }
 
-// The report at an address, or nothing where the catalog has no such name.
-export function reportAt(slug: string): Report | undefined {
-  return CATALOG.find((report) => report.slug === slug);
-}
-
 // The destination of a catalog row, and what stands in the way.
 //
 // Returned together because a row that cannot answer is still worth drawing:

@@ -3,10 +3,8 @@
 
 import { Link } from "react-router-dom";
 
-// The place you are in, and the way back up. The findings list is bound to one
-// build
-// , so which build that is has to be on the screen rather than only in the
-// address bar.
+// The place you are in, and the way back up. A screen bound to one build says
+// which build that is on the screen rather than only in the address bar.
 export function Crumbs({
   product,
   stream,

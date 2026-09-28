@@ -10,6 +10,8 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
+import { apiBuildPath } from "./list";
+import { own } from "../ui/own";
 
 // A promise's state, said in words rather than left to a color.
 const STANDING: Record<string, string> = {
@@ -25,9 +27,8 @@ function rank(state?: string): number {
 
 // The work one build is waiting on, by the upgrade that would deliver it.
 //
-// Called "release plan" once, which read as the plan for the product's own
-// release. It is dependency hygiene: which packages this build is waiting to
-// move, and how much of each has landed.
+// Dependency hygiene rather than a plan for the product's own release: which
+// packages this build is waiting to move, and how much of each has landed.
 //
 // The fix-bundle query read from the other end: a triager reads a bump and the
 // issues it closes, a coordinator reads a build and the upgrades it is waiting
@@ -141,7 +142,7 @@ export function Upgrades() {
                               ? "state lapsed"
                               : "state waiting"
                         }
-                        title={STANDING[row.state ?? ""] ?? ""}
+                        title={own(STANDING, row.state) ?? ""}
                       >
                         {done ? "landed" : `${row.issues} ${row.issues === 1 ? "issue" : "issues"}`}
                       </span>
@@ -165,9 +166,5 @@ export function Upgrades() {
 
 // The address the file comes from.
 function fileAt(product: string, stream: string, variant: string, format: string): string {
-  return (
-    `/v1/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}/pending-upgrades.${format}`
-  );
+  return apiBuildPath({ product, stream, variant }) + `/pending-upgrades.${format}`;
 }

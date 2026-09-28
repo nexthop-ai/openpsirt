@@ -1,11 +1,14 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { Outcome as Word } from "./outcomes";
+
 // The outcomes. All but "affected" hide risk, which is the distinction that
 // decides whether a second person has to agree — and the two that promise work
 // hide it only until the date they promised, which is what they are gated on
-// instead.
-const said: Record<string, { label: string; color: string; means: string }> = {
+// instead. Keyed by every outcome the server records, so one it adds is a
+// compile error here until it has a label.
+const said: Record<Word, { label: string; color: string; means: string }> = {
   affected: {
     label: "Affected",
     color: "var(--sev-high)",
@@ -67,21 +70,18 @@ export function called(outcome?: string): string {
 //
 // Asked through a guard rather than by indexing, because an object literal
 // inherits from the prototype: a server-supplied word that names a member of
-// it — `constructor`, `toString` — came back as a function, and the `?.` that
-// guards the lookup does not guard the field read after it. The render then
-// threw, on a value that arrived over the network.
-function of(outcome?: string): (typeof said)[string] | undefined {
+// it — `constructor`, `toString` — is a function, and the `?.` that guards the
+// lookup does not guard the field read after it.
+function of(outcome?: string): (typeof said)[Word] | undefined {
   const word = outcome ?? "";
-  return Object.hasOwn(said, word) ? said[word] : undefined;
+  return Object.hasOwn(said, word) ? said[word as Word] : undefined;
 }
 
-// The same word as a chip carries it, capitalised.
+// The same word as a chip carries it, capitalized.
 //
-// Two screens kept partial copies of this map — the review queue knew four
-// outcomes and the finding's claim card knew five, of seven — so a claim of
-// "patch-needed" or "upgrade-needed" showed the stored token to the person
-// being asked to agree with it. One map, and a word it does not know is still
-// shown as it arrived.
+// Every screen labels an outcome from this one map, so a partial copy cannot
+// show a stored token to the person asked to agree with it. A word it does not
+// know is shown as it arrived.
 export function labeled(outcome?: string): string {
   return of(outcome)?.label ?? outcome ?? "";
 }
@@ -89,9 +89,8 @@ export function labeled(outcome?: string): string {
 // The same word as a chip, with its color and its meaning.
 //
 // A word this does not know is shown as it arrived, the way the two renderers
-// above do it. Returning nothing instead draws an empty cell in five tables —
-// and in those tables the outcome is the whole of the cell, so a vocabulary
-// the server grew first reads as a judgment nobody made.
+// above do it. In the tables that draw it the outcome is the whole of the
+// cell, so an empty one reads as a judgment nobody made.
 export function Outcome({ outcome }: { outcome?: string }) {
   if (!outcome) return null;
   const it = of(outcome);
@@ -143,14 +142,6 @@ export const JUSTIFICATIONS = [
   },
 ] as const;
 
-// The reasons a correction may state: the two that say something is not there.
-//
-// Derived rather than written out again. The other three describe how code is
-// reached or what already stops it, and a version bump changes both — a
-// correction carries past every bump, so one of those recorded as a correction
-// would put a judgment about risk beyond the rule that re-examines it. The
-// endpoint refuses them; offering them here would be a refusal somebody meets
-// after writing the reasoning.
 // The reasons an outcome may state, and what is left of a choice when the
 // outcome moves under it.
 //
@@ -167,18 +158,22 @@ export function reasonOffered(outcome: string | undefined, chosen: string): stri
   return reasonsFor(outcome).some((each) => each.value === chosen) ? chosen : "";
 }
 
+// The reasons a correction may state: the two that say something is not there.
+//
+// Derived rather than written out again. The other three describe how code is
+// reached or what already stops it, and a version bump changes both — a
+// correction carries past every bump, so one of those recorded as a correction
+// would put a judgment about risk beyond the rule that re-examines it. The
+// endpoint refuses them; offering them here would be a refusal somebody meets
+// after writing the reasoning.
 export const JUSTIFICATIONS_CORRECTING = JUSTIFICATIONS.filter(
   (each) => each.value === "component_not_present" || each.value === "vulnerable_code_not_present",
 );
 
 // The exchange format's own vocabulary, named as it is stored.
 //
-// Derived from the list rather than written beside it. It was a second
-// hand-written copy, and a third lived in a test asserting the two agree — a
-// test that could not fail in one direction, because it was typed as a subset
-// of the union it was checking. Reading the type out of the list makes the
-// divergence unrepresentable, so the compiler enforces what the assertion
-// could not.
+// Derived from the list rather than written beside it, which makes a
+// divergence between the two unrepresentable: the compiler enforces it.
 export type Justification = (typeof JUSTIFICATIONS)[number]["value"];
 
 const because = new Map(JUSTIFICATIONS.map((each) => [each.value as string, each]));
@@ -186,8 +181,7 @@ const because = new Map(JUSTIFICATIONS.map((each) => [each.value as string, each
 // Because renders a stored justification in words.
 //
 // One place, because two spellings of one vocabulary is how the list a person
-// chooses from and the list they read back stop agreeing — which is how this
-// started, with one screen labeling them and the other not.
+// chooses from and the list they read back stop agreeing.
 export function Because({ code }: { code?: string | null }) {
   if (!code) return null;
   const it = because.get(code);

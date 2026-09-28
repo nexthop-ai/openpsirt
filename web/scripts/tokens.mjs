@@ -23,7 +23,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = import.meta.dirname;
 const src = path.join(here, "..", "src");
 
 // A comment is prose, not a reference.

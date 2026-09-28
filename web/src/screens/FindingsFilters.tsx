@@ -3,19 +3,16 @@
 
 import { FLOORS } from "../ui/severities";
 import { labeled } from "../ui/Outcome";
+import type { Outcome } from "../ui/outcomes";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
 // The findings list's filters, apart from the list itself.
 //
-// Everything the server can narrow by is here, named for what it asks.
-// The panel this replaced offered a third of them behind a "more" control, in
-// a flat run of unlabeled boxes whose values read as phrases — "whatever it
-// did", "any deadline", "anyone or nobody". Two of the filters people asked
-// for most often, what upstream declined to fix and what somebody entered by
-// hand, were already there and were not found: one was a word in an unlabeled
-// dropdown and the other a chip that said "Recorded here". A filter nobody
-// can find is a filter that is not there.
+// Everything the server can narrow by is here, named for what it asks, each
+// with a label. A filter nobody can find is a filter that is not there: a word
+// in an unlabeled dropdown or a value read as a phrase is not found by
+// somebody looking straight at it.
 //
 // A label says what it asks; a value says what it is. "Upstream fix: will
 // not fix" rather than "Upstream: declined to fix". The words are the ones the
@@ -33,13 +30,13 @@ import { Words } from "../ui/Words";
 // and when.
 
 // A floor is picked by asking "at least this bad", so the words run least
-// first — which is what FLOORS is. Derived rather than listed here: written
-// out, a rung added to the ladder was one this filter could not be set to.
+// first — which is what FLOORS is. Derived rather than listed here, so a rung
+// added to the ladder is one this filter can be set to.
 //
 // The label says what picking it means rather than naming the word again: the
 // least of them is every finding there is, and the worst of them is only that
 // one.
-export const SEVERITIES = FLOORS.map((word, i) => [
+const SEVERITIES = FLOORS.map((word, i) => [
   word,
   i === 0 ? "Any" : i === FLOORS.length - 1 ? "Critical only" : titled(word) + " and above",
 ]) as unknown as readonly (readonly [string, string])[];
@@ -49,7 +46,7 @@ function titled(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-export const FIX_STATES = [
+const FIX_STATES = [
   ["", "Any"],
   ["fixed", "Fixed upstream"],
   ["none", "No fix released"],
@@ -60,7 +57,7 @@ export const FIX_STATES = [
 
 // How a group is spread over the variants of a branch. "Only this variant"
 // is offered where one is named, because it is a question about that one.
-export const SPREADS = [
+const SPREADS = [
   ["", "Any"],
   ["only", "Only this variant"],
   ["every", "Every variant"],
@@ -76,22 +73,21 @@ export const STATES = [
 
 // The outcomes this filter offers, labeled from the one map rather than
 // beside the tokens here: a second spelling of a word somebody picks and then
-// reads back is how the two stop agreeing, which is what happened to the
-// decision form's "Backport needed".
-export const OUTCOMES: readonly (readonly [string, string])[] = [
+// reads back is how the two stop agreeing. Keyed by every outcome the server
+// records, so one it adds or drops is a compile error here.
+const OFFERED: Record<Outcome, true> = {
+  affected: true,
+  "not-applicable": true,
+  mismatched: true,
+  "wont-fix": true,
+  deferred: true,
+  "already-fixed": true,
+  "upgrade-needed": true,
+  "patch-needed": true,
+};
+const OUTCOMES: readonly (readonly [string, string])[] = [
   ["", "Any"],
-  ...(
-    [
-      "affected",
-      "not-applicable",
-      "mismatched",
-      "wont-fix",
-      "deferred",
-      "already-fixed",
-      "upgrade-needed",
-      "patch-needed",
-    ] as const
-  ).map((each) => [each, labeled(each)] as const),
+  ...(Object.keys(OFFERED) as Outcome[]).map((each) => [each, labeled(each)] as const),
 ];
 
 export const ASSIGNED = [
@@ -101,7 +97,7 @@ export const ASSIGNED = [
   ["nobody", "No one"],
 ] as const;
 
-export const PLANNED = [
+const PLANNED = [
   ["either", "Covered or not"],
   ["unplanned", "Not covered by a planned upgrade"],
   ["planned", "Covered by a planned upgrade"],
@@ -110,23 +106,23 @@ export const PLANNED = [
 // The sort of release, and its support. Two questions
 // kept apart because they are two: a tag can be in support and a branch can be
 // past its date.
-export const RELEASES = [
+const RELEASES = [
   ["branch", "Branches"],
   ["tag", "Tags"],
 ] as const;
 
-export const SUPPORT = [
+const SUPPORT = [
   ["in-support", "In support"],
   ["past-eol", "Past end-of-life"],
 ] as const;
 
-export const ORIGINS = [
+const ORIGINS = [
   ["", "Any"],
   ["scanner", "Scanner"],
   ["manual", "Entered by hand"],
 ] as const;
 
-export const VEX_STATUS = [
+const VEX_STATUS = [
   ["", "Any"],
   ["not_affected", "Not affected"],
   ["affected", "Affected"],
@@ -139,9 +135,8 @@ export const DEADLINES = [
   ["overdue", "Overdue"],
   ["7", "Due within 7 days"],
   // A fortnight, because that is what the front page's "due soon" tile
-  // navigates with. Absent here, the panel showed nothing chosen while the
-  // list was narrowed — a filter in force that the reader could neither see
-  // nor turn off.
+  // navigates with. Every value an address can carry is offered, so a filter
+  // in force is one the reader can see and turn off.
   ["14", "Due within 14 days"],
   ["30", "Due within 30 days"],
   ["90", "Due within 90 days"],
@@ -156,16 +151,14 @@ export const DEADLINES = [
 // carries whatever string arrives and matches the identifier against it, so
 // this list bounds the picker rather than the question — and a list short of
 // what an image actually holds is a capability that exists and cannot be
-// reached. `apk` and `rpm` were missing from it, so on an Alpine or RPM image
-// the majority of the inventory could not be narrowed to at all, while the
-// server would have answered either correctly.
+// reached. On an Alpine or RPM image `apk` or `rpm` is most of the inventory.
 //
 // A kind this does not list is still askable: the address carries it, the
 // server matches it, and the chip above the list labels it with the word
 // itself. What it has no way to do is offer it, and the durable answer to that
 // is the kinds actually present travelling with the read rather than a longer
 // list here — which is a question the server does not answer yet.
-export const ECOSYSTEMS = [
+const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
   ["golang", "Go (golang)"],
@@ -189,7 +182,7 @@ export const ECOSYSTEMS = [
 // different words, and a label claiming they are the same word would be a
 // reading the tool deliberately does not make. The label says which format the
 // word comes from for the same reason.
-export const DECLARED_AS = [
+const DECLARED_AS = [
   ["required", "required (CycloneDX)"],
   ["optional", "optional (CycloneDX or SPDX)"],
   ["excluded", "excluded (CycloneDX)"],
@@ -213,7 +206,7 @@ function said(pairs: Pairs, value: string): string {
 // removing one leaves the rest — which is the whole point of asking for two.
 // The pairs say what to remove: a key with an empty word is the whole filter,
 // a key with a word is that one value of it.
-export type Active = {
+type Active = {
   key: string;
   label: string;
   value: string;
@@ -240,8 +233,8 @@ export function activeFilters(params: URLSearchParams): Active[] {
     add("floor", "Severity", said(SEVERITIES, at("floor")));
   }
   // Every one below reads the raw value first. `said` answers "Any" for an
-  // empty one, which is a label rather than a value — taken as the test, it
-  // reported seven dropdowns as narrowing a list none of them touched.
+  // empty one, which is a label rather than a value, so it is never the test
+  // for whether a filter narrows the list.
   const pick = (key: string, label: string, pairs: Pairs) => {
     if (at(key)) add(key, label, said(pairs, at(key)));
   };
@@ -316,9 +309,8 @@ export function activeFilters(params: URLSearchParams): Active[] {
   if (at("reassessed") === "1") add("reassessed", "Rated differently here", "only");
   // Not oneOf: `on` and `support` are read off the address with getAll, so
   // naming both values means both, and origin is a single enum the reader
-  // takes with get — the both-values spelling came back as "scanner" alone and
-  // clearing the chip hid every hand-recorded finding with nothing left saying
-  // so. Leaving the parameter out already means both, on the wire and here.
+  // takes with get, which reads both values as the first alone. Leaving the
+  // parameter out already means both, on the wire and here.
   pick("origin", "Origin", ORIGINS);
   if (at("unconfirmed") === "1") add("unconfirmed", "Not confirmed by a packager", "only");
   each("vex_publisher", "VEX publisher", []);
@@ -400,9 +392,8 @@ export function withoutAny(params: URLSearchParams): URLSearchParams {
   return next;
 }
 
-// A labeled control. Every filter has one: the panel this replaced left half
-// of them to be identified by their values, which is what made two of them
-// invisible to somebody looking straight at them.
+// A labeled control. Every filter has one, because a filter identified only
+// by its values is invisible to somebody looking straight at it.
 function Field({
   label,
   hint,
@@ -631,11 +622,9 @@ export function Filters({
       {/* Cleared means the key goes, not both values written in.
           Both of these default to the working population when the address is
           silent, and the default is applied only where the key is absent — so
-          writing "branch and tag" to mean "I have not narrowed this" made the
-          address say something, suppressed the default, and quietly widened the
-          list. There was then no way to express from this panel what the rail's
-          own address says, which is how one screen came to disagree with the
-          number that opened it. */}
+          writing "branch and tag" to mean "I have not narrowed this" makes the
+          address say something, suppresses the default and widens the list
+          past the number that opened it. */}
       <Group legend="Release">
         <Choices
           label="Release kind"
@@ -785,13 +774,9 @@ export function Narrowed({
 }: {
   params: URLSearchParams;
   // The narrowing the selection puts on this list, which is a filter like any
-  // other and was the one that did not say so. It rides on the path rather
-  // than in the parameters, so it drew no chip — and a list scoped to one
-  // product sat under filters identical to the list across every product,
-  // counting fewer rows, with nothing on the screen to explain the
-  // difference. The rule the three implicit filters are written into the
-  // address for is the same rule: a list that narrows itself and does not say
-  // so is how two people read one screen and disagree about what it holds.
+  // other and says so. It rides on the path rather than in the parameters, so
+  // it draws a chip of its own: a list that narrows itself and does not say so
+  // is how two people read one screen and disagree about what it holds.
   scope: { product: string; stream: string; variant: string };
   // Widening by a level. Removing a scope chip only ever widens, like every
   // other chip here.
@@ -844,10 +829,9 @@ export function Narrowed({
       {active.map((each) => (
         <button
           // The key and the value, because a multi-valued filter puts one
-          // entry here per value and they all carry the filter's key. Keyed
-          // on the key alone, two values of one filter were siblings with the
-          // same key, and removing either left the survivor drawing the one
-          // that went.
+          // entry here per value and they all carry the filter's key; keyed
+          // on the key alone, removing one value redraws the survivor as the
+          // one that went.
           key={`${each.key} ${each.value}`}
           type="button"
           className="chip"

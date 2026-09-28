@@ -1,16 +1,15 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { own } from "./own";
+
 // A place's decision state, in the words every screen says it in.
 //
-// One vocabulary, because a register, a comparison and a document all state
-// the same four words about the same fact — and three copies is three edits
-// the day a fifth state exists, with the one nobody remembers reading in the
-// vocabulary of the database.
-//
-// The server says them too, for the document it renders; that copy is the
-// server's and moves with it.
-export const STATE_SAID: Record<string, string> = {
+// One vocabulary, because a register, a comparison, the findings list and a
+// document all state the same four words about the same fact. The server says
+// them too, for the document it renders; that copy is the server's and moves
+// with it.
+const STATE_SAID: Record<string, string> = {
   undecided: "nobody has said",
   waiting: "waiting for a second person",
   agreed: "agreed",
@@ -18,7 +17,7 @@ export const STATE_SAID: Record<string, string> = {
 };
 
 // And how each is drawn, by the class names the rest of the interface uses.
-export const STATE_DRAWN: Record<string, string> = {
+const STATE_DRAWN: Record<string, string> = {
   undecided: "open",
   waiting: "waiting",
   agreed: "agreed",
@@ -32,15 +31,21 @@ export const STATES = ["undecided", "waiting", "agreed", "lapsed"] as const;
 // reach a query parameter that takes them.
 export type Stands = (typeof STATES)[number];
 
+// The class for the one case none of the four covers: some places answered and
+// the rest never decided. The server leaves the word empty there. Drawn as
+// waiting, because it is neither decided nor untouched.
+const PARTLY_CLASS = "waiting";
+
 // said is what a state is called, or a plain description of the one case none
 // of the four covers: some places agreed and the rest never decided.
 export function said(state: string | undefined): string {
   if (!state) return "part decided";
-  return STATE_SAID[state] ?? state;
+  return own(STATE_SAID, state) ?? state;
 }
 
-// drawn is the class it takes, falling back to the open one — a state this
-// does not know is visible rather than invisible.
+// drawn is the class it takes. A state this does not know is drawn as open, so
+// it is visible rather than invisible.
 export function drawn(state: string | undefined): string {
-  return STATE_DRAWN[state ?? ""] ?? "open";
+  if (!state) return PARTLY_CLASS;
+  return own(STATE_DRAWN, state) ?? "open";
 }

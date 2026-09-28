@@ -5,11 +5,10 @@
    one: the finding detail, the review queue, the comparison, the guided
    review, the upload.
 
-   The charts, the report sheet, the drawer and the covering panel left for
-   parts.css, which is where a shape many screens draw belongs. What stays is
-   what one screen owns — including the phone shaping below, which sets the
-   desktop default narrow.css flips, so it belongs with the screen rather
-   than with the parts. */
+   A shape many screens draw is in parts.css, the charts are in charts.css and
+   the drawer in overlay.css. What is here is what one screen owns — including
+   the phone shaping below, which sets the desktop default narrow.css flips, so
+   it belongs with the screen rather than with the parts. */
 
 /* ---------- detail ---------- */
 
@@ -18,12 +17,6 @@
   grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   gap: var(--gap-room);
 }
-/* Evidence on one side, the action on the other. The action leads, because it
-   is what the screen is for and because the decision form carries its own
-   aside — the arrangement inside the form and the arrangement of the page
-   then read the same way round. Everything that is neither, the timeline and
-   the comments and the holder, stays below at full width: it is consulted
-   after the judgment rather than during it. */
 /* The description, above both columns. A paragraph of a vulnerability
    description is prose, and prose in a 380-pixel column is four words to a
    line. */
@@ -33,11 +26,9 @@
 .described p {
   max-width: 90ch;
 }
-/* The evidence and the act are stacked, not side by side. Beside the form the
-   facts were read in a 380-pixel column — severity, EPSS, the vector, a
-   weakness and eleven references — while the widest thing on the screen was an
-   empty text area. Somebody weighs the evidence and then acts, and the page
-   runs in that order. */
+/* The evidence and the act are stacked. Somebody weighs the evidence and then
+   acts, and the page runs in that order; beside the form, the facts would be
+   read in a 380-pixel column. */
 .evidence + .acting {
   margin-top: var(--gap-room);
 }
@@ -68,10 +59,9 @@
   }
 }
 
-/* Two columns at most. auto-fit took a wide screen to three and sometimes
-   four, and the blocks are read rather than scanned: at that width the eye has
-   to find where each one starts, and a long description sat beside two short
-   panels with nothing lining up. */
+/* Two columns at most. The blocks are read rather than scanned, and at three
+   or four across the eye has to find where each one starts, with a long
+   description beside two short panels and nothing lining up. */
 .evidence {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -186,17 +176,6 @@
 }
 .deciding .rendered {
   min-height: 210px;
-}
-.deciding .writing {
-  display: grid;
-  grid-template-columns: minmax(0, 78ch) minmax(220px, 1fr);
-  gap: var(--gap-room);
-  align-items: start;
-}
-@media (width <= 900px) {
-  .deciding .writing {
-    grid-template-columns: 1fr;
-  }
 }
 
 .shortfall {
@@ -356,9 +335,9 @@
   font-family: var(--mono);
 }
 /* A row with something under it is told from one without at a glance, by two
-   things at once. Color alone was not enough — at this size the triangle and
-   the dot were the same mark in two shades — so the control is also half again
-   the size of the punctuation. The line-height is pinned so the larger glyph
+   things at once. At this size the triangle and the dot are the same mark in
+   two shades, so the control is also half again the size of the
+   punctuation. The line-height is pinned so the larger glyph
    does not push the row taller than its neighbors. */
 .tree .rule {
   color: var(--line-strong);
@@ -400,12 +379,10 @@
    says nothing about whether any of it matters, and this is the screen whose
    whole job is saying which branch is worth opening. Only the bands that are
    there: a row of zeros is noise. */
-/* A column, not a run of pills after the name.
-   **The row had two automatic margins** — one here and one on the count — so
-   the slack was split between them and the strip started wherever the name
-   ended: 113 different positions down one page. One automatic margin, and a
-   width that does not depend on how many of the five bands a row has, puts
-   every band of every row in the same place. */
+/* A column, not a run of pills after the name. One automatic margin, and a
+   width that does not depend on how many of the bands a row has, puts every
+   band of every row in the same place; a second automatic margin splits the
+   slack and starts the strip wherever the name ends. */
 .strip {
   margin-left: auto;
   display: inline-flex;
@@ -894,8 +871,8 @@
 .fcard.medium::before {
   background: var(--sev-medium);
 }
-/* The two the ladder has that this did not: a low card and an unrated card
-   were drawn alike, and alike to each other, because neither had an arm. */
+/* Every band on the ladder has an arm, so a low card and an unrated card are
+   told apart from each other and from the neutral base. */
 .fcard.low::before {
   background: var(--sev-low);
 }
@@ -1022,9 +999,8 @@
 .ostats .o.bad b {
   color: var(--sev-exploited);
 }
-/* Its own name rather than the block-level notice class: `.warn` sets a
-   display, a gap, a top margin and a left bar, all of which landed on a pill
-   that declares none of them. */
+/* Its own name rather than a word another component styles: a modifier whose
+   bare rule draws a box hands that box to the pill. */
 .ostats .o.hot {
   border-color: var(--sev-high);
   color: var(--sev-high);
@@ -1197,7 +1173,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   overflow-x: auto;
   margin: 0 0 8px;
 }
@@ -1231,7 +1207,7 @@
   height: 22px;
   font-size: 9px;
 }
-.timeline.earlier {
+.timeline.past {
   opacity: 0.8;
 }
 
@@ -1438,8 +1414,7 @@
   margin-left: auto;
 }
 
-/* Who holds a finding, as one row at the head of the triage pane. It was a
-   card with a heading and a hint on either side, around a dropdown. */
+/* Who holds a finding, as one row at the head of the triage pane. */
 .assignee {
   display: flex;
   gap: 10px;
@@ -1508,7 +1483,7 @@
   font-weight: 400;
   color: var(--faint);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--pill);
   padding: 0 6px;
 }
 .settingname .badge.set {
@@ -1572,19 +1547,19 @@
   height: 8px;
   appearance: none;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--pill);
   background: var(--line);
   overflow: hidden;
 }
 .patchbar::-webkit-progress-bar {
   background: var(--line);
-  border-radius: 999px;
+  border-radius: var(--pill);
 }
 .patchbar::-webkit-progress-value {
   background: var(--accent);
-  border-radius: 999px;
+  border-radius: var(--pill);
 }
 .patchbar::-moz-progress-bar {
   background: var(--accent);
-  border-radius: 999px;
+  border-radius: var(--pill);
 }

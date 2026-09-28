@@ -9,12 +9,14 @@ import {
   SORTS,
   asAsked,
   fromAt,
+  identityOf,
   listQuery,
   pageSize,
   pathTo,
   where,
   widened,
   windowFor,
+  type Row,
 } from "./list";
 
 // The list's address is the list. What is tested here is the part a second
@@ -279,6 +281,27 @@ describe("where a row opens", () => {
       "",
     );
     expect(new URLSearchParams(at.split("?")[1]).has("rule")).toBe(false);
+  });
+});
+
+describe("a row's identity", () => {
+  // A row is one issue at one fold, in one product on the list that spans
+  // products — the grain the server groups the list by. The identity is what a
+  // selection, a preview and a key are held by.
+  const row = { vulnerability: "CVE-2024-1", fold: "openssl 3.0.13 deb debian" } as Row;
+
+  it("tells apart the same issue at the same fold in two products", () => {
+    expect(identityOf({ ...row, product: "sonic" })).not.toBe(
+      identityOf({ ...row, product: "edge" }),
+    );
+  });
+
+  it("tells apart two folds of one issue", () => {
+    expect(identityOf(row)).not.toBe(identityOf({ ...row, fold: "openssl 3.0.14 deb debian" }));
+  });
+
+  it("is the same for a row read afresh", () => {
+    expect(identityOf({ ...row, places: 3 } as Row)).toBe(identityOf({ ...row, places: 9 } as Row));
   });
 });
 

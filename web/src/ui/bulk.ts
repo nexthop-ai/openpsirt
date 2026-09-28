@@ -8,9 +8,8 @@ import { useWho } from "../app/session";
 // Every such screen sends one request per selected row, so an unbounded
 // selection is one click turning into as many round trips as the filter
 // matched — and the server refuses past the deployment's cap anyway. A screen
-// that does not read it discovers the limit one refusal at a time, which is
-// exactly what the field was added to stop, and it was read by one of the
-// three screens that loop.
+// that does not read it discovers the limit one refusal at a time, so every
+// screen that loops reads it here.
 //
 // Zero means the deployment states no cap, and nothing is drawn.
 export function useBulkCap(picked: number): { cap: number; over: boolean } {

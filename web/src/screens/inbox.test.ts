@@ -62,4 +62,8 @@ describe("a disposition's name", () => {
     expect(dispositionSaid("out-of-scope")).toBe("Out of scope");
     expect(dispositionSaid("withdrawn-upstream")).toBe("withdrawn-upstream");
   });
+
+  it("is shown as it arrived where the word names a member every object inherits", () => {
+    expect(dispositionSaid("constructor")).toBe("constructor");
+  });
 });

@@ -7,12 +7,15 @@
     <title>OpenPSIRT — Product Security Incident Response &amp; Triage</title>
     <!-- The look, stamped before anything paints. Setting it from the
          application means one frame drawn light on a machine set to dark,
-         which reads as a flicker on every navigation to a fresh page. -->
+         which reads as a flicker on every navigation to a fresh page. The
+         key and the list of looks are the ones src/app/look.ts keeps, and a
+         web test holds the two to each other. -->
     <script>
       (function () {
         try {
+          var looks = ["light", "dark"];
           var kept = window.localStorage.getItem("openpsirt.look");
-          if (kept !== "light" && kept !== "dark") {
+          if (looks.indexOf(kept) < 0) {
             kept = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
           }
           document.documentElement.setAttribute("data-look", kept);

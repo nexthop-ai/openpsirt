@@ -16,6 +16,7 @@ import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
 import { mayOf, useWho } from "../app/session";
 import { linkable } from "../ui/addressable";
+import { at } from "../ui/when";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
@@ -389,7 +390,7 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
               answer. */}
           {report.found_here ? null : report.acknowledged ? (
             <p className="hint">
-              Answered {report.acknowledged.replace("T", " ").slice(0, 16)}
+              Answered {at(report.acknowledged)}
               {report.acknowledged_by && (
                 <> by {report.acknowledged_by_name || report.acknowledged_by}</>
               )}

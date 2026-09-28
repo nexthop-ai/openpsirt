@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Sitting } from "../ui/Covering";
-import { keyOf } from "./treeshape";
+import { STEP, keyOf } from "./treeshape";
 
 // The way down to one place, as the rows a reader sees.
 //
@@ -14,13 +14,13 @@ import { keyOf } from "./treeshape";
 // place with neither is unplaced, and only there does the screen say nothing
 // recorded what pulls it in.
 //
-// Drawing the second as the third said something false about a record that had
-// the answer, and drew it with the component's own name missing: the name was
-// read off the end of a chain that was not there.
+// Drawn as unplaced, the second says something false about a record that has
+// the answer, and loses the component's own name, which is read off the end of
+// the chain.
 
-export type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
+type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
 
-export type WayDown = {
+type WayDown = {
   steps: Step[];
   // Rootless says the walk up from the first step reached nothing, so what is
   // above it is unknown rather than absent.
@@ -73,7 +73,7 @@ export function intoTheTree(places: Sitting[]): string {
   // Each step as the tree's own identity for a row, not as a bare name: the
   // tree opens the set it is handed, and a name the build ships twice names
   // two rows there.
-  query.set("path", steps.map((step) => keyOf(step)).join("\u001f"));
+  query.set("path", steps.map((step) => keyOf(step)).join(STEP));
   if (last?.version) query.set("version", last.version);
   // The rest of what the tree keys a row on, so the row the link exists to
   // show is the one marked.

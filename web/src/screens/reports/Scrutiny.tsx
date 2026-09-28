@@ -10,6 +10,7 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Outcome } from "../../ui/Outcome";
+import { dismisses } from "../../ui/outcomes";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import {
@@ -34,11 +35,6 @@ import { Wide } from "../../ui/Wide";
 // here by it could be told a control failed and shown a page that cannot
 // contain the failure at any setting.
 const WINDOWS = [30, 90, 365, 3650] as const;
-
-// The outcomes that dismiss, and so the ones that need a second person. Named here
-// because a deferral standing alone reads very differently from a dismissal
-// standing alone, and the table has to say which it is looking at.
-const DISMISSALS = new Set(["not-applicable", "mismatched", "wont-fix", "already-fixed"]);
 
 // The rows each section carries. Sent rather than left to the server's
 // default, because the number has to be the one the notice below quotes: a
@@ -89,8 +85,10 @@ export function Scrutiny() {
   };
 
   const alone = got.data?.alone ?? [];
-  const dismissed = alone.filter((row) => DISMISSALS.has(row.outcome));
-  const exempt = alone.filter((row) => !DISMISSALS.has(row.outcome));
+  // A deferral standing alone reads very differently from a dismissal standing
+  // alone, and the table says which it is looking at.
+  const dismissed = alone.filter((row) => dismisses(row.outcome));
+  const exempt = alone.filter((row) => !dismisses(row.outcome));
 
   return (
     <Sheet

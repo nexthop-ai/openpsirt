@@ -3,6 +3,8 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { at } from "../ui/when";
+import { own } from "../ui/own";
 
 import { type Body } from "../api/client";
 import { useSplitClaim } from "../api/claims";
@@ -75,9 +77,8 @@ export function Became({
 // rows back.
 //
 // The same signals an approver is shown. An approver reading a bulk claim may
-// agree to most of it and set some aside; until this the author could only
-// withdraw the whole thing and start again, so "this holds for most of them
-// but not those four" was unavailable to the person best placed to say it.
+// agree to most of it and set some aside, and so may its author: "this holds
+// for most of them but not those four" is the person best placed to say it.
 function Mine({ row }: { row: Body<"BecameBody"> }) {
   const split = useSplitClaim();
   const [holding, setHolding] = useState<Set<number>>(new Set());
@@ -141,7 +142,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
             </span>
           )}
         </td>
-        <td className="hint">{row.when ? row.when.replace("T", " ").slice(0, 16) : "—"}</td>
+        <td className="hint">{at(row.when) || "—"}</td>
       </tr>
       {outliers && (outliers.rows ?? []).length > 0 && (
         <tr>
@@ -246,7 +247,7 @@ export function Happened({ word, by }: { word?: string; by?: string }) {
     undone: { cls: "lapsed", said: "Agreement undone" },
     mixed: { cls: "waiting", said: "Ended several ways" },
   };
-  const shown = how[word ?? ""] ?? { cls: "", said: word ?? "" };
+  const shown = own(how, word) ?? { cls: "", said: word ?? "" };
   return (
     <>
       <span className={`state ${shown.cls}`}>{shown.said}</span>

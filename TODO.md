@@ -42,6 +42,7 @@ The owner has chosen to wait on each of these.
 | Fetching a repository from a mirror | The kernel stable tree is 5.1 GB from kernel.org and 1.1 GB from a mirror that sends commits only |
 | Marking the patch for the branch a component ships | Matching a branch such as `linux-6.12.y` to a version works differently in every project |
 | Cloning through an outbound HTTP proxy | The patch-branch fetcher connects directly, so a network with no direct route cannot use it |
+| Publishing which outcomes dismiss and which state a reason | The interface holds a copy of both classes, so an outcome the server moves to another class is not a compile error there |
 
 ## Decided, not built
 

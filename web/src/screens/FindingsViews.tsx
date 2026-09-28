@@ -22,13 +22,6 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Exploited, Severity } from "../ui/Severity";
 
-// The bands, worst first — the order of these words is a fact about the domain
-// rather than a display choice, which is why the server names the worst one
-// and this only draws them. The page sizes, the orders, the filters and where
-// a row goes all live beside the list rather than in it, because the finding
-// screen asks the same question of the server to offer the row before and the
-// row after. Fifty rows is 153 pages of one product's findings, which is not a
-// list anybody assembles a day's work out of.
 import { PAGE, type Row } from "./list";
 import { Wide } from "../ui/Wide";
 import { cut } from "../ui/cut";
@@ -291,9 +284,8 @@ export function ByComponent({
                   </td>
                   <td className="num">{(row.places ?? 0).toLocaleString()}</td>
                   <td>
-                    {/* The two secondary acts, where opening the component
-                        used to sit. Narrowing is one of them now: the name
-                        is the way to the thing itself. */}
+                    {/* The two secondary acts, narrowing among them: the
+                        name is the way to the thing itself. */}
                     <button
                       type="button"
                       className="linkish onlyit"
@@ -372,9 +364,9 @@ export function bumpQuery(
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
 //
-// No action column. The view this replaces put the act in the last column,
-// away from the thing it acts on, which is what it was deleted for. The
-// package name opens the component, where planning the upgrade lives.
+// No action column: an act in the last column sits away from the thing it
+// acts on. The package name opens the component, where planning the upgrade
+// lives.
 export function ByBump({
   at,
   query,
@@ -672,7 +664,7 @@ function bundlesFile(
 // somebody follows, not a request this page makes: the browser fetches it with
 // the session it already has. The filters are the ones on screen, so the file
 // and the table cannot disagree about what was asked for.
-export function componentsFile(
+function componentsFile(
   at: { product: string; stream?: string; variant?: string },
   query: Record<string, unknown>,
   format: string,

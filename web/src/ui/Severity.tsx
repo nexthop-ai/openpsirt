@@ -25,10 +25,8 @@ export function Severity({ word }: { word?: string }) {
   // somebody looked at and dismissed.
   const band = bandOf(word);
   const said = ratedAs(word);
-  // The class says what the band says. `unrated` is not one of the four, so
-  // the test that decided the class was always false for it and the badge
-  // drew as a low while reading "Unrated" — the same row counted as a medium
-  // by the chart beside it and drawn with a low's stripe in the card view.
+  // The class is the band, so an unrated row is drawn as unrated here and in
+  // the card view alike.
   return (
     <span
       className={`sev ${band}`}

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
+import { exportAt } from "../../api/exports";
 import { findingsPath, scopeQuery, useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -235,8 +236,8 @@ function aheadAsked(params: URLSearchParams): number {
 // The address the file comes from. A link somebody follows rather than a
 // request this page makes, so the browser fetches it with the session it
 // already has.
-function fileAt(format: string, asked: string): string {
-  return `/v1/releases/out-of-support.${format}${asked ? `?${asked}` : ""}`;
+function fileAt(format: "csv" | "json", asked: string): string {
+  return exportAt("/v1/releases/out-of-support", format, asked);
 }
 
 // The findings open on one release, as the findings list shows them.

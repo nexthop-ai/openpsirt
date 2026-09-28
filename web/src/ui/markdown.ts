@@ -4,9 +4,8 @@
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 
-// Rendering moved here when the API stopped returning markup, so this carries
-// the half of the policy that travels with rendering (DESIGN-text.md). The
-// other half — what may be submitted at all, which links survive, what a
+// The API returns no markup, so this carries the half of the policy that
+// travels with rendering (DESIGN-text.md). The other half — what may be submitted at all, which links survive, what a
 // reference resolves to — still runs on the server before anything is stored,
 // because it needs data and authorization checks no browser holds.
 //
@@ -197,11 +196,10 @@ function tidy(node: Element) {
 
 // anchor is the half of that about where a link goes.
 //
-// Separated so the class check above runs on every element that leaves here.
-// Written as early returns inside one function, the two anchors that keep
-// their href — a file held here, and a link into this deployment — left
-// without it, so the stated invariant was true of some of what the sanitizer
-// emits rather than of all of it.
+// Separated so the class check above runs on every element that leaves here,
+// the two anchors that keep their href — a file held here, and a link into
+// this deployment — among them. Early returns inside one function would let
+// those two leave without it.
 function anchor(node: Element) {
   if (node.tagName !== "A") {
     return;

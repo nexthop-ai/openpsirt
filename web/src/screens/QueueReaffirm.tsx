@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { at } from "../ui/when";
 import { useMutation } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
@@ -18,7 +19,7 @@ type Row = Body<"ToReaffirmBody">;
 
 // What one act re-made: how many claims, and how many of those wait for a
 // second person.
-export type Reaffirmed = { claims: number; waiting: number };
+type Reaffirmed = { claims: number; waiting: number };
 
 // What to say about it once the rows it came from have left the list.
 export function reaffirmedNotice(made: Reaffirmed): string {
@@ -223,9 +224,7 @@ export function ToReaffirm({
                     <td className="num">
                       {row.places} {row.places === 1 ? "place" : "places"}
                     </td>
-                    <td className="hint">
-                      {row.lapsed_at ? row.lapsed_at.replace("T", " ").slice(0, 16) : "—"}
-                    </td>
+                    <td className="hint">{at(row.lapsed_at) || "—"}</td>
                   </tr>
                 ))}
               </tbody>

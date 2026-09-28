@@ -7,9 +7,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
-import { on } from "../ui/when";
+import { DAY_MS, on } from "../ui/when";
+import { own } from "../ui/own";
 import { Peek, Sits } from "./FindingsViews";
-import { SORTS, pathTo, type Row } from "./list";
+import { SORTS, identityOf, pathTo, type Row } from "./list";
 import { bandOf } from "../ui/severities";
 
 // The findings list as a table, and as cards on a narrow screen.
@@ -27,7 +28,7 @@ import { bandOf } from "../ui/severities";
 // anybody who wants it. This is also the age a deadline relates to.
 function openFor(opened: string | undefined): string | null {
   if (!opened) return null;
-  const days = Math.floor((Date.now() - Date.parse(opened + "T00:00:00Z")) / 86_400_000);
+  const days = Math.floor((Date.now() - Date.parse(opened + "T00:00:00Z")) / DAY_MS);
   if (!Number.isFinite(days) || days < 0) return null;
   if (days < 60) return `open ${days}d`;
   if (days < 730) return `open ${Math.floor(days / 30)}mo`;
@@ -51,7 +52,7 @@ function dueSays(row: { due?: string; days_left?: number; no_deadline?: string }
 } {
   if (!row.due) {
     return {
-      text: noDeadlineSays[row.no_deadline ?? ""] ?? "no deadline",
+      text: own(noDeadlineSays, row.no_deadline) ?? "no deadline",
       tone: "none",
     };
   }
@@ -86,7 +87,6 @@ export function FindingsTable({
   pick,
   pickAll,
   spanning,
-  columns,
   oneBuild,
   sortable,
   buildOf,
@@ -106,10 +106,8 @@ export function FindingsTable({
   picked: Map<string, Row>;
   pick: (key: string, row: Row, on: boolean) => void;
   pickAll: (rows: Row[], keys: string[], on: boolean) => void;
-  // A list spanning every product, which is what decides the extra
-  // column — and `columns`, which is how many the preview row has to span.
+  // A list spanning every product, which is what decides the extra column.
   spanning: boolean;
-  columns: number;
   oneBuild: boolean;
   sortable: (label: keyof typeof SORTS) => React.ReactNode;
   // The build a row's actions and links are about.
@@ -134,6 +132,10 @@ export function FindingsTable({
   cursor: number;
 }) {
   const navigate = useNavigate();
+  // The columns the header below draws, counted where it draws them, so the
+  // preview row spans all of them, the product among them on a list spanning
+  // every product.
+  const columns = spanning ? 11 : 10;
   return (
     <div className="findings">
       <Wide>
@@ -151,8 +153,8 @@ export function FindingsTable({
               {/* The three that decide what happens next, before anything
                   that describes what it is. At a laptop's width the table is
                   wider than its container and the columns at the right-hand
-                  end are cut — which used to be Due and State, the two facts
-                  somebody reads a list of findings to get at. Severity, the
+                  end are cut, so Due and State, the two facts somebody reads
+                  a list of findings to get at, are not among them. Severity, the
                   deadline and how far it is decided lead; the component, the
                   path and the rest can run off the edge without taking the
                   next action with them. */}
@@ -176,7 +178,7 @@ export function FindingsTable({
           </thead>
           <tbody id="findingRows">
             {rows.map((row, i) => {
-              const key = `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
+              const key = identityOf(row);
               const at = pathTo(buildOf(row), row, carrying, prepared?.name);
               // Its decision state comes from the server, defined the
               // way the state filter defines it; a row does not guess from
@@ -343,12 +345,9 @@ export function FindingsTable({
                         <Link
                           className="linkish id compname"
                           title={`Open ${row.component}`}
-                          // The row's own product, not the selection's.
-                          // Across every product there is no selection, so
-                          // this built `/products//components/NAME` — a
-                          // path that matches no route, and the app fell
-                          // back to the home screen. The source-package
-                          // link four rows down already asked the row.
+                          // The row's own product, not the selection's:
+                          // across every product there is no selection, and
+                          // a path with an empty product matches no route.
                           to={`/products/${encodeURIComponent(
                             buildOf(row).product,
                           )}/components/${encodeURIComponent(row.component ?? "")}`}
@@ -427,11 +426,10 @@ export function FindingsTable({
                           <>
                             {/* A version is one token to a reader. Left
                                       to itself the browser breaks at every
-                                      hyphen, so "1.26.0-rc.3" arrived as two
-                                      lines and three versions as four — the
-                                      tallest cell on the row, for a column that
-                                      holds three short words. It still wraps,
-                                      but only between one version and the
+                                      hyphen, and "1.26.0-rc.3" becomes two
+                                      lines — the tallest cell on the row, for
+                                      a column that holds three short words. It
+                                      wraps only between one version and the
                                       next. */}
                             <span
                               className={said.kind === "id" ? "id" : "hint"}
@@ -516,10 +514,9 @@ export function FindingsTable({
             // a click and nothing else is a list nobody can get into
             // from a keyboard.
             <article
-              key={`${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`}
+              key={identityOf(row)}
               // The word the badge draws with, so the card's stripe and the
-              // badge on it agree. An absent rating gave the card no class at
-              // all while the badge beside it said "Unrated".
+              // badge on it agree, an absent rating included.
               className={`fcard ${row.exploited || row.exploited_here ? "exploited" : bandOf(row.severity)}`}
               role="link"
               tabIndex={0}

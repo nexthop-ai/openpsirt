@@ -17,7 +17,14 @@ import { Crumbs } from "../ui/Crumbs";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { JUSTIFICATIONS, reasonOffered, reasonsFor, type Justification } from "../ui/Outcome";
+import {
+  JUSTIFICATIONS,
+  labeled,
+  reasonOffered,
+  reasonsFor,
+  type Justification,
+} from "../ui/Outcome";
+import { needsJustification as statesReason } from "../ui/outcomes";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
 
@@ -32,6 +39,18 @@ const PAGE = 500;
 type Claimed = NonNullable<
   paths["/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions"]["post"]["requestBody"]
 >["content"]["application/json"];
+
+// The outcomes one bulk claim may record, in the order the form offers them.
+// Keyed by the request's own union, so an outcome the endpoint gains or drops
+// is a compile error here rather than an option that is missing or refused.
+const OFFERED: Record<Claimed["outcome"], true> = {
+  "not-applicable": true,
+  mismatched: true,
+  "wont-fix": true,
+  affected: true,
+  deferred: true,
+  "already-fixed": true,
+};
 
 // A place a claim left out because a decision already stands there.
 type Skipped = Body<"SkippedBody">;
@@ -67,10 +86,9 @@ export function Together() {
   const queries = useQueryClient();
 
   const at = { product, stream, variant, component };
-  // The whole build, not the product and the component. Keyed on two of the
-  // four, the same component under two variants shared one draft and each
-  // cleared the other's — and what is kept here is the reasoning a second
-  // person is asked to agree to.
+  // The whole build, not the product and the component, so the same component
+  // under two variants keeps two drafts — and what is kept here is the
+  // reasoning a second person is asked to agree to.
   const kind = Object.values(which).join("/");
   const draftKey = `together:${product}:${stream}:${variant}:${component}${kind ? `:${kind}` : ""}`;
 
@@ -245,9 +263,8 @@ export function Together() {
             >
               Select all {items.length.toLocaleString()} shown
             </button>
-            {/* The whole narrowed set, not the page. A page is fifty of eight
-                hundred, and a claim assembled a page at a time is eighteen
-                claims where the person meant one. */}
+            {/* The whole narrowed set, not the page. A claim assembled a page
+                at a time is several claims where the person meant one. */}
             {everything > items.length && (
               <button
                 type="button"
@@ -278,11 +295,10 @@ export function Together() {
             </p>
           )}
 
-          {/* The evidence one judgment is being made on. It showed the
-              identifier, the severity and a place count and nothing else —
-              while narrowing by the description, which it did not show. One
-              click here writes a claim across hundreds of places, so it says
-              at least as much as the screen for deciding one. */}
+          {/* The evidence one judgment is being made on, the description
+              the list is narrowed by among it. One click here writes a claim
+              across hundreds of places, so it says at least as much as the
+              screen for deciding one. */}
           <div className="picklist">
             <Wide>
               <table>
@@ -426,7 +442,7 @@ function Claim({
   // refused, naming the decision, unless the person asks to leave it out.
   const [skipDecided, setSkipDecided] = useState(false);
 
-  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  const needsJustification = statesReason(outcome);
   // A correction carries past every version bump, so it takes only the two
   // reasons that say something is not there. The endpoint refuses the rest,
   // and a reason chosen under another outcome is clamped rather than sent.
@@ -459,14 +475,11 @@ function Claim({
             value={outcome}
             onChange={(event) => setOutcome(event.target.value as Claimed["outcome"])}
           >
-            <option value="not-applicable">Not applicable</option>
-            <option value="mismatched">Wrong match</option>
-            <option value="wont-fix">Will not fix</option>
-            <option value="affected">Affected</option>
-            {/* The two bulk cases that were missing: a bump scheduled for the
-                next release, and a distribution's backport. */}
-            <option value="deferred">Deferred</option>
-            <option value="already-fixed">Already fixed</option>
+            {(Object.keys(OFFERED) as Claimed["outcome"][]).map((each) => (
+              <option key={each} value={each}>
+                {labeled(each)}
+              </option>
+            ))}
           </select>
         </label>
 
