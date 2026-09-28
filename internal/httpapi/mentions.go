@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // MentionableBody is somebody who could be named in a comment or a
@@ -41,22 +42,9 @@ func registerMentions(api huma.API, in Ingest) {
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name"`
 		Limit      int    `query:"limit" default:"25" minimum:"1" maximum:"100"`
 	}) (*listOutput[MentionableBody], error) {
-		subject, err := reading(ctx)
+		subject, product, wanted, err := readersHere(ctx, in, input.Product, input.Visibility)
 		if err != nil {
 			return nil, err
-		}
-		product, err := productNamedVisibly(ctx, in, subject, input.Product)
-		if err != nil {
-			return nil, err
-		}
-
-		// A request for who may be told about an undisclosed finding is itself
-		// a question about undisclosed findings. Somebody who cannot read them
-		// is answered as though the product were not there, which is the same
-		// answer every other path gives.
-		wanted := access.AsVisibility(input.Visibility)
-		if !subject.Reads(wanted, product.ID) {
-			return nil, noSuchProduct()
 		}
 
 		found, err := access.NewStore(in.DB.DB).WhoCanRead(ctx, subject, product.ID, wanted, input.Term, input.Limit)
@@ -73,4 +61,32 @@ func registerMentions(api huma.API, in Ingest) {
 		}
 		return out, nil
 	})
+}
+
+// readersHere resolves who is asking about the readers of a product, the
+// product, and the visibility asked about, for the pickers that offer people
+// who can already read what they would be named on or handed.
+//
+// A request about who may read undisclosed work is itself about undisclosed
+// work. Somebody who cannot read it is answered as though the product were not
+// there, which is the answer every other path gives.
+func readersHere(ctx context.Context, in Ingest, product, visibility string) (
+	access.Subject, *catalog.Product, access.Visibility, error) {
+
+	subject, err := reading(ctx)
+	if err != nil {
+		return access.Subject{}, nil, "", err
+	}
+	if in.DB == nil {
+		return access.Subject{}, nil, "", noDatabase(in.logger())
+	}
+	named, err := productNamedVisibly(ctx, in, subject, product)
+	if err != nil {
+		return access.Subject{}, nil, "", err
+	}
+	wanted := access.AsVisibility(visibility)
+	if !subject.Reads(wanted, named.ID) {
+		return access.Subject{}, nil, "", noSuchProduct()
+	}
+	return subject, named, wanted, nil
 }

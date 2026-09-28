@@ -73,23 +73,9 @@ func registerHolders(api huma.API, in Ingest) {
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals"`
 		Limit      int    `query:"limit" default:"25" minimum:"1" maximum:"100"`
 	}) (*listOutput[HolderBody], error) {
-		subject, err := reading(ctx)
+		subject, product, wanted, err := readersHere(ctx, in, input.Product, input.Visibility)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		product, err := productNamedVisibly(ctx, in, subject, input.Product)
-		if err != nil {
-			return nil, err
-		}
-		// A request for who may hold undisclosed work is itself about
-		// undisclosed work, and is answered the way every other path answers
-		// it: as though the product were not there.
-		wanted := access.AsVisibility(input.Visibility)
-		if !subject.Reads(wanted, product.ID) {
-			return nil, noSuchProduct()
 		}
 
 		store := access.NewStore(in.DB.DB)
