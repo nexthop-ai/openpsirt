@@ -1623,6 +1623,22 @@ again under its Settings.</p>
 <td>With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group</td>
 <td>Record them again to reopen the window</td>
 </tr>
+<tr>
+<td>A chart install with <code>auth.trustedHeader.name</code> set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels and namespace unless told otherwise</td>
+<td>Where the controller is not ingress-nginx, or runs in a namespace other than <code>ingress-nginx</code>, set <code>networkPolicy.ingressController</code> to its labels, or add it under <code>networkPolicy.from</code>. Anything in the cluster that reaches the Service directly rather than through the ingress, such as a pipeline uploading with a key, is refused until it is named under <code>networkPolicy.from</code>. <a href="#the-trusted-header">The trusted header</a></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_BASE_URL</code> with a query, a fragment or credentials is refused at startup</td>
+<td>Write the address alone</td>
+</tr>
+<tr>
+<td>With <code>OPENPSIRT_DB_REQUIRE_ENCRYPTION</code> set, <code>sslmode=disable</code>, <code>tls=false</code> or <code>allowFallbackToPlaintext=true</code> in the database URL, or <code>PGSSLMODE=disable</code> under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not</td>
+<td>Remove the cleartext setting</td>
+</tr>
+<tr>
+<td>Migrating with <code>OPENPSIRT_DB_MAX_OPEN=1</code> on PostgreSQL, MySQL or MariaDB is refused</td>
+<td>Set it to 2 or more</td>
+</tr>
 </tbody>
 </table>
 <table>
@@ -1660,7 +1676,7 @@ again under its Settings.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_BASE_URL</code></td>
-<td>The address people arrive on, <strong>written in full and with no path below it</strong>: <code>https://psirt.example.com</code>. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured</td>
+<td>The address people arrive on, <strong>written in full, with no path below it and no query, fragment or credentials</strong>: <code>https://psirt.example.com</code>. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -1715,7 +1731,7 @@ writes <code>text</code>.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_DB_MAX_OPEN</code></td>
-<td>Most connections open at once</td>
+<td>Most connections open at once. At least 2 on a server engine to migrate: the migration lock holds one connection while the migrations use another</td>
 <td><code>25</code></td>
 </tr>
 <tr>
@@ -1789,6 +1805,18 @@ read.</p>
 </thead>
 <tbody>
 <tr>
+<td>The URL asks for a transport that falls back to cleartext, or says nothing</td>
+<td>Every connection is opened with one that does not: <code>sslmode=require</code> on PostgreSQL where the URL says <code>prefer</code>, <code>allow</code> or nothing, and <code>tls=skip-verify</code> on MySQL and MariaDB where it says <code>preferred</code> or nothing. Encrypted, with no certificate checked, which is what the default already gave where the server offered it</td>
+</tr>
+<tr>
+<td>A PostgreSQL URL says nothing and <code>PGSSLMODE</code> is set</td>
+<td>The environment's mode is judged in the URL's place: <code>require</code>, <code>verify-ca</code> and <code>verify-full</code> are left to apply, <code>prefer</code> and <code>allow</code> become <code>require</code>, and <code>disable</code> is refused</td>
+</tr>
+<tr>
+<td>The URL asks for cleartext</td>
+<td><code>sslmode=disable</code>, <code>tls=false</code> or <code>tls=0</code> in any case, or <code>allowFallbackToPlaintext</code> true: refused at startup, naming the setting</td>
+</tr>
+<tr>
 <td>The connection is encrypted</td>
 <td>Nothing happens. The transport is logged as it always is</td>
 </tr>
@@ -1828,7 +1856,7 @@ read.</p>
 </tr>
 <tr>
 <td><code>GRYPE_DB_CACHE_DIR</code></td>
-<td>Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written</td>
+<td>Where the scanner keeps its vulnerability data. The image sets it, and the chart sets it from <code>scanner.cacheDir</code>, where it mounts the volume; outside the chart, a deployment that moves it moves the volume with it, or the data lands on the read-only root filesystem where it cannot be written</td>
 <td><code>/var/cache/openpsirt/grype</code></td>
 </tr>
 <tr>
@@ -1836,8 +1864,17 @@ read.</p>
 <td>Whether the scanner fetches its own vulnerability data. Set it to <code>false</code> where the deployment cannot reach the network, and put the data there yourself — see below</td>
 <td><code>true</code></td>
 </tr>
+<tr>
+<td><code>GRYPE_CHECK_FOR_APP_UPDATE</code></td>
+<td>Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured</td>
+<td><code>false</code></td>
+</tr>
 </tbody>
 </table>
+<p>The scanner is given only part of this process's environment: <code>PATH</code>, <code>HOME</code>,
+<code>TMPDIR</code>, <code>TZ</code>, <code>SSL_CERT_FILE</code>, <code>SSL_CERT_DIR</code>, the proxy variables in either
+case, and every <code>GRYPE_</code> variable. None of the <code>OPENPSIRT_</code> settings reaches it,
+so a credential the scanner needs has to be given under a name of its own.</p>
 <h3 id="an-air-gapped-install">An air-gapped install<a class="headerlink" href="#an-air-gapped-install" title="Permanent link">&para;</a></h3>
 <p>The scanner's vulnerability data is not shipped in the image: it changes daily
 and the image does not. A deployment that can reach the network downloads it
@@ -1967,7 +2004,7 @@ web server serves them, at the address you give below.</p>
 <tbody>
 <tr>
 <td><code>OPENPSIRT_DIRECTORY_URL</code></td>
-<td>The <code>https</code> address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an <code>https</code> address</td>
+<td>The <code>https</code> address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an <code>https</code> address, or carries a query, a fragment or credentials. A value that is only whitespace is unset</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -2642,6 +2679,48 @@ half of one, and the process stops rather than accept a header anybody can set.<
 </tr>
 </tbody>
 </table>
+<p>The header is believed by address alone. In a cluster the sources are usually
+the pod network, which every pod is on, so the chart renders a NetworkPolicy
+admitting only the ingress controller wherever <code>auth.trustedHeader.name</code> is
+set.</p>
+<table>
+<thead>
+<tr>
+<th>Chart value</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>networkPolicy.enabled</code></td>
+<td>Whether the policy is rendered for a trusted-header install. Turn it off only where something else keeps other pods from reaching this one</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>networkPolicy.ingressController.enabled</code></td>
+<td>Whether the ingress controller is admitted by its labels. Off, the policy admits <code>networkPolicy.from</code> alone</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>networkPolicy.ingressController.namespaceLabels</code></td>
+<td>The labels of the ingress controller's namespace. Set here or in <code>podLabels</code>, it replaces both of ingress-nginx's defaults</td>
+<td>ingress-nginx's, where neither is set</td>
+</tr>
+<tr>
+<td><code>networkPolicy.ingressController.podLabels</code></td>
+<td>The labels of its pods, replacing the defaults the same way</td>
+<td>ingress-nginx's, where neither is set</td>
+</tr>
+<tr>
+<td><code>networkPolicy.from</code></td>
+<td>Further peers, in the NetworkPolicy's own form: an <code>ipBlock</code> for a controller on the host network, or a namespace a metrics scraper runs in</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>A policy is enforced only where the cluster's network plugin supports
+NetworkPolicy.</p>
 <h2 id="attachment-storage">Attachment storage<a class="headerlink" href="#attachment-storage" title="Permanent link">&para;</a></h2>
 <p>Absent is ordinary: with none of this set, attachments are off and everything
 else works. An operator who wants none should not have to run a bucket.</p>
