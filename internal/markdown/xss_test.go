@@ -131,6 +131,43 @@ func TestARefusalSaysWhereToLook(t *testing.T) {
 	}
 }
 
+func TestARefusalNamesTheLineOfTheLinkItRefuses(t *testing.T) {
+	// The same destination written more than once, or shown in a fenced
+	// block before it is written for real. Each fault names the line of the
+	// node it is about.
+	image := "![a](https://evil.example/x.png)"
+	for _, c := range []struct {
+		what   string
+		source string
+		want   []int
+	}{
+		{"shown in a fence before it is written", "Example:\n\n```\n" + image + "\n```\n\nfine\n\n" + image + "\n",
+			[]int{9}},
+		{"written in two paragraphs", image + "\n\n" + image + "\n", []int{1, 3}},
+		{"written twice in one paragraph", image + "\n" + image + "\n", []int{1, 2}},
+		{"used below the definition it names", "[x]: javascript:alert(1)\n\nSee [x].\n", []int{1}},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			var faults markdown.Faults
+			if !errors.As(markdown.Check(c.source), &faults) {
+				t.Fatal("the text was accepted")
+			}
+			got := make([]int, 0, len(faults))
+			for _, fault := range faults {
+				got = append(got, fault.Line)
+			}
+			if len(got) != len(c.want) {
+				t.Fatalf("faults on lines %v, want %v", got, c.want)
+			}
+			for i := range got {
+				if got[i] != c.want[i] {
+					t.Errorf("faults on lines %v, want %v", got, c.want)
+				}
+			}
+		})
+	}
+}
+
 func TestEverythingWrongIsReportedAtOnce(t *testing.T) {
 	// Fixing one problem and resubmitting to find the next is how somebody
 	// learns to write plain sentences with no evidence in them.
@@ -178,8 +215,8 @@ func TestWhatIsNotTextIsRefusedAsNotText(t *testing.T) {
 func TestAFieldOfNothingButProblemsIsAnsweredWithACappedList(t *testing.T) {
 	// A refusal many times the size of what was sent is a way to make
 	// refusing expensive, and sixty problems told at once is not something
-	// anybody reads. The cap and the row that says there are more had zero
-	// executions: no test had ever submitted more than a handful of faults.
+	// anybody reads. This is the input that reaches the cap and the row that
+	// says there are more.
 	err := markdown.Check(strings.Repeat("![a](https://evil.example/x.png)\n", 25))
 	if err == nil {
 		t.Fatal("a field of refused images was accepted")
@@ -199,8 +236,7 @@ func TestAFieldOfNothingButProblemsIsAnsweredWithACappedList(t *testing.T) {
 
 // A destination beginning with two separators is not a relative link.
 //
-// It carries no scheme, so the check read it as relative and accepted it —
-// and for the same reason neither the referrer rule nor the new-tab rule
+// It carries no scheme, so neither the referrer rule nor the new-tab rule
 // applies to it when it is rendered. A reader clicking one navigates in the
 // same tab to a third party, handing over this deployment's own address,
 // which names the product, the build and the finding.
@@ -213,6 +249,10 @@ func TestAnAddressOnAnotherHostIsNotARelativeLink(t *testing.T) {
 		// alike and a list of the two somebody thought of is not a rule.
 		`See [the note](\\evil.example/log).`,
 		`See [the note](\/evil.example/log).`,
+		// A browser removes a tab or a newline anywhere in an address, so a
+		// tab between the two separators is still two separators.
+		"See [the note](/&#9;/evil.example/log).",
+		"See [the note](/&#10;/evil.example/log).",
 	} {
 		if err := markdown.Check(written); err == nil {
 			t.Errorf("an address on another host was accepted: %q", written)

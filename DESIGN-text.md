@@ -71,6 +71,16 @@ other scheme is dropped.
 
 Outbound links carry no referrer and no live opener.
 
+A destination is judged as a browser reads it, in every form a link takes:
+inline, a reference definition, and an autolink in angle brackets.
+
+| Step | Reason |
+|---|---|
+| Character references are decoded | `&#106;avascript:` is `javascript:` to a browser |
+| Leading and trailing control characters and spaces are removed, and every tab and newline wherever it sits | A browser's address parser does the same, so `/`, a tab, `/evil.example` is two separators |
+| The scheme runs to the first colon, with any control character inside it ignored | `java&#9;script:` is `javascript:` to a browser |
+| `attachment:` and `issue:` are refused unless written exactly so, in lower case | A renderer resolves them as written, so `Attachment:` is a link to nothing. The refusal names the spelling, because the identifier after it may be well formed |
+
 A link to somewhere in this deployment survives. The browser's sanitizer decides
 by **resolving** the destination against the page rather than matching it
 against a pattern: `//somewhere.else/x` carries no scheme and is not relative, so
@@ -122,6 +132,7 @@ by scheme, not by address.
 |---|---|
 | The only permitted image scheme is `attachment:` | A submission pointing anywhere else is told to attach the file |
 | What follows the scheme must be a 32-hexadecimal-character identifier this deployment minted | Otherwise `attachment:../../secret` is accepted when written and resolves to nothing when read |
+| Every link form the check accepts a reference in is a form that keeps the file: a link, an image, a reference definition and an autolink | The list of what a text refers to marks a file attached, and an unmarked file is deleted by the sweep while the text still points at it |
 | The sanitizer permits the scheme | It cannot become a page or a script: no browser resolves it, and the interface turns it into a path against a file this deployment holds |
 
 A remote image fires from the browser of everybody who reads the text, from
@@ -165,6 +176,12 @@ origins stay distinguishable, so a renderer can tell which it is holding.
 
 A refusal carries the line, the offending text, and the reason. Every fault in
 the submission is reported at once rather than one at a time.
+
+The line is where the refused link is written. A destination written twice is
+named on both lines, and one shown in a fenced block above is not the one
+named. A destination supplied by a reference definition is named on the
+definition's line, and one that does not appear literally — spelled with a
+character reference — on the first line of its block.
 
 ## Code block language tags
 

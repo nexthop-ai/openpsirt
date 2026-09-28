@@ -12,9 +12,8 @@ import (
 )
 
 // An address stored on its own goes through the judgment a link inside text
-// goes through. It did not: it stopped at the scheme, so a destination the
-// link path refused was accepted here — on the field a triager types and an
-// approver reads.
+// goes through, all of it rather than the scheme alone — on the field a
+// triager types and an approver reads.
 
 func TestAnAddressStoredOnItsOwnIsJudgedLikeALink(t *testing.T) {
 	for _, c := range []struct {
@@ -39,9 +38,15 @@ func TestAnAddressStoredOnItsOwnIsJudgedLikeALink(t *testing.T) {
 		// Two separators is another host, whatever it looks like.
 		{"a protocol-relative address", "//evil.example/x", true},
 		{"the backslash spelling of it", `/\evil.example/x`, true},
+		// A browser strips a leading control character and removes a tab or
+		// a newline anywhere, and then reads two separators.
+		{"two separators with a tab between them", "/\t/evil.example/x", true},
+		{"two separators with a newline between them", "/\n/evil.example/x", true},
+		{"two separators after a control character", "\x01//evil.example/x", true},
+		{"a script after a control character", "\x01javascript:alert(1)", true},
+		{"a script with a tab in its scheme", "java\tscript:alert(1)", true},
 
-		// The half that was missing. Each of these is refused inside a link
-		// and was accepted here.
+		// What follows the scheme, judged as it is inside a link.
 		{"an attachment reference that traverses", "attachment:../../etc/passwd", true},
 		{"an attachment reference of the wrong length", "attachment:" + strings.Repeat("a", 31), true},
 		{"an attachment reference that is not hexadecimal", "attachment:" + strings.Repeat("z", 32), true},
@@ -69,9 +74,8 @@ func TestARefusedAddressSaysWhatIsWrongWithoutNamingALine(t *testing.T) {
 		t.Errorf("a stored address is refused by line number: %q", err)
 	}
 
-	// And the message names what is wrong with it rather than an empty scheme.
-	// The protocol-relative case has no scheme at all, and the refusal read
-	// "and this uses \"\"".
+	// And the message names what is wrong with it rather than an empty scheme:
+	// the protocol-relative case has no scheme at all.
 	err = markdown.Addressable("//evil.example/x")
 	if err == nil {
 		t.Fatal("an address on another host was accepted")
@@ -82,9 +86,8 @@ func TestARefusedAddressSaysWhatIsWrongWithoutNamingALine(t *testing.T) {
 }
 
 func TestTextPastTheBoundIsMatchableAsWhatItIs(t *testing.T) {
-	// ErrTooLong is exported, which says a caller may match it. It was
-	// formatted into a string with no wrapping and neither Fault nor Faults
-	// had an Unwrap, so no caller ever could — a contract stated and not kept.
+	// ErrTooLong is exported, which says a caller may match it, so the
+	// refusal carries it through both Fault and Faults.
 	err := markdown.Check(strings.Repeat("a", markdown.MaxBytes+1))
 	if err == nil {
 		t.Fatal("text past the bound was accepted")
