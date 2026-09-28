@@ -44,6 +44,7 @@ components:
           type: string
         record:
           $ref: "#/components/schemas/PersonRecordBody"
+          description: Their part in the triage record, counted over every product. Absent unless you administer the deployment
         sees_nothing:
           description: Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing
           type: boolean
@@ -60,7 +61,6 @@ components:
       required:
         - identity
         - held_total
-        - record
         - told_total
       type: object
     Acknowledge-all-notificationsResponse:
@@ -1280,6 +1280,10 @@ components:
           description: Reach it by matching. Nothing to choose
           format: int64
           type: integer
+        expired:
+          description: Deferrals and promises at a place this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer
+          format: int64
+          type: integer
         moved:
           description: The version differs, so each needs a fresh answer
           items:
@@ -1294,10 +1298,16 @@ components:
           type:
             - array
             - "null"
+        upgrades:
+          description: "Promised upgrades at a version this line does not have. They cannot be carried: plan the upgrade from the component, naming this line"
+          format: int64
+          type: integer
       required:
         - applying
         - moved
         - postponed
+        - expired
+        - upgrades
         - absent
       type: object
     CarriedClaimBody:
@@ -1657,6 +1667,13 @@ components:
           description: The number of things pulling them in
           format: int64
           type: integer
+        ended:
+          description: The claim's withdrawn rows and its lapsed rows, each with what they reached when they stopped. Empty while every row is live
+          items:
+            $ref: "#/components/schemas/EndedReachBody"
+          type:
+            - array
+            - "null"
         finding:
           $ref: "#/components/schemas/FindingRefBody"
           description: A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place
@@ -1726,6 +1743,7 @@ components:
         - consumers
         - findings
         - builds
+        - ended
       type: object
     ClaimedBody:
       additionalProperties: false
@@ -2961,6 +2979,40 @@ components:
           type: string
       required:
         - "on"
+      type: object
+    EndedReachBody:
+      additionalProperties: false
+      properties:
+        at:
+          description: The latest moment one of them stopped
+          type: string
+        builds:
+          description: Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        places:
+          description: The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now
+          format: int64
+          type: integer
+        rows:
+          description: The number of decisions that stopped this way
+          format: int64
+          type: integer
+        state:
+          description: How these rows stopped applying
+          enum:
+            - withdrawn
+            - lapsed
+          type: string
+      required:
+        - state
+        - at
+        - rows
+        - places
+        - builds
       type: object
     Engine:
       additionalProperties: false
@@ -13955,6 +14007,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -14412,6 +14490,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -17054,6 +17158,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -17625,6 +17755,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -18116,6 +18272,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -18618,6 +18800,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -19133,6 +19341,32 @@ paths:
           schema:
             description: Keep only groups where a claim is with its author, sent back for more
             type: boolean
+        - description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+          explode: false
+          in: query
+          name: claim
+          schema:
+            description: Keep only what sits at a place this claim wrote a decision for, by the claim's identifier
+            format: int64
+            minimum: 1
+            type: integer
+        - description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+          explode: true
+          in: query
+          name: claim_state
+          schema:
+            description: With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim
+            items:
+              enum:
+                - proposed
+                - approved
+                - withdrawn
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what one of these VEX publishers has a standing statement about
           explode: true
           in: query
@@ -21446,6 +21680,8 @@ paths:
 
         A saved filter naming something the list no longer offers simply stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one.
 
+        At most as many as the per-person limit, in name order. `total` is how many you keep, which is more than the list holds where the limit was lowered after they were saved.
+
         Kept per product. A filter narrows one product's findings list and its query names branches and variants that usually exist in no other, so one offered everywhere would be offered where it matches nothing.
 
         Requires: any signed-in person, and not a pipeline key. Answers your own and nobody else's.
@@ -21848,13 +22084,17 @@ paths:
       description: |-
         Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
 
-        Four groups, because they need four different things:
+        Six groups, because they need different things:
 
         `applying` reach this line by matching, and there is nothing to choose.
 
         `moved` held a claim at a version this line does not have. Each would come across as a proposal carrying the old reasoning, never as a decision.
 
         `postponed` were deferrals. Each says how long it has already been put off across every line it has come through, which is the total that carrying it again agrees to.
+
+        `expired` are deferrals and promises at a place this line still holds whose date has passed. A carried judgment keeps its date, so these cannot be carried.
+
+        `upgrades` are promised upgrades that moved. Plan the upgrade from the component, naming this line, rather than carrying it.
 
         `absent` cover nothing here and are left behind.
 
