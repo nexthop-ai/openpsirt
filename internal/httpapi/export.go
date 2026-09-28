@@ -473,14 +473,7 @@ func registerExport(api huma.API, in Ingest) {
 		out := Exporting{
 			What:  "findings",
 			About: []Stated{{"triaged at or above", line}},
-			Header: []string{
-				// The scheme beside the score. Two are scorable and their
-				// numbers are not comparable, so a column of them read by
-				// somebody's script is a ranking that is not one.
-				"issue", "severity", "score", "score scheme", "exploited", "component", "version",
-				"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-				"stream", "variant",
-			},
+			Header: findingColumns(),
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.Groups(ctx, subject, scope, limit, offset, narrowed)
 				if err != nil {
@@ -488,23 +481,7 @@ func registerExport(api huma.API, in Ingest) {
 				}
 				rows := make([][]string, 0, len(groups))
 				for _, g := range groups {
-					due, opened := "", ""
-					if g.DueAt != nil {
-						due = g.DueAt.Format("2006-01-02")
-					} else if g.NoDeadline != "" {
-						due = string(g.NoDeadline)
-					}
-					if !g.OpenedAt.IsZero() {
-						opened = g.OpenedAt.Format("2006-01-02")
-					}
-					rows = append(rows, []string{
-						g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
-						g.ScoreVersion, strconv.FormatBool(g.Exploited),
-						g.Component, g.Version, g.Ecosystem, g.FixedIn,
-						strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
-						g.State, opened, due,
-						g.Stream, g.Variant,
-					})
+					rows = append(rows, findingCells(g))
 				}
 				return rows, nil
 			},
@@ -564,12 +541,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 		out := Exporting{
 			What:  "findings, every product",
 			About: []Stated{{"triaged at or above", "each product's own line"}},
-			Header: []string{
-				"product", "issue", "severity", "score", "score scheme", "exploited",
-				"component", "version",
-				"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-				"stream", "variant",
-			},
+			Header: append([]string{"product"}, findingColumns()...),
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.Anywhere(ctx, subject, limit, offset, narrowed)
 				if err != nil {
@@ -577,23 +549,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 				}
 				rows := make([][]string, 0, len(groups))
 				for _, g := range groups {
-					due, opened := "", ""
-					if g.DueAt != nil {
-						due = g.DueAt.Format("2006-01-02")
-					} else if g.NoDeadline != "" {
-						due = string(g.NoDeadline)
-					}
-					if !g.OpenedAt.IsZero() {
-						opened = g.OpenedAt.Format("2006-01-02")
-					}
-					rows = append(rows, []string{
-						g.Product, g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
-						g.ScoreVersion, strconv.FormatBool(g.Exploited),
-						g.Component, g.Version, g.Ecosystem, g.FixedIn,
-						strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
-						g.State, opened, due,
-						g.Stream, g.Variant,
-					})
+					rows = append(rows, append([]string{g.Product}, findingCells(g)...))
 				}
 				return rows, nil
 			},
@@ -602,4 +558,42 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 			writeExport(writer, input.Format, "findings", out)
 		}}, nil
 	})
+}
+
+// findingColumns names the columns of a findings export, in the order
+// findingCells fills them.
+//
+// One list for the export within a product and the one across products, which
+// adds the product in front: two lists is how the same export comes to carry
+// different columns depending on where it was asked for. The scheme sits
+// beside the score because two schemes are scorable and their numbers are not
+// comparable, so a column of them read by somebody's script is a ranking that
+// is not one.
+func findingColumns() []string {
+	return []string{
+		"issue", "severity", "score", "score scheme", "exploited", "component", "version",
+		"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
+		"stream", "variant",
+	}
+}
+
+// findingCells is one row of a findings export.
+func findingCells(g finding.Group) []string {
+	due, opened := "", ""
+	if g.DueAt != nil {
+		due = g.DueAt.Format("2006-01-02")
+	} else if g.NoDeadline != "" {
+		due = string(g.NoDeadline)
+	}
+	if !g.OpenedAt.IsZero() {
+		opened = g.OpenedAt.Format("2006-01-02")
+	}
+	return []string{
+		g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
+		g.ScoreVersion, strconv.FormatBool(g.Exploited),
+		g.Component, g.Version, g.Ecosystem, g.FixedIn,
+		strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
+		g.State, opened, due,
+		g.Stream, g.Variant,
+	}
 }

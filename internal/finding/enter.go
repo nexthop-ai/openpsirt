@@ -641,22 +641,42 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 // the whole of what this prevents. What happens to a collision is
 // drawIdentifier's, below.
 func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
+	return drawNamed(ctx, tx, product, year, naming{
+		what: "identifier", an: "an", pool: "%s in %d", shape: "%s-%d-%d",
+		table: "vulnerability", column: "identifier",
+	})
+}
+
+// naming is one kind of name a product issues: what it is called, the pool
+// its numbers are drawn from, its shape, and the column that records the
+// names already issued. The table and column are written here in code and
+// never taken from a request.
+type naming struct {
+	what, an      string
+	pool, shape   string
+	table, column string
+}
+
+// drawNamed issues a name of one kind for a product in a year: the product's
+// name in capitals, the year, and a drawn number, drawn again where the name
+// is spoken for.
+func drawNamed(ctx context.Context, tx bun.IDB, product string, year int, n naming) (string, error) {
 	prefix := strings.ToUpper(strings.TrimSpace(product))
 	if prefix == "" {
-		return "", fmt.Errorf("a product with no name cannot issue an identifier")
+		return "", fmt.Errorf("a product with no name cannot issue %s %s", n.an, n.what)
 	}
-	return drawIdentifier(ctx, fmt.Sprintf("%s in %d", prefix, year),
+	return drawIdentifier(ctx, fmt.Sprintf(n.pool, prefix, year),
 		func(number int64) string {
-			return fmt.Sprintf("%s-%d-%d", prefix, year, number)
+			return fmt.Sprintf(n.shape, prefix, year, number)
 		},
 		func(ctx context.Context, candidate string) (bool, error) {
 			taken, err := tx.NewSelect().
-				TableExpr(`"vulnerability" AS "v"`).
-				Where("v.identifier = ?", candidate).
+				TableExpr("?", bun.Ident(n.table)).
+				Where("? = ?", bun.Ident(n.column), candidate).
 				Count(ctx)
 			if err != nil {
 				return false, fmt.Errorf(
-					"read whether that identifier is spoken for: %w", err)
+					"read whether that %s is spoken for: %w", n.what, err)
 			}
 			return taken > 0, nil
 		})

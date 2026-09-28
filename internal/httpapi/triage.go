@@ -910,28 +910,10 @@ func decisionBody(d triage.Decision) DecisionBody {
 	// and this row says where it lands. A decision read without its claim is
 	// a programming error rather than a state a caller can reach, so it is
 	// left to fail here rather than rendered as an outcome nobody chose.
-	said := d.Claim
-	body := DecisionBody{
-		ID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome), State: string(d.State),
-	}
-	if said.Mitigation != nil {
-		body.Mitigation = *said.Mitigation
-	}
-	if said.Justification != nil {
-		body.Justification = justification(*said.Justification)
-	}
-	if said.FixedVersion != nil {
-		body.FixedVersion = *said.FixedVersion
-	}
-	if said.DeferredUntil != nil {
-		body.DeferredUntil = said.DeferredUntil.Format(time.DateOnly)
-	}
-	if said.CommittedTo != nil {
-		body.CommittedTo = said.CommittedTo.Format(time.DateOnly)
-	}
-	if said.UpgradeTo != nil {
-		body.UpgradeTo = *said.UpgradeTo
-	}
+	// The argument is drawn the one way a claim's argument is drawn, and the
+	// row adds what belongs to it.
+	body := claimArgument(*d.Claim, "")
+	body.ID, body.ClaimID, body.State = d.ID, d.ClaimID, string(d.State)
 	if d.SentBackAt != nil {
 		body.SentBackAt = d.SentBackAt.UTC().Format(time.RFC3339)
 	}
