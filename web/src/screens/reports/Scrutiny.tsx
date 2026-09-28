@@ -24,6 +24,7 @@ import {
   windowStart,
 } from "./Window";
 import { Wide } from "../../ui/Wide";
+import { auditAt, claimAt } from "../../app/routes";
 
 // The window back. Ninety days is a quarter, which is the period an
 // audit asks about; the others are here because a control question is
@@ -67,10 +68,9 @@ export function Scrutiny() {
       ),
   });
 
-  // The record, narrowed to the set the figure was computed over. A link
-  // carrying only the outcome opened the whole record, which is a different
-  // population from the sheet's window and product — so the number and the
-  // list it opens disagreed.
+  // The record, narrowed to the set the figure was computed over: the outcome,
+  // the sheet's window and its product. The whole record is a different
+  // population, and a number and the list it opens have to agree.
   const overTheSame = (outcome: string) => {
     const asked = new URLSearchParams({ outcome, alone: "true" });
     // The same stretch the figure was computed over, whichever way it was
@@ -81,7 +81,7 @@ export function Scrutiny() {
     // The record reads "to" as the last day in the period, as this sheet does.
     if (period.to) asked.set("to", period.to);
     if (product) asked.set("product", product);
-    return `/audit?${asked.toString()}`;
+    return auditAt(asked);
   };
 
   const alone = got.data?.alone ?? [];
@@ -301,7 +301,7 @@ export function Scrutiny() {
                     {(got.data?.grew ?? []).map((row) => (
                       <tr key={row.claim_id} className="row">
                         <td>
-                          <Link to={`/claims/${row.claim_id}`} className="id">
+                          <Link to={claimAt(row.claim_id)} className="id">
                             {row.claim_id}
                           </Link>
                         </td>
@@ -343,7 +343,7 @@ export function Scrutiny() {
                     {(got.data?.lapsed ?? []).map((row) => (
                       <tr key={`${row.claim_id} ${row.approved_by}`} className="row">
                         <td>
-                          <Link to={`/claims/${row.claim_id}`} className="id">
+                          <Link to={claimAt(row.claim_id)} className="id">
                             {row.claim_id}
                           </Link>
                         </td>

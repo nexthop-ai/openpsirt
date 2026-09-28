@@ -14,6 +14,7 @@ import { Paged } from "../../ui/Paged";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import { Wide } from "../../ui/Wide";
+import { inventoriesAt } from "../../app/routes";
 
 // The builds being scanned, and the ones that have gone silent.
 //
@@ -181,11 +182,7 @@ function fileAt(format: "csv" | "json", asked: string): string {
 }
 
 function scansAt(product: string, stream: string, variant: string): string {
-  return (
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}/scans`
-  );
+  return inventoriesAt({ product, stream, variant });
 }
 
 // The one word a build's row says about its state, in the order the counts

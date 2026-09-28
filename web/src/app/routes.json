@@ -1,0 +1,78 @@
+{
+  "home": { "path": "/" },
+  "reviewQueue": { "path": "/review-queue", "query": ["mine", "product", "reaffirm"] },
+  "unassigned": { "path": "/unassigned" },
+  "findings": {
+    "path": "/findings",
+    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "on", "only", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+  },
+  "claim": { "path": "/claims/:id" },
+  "decision": { "path": "/decisions/:id" },
+  "issue": { "path": "/issues/:vulnerability" },
+  "products": { "path": "/products" },
+  "product": { "path": "/products/:product" },
+  "streams": { "path": "/products/:product/streams" },
+  "stream": { "path": "/products/:product/streams/:stream" },
+  "variants": { "path": "/products/:product/variants" },
+  "productFindings": {
+    "path": "/products/:product/findings",
+    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "on", "only", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+  },
+  "productComponent": {
+    "path": "/products/:product/components/:component",
+    "query": ["stream", "variant", "version"]
+  },
+  "buildFindings": {
+    "path": "/products/:product/streams/:stream/variants/:variant/findings",
+    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "on", "only", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+  },
+  "finding": {
+    "path": "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component",
+    "query": ["ecosystem", "from", "namespace", "rule", "version"]
+  },
+  "tree": {
+    "path": "/products/:product/streams/:stream/variants/:variant/components",
+    "query": ["at", "ecosystem", "namespace", "path", "q", "version"]
+  },
+  "decide": {
+    "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide",
+    "query": ["contains", "ecosystem", "namespace", "version"]
+  },
+  "inventories": { "path": "/products/:product/streams/:stream/variants/:variant/scans" },
+  "inventoryChanges": {
+    "path": "/products/:product/streams/:stream/variants/:variant/scans/:scan/changes"
+  },
+  "run": { "path": "/products/:product/streams/:stream/variants/:variant/runs/:run" },
+  "upgrades": { "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades" },
+  "matchCoverage": {
+    "path": "/products/:product/streams/:stream/variants/:variant/match-coverage"
+  },
+  "vex": { "path": "/products/:product/streams/:stream/variants/:variant/vex" },
+  "comparison": {
+    "path": "/products/:product/comparison",
+    "query": ["from", "from_variant", "to", "to_variant", "undisclosed"]
+  },
+  "inventoryComparison": {
+    "path": "/products/:product/comparison/inventory",
+    "query": ["change", "from", "from_variant", "to", "to_variant"]
+  },
+  "inbox": { "path": "/products/:product/inbox", "query": ["waiting"] },
+  "inboxReport": { "path": "/products/:product/inbox/:reference" },
+  "me": { "path": "/me" },
+  "people": { "path": "/people" },
+  "person": { "path": "/people/:identity" },
+  "teams": { "path": "/teams" },
+  "work": { "path": "/work", "query": ["person", "tab", "team"] },
+  "audit": { "path": "/audit", "query": ["alone", "from", "in_force", "outcome", "product", "to"] },
+  "reports": { "path": "/reports" },
+  "report": { "path": "/reports/:report", "query": ["days"] },
+  "record": { "path": "/record", "query": ["from", "product"] },
+  "disclosing": { "path": "/disclosing" },
+  "obligations": { "path": "/obligations" },
+  "advisories": { "path": "/advisories" },
+  "advisory": { "path": "/advisories/:advisory" },
+  "autoAssignment": { "path": "/auto-assignment" },
+  "settings": { "path": "/settings" },
+  "settingsSection": { "path": "/settings/:section" },
+  "system": { "path": "/system" }
+}

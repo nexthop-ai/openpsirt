@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // The ways a destination is reached.
@@ -141,7 +143,7 @@ func noteOf(rows []noting, baseURL string) Note {
 		return Note{Heading: said.Subject, Lines: []NoteLine{line}, Link: said.Link}
 	}
 
-	front := link(baseURL, "/")
+	front := link(baseURL, weblink.Home())
 	type group struct {
 		kind    Kind
 		product string

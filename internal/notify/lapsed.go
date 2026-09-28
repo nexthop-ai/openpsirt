@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Lapses tells people that a judgment of theirs has stopped applying.
@@ -36,9 +37,6 @@ func Lapses(db *bun.DB, logger *slog.Logger) func(context.Context, []triage.ForP
 	}
 }
 
-// ToReaffirm is where somebody re-affirms what lapsed under them.
-const ToReaffirm = "/review-queue?reaffirm=1"
-
 // Lapse is what one person is told about the rows of theirs that lapsed.
 //
 // A link to the claims that are theirs to re-affirm rather than to one of the
@@ -56,7 +54,7 @@ func Lapse(one triage.ForPerson) Telling {
 	return Telling{
 		PersonID: one.PersonID, Kind: ClaimLapsed,
 		Body: what + why + " The finding is open again, and re-affirming it is yours to do.",
-		Link: ToReaffirm,
+		Link: weblink.ReviewQueueReaffirm(),
 		// As careful as the most careful row.
 		Private: one.Undisclosed,
 		// The fields a later read narrows by, off the representative row.

@@ -6,7 +6,6 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // The notes people write about an issue in a product, and their earlier
@@ -283,7 +283,7 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 		// note carries no address of its own: it is one line of a thread
 		// about an issue in a product, and there is no screen showing one
 		// by itself for a link to point at.
-	}, note.Body, fmt.Sprintf("/issues/%s", identifier))
+	}, note.Body, weblink.Issue(identifier))
 	if err != nil {
 		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
 	}

@@ -52,6 +52,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/triage/`, `internal/advisory/` | Judgments, approvals, and the CSAF document. See `DESIGN-triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
+| `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `DESIGN-notifications.md` § Links |
 | `internal/obligation/` | The windows a deployment counts after an attack, the notices given, and the shelf over both. See `DESIGN-obligations.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
 | `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
@@ -157,6 +158,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check`, `spdx` |
+| the interface's route table | the Go tier as well as the interface's, because a Go test holds the server's links to it |
 | Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
@@ -334,6 +336,13 @@ module and fails on an export no other file mentions, which is the interface's
 half of `make unreachable`. A test counts as a caller, as it does there. It
 matches names rather than walking imports, so a name that is also an ordinary
 word elsewhere passes.
+
+An address into the interface that no route answers, or one put together
+outside the route module. A web test reads every module for both, and holds
+every query parameter the route table lists to a read on the screen that route
+renders; a Go test holds every link the server builds to the same table and
+fails on one spelled outside its package. `DESIGN-interface.md` § The route
+table has the rules.
 
 ## Database engines
 

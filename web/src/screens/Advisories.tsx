@@ -17,6 +17,7 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { standing, statusLabel } from "./advisory";
 import { FlawPicker } from "./FlawPicker";
+import { advisoryAt } from "../app/routes";
 
 // Every advisory this deployment has minted, newest first.
 //
@@ -57,9 +58,7 @@ export function Advisories() {
         )}
       </div>
 
-      {starting && (
-        <Start onStarted={(made) => navigate(`/advisories/${encodeURIComponent(made)}`)} />
-      )}
+      {starting && <Start onStarted={(made) => navigate(advisoryAt(made))} />}
 
       {items.length === 0 ? (
         <Empty
@@ -83,7 +82,7 @@ export function Advisories() {
               {items.map((row) => (
                 <tr key={row.advisory} className="row">
                   <td>
-                    <Link className="id" to={`/advisories/${encodeURIComponent(row.advisory)}`}>
+                    <Link className="id" to={advisoryAt(row.advisory)}>
                       {row.advisory}
                     </Link>
                     {row.title && <div className="hint">{row.title}</div>}

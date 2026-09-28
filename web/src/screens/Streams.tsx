@@ -16,6 +16,7 @@ import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
+import { streamAt } from "../app/routes";
 
 // A branch and a tag are different shapes of thing — one moves and is rebuilt,
 // one never changes again — so they are labeled rather than blended into a
@@ -181,10 +182,7 @@ export function Streams() {
               {items.map((stream) => (
                 <tr key={stream.name} className="row">
                   <td>
-                    <Link
-                      to={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream.name ?? "")}`}
-                      className="id"
-                    >
+                    <Link to={streamAt(product, stream.name ?? "")} className="id">
                       {stream.name}
                     </Link>
                   </td>
@@ -277,10 +275,7 @@ export function Streams() {
                     )}
                   </td>
                   <td className="rowacts">
-                    <Link
-                      to={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream.name ?? "")}`}
-                      className="linkish"
-                    >
+                    <Link to={streamAt(product, stream.name ?? "")} className="linkish">
                       Variants
                     </Link>
                     {who.data?.admin && (

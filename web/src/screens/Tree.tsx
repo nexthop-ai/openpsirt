@@ -6,7 +6,7 @@ import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { STEP, keyOf, partsOf, stepsOf, type At, type Node } from "./treeshape";
-import { buildPath } from "./list";
+import { buildFindingsAt, componentAt, matchCoverageAt } from "../app/routes";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -172,7 +172,7 @@ function Yours() {
                 className="branch"
                 style={{ paddingLeft: 10 + (row.depth ?? 0) * 18 }}
               >
-                <Link className="id" to={componentPage(at, row.component) + buildQuery(at)}>
+                <Link className="id" to={componentPage(at, row.component, row.version)}>
                   {row.component}
                 </Link>{" "}
                 <span className="hint">{row.version}</span>
@@ -210,7 +210,7 @@ function Yours() {
             <ul className="branchlist">
               {loose.map((row, i) => (
                 <li key={`${row.component}@${i}`} className="branch" style={{ paddingLeft: 10 }}>
-                  <Link className="id" to={componentPage(at, row.component) + buildQuery(at)}>
+                  <Link className="id" to={componentPage(at, row.component, row.version)}>
                     {row.component}
                   </Link>{" "}
                   <span className="hint">{row.version}</span>
@@ -382,7 +382,7 @@ function Whole() {
               {" "}
               ·{" "}
               <Link
-                to={`${buildPath({ product, stream, variant })}/match-coverage`}
+                to={matchCoverageAt({ product, stream, variant })}
                 title="The scanner can't match these, so nothing will be found in them."
               >
                 {(top.data?.unmatched ?? 0).toLocaleString()} unmatched
@@ -523,7 +523,7 @@ function Matches({
             className="look"
             title={`Everything about ${node.component}`}
             aria-label={`Open ${node.component}`}
-            to={componentPage(at, node.component) + buildQuery(at)}
+            to={componentPage(at, node.component, node.version)}
             onClick={(event) => event.stopPropagation()}
           >
             ⋯
@@ -539,24 +539,17 @@ function Matches({
 // question — "beneath" is the tree's own walk, which is why the list has a
 // filter for it rather than a name match.
 function onComponent(at: At, component: string | undefined): string {
-  return `${buildPath(at)}/findings?component=${encodeURIComponent(component ?? "")}`;
-}
-
-// The build the tree is drawn for, so the component's screen opens on the
-// graph of the build somebody was looking at rather than the first one.
-function buildQuery(at: At): string {
-  return `?stream=${encodeURIComponent(at.stream)}` + `&variant=${encodeURIComponent(at.variant)}`;
+  return buildFindingsAt(at, { component: component ?? "" });
 }
 
 // The component's own screen: everything open against it across every build,
 // where it could go, and the act that moves it. Reachable from a finding and
 // from the findings list, and from here, which is where somebody looking at
-// the graph asks about a component.
-function componentPage(at: At, component: string | undefined): string {
-  return (
-    `/products/${encodeURIComponent(at.product)}` +
-    `/components/${encodeURIComponent(component ?? "")}`
-  );
+// the graph asks about a component. It carries the build the tree is drawn
+// for, so it opens on the graph somebody was looking at rather than the first
+// one.
+function componentPage(at: At, component: string | undefined, version?: string): string {
+  return componentAt(at.product, component ?? "", version, at);
 }
 
 // The rest of what names the component travels with it, because a name at a
@@ -569,7 +562,7 @@ function beneathComponent(
   if (row.version) query.set("beneath_version", row.version);
   if (row.ecosystem) query.set("beneath_ecosystem", row.ecosystem);
   if (row.namespace) query.set("beneath_namespace", row.namespace);
-  return `${buildPath(at)}/findings?${query}`;
+  return buildFindingsAt(at, query);
 }
 
 // One flat list of indented rows rather than nested lists, so the rule down the
@@ -710,7 +703,7 @@ function Branches({
           className="look"
           title={`Everything about ${name}`}
           aria-label={`Open ${name}`}
-          to={componentPage(at, name) + buildQuery(at)}
+          to={componentPage(at, name)}
           onClick={(event) => event.stopPropagation()}
         >
           ⋯

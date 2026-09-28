@@ -28,6 +28,7 @@ import {
   windowStart,
 } from "./Window";
 import { Wide } from "../../ui/Wide";
+import { decisionAt } from "../../app/routes";
 
 // The window the figures cover. Thirty days is the window the remediation
 // metrics names and the one people quote; the others are here because a month
@@ -516,7 +517,7 @@ export function Overview() {
                 {(argued.data?.items ?? []).map((row) => (
                   <tr key={row.id} className="row">
                     <td>
-                      <Link to={`/decisions/${row.id}`} className="id">
+                      <Link to={decisionAt(row.id)} className="id">
                         {row.issue}
                       </Link>
                     </td>

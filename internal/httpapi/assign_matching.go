@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // PieceBody names one row of the findings list: an issue at a fold.
@@ -161,7 +162,7 @@ func registerAssignMatching(api huma.API, in Ingest) {
 			tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: piecesOfWork(arrived) + " in " + input.Product,
-				Link: "/work", Private: handed.Undisclosed, ProductID: &product,
+				Link: weblink.Work(), Private: handed.Undisclosed, ProductID: &product,
 			}, "person", whoToTell)
 		}
 		left, err := pieceBodies(ctx, in, handed.Left)

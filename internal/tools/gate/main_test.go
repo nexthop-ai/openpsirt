@@ -124,6 +124,8 @@ func TestTheTiersAboveDocumentsCarryTheOneBelow(t *testing.T) {
 		{"an engine change is code too", []string{query}, code, true},
 		{"a document change is not code", []string{prose}, code, false},
 		{"an interface change is not code", []string{"web/src/app/App.tsx"}, code, false},
+		{"the route table is code too", []string{"web/src/app/routes.json"}, code, true},
+		{"the route table is the interface too", []string{"web/src/app/routes.json"}, web, true},
 	} {
 		if got := tiers(c.files)[c.also]; got != c.want {
 			t.Errorf("%s: reached %s = %v, want %v", c.what, name(c.also), got, c.want)

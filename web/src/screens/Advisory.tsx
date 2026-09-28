@@ -24,6 +24,7 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { agreeing, missing, standing, statusLabel } from "./advisory";
 import { FlawPicker } from "./FlawPicker";
+import { issueAt } from "../app/routes";
 
 // One advisory, whole: what it is called, what it covers, the document it
 // generates, who agrees to it, and what has gone out.
@@ -164,7 +165,7 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
               {covers.map((row) => (
                 <tr key={`${row.product} ${row.vulnerability}`} className="row">
                   <td>
-                    <Link className="id" to={`/issues/${encodeURIComponent(row.vulnerability)}`}>
+                    <Link className="id" to={issueAt(row.vulnerability)}>
                       {row.vulnerability}
                     </Link>
                     {row.summary && <div className="hint">{row.summary}</div>}

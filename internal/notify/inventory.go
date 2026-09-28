@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strconv"
 
 	"github.com/uptrace/bun"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Movements tells people about an upload that changed much of what a build is
@@ -84,10 +84,8 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 	// product. Hashed for the reason a condition's key is: it lands in a
 	// fixed-width column beside keys other passes invent.
 	together := identify("inventory-moved " + strconv.FormatInt(stored.ScanID, 10))
-	where := "/products/" + url.PathEscape(placed.Addressed.Product) +
-		"/streams/" + url.PathEscape(placed.Addressed.Stream) +
-		"/variants/" + url.PathEscape(placed.Addressed.Variant) +
-		"/scans/" + strconv.FormatInt(stored.ScanID, 10) + "/changes"
+	where := weblink.InventoryChanges(placed.Addressed.Product, placed.Addressed.Stream,
+		placed.Addressed.Variant, stored.ScanID)
 
 	for personID, per := range reach {
 		// Whoever may read the product, which is exactly who the link

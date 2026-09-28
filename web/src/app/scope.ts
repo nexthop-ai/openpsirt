@@ -4,6 +4,18 @@
 import { matchPath, useLocation } from "react-router-dom";
 
 import { ownsSession, SCOPE_KEPT } from "./drafts";
+import {
+  BUILD,
+  ROUTES,
+  allFindingsAt,
+  buildFindingsAt,
+  productAt,
+  productFindingsAt,
+  sameProductScreenAt,
+  sameScreenAt,
+  streamAt,
+  streamsAt,
+} from "./routes";
 
 // The selection in hand.
 //
@@ -15,30 +27,22 @@ import { ownsSession, SCOPE_KEPT } from "./drafts";
 // A screen that names a build in its path is the authority for that build.
 // Everything else — home, the queue, the product list — remembers the last one
 // instead, so walking away from a build and back does not lose it.
-const BUILD = "/products/:product/streams/:stream/variants/:variant";
 // The findings list for anything wider than one build. The product is in the
 // path because a list of findings is always a product's; the two levels below
 // it ride in the query, which is the shape the server takes them in and the
 // only shape that keeps them independent.
-const LIST = "/products/:product/findings";
+const LIST = ROUTES.productFindings;
 // The same list with no product picked.
-const EVERY = "/findings";
+const EVERY = ROUTES.findings;
 
 // Anything else under a product: every address below `/products/:product`
 // names that product, and a shape added to the router without being listed
 // still yields it. It names no branch or variant, so it keeps the ones
 // remembered for the same product.
-const UNDER = "/products/:product/*";
+const UNDER = `${ROUTES.product}/*`;
 
 // The exact shapes first, then anything else under a product.
-const SHAPES = [
-  `${BUILD}/*`,
-  BUILD,
-  "/products/:product/streams/:stream",
-  "/products/:product/streams",
-  "/products/:product",
-  UNDER,
-];
+const SHAPES = [`${BUILD}/*`, BUILD, ROUTES.stream, ROUTES.streams, ROUTES.product, UNDER];
 
 export type Scoped = { product?: string; stream?: string; variant?: string };
 
@@ -64,7 +68,7 @@ export function needsBuild(pathname: string): boolean {
 export function onFindings(pathname: string): boolean {
   return (
     pathname === EVERY ||
-    matchPath(`${BUILD}/findings`, pathname) !== null ||
+    matchPath(ROUTES.buildFindings, pathname) !== null ||
     matchPath(LIST, pathname) !== null
   );
 }
@@ -100,24 +104,18 @@ export function findingsPath(
   // list being a screen of its own, reached from its own rail entry — one list
   // would have two doors, and the one in the scope group would be dead
   // whenever no product is picked.
-  let path = "/findings";
-  if (at.product) {
-    const product = `/products/${encodeURIComponent(at.product)}`;
-    if (at.stream && at.variant) {
-      path =
-        `${product}/streams/${encodeURIComponent(at.stream)}` +
-        `/variants/${encodeURIComponent(at.variant)}/findings`;
-    } else {
-      path = `${product}/findings`;
-      if (at.stream) query.set("stream", at.stream);
-      if (at.variant) query.set("variant", at.variant);
-    }
+  let whole: { product: string; stream: string; variant: string } | undefined;
+  if (at.product && at.stream && at.variant) {
+    whole = { product: at.product, stream: at.stream, variant: at.variant };
+  } else if (at.product) {
+    if (at.stream) query.set("stream", at.stream);
+    if (at.variant) query.set("variant", at.variant);
   }
   if (unnarrowed)
     for (const [name, value] of new URLSearchParams(UNNARROWED)) query.append(name, value);
   for (const [name, value] of new URLSearchParams(extra)) query.append(name, value);
-  const rest = query.toString();
-  return rest ? `${path}?${rest}` : path;
+  if (whole) return buildFindingsAt(whole, query);
+  return at.product ? productFindingsAt(at.product, query) : allFindingsAt(query);
 }
 
 // The place the tab remembers a selection. Named beside the
@@ -225,15 +223,15 @@ export function scopeAt(pathname: string, search: string, kept: Scoped = {}): Sc
 // sits below the product in the address is dropped where it belongs to the
 // product that was there: a branch is one product's, and so is a component.
 const UNDER_PRODUCT: { shape: string; carries: "nothing" | "stream" | "tail" }[] = [
-  { shape: "/products/:product/streams/:stream", carries: "stream" },
-  { shape: "/products/:product/streams", carries: "tail" },
-  { shape: "/products/:product/variants", carries: "tail" },
-  { shape: "/products/:product/comparison", carries: "tail" },
-  { shape: "/products/:product/comparison/inventory", carries: "tail" },
-  { shape: "/products/:product/inbox", carries: "tail" },
-  { shape: "/products/:product/inbox/:reference", carries: "nothing" },
-  { shape: "/products/:product/components/:component", carries: "nothing" },
-  { shape: "/products/:product", carries: "tail" },
+  { shape: ROUTES.stream, carries: "stream" },
+  { shape: ROUTES.streams, carries: "tail" },
+  { shape: ROUTES.variants, carries: "tail" },
+  { shape: ROUTES.comparison, carries: "tail" },
+  { shape: ROUTES.inventoryComparison, carries: "tail" },
+  { shape: ROUTES.inbox, carries: "tail" },
+  { shape: ROUTES.inboxReport, carries: "nothing" },
+  { shape: ROUTES.productComponent, carries: "nothing" },
+  { shape: ROUTES.product, carries: "tail" },
 ];
 
 // where a scope change should land, given where somebody already is.
@@ -252,12 +250,10 @@ export function rescoped(pathname: string, to: Scoped): string | null {
     // selection has nowhere to land. The picker disables those levels while
     // somebody stands on one, so this is the belt rather than the braces.
     if (!to.product || !to.stream || !to.variant) return null;
-    const rest = (build.params as { "*"?: string })["*"] ?? "";
-    const base =
-      `/products/${encodeURIComponent(to.product)}` +
-      `/streams/${encodeURIComponent(to.stream)}` +
-      `/variants/${encodeURIComponent(to.variant)}`;
-    return rest ? `${base}/${rest}` : `${base}/findings`;
+    // Cut from the address as it stands rather than read from the match,
+    // whose splat has an escaped slash turned back into a separator.
+    const rest = pathname.slice(build.pathnameBase.length).replace(/^\//, "");
+    return sameScreenAt({ product: to.product, stream: to.stream, variant: to.variant }, rest);
   }
   // The wider list carries the whole selection in its own address.
   if (matchPath(LIST, pathname)) return findingsPath(to);
@@ -266,14 +262,13 @@ export function rescoped(pathname: string, to: Scoped): string | null {
     if (!hit) continue;
     // Every product, chosen from one product's screen, is the catalog.
     if (!to.product) return "/products";
-    const base = `/products/${encodeURIComponent(to.product)}`;
-    if (carries === "nothing") return base;
+    if (carries === "nothing") return productAt(to.product);
     if (carries === "tail") {
-      const tail = shape.slice("/products/:product".length);
-      return hit.params.product === to.product ? null : `${base}${tail}`;
+      const tail = shape.slice(ROUTES.product.length);
+      return hit.params.product === to.product ? null : sameProductScreenAt(to.product, tail);
     }
     if (hit.params.product === to.product && hit.params.stream === to.stream) return null;
-    return to.stream ? `${base}/streams/${encodeURIComponent(to.stream)}` : `${base}/streams`;
+    return to.stream ? streamAt(to.product, to.stream) : streamsAt(to.product);
   }
   return null;
 }

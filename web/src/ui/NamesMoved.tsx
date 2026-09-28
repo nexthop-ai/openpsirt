@@ -3,6 +3,7 @@
 
 import { Link } from "react-router-dom";
 import { Wide } from "./Wide";
+import { componentAt } from "../app/routes";
 
 // One kind of change, or every kind where it is empty.
 export type Kind = "" | "removed" | "added" | "changed";
@@ -79,11 +80,7 @@ export function NamesMoved({
                 {removedIsGone && row.change === "removed" ? (
                   row.name
                 ) : (
-                  <Link
-                    to={`/products/${encodeURIComponent(product)}/components/${encodeURIComponent(row.name ?? "")}`}
-                  >
-                    {row.name}
-                  </Link>
+                  <Link to={componentAt(product, row.name ?? "")}>{row.name}</Link>
                 )}
               </td>
               <td>

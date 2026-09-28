@@ -11,6 +11,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
 import { KindChips, NamesMoved, type Kind } from "../ui/NamesMoved";
+import { inventoriesAt } from "../app/routes";
 
 // The most one page asks for. Long enough that an ordinary night fits on one
 // page, short enough that a build which replaced everything does not arrive as
@@ -28,10 +29,6 @@ export function InventoryChanges() {
   const [offset, setOffset] = useState(0);
   const [only, setOnly] = useState<Kind>("");
   const at = { product, stream, variant, scan: Number(scan) };
-  const build =
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}`;
 
   const changes = useQuery({
     queryKey: ["inventory-changes", at, only, offset],
@@ -60,7 +57,11 @@ export function InventoryChanges() {
     <div>
       <div className="screen-head">
         <span className="crumbs">
-          <Link to={`${build}/scans`} className="linkish" style={{ fontWeight: 500 }}>
+          <Link
+            to={inventoriesAt({ product, stream, variant })}
+            className="linkish"
+            style={{ fontWeight: 500 }}
+          >
             Inventories
           </Link>{" "}
           › <b>upload {scan}</b>

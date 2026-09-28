@@ -20,6 +20,7 @@ import { useReseed } from "../ui/reseed";
 import { Scoring } from "../ui/Scoring";
 import { Weaknesses } from "../ui/Weaknesses";
 import { Required } from "../ui/Required";
+import { inboxReportAt, issueAt, productFindingsAt } from "../app/routes";
 
 // Reporting a flaw in what we ship: one somebody outside sent, or one somebody
 // here found. The one way in for both. What separates them is a single answer
@@ -237,7 +238,7 @@ export function Record() {
       setRefused(failed);
       // Onto the issue: every build it landed in, and the advisory about it,
       // which is the next thing a flaw in our own product is headed for.
-      const onward = `/issues/${encodeURIComponent(made.identifier)}`;
+      const onward = issueAt(made.identifier);
       // Unless a file was refused. Navigating in the same commit that writes
       // the warning puts it on a screen that is already unmounting, so the
       // files that did not attach are lost in silence. Staying put is what
@@ -267,7 +268,7 @@ export function Record() {
       return { made, failed };
     },
     onSuccess: ({ made, failed }) => {
-      const onward = `/products/${encodeURIComponent(product)}/inbox/${encodeURIComponent(made.reference)}`;
+      const onward = inboxReportAt(product, made.reference);
       setRefused(failed);
       if (failed.length > 0) {
         setOnward(onward);
@@ -322,7 +323,7 @@ export function Record() {
           <span style={{ marginLeft: "auto" }}>
             <Link
               className="btn quiet"
-              to={`/products/${encodeURIComponent(scope.product)}/findings?origin=manual&below=yes`}
+              to={productFindingsAt(scope.product, { origin: "manual", below: "yes" })}
             >
               What has been recorded here
             </Link>
@@ -391,10 +392,7 @@ export function Record() {
         {fromReport ? (
           <p className="hint">
             From{" "}
-            <Link
-              className="id"
-              to={`/products/${encodeURIComponent(product)}/inbox/${encodeURIComponent(fromReport)}`}
-            >
+            <Link className="id" to={inboxReportAt(product, fromReport)}>
               {fromReport}
             </Link>
             {report.data?.found_here

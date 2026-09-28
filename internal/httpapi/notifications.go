@@ -6,7 +6,6 @@ package httpapi
 import (
 	"context"
 	"net/http"
-	"net/url"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -225,16 +224,4 @@ func registerChatChoices(api huma.API, in Ingest) {
 		}
 		return &struct{}{}, nil
 	})
-}
-
-// findingPath is where a notification about one finding points.
-//
-// Spelled once here rather than at each producer: it is the address the
-// interface routes on, and three copies of it drift the moment a route moves.
-func findingPath(product, stream, variant, vulnerability, component string) string {
-	return "/products/" + url.PathEscape(product) +
-		"/streams/" + url.PathEscape(stream) +
-		"/variants/" + url.PathEscape(variant) +
-		"/findings/" + url.PathEscape(vulnerability) +
-		"/components/" + url.PathEscape(component)
 }

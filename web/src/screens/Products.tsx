@@ -15,6 +15,7 @@ import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
+import { productAt, streamsAt } from "../app/routes";
 
 // You pick a product first, and everything below is bound to it. What each one
 // holds is on the row, so the list answers the question it exists to answer
@@ -203,7 +204,7 @@ export function Products({ who }: { who: Who }) {
                           This table is an administration surface — a triage
                           line in a select, a date in an input — and "how is
                           this one doing" is a different question. */}
-                      <Link to={`/products/${encodeURIComponent(product.name)}`} className="id">
+                      <Link to={productAt(product.name)} className="id">
                         {product.display_name || product.name}
                       </Link>
                       {product.display_name && product.display_name !== product.name && (
@@ -257,10 +258,7 @@ export function Products({ who }: { who: Who }) {
                       )}
                     </td>
                     <td className="rowacts">
-                      <Link
-                        to={`/products/${encodeURIComponent(product.name)}/streams`}
-                        className="linkish"
-                      >
+                      <Link to={streamsAt(product.name)} className="linkish">
                         Manage
                       </Link>
                       {who.admin && (

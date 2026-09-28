@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Conditions about the deployment rather than about anybody's work: data that
@@ -105,7 +106,7 @@ func (w *Watch) dataStale(ctx context.Context) ([]Holds, error) {
 		Body: fmt.Sprintf("The vulnerability data has not moved in %s. Every scan "+
 			"since has answered against %s, so a finding that would have opened on newer "+
 			"data has not — and nothing has failed to say so.", plainly(days), version),
-		Link: "/system",
+		Link: weblink.System(),
 	}}, nil
 }
 
@@ -243,7 +244,7 @@ func (w *Watch) riskUnagreed(ctx context.Context) ([]Holds, error) {
 		// shown a page with nothing on it, which is the alert nobody can clear
 		// that REQ-49 is about. The longest window the sheet offers reads as
 		// "everything" and is also the bound on what an address may ask for.
-		Link: "/reports/rubber-stamp?days=" + everythingBack,
+		Link: weblink.Report("rubber-stamp", everythingBack),
 	}}, nil
 }
 
@@ -387,7 +388,7 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 				"people who may approve that one pair doing most of it is worth a look.",
 				each.product.DisplayName, people[each.pair.First], people[each.pair.Second],
 				each.percent, days),
-			Link:      "/reports/rubber-stamp?days=" + pairsBack,
+			Link:      weblink.Report("rubber-stamp", pairsBack),
 			ProductID: &productID,
 		})
 	}

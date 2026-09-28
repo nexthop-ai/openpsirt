@@ -9,6 +9,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { standing, statusLabel } from "./advisory";
+import { advisoryAt } from "../app/routes";
 
 // Starting an advisory about this flaw, and the first look at what it
 // generates.
@@ -154,7 +155,7 @@ export function IssueAdvisory({
           {(already.data?.items ?? []).map((one, at) => (
             <span key={one.advisory}>
               {at > 0 && ", "}
-              <Link className="id" to={`/advisories/${encodeURIComponent(one.advisory)}`}>
+              <Link className="id" to={advisoryAt(one.advisory)}>
                 {one.advisory}
               </Link>
               {" ("}
@@ -226,7 +227,7 @@ export function IssueAdvisory({
               not give. A second flaw, the title, and recording that it went
               out are all there too. */}
               <div className="actions" style={{ marginTop: 10 }}>
-                <Link className="btn" to={`/advisories/${encodeURIComponent(advisory)}`}>
+                <Link className="btn" to={advisoryAt(advisory)}>
                   Open {advisory}
                 </Link>
               </div>

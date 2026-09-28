@@ -52,7 +52,6 @@ import {
   PAGE,
   PAGES,
   pageSize,
-  pathTo,
   SORTS,
   type Row,
   type SortWord,
@@ -63,6 +62,7 @@ import {
   withParam,
   withParams,
 } from "./list";
+import { allFindingsAt, findingAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
 
 // The filters the bar sets itself, so the count on More filters leaves them out.
@@ -545,13 +545,13 @@ export function Findings() {
   // The rows are held in a ref so that the listener is bound once rather than
   // re-bound on every page of results, which would also have made the cursor
   // a dependency of itself.
-  const live = useRef({ rows, cursor, peeking, at: (row: Row) => pathTo(buildOf(row), row) });
+  const live = useRef({ rows, cursor, peeking, at: (row: Row) => findingAt(buildOf(row), row) });
   useEffect(() => {
     live.current = {
       rows,
       cursor,
       peeking,
-      at: (row: Row) => pathTo(buildOf(row), row, carrying, prepared?.name),
+      at: (row: Row) => findingAt(buildOf(row), row, carrying, prepared?.name),
     };
   });
   useEffect(() => {
@@ -848,7 +848,7 @@ export function Findings() {
   if (spanning && view !== "issues") {
     const asking = new URLSearchParams(params);
     asking.delete("view");
-    return <Navigate replace to={`/findings?${asking}`} />;
+    return <Navigate replace to={allFindingsAt(asking)} />;
   }
 
   if (view === "bumps") {

@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Body } from "../api/client";
-import { buildPath } from "./list";
+import { buildFindingsAt } from "../app/routes";
 
 type Build = Body<"PerBuildBody">;
 
 // The findings list names binaries, so a source package is every binary of it.
 export const findingsAt = (product: string, row: Build, names: string[]) =>
-  buildPath({ product, stream: row.stream ?? "", variant: row.variant ?? "" }) +
-  "/findings?" +
-  names.map((name) => `component=${encodeURIComponent(name)}`).join("&");
+  buildFindingsAt(
+    { product, stream: row.stream ?? "", variant: row.variant ?? "" },
+    new URLSearchParams(names.map((name) => ["component", name])),
+  );
 
 export const binaries = (row: Build) => (row.packages ?? []).map((each) => each.name);
 

@@ -17,6 +17,7 @@ import { Access } from "./Access";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import type { Who } from "../app/session";
+import { personAt } from "../app/routes";
 
 // Access: who can see what, who can decide about it, and the credentials
 // that carry either.
@@ -281,10 +282,7 @@ export function People({ who: me }: { who: Who }) {
                           opens the component. What this row shows is what they
                           hold; what they were told and what they did to the
                           record is a screen. */}
-                      <Link
-                        className="id"
-                        to={`/people/${encodeURIComponent(person.identity ?? "")}`}
-                      >
+                      <Link className="id" to={personAt(person.identity ?? "")}>
                         {person.display_name || person.identity}
                       </Link>
                       {(person.admin || person.admin_by_configuration) && (

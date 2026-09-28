@@ -16,6 +16,7 @@ import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
 import { PickBuild } from "../ui/PickBuild";
+import { inventoryComparisonAt, runAt, type Build } from "../app/routes";
 
 // The rows of each column shown before it says how many more there are.
 const SHOWN = 8;
@@ -188,10 +189,7 @@ export function Compare() {
             {/* The same two builds, compared by what they contain rather
                 than by what is open against them. */}
             {ready && (
-              <Link
-                className="btn quiet"
-                to={`/products/${encodeURIComponent(product)}/comparison/inventory?${new URLSearchParams(pair)}`}
-              >
+              <Link className="btn quiet" to={inventoryComparisonAt(product, pair)}>
                 Compare components
               </Link>
             )}
@@ -226,7 +224,7 @@ export function Compare() {
               closed={comparison.data?.closed_not_fixed ?? []}
               newly={comparison.data?.newly_present ?? []}
               still={comparison.data?.still_present ?? []}
-              runsAt={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(to)}/variants/${encodeURIComponent(toVariant)}/runs`}
+              runsIn={{ product, stream: to, variant: toVariant }}
             />
 
             {/* The same comparison in the form it is actually wanted in
@@ -318,13 +316,13 @@ function Columns({
   closed,
   newly,
   still,
-  runsAt,
+  runsIn,
 }: {
   fixed: Changed[];
   closed: Changed[];
   newly: Changed[];
   still: Changed[];
-  runsAt: string;
+  runsIn: Build;
 }) {
   return (
     <div className="cmp">
@@ -343,7 +341,7 @@ function Columns({
         kind="not-fixed"
         title="Closed, not fixed"
         rows={closed}
-        runsAt={runsAt}
+        runsIn={runsIn}
         note="Superseded means the version moved and took the issue with it. Unexplained means the component is unchanged and the scanner stopped reporting it, which is a fault to look into."
       />
       <Column kind="newly" title="Introduced" rows={newly} />
@@ -368,14 +366,14 @@ function Column({
   title,
   rows,
   note,
-  runsAt,
+  runsIn,
   signOff,
 }: {
   kind: string;
   title: string;
   rows: Changed[];
   note?: string;
-  runsAt?: string;
+  runsIn?: Build;
   // signOff draws what stands about each row, and offers the one narrowing a
   // release coordinator actually works from: what nobody has decided.
   signOff?: boolean;
@@ -433,10 +431,10 @@ function Column({
                 {/* The run that stopped reporting it. Being told a closure is
                     unexplained and given nowhere to look leaves the reader
                     with the fault and no way to start on it. */}
-                {runsAt && row.because === "unexplained" && row.closed_by_run && (
+                {runsIn && row.because === "unexplained" && row.closed_by_run && (
                   <>
                     {" — "}
-                    <Link to={`${runsAt}/${row.closed_by_run}`}>the run that stopped</Link>
+                    <Link to={runAt(runsIn, row.closed_by_run)}>the run that stopped</Link>
                   </>
                 )}
               </span>

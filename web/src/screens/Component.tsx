@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap, whichOf } from "../api/queries";
+import { componentAt, decideAt, treeAt } from "../app/routes";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Empty } from "../ui/Empty";
@@ -71,18 +72,12 @@ function pickPackage(row: Build, asked: string): Package | undefined {
 //
 // The package's version, ecosystem and namespace travel with the name, because
 // a build can hold one name as more than one component.
-const decideAt = (product: string, row: Build, component: string, pkg?: Package) => {
-  const which = new URLSearchParams(
+const decideHere = (product: string, row: Build, component: string, pkg?: Package) =>
+  decideAt(
+    { product, stream: row.stream ?? "", variant: row.variant ?? "" },
+    component,
     whichOf({ version: pkg?.version, ecosystem: row.ecosystem, namespace: pkg?.namespace }),
-  ).toString();
-  return (
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(row.stream ?? "")}` +
-    `/variants/${encodeURIComponent(row.variant ?? "")}` +
-    `/components/${encodeURIComponent(component)}/decide` +
-    (which ? `?${which}` : "")
   );
-};
 
 export function Component() {
   const { product = "", component = "" } = useParams();
@@ -449,13 +444,8 @@ function Sits({
   const above = around.data?.above ?? [];
   const below = around.data?.below ?? [];
   const carrying = below.filter((each) => (each.findings ?? 0) > 0);
-  const buildAt =
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(scope.stream)}` +
-    `/variants/${encodeURIComponent(scope.variant)}`;
-  const componentAt = (name: string) =>
-    `/products/${encodeURIComponent(product)}/components/${encodeURIComponent(name)}` +
-    `?stream=${encodeURIComponent(scope.stream)}&variant=${encodeURIComponent(scope.variant)}`;
+  const componentHere = (name: string, version?: string) =>
+    componentAt(product, name, version, scope);
 
   return (
     <div>
@@ -501,7 +491,7 @@ function Sits({
                 {above.slice(0, 3).map((parent, i) => (
                   <span key={(parent.component ?? "") + i}>
                     {i > 0 && ", "}
-                    <Link className="id" to={componentAt(parent.component ?? "")}>
+                    <Link className="id" to={componentHere(parent.component ?? "", parent.version)}>
                       {parent.component}
                     </Link>
                   </span>
@@ -559,7 +549,10 @@ function Sits({
                         {carrying.slice(0, SHOWN).map((each, i) => (
                           <tr key={(each.component ?? "") + i}>
                             <td>
-                              <Link className="id" to={componentAt(each.component ?? "")}>
+                              <Link
+                                className="id"
+                                to={componentHere(each.component ?? "", each.version)}
+                              >
                                 {each.component}
                               </Link>{" "}
                               <span className="hint">{each.version}</span>
@@ -569,7 +562,9 @@ function Sits({
                                 its own, so the second is what says whether the
                                 branch is worth opening. */}
                             <td className="num">
-                              <Link to={componentAt(each.component ?? "")}>{each.findings}</Link>
+                              <Link to={componentHere(each.component ?? "", each.version)}>
+                                {each.findings}
+                              </Link>
                             </td>
                             <td className="num" style={{ color: "var(--faint)" }}>
                               {(each.beneath ?? 0) > (each.findings ?? 0)
@@ -594,7 +589,17 @@ function Sits({
                 )}
               </>
             )}
-            <Link className="linkish" to={buildAt + "/tree?at=" + encodeURIComponent(component)}>
+            <Link
+              className="linkish"
+              to={treeAt(scope, {
+                at: component,
+                ...whichOf({
+                  version: pkg.version,
+                  ecosystem: here.ecosystem,
+                  namespace: pkg.namespace,
+                }),
+              })}
+            >
               Open in the tree →
             </Link>
           </li>
@@ -776,7 +781,7 @@ function Upgrade({
           Nothing fixes the {here.issues} open here.
         </p>
         <p style={{ marginTop: 10 }}>
-          <Link className="btn" to={decideAt(product, here, component, pkg)}>
+          <Link className="btn" to={decideHere(product, here, component, pkg)}>
             Decide them together
           </Link>{" "}
           <Link className="btn quiet" to={findingsAt(product, here, binaries(here))}>
@@ -820,7 +825,7 @@ function Upgrade({
           card and nothing on this page answered this one. */}
       {noFix > 0 && (
         <p style={{ marginTop: 6 }}>
-          <Link className="linkish" to={decideAt(product, here, component, pkg)}>
+          <Link className="linkish" to={decideHere(product, here, component, pkg)}>
             Decide those together →
           </Link>
         </p>

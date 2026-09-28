@@ -9,6 +9,7 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { BANDS } from "../ui/severities";
 import { lasted, on } from "../ui/when";
+import { buildFindingsAt, inventoriesAt } from "../app/routes";
 
 type Changed = {
   total?: number;
@@ -27,10 +28,7 @@ type Changed = {
 export function Run() {
   const { product = "", stream = "", variant = "", run = "" } = useParams();
   const at = { product, stream, variant, run: Number(run) };
-  const build =
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}`;
+  const build = { product, stream, variant };
 
   const ran = useQuery({
     queryKey: ["run", at],
@@ -51,7 +49,7 @@ export function Run() {
     <div>
       <div className="screen-head">
         <span className="crumbs">
-          <Link to={`${build}/scans`} className="linkish" style={{ fontWeight: 500 }}>
+          <Link to={inventoriesAt(build)} className="linkish" style={{ fontWeight: 500 }}>
             Inventories
           </Link>{" "}
           › <b>run {it.run_id}</b>
@@ -129,7 +127,7 @@ export function Run() {
           title="The findings it opened"
           changed={it.opened}
           exploited={it.opened_exploited}
-          to={`${build}/findings?opened_by_run=${encodeURIComponent(run)}`}
+          to={buildFindingsAt(build, { opened_by_run: run })}
         />
         <Shape title="The findings it closed" changed={it.closed} />
       </div>

@@ -16,6 +16,7 @@ import { Fab } from "../ui/Drawer";
 import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
 import { Wide } from "../ui/Wide";
+import { inventoryChangesAt, runAt } from "../app/routes";
 
 // Each build's uploads, and what the scan of them found. A scan is what the
 // deployment does to an inventory after it arrives; what a person uploads, and
@@ -146,11 +147,7 @@ export function Inventories() {
                         word is where somebody asks "what did it find". */}
                     {scan.run_id ? (
                       <Link
-                        to={
-                          `/products/${encodeURIComponent(product)}` +
-                          `/streams/${encodeURIComponent(stream)}` +
-                          `/variants/${encodeURIComponent(variant)}/runs/${scan.run_id}`
-                        }
+                        to={runAt({ product, stream, variant }, scan.run_id)}
                         title="The change this run made, and the tooling it was measured with"
                       >
                         <State state={scan.state} />
@@ -423,10 +420,7 @@ function Moved({
   const added = inventory.added ?? 0;
   const removed = inventory.removed ?? 0;
   const changed = inventory.changed ?? 0;
-  const where =
-    `/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}/scans/${scan}/changes`;
+  const where = inventoryChangesAt(at, scan);
   if (added + removed + changed === 0) {
     return (
       <Link to={where} className="hint" title="Nothing about this build's contents moved">

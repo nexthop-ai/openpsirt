@@ -13,6 +13,7 @@ import { Dropzone } from "./Dropzone";
 import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
 import { Required } from "./Required";
+import { inventoriesAt } from "../app/routes";
 
 // The build an upload is sent to.
 type Target = { product: string; stream: string; variant: string };
@@ -89,10 +90,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       void queries.invalidateQueries({ queryKey: ["scans"] });
       void queries.invalidateQueries({ queryKey: ["scanning"] });
       onClose();
-      navigate(
-        `/products/${encodeURIComponent(to.product)}/streams/${encodeURIComponent(to.stream)}` +
-          `/variants/${encodeURIComponent(to.variant)}/scans`,
-      );
+      navigate(inventoriesAt(to));
     },
   });
 
@@ -137,15 +135,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <span>
             {held.product} · {held.stream} · {held.variant} already holds this inventory, as scan{" "}
             {held.scan}. Nothing was queued.{" "}
-            <Link
-              to={
-                `/products/${encodeURIComponent(held.product)}` +
-                `/streams/${encodeURIComponent(held.stream)}` +
-                `/variants/${encodeURIComponent(held.variant)}/scans`
-              }
-              onClick={onClose}
-              className="linkish"
-            >
+            <Link to={inventoriesAt(held)} onClick={onClose} className="linkish">
               View inventories →
             </Link>
           </span>

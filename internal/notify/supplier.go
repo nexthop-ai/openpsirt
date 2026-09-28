@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // suppliersSilent is the condition that a configured supplier has not been
@@ -86,7 +87,7 @@ func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 			// attempts stays one condition rather than a new one each pass.
 			About:     identify(fmt.Sprintf("supplier-silent %d", one.ID)),
 			Body:      body,
-			Link:      "/settings",
+			Link:      weblink.Settings(),
 			ProductID: &productID,
 		})
 	}

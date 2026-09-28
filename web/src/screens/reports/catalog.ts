@@ -2,6 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type Scoped } from "../../app/scope";
+import {
+  auditAt,
+  comparisonAt,
+  inventoriesAt,
+  matchCoverageAt,
+  reportAt,
+  streamsAt,
+  type Build,
+  upgradesAt,
+} from "../../app/routes";
 
 // The named reports, and where each is read.
 //
@@ -36,10 +46,10 @@ export type Report = {
 //
 // The record is the one screen that does: it is read as a document and sent as
 // a link, so what it answers has to be in the address it was sent as.
-function withProduct(at: string, scope: Scoped): string {
-  if (!scope.product) return at;
-  const joined = at.includes("?") ? "&" : "?";
-  return `${at}${joined}product=${encodeURIComponent(scope.product)}`;
+function withProduct(asked: string, scope: Scoped): string {
+  const query = new URLSearchParams(asked);
+  if (scope.product) query.set("product", scope.product);
+  return auditAt(query);
 }
 
 export const CATALOG: Report[] = [
@@ -103,28 +113,28 @@ export const CATALOG: Report[] = [
     name: "Release readiness",
     answers:
       "Whether a branch is ready to cut, against the last release cut from it. On the branches list, where the two are picked.",
-    to: (at) => `/products/${encodeURIComponent(at.product ?? "")}/streams`,
+    to: (at) => streamsAt(at.product ?? ""),
     needs: (at) => (at.product ? null : "Pick a product to see its branches and tags."),
   },
   {
     name: "Upgrade plan status",
     answers:
       "What each build is waiting on: the upgrades promised, what they would close, and which have landed.",
-    to: (at) => `${buildAt(at)}/pending-upgrades`,
+    to: (at) => upgradesAt(buildOf(at)),
     needs: whole,
   },
   {
     name: "Match coverage",
     answers:
       "What a build holds that the scanner has no way to match, and why. Those components report no findings, which looks exactly like having none.",
-    to: (at) => `${buildAt(at)}/match-coverage`,
+    to: (at) => matchCoverageAt(buildOf(at)),
     needs: whole,
   },
   {
     name: "Carried patches",
     answers:
       "What a distribution fixed without moving the version, which no comparison of versions can see. On the build's inventories screen.",
-    to: (at) => `${buildAt(at)}/scans`,
+    to: (at) => inventoriesAt(buildOf(at)),
     needs: whole,
   },
   {
@@ -148,12 +158,11 @@ export const CATALOG: Report[] = [
     answers:
       "Dismissals no second person has a standing agreement on. It should come back empty — every dismissal requires one, so a row here is a control that did not hold.",
     // The product the catalog is being read for, carried into the record. The
-    // record reads its narrowing from the address alone, so an entry that
-    // dropped it opened every product the reader can see from a page scoped
-    // to one — a different population under the same name.
+    // record reads its narrowing from the address alone, and without the
+    // product it answers for every product the reader can see.
     to: (at) =>
       withProduct(
-        "/audit?alone=true&outcome=not-applicable&outcome=mismatched&outcome=wont-fix" +
+        "alone=true&outcome=not-applicable&outcome=mismatched&outcome=wont-fix" +
           "&outcome=already-fixed",
         at,
       ),
@@ -166,13 +175,13 @@ export const CATALOG: Report[] = [
     name: "Standing corrections",
     answers:
       "The matches recorded as wrong, and still standing: what each is about, who proposed it, who agreed, and on what grounds. Nothing expires one, so this is the list nobody is shown unless they ask.",
-    to: (at) => withProduct("/audit?in_force=true&outcome=mismatched", at),
+    to: (at) => withProduct("in_force=true&outcome=mismatched", at),
   },
   {
     name: "Administrative changes",
     answers:
       "Who moved the ground under the judgments: roles, support dates, thresholds. In the record, for administrators.",
-    to: (at) => withProduct("/audit", at),
+    to: (at) => withProduct("", at),
   },
   {
     // The sign-off sheet. The comparison screen already answers it, so the
@@ -181,25 +190,22 @@ export const CATALOG: Report[] = [
     name: "Shipping with known issues",
     answers:
       "What a build still carries, with what stands about each: agreed and why, waiting on a second person, or nobody has said anything. The last of those is the release coordinator's blocker list.",
-    to: (at) => `/products/${encodeURIComponent(at.product ?? "")}/comparison`,
+    to: (at) => comparisonAt(at.product ?? ""),
     needs: (at) => (at.product ? null : "Pick a product to compare two of its builds."),
   },
   {
     name: "Release comparison",
     answers:
       "What changed between two builds — fixed, newly present, and still present — in the form a release note takes.",
-    to: (at) => `/products/${encodeURIComponent(at.product ?? "")}/comparison`,
+    to: (at) => comparisonAt(at.product ?? ""),
     needs: (at) => (at.product ? null : "Pick a product to compare two of its builds."),
   },
 ];
 
-// The address of a whole build, for an entry that points at one of its screens.
-function buildAt(at: Scoped): string {
-  return (
-    `/products/${encodeURIComponent(at.product ?? "")}` +
-    `/streams/${encodeURIComponent(at.stream ?? "")}` +
-    `/variants/${encodeURIComponent(at.variant ?? "")}`
-  );
+// The whole build a selection names, for an entry that points at one of its
+// screens.
+function buildOf(at: Scoped): Build {
+  return { product: at.product ?? "", stream: at.stream ?? "", variant: at.variant ?? "" };
 }
 
 // The picks a build-scoped entry needs. Five screens exist for one build and no
@@ -218,7 +224,7 @@ function whole(at: Scoped): string | null {
 export function leadsTo(report: Report, at: Scoped): { to: string | null; why: string | null } {
   const why = report.needs?.(at) ?? null;
   if (why) return { to: null, why };
-  if (report.slug) return { to: `/reports/${report.slug}`, why: null };
+  if (report.slug) return { to: reportAt(report.slug), why: null };
   return { to: report.to?.(at) ?? null, why: null };
 }
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { CATALOG, leadsTo, scopeWords } from "./catalog";
 import { PAGES } from "./Report";
 import { matchPath } from "react-router-dom";
-import { ROUTES as NAMED } from "../../app/App";
+import { ROUTES as NAMED } from "../../app/routes";
 
 // The router's patterns as a list, because what is asked here is whether an
 // address matches any of them rather than which.

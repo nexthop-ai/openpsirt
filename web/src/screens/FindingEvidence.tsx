@@ -20,6 +20,7 @@ import { at } from "../ui/when";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
+import { decisionAt, inboxReportAt, refiled, treeAt, type Build } from "../app/routes";
 
 // Away is an address somebody else supplied, shown as a link only where it is
 // one this deployment is willing to send a reader to.
@@ -46,7 +47,7 @@ export function Places({
   version,
 }: {
   places: Sitting[];
-  build: string;
+  build: Build;
   // The versions shipped here, for a way down the graph could not walk: the
   // chain carries a version at every step and a place without one carries none.
   version?: string;
@@ -92,7 +93,7 @@ export function Places({
                       <span className="state open">suppressed by the build</span>
                     )}
                     {last && place.decision != null && (
-                      <Link to={`/decisions/${place.decision}`} className="linkish">
+                      <Link to={decisionAt(place.decision)} className="linkish">
                         decided
                       </Link>
                     )}
@@ -115,9 +116,9 @@ export function Places({
 
             From a place the graph could be walked to, whichever of them that
             is. A chain is what the tree opens along, and the first place is
-            not always one that has a route up — handed that one, the tree was
-            given a name to land on and no way down to it. */}
-        <Link to={`${build}/components?${intoTheTree(places)}`} className="linkish">
+            not always one that has a route up; the tree handed only a name
+            has nothing to open on the way down to it. */}
+        <Link to={treeAt(build, intoTheTree(places))} className="linkish">
           View in dependency tree →
         </Link>
       </div>
@@ -375,9 +376,9 @@ export function Reporter({
       // this screen was reached by names it no more.
       const now = removed?.filed_under;
       if (now && now !== vulnerability) {
-        const from = `/${encodeURIComponent(vulnerability)}`;
-        const to = `/${encodeURIComponent(now)}`;
-        navigate(location.pathname.replace(from, to) + location.search, { replace: true });
+        navigate(refiled(location.pathname, vulnerability, now) + location.search, {
+          replace: true,
+        });
       }
       void queries.invalidateQueries({ queryKey: ["finding"] });
     },
@@ -528,14 +529,13 @@ export function Duplicates({
   }
   const rows = duplicates.data?.items ?? [];
   if (rows.length === 0) return null;
-  const inbox = `/products/${encodeURIComponent(product)}/inbox`;
   return (
     <div className={card ? "card" : undefined} style={{ marginTop: card ? 14 : 10 }}>
       {card ? <h3>Duplicates</h3> : <h4 style={{ margin: "0 0 4px" }}>Duplicates</h4>}
       <ul className="files">
         {rows.map((row) => (
           <li key={row.reference}>
-            <Link className="id" to={`${inbox}/${encodeURIComponent(row.reference)}`}>
+            <Link className="id" to={inboxReportAt(product, row.reference)}>
               {row.reference}
             </Link>
             <span className="hint">

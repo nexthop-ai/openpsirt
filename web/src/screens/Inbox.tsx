@@ -14,6 +14,7 @@ import { on } from "../ui/when";
 import { rulable, standing } from "./inbox";
 import { RuleForm, RulingCard, useBackOff } from "./InboxRuling";
 import { Count } from "../ui/Count";
+import { inboxReportAt, issueAt, productAt, recordAt } from "../app/routes";
 
 // One product's reports: what arrived, what it was judged to be, and the
 // rulings waiting on a second person.
@@ -36,13 +37,12 @@ export function Inbox() {
       <div className="screen-head">
         <h2>Inbox</h2>
         <p>
-          Vulnerability reports sent to{" "}
-          <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link>
+          Vulnerability reports sent to <Link to={productAt(product)}>{product}</Link>
         </p>
         {/* The one form every flaw is reported through, found here or sent
             in, with this product already picked. */}
         {works && (
-          <Link className="btn" to={`/record?product=${encodeURIComponent(product)}`}>
+          <Link className="btn" to={recordAt(product)}>
             Report a flaw
           </Link>
         )}
@@ -88,7 +88,6 @@ function Reports({ product, works }: { product: string; works: boolean }) {
   if (listed.isError)
     return <Failed error={listed.error} what="The vulnerability reports could not be read." />;
   const rows = listed.data?.items ?? [];
-  const at = `/products/${encodeURIComponent(product)}/inbox`;
   const open = rows.filter(rulable).map((row) => row.reference);
   const toggle = (reference: string) =>
     setChosen((was) =>
@@ -152,7 +151,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <Link className="id" to={`${at}/${encodeURIComponent(row.reference)}`}>
+                    <Link className="id" to={inboxReportAt(product, row.reference)}>
                       {row.reference}
                     </Link>
                   </td>
@@ -180,7 +179,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
                     {row.issue && (
                       <>
                         {" "}
-                        <Link className="id" to={`/issues/${encodeURIComponent(row.issue)}`}>
+                        <Link className="id" to={issueAt(row.issue)}>
                           {row.issue}
                         </Link>
                       </>
@@ -189,7 +188,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
                       <>
                         {" "}
                         of{" "}
-                        <Link className="id" to={`/issues/${encodeURIComponent(row.duplicate_of)}`}>
+                        <Link className="id" to={issueAt(row.duplicate_of)}>
                           {row.duplicate_of}
                         </Link>
                       </>

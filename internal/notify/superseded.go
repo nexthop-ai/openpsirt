@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Superseded tells a product's triagers that a merge of two issues met two
@@ -93,9 +93,9 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			failed = errors.Join(failed, fmt.Errorf("read what a merge superseded: %w", err))
 			continue
 		}
-		link := fmt.Sprintf("/decisions/%d", one.StandingID)
+		link := weblink.Decision(one.StandingID)
 		if one.Kind != finding.DisplacedDecision {
-			link = "/issues/" + url.PathEscape(about.Kept)
+			link = weblink.Issue(about.Kept)
 		}
 		body := fmt.Sprintf("%s merged into %s, and "+said+". The one with more standing "+
 			"is kept and the other stopped applying.", about.Absorbed, about.Kept, about.Product)

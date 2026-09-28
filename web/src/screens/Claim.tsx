@@ -27,7 +27,7 @@ import { on } from "../ui/when";
 import { mayOf, useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
-import { pathTo } from "./list";
+import { allFindingsAt, findingAt } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
 
 // The stripe down the card, which says the claim's state before anybody reads
@@ -244,7 +244,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
           {" · "}
           <Link
             className="linkish"
-            to={pathTo(
+            to={findingAt(
               {
                 product: claim.finding.product,
                 stream: claim.finding.stream,
@@ -297,7 +297,7 @@ function Ended({ claimId, part }: { claimId: number; part: Body<"EndedReachBody"
         {part.at && <>on {on(part.at)}</>}
         {builds.length > 0 && <> in {builds.join(", ")}</>}
       </span>
-      <Link className="linkish" to={`/findings?${query.toString()}`}>
+      <Link className="linkish" to={allFindingsAt(query)}>
         Findings there now →
       </Link>
     </div>

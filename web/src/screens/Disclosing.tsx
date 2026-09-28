@@ -15,6 +15,7 @@ import { Failed } from "../ui/Failed";
 import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
+import { findingAt } from "../app/routes";
 
 // The findings approaching disclosure, and the place an embargo is moved (a
 // finding saying whether it is disclosed, a movement needing agreement).
@@ -178,11 +179,14 @@ export function Disclosing() {
                     <td>
                       <Link
                         className="id"
-                        to={`/products/${encodeURIComponent(row.product ?? "")}/streams/${encodeURIComponent(
-                          row.stream ?? "",
-                        )}/variants/${encodeURIComponent(row.variant ?? "")}/findings/${encodeURIComponent(
-                          row.vulnerability ?? "",
-                        )}/components/${encodeURIComponent(row.component ?? "")}`}
+                        to={findingAt(
+                          {
+                            product: row.product ?? "",
+                            stream: row.stream ?? "",
+                            variant: row.variant ?? "",
+                          },
+                          row,
+                        )}
                       >
                         {row.vulnerability}
                       </Link>

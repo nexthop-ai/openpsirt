@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // UnassignedBody is one finding nobody is dealing with.
@@ -242,8 +243,8 @@ func registerAssigning(api huma.API, in Ingest) {
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
 					", in " + input.Product + " " + input.Stream + " " + input.Variant,
-				Link: findingPath(input.Product, input.Stream, input.Variant,
-					input.Vulnerability, input.Component),
+				Link: weblink.Finding(input.Product, input.Stream, input.Variant,
+					input.Vulnerability, input.Component, ""),
 				// Its subject, so a digest can tell later that this
 				// person was told about this work and leave it out.
 				Concerns: notify.Concerning(product, issue, component),

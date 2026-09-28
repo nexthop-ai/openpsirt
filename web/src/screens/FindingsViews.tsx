@@ -25,6 +25,7 @@ import { Exploited, Severity } from "../ui/Severity";
 import { PAGE, type Row } from "./list";
 import { Wide } from "../ui/Wide";
 import { cut } from "../ui/cut";
+import { componentAt } from "../app/routes";
 
 // A component's place, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
@@ -220,7 +221,7 @@ export function ByComponent({
                     <Link
                       className="linkish id"
                       title={`Open ${name}`}
-                      to={`/products/${encodeURIComponent(at.product)}/components/${encodeURIComponent(name)}`}
+                      to={componentAt(at.product, name, row.version, at)}
                     >
                       {name}
                     </Link>
@@ -469,7 +470,7 @@ export function ByBump({
                   {(row.components ?? []).map((name) => (
                     <div key={name}>
                       <Link
-                        to={`/products/${encodeURIComponent(at.product)}/components/${encodeURIComponent(name)}`}
+                        to={componentAt(at.product, name, undefined, at)}
                         className="linkish id"
                       >
                         {name}

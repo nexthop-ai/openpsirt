@@ -4,6 +4,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import type { Body } from "../api/client";
+import { allFindingsAt, requeried } from "../app/routes";
 import type { operations } from "../api/schema";
 
 // The findings list, apart from the screen that draws it.
@@ -95,7 +96,7 @@ export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
 // It is the findings list, so it carries the deadline, the age, the filters and
 // the sort a list running to thousands of rows needs.
 export const UNOWNED = "assigned=nobody&state=undecided";
-export const UNOWNED_LIST = `/findings?${UNOWNED}`;
+export const UNOWNED_LIST = allFindingsAt(new URLSearchParams(UNOWNED));
 
 // The by-issue list's own default, where the address has not said: the work a
 // promised upgrade already answers is out of view, because deciding it again
@@ -147,8 +148,7 @@ export function widened(path: string, params: URLSearchParams): string {
   const base = cut < 0 ? path : path.slice(0, cut);
   const own = cut < 0 ? "" : path.slice(cut + 1);
   for (const [key, value] of new URLSearchParams(own)) rest.append(key, value);
-  const query = rest.toString();
-  return query ? `${base}?${query}` : base;
+  return requeried(base, rest);
 }
 
 // withParam sets one value, or takes the key out where there is none.
@@ -489,61 +489,13 @@ export function identityOf(row: Row): string {
   return `${row.product ?? ""} ${row.vulnerability} ${row.fold}`;
 }
 
-// The prefix one build's screens live under, which every address under a
-// build shares. Written once, because a copy cannot be checked against the
-// router or against another copy.
-export function buildPath(at: { product: string; stream: string; variant: string }): string {
+// The prefix one build's API addresses live under, for an address a browser
+// fetches directly: a file to download, a document to open.
+export function apiBuildPath(at: { product: string; stream: string; variant: string }): string {
   return (
-    `/products/${encodeURIComponent(at.product)}` +
+    `/v1/products/${encodeURIComponent(at.product)}` +
     `/streams/${encodeURIComponent(at.stream)}` +
     `/variants/${encodeURIComponent(at.variant)}`
-  );
-}
-
-// The same prefix under the API, for an address a browser fetches directly: a
-// file to download, a document to open.
-export function apiBuildPath(at: { product: string; stream: string; variant: string }): string {
-  return "/v1" + buildPath(at);
-}
-
-// The address a row opens. The version is part of it: a component name is
-// not unique within a build. It carries the list it came from so the finding
-// can offer the row before and the row after. The list's address travels as
-// one value rather than as its own parameters, so a filter added to the list
-// needs nothing here and cannot collide with a name the finding screen already
-// uses.
-//
-// Opened through a saved filter that prepares a claim, the filter's name
-// travels too, and the finding fills its decision form from what that filter
-// prepares. The name rather than the words: the filter is the one place
-// deciding what it says, and a copy in an address is a second one that goes
-// stale the moment somebody saves over the name.
-export function pathTo(
-  at: { product: string; stream: string; variant: string },
-  // Only the three fields the address is built from, so that what a caller has
-  // to hold is what a link needs rather than a whole row.
-  row: Pick<Row, "vulnerability" | "component" | "version" | "ecosystem" | "namespace">,
-  from?: string,
-  rule?: string,
-): string {
-  const query = new URLSearchParams();
-  if (row.version) query.set("version", row.version);
-  // A name at a version can be two components in one build, so the address
-  // carries the rest of what picks the row it was drawn from.
-  if (row.ecosystem) query.set("ecosystem", row.ecosystem);
-  if (row.namespace) query.set("namespace", row.namespace);
-  if (rule) query.set("rule", rule);
-  // Set even when it is empty, because an unfiltered list is still a list: the
-  // finding tells "there was no list" from "the list asked for everything" by
-  // whether the parameter is there at all, and the second one has a row before
-  // and a row after exactly like the first.
-  if (from !== undefined) query.set("from", from);
-  const asked = query.toString();
-  return (
-    buildPath(at) +
-    `/findings/${encodeURIComponent(row.vulnerability ?? "")}` +
-    `/components/${encodeURIComponent(row.component ?? "")}` +
-    (asked ? `?${asked}` : "")
   );
 }
 

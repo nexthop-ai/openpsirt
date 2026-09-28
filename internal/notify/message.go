@@ -6,6 +6,8 @@ package notify
 import (
 	"fmt"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // Message is one thing to carry outside the application.
@@ -111,7 +113,7 @@ func Compose(n Notification, baseURL string) Message {
 			"This message deliberately says no more than that, including in its " +
 			"address: it travels outside the application, where the check on who " +
 			"may read it does not reach. Your notifications say which thing.\n"
-		front := link(baseURL, "/")
+		front := link(baseURL, weblink.Home())
 		if front != "" {
 			text += "\n" + front + "\n"
 		}

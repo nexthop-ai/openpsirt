@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
 // DecisionBody is a claim about a finding.
@@ -953,7 +953,7 @@ func tellTheApprovers(ctx context.Context, in Ingest, claimID int64,
 			PersonID: one.PersonID, Kind: notify.ApprovalWithdrawn,
 			Body: what + " of a claim you agreed to was changed, so your agreement no " +
 				"longer counts. It is back in the review queue.",
-			Link:    "/claims/" + strconv.FormatInt(claimID, 10),
+			Link:    weblink.Claim(claimID),
 			Private: one.Undisclosed,
 			// The narrowing a later read applies.
 			ProductID:       &one.ProductID,

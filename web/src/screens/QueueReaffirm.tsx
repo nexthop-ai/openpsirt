@@ -13,7 +13,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because, Outcome } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
-import { pathTo } from "./list";
+import { claimAt, findingAt } from "../app/routes";
 
 type Row = Body<"ToReaffirmBody">;
 
@@ -191,7 +191,7 @@ export function ToReaffirm({
                       <Because code={row.decision.justification} />
                     </td>
                     <td>
-                      <Link to={`/claims/${row.claim.id}`} className="id">
+                      <Link to={claimAt(row.claim.id)} className="id">
                         {row.place.vulnerability}
                       </Link>
                       {row.issues > 1 && <span className="hint"> and {row.issues - 1} more</span>}
@@ -199,7 +199,7 @@ export function ToReaffirm({
                     <td className="id">
                       {row.finding ? (
                         <Link
-                          to={pathTo(
+                          to={findingAt(
                             {
                               product: row.finding.product ?? "",
                               stream: row.finding.stream ?? "",

@@ -12,6 +12,7 @@ import { Loading } from "../ui/Loading";
 import { KindChips, NamesMoved, type Kind } from "../ui/NamesMoved";
 import { Paged } from "../ui/Paged";
 import { PickBuild } from "../ui/PickBuild";
+import { comparisonAt } from "../app/routes";
 
 // The most one page asks for, as on one upload's listing.
 const PAGE = 200;
@@ -79,11 +80,7 @@ export function InventoryCompare() {
     <div>
       <div className="screen-head">
         <span className="crumbs">
-          <Link
-            to={`/products/${encodeURIComponent(product)}/comparison?${new URLSearchParams(pair)}`}
-            className="linkish"
-            style={{ fontWeight: 500 }}
-          >
+          <Link to={comparisonAt(product, pair)} className="linkish" style={{ fontWeight: 500 }}>
             Release comparison
           </Link>{" "}
           › <b>components</b>
