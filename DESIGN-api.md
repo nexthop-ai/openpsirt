@@ -266,8 +266,10 @@ allowlist and paging.
 
 Every product's own triage line applies per row from that product's own column
 rather than from one number chosen for the page. `severity` raises the line for
-the whole page and never lowers it below what a product decided; `below_floor`
-turns every line off.
+the whole page and never lowers it below what a product decided: a row passes
+its product's line and the raised one, so the higher of the two applies,
+whether the product states its own line or inherits the deployment's. An
+exploited row passes both. `below_floor` turns every line off.
 
 The filters belonging to one product's builds are not offered across products
 rather than answered from whichever build sorted first: `beneath` walks one

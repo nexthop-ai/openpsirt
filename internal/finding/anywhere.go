@@ -96,12 +96,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		if set && word != "" {
 			deployment = word
 		}
-		// A caller may raise the line for the whole page — that is what the
-		// severity control on the list does — but never lower it below what a
-		// product decided, because the line is the product's decision.
-		if line.Hides() && Ranks(line.Word) > Ranks(deployment) {
-			deployment = line.Word
-		}
+	}
+	// A caller may raise the line for the whole page — that is what the
+	// severity control on the list does — but never lower it below what a
+	// product decided, because the line is the product's decision. So the
+	// raise is a second condition beside each product's own line, and a row
+	// passes both: the higher of the two.
+	raised := 0
+	if !wasBelow && line.Hides() {
+		raised = Ranks(line.Word)
 	}
 
 	// pastEOL is which releases are past their date, read once for the
@@ -162,6 +165,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 					WhereOr("f.urgency >= ?", int64(exploiting)).
 					WhereOr(ratedAt+" >= "+lineAt, deployment)
 			})
+			if raised > 0 {
+				q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+					return q.
+						WhereOr("f.urgency >= ?", int64(exploiting)).
+						WhereOr(ratedAt+" >= ?", raised)
+				})
+			}
 		}
 		return filter.narrow(q)
 	}
