@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -114,12 +115,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`v.description AS "summary"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		Apply(catalog.BuildNames("p", "st", "va")).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Whoever is dealing with it, and nobody where the places disagree.
 		// A minimum named one of them: a partly assigned embargo read as one

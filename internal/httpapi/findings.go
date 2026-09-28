@@ -65,7 +65,7 @@ type FindingBody struct {
 	// product every row would repeat it, and a column every row agrees
 	// about is width the parts that differ need.
 	Product     string `json:"product,omitempty" doc:"The product this is open in. Present only on the list that spans products"`
-	ProductName string `json:"product_name,omitempty" doc:"That product's display name, where it has one"`
+	ProductName string `json:"product_name,omitempty" doc:"That product's display name, or its name where it has none"`
 
 	Vulnerability string `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
 	// Summary is the one line of the issue's own words the row shows. Without
@@ -108,9 +108,9 @@ type FindingBody struct {
 	// take their place.
 	Builds      int    `json:"builds,omitempty" doc:"The number of builds in the selection holding this. Absent where the selection is one build"`
 	Stream      string `json:"stream,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant     string `json:"variant,omitempty" doc:"The variant of that build"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 
 	// Tags are the words people put on this, as they were typed. On the
 	// row because the point of marking work is finding it again in a list,
@@ -486,8 +486,8 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Owner:   group.Owner, Parent: group.Parent,
 		Middle: group.Middle, Chains: group.Chains,
 		Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
-		StreamName:  labelBeside(group.StreamName, group.Stream),
-		VariantName: labelBeside(group.VariantName, group.Variant),
+		StreamName:  group.StreamName,
+		VariantName: group.VariantName,
 		Tags:        group.Tags,
 		Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
 		Places: group.Places, Answered: group.Answered,

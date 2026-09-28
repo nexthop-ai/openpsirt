@@ -34,7 +34,7 @@ type JudgedBody struct {
 	Issue   string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
 	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	// Component is the judgment's subject. Named from a finding at the place,
 	// in any state — a judgment about something since fixed or removed is
 	// exactly what an audit asks for, so it is named rather than left
@@ -238,7 +238,7 @@ func judgedBody(row triage.Judged) JudgedBody {
 		{
 			body := JudgedBody{
 				ID: row.ID, Issue: row.Issue, Product: row.Product,
-				ProductName: labelBeside(row.ProductName, row.Product),
+				ProductName: row.ProductName,
 				Component:   row.Component, Version: row.Version, Consumer: row.Consumer,
 				Outcome: outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
 				State: string(row.State), Standing: row.Standing(),

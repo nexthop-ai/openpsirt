@@ -18,7 +18,7 @@ import (
 type SpentBody struct {
 	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	Component   string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
 	// Claims is the unit somebody works in — one argument, however many rows
 	// it wrote — and Decisions how many places those reached.
@@ -78,7 +78,7 @@ func registerEffort(api huma.API, in Ingest) {
 		out.Body.Items = make([]SpentBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, SpentBody{
-				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Product: row.Product, ProductName: row.ProductName,
 				Component: row.Component,
 				Claims:    row.Claims, Decisions: row.Decisions, People: row.People,
 				Promised: row.Promised, Dismissed: row.Dismissed, Deferred: row.Deferred,

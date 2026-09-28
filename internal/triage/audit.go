@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
@@ -374,7 +375,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`COALESCE(uc.name, ?) AS "consumer"`, "").
 		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		Where("de.id IN (?)", bun.List(keys)).
 		Scan(ctx, &rows)
 	if err != nil {

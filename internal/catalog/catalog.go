@@ -1024,7 +1024,8 @@ func (s *Store) ProductsCalled(ctx context.Context, ids []int64) (map[int64]stri
 // Batched for the same reason people are: the lists that need it are long, and
 // a query per row is how a page of fifty becomes fifty-one round trips.
 func (s *Store) ProductNames(ctx context.Context, ids []int64) (map[int64]string, error) {
-	names, err := database.NamesByID(ctx, s.db, `"product"`, `"display_name"`, ids)
+	names, err := database.NamesByID(ctx, s.db, `"product"`,
+		database.Composed(ShownExpr(`"product"`)), ids)
 	if err != nil {
 		return nil, fmt.Errorf("read which products these are: %w", err)
 	}

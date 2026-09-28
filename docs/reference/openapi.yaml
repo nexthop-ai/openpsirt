@@ -905,7 +905,7 @@ components:
           description: The product the role is held against, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         role:
           description: The role membership of this group grants
@@ -1033,7 +1033,7 @@ components:
         stream:
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         total:
           format: int64
@@ -1041,7 +1041,7 @@ components:
         variant:
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
       required:
         - stream
@@ -2097,7 +2097,7 @@ components:
         product:
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         summary:
           type: string
@@ -2908,21 +2908,21 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         severity:
           type: string
         stream:
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         summary:
           type: string
         variant:
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
         vulnerability:
           type: string
@@ -3507,7 +3507,7 @@ components:
           description: The product this is open in. Present only on the list that spans products
           type: string
         product_name:
-          description: That product's display name, where it has one
+          description: That product's display name, or its name where it has none
           type: string
         score:
           description: The severity as a number, which is what the order compares
@@ -3537,7 +3537,7 @@ components:
           description: "A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         summary:
           description: The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding
@@ -3559,7 +3559,7 @@ components:
           description: The variant of that build
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
         version:
           description: The version that ships
@@ -3698,7 +3698,7 @@ components:
           description: The build to link to, by product, branch or tag, and variant. The product by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         score:
           format: double
@@ -3712,12 +3712,12 @@ components:
         stream:
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         variant:
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
         version:
           description: The version that ships
@@ -3983,7 +3983,7 @@ components:
           description: The product the role is held against, by the name that addresses it. Absent where it is held across every product
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         role:
           description: The rights it carries
@@ -4449,7 +4449,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         proposed_at:
           type: string
@@ -4513,7 +4513,7 @@ components:
           minLength: 1
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -4599,19 +4599,19 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         severity:
           type: string
         stream:
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         variant:
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
         version:
           description: The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved
@@ -5826,12 +5826,12 @@ components:
         stream:
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         variant:
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
         version:
           description: The version that build ships under this name — pass it as ?version= when applying a decision there
@@ -7148,7 +7148,7 @@ components:
           minLength: 1
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           readOnly: true
           type: string
         vulnerability:
@@ -8130,7 +8130,7 @@ components:
         stream:
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
       required:
         - stream
@@ -8210,7 +8210,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         severity:
           type: string
@@ -9504,7 +9504,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         promised:
           description: "Claims that promised work: an upgrade or a backport"
@@ -10289,7 +10289,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it differs from its name
+          description: The product's display name, or its name where it has none
           type: string
         severity:
           type: string
@@ -10297,13 +10297,13 @@ components:
           description: A branch or tag holding it. Where builds is more than one, any of them
           type: string
         stream_name:
-          description: The branch or tag as it was spelled, where that differs from its name
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         variant:
           description: A build variant holding it. Where builds is more than one, any of them
           type: string
         variant_name:
-          description: The variant as it was spelled, where that differs from its name
+          description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
         version:
           type: string

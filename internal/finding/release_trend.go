@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
@@ -99,7 +100,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
 		// The day it went out, where somebody said, and the day it was declared
 		// here otherwise. Ordering by the declaration alone made this chart an
 		// accident of administration: a release recorded months after it

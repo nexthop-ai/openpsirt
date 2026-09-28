@@ -35,15 +35,15 @@ func reachBody(r finding.Reach) ReachBody {
 	for _, m := range r.Automatic {
 		body.Automatic = append(body.Automatic, MatchBody{
 			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Places: m.Places, Here: m.Here,
-			StreamName:  labelBeside(m.StreamName, m.Stream),
-			VariantName: labelBeside(m.VariantName, m.Variant),
+			StreamName:  m.StreamName,
+			VariantName: m.VariantName,
 		})
 	}
 	for _, m := range r.Differing {
 		body.Differing = append(body.Differing, MatchBody{
 			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Places: m.Places, Here: m.Here,
-			StreamName:  labelBeside(m.StreamName, m.Stream),
-			VariantName: labelBeside(m.VariantName, m.Variant),
+			StreamName:  m.StreamName,
+			VariantName: m.VariantName,
 		})
 	}
 	return body
@@ -52,9 +52,9 @@ func reachBody(r finding.Reach) ReachBody {
 // MatchBody is the same issue at the same place in another build.
 type MatchBody struct {
 	Stream      string `json:"stream"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant     string `json:"variant"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	// Version is what that build ships, and the reason this is a separate
 	// question. With a match, the decision already reaches there and nobody is
 	// asked. It is the version the decision route resolves a name by, so a

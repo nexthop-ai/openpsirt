@@ -28,14 +28,14 @@ type UnassignedBody struct {
 	Namespace     string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	// Stream and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.
 	Stream      string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant     string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	Places      int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
 	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
 }
@@ -385,10 +385,10 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
 				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Product: row.Product, ProductName: row.ProductName,
 				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  labelBeside(row.StreamName, row.Stream),
-				VariantName: labelBeside(row.VariantName, row.Variant),
+				StreamName:  row.StreamName,
+				VariantName: row.VariantName,
 				Places:      row.Places, Builds: row.Builds,
 			})
 		}
@@ -493,10 +493,10 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
 				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Product: row.Product, ProductName: row.ProductName,
 				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  labelBeside(row.StreamName, row.Stream),
-				VariantName: labelBeside(row.VariantName, row.Variant),
+				StreamName:  row.StreamName,
+				VariantName: row.VariantName,
 				Places:      row.Places, Builds: row.Builds,
 			})
 		}
@@ -580,10 +580,10 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
 				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Product: row.Product, ProductName: row.ProductName,
 				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  labelBeside(row.StreamName, row.Stream),
-				VariantName: labelBeside(row.VariantName, row.Variant),
+				StreamName:  row.StreamName,
+				VariantName: row.VariantName,
 				Places:      row.Places, Builds: row.Builds,
 			})
 		}

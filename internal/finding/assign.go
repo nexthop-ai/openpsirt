@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -938,12 +939,7 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
-		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		Apply(catalog.BuildNames("p", "st", "va")).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &builds)
 	if err != nil {

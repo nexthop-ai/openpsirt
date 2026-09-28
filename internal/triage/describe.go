@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -119,12 +120,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 			` THEN 1 ELSE 0 END AS "exact"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`pr.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(pr.display_name, ''), pr.name) AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		Apply(catalog.BuildNames("pr", "st", "va")).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).

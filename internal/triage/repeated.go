@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
@@ -102,7 +103,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// whichever name the group collapsed onto. Only the product's name is
 		// unique, and it is not the one anybody reads.
 		ColumnExpr(`MIN(p.name) AS "product"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS "product_name"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
 		ColumnExpr("MIN("+rating.EffectiveExpr+`) AS "severity"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).

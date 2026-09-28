@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // Reach is how far a judgment travels, in the three parts somebody deciding
@@ -187,9 +188,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
 		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).

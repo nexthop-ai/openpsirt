@@ -358,7 +358,8 @@ wherever a display name is more than a recapitalization.
 |---|---|
 | A field a write resolves carries the address | It is what the lookup matches. A listing publishing the label there cannot undo what it listed |
 | The label goes beside it, never in place of it | A screen still shows what a person reads. Two fields is the only arrangement where both are true |
-| The label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
+| A person's or a team's label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
+| A product's, a branch or tag's and a variant's label is always present: its display name, or its name where it has none | One rule on every endpoint, read with one helper, so no list is blank where another names the same build |
 | A name in a path is the address | Folding only lowercases and trims, so a label matches no row |
 
 What publishing the label in the address's field costs. A collaborator on an
@@ -370,6 +371,9 @@ label, is sent back by the withdraw beside it and matches nothing.
 Every listing carries both fields: the collaborators, the roles, the
 credentials, the bindings, the tokens and the routing rules.
 
+The personal-token list is the one listing that still leaves a product's label
+off where it repeats the product's name.
+
 A person named as the actor on a record, and a product, branch or tag, variant
 or team a row is about, are named the same way.
 
@@ -378,7 +382,7 @@ or team a row is about, are named the same way.
 | A field naming a person carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
 | A field naming a product, a branch or tag, a variant or a team carries its name | A caller filters a list and builds a path from what it was handed, and a label resolves to nothing |
 | A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `stream` and `stream_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
-| A label is absent where it would repeat the name | So that absent reads as "the same", and a caller shows the name |
+| A label beside a person or a team is absent where it would repeat the name; a label beside a product, branch or tag, or variant falls back to the name | Absent beside a person reads as "the same". A build is named on every list alike |
 | Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
 | The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
 | A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, and the review-queue file the product and the proposer, the way their lists do |

@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -30,7 +31,7 @@ type BindingBody struct {
 	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
 	// ProductDisplayName is the label shown beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
-	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The role membership of this group grants"`
 }
 
@@ -391,11 +392,9 @@ func productNames(ctx context.Context, a Administering) (map[int64]named, error)
 	}
 	by := map[int64]named{}
 	for _, product := range products {
-		one := named{Address: product.Name}
-		if product.DisplayName != product.Name {
-			one.Display = product.DisplayName
+		by[product.ID] = named{
+			Address: product.Name, Display: catalog.Shown(product.DisplayName, product.Name),
 		}
-		by[product.ID] = one
 	}
 	return by, nil
 }

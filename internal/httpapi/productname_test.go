@@ -152,3 +152,68 @@ func TestAListNamesABuildByTheNamesThatAddressIt(t *testing.T) {
 		}
 	})
 }
+
+// TestABuildWithNoDisplayNamesIsNamedByItsNames pins the fallback every
+// endpoint shares: a product, branch or tag, or variant with no display name
+// is labeled by its name, on every list alike.
+func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		for _, table := range []string{"product", "stream", "variant"} {
+			if _, err := r.db.DB.NewUpdate().Table(table).
+				Set("display_name = ?", "").Where("1 = 1").Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		type row struct {
+			Product     string `json:"product"`
+			ProductName string `json:"product_name"`
+			Stream      string `json:"stream"`
+			StreamName  string `json:"stream_name"`
+			Variant     string `json:"variant"`
+			VariantName string `json:"variant_name"`
+		}
+		named := func(what string, one row, build bool) {
+			if one.Product != "" && one.ProductName != one.Product {
+				t.Errorf("%s labels product %q as %q", what, one.Product, one.ProductName)
+			}
+			if build && (one.Stream == "" || one.StreamName != one.Stream ||
+				one.Variant == "" || one.VariantName != one.Variant) {
+				t.Errorf("%s labels the build as %+v, want each label to be its name", what, one)
+			}
+		}
+		for _, list := range []struct {
+			path  string
+			build bool
+		}{
+			{"/v1/running-out?days=365", true},
+			{"/v1/unassigned", true},
+			{"/v1/audit", false},
+			{"/v1/effort", false},
+		} {
+			var got struct {
+				Items []row `json:"items"`
+			}
+			read(t, r, "triager", list.path, &got)
+			if len(got.Items) == 0 {
+				t.Errorf("%s answered nothing, so this checked nothing", list.path)
+				continue
+			}
+			for _, one := range got.Items {
+				if one.Product == "" && !list.build {
+					t.Errorf("%s names no product", list.path)
+				}
+				named(list.path, one, list.build)
+			}
+		}
+
+		var readiness struct {
+			Now row `json:"now"`
+		}
+		read(t, r, "triager",
+			"/v1/products/mine/streams/master/variants/broadcom/readiness", &readiness)
+		named("readiness", readiness.Now, true)
+	})
+}

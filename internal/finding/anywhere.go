@@ -234,7 +234,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS "product_name"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
