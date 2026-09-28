@@ -148,11 +148,19 @@ func run(args []string, stdout, stderr *os.File) error {
 
 	// Named administrators are granted at every start, which is what makes
 	// this the way back in rather than a one-time setup step.
-	if err := access.Bootstrap(ctx, access.NewStore(db.DB), cfg.BootstrapAdmins); err != nil {
+	unnamed, err := access.Bootstrap(ctx, access.NewStore(db.DB), cfg.BootstrapAdmins)
+	if err != nil {
 		return startupFailed(err, "granting the administrators named in configuration", cfg)
 	}
 	if len(cfg.BootstrapAdmins) > 0 {
 		logger.Info("administrators granted from configuration", "count", len(cfg.BootstrapAdmins))
+	}
+	// Taking administration away is said by name, because nobody made the
+	// change in the application and the administrative trail records only
+	// what a person did there.
+	for _, identity := range unnamed {
+		logger.Warn("administration named in configuration withdrawn: no longer named",
+			"identity", identity)
 	}
 
 	// A deployment that cannot reach its own administration has one route

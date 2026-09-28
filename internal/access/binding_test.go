@@ -153,7 +153,7 @@ func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *
 	// path away at exactly the moment it is needed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
 		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "the-operator"}, []string{"nothing-mapped"})
@@ -169,12 +169,16 @@ func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *
 func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"}); err != nil {
 			t.Fatal(err)
 		}
 		// Removed from configuration and restarted.
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"first"}); err != nil {
+		unnamed, err := f.store.NameBootstrapAdmins(ctx, []string{"first"})
+		if err != nil {
 			t.Fatal(err)
+		}
+		if len(unnamed) != 1 || unnamed[0] != "second" {
+			t.Errorf("the names no longer in configuration came back as %v", unnamed)
 		}
 
 		second, err := f.store.ByIdentity(ctx, "second")
@@ -184,12 +188,45 @@ func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
 		if second.IsBootstrap {
 			t.Error("somebody removed from configuration is still named by it")
 		}
+		// Administration configuration gave is what configuration takes back.
+		if subject, err := f.store.Resolve(ctx, "second"); err == nil && subject.Admin {
+			t.Error("somebody removed from configuration still administers")
+		} else if err != nil && !errors.Is(err, access.ErrDenied) {
+			t.Fatalf("resolution failed for an unrelated reason: %v", err)
+		}
 		first, err := f.store.ByIdentity(ctx, "first")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !first.IsBootstrap || !first.IsAdmin {
+		if !first.IsBootstrap {
 			t.Error("somebody still named lost it")
+		}
+		if subject, err := f.store.Resolve(ctx, "first"); err != nil || !subject.Admin {
+			t.Errorf("somebody still named does not administer: %v", err)
+		}
+	})
+}
+
+func TestAdministrationGrantedHereOutlivesBeingNamedInConfiguration(t *testing.T) {
+	// The two halves are recorded apart, so removing a name from
+	// configuration takes back only what configuration gave.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"both"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Ensure(ctx, "both", "", access.Stated(true), nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.NameBootstrapAdmins(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.Resolve(ctx, "both")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.Admin {
+			t.Error("administration granted here went with the name in configuration")
 		}
 	})
 }
@@ -302,7 +339,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 
 		// Naming somebody in configuration is enough in either mode, and with
 		// that in place the group can be unbound.
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); err != nil {

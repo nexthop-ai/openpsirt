@@ -120,7 +120,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 
 		body := AboutPersonBody{
-			Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+			Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.Administers(),
 			Audits:        person.Audits,
 			DeactivatedAt: orAbsent(person.DeactivatedAt),
 		}

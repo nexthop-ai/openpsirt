@@ -222,7 +222,8 @@ The chain is one part per release.
 | 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again |
 | 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. A database v0.3.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
-| None | v0.4.0 changes no schema. Its record carries migration 38 as its last. The next schema change is migration 39 |
+| None | v0.4.0 changes no schema. Its record carries migration 38 as its last |
+| 39 | The untagged release: v0.4.0's rows moved onto its rules. It changes no schema, and it is edited until the release tags it |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -242,7 +243,8 @@ database any 0.x release built is recreated then.
 
 Migrations 1 to 36 each create something, which is why rolling one back is
 dropping what it made. Migrations 37 and 38 change existing tables, and rolling
-one back changes the tables back.
+one back changes the tables back. Migration 39 changes rows only, and rolling
+it back changes them back.
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
@@ -284,7 +286,8 @@ when one stops half way.
 
 Each release after v0.1.0 carries one migration that changes the schema the
 release before it built into its own, and moves the rows with it: 37 carries a
-database from v0.1.0 to v0.2.0, and 38 from v0.2.0 to v0.3.0. A database a
+database from v0.1.0 to v0.2.0, 38 from v0.2.0 to v0.3.0, and 39 from v0.4.0
+to the release after it. A database a
 release built applies the ones after its own; a fresh install walks the whole
 chain. They are shaped the way every migration after 1.0 will be.
 

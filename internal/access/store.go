@@ -30,9 +30,14 @@ type Account struct {
 	PartyID     int64  `bun:"party_id,notnull"`
 	Identity    string `bun:"identity,notnull"`
 	DisplayName string `bun:"display_name"`
-	IsAdmin     bool   `bun:"is_admin,notnull"`
-	// IsBootstrap is set from configuration at every startup, and is what
-	// keeps a re-derivation from group membership out of the way back in.
+	// IsAdmin is administration granted here: by an administrator, or
+	// derived from a group. Configuration's half is IsBootstrap, and
+	// Administers is the two together.
+	IsAdmin bool `bun:"is_admin,notnull"`
+	// IsBootstrap is set from configuration at every startup. It is
+	// administration of its own, held while the name stays in configuration,
+	// and it keeps a re-derivation from group membership out of the way back
+	// in.
 	IsBootstrap bool `bun:"is_bootstrap,notnull"`
 	// AdminDerived says a group granted this rather than a person. Only what
 	// a group gave is taken back when groups stop deciding, so somebody
@@ -77,6 +82,13 @@ type Account struct {
 	// as the proposer of judgments and the approver of others.
 	DeactivatedAt *time.Time `bun:"deactivated_at"`
 }
+
+// Administers reports whether they administer this deployment, from either
+// half: granted here, or named in configuration.
+//
+// What is stored, unbounded by the stamp a group's grant carries. Resolve is
+// what applies that bound to a request.
+func (a Account) Administers() bool { return a.IsAdmin || a.IsBootstrap }
 
 // Party is a name that work can be assigned to: a person or a team.
 //
@@ -562,6 +574,9 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 			administers = false
 		}
 	}
+	// Named in configuration is administration of its own, which no group
+	// confirms and no stamp bounds.
+	administers = administers || person.IsBootstrap
 	// Auditing is bounded exactly as administration is, and for the same
 	// reason: a group is what says so, and a credential that never signs in
 	// never asks a group again.

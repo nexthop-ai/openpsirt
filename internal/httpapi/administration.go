@@ -43,7 +43,7 @@ func described(ctx context.Context, a Administering, store *access.Store,
 		return nil, err
 	}
 	body := &PersonBody{
-		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.Administers(),
 		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 		Email: person.Email, EmailSource: string(person.EmailSource),
 	}
@@ -350,7 +350,7 @@ func registerAdministration(api huma.API, a Administering) {
 		out.Body.Items = make([]PersonBody, 0, len(people))
 		for _, person := range people {
 			body := PersonBody{
-				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.Administers(),
 				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 				// Their address, and which of the two sources said
 				// so. On the list as well as on the one-person read: the

@@ -187,7 +187,7 @@ func TestADeploymentCannotBeAdministeredBySomebodyWhoHasLeft(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"ana"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"ana"}); err != nil {
 			t.Fatal(err)
 		}
 		can, err := f.store.CanAdminister(ctx, access.GroupBound)
@@ -216,7 +216,7 @@ func TestADeploymentCannotBeAdministeredBySomebodyWhoHasLeft(t *testing.T) {
 
 		// And the documented way back in works: naming them in configuration
 		// is the deliberate act of letting them back, so it readmits them.
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"ana"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"ana"}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Resolve(ctx, "ana"); err != nil {

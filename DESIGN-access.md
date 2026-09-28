@@ -816,6 +816,22 @@ administrative access, add yourself, restart. It survives re-derivation from
 groups, because a sign-in that stripped it would take the recovery path away at
 the moment it is needed. It remains a pre-authorization and not a bypass.
 
+Administration has three sources, recorded apart, and somebody administers
+when any one of them holds.
+
+| Source | Recorded as | Taken back by |
+|---|---|---|
+| Named in configuration | The name, written at every startup | Removing the name and restarting |
+| Granted here | The administration flag | An administrator here |
+| Derived from a group | The administration flag, marked derived and stamped | Leaving the group, the stamp going stale, or switching to direct roles |
+
+| Rule | Reason |
+|---|---|
+| Configuration writes only its own source | A name removed from configuration takes back what the name gave, and nothing granted here or derived from a group |
+| Somebody named and also granted here keeps administration when the name goes | The grant here is a separate act that nobody took back |
+| A name removed is logged at startup, by identity | Nobody made the change in the application, and the trail records what a person did there |
+| The upgrade from v0.4.0 clears the flag for every named administrator whose flag no group derived | v0.4.0 wrote the name into the flag and kept nothing telling the two apart. The name still holds, so nobody loses administration at the upgrade; an administrator granted here and also named has to be granted again once the name goes |
+
 A deployment may not start unable to administer itself. In group-bound mode that
 means at least one group mapped to administration, or somebody named in
 configuration. The only route back from locking yourself out is editing the

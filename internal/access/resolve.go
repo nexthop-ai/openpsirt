@@ -354,6 +354,9 @@ func ParseSources(raw string) ([]net.IPNet, error) {
 //
 // It is a pre-authorization rather than a bypass. Being named grants the role;
 // it does not admit anybody who has not authenticated.
-func Bootstrap(ctx context.Context, store *Store, identities []string) error {
+//
+// The identities it returns were named before and are not now, and administer
+// no longer unless administration was granted to them here.
+func Bootstrap(ctx context.Context, store *Store, identities []string) ([]string, error) {
 	return store.NameBootstrapAdmins(ctx, identities)
 }
