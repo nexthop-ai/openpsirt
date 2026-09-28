@@ -102,11 +102,7 @@ export function Compliance() {
                   still open, with the date deliberately moved. Neither met nor late
                 </span>
               </div>
-              <Link
-                className="kpi"
-                to={plainlyLate(at)}
-                aria-label="Open what is overdue"
-              >
+              <Link className="kpi" to={plainlyLate(at)} aria-label="Open what is overdue">
                 <span className="l">Plainly late</span>
                 <span className="n">{whole.overdue.toLocaleString()}</span>
                 <span className="d">still open, past the date, with nothing standing over it</span>

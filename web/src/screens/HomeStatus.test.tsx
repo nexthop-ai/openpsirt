@@ -28,7 +28,9 @@ describe("the front page's coverage figure", () => {
       return { data: { items: [], total: 0 } };
     });
     mount.render(
-      screen(<Home who={{ identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] }} />),
+      screen(
+        <Home who={{ identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] }} />,
+      ),
     );
     await settle();
     const row = Array.from(mount.host().querySelectorAll("li")).find(

@@ -37,9 +37,7 @@ describe("what the decision form says about a second person", () => {
     try {
       expect(forecast("deferred", 30, "2026-03-31")).toContain("29 days is inside");
       expect(forecast("deferred", 30, "2026-04-01")).toContain("a second person has to agree");
-      expect(forecast("deferred", 30, "2026-03-31", 0.5)).toContain(
-        "a second person has to agree",
-      );
+      expect(forecast("deferred", 30, "2026-03-31", 0.5)).toContain("a second person has to agree");
     } finally {
       vi.useRealTimers();
     }

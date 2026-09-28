@@ -31,10 +31,12 @@ describe("an upload that is already held", () => {
       return { data: { items: [] } };
     });
     let answer: (value: unknown) => void = () => undefined;
-    const sent = vi.spyOn(api, "POST").mockImplementation((() =>
-      new Promise((done) => {
-        answer = done;
-      })) as never);
+    const sent = vi.spyOn(api, "POST").mockImplementation(
+      (() =>
+        new Promise((done) => {
+          answer = done;
+        })) as never,
+    );
 
     mount.render(
       screen(
