@@ -15,6 +15,9 @@ import "testing"
 // Asked here, where the map is reachable, rather than through an exported
 // helper whose only caller was the test asking it.
 func TestEveryOfferedOrderHasAnExpression(t *testing.T) {
+	if len(SortKeys()) == 0 || len(order) == 0 {
+		t.Fatal("no sort key or no sort expression was found, so this checked nothing")
+	}
 	for _, key := range SortKeys() {
 		if _, known := order[key]; !known {
 			t.Errorf("%q is offered and the store sorts by nothing of that name", key)

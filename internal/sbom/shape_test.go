@@ -66,6 +66,9 @@ func TestEveryPathTheFixturesContainHasBeenDecidedAbout(t *testing.T) {
 			seen[path] = true
 		}
 	}
+	if len(seen) == 0 {
+		t.Fatal("no fixture yielded a path, so this checked nothing")
+	}
 
 	if *update {
 		writeDecisions(t, decided, seen)
@@ -97,12 +100,23 @@ func TestEveryPathTheReaderActsOnAppearsInAFixture(t *testing.T) {
 			seen[path] = true
 		}
 	}
+	if len(seen) == 0 {
+		t.Fatal("no fixture yielded a path, so this checked nothing")
+	}
 
 	var missing []string
+	read := 0
 	for path, what := range decided {
-		if what == pathRead && !seen[path] {
+		if what != pathRead {
+			continue
+		}
+		read++
+		if !seen[path] {
 			missing = append(missing, path)
 		}
+	}
+	if read == 0 {
+		t.Fatalf("%s records no path the reader acts on, so this checked nothing", pathsFile)
 	}
 	sort.Strings(missing)
 	if len(missing) > 0 {
