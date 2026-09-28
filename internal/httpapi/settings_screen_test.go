@@ -31,7 +31,7 @@ import (
 func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 	screen, err := os.ReadFile(filepath.Join("..", "..", "web", "src", "screens", "Settings.tsx"))
 	if err != nil {
-		t.Skipf("the interface is not in this checkout: %v", err)
+		t.Fatalf("the settings screen is not where this reads it: %v", err)
 	}
 	body := string(screen)
 

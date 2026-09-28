@@ -41,45 +41,13 @@ func TestNamingOneWholeBuildIsNotNarrowedByWhatKindOfReleaseItIs(t *testing.T) {
 	})
 }
 
-// The list of what a release was built as carried no count at all, so every
-// screen drawing the column drew zeroes — including for a variant holding
-// twenty-five, which reads as a clean build rather than as a number nobody
-// filled in.
-func TestWhatAReleaseWasBuiltAsSaysHowMuchIsOpenInEach(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scanned(t)
-
-		var built struct {
-			Items []struct {
-				Name string `json:"name"`
-				Open *int   `json:"open"`
-			} `json:"items"`
-		}
-		read(t, r, "triager", "/v1/products/mine/streams/master/variants?counts=true", &built)
-		if len(built.Items) == 0 {
-			t.Fatal("the fixture's branch was built as nothing, so this proves nothing")
-		}
-		total := 0
-		for _, one := range built.Items {
-			if one.Open == nil {
-				t.Fatalf("%q reports no count at all where one was asked for", one.Name)
-			}
-			total += *one.Open
-		}
-		if total == 0 {
-			t.Error("every variant of a release with findings in it reports nothing open")
-		}
-	})
-}
-
 // Counting what is open is the expensive half of a catalog read, so it is
 // asked for rather than always done. Both directions are pinned on every path
 // that takes the parameter.
 //
 // Unasked, it must never come back as a zero: the screens that draw this
-// column render a missing number as "0", and a variant holding twenty-five
-// reported as clean is the failure the count above exists to catch, arriving
-// by a different route. Asked, it must still be the number.
+// column render a missing number as "0", and a variant holding findings reads
+// as a clean build. Asked, it must be the number.
 func TestACatalogListCountsWhatWasAskedForAndNothingOtherwise(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)

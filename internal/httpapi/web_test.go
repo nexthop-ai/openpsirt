@@ -99,6 +99,30 @@ func TestAnUnknownEndpointStaysAnEndpoint(t *testing.T) {
 	}
 }
 
+func TestAPathThatCleansToAnEndpointIsNotAPage(t *testing.T) {
+	// These pass the credential check, which reads the raw path, and name no
+	// route, so the page server decides them on the cleaned path. Verified by
+	// deleting that check: each is answered with the page.
+	handler := serving(t, built())
+	for _, path := range []string{"/assets/../v1/nonesuch", "/x/../docs", "/x/../openapi.json"} {
+		got := fetch(t, handler, http.MethodGet, path)
+		if got.Code != http.StatusNotFound {
+			t.Errorf("GET %s answered %d with %q, want 404", path, got.Code, got.Body.String())
+		}
+		if body := got.Body.String(); len(body) > 0 && body[0] == '<' {
+			t.Errorf("GET %s answered with a page: %q", path, body)
+		}
+	}
+	// A page is read, never written to. Verified by deleting the method check.
+	got := fetch(t, handler, http.MethodPost, "/products")
+	if got.Code != http.StatusNotFound {
+		t.Errorf("POST /products answered %d with %q, want 404", got.Code, got.Body.String())
+	}
+	if body := got.Body.String(); len(body) > 0 && body[0] == '<' {
+		t.Errorf("POST /products answered with a page: %q", body)
+	}
+}
+
 func TestThePageIsNeverCached(t *testing.T) {
 	// The assets carry a content hash and may be cached forever. index.html is
 	// the one file that names them, so a cached copy pins a browser to the

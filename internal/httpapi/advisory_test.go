@@ -405,27 +405,41 @@ func TestAFixedFlawIsOfferedToAnAdvisory(t *testing.T) {
 	})
 }
 
-func TestAReaderWhoMayNotGenerateAnAdvisoryStillReadsIt(t *testing.T) {
-	// Whether it changed since it went out is worked out by generating the
-	// document as the reader. One who may see the advisory and not every
-	// flaw it covers is answered without that, rather than told it is not
-	// there.
+func TestAnAdvisoryIsReadWholeBeforeAndAfterItGoesOut(t *testing.T) {
+	// An advisory covering an undisclosed flaw is not there to a reader of
+	// disclosed work alone, before it goes out and after, and answers them as
+	// a name nobody minted does. A reader of undisclosed work reads it both
+	// times, and once it has gone out is told whether it changed since.
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		flaw := r.embargoed(t)
 		named := advisoryOver(t, r, "private-triage", "mine", flaw)
 		at := "/v1/advisories/" + named
-		before := asPerson(t, r, "reader", http.MethodGet, at, "")
+		unminted := asPerson(t, r, "reader", http.MethodGet, "/v1/advisories/EXNET-2099-9999", "")
+		hidden := func(when string) {
+			t.Helper()
+			got := asPerson(t, r, "reader", http.MethodGet, at, "")
+			refusedWith(t, got, http.StatusNotFound)
+			if got.Body.String() != unminted.Body.String() {
+				t.Errorf("%s it went out, a hidden advisory answers %s and an unminted name %s",
+					when, got.Body.String(), unminted.Body.String())
+			}
+		}
+		hidden("before")
+		if got := asPerson(t, r, "embargo-reader", http.MethodGet, at, ""); got.Code != http.StatusOK {
+			t.Fatalf("a reader of undisclosed work answered %d: %s", got.Code, got.Body.String())
+		}
 
 		agreedTo(t, r, at)
 		if got := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
 			`{}`); got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
 		}
-		after := asPerson(t, r, "reader", http.MethodGet, at, "")
-		if after.Code != before.Code {
-			t.Errorf("once it went out a reader got %d where before they got %d: %s",
-				after.Code, before.Code, after.Body.String())
+		hidden("after")
+		after := asPerson(t, r, "embargo-reader", http.MethodGet, at, "")
+		if after.Code != http.StatusOK || !contains(after.Body.String(), `"changed":false`) {
+			t.Errorf("once it went out a reader of undisclosed work got %d: %s",
+				after.Code, after.Body.String())
 		}
 	})
 }

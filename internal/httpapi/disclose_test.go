@@ -36,9 +36,7 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 			`{"person":"private"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
 		}
-		if got := asPerson(t, r, "reader", http.MethodGet, finding, ""); got.Code < 400 {
-			t.Fatalf("an undisclosed finding was readable to a public reader: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "reader", http.MethodGet, finding, ""), http.StatusNotFound)
 
 		at := "/v1/products/mine/issues/" + recorded.Identifier + "/disclosure"
 		// A reason missing, or one the text policy refuses, is the caller's to
@@ -50,12 +48,8 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 					reason, got.Code, got.Body.String())
 			}
 		}
-		if got := asPerson(t, r, "reader", http.MethodGet, at, ""); got.Code < 400 {
-			t.Errorf("a public reader read the history of a running embargo: %d", got.Code)
-		}
-		if got := asPerson(t, r, "triager", http.MethodPost, at, `{"reason":"Because."}`); got.Code < 400 {
-			t.Errorf("somebody holding only public triage disclosed an issue: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "reader", http.MethodGet, at, ""), http.StatusNotFound)
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, at, `{"reason":"Because."}`), http.StatusNotFound)
 
 		got = asPerson(t, r, "private-triage", http.MethodPost, at, `{"reason":"The advisory is out."}`)
 		if got.Code != http.StatusCreated {
@@ -110,6 +104,62 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 		}
 		if !heard {
 			t.Errorf("the person holding it was not told it was disclosed: %+v", told.Items)
+		}
+	})
+}
+
+// The person whose act makes an issue public is not told it is public, even
+// where they hold a place of it. Verified by deleting the skip in
+// toldDisclosed: the agreer is told of their own act.
+func TestWhoeverDisclosesAnIssueIsNotToldOfIt(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		got := asPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.",`+
+				`"severity":"high","component":"libnl-3-200"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+			Component  string `json:"component"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		finding := "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+			recorded.Identifier + "/components/" + recorded.Component
+		// The person who will agree to the disclosure holds the finding.
+		if got := asPerson(t, r, "private-dispatcher", http.MethodPut, finding+"/assignment",
+			`{"person":"private-dispatcher"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("taking the finding answered %d: %s", got.Code, got.Body.String())
+		}
+		at := "/v1/products/mine/issues/" + recorded.Identifier + "/disclosure"
+		got = asPerson(t, r, "private-triage", http.MethodPost, at, `{"reason":"The advisory is out."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("disclosing answered %d: %s", got.Code, got.Body.String())
+		}
+		var asked struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &asked); err != nil {
+			t.Fatal(err)
+		}
+		if got := asPerson(t, r, "private-dispatcher", http.MethodPost,
+			fmt.Sprintf("/v1/disclosure-movements/%d/approval", asked.ID), `{}`); got.Code != http.StatusNoContent {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var told struct {
+			Items []struct {
+				Kind string `json:"kind"`
+			} `json:"items"`
+		}
+		read(t, r, "private-dispatcher", "/v1/notifications", &told)
+		for _, item := range told.Items {
+			if item.Kind == "disclosed" {
+				t.Errorf("the person who disclosed the issue was told of it: %+v", told.Items)
+			}
 		}
 	})
 }

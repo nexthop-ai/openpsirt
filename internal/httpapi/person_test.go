@@ -5,6 +5,7 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -46,7 +47,7 @@ func TestOnlyAnAdministratorReadsAPersonWhole(t *testing.T) {
 // read themselves, which is pinned in the notify package.
 func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
-		var body struct {
+		type page struct {
 			Identity  string `json:"identity"`
 			ToldTotal int    `json:"told_total"`
 			HeldTotal int    `json:"held_total"`
@@ -61,17 +62,48 @@ func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 				Withdrawn int `json:"withdrawn"`
 			} `json:"record"`
 		}
-		read(t, r, "admin", "/v1/people/triager", &body)
-		if len(body.Holds) == 0 {
+		_, claim := r.decidedAt(t, r.scanned(t))
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "assigner", http.MethodPut, findingAt("CVE-2026-9999")+"/assignment",
+			`{"person":"triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("handing the finding over answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"newcomer","holds":[{"product":"mine","role":"public-read"}]}`); got.Code != http.StatusCreated {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var proposer page
+		read(t, r, "admin", "/v1/people/triager", &proposer)
+		if len(proposer.Holds) == 0 {
 			t.Error("somebody who holds a role reads as holding nothing")
 		}
-		// The counts are answerable even where nothing has been proposed;
-		// zero and absent are different answers and this one is a number.
-		if body.Record.Proposed < 0 || body.Record.Approved < 0 || body.Record.Withdrawn < 0 {
-			t.Errorf("the record reads as %+v", body.Record)
+		if proposer.Record.Proposed != 1 || proposer.Record.Approved != 0 {
+			t.Errorf("the proposer's record reads as %+v, want one proposed", proposer.Record)
 		}
-		if body.ToldTotal < 0 || body.HeldTotal < 0 {
-			t.Errorf("a total came back negative: told %d, held %d", body.ToldTotal, body.HeldTotal)
+		var agreer page
+		read(t, r, "admin", "/v1/people/reviewer", &agreer)
+		if agreer.Record.Approved != 1 || agreer.Record.Proposed != 0 {
+			t.Errorf("the approver's record reads as %+v, want one agreed", agreer.Record)
+		}
+		var granted page
+		read(t, r, "admin", "/v1/people/newcomer", &granted)
+		if granted.HeldTotal != 1 {
+			t.Errorf("somebody granted one role reads as %d role changes", granted.HeldTotal)
+		}
+		if proposer.ToldTotal != 1 {
+			t.Errorf("somebody handed one finding reads as told %d things", proposer.ToldTotal)
+		}
+
+		// The record is a count over every product, so an auditor's page
+		// leaves it at nothing.
+		var audited page
+		read(t, r, "auditor", "/v1/people/triager", &audited)
+		if audited.Record.Proposed != 0 || audited.Record.Approved != 0 {
+			t.Errorf("an auditor reads the record as %+v", audited.Record)
 		}
 	})
 }
