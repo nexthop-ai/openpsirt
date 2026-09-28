@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -137,6 +138,21 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 					return ErrNoSuchWindow
 				}
 				return fmt.Errorf("read the window: %w", err)
+			}
+			// Only a window that applies to this record's product. One limited
+			// to other products is not one this record answers, and its name
+			// is not the caller's to learn, so it is refused as one nobody
+			// declared.
+			var limited []int64
+			if err := tx.NewSelect().
+				TableExpr(`"obligation_window_product" AS "owp"`).
+				ColumnExpr("owp.product_id").
+				Where("owp.window_id = ?", *windowID).
+				Scan(ctx, &limited); err != nil {
+				return fmt.Errorf("read which products the window applies to: %w", err)
+			}
+			if len(limited) > 0 && !slices.Contains(limited, record.ProductID) {
+				return ErrNoSuchWindow
 			}
 		}
 		*told = Told{

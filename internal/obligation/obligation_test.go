@@ -259,6 +259,36 @@ func TestANoticeNamingAWindowAnswersThatWindowAlone(t *testing.T) {
 	})
 }
 
+func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
+	// A window limited to other products is not one this record answers, and
+	// its name is not the triager's to learn: it is refused as a window
+	// nobody declared.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Other's window", Hours: 24, Products: []string{"other"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		here, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Sonic's window", Hours: 24, Products: []string{"sonic"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := f.attacked(t)
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &elsewhere.ID, "ENISA",
+			knownAt.Add(time.Hour), "Told."); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			t.Errorf("a notice naming a window limited to another product answered %v", err)
+		}
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &here.ID, "ENISA",
+			knownAt.Add(time.Hour), "Told."); err != nil {
+			t.Errorf("a notice naming a window limited to its own product answered %v", err)
+		}
+	})
+}
+
 func TestANoticeIsNotBeforeTheAttackBecameKnown(t *testing.T) {
 	// One of the two moments is wrong, and the record is the one already
 	// kept.
