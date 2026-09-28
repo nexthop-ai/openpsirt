@@ -204,19 +204,6 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 	return applied, err
 }
 
-// DB exposes the underlying handle for queries this package does not wrap.
-func (s *Store) DB() bun.IDB { return s.db }
-
-// CurrentNodes returns the components present in a variant now.
-func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error) {
-	var nodes []Node
-	err := s.db.NewSelect().Model(&nodes).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
-		Scan(ctx)
-	return nodes, err
-}
-
 // CurrentComponents returns what a target contains now, as the scanner needs
 // to be given it.
 //
@@ -270,16 +257,6 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 		described = append(described, stated)
 	}
 	return described, nil
-}
-
-// ComponentAt resolves a component by name within one build.
-//
-// By name, because that is what a findings list gives out and what somebody
-// composing a request has. Scoped to the build so the name means what it means
-// there: two products can ship different things under one name, and a lookup
-// across everything would answer with whichever was interned first.
-func (s *Store) ComponentAt(ctx context.Context, targetID int64, name string) (int64, error) {
-	return s.ComponentVersionAt(ctx, targetID, name, "")
 }
 
 // ErrAmbiguous says a name matched more than one component and no version was
@@ -376,34 +353,9 @@ func (a *Ambiguous) Error() string {
 	return fmt.Sprintf("%s: %q as %s", ErrAmbiguous, a.Name, strings.Join(said, ", "))
 }
 
-// Versions are the distinct versions among the choices, in order.
-func (a *Ambiguous) Versions() []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, c := range a.Choices {
-		if !seen[c.Version] {
-			seen[c.Version] = true
-			out = append(out, c.Version)
-		}
-	}
-	return out
-}
-
 // Is makes errors.Is(err, ErrAmbiguous) hold for this, so callers that only
 // care that it was ambiguous keep working.
 func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
-
-// ComponentVersionAt resolves a component by name and, where one is given,
-// version.
-//
-// A name is not unique within a build, and not rarely: a real switch image
-// ships three vendored versions of one library. The version narrows it where
-// the caller has one, and an ambiguous name with no version is refused rather
-// than resolved to the lowest identifier, which answers about a version nobody
-// asked about.
-func (s *Store) ComponentVersionAt(ctx context.Context, targetID int64, name, version string) (int64, error) {
-	return s.ComponentAs(ctx, targetID, name, Choice{Version: version})
-}
 
 // ComponentAs resolves a component by name and, where they are given, the
 // version, ecosystem and namespace a choice names.
@@ -413,6 +365,11 @@ func (s *Store) ComponentVersionAt(ctx context.Context, targetID int64, name, ve
 // built from it share both, and so does one package a producer described under
 // two namespaces. An empty part means "any", which is what a caller who has
 // never needed it passes.
+//
+// A name is not unique within a build, and not rarely: a real switch image
+// ships three vendored versions of one library. An ambiguous name the choice
+// does not narrow is refused rather than resolved to the lowest identifier,
+// which answers about a version nobody asked about.
 func (s *Store) ComponentAs(ctx context.Context, targetID int64,
 	name string, which Choice) (int64, error) {
 

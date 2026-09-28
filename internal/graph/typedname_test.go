@@ -32,16 +32,16 @@ func TestATypedComponentNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 		}
 
 		// One component, typed with other capitals.
-		want, err := f.store.ComponentAt(ctx, f.targetID, zlib.Name)
+		want, err := f.store.ComponentAs(ctx, f.targetID, zlib.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got, err := f.store.ComponentAt(ctx, f.targetID, "ZLib"); err != nil || got != want {
+		if got, err := f.store.ComponentAs(ctx, f.targetID, "ZLib", graph.Choice{}); err != nil || got != want {
 			t.Errorf("zlib typed as ZLib resolved %d (%v), want %d", got, err, want)
 		}
 
 		// Two that differ only in capitals, typed in neither spelling.
-		_, err = f.store.ComponentAt(ctx, f.targetID, "OPENSSL")
+		_, err = f.store.ComponentAs(ctx, f.targetID, "OPENSSL", graph.Choice{})
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a name two components answer to answered %v, want the two choices", err)
@@ -54,7 +54,7 @@ func TestATypedComponentNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 
 		// The producer's own spelling reaches the one spelled that way.
 		for _, each := range []graph.Described{shouted, quiet} {
-			id, err := f.store.ComponentAt(ctx, f.targetID, each.Name)
+			id, err := f.store.ComponentAs(ctx, f.targetID, each.Name, graph.Choice{})
 			if err != nil {
 				t.Errorf("%s in its own spelling answered %v", each.Name, err)
 				continue

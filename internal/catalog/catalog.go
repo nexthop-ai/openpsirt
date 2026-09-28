@@ -151,17 +151,6 @@ type Store struct{ db bun.IDB }
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store { return &Store{db: db} }
 
-// Within runs do inside one transaction, with this store rebuilt over it.
-//
-// For an act that is more than one statement: a handler doing two of these in
-// a row leaves the first standing when the second fails, and a caller already
-// inside a transaction joins it rather than opening a second.
-func (s *Store) Within(ctx context.Context, do func(context.Context, *Store) error) error {
-	return database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
-		return do(ctx, NewStore(db))
-	})
-}
-
 // maxNameLength matches the column width in characters, which is bounded so a
 // unique index on it stays inside every engine's key-length limit.
 const maxNameLength = database.NameWidth
@@ -395,17 +384,12 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 	return counted(res, what, id, "record when this "+what+" goes out of support")
 }
 
-// EndOfLifeFor reads the date in force for one release.
+// EndOfLifeForTarget reads the date in force for the release one build belongs
+// to.
 //
 // The release's own where it has stated one, the product's otherwise. A
 // release with no date of its own inherits rather than copying, so it keeps
 // following the product when the product's policy moves.
-func (s *Store) EndOfLifeFor(ctx context.Context, streamID int64) (EndOfLife, error) {
-	return s.endOfLife(ctx, "s.id = ?", streamID, "release", streamID)
-}
-
-// EndOfLifeForTarget reads the date in force for the release one build belongs
-// to.
 //
 // A build is of a release, and support ends for the release rather than for
 // one of the ways it is built: shipping two chip variants of a version does

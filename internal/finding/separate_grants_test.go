@@ -27,7 +27,7 @@ import (
 // product's row hidden and the other's left disclosed.
 func (f *fixture) undisclose(t *testing.T, target int64, identifier, component string) {
 	t.Helper()
-	at, err := graph.NewStore(f.db.DB).ComponentAt(t.Context(), target, component)
+	at, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), target, component, graph.Choice{})
 	if err != nil {
 		t.Fatalf("resolve %s: %v", component, err)
 	}
@@ -45,7 +45,7 @@ func (f *fixture) undisclose(t *testing.T, target int64, identifier, component s
 // the holder's own grants play no part in how it got there.
 func (f *fixture) handTo(t *testing.T, target int64, identifier, component string, party int64) {
 	t.Helper()
-	at, err := graph.NewStore(f.db.DB).ComponentAt(t.Context(), target, component)
+	at, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), target, component, graph.Choice{})
 	if err != nil {
 		t.Fatalf("resolve %s: %v", component, err)
 	}

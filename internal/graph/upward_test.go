@@ -29,7 +29,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.store.DB())
+		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
 			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
@@ -64,7 +64,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 			component graph.Described
 		}{{"CVE-2026-1", zlib}, {"CVE-2026-2", zlib}, {"CVE-2026-3", curl}} {
 			issue := issueID(t, f, each.issue)
-			component, err := f.store.ComponentAt(t.Context(), f.targetID, each.component.Name)
+			component, err := f.store.ComponentAs(t.Context(), f.targetID, each.component.Name, graph.Choice{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -142,7 +142,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.store.DB())
+		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
 			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
@@ -159,7 +159,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		boss := access.NewPerson(1, "boss", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.PrivateTriage, access.Assigner}}, 1)
 		issue := issueID(t, f, "CVE-2026-9")
-		component, err := f.store.ComponentAt(t.Context(), f.targetID, zlib.Name)
+		component, err := f.store.ComponentAs(t.Context(), f.targetID, zlib.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -172,7 +172,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		// like: assigning refuses the pairing, so the only way to reach this
 		// state is for it to change afterwards, and the tree has to answer
 		// for it rather than assume it cannot happen.
-		if _, err := f.store.DB().NewUpdate().
+		if _, err := f.db.DB.NewUpdate().
 			Table("finding").
 			Set("visibility = ?", access.Private).
 			Where("target_id = ?", f.targetID).
@@ -210,7 +210,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 func issueID(t *testing.T, f *fixture, identifier string) int64 {
 	t.Helper()
 	var id int64
-	if err := f.store.DB().NewSelect().
+	if err := f.db.DB.NewSelect().
 		TableExpr("\"vulnerability\" AS \"v\"").Column("v.id").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &id); err != nil {

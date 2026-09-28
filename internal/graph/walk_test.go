@@ -49,7 +49,7 @@ func TestTheShortestWayDownIsTheOneShown(t *testing.T) {
 		}
 		ids := map[string]int64{}
 		for _, name := range []string{"sonic", "curl", "openssl", "zlib", "orphan"} {
-			id, err := f.store.ComponentAt(t.Context(), f.targetID, name)
+			id, err := f.store.ComponentAs(t.Context(), f.targetID, name, graph.Choice{})
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
 			}
@@ -100,7 +100,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.store.DB())
+		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
 			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
@@ -140,7 +140,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		// The list a tree number opens agrees with it: narrowed beneath a
 		// container, the findings list holds the library's two issues, and
 		// beneath the root everything.
-		aID, err := f.store.ComponentAt(t.Context(), f.targetID, a.Name)
+		aID, err := f.store.ComponentAs(t.Context(), f.targetID, a.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		if total != 3 {
 			t.Errorf("beneath %s the list counts %d groups, wanted 3", a.Name, total)
 		}
-		bID, err := f.store.ComponentAt(t.Context(), f.targetID, b.Name)
+		bID, err := f.store.ComponentAs(t.Context(), f.targetID, b.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -182,8 +182,8 @@ func TestADocumentInALoopIsWalkedOnceAndStops(t *testing.T) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		aID, _ := f.store.ComponentAt(t.Context(), f.targetID, "a")
-		bID, _ := f.store.ComponentAt(t.Context(), f.targetID, "b")
+		aID, _ := f.store.ComponentAs(t.Context(), f.targetID, "a", graph.Choice{})
+		bID, _ := f.store.ComponentAs(t.Context(), f.targetID, "b", graph.Choice{})
 
 		chains, err := f.store.Chains(t.Context(), everyone(f), f.targetID, []int64{aID, bID})
 		if err != nil {
@@ -226,7 +226,7 @@ func TestContainersAreOrderedByWhatIsInsideThem(t *testing.T) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.store.DB())
+		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
 			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
@@ -286,7 +286,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.store.DB())
+		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
 			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
@@ -377,7 +377,7 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 		}); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.store.DB())
+		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(ctx, finding.Run{
 			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,

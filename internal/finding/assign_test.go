@@ -284,7 +284,7 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 		// findings here and they hold different numbers of places, so
 		// indexing into an unordered read makes this assert a different
 		// thing on different runs.
-		library, err := graph.NewStore(f.db.DB).ComponentAt(t.Context(), f.target, libnl.Name)
+		library, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.target, libnl.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}

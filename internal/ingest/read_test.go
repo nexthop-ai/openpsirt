@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/uptrace/bun"
 )
 
 const anInventory = `{
@@ -150,7 +151,7 @@ func TestAnAcceptedScanBecomesStoredGraph(t *testing.T) {
 			t.Errorf("read %d suppressions, want 1", result.Suppressions)
 		}
 
-		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
+		nodes, err := nodesNow(t.Context(), f.db.DB, f.branch)
 		if err != nil || len(nodes) != 3 {
 			t.Errorf("%d nodes are present, want 3 (%v)", len(nodes), err)
 		}
@@ -256,7 +257,7 @@ func TestAScanThatCannotBeReadSaysSoOnTheScan(t *testing.T) {
 		}
 		// Nothing partial: a half-applied graph is indistinguishable from
 		// components having been removed.
-		nodes, _ := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
+		nodes, _ := nodesNow(t.Context(), f.db.DB, f.branch)
 		if len(nodes) != 0 {
 			t.Errorf("%d nodes were stored from a scan that failed", len(nodes))
 		}
@@ -350,7 +351,7 @@ func TestAScanOvertakenByANewerOneIsNotApplied(t *testing.T) {
 
 		// And what is present is the newer picture, not the older one: the
 		// older inventory holds one component fewer.
-		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
+		nodes, err := nodesNow(t.Context(), f.db.DB, f.branch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -378,7 +379,7 @@ func TestAScanOvertakenWhileItIsParsedIsNotApplied(t *testing.T) {
 		if !result.Superseded || result.ScanID != older {
 			t.Fatalf("read %+v, want the older scan set aside once the newer %d arrived", result, newer)
 		}
-		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
+		nodes, err := nodesNow(t.Context(), f.db.DB, f.branch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -456,7 +457,7 @@ func TestAScanReadOnALaterAttemptStandsAndBringsNothingOlderBack(t *testing.T) {
 		if n := f.jobsFor(t, older); n != 1 {
 			t.Errorf("the overtaken scan was queued %d times, want once", n)
 		}
-		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(ctx, f.branch)
+		nodes, err := nodesNow(ctx, f.db.DB, f.branch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -521,7 +522,7 @@ func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
 		if result.Superseded || result.ScanID != older {
 			t.Fatalf("read %+v, want the older scan applied", result)
 		}
-		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
+		nodes, err := nodesNow(t.Context(), f.db.DB, f.branch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -754,4 +755,14 @@ func TestAnInventoryNothingCouldReadIsHandedToNobody(t *testing.T) {
 			t.Errorf("a scan that failed was handed on: %+v", *f.told)
 		}
 	})
+}
+
+// nodesNow is the components present in a build now.
+func nodesNow(ctx context.Context, db bun.IDB, targetID int64) ([]graph.Node, error) {
+	var nodes []graph.Node
+	err := db.NewSelect().Model(&nodes).
+		Where("target_id = ?", targetID).
+		Where("closed_scan_id IS NULL").
+		Scan(ctx)
+	return nodes, err
 }

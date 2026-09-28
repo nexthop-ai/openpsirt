@@ -257,7 +257,7 @@ func TestRecordingAgainstANameTheBuildHoldsTwiceIsRefusedRatherThanGuessed(t *te
 		}
 		// The versions, not only the fact. "Say which one" is not answerable
 		// by somebody who does not know what the choices are.
-		if got := several.Versions(); len(got) != 2 {
+		if got := several.Choices; len(got) != 2 {
 			t.Errorf("the refusal offers %v, want both versions", got)
 		}
 
