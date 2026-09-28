@@ -135,10 +135,9 @@ excess by killing the larger of the two.
 | Importing the vulnerability database is the largest single draw | It happens on every start where the data is not kept, so a deployment that restarts pays that peak repeatedly. Keeping the data is what takes it off the common path |
 | A first copy of a large repository is the other large draw, and the chart says so beside the limit | Off unless patch branches are turned on. Measured for the kernel's stable tree: 1.3 GB fetched whole from git.kernel.org, 0.6 GB where the host sends commits alone. Either can coincide with a scan, so the operator documentation asks for 4 GiB before turning it on for the first |
 
-Neither default is measured against the scanner. Both are set from the shape of the problem —
-two processes, one of them unmeasured, and a peak paid at start — and the
-number that would settle them is the scanner's own memory against a real
-inventory.
+Neither default is measured against the scanner, whose memory moves with each
+of its releases. Both are set from the shape of the problem: two processes, one
+of them unmeasured, and a peak paid at start.
 
 ### CPU priority
 
