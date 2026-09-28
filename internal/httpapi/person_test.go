@@ -94,8 +94,16 @@ func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 		if granted.HeldTotal != 1 {
 			t.Errorf("somebody granted one role reads as %d role changes", granted.HeldTotal)
 		}
-		if proposer.ToldTotal != 1 {
-			t.Errorf("somebody handed one finding reads as told %d things", proposer.ToldTotal)
+		// What they were told is narrowed to the viewer's products, so it is
+		// read by an administrator who holds a role on this one; one who holds
+		// none is told nothing.
+		var seenByReader page
+		read(t, r, "admin-reader", "/v1/people/triager", &seenByReader)
+		if seenByReader.ToldTotal != 1 {
+			t.Errorf("somebody handed one finding reads as told %d things", seenByReader.ToldTotal)
+		}
+		if proposer.ToldTotal != 0 {
+			t.Errorf("an administrator holding nothing here reads %d things told", proposer.ToldTotal)
 		}
 
 		// The record is a count over every product, so an auditor's page

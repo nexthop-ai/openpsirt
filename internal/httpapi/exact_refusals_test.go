@@ -8,7 +8,6 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -43,13 +42,6 @@ func boundedRefusals(file *ast.File, name string) []string {
 	return out
 }
 
-// awaitingRebase holds the functions whose bounded assertions are rewritten on
-// branches not yet merged. An entry that no longer compares fails the test
-// below, so each is removed as its branch lands.
-var awaitingRebase = []string{
-	"enter_test.go:TestARecordedSummaryGoesThroughTheSamePolicyAsAJustification",
-}
-
 // A refusal is asserted as the exact status it answers with. A bound below 400
 // also holds for a panic answered 500, a route that moved and answers 404 or
 // 405, and a 403 that says a hidden product exists.
@@ -71,14 +63,7 @@ func TestARefusalIsAssertedAsItsExactStatus(t *testing.T) {
 		bounded = append(bounded, boundedRefusals(file, name)...)
 	}
 	for _, each := range bounded {
-		if !slices.Contains(awaitingRebase, each) {
-			t.Errorf("%s asserts a refusal as a status below 400; use refusedWith with the exact status", each)
-		}
-	}
-	for _, each := range awaitingRebase {
-		if !slices.Contains(bounded, each) {
-			t.Errorf("%s no longer compares against 400; remove it from awaitingRebase", each)
-		}
+		t.Errorf("%s asserts a refusal as a status below 400; use refusedWith with the exact status", each)
 	}
 }
 

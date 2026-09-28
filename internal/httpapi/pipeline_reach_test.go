@@ -25,11 +25,12 @@ import (
 func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// What a sender may read, and what each answers here: its receipts, what
 	// one upload changed, and a document it sent. The fixture's scan was not
-	// sent by the key, so its document is not the key's to read.
+	// sent by the key, so what it changed and its document are not the key's
+	// to read.
 	const build = "/v1/products/{product}/streams/{stream}/variants/{variant}"
 	sent := map[string]int{
 		build + "/scans":                             http.StatusOK,
-		build + "/scans/{scan}/changes":              http.StatusOK,
+		build + "/scans/{scan}/changes":              http.StatusNotFound,
 		build + "/scans/{scan}/documents/{document}": http.StatusNotFound,
 	}
 	parameter := regexp.MustCompile(`\{[^}]+\}`)

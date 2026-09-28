@@ -11342,7 +11342,7 @@ export interface components {
             claim?: number;
             /** @description The package of the source package this place is */
             component: string;
-            /** @description The consumer that pulls the component in here. Absent under the product itself */
+            /** @description The consumer that pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             /**
              * Format: int64

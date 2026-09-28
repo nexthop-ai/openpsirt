@@ -53,7 +53,7 @@ func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
 
 		reader := access.NewPerson(1, "reader", false,
 			map[int64][]access.Role{product.ID: {access.PublicRead}}, 0)
-		if _, err := s.Of(ctx, reader, target.ID, scan.ID, ""); err != nil {
+		if _, err := s.Of(ctx, reader, target.ID, scan.ID); err != nil {
 			t.Fatalf("somebody who reads the product could not read its scan: %v", err)
 		}
 
@@ -63,7 +63,7 @@ func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
 			"a pipeline scoped to another product": access.NewPipeline(3, "key-1",
 				access.Scope{ProductID: other.ID}),
 		} {
-			if got, err := s.Of(ctx, subject, target.ID, scan.ID, ""); !errors.Is(err, ingest.ErrNoScan) {
+			if got, err := s.Of(ctx, subject, target.ID, scan.ID); !errors.Is(err, ingest.ErrNoScan) {
 				t.Errorf("%s got %+v and %v, want no scan", name, got, err)
 			}
 		}

@@ -9602,7 +9602,7 @@ components:
           description: The package of the source package this place is
           type: string
         consumer:
-          description: The consumer that pulls the component in here. Absent under the product itself
+          description: The consumer that pulls the component in. Absent where the build holds it directly
           type: string
         decision:
           description: The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument
