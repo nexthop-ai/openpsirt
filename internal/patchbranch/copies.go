@@ -5,8 +5,6 @@ package patchbranch
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -57,9 +55,11 @@ var ErrTooLarge = errors.New("the repository is larger than the cache may hold")
 //
 // Named by a digest of the address. The address came out of a report, and a
 // report never chooses a path on this disk (REQ-66).
+//
+// The digest is the one the repository's row is keyed on, because removing a
+// copy is recorded by matching the directory's name to that key.
 func (c copies) dirFor(repository string) string {
-	sum := sha256.Sum256([]byte(repository))
-	return filepath.Join(c.root, hex.EncodeToString(sum[:]))
+	return filepath.Join(c.root, identity(repository))
 }
 
 // has reports whether a repository's copy is on this disk.

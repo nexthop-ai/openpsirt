@@ -17,7 +17,7 @@ import (
 // NewLocalPass is a pass that fetches from directories rather than hosts, with
 // no lease, so a test drives it directly.
 func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded, locate func(string) string) *Pass {
-	return &Pass{
+	pass := &Pass{
 		db: db, logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		git:      git{excluded: excluded, transport: "file", locate: locate},
 		copies:   copies{root: dir, quota: quota, now: time.Now, poll: 10 * time.Millisecond},
@@ -25,6 +25,10 @@ func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded
 		on:       true,
 		Now:      time.Now,
 	}
+	// Wired as NewPass wires it, so a copy removed to stay within the cache
+	// is recorded as no longer held.
+	pass.copies.gone = pass.forget
+	return pass
 }
 
 // TurnOff is the pass with the lookups off, as a deployment that never turned

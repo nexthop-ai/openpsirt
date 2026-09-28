@@ -568,6 +568,36 @@ func TestTheLeastRecentlyUsedCopyIsRemovedFirst(t *testing.T) {
 				t.Errorf("%s held = %v, want %v", name, got, want)
 			}
 		}
+		// And the removal is recorded: a copy no longer on the disk holds no
+		// bytes, so the report does not count it and the next plan does not
+		// take it as held.
+		progress, totals, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var held int64
+		seen := 0
+		for _, repository := range progress {
+			for name, want := range map[string]bool{"first": false, "second": true, "third": true} {
+				if repository.URL != repositoryOf(name) {
+					continue
+				}
+				seen++
+				if got := repository.HeldBytes != nil; got != want {
+					t.Errorf("%s is reported holding bytes = %v, want %v", name, got, want)
+				}
+				if repository.HeldBytes != nil {
+					held += *repository.HeldBytes
+				}
+			}
+		}
+		if seen != 3 {
+			t.Fatalf("the report named %d of the three repositories", seen)
+		}
+		if totals.HeldBytes != held {
+			t.Errorf("the report totals %d bytes held, and the copies still held take %d",
+				totals.HeldBytes, held)
+		}
 	})
 }
 
