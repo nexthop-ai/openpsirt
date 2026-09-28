@@ -305,10 +305,10 @@ func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // plan nobody can be asked about.
 func (f *fixture) planner(t *testing.T, roles ...access.Role) access.Subject {
 	t.Helper()
-	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "them@example.com", "Them", nil, nil)
+	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "somebody@example.com", "Them", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return access.NewPerson(person.ID, "them@example.com", false,
+	return access.NewPerson(person.ID, "somebody@example.com", false,
 		map[int64][]access.Role{f.productID: roles}, 0)
 }

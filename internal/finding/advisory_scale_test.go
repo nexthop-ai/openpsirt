@@ -40,11 +40,11 @@ func TestMeasureRecordingOneRealAdvisory(t *testing.T) {
 		product := world.New(t, db).Product
 		// A real row, because the statement records who uploaded it and the
 		// schema says that has to be a person.
-		person, err := access.NewStore(db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		who := access.NewPerson(person.ID, "them@example.com", true,
+		who := access.NewPerson(person.ID, "somebody@example.com", true,
 			map[int64][]access.Role{product.ID: {access.PrivateTriage}}, 0)
 
 		statements := make([]finding.Statement, 0, claimed)

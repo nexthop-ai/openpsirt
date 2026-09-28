@@ -418,7 +418,7 @@ func TestARulingNamingOneReportItCannotWriteWritesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		both := access.NewPerson(who.ID, "them@example.com", false, map[int64][]access.Role{
+		both := access.NewPerson(who.ID, "somebody@example.com", false, map[int64][]access.Role{
 			f.productID: {access.PrivateTriage}, other.ID: {access.PrivateTriage},
 		}, 0)
 		elsewhere, err := f.store.Record(t.Context(), both, other.ID,
@@ -611,7 +611,7 @@ func TestRulingsAcrossProductsReachOnlyTheProductsTheReaderWorksReportsIn(t *tes
 			t.Fatal(err)
 		}
 		// One person working reports in both, who records a ruling in each.
-		both := access.NewPerson(f.planner(t).ID, "them@example.com", false,
+		both := access.NewPerson(f.planner(t).ID, "somebody@example.com", false,
 			map[int64][]access.Role{
 				f.productID: {access.PrivateTriage}, other.ID: {access.PrivateTriage},
 			}, 0)

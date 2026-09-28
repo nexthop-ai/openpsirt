@@ -347,7 +347,7 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -430,7 +430,7 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -469,7 +469,7 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

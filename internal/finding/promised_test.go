@@ -24,7 +24,7 @@ func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
