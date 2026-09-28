@@ -580,11 +580,9 @@ export function fromAt(from: string, absolute: number, limit: number): string {
 // The page a list is on, kept in its address.
 //
 // The offset lives in the address for the reason every filter does: a page
-// somebody sends is the page they were looking at. Five screens each had
-// their own copy of this — read the offset, clone the parameters, delete it
-// or set it, write them back — and the rule that keeps a first page's address
-// clean, deleting rather than setting zero, was five chances to write
-// `?offset=0` into a link.
+// somebody sends is the page they were looking at. One copy, because the rule
+// that keeps a first page's address clean — deleting rather than setting zero
+// — is a chance at every copy to write `?offset=0` into a link.
 export function usePaging(): { offset: number; go: (to: number) => void } {
   const [params, setParams] = useSearchParams();
   const offset = num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0;

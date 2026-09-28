@@ -385,9 +385,9 @@ export function Streams() {
                 </option>
               ))}
             </select>
-            {/* It looked optional and it decides something. Release readiness
-                asks what was cut from a branch, so a tag that never says
-                leaves the branch reporting that nothing has ever shipped. */}
+            {/* It decides something. Release readiness asks what was cut
+                from a branch, so a tag that never says leaves the branch
+                reporting that nothing has ever shipped. */}
             <p className="hint">
               An unnamed tag leaves its branch reading as never released. Declare the tag again to
               fill it in.

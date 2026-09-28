@@ -142,9 +142,8 @@ export function Inventories() {
                   <td>{minute(scan.received_at)}</td>
                   <td className="hint">{minute(scan.built_at)}</td>
                   <td>
-                    {/* The run's own page, where there is one. A
-                        state word is where somebody asks "what did it find",
-                        and the answer had nowhere to go. */}
+                    {/* The run's own page, where there is one: a state
+                        word is where somebody asks "what did it find". */}
                     {scan.run_id ? (
                       <Link
                         to={

@@ -5,13 +5,9 @@ import { Link, useLocation } from "react-router-dom";
 
 // An address this application does not answer.
 //
-// It used to redirect to the home screen, which made a link built wrong look
-// like a click that did nothing: the address went out of the bar with the
-// redirect, so there was nothing left to read and nothing to report. A
-// component link composed with no product selected — `/products//components/x`
-// — was reported as "it brings you back to the homepage".
-//
-// So the address stays in the bar and the screen says it was not recognized.
+// The address stays in the bar and the screen says it was not recognized. A
+// redirect makes a link built wrong look like a click that did nothing, with
+// nothing left in the bar to read or report.
 // The two ways on are the two that are always right: the home screen, and the
 // findings list, which answers for every product a reader can see.
 export function NotFound() {

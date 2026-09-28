@@ -22,10 +22,9 @@ import { useReseed } from "../ui/reseed";
 // The counts beneath a node, worst first, as one bar whose widths are them.
 //
 // The same control the component screen draws, for the same reason: a bar that
-// is mostly one color says where the weight is before a number is read. This
-// was a chip per band at a fixed width, which said only which bands were
-// present — and down a page of rows at six different depths that is five
-// numbers a reader cannot compare, which is the one thing they are for.
+// is mostly one color says where the weight is before a number is read. A
+// chip per band says only which bands are present, and down a page of rows at
+// six different depths that is numbers a reader cannot compare.
 //
 // The column stays a fixed width and keeps its left edge, so the bars line up
 // under each other whatever the name above them was. Drawn empty rather than
@@ -623,17 +622,12 @@ function Branches({
         style={{ paddingLeft: depth * 20 }}
       >
         {/* Whether anything hangs off this row, said by the marker itself.
-            Both states were drawn in the same faint line color, so a node
-            with a hundred things under it and a leaf looked alike until you
-            clicked one — and clicking the wrong one was how the leaf's
-            behavior got noticed. The triangle is ink, because it is a
-            control; the leaf's dot stays faint, because it is punctuation. */}
+            The triangle is ink, because it is a control; the leaf's dot
+            stays faint, because it is punctuation. Drawn alike, a node with a
+            hundred things under it and a leaf look the same until clicked. */}
         {/* A button where it opens something, and punctuation where it does
-            not. It was a span with a click handler either way, so a tree
-            could be walked from a keyboard — the names are buttons — and
-            never expanded: every node past the first level was unreachable
-            without a pointer, on the screen whose whole purpose is walking
-            down. */}
+            not, so the tree expands from a keyboard: the screen's whole
+            purpose is walking down. */}
         {openable ? (
           <button
             type="button"
@@ -704,8 +698,8 @@ function Branches({
           {node.beneath.toLocaleString()}
         </span>
         {/* What pulls it in, what it pulls in, its history and what is open
-            against it, on the component's own screen. Drawn over the tree it
-            was a second copy of a page that already exists. */}
+            against it, on the component's own screen rather than a second
+            copy of that page drawn over the tree. */}
         <Link
           className="look"
           title={`Everything about ${name}`}

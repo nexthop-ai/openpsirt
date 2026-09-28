@@ -28,10 +28,9 @@ export function typingIn(element: Element | null): boolean {
 // An Enter that already belongs to whatever has focus.
 //
 // A button's activation *is* the default action of the keydown, so taking
-// Enter here and preventing the default takes the button with it: opening a
-// row, tabbing to the record button in its decision form and pressing Enter
-// collapsed the form instead of recording the claim — on the keyboard path the
-// list advertises at its own foot.
+// Enter here and preventing the default takes the button with it: Enter on
+// the record button in a row's decision form would collapse the form instead
+// of recording the claim, on the keyboard path the list advertises.
 export function activates(element: Element | null): boolean {
   if (!element) return false;
   const tag = element.tagName.toUpperCase();

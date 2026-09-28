@@ -6,22 +6,16 @@ import { identityOf, type Row } from "./list";
 
 // The selection on the findings list, and a bulk act's use of it.
 //
-// A hook rather than five pieces of state inside a thousand-line render
-// function, because one rule holds them together and that rule was written at
-// three of five call sites and missing at two: a selection is made out of a
-// population, so replacing the population replaces what was selected. Here
-// it is enforced once, where the question changes, and there is no call site
-// left that could bypass it.
+// A hook rather than pieces of state inside a render function, because one
+// rule holds them together: a selection is made out of a population, so
+// replacing the population replaces what was selected. It is enforced once,
+// where the question changes, so no call site can bypass it — bypassed, a bar
+// says thirty over four rows listed, and handing them over assigns rows nobody
+// can see.
 //
-// The cost of bypassing it: a triager filtering to low, ticking
-// thirty rows and then clicking critical had a bar still saying thirty while
-// four rows were listed — and handing them over wrote assignments for
-// twenty-six rows nobody could see.
-//
-// The rows are held, not only their keys. The selection survives paging
-// and a page does not, so an act built from what is on screen reaches part of
-// what was ticked: picking thirty on one page and twenty on the next and
-// pressing "Assign 50" wrote twenty and dropped thirty, silently.
+// The rows are held, not only their keys. The selection survives paging and a
+// page does not, so an act built from what is on screen reaches part of what
+// was ticked.
 
 // The list's own question, with the position in it left out. Two addresses
 // that differ only by offset are the same question asked from a different row.

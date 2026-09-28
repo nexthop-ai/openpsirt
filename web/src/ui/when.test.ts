@@ -4,9 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { at, lasted, on, since } from "./when";
 
-// Two forms and no others. There were four in use at once, two of them
-// showing the stored string with its time and offset — the tool displaying its
-// storage rather than answering the question.
+// Two forms and no others. A stored string shown with its time and offset is
+// the tool displaying its storage rather than answering the question.
 describe("how a moment is written", () => {
   const now = new Date("2026-09-07T12:00:00Z");
 
@@ -33,9 +32,9 @@ describe("how a moment is written", () => {
 
   it("says nothing about a moment it cannot read", () => {
     expect(since("last week", now)).toBe("");
-    // The absolute form asks the same question. Sixteen files call it, and a
-    // field that is not a moment was drawn as its own first ten characters —
-    // which reads like a date and is not one.
+    // The absolute form asks the same question: a field that is not a moment
+    // would otherwise be drawn as its own first ten characters, which reads
+    // like a date and is not one.
     expect(on("last week")).toBe("");
     expect(on("libnl-3-200")).toBe("");
     expect(on("")).toBe("");

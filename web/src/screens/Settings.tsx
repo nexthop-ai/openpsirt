@@ -140,11 +140,9 @@ const NOTES: Partial<Record<Tab, string>> = {
 
 // A value's type, and the values it may take, come from the server.
 //
-// They were three tables here keyed on setting names, beside the server's own
-// — five copies of one fact. A setting added to the server and not to these
-// was offered as a text field somebody typed a refused value into, and a word
-// list that drifted offered a word the write path refuses. The server is what
-// checks the value, so the server is what says what it is.
+// The server is what checks the value, so the server is what says what it is:
+// a copy here offers a new setting as a text field somebody types a refused
+// value into, and a word the write path refuses.
 
 function Field({
   setting,
@@ -178,9 +176,9 @@ function Field({
   const takes = timed && composable(setting.value ?? "");
   // The same composition for a size, and chosen the same way: on what the
   // setting *is* rather than on whether the value in hand happens to parse.
-  // Read from the value, a size nobody had set fell through to a plain text
-  // box — the one control that cannot say which unit a number is in — so
-  // typing 25 into the attachment quota set it to twenty-five bytes.
+  // Read from the value, a size nobody has set falls through to a plain text
+  // box — the one control that cannot say which unit a number is in — and 25
+  // typed into the attachment quota is twenty-five bytes.
   const sized = setting.kind === "size";
   const measured = sized ? readBytes(setting.value ?? "") : null;
   const sizes = sized && (setting.value ?? "").trim() === "" ? true : measured !== null;
@@ -216,10 +214,9 @@ function Field({
   // A password manager classifies a field by every word it can reach through
   // it, and the key is one of those: the claim window's key rendered into `id`
   // is a sign-in field to LastPass however many ignore attributes sit beside
-  // it, which is how one duration box came to be offered a saved login. `name`
-  // was already pinned to a constant for this reason and `id` was missed.
-  // Generated rather than sanitized, so no key can ever reach a classifier
-  // again — sanitizing only moves the problem to the next key somebody adds.
+  // it. `name` is pinned to a constant for the same reason. Generated rather
+  // than sanitized, so no key reaches a classifier — sanitizing only moves the
+  // problem to the next key somebody adds.
   const field = useId();
   const typed = Number(count);
   const usable = count.trim() !== "" && Number.isFinite(typed) && typed >= 1;

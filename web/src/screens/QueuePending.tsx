@@ -59,12 +59,10 @@ export function Embargoes({
 }: {
   waiting: Body<"PendingMovementBody">[];
   // The number waiting in all. Without it the page length is printed as the
-  // figure, so the fifty-first request was not in the number and nothing said
-  // so.
+  // figure.
   total?: number;
-  // The offset this page starts at, and the controls that move it. Without them
-  // the heading said the real total over fifty rows and the fifty-first was
-  // counted and unreachable.
+  // The offset this page starts at, and the controls that move it, so every
+  // row the total counts is reachable.
   offset?: number;
   onGo?: (offset: number) => void;
   // A failed read, so the section says so rather than drawing nothing. Absent
@@ -154,9 +152,8 @@ export function Embargoes({
 
 // Ratings of issues waiting for a second person.
 //
-// A milder rating hides things, so it waits the way a dismissal does — and
-// there was nowhere to be that second person, because the route existed and no
-// screen reached it.
+// A milder rating hides things, so it waits the way a dismissal does, and
+// this is where the second person acts.
 //
 // The point is what it says beyond "agree or not". Rating something milder
 // pushes its deadline out, which is what the second person is there for. But

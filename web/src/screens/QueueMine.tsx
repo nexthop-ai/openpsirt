@@ -76,9 +76,8 @@ export function Became({
 // rows back.
 //
 // The same signals an approver is shown. An approver reading a bulk claim may
-// agree to most of it and set some aside; until this the author could only
-// withdraw the whole thing and start again, so "this holds for most of them
-// but not those four" was unavailable to the person best placed to say it.
+// agree to most of it and set some aside, and so may its author: "this holds
+// for most of them but not those four" is the person best placed to say it.
 function Mine({ row }: { row: Body<"BecameBody"> }) {
   const split = useSplitClaim();
   const [holding, setHolding] = useState<Set<number>>(new Set());

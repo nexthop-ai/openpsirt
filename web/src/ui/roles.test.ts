@@ -53,9 +53,7 @@ describe("granting somebody an empty tool", () => {
 
   it("counts a read held across the estate", () => {
     // A read held everywhere is a read held here, so a capability granted
-    // beside one reaches something. This is the case the grid's own copy of
-    // the rule handled and this one did not — so the copy with assertions
-    // against it was not the copy anybody saw.
+    // beside one reaches something.
     expect(wouldReachNothing("approver", [{ role: "private-read", everywhere: true }])).toBe(false);
     // And a withdrawn estate grant is no more held than a withdrawn one on
     // the product itself.

@@ -152,8 +152,8 @@ export function FindingsTable({
               {/* The three that decide what happens next, before anything
                   that describes what it is. At a laptop's width the table is
                   wider than its container and the columns at the right-hand
-                  end are cut — which used to be Due and State, the two facts
-                  somebody reads a list of findings to get at. Severity, the
+                  end are cut, so Due and State, the two facts somebody reads
+                  a list of findings to get at, are not among them. Severity, the
                   deadline and how far it is decided lead; the component, the
                   path and the rest can run off the edge without taking the
                   next action with them. */}
@@ -344,12 +344,9 @@ export function FindingsTable({
                         <Link
                           className="linkish id compname"
                           title={`Open ${row.component}`}
-                          // The row's own product, not the selection's.
-                          // Across every product there is no selection, so
-                          // this built `/products//components/NAME` — a
-                          // path that matches no route, and the app fell
-                          // back to the home screen. The source-package
-                          // link four rows down already asked the row.
+                          // The row's own product, not the selection's:
+                          // across every product there is no selection, and
+                          // a path with an empty product matches no route.
                           to={`/products/${encodeURIComponent(
                             buildOf(row).product,
                           )}/components/${encodeURIComponent(row.component ?? "")}`}
@@ -428,11 +425,10 @@ export function FindingsTable({
                           <>
                             {/* A version is one token to a reader. Left
                                       to itself the browser breaks at every
-                                      hyphen, so "1.26.0-rc.3" arrived as two
-                                      lines and three versions as four — the
-                                      tallest cell on the row, for a column that
-                                      holds three short words. It still wraps,
-                                      but only between one version and the
+                                      hyphen, and "1.26.0-rc.3" becomes two
+                                      lines — the tallest cell on the row, for
+                                      a column that holds three short words. It
+                                      wraps only between one version and the
                                       next. */}
                             <span
                               className={said.kind === "id" ? "id" : "hint"}
@@ -519,8 +515,7 @@ export function FindingsTable({
             <article
               key={identityOf(row)}
               // The word the badge draws with, so the card's stripe and the
-              // badge on it agree. An absent rating gave the card no class at
-              // all while the badge beside it said "Unrated".
+              // badge on it agree, an absent rating included.
               className={`fcard ${row.exploited || row.exploited_here ? "exploited" : bandOf(row.severity)}`}
               role="link"
               tabIndex={0}

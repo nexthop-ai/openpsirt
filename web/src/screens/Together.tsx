@@ -86,10 +86,9 @@ export function Together() {
   const queries = useQueryClient();
 
   const at = { product, stream, variant, component };
-  // The whole build, not the product and the component. Keyed on two of the
-  // four, the same component under two variants shared one draft and each
-  // cleared the other's — and what is kept here is the reasoning a second
-  // person is asked to agree to.
+  // The whole build, not the product and the component, so the same component
+  // under two variants keeps two drafts — and what is kept here is the
+  // reasoning a second person is asked to agree to.
   const kind = Object.values(which).join("/");
   const draftKey = `together:${product}:${stream}:${variant}:${component}${kind ? `:${kind}` : ""}`;
 
@@ -264,9 +263,8 @@ export function Together() {
             >
               Select all {items.length.toLocaleString()} shown
             </button>
-            {/* The whole narrowed set, not the page. A page is fifty of eight
-                hundred, and a claim assembled a page at a time is eighteen
-                claims where the person meant one. */}
+            {/* The whole narrowed set, not the page. A claim assembled a page
+                at a time is several claims where the person meant one. */}
             {everything > items.length && (
               <button
                 type="button"
@@ -297,11 +295,10 @@ export function Together() {
             </p>
           )}
 
-          {/* The evidence one judgment is being made on. It showed the
-              identifier, the severity and a place count and nothing else —
-              while narrowing by the description, which it did not show. One
-              click here writes a claim across hundreds of places, so it says
-              at least as much as the screen for deciding one. */}
+          {/* The evidence one judgment is being made on, the description
+              the list is narrowed by among it. One click here writes a claim
+              across hundreds of places, so it says at least as much as the
+              screen for deciding one. */}
           <div className="picklist">
             <Wide>
               <table>

@@ -55,9 +55,8 @@ export function Collaborators({
   // cannot bring anybody into the deployment.
   //
   // Narrowed by what is typed, in the server, which is where the whole list
-  // is: the endpoint has always taken a term and this picker simply never
-  // sent one, so it asked for a hundred people and offered whichever hundred
-  // came back.
+  // is: a page of people asked for without a term is whichever hundred come
+  // back.
   const people = useQuery({
     queryKey: ["mentionable", product, false, adding.trim()],
     queryFn: async () =>

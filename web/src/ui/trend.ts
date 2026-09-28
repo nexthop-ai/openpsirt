@@ -26,8 +26,8 @@ const ENOUGH = 4;
 //
 // The trend answers for a fixed window whether or not this deployment existed
 // through it, so a week-old deployment gets twelve weekly steps of which
-// eleven are zeros. Measured across all twelve, the copy read "Backlog
-// growing: open up 5,803 across the range" and "Critical went 0 → 389" — both
+// eleven are zeros. Measured across all twelve, a real week-old deployment
+// reads "open up 5,803 across the range" and "Critical went 0 → 389" — both
 // arithmetically correct, and both describing the first scan landing rather
 // than anything about the estate.
 //

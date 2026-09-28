@@ -100,7 +100,7 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
 // after a session ended under them. The words differ because the situation
 // does: one is arriving, the other is being interrupted.
 // The dark wordmark, named once. It is committed and symlinked into the web
-// root and was referenced by nothing at all.
+// root.
 const LOOKS = "/brand/logo-dark.svg";
 
 export function SignIn({ resuming }: { resuming?: boolean }) {

@@ -84,10 +84,9 @@ const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
 
 // The filters the by-bump view can apply, by the key their chip carries.
 //
-// Six of the thirty-odd. The rest ask about a place, a deadline or an
-// assignee, and a bump has none of those — so they are named on that screen
-// rather than dropped, which is what would widen the list back out while the
-// chips went on saying they were on.
+// The rest ask about a place, a deadline or an assignee, and a bump has none
+// of those — so they are named on that screen rather than dropped, which would
+// widen the list back out while the chips go on saying they are on.
 const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
 
 // The most rows one assignment may name. The server takes this many picked rows
@@ -118,9 +117,7 @@ export function Findings() {
   // The selection the server needs, beside the filters.
   //
   // Held rather than rebuilt each render, so the memo below it does not
-  // recompute every time — and so the interface's own lint count stays the
-  // honest measure the config says it is: nine warnings of one pattern, and
-  // not a tenth of another nobody had accounted for.
+  // recompute every time.
   const selection = useMemo(
     () => ({ ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) }),
     [stream, variant],
@@ -178,9 +175,8 @@ export function Findings() {
   //
   // The row travels with the key, not just the key: a selection spans pages by
   // design, and handing one over needs what each row *is* rather than only
-  // that it was chosen. Keeping keys alone meant the act could only reach the
-  // rows still on screen, so picking thirty on one page and twenty on the next
-  // and pressing "Assign 50" wrote twenty and dropped thirty, silently.
+  // that it was chosen: with keys alone the act reaches only the rows still on
+  // screen.
   const {
     picked,
     pick,
@@ -296,11 +292,6 @@ export function Findings() {
   }, [kept.data, params, declined]);
 
   const queries = useQueryClient();
-  // The bound on one action here, as the deployment sets it. A selection is
-  // handed over a row at a time, so this is the bound on how many round trips
-  // one click makes. Read up here with the other hooks, because the screen
-  // returns early for two of its views.
-
   // The tags people have marked findings with here, for the filter to offer.
   // Read only while the panel that uses it is open: it is a per-product list
   // nobody needs unless they are narrowing by one.
@@ -330,9 +321,8 @@ export function Findings() {
         ),
       ),
     // Nothing is invalidated per row. Handing over a selection is a loop of
-    // these, and invalidating on each one interleaved a list refetch between
-    // every write — so the page spent a long selection refetching rather than
-    // writing. The loop invalidates once when it is done.
+    // these, and invalidating on each one interleaves a list refetch between
+    // every write. The loop invalidates once when it is done.
   });
 
   // Handing a selection over in one request, where the list is one product's.

@@ -14,9 +14,9 @@ import { keyOf } from "./treeshape";
 // place with neither is unplaced, and only there does the screen say nothing
 // recorded what pulls it in.
 //
-// Drawing the second as the third said something false about a record that had
-// the answer, and drew it with the component's own name missing: the name was
-// read off the end of a chain that was not there.
+// Drawn as unplaced, the second says something false about a record that has
+// the answer, and loses the component's own name, which is read off the end of
+// the chain.
 
 export type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
 

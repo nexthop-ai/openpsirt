@@ -6,10 +6,10 @@ import { notACredential } from "./noautofill";
 
 // A filter somebody types into, holding as many words as they type.
 //
-// One box held one word, so a family of packages was three reads of the
-// same list, and two of somebody's own tags could not be asked for at all.
-// It holds chips, because a box that shows one value while narrowing
-// by three is the thing the summary above the list exists to prevent.
+// Several words, so a family of packages is one read of the list and two of
+// somebody's own tags can be asked for together. It holds chips, because a box
+// that shows one value while narrowing by three is the thing the summary above
+// the list exists to prevent.
 //
 // Any of them rather than all of them. A row has one component name, so
 // "both" is a question with no answer; two of a person's own labels means

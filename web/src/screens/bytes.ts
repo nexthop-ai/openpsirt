@@ -15,9 +15,8 @@
 //
 // The smallest unit is one byte, which is what makes both readers below
 // total: every positive whole number of bytes divides by it, so the loop
-// always returns and the statement after it was unreachable. The duration
-// composer beside this one genuinely differs — its smallest unit is an hour,
-// so "90m" falls out of its loop and its fall-through is real.
+// always returns. The duration composer beside this one differs — its
+// smallest unit is an hour, so "90m" falls out of its loop.
 export const SIZES = [
   { unit: "bytes", bytes: 1 },
   { unit: "KB", bytes: 1024 },

@@ -239,8 +239,7 @@ function Readiness({ at }: { at: Scoped }) {
       {shipped ? (
         <>
           {/* Wrapped like every other table on the page: on a narrow screen a
-              wide table scrolls sideways and says so, and this was the one
-              that did neither — it was cut off with nothing explaining why. */}
+              wide table scrolls sideways and says so. */}
           <Wide>
             <table className="plain">
               <thead>
@@ -292,8 +291,8 @@ function Readiness({ at }: { at: Scoped }) {
           <ul className="plain">
             {blocking.map((row) => (
               /* Keyed on the version too, because that is what the group is
-                 keyed on. Without it one issue at three versions of one
-                 component was three rows under one key. */
+                 keyed on: one issue at three versions of one component is
+                 three rows. */
               <li key={`${row.vulnerability} ${row.component} ${row.version ?? ""}`}>
                 <Severity word={row.severity} /> <span className="id">{row.vulnerability}</span>{" "}
                 {/* The component is the part that varies, and a Debian kernel
@@ -397,11 +396,8 @@ function Figures({
         }),
       ),
   });
-  // This person's holdings, and what has come back to them. Home
-  // answered "how much is there" and never "what do I do next": the largest
-  // number on the screen was the whole estate's open count, and the one panel
-  // that could have carried her own work is deliberately everybody else's.
-  // Both of these existed as endpoints and as screens one click away.
+  // This person's holdings, and what has come back to them: Home answers
+  // "what do I do next" as well as "how much is there".
   const assigned = useQuery({
     queryKey: ["home", "assigned", "me", scope],
     queryFn: async () =>
@@ -538,8 +534,7 @@ function Figures({
       </button>
       {/* Unnarrowed, because the figure is. The list writes three narrowings
           into its own address when the address says nothing, and none of them
-          was applied to the count — so every figure here opened a list with
-          fewer rows in it than the number said. */}
+          applies to the count, so the list opens with the number's rows. */}
       <button type="button" className="kpi" onClick={() => navigate(findingsPath(at, true))}>
         <span className="l">Open issues · {counting}</span>
         <span className="n">
@@ -606,10 +601,9 @@ function Figures({
         )}
       </button>
       {/* Into the list it counts, narrowed the same way: what is undecided
-          and past its deadline. It pointed at the assignments screen, which
-          answers a different question — what is *mine* — so the number and
-          the screen it opened disagreed for everybody but the one person
-          holding all of it. */}
+          and past its deadline. The assignments screen answers a different
+          question — what is *mine* — and would disagree with the number for
+          everybody but the one person holding all of it. */}
       <button type="button" className="kpi" onClick={() => navigate(runningOut(at, "overdue"))}>
         <span className="l">
           <i style={{ background: "var(--sev-critical)" }} /> Overdue
@@ -860,8 +854,7 @@ function Lapsed() {
   const product = at.product ? { product: at.product } : {};
   // Lapsed and expired asked as one question rather than as two lists added
   // together. A deferral that ran out on code that then moved is in both, so
-  // the sum is larger than the thing it labels — the tally said eleven over a
-  // queue of ten, on the screen people check first.
+  // the sum is larger than the thing it labels.
   const stopped = useQuery({
     queryKey: ["home", "stopped", product],
     queryFn: async () =>

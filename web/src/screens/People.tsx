@@ -185,9 +185,9 @@ export function People({ who: me }: { who: Who }) {
   const rows = people.data?.items ?? [];
   const derived = mode.data?.mode === "group-bound";
   // A role source that could not be read is not a role source that assigns
-  // roles here. Reading it as "not group-bound" re-enabled every Manage button
-  // in a deployment where a direct grant is overwritten by the next sign-in,
-  // so an administrator's work is undone with nothing said.
+  // roles here. Read as "not group-bound", it enables every Manage button in a
+  // deployment where a direct grant is overwritten by the next sign-in, so an
+  // administrator's work is undone with nothing said.
   const unreadMode = mode.isPending || mode.isError;
   const cannotManage = derived || unreadMode;
 
