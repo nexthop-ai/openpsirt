@@ -465,15 +465,13 @@ func sameReading(held, said []Statement) bool {
 	return slices.Equal(reading(held), reading(said))
 }
 
-// folded is how a name is stored so that every engine compares it alike.
+// folded is how a name is stored so that every engine compares it alike: the
+// fold a component's own name is stored under, cut to the same width.
 //
 // Done here rather than by the engine because the four do not agree: SQLite's
 // LOWER folds ASCII and nothing else, while the three servers fold the whole
-// character set — so a component named with any letter outside ASCII matched a
-// statement on three engines and not on the fourth, and which one a deployment
-// runs decided whether a publisher's judgment reached a finding. Normalizing
-// on write is the same answer matching a typed name without capitals gives for
-// every other name people type.
+// character set. Cut at the column's width, because a longer value is refused
+// by the three servers and kept whole by SQLite.
 func folded(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
+	return graph.Folded(name)
 }
