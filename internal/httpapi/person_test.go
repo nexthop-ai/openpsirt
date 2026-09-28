@@ -4,6 +4,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -71,6 +72,22 @@ func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 		}
 		if body.ToldTotal < 0 || body.HeldTotal < 0 {
 			t.Errorf("a total came back negative: told %d, held %d", body.ToldTotal, body.HeldTotal)
+		}
+	})
+}
+
+// An auditor reads a person's page without their part in the triage record. It
+// is counted over every product, which the audit grant does not reach, so the
+// block is left out rather than sent as zeros that say the person decided
+// nothing.
+func TestAnAuditorReadsAPersonWithoutTheirPartInTheRecord(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		for who, want := range map[string]bool{"admin": true, "auditor": false} {
+			var body map[string]json.RawMessage
+			read(t, r, who, "/v1/people/triager", &body)
+			if _, carried := body["record"]; carried != want {
+				t.Errorf("%s reading a person: the record is carried %v, want %v", who, carried, want)
+			}
 		}
 	})
 }

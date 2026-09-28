@@ -44,6 +44,7 @@ components:
           type: string
         record:
           $ref: "#/components/schemas/PersonRecordBody"
+          description: Their part in the triage record, counted over every product. Absent unless you administer the deployment
         sees_nothing:
           description: Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing
           type: boolean
@@ -60,7 +61,6 @@ components:
       required:
         - identity
         - held_total
-        - record
         - told_total
       type: object
     Acknowledge-all-notificationsResponse:

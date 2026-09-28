@@ -1488,7 +1488,7 @@ other, and two that could not be asked at all.
 | Section | What it answers |
 |---|---|
 | Grants in force | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
-| Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the rubber-stamp report asks across a program, asked about one person |
+| Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the rubber-stamp report asks across a program, asked about one person. Counted over every product, so it is sent to an administrator and absent for an auditor, whose grant reaches no product's decisions; the section is drawn only where it is sent |
 | Roles granted and withdrawn | Every change against them, newest first, with who made it. Absent before means nobody had set it; absent after means it was withdrawn, and a blank cannot tell the two apart |
 | Notifications sent | Everything sent to them, acknowledged and cleared included |
 

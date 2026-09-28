@@ -5786,7 +5786,8 @@ export interface components {
             held_total: number;
             holds?: components["schemas"]["HeldBody"][] | null;
             identity: string;
-            record: components["schemas"]["PersonRecordBody"];
+            /** @description Their part in the triage record, counted over every product. Absent unless you administer the deployment */
+            record?: components["schemas"]["PersonRecordBody"];
             /** @description Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing */
             sees_nothing?: boolean;
             told?: components["schemas"]["ToldBody"][] | null;

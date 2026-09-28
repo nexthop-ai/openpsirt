@@ -148,36 +148,39 @@ export function Person() {
         )}
       </section>
 
-      <section className="panel" style={{ marginTop: 14 }}>
-        <h3>Their part in the record</h3>
-        <p className="hint" style={{ marginTop: 0 }}>
-          Withdrawn agreements are counted separately.
-        </p>
-        <ul className="files catalog">
-          <li>
-            <div>
-              <b>{record.proposed.toLocaleString()}</b> claims argued
-            </div>
-            <div className="hint">
-              {record.last_proposed_at ? `Last on ${stamp(record.last_proposed_at)}` : "Never"}
-            </div>
-          </li>
-          <li>
-            <div>
-              <b>{record.approved.toLocaleString()}</b> claims agreed to, still standing
-            </div>
-            <div className="hint">
-              {record.last_approved_at ? `Last on ${stamp(record.last_approved_at)}` : "Never"}
-            </div>
-          </li>
-          <li>
-            <div>
-              <b>{record.withdrawn.toLocaleString()}</b> agreements taken back
-            </div>
-            <div className="hint">Counted separately.</div>
-          </li>
-        </ul>
-      </section>
+      {/* Counted over every product, so only an administrator is sent it. */}
+      {record && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>Their part in the record</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Withdrawn agreements are counted separately.
+          </p>
+          <ul className="files catalog">
+            <li>
+              <div>
+                <b>{record.proposed.toLocaleString()}</b> claims argued
+              </div>
+              <div className="hint">
+                {record.last_proposed_at ? `Last on ${stamp(record.last_proposed_at)}` : "Never"}
+              </div>
+            </li>
+            <li>
+              <div>
+                <b>{record.approved.toLocaleString()}</b> claims agreed to, still standing
+              </div>
+              <div className="hint">
+                {record.last_approved_at ? `Last on ${stamp(record.last_approved_at)}` : "Never"}
+              </div>
+            </li>
+            <li>
+              <div>
+                <b>{record.withdrawn.toLocaleString()}</b> agreements taken back
+              </div>
+              <div className="hint">Counted separately.</div>
+            </li>
+          </ul>
+        </section>
+      )}
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Roles granted and withdrawn</h3>
