@@ -11,12 +11,11 @@
 // them nothing they did not already know. What makes that safe is the sentence
 // beside it — every read past this asks about the issue again.
 //
-// Nothing enforced that sentence. A collaborator on one embargoed issue
-// received every approved statement for the whole build, because the read that
-// followed the resolution checked whether one issue was undisclosed and never
-// whether the subject could read the product at all. Two neighboring routes
-// re-checked correctly. The difference between them was invisible: all three
-// compiled, passed and answered.
+// A read that follows the resolution and checks only whether one issue is
+// undisclosed, never whether the subject can read the product at all, hands a
+// collaborator on one embargoed issue every approved statement for the whole
+// build. A route that re-checks and one that does not look alike: both
+// compile, pass and answer.
 //
 // So the rule this holds to is the one the requirements already state — a read
 // carries a subject and is narrowed in the data layer, never in a handler. A
@@ -28,10 +27,11 @@
 // is almost never read directly: it is handed to the call that turns a release
 // and a variant into a build, and the finding query is keyed on what that
 // returned. So what a resolver hands back is followed as another name, and
-// what a route collects into a list of builds with it. Anything further —
-// a value carried through a struct field, or out of the function and back —
-// is not followed, because a gate that did would be an analysis rather than a
-// check. What it buys is that the next call site arrives announced rather than
+// what a route collects into a list of builds with it, whether bound by an
+// assignment or by `var`. Anything further — a resolution used inline without
+// being bound, a value carried through a struct field, or out of the function
+// and back — is not followed, because a gate that did would be an analysis
+// rather than a check. What it buys is that the next call site arrives announced rather than
 // discovered.
 package main
 
@@ -230,20 +230,40 @@ func functionBody(node ast.Node) *ast.BlockStmt {
 func resolvedIn(body *ast.BlockStmt) map[string]token.Pos {
 	found := map[string]token.Pos{}
 	ast.Inspect(body, func(node ast.Node) bool {
-		assign, ok := node.(*ast.AssignStmt)
-		if !ok || len(assign.Rhs) != 1 || len(assign.Lhs) == 0 {
-			return true
-		}
-		call, ok := assign.Rhs[0].(*ast.CallExpr)
+		name, call, at, ok := binding(node)
 		if !ok || !permissive[called(call)] {
 			return true
 		}
-		if name, ok := assign.Lhs[0].(*ast.Ident); ok && name.Name != "_" {
-			found[name.Name] = assign.Pos()
-		}
+		found[name] = at
 		return true
 	})
 	return found
+}
+
+// binding is the name a call's first result is bound to, in either spelling a
+// function body binds one: an assignment, or a declaration with `var`.
+func binding(node ast.Node) (name string, call *ast.CallExpr, at token.Pos, ok bool) {
+	var lhs, rhs []ast.Expr
+	switch bound := node.(type) {
+	case *ast.AssignStmt:
+		lhs, rhs, at = bound.Lhs, bound.Rhs, bound.Pos()
+	case *ast.ValueSpec:
+		for _, n := range bound.Names {
+			lhs = append(lhs, n)
+		}
+		rhs, at = bound.Values, bound.Pos()
+	default:
+		return "", nil, 0, false
+	}
+	if len(rhs) != 1 || len(lhs) == 0 {
+		return "", nil, 0, false
+	}
+	call, isCall := rhs[0].(*ast.CallExpr)
+	first, isName := lhs[0].(*ast.Ident)
+	if !isCall || !isName || first.Name == "_" {
+		return "", nil, 0, false
+	}
+	return first.Name, call, at, true
 }
 
 // derivedIn returns what a call that resolves the rest of an address was bound
@@ -257,11 +277,7 @@ func resolvedIn(body *ast.BlockStmt) map[string]token.Pos {
 func derivedIn(body *ast.BlockStmt, from map[string]token.Pos) map[string]token.Pos {
 	found := map[string]token.Pos{}
 	ast.Inspect(body, func(node ast.Node) bool {
-		assign, ok := node.(*ast.AssignStmt)
-		if !ok || len(assign.Rhs) != 1 || len(assign.Lhs) == 0 {
-			return true
-		}
-		call, ok := assign.Rhs[0].(*ast.CallExpr)
+		name, call, at, ok := binding(node)
 		if !ok {
 			return true
 		}
@@ -271,9 +287,7 @@ func derivedIn(body *ast.BlockStmt, from map[string]token.Pos) map[string]token.
 		if !mentions(call, from) {
 			return true
 		}
-		if name, ok := assign.Lhs[0].(*ast.Ident); ok && name.Name != "_" {
-			found[name.Name] = assign.Pos()
-		}
+		found[name] = at
 		return true
 	})
 	return found

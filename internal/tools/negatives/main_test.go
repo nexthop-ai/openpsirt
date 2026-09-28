@@ -10,9 +10,9 @@ import (
 
 // A 404 built from an error's own text asserts that a name reaches nothing and
 // publishes whatever the error carried — for a store read, the driver's
-// message, which names the host and the port. This gate finds them, and had no
-// test: its only consumer is an exit code, and an exit code cannot tell a check
-// that found nothing from one that looked at nothing.
+// message, which names the host and the port. This gate finds them. Its only
+// consumer is an exit code, and an exit code cannot tell a check that found
+// nothing from one that looked at nothing.
 
 func TestWhatCountsAsA404BuiltFromAnError(t *testing.T) {
 	for _, c := range []struct {
@@ -38,6 +38,28 @@ func TestWhatCountsAsA404BuiltFromAnError(t *testing.T) {
 		},
 
 		{
+			// The framework appends an error passed after the message to the
+			// body as a detail, whatever it is called.
+			"an error passed as a detail",
+			`	return huma.Error404NotFound("that product does not exist", err)`, true,
+		},
+		{
+			"an error under any other name",
+			`	return huma.Error404NotFound(readErr.Error())`, true,
+		},
+		{
+			"an error's text after a formatted sentence",
+			`	return huma.Error404NotFound(fmt.Sprintf("%q", n) + e.Error())`, true,
+		},
+		{
+			"a call spread over lines",
+			"	return huma.Error404NotFound(\n\t\t\"cannot read that: \" +\n\t\terr.Error())", true,
+		},
+		{
+			"a package's sentinel, which is a sentence the code chose",
+			`	return huma.Error404NotFound(catalog.ErrNotFound.Error())`, false,
+		},
+		{
 			"a sentence the code chose",
 			`	return huma.Error404NotFound("no product is declared by that name")`, false,
 		},
@@ -60,7 +82,11 @@ func TestWhatCountsAsA404BuiltFromAnError(t *testing.T) {
 			`	if err != nil { return err }`, false,
 		},
 	} {
-		if got := built.MatchString(c.line); got != c.want {
+		lines, err := builtIn("x.go", []byte("package p\n\nfunc f() {\n"+c.line+"\n}\n"))
+		if err != nil {
+			t.Fatalf("%s: %v", c.what, err)
+		}
+		if got := len(lines) > 0; got != c.want {
 			t.Errorf("%s: reported=%v, want %v: %s", c.what, got, c.want, c.line)
 		}
 	}

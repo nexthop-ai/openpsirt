@@ -4,7 +4,9 @@
 package build_test
 
 import (
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -17,7 +19,7 @@ import (
 var (
 	documented = regexp.MustCompile("`make ([a-z][a-z-]*)`")
 	printed    = regexp.MustCompile(`"([a-z][a-z-]*)"`)
-	named      = regexp.MustCompile("`internal/([a-z][a-z0-9]*)/`")
+	named      = regexp.MustCompile("`internal/([a-z][a-z0-9/]*)/`")
 )
 
 // buildDocument returns DESIGN-build.md, which is the one document that
@@ -31,51 +33,105 @@ func buildDocument(t *testing.T) string {
 	return string(body)
 }
 
-// The one table that enumerates the tree names every package in it.
+// packages is every directory under internal holding a Go file that is not a
+// test, as a path below internal, and every directory there at all.
+func packages(t *testing.T) (withGo []string, dirs map[string]bool) {
+	t.Helper()
+	root := filepath.Join("..", "..", "internal")
+	dirs = map[string]bool{}
+	held := map[string]bool{}
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			// A fixture tree and the built interface are data, not packages.
+			if d.Name() == "testdata" || d.Name() == "dist" || d.Name() == "node_modules" {
+				return filepath.SkipDir
+			}
+			dirs[rel] = true
+			return nil
+		}
+		if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			held[filepath.ToSlash(filepath.Dir(rel))] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for dir := range held {
+		withGo = append(withGo, dir)
+	}
+	sort.Strings(withGo)
+	return withGo, dirs
+}
+
+// layoutGaps is every package the document names nowhere, and every path it
+// names that is not there. A package is named by a row naming it or any
+// directory above it, so a row for a parent covers what is inside.
+func layoutGaps(packages []string, document string, exists func(string) bool) (unnamed, gone []string) {
+	for _, pkg := range packages {
+		covered := false
+		for at := pkg; at != "." && at != ""; at = path.Dir(at) {
+			if strings.Contains(document, "`internal/"+at+"/`") {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			unnamed = append(unnamed, pkg)
+		}
+	}
+	for _, found := range named.FindAllStringSubmatch(document, -1) {
+		if !exists(found[1]) {
+			gone = append(gone, found[1])
+		}
+	}
+	sort.Strings(unnamed)
+	sort.Strings(gone)
+	return unnamed, gone
+}
+
+// The one table that enumerates the tree names every package in it, at any
+// depth, through its own row or one for a directory above it.
 //
 // It is where somebody looks to find out where something lives, so a package
 // missing from it is a package they conclude is not there — and by this
 // repository's own rule, code no document describes is a remnant somebody may
 // delete.
 func TestTheLayoutTableNamesEveryPackage(t *testing.T) {
-	entries, err := os.ReadDir(filepath.Join("..", "..", "internal"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	document := buildDocument(t)
-	here := map[string]bool{}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			here[entry.Name()] = true
-		}
-	}
-	if len(here) == 0 {
+	found, dirs := packages(t)
+	if len(found) == 0 {
 		t.Fatal("no packages were found under internal, so this checked nothing")
 	}
-	var unnamed []string
-	for name := range here {
-		if !strings.Contains(document, "`internal/"+name+"/`") {
-			unnamed = append(unnamed, name)
-		}
-	}
-	// And the other direction, which is the one that rots quietly: a package
-	// is renamed, the row that named it stays, and the table sends a reader
-	// somewhere that is not there while every check stays green.
-	var gone []string
-	for _, found := range named.FindAllStringSubmatch(document, -1) {
-		if !here[found[1]] {
-			gone = append(gone, found[1])
-		}
-	}
-	sort.Strings(unnamed)
-	sort.Strings(gone)
+	unnamed, gone := layoutGaps(found, buildDocument(t), func(dir string) bool { return dirs[dir] })
 	if len(unnamed) > 0 {
 		t.Errorf("under internal and named nowhere in DESIGN-build.md, so somebody looking for %s finds no row:\n  %s",
 			plural(len(unnamed)), strings.Join(unnamed, "\n  "))
 	}
+	// The other direction, which is the one that rots quietly: a package is
+	// renamed, the row that named it stays, and the table sends a reader
+	// somewhere that is not there while every check stays green.
 	if len(gone) > 0 {
 		t.Errorf("named by DESIGN-build.md and not under internal, so the table sends a reader to %s:\n  %s",
 			plural(len(gone)), strings.Join(gone, "\n  "))
+	}
+}
+
+// Both directions of the layout check, given a document and a tree.
+func TestALayoutGapIsReportedInBothDirections(t *testing.T) {
+	document := "| `internal/a/` | a |\n| `internal/b/c/` | c |\n| `internal/gone/deeper/` | x |\n"
+	tree := map[string]bool{"a": true, "a/inner": true, "b": true, "b/c": true, "d": true}
+	unnamed, gone := layoutGaps([]string{"a", "a/inner", "b/c", "d"}, document,
+		func(dir string) bool { return tree[dir] })
+	if strings.Join(unnamed, ",") != "d" {
+		t.Errorf("unnamed: %v, want [d] — a/inner is covered by its parent's row", unnamed)
+	}
+	if strings.Join(gone, ",") != "gone/deeper" {
+		t.Errorf("gone: %v, want [gone/deeper]", gone)
 	}
 }
 
@@ -113,49 +169,78 @@ func TestTheGateTheMakefileAndTheDocumentNameTheSameTargets(t *testing.T) {
 		t.Fatal("the gate program's order slice is not closed, so this checked nothing")
 	}
 	order = order[:closes]
-	document := buildDocument(t)
 
-	var unknown, undescribed []string
-	named := 0
-	for _, found := range printed.FindAllStringSubmatch(string(order), -1) {
-		named++
-		if !targets[found[1]] {
-			unknown = append(unknown, found[1])
+	gaps := targetGaps(string(order), buildDocument(t), targets)
+	if gaps.printed == 0 {
+		t.Fatal("the gate prints no targets, so this checked nothing")
+	}
+	if gaps.described == 0 {
+		t.Fatal("DESIGN-build.md names no make target, so this checked nothing")
+	}
+	if len(gaps.unknown) > 0 {
+		t.Errorf("printed by the gate and defined by no target, so the gate would ask make for %s:\n  %s",
+			plural(len(gaps.unknown)), strings.Join(gaps.unknown, "\n  "))
+	}
+	if len(gaps.undescribed) > 0 {
+		t.Errorf("run by the gate and described nowhere in DESIGN-build.md, which reads as a remnant:\n  %s",
+			strings.Join(gaps.undescribed, "\n  "))
+	}
+	if len(gaps.invented) > 0 {
+		t.Errorf("described in DESIGN-build.md and defined by no target, so typing %s gets nothing:\n  %s",
+			plural(len(gaps.invented)), strings.Join(gaps.invented, "\n  "))
+	}
+}
+
+// targetJoin is what the join of the gate, the makefile and the document found.
+type targetJoin struct {
+	unknown, undescribed, invented []string
+	printed, described             int
+}
+
+// targetGaps joins the names the gate prints, the targets the makefile
+// defines and the targets the document describes, in every direction that
+// can go wrong.
+func targetGaps(order, document string, defined map[string]bool) targetJoin {
+	var out targetJoin
+	for _, found := range printed.FindAllStringSubmatch(order, -1) {
+		out.printed++
+		if !defined[found[1]] {
+			out.unknown = append(out.unknown, found[1])
 		}
 		if !strings.Contains(document, "`"+found[1]+"`") &&
 			!strings.Contains(document, "`make "+found[1]+"`") {
-			undescribed = append(undescribed, found[1])
+			out.undescribed = append(out.undescribed, found[1])
 		}
 	}
-	if named == 0 {
-		t.Fatal("the gate prints no targets, so this checked nothing")
-	}
-	sort.Strings(unknown)
-	sort.Strings(undescribed)
-	if len(unknown) > 0 {
-		t.Errorf("printed by the gate and defined by no target, so the gate would ask make for %s:\n  %s",
-			plural(len(unknown)), strings.Join(unknown, "\n  "))
-	}
-	if len(undescribed) > 0 {
-		t.Errorf("run by the gate and described nowhere in DESIGN-build.md, which reads as a remnant:\n  %s",
-			strings.Join(undescribed, "\n  "))
-	}
-
-	var invented []string
-	described := 0
 	for _, found := range documented.FindAllStringSubmatch(document, -1) {
-		described++
-		if !targets[found[1]] {
-			invented = append(invented, found[1])
+		out.described++
+		if !defined[found[1]] {
+			out.invented = append(out.invented, found[1])
 		}
 	}
-	if described == 0 {
-		t.Fatal("DESIGN-build.md names no make target, so this checked nothing")
+	sort.Strings(out.unknown)
+	sort.Strings(out.undescribed)
+	sort.Strings(out.invented)
+	return out
+}
+
+// Each direction of the join, given inputs that must be reported.
+func TestATargetGapIsReportedInEveryDirection(t *testing.T) {
+	defined := map[string]bool{"lint": true, "test": true}
+	gaps := targetGaps(`"lint", "test", "ghost", "quiet"`,
+		"`make lint` and `test`, and `make typo`", defined)
+	if strings.Join(gaps.unknown, ",") != "ghost,quiet" {
+		t.Errorf("unknown: %v, want the two the makefile does not define", gaps.unknown)
 	}
-	sort.Strings(invented)
-	if len(invented) > 0 {
-		t.Errorf("described in DESIGN-build.md and defined by no target, so typing %s gets nothing:\n  %s",
-			plural(len(invented)), strings.Join(invented, "\n  "))
+	if strings.Join(gaps.undescribed, ",") != "ghost,quiet" {
+		t.Errorf("undescribed: %v, want the two the document does not name", gaps.undescribed)
+	}
+	if strings.Join(gaps.invented, ",") != "typo" {
+		t.Errorf("invented: %v, want the one the makefile does not define", gaps.invented)
+	}
+	clean := targetGaps(`"lint"`, "`make lint`", defined)
+	if len(clean.unknown)+len(clean.undescribed)+len(clean.invented) != 0 {
+		t.Errorf("a clean join reported %+v", clean)
 	}
 }
 

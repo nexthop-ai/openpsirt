@@ -65,7 +65,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
 | `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `DESIGN-remediation.md` |
-| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gates that are not linters |
+| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the commands the makefile runs: the gates that are not linters, and the release, rehearsal and image-inventory tools |
 | `web/` | The interface source. See `DESIGN-interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
@@ -116,9 +116,9 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make sbom` | This project's own CycloneDX inventory |
 | `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests with coverage, class-name checks, and the generated client diffed against the API document. Refuses without npm rather than skipping |
 | `make unreachable` | Exported code nothing reaches |
-| `make negatives` | A 404 built from an error's own text: it asserts a name reaches nothing, and publishes whatever the error carried |
-| `make granted` | Every query outside the access package asks both grant tables |
-| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read |
+| `make negatives` | A 404 built from an error's own text, or given an error as a detail: it asserts a name reaches nothing, and publishes whatever the error carried. Read as parsed Go, so a call spread over lines and an error under any name are one shape |
+| `make granted` | Every function that reaches one grant table reaches the other, by the table's name or by the model bound to it. The functions that legitimately ask one — writing or listing that table's own rows — are named in the gate with a reason each, and a name nothing matches fails it |
+| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read. A resolution bound by an assignment or by `var` is followed; one used inline without a binding is not |
 | `make attached` | A doc comment describing something other than the declaration it sits on |
 | `make confined` | Engine-specific code outside the two places allowed to hold it |
 | `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
@@ -157,7 +157,7 @@ query runs both.
 | `web/**` alone | `web-check`, `spdx` |
 | Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
-| Go the API document is generated from | `openapi-current`, `web-api` |
+| Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
 
 | Rule | |

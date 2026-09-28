@@ -4,6 +4,7 @@
 package docs_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -91,77 +92,163 @@ func documents(t *testing.T, pattern string) map[string]string {
 	return docs
 }
 
+// contentsProblems is everything wrong with a document's Contents section: it
+// is not the first section, an entry navigates somewhere its label does not
+// name, or the entries are not the document's sections in order.
+//
+// Entries are read from the Contents section alone, so a list elsewhere in the
+// document is neither mistaken for it nor able to stand in for a missing one.
+func contentsProblems(name, text string) []string {
+	var problems []string
+	sections := designHeading.FindAllStringSubmatchIndex(text, -1)
+	var headings []string
+	from, to := -1, len(text)
+	for i, at := range sections {
+		level, heading := text[at[2]:at[3]], text[at[4]:at[5]]
+		if level != "##" {
+			continue
+		}
+		if heading == "Contents" {
+			if len(headings) > 0 || from >= 0 {
+				problems = append(problems, name+": Contents is not the first section")
+			}
+			from = at[1]
+			for _, next := range sections[i+1:] {
+				if text[next[2]:next[3]] == "##" {
+					to = next[0]
+					break
+				}
+			}
+			continue
+		}
+		headings = append(headings, heading)
+	}
+	if from < 0 {
+		return append(problems, name+": does not open with a Contents section")
+	}
+	var listed []string
+	for _, m := range contentsEntry.FindAllStringSubmatch(text[from:to], -1) {
+		listed = append(listed, m[1])
+		if want := anchorFor(m[1]); m[2] != want {
+			problems = append(problems, fmt.Sprintf("%s: the Contents entry %q points at #%s, which "+
+				"is not the anchor its own label derives (#%s) — it reads as one section and "+
+				"navigates to another", name, m[1], m[2], want))
+		}
+	}
+	if strings.Join(headings, "\n") != strings.Join(listed, "\n") {
+		problems = append(problems, fmt.Sprintf("%s: Contents does not match the sections.\n"+
+			"  sections: %v\n  contents: %v", name, headings, listed))
+	}
+	return problems
+}
+
 func TestEveryDesignDocumentListsItsOwnSections(t *testing.T) {
 	// A section added without an entry is a section nobody scanning the
 	// contents knows exists, and the drift is silent: the document renders,
 	// the links all work, and the list is simply short.
-	for name, text := range designDocuments(t) {
-		var headings []string
-		for _, m := range designHeading.FindAllStringSubmatch(text, -1) {
-			if m[1] != "##" || m[2] == "Contents" {
-				continue
-			}
-			headings = append(headings, m[2])
-		}
-		var listed []string
-		for _, m := range contentsEntry.FindAllStringSubmatch(text, -1) {
-			listed = append(listed, m[1])
-			if want := anchorFor(m[1]); m[2] != want {
-				t.Errorf("%s: the Contents entry %q points at #%s, which is not the "+
-					"anchor its own label derives (#%s) — it reads as one section and "+
-					"navigates to another", name, m[1], m[2], want)
-			}
-		}
-		if len(listed) == 0 {
-			t.Errorf("%s: has no Contents section", name)
-			continue
-		}
-		if strings.Join(headings, "\n") != strings.Join(listed, "\n") {
-			t.Errorf("%s: Contents does not match the sections.\n  sections: %v\n  contents: %v",
-				name, headings, listed)
+	//
+	// The design documents, and the README, which carries a list because it
+	// is read on the repository page, outside the site that generates one.
+	docs := designDocuments(t)
+	for name, text := range documents(t, filepath.Join("..", "..", "README.md")) {
+		docs[name] = text
+	}
+	for name, text := range docs {
+		for _, problem := range contentsProblems(name, text) {
+			t.Error(problem)
 		}
 	}
+}
+
+// Each way a Contents section goes wrong is reported, and a right one is not.
+func TestAContentsSectionIsHeldToTheSections(t *testing.T) {
+	const right = "# T\n\n## Contents\n\n- [Scope](#scope)\n- [Parsing rules](#parsing-rules)\n\n" +
+		"## Scope\n\ntext\n\n### Detail\n\n## Parsing rules\n\ntext\n"
+	if problems := contentsProblems("right", right); len(problems) != 0 {
+		t.Errorf("a right Contents section was reported: %v", problems)
+	}
+	for what, text := range map[string]string{
+		"a stale entry":           strings.Replace(right, "- [Scope](#scope)", "- [Scoped](#scoped)", 1),
+		"an anchor that differs":  strings.Replace(right, "(#scope)", "(#scop)", 1),
+		"a section with no entry": right + "\n## Limits\n\ntext\n",
+		"no Contents heading":     strings.Replace(right, "## Contents\n", "", 1),
+		// Listing the section before it, so only the position is wrong.
+		"Contents second": strings.Replace(strings.Replace(right, "## Contents", "## First\n\n## Contents", 1),
+			"- [Scope]", "- [First](#first)\n- [Scope]", 1),
+		"the list elsewhere": "# T\n\n## Contents\n\n## Scope\n\n- [Scope](#scope)\n" +
+			"- [Parsing rules](#parsing-rules)\n\n## Parsing rules\n",
+	} {
+		if len(contentsProblems(what, text)) == 0 {
+			t.Errorf("%s was not reported", what)
+		}
+	}
+}
+
+// headingProblems is everything wrong with one heading: past the bound, ended
+// as a sentence, opened on a question word, or a gerund taking an object.
+func headingProblems(name, heading string) []string {
+	var problems []string
+	if n := len(strings.Fields(heading)); n > headingWords {
+		problems = append(problems, fmt.Sprintf("%s: heading is %d words, over %d: %q",
+			name, n, headingWords, heading))
+	}
+	if strings.HasSuffix(heading, ".") || strings.HasSuffix(heading, "?") {
+		problems = append(problems, fmt.Sprintf("%s: heading ends as a sentence: %q", name, heading))
+	}
+	if first := strings.Fields(heading); len(first) > 0 {
+		if interrogative[strings.ToLower(strings.Trim(first[0], "*`"))] {
+			problems = append(problems, fmt.Sprintf("%s: heading asks rather than names: %q", name, heading))
+		}
+		// A bare gerund is a noun — "Parsing", "Scanning" — and one taking an
+		// object is a verb with its object: "Asking upstream what is current".
+		coordinated := len(first) > 1 &&
+			(strings.EqualFold(first[1], "and") || strings.EqualFold(first[1], "or"))
+		if len(first) > 1 && strings.HasSuffix(strings.ToLower(first[0]), "ing") &&
+			!adjectival[strings.ToLower(first[0])] && !coordinated {
+			problems = append(problems, fmt.Sprintf("%s: heading is a gerund taking an object: %q", name, heading))
+		}
+	}
+	return problems
 }
 
 func TestEveryHeadingNamesItsSubject(t *testing.T) {
 	// A heading is a noun phrase naming the mechanism, not a sentence and not
 	// a teaser that withholds the subject to make somebody read on. Length,
 	// the wh-words and a gerund taking an object are the parts a machine can
-	// judge.
-	//
-	// Every document rather than the design documents alone. Globbed at
-	// DESIGN-*.md this never read the file that states the rule, so that file
-	// carried headings of nine words while defining the bound at six.
+	// judge. Every document rather than the design documents alone, the file
+	// stating the rule included.
 	checked := 0
 	for name, text := range everyDocument(t) {
 		for _, m := range anyHeading.FindAllStringSubmatch(text, -1) {
-			heading := strings.TrimSpace(m[2])
 			checked++
-			if n := len(strings.Fields(heading)); n > headingWords {
-				t.Errorf("%s: heading is %d words, over %d: %q",
-					name, n, headingWords, heading)
-			}
-			if strings.HasSuffix(heading, ".") || strings.HasSuffix(heading, "?") {
-				t.Errorf("%s: heading ends as a sentence: %q", name, heading)
-			}
-			if first := strings.Fields(heading); len(first) > 0 {
-				if interrogative[strings.ToLower(strings.Trim(first[0], "*`"))] {
-					t.Errorf("%s: heading asks rather than names: %q", name, heading)
-				}
-				// A bare gerund is a noun — "Parsing", "Scanning" — and one
-				// taking an object is a verb with its object: "Asking
-				// upstream what is current".
-				coordinated := len(first) > 1 &&
-					(strings.EqualFold(first[1], "and") || strings.EqualFold(first[1], "or"))
-				if len(first) > 1 && strings.HasSuffix(strings.ToLower(first[0]), "ing") &&
-					!adjectival[strings.ToLower(first[0])] && !coordinated {
-					t.Errorf("%s: heading is a gerund taking an object: %q", name, heading)
-				}
+			for _, problem := range headingProblems(name, strings.TrimSpace(m[2])) {
+				t.Error(problem)
 			}
 		}
 	}
 	if checked == 0 {
 		t.Fatal("no headings were read, so this checked nothing")
+	}
+}
+
+// Each shape a heading drifts into is reported, and the shapes it may take are
+// not.
+func TestAHeadingThatIsASentenceIsReported(t *testing.T) {
+	for _, bad := range []string{
+		"What the scanner reads",
+		"Asking upstream what is current",
+		"Ends.",
+		"Is it current?",
+		"A bump that did not reach the fix",
+	} {
+		if len(headingProblems("x", bad)) == 0 {
+			t.Errorf("%q was not reported", bad)
+		}
+	}
+	for _, good := range []string{"Parsing", "Upstream currency", "Routing rules", "Reading and writing"} {
+		if problems := headingProblems("x", good); len(problems) != 0 {
+			t.Errorf("%q was reported: %v", good, problems)
+		}
 	}
 }
 

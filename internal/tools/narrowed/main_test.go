@@ -139,6 +139,27 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			true,
 		},
 		{
+			"resolved and bound with var rather than assigned",
+			`func f() {
+				var named, err = names.LocateVisible(ctx, subject, product, stream, variant)
+				_ = err
+				rows := db.NewSelect().Where("product_id = ?", named.ProductID).Scan(ctx)
+				_ = rows
+			}`,
+			true,
+		},
+		{
+			"read through the build a resolver handed back, bound with var",
+			`func f() {
+				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+				_ = err
+				var target, _ = targetRow(ctx, in, named.StreamID, named.VariantID)
+				planned, err := store.PendingUpgrades(ctx, target.ID)
+				_ = planned
+			}`,
+			true,
+		},
+		{
 			"resolved and handed back, which is what a resolver does",
 			`func f() *catalog.Named {
 				named, err := catalog.NewStore(db).LocateVisible(ctx, subject, product, stream, variant)

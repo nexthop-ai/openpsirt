@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -271,7 +272,14 @@ func run(name, version, out string, inputs []string) error {
 	here := os.DirFS(".")
 	docs := make([]document, 0, len(inputs))
 	for _, path := range inputs {
-		body, err := fs.ReadFile(here, strings.TrimPrefix(path, "/"))
+		// Read below the working directory and nowhere else. A path that
+		// directory cannot address is refused in words, rather than an
+		// absolute one being read as if it were relative to here.
+		below := filepath.ToSlash(path)
+		if filepath.IsAbs(path) || !fs.ValidPath(below) {
+			return fmt.Errorf("%s: give an input relative to the working directory, with no parent directory in it", path)
+		}
+		body, err := fs.ReadFile(here, below)
 		if err != nil {
 			return err
 		}

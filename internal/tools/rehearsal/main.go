@@ -103,6 +103,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: rehearsal -from vX.Y.Z -engine sqlite|postgres|mysql|mariadb [-url …]")
 		os.Exit(2)
 	}
+	if err := usable(r.from, r.engine); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	r.adminURL = engineURL(r.adminURL, r.engine, os.Getenv)
 	if r.engine != "sqlite" && r.adminURL == "" {
 		fmt.Fprintf(os.Stderr, "%s needs %s or -url: the rehearsal makes its database beside the one it names\n",
@@ -832,4 +836,20 @@ func head(b []byte) string {
 		s = s[:200] + "…"
 	}
 	return s
+}
+
+// usable refuses a release and an engine that are not one, before either is
+// joined into a path. The directory named by the two is removed and replaced
+// by a worktree, so a -from like "../../elsewhere" would remove a directory
+// outside the run's own.
+func usable(from, engine string) error {
+	if _, err := released.Base(from); err != nil {
+		return err
+	}
+	for _, known := range database.Engines() {
+		if string(known) == engine {
+			return nil
+		}
+	}
+	return fmt.Errorf("%q is not an engine: one of sqlite, postgres, mysql or mariadb", engine)
 }

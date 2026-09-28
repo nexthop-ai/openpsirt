@@ -190,8 +190,15 @@ var storage = []string{
 // themselves were SQL is a narrower question than the one that matters.
 var query = regexp.MustCompile(`(?i)\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|CREATE TABLE|CREATE INDEX|ALTER TABLE|JOIN|GROUP BY|ORDER BY)\b|\.New(Select|Insert|Update|Delete|Raw)\(|RunInTx\(`)
 
-// An operation the API document is generated from.
-var operation = regexp.MustCompile(`huma\.(Register|Operation)|Summary:|OperationID:`)
+// What the API document is generated from: an operation, or a field whose
+// description it carries. A type a route answers with need not sit beside the
+// route, so a doc tag anywhere is read the same way.
+var operation = regexp.MustCompile(`huma\.(Register|Operation)|Summary:|OperationID:|\bdoc:"`)
+
+// apiPackage is the package the API document is generated from. Every file in it
+// takes the tier, whatever it holds: a type an operation answers with, its
+// field names and its tags, are the document as much as the operation is.
+const apiPackage = "internal/httpapi/"
 
 func classify(file string) tier {
 	switch {
@@ -231,7 +238,7 @@ func classify(file string) tier {
 	switch {
 	case query.Match(content):
 		return engines
-	case operation.Match(content):
+	case operation.Match(content), inAPIPackage(file):
 		return api
 	default:
 		return code
@@ -273,4 +280,10 @@ func changed() ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+// inAPIPackage is whether a path is a file of the package the API document is
+// generated from, relative to the checkout or below another directory.
+func inAPIPackage(file string) bool {
+	return strings.HasPrefix(file, apiPackage) || strings.Contains(file, "/"+apiPackage)
 }

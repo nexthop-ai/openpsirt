@@ -90,16 +90,18 @@ func vetGaps(text string) []string {
 	if !holds(under(lines, "run", "build-tags"), "measure") {
 		gaps = append(gaps, `the "measure" tag is not passed, so nothing compiles the measurement file`)
 	}
-	// The default skips any file marked generated, which go vet reads.
+	// The default skips any file marked generated, which go vet reads. Every
+	// other exclusion is refused, not only one naming govet: a path, a rule
+	// with no linters listed, or a preset takes files or findings away from
+	// every linter, govet among them.
 	exclusions := under(lines, "linters", "exclusions")
 	generated := false
 	for _, l := range exclusions {
-		switch {
-		case l.text == "generated: disable":
+		if l.text == "generated: disable" {
 			generated = true
-		case strings.Contains(l.text, "govet") || strings.Contains(l.text, "_test"):
-			gaps = append(gaps, "an exclusion takes files or findings away from govet: "+l.text)
+			continue
 		}
+		gaps = append(gaps, "an exclusion can take files or findings away from govet: "+l.text)
 	}
 	if !generated {
 		gaps = append(gaps, "generated files are excluded, and go vet reads them")
@@ -177,7 +179,32 @@ linters:
   enable:
     - govet
 `
-	if gaps := vetGaps(excluding); len(gaps) != 2 {
-		t.Errorf("an exclusion rule over govet and test files was reported as %v", gaps)
+	if gaps := vetGaps(excluding); len(gaps) == 0 {
+		t.Error("an exclusion rule over govet and test files was not reported")
+	}
+}
+
+// An exclusion that takes files away from every linter narrows govet as surely
+// as one naming it, and is reported however it is spelled.
+func TestAnExclusionNotNamingGovetStillNarrowsIt(t *testing.T) {
+	const base = `version: "2"
+run:
+  build-tags:
+    - measure
+linters:
+  default: none
+  enable:
+    - govet
+  exclusions:
+    generated: disable
+`
+	for what, extra := range map[string]string{
+		"a path":                 "    paths:\n      - internal/x/\n",
+		"a rule with no linters": "    rules:\n      - path: internal/x/\n        text: something\n",
+		"a preset":               "    presets:\n      - legacy\n",
+	} {
+		if gaps := vetGaps(base + extra); len(gaps) == 0 {
+			t.Errorf("%s was not reported", what)
+		}
 	}
 }

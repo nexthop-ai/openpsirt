@@ -68,6 +68,20 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 			api,
 		},
 		{
+			// A field's description is written into the document, wherever
+			// the type is declared.
+			"go declaring a documented field",
+			write("types.go", "package p\n\ntype X struct{ A int `json:\"a\" doc:\"x\"` }\n"),
+			api,
+		},
+		{
+			// A type a route answers with changes the document through its
+			// field names alone, with no tag to find.
+			"any go in the package the document is generated from",
+			write("internal/httpapi/shape.go", "package httpapi\n\ntype X struct{ A int }\n"),
+			api,
+		},
+		{
 			"plain go",
 			write("plain.go", "package p\n\nfunc add(a, b int) int { return a + b }\n"),
 			code,
