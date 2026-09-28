@@ -13,7 +13,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
-import { Outward } from "../ui/Outward";
+import { Elsewhere } from "../ui/Elsewhere";
 import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
 import { Happened } from "./QueueMine";
@@ -383,55 +383,6 @@ function Reaffirm({
       </div>
       {again.isError && <Failed error={again.error} what="It could not be re-affirmed." />}
     </div>
-  );
-}
-
-// The place this is being argued about or worked on outside here.
-//
-// Anybody who may argue about the claim may set it: a link is a note about
-// where the conversation is rather than a judgment, and needing a second
-// person for it would leave it unset. Nothing is ever fetched from it.
-function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () => void }) {
-  const point = useMutation({
-    mutationFn: async (to: string) =>
-      unwrap(
-        await api.PUT("/v1/claims/{id}/elsewhere", {
-          params: { path: { id } },
-          body: { elsewhere: to },
-        }),
-      ),
-    onSuccess: onSet,
-  });
-
-  return (
-    <p className="hint" style={{ margin: "10px 0 0" }}>
-      {where ? (
-        <>
-          Being worked on at{" "}
-          {/* Typed here rather than supplied by a scanner, and still a string
-              that becomes somewhere to click — so it is judged the same way a
-              scanner's reference is, by the one component that judges. */}
-          <Outward href={where} />
-          {". "}
-        </>
-      ) : (
-        "Nothing here says where this is being worked on. "
-      )}
-      <button
-        type="button"
-        className="linkish"
-        onClick={() => {
-          const to = window.prompt(
-            "The place this is being worked on: a ticket, a thread, a change. Nothing is ever sent to it.",
-            where,
-          );
-          if (to !== null) point.mutate(to.trim());
-        }}
-      >
-        {where ? "Change it" : "Link it"}
-      </button>
-      {point.error != null && <Failed error={point.error} what="That could not be recorded." />}
-    </p>
   );
 }
 

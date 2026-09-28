@@ -17,13 +17,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { notYours, unwrap } from "../api/queries";
-import { Outward } from "../ui/Outward";
+import { Elsewhere } from "../ui/Elsewhere";
 import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
 import { ReasonEditor } from "../ui/ReasonEditor";
 import { Markdown } from "../ui/Markdown";
-import { Thread } from "../ui/Thread";
-import { Editor, mentioning } from "../ui/Editor";
+import { EditPiece, Thread } from "../ui/Thread";
 import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
@@ -113,17 +112,6 @@ export function Standing({
     [rows.proposed ?? 0, rows.sent_back ?? 0, rows.approved ?? 0].filter((n) => n > 0).length > 1;
   const sentBackAt = summary?.sent_back_at ?? claim.decision?.sent_back_at;
   const queries = useQueryClient();
-  // The place this claim's work is happening. Stored and never fetched.
-  const point = useMutation({
-    mutationFn: async (where: string) =>
-      unwrap(
-        await api.PUT("/v1/claims/{id}/elsewhere", {
-          params: { path: { id } },
-          body: { elsewhere: where },
-        }),
-      ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["finding"] }),
-  });
   const approvals = useQuery({
     queryKey: ["decision", id, "approvals"],
     queryFn: async () =>
@@ -279,37 +267,11 @@ export function Standing({
         onDone={onRevised}
         spaced
       />
-      {/* Where this is being worked on or argued about outside here.
-          Anybody who may argue about the claim may set it: a link is a note
-          about where the conversation is rather than a judgment, and needing a
-          second person for it would leave it unset. */}
-      <p className="hint" style={{ margin: "8px 0 0" }}>
-        {summary?.elsewhere ? (
-          <>
-            Being worked on at{" "}
-            {/* Judged before it is somewhere to click, like every other
-                address that was somebody's text. */}
-            <Outward href={summary.elsewhere} />
-            {". "}
-          </>
-        ) : (
-          "Nothing here says where this is being worked on. "
-        )}
-        <button
-          type="button"
-          className="linkish"
-          onClick={() => {
-            const where = window.prompt(
-              "The place this is being worked on: a ticket, a thread, a change.",
-              summary?.elsewhere ?? "",
-            );
-            if (where !== null) point.mutate(where.trim());
-          }}
-        >
-          {summary?.elsewhere ? "Change it" : "Link it"}
-        </button>
-        {point.error != null && <Failed error={point.error} what="That could not be recorded." />}
-      </p>
+      <Elsewhere
+        id={id}
+        where={summary?.elsewhere ?? ""}
+        onSet={() => void queries.invalidateQueries({ queryKey: ["finding"] })}
+      />
     </div>
   );
 }
@@ -547,9 +509,11 @@ export function Comments({
         adding={comment}
         onAdd={(body, done) => comment.mutate({ id: claimId, body }, { onSuccess: done })}
         edit={(piece, done) => (
-          <Edit
+          <EditPiece
             id={piece.id ?? 0}
             was={piece.body ?? ""}
+            label="Comment"
+            useEdit={useEditComment}
             about={about}
             undisclosed={undisclosed}
             onDone={done}
@@ -571,58 +535,6 @@ function useCommentHistory(id: number) {
     queryFn: async () =>
       unwrap(await api.GET("/v1/comments/{id}/history", { params: { path: { id } } })),
   });
-}
-
-// Rewriting a comment in place.
-//
-// Only its author can, which the server enforces; the button is offered only
-// to them so that nobody is invited into a refusal. What it said before is
-// kept and readable behind the "edited" mark.
-//
-// No draft is saved. A draft exists so a half-written thought survives a
-// sign-out; this one starts as text that is already stored, so keeping a copy
-// of it would offer somebody their own comment back as an unsent draft.
-export function Edit({
-  id,
-  was,
-  onDone,
-  about,
-  undisclosed,
-}: {
-  id: number;
-  was: string;
-  onDone: () => void;
-  about: { product: string; vulnerability: string };
-  undisclosed?: boolean;
-}) {
-  const [text, setText] = useState(was);
-  const edit = useEditComment();
-  return (
-    <div className="field" style={{ margin: 0, maxWidth: "78ch" }}>
-      <Editor
-        value={text}
-        onChange={setText}
-        rows={4}
-        label="Comment"
-        attachTo={about}
-        mentions={mentioning(about.product, undisclosed)}
-      />
-      {edit.error != null && <Failed error={edit.error} what="That could not be changed." />}
-      <div className="actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={!text.trim() || text === was || edit.isPending}
-          onClick={() => edit.mutate({ id, body: text }, { onSuccess: onDone })}
-        >
-          Save
-        </button>
-        <button type="button" className="btn quiet" onClick={onDone}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
 }
 
 // The decisions made here before — lapsed, withdrawn — with their reasoning

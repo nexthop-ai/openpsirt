@@ -209,3 +209,66 @@ function Earlier({ history }: { history: UseQueryResult<{ items?: Version[] | nu
     </div>
   );
 }
+
+// Rewriting one piece of a thread in place.
+//
+// Only its author can, which the server enforces; the button is offered only
+// to them so that nobody is invited into a refusal. What it said before is
+// kept and readable behind the "edited" mark.
+//
+// No draft is saved. A draft exists so a half-written thought survives a
+// sign-out; this one starts as text that is already stored, so keeping a copy
+// of it would offer somebody their own words back as an unsent draft.
+//
+// The write is the caller's, as the thread's other endpoints are: a comment
+// and a note differ in where they are saved and in nothing drawn here.
+export function EditPiece({
+  id,
+  was,
+  label,
+  useEdit,
+  onDone,
+  about,
+  undisclosed,
+}: {
+  id: number;
+  was: string;
+  label: string;
+  useEdit: () => {
+    mutate: (piece: { id: number; body: string }, then: { onSuccess: () => void }) => void;
+    error: unknown;
+    isPending: boolean;
+  };
+  onDone: () => void;
+  about: { product: string; vulnerability: string };
+  undisclosed?: boolean;
+}) {
+  const [text, setText] = useState(was);
+  const edit = useEdit();
+  return (
+    <div className="field" style={{ margin: 0, maxWidth: "78ch" }}>
+      <Editor
+        value={text}
+        onChange={setText}
+        rows={4}
+        label={label}
+        attachTo={about}
+        mentions={mentioning(about.product, undisclosed)}
+      />
+      {edit.error != null && <Failed error={edit.error} what="That could not be changed." />}
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={!text.trim() || text === was || edit.isPending}
+          onClick={() => edit.mutate({ id, body: text }, { onSuccess: onDone })}
+        >
+          Save
+        </button>
+        <button type="button" className="btn quiet" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
