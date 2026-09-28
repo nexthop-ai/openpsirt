@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
@@ -21,45 +21,20 @@ import (
 // product the reader cannot see.
 func scanned(t *testing.T, fn func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, theirs int64)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
+		db := w.DB
 		store := ingest.NewStore(db.DB)
 
-		// Declaring is refused where the name is taken, and two builds of one
-		// product share a product and a branch by construction — so each level
-		// falls back to the one that exists.
-		build := func(product, stream, variant string) (int64, int64) {
-			p, err := cat.DeclareProduct(ctx, product, product)
-			if err != nil {
-				if p, err = cat.ProductByName(ctx, product); err != nil {
-					t.Fatal(err)
-				}
-			}
-			br, err := cat.DeclareStream(ctx, p.ID, stream, catalog.Branch, nil)
-			if err != nil {
-				if br, err = cat.StreamByName(ctx, p.ID, stream); err != nil {
-					t.Fatal(err)
-				}
-			}
-			v, err := cat.DeclareVariant(ctx, p.ID, variant, true)
-			if err != nil {
-				if v, err = cat.VariantByName(ctx, p.ID, variant); err != nil {
-					t.Fatal(err)
-				}
-			}
-			target, err := cat.TargetFor(ctx, br.ID, v.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return p.ID, target.ID
-		}
-
-		ours, current := build("sonic", "master", "broadcom")
-		_, silent := build("sonic", "master", "mellanox")
-		theirs, hidden := build("edge-router", "main", "generic")
+		// The world's build is the one filed against recently. A second
+		// variant of the same branch is the one that went silent, and a
+		// product the reader holds nothing on has the third.
+		ours, current := w.Product.ID, w.Target.ID
+		silent := w.TargetFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true)).ID
+		elsewhere := w.DeclareProduct("edge-router", "Edge Router")
+		theirs := elsewhere.ID
+		hidden := w.TargetFor(w.DeclareStream(elsewhere, "main", catalog.Branch, nil),
+			w.DeclareVariant(elsewhere, "generic", true)).ID
 
 		file := func(target int64, hash string, ago time.Duration) {
 			at := time.Now().UTC().Add(-ago)
@@ -125,7 +100,7 @@ func TestScanningCountsFromDeclarationWhereNothingEverArrived(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		v, err := cat.VariantByName(t.Context(), ours, "broadcom")
+		v, err := cat.VariantByName(t.Context(), ours, fixture.CustomerVariant)
 		if err != nil {
 			t.Fatal(err)
 		}
