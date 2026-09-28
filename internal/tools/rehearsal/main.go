@@ -491,15 +491,21 @@ func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, erro
 	}
 }
 
+// connect opens a database by its URL, parsed by the database package so a
+// malformed one is refused without quoting the password it holds.
+func connect(ctx context.Context, raw string) (*database.DB, error) {
+	target, err := database.ParseURL(raw)
+	if err != nil {
+		return nil, err
+	}
+	return database.Open(ctx, target)
+}
+
 // droppedSettings counts the settings migration 38 removes from what the
 // release left: the patch branch switch, and v0.1.0's name for the disclosure
 // threshold where the new name is also stored.
 func (r *run) droppedSettings(ctx context.Context) (int64, error) {
-	target, err := database.ParseURL(r.hostURL)
-	if err != nil {
-		return 0, err
-	}
-	db, err := database.Open(ctx, target)
+	db, err := connect(ctx, r.hostURL)
 	if err != nil {
 		return 0, err
 	}
@@ -519,11 +525,7 @@ func (r *run) droppedSettings(ctx context.Context) (int64, error) {
 // count reads how many rows each table holds, with nothing running against
 // the database.
 func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
-	target, err := database.ParseURL(r.hostURL)
-	if err != nil {
-		return nil, err
-	}
-	db, err := database.Open(ctx, target)
+	db, err := connect(ctx, r.hostURL)
 	if err != nil {
 		return nil, err
 	}
@@ -733,11 +735,9 @@ func (r *run) clean(ctx context.Context) {
 	_ = exec.CommandContext(ctx, "docker", "rm", "-f", app, proxy).Run()
 	_ = exec.CommandContext(ctx, "docker", "network", "rm", network).Run()
 	if r.engine != "sqlite" && r.adminURL != "" {
-		if target, err := database.ParseURL(r.adminURL); err == nil {
-			if db, err := database.Open(ctx, target); err == nil {
-				_, _ = db.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+dbName+`"`)
-				_ = db.Close()
-			}
+		if db, err := connect(ctx, r.adminURL); err == nil {
+			_, _ = db.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+dbName+`"`)
+			_ = db.Close()
 		}
 	}
 	_ = os.RemoveAll(filepath.Join(r.demo, "data"))

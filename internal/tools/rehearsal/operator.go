@@ -28,11 +28,7 @@ var Implied = map[string]string{
 // a personal token's holds, gains the disclosed role beside it where it is not
 // already held. It returns how many rows it wrote.
 func (r *run) grantImplied(ctx context.Context) (int, error) {
-	target, err := database.ParseURL(r.hostURL)
-	if err != nil {
-		return 0, err
-	}
-	db, err := database.Open(ctx, target)
+	db, err := connect(ctx, r.hostURL)
 	if err != nil {
 		return 0, err
 	}
