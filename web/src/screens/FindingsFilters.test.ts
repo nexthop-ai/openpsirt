@@ -34,10 +34,9 @@ describe("the chips an address draws", () => {
     ]);
   });
 
-  it("draws one chip for known-exploited however the address spells it", () => {
-    expect(chips("only=exploited")).toEqual(["Known exploited: only"]);
+  it("draws a chip for known-exploited and for a fix version known", () => {
     expect(chips("exploited=1")).toEqual(["Known exploited: only"]);
-    expect(chips("exploited=1&only=exploited")).toEqual(["Known exploited: only"]);
+    expect(chips("fixable=1")).toEqual(["Fix version known: only"]);
   });
 
   it("draws a chip for one of two releases, and none for both", () => {
@@ -60,10 +59,10 @@ describe("removing a chip", () => {
     expect(chips(left)).toEqual(["Decision state: Pending approval"]);
   });
 
-  it("removes both spellings of known-exploited", () => {
-    const left = removed("exploited=1&only=exploited");
+  it("removes known-exploited and leaves a fix version known", () => {
+    const left = removed("exploited=1&fixable=1");
     expect(left.has("exploited")).toBe(false);
-    expect(left.has("only")).toBe(false);
+    expect(left.get("fixable")).toBe("1");
   });
 
   it("widens a one-of-two filter to both rather than dropping it", () => {
@@ -92,7 +91,7 @@ describe("clearing every chip", () => {
   it("leaves nothing narrowing, and keeps what is not a filter", () => {
     const left = withoutAny(
       address(
-        "q=ssl&floor=high&state=undecided&state=waiting&only=exploited&on=tag&support=past-eol" +
+        "q=ssl&floor=high&state=undecided&state=waiting&exploited=1&on=tag&support=past-eol" +
           "&planned=planned&hide=zlib&origin=manual&view=issues",
       ),
     );

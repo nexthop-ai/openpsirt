@@ -34,3 +34,6 @@ func StatementsV050(engine database.Engine) map[string][]string {
 		"chat_delivery":       {chatV050(t)[1]},
 	}
 }
+
+// Respelled is one kept findings-list query in v0.5.0's words.
+var Respelled = respelled

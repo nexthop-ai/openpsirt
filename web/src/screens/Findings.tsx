@@ -762,7 +762,6 @@ export function Findings() {
         <Filters
           params={asked}
           set={set}
-          setEach={setEach}
           setMany={setMany}
           tags={inUse.data?.items ?? []}
           oneBuild={oneBuild}

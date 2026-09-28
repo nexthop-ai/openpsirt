@@ -75,7 +75,7 @@ describe("the filters as the server takes them", () => {
   it("carries what the address says", () => {
     const asked = listQuery(
       new URLSearchParams(
-        "sort=severity&asc=yes&floor=high&only=exploited&state=undecided&hide=zlib,curl&running=overdue&open_for=30",
+        "sort=severity&asc=yes&floor=high&exploited=1&state=undecided&hide=zlib&hide=curl&running=overdue&open_for=30",
       ),
     );
     expect(asked).toMatchObject({
@@ -89,6 +89,10 @@ describe("the filters as the server takes them", () => {
       open_for: 30,
     });
     expect(asked).not.toHaveProperty("due_within");
+  });
+
+  it("reads a hidden name holding a comma as one name", () => {
+    expect(listQuery(new URLSearchParams([["hide", "a,b"]]))).toMatchObject({ exclude: ["a,b"] });
   });
 
   it("asks for every value of a filter the address repeats", () => {

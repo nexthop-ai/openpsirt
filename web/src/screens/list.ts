@@ -304,14 +304,11 @@ function num(raw: string | null, least: number, most: number): number | undefine
 //
 // Carried as the parameter repeated, like every other filter that takes a set,
 // so the summary above the list can offer one chip each and take one back off.
-// A comma-joined value is still read, because that is how it was written
-// before and an address somebody saved should still open the list they saved.
 function hiddenIn(params: URLSearchParams): string[] {
   return [
     ...new Set(
       params
         .getAll("hide")
-        .flatMap((each) => each.split(","))
         .map((each) => each.trim())
         .filter(Boolean),
     ),
@@ -328,11 +325,8 @@ export function listQuery(params: URLSearchParams) {
   const hiding = hiddenIn(params);
   const floor = one("severity", params.get("floor") ?? "") ?? "low";
   // Exploited and fix-available are two flags, so both can be asked at once.
-  // The single word `only` is read too, so an address somebody saved with it
-  // still opens the list they saved.
-  const only = params.get("only") ?? "";
-  const exploited = params.get("exploited") === "1" || only === "exploited";
-  const fixable = params.get("fixable") === "1" || only === "hasFix";
+  const exploited = params.get("exploited") === "1";
+  const fixable = params.get("fixable") === "1";
   // Repeated in the address rather than one value, because "undecided or
   // waiting" is a question a single value could not ask.
   const states = pick("state", params.getAll("state"));
