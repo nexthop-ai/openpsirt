@@ -12,6 +12,7 @@ REQ-78.
 - [The row a person reads](#the-row-a-person-reads)
 - [Issue identity](#issue-identity)
 - [Report contents](#report-contents)
+- [Issue dates](#issue-dates)
 - [Component suppliers](#component-suppliers)
 - [Component licenses](#component-licenses)
 - [Report merging](#report-merging)
@@ -172,6 +173,19 @@ being parsed and thrown away.
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
 | A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered, with the one the data calls the root cause first. It groups findings by the shape of the mistake rather than the package it landed in, and a published advisory states one of them — which is what the order says |
+
+## Issue dates
+
+An issue's published and last-modified dates come from a public vulnerability
+database asked about that issue, because no scanner report carries either
+(REQ-82). Not built.
+
+| Rule | |
+|---|---|
+| The source is OSV | It answers national and advisory identifiers alike, in batches, with no key |
+| Asked in the background | A scan does not wait on the network, and works without it (REQ-12) |
+| Only the dates are taken | Severity and fix state stay the scanner's, so the two sources have nothing to reconcile |
+| An issue the source does not know has no date | A figure that needs one says it is unknown |
 
 ## Component suppliers
 

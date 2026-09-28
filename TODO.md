@@ -50,6 +50,7 @@ A decision in `REQUIREMENTS.md` is in force and nothing implements it.
 | REQ-14 | Findings from static analyzers and fuzzers |
 | REQ-36 | Opening or updating an item in an external tracker. A finding stores a link somebody typed, and nothing follows it |
 | REQ-73 | Purging old data by exporting rows to a file and then dropping them. Nothing is purged or partitioned, and the column to partition on is undecided |
+| REQ-82 | Each issue's published and last-modified dates, read from a public vulnerability database. Nothing asks one |
 
 ## Known gaps
 
@@ -92,7 +93,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Fetch each issue's own record from a vulnerability database? | The scanner reports no date an issue was published or modified. A second source per issue would supply them. Storing the date as a field alone is rejected in `REQUIREMENTS.md` |
 | Count the exploitation clock from the catalog's date? | The clock starts when a scan learns an issue is exploited. The catalog states the date it added the issue, and nothing reads it |
 | Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |
 | Keep the screen's short list of weakness names? | The screen shows a short list in plain words. Published advisories use the full CWE catalog |
