@@ -132,6 +132,15 @@ export function satisfies(expression, against = allowed) {
   return position === tokens.length && result;
 }
 
+// What to say where no shipped dependency was read, or nothing where some
+// were. A lockfile whose every entry is marked for development, or one that
+// moved, refuses no license for the reason that it examined none.
+export function checkedNothing(checked) {
+  return checked === 0
+    ? "no shipped dependency was found in the lockfile, so this checked nothing"
+    : "";
+}
+
 // Run when this is the program, not when a test imports it.
 //
 // A script that reads the lockfile at import time cannot have a test beside
@@ -171,6 +180,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     refused.push(`${name} is ${license}`);
   }
 
+  const nothing = checkedNothing(checked);
+  if (nothing) {
+    console.error(nothing);
+    process.exit(1);
+  }
   if (refused.length === 0) {
     const note = excepted.length ? `, ${excepted.length} by documented exception` : "";
     console.log(
