@@ -16,6 +16,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -214,39 +215,13 @@ func registerVexImport(api huma.API, in Ingest) {
 				"who published it is longer than the %d characters this records; "+
 					"name it with ?publisher=", finding.MostPublisher))
 		}
-		statements := make([]finding.Statement, 0, len(said))
-		for _, one := range said {
-			for _, at := range one.Targets {
-				statements = append(statements, finding.Statement{
-					Vulnerability: one.Vulnerability,
-					Purl:          at.Purl,
-					About:         at.VersionNamed(),
-					Component:     at.ComponentNamed(),
-					Status:        string(one.Status),
-					Justification: one.Justification,
-					Statement:     one.Statement,
-				})
-			}
-		}
-		var recorded, superseded int
-		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
-			var err error
-			recorded, superseded, err = finding.NewStore(tx).RecordStatements(ctx, by,
-				product.ID, finding.Supplied{
-					Source:    finding.FromVex,
-					Publisher: publisher,
-					Document:  file.Filename,
-					Digest:    digest,
-				}, statements)
-			if err != nil {
-				return asked(in.Logger, err)
-			}
-			if err := noted(ctx, tx, trail.Setting, "VEX statements from "+publisher,
-				nil, trail.Said(file.Filename, true)); err != nil {
-				return notRecorded(in.Logger, err)
-			}
-			return nil
-		}); err != nil {
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.ID, finding.Supplied{
+			Source:    finding.FromVex,
+			Publisher: publisher,
+			Document:  file.Filename,
+			Digest:    digest,
+		}, said, "VEX statements from "+publisher)
+		if err != nil {
 			return nil, err
 		}
 
@@ -255,6 +230,53 @@ func registerVexImport(api huma.API, in Ingest) {
 			Digest: digest,
 		}}, nil
 	})
+}
+
+// statementsOf is what a publisher's document says, one statement for each
+// component each claim names.
+func statementsOf(said []sbom.Suppression) []finding.Statement {
+	statements := make([]finding.Statement, 0, len(said))
+	for _, one := range said {
+		for _, at := range one.Targets {
+			statements = append(statements, finding.Statement{
+				Vulnerability: one.Vulnerability,
+				Purl:          at.Purl,
+				About:         at.VersionNamed(),
+				Component:     at.ComponentNamed(),
+				Status:        string(one.Status),
+				Justification: one.Justification,
+				Statement:     one.Statement,
+			})
+		}
+	}
+	return statements
+}
+
+// recordSupplied records what an uploaded document says about a product, in
+// place of what the same document said before, and notes the upload in the
+// trail under about. It answers how many statements it recorded and how many
+// earlier ones it set aside.
+func recordSupplied(ctx context.Context, in Ingest, by access.Subject, productID int64,
+	from finding.Supplied, said []sbom.Suppression, about string) (int, int, error) {
+
+	statements := statementsOf(said)
+	var recorded, superseded int
+	if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+		var err error
+		recorded, superseded, err = finding.NewStore(tx).RecordStatements(ctx, by,
+			productID, from, statements)
+		if err != nil {
+			return asked(in.Logger, err)
+		}
+		if err := noted(ctx, tx, trail.Setting, about,
+			nil, trail.Said(from.Document, true)); err != nil {
+			return notRecorded(in.Logger, err)
+		}
+		return nil
+	}); err != nil {
+		return 0, 0, err
+	}
+	return recorded, superseded, nil
 }
 
 // cited is a VEX statement's identifier as a citation, or none where

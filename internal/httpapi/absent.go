@@ -388,6 +388,23 @@ func locatedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 	return named, nil
 }
 
+// visibleBuild is the reader and the build a route is about: the build
+// resolved as the reader may see it and required to have been scanned.
+func visibleBuild(ctx context.Context, in Ingest, product, stream, variant string) (access.Subject, int64, error) {
+	subject, err := reading(ctx)
+	if err != nil {
+		return access.Subject{}, 0, err
+	}
+	if in.DB == nil {
+		return access.Subject{}, 0, noDatabase(in.Logger)
+	}
+	target, err := targetIDOf(ctx, in, subject, product, stream, variant)
+	if err != nil {
+		return access.Subject{}, 0, err
+	}
+	return subject, target, nil
+}
+
 // targetIDOf is the build a route is about, resolved and required to have been
 // scanned.
 //

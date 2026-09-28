@@ -1094,29 +1094,9 @@ func registerCoverage(api huma.API, in Ingest) {
 		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand"`
 		Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*coverageOutput, error) {
-		subject, err := reading(ctx)
+		rows, quietAfter, err := scanningRows(ctx, in, input.ScopeQuery)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		scope, err := scoped(ctx, in, subject, input.ScopeQuery)
-		if err != nil {
-			return nil, err
-		}
-		quietAfter, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the settings could not be read", err)
-		}
-
-		rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
-		if err != nil {
-			// The last scan of a build by anybody is a person's
-			// question, and the store says so. Answered as a fault, it reads
-			// as the deployment being broken rather than as this credential
-			// not being the one to ask.
-			return nil, refused(in.Logger, err, "what has been scanned could not be read")
 		}
 
 		out := &coverageOutput{}
@@ -1165,6 +1145,34 @@ func registerCoverage(api huma.API, in Ingest) {
 	})
 }
 
+// scanningRows is when each build the reader may see in the scope was last
+// scanned, with the threshold past which a build counts as quiet.
+func scanningRows(ctx context.Context, in Ingest, q ScopeQuery) ([]ingest.Coverage, time.Duration, error) {
+	subject, err := reading(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if in.DB == nil {
+		return nil, 0, noDatabase(in.Logger)
+	}
+	scope, err := scoped(ctx, in, subject, q)
+	if err != nil {
+		return nil, 0, err
+	}
+	quietAfter, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
+	if err != nil {
+		return nil, 0, wentWrong(in.Logger, "the settings could not be read", err)
+	}
+	rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
+	if err != nil {
+		// The last scan of a build by anybody is a person's question, and the
+		// store says so. Answered as a fault, it reads as the deployment being
+		// broken rather than as this credential not being the one to ask.
+		return nil, 0, refused(in.Logger, err, "what has been scanned could not be read")
+	}
+	return rows, quietAfter, nil
+}
+
 // registerCoverageExport writes coverage out as a file.
 //
 // Coverage is the report whose whole point is what is *not* there, and the
@@ -1194,31 +1202,12 @@ func registerCoverageExport(api huma.API, in Ingest) {
 		Format string `path:"format" enum:"csv,json"`
 		ScopeQuery
 	}) (*huma.StreamResponse, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		scope, err := scoped(ctx, in, subject, input.ScopeQuery)
-		if err != nil {
-			return nil, err
-		}
-		quietAfter, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the settings could not be read", err)
-		}
 		// Read once and paged out of the slice, because the reader answers
 		// whole: asking it again per page would re-run the same statement and
 		// re-sort the same estate for every two hundred rows.
-		rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
+		rows, quietAfter, err := scanningRows(ctx, in, input.ScopeQuery)
 		if err != nil {
-			// The last scan of a build by anybody is a person's
-			// question, and the store says so. Answered as a fault, it reads
-			// as the deployment being broken rather than as this credential
-			// not being the one to ask.
-			return nil, refused(in.Logger, err, "what has been scanned could not be read")
+			return nil, err
 		}
 		out := Exporting{
 			What:  "scanning",

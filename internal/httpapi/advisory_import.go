@@ -11,12 +11,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
-	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // advisoryParts is a supplier's security advisory arriving.
@@ -115,40 +113,14 @@ func registerAdvisoryImport(api huma.API, in Ingest) {
 				finding.MostDocumentName))
 		}
 
-		statements := make([]finding.Statement, 0, len(advisory.Claims))
-		for _, one := range advisory.Claims {
-			for _, at := range one.Targets {
-				statements = append(statements, finding.Statement{
-					Vulnerability: one.Vulnerability,
-					Purl:          at.Purl,
-					About:         at.VersionNamed(),
-					Component:     at.ComponentNamed(),
-					Status:        string(one.Status),
-					Justification: one.Justification,
-					Statement:     one.Statement,
-				})
-			}
-		}
-		var recorded, superseded int
-		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
-			var err error
-			recorded, superseded, err = finding.NewStore(tx).RecordStatements(ctx, by,
-				product.ID, finding.Supplied{
-					Source:     finding.FromAdvisory,
-					Identifier: advisory.Identifier,
-					Publisher:  advisory.Publisher,
-					Document:   file.Filename,
-					Digest:     digest,
-				}, statements)
-			if err != nil {
-				return asked(in.Logger, err)
-			}
-			if err := noted(ctx, tx, trail.Setting, "Advisory "+advisory.Identifier+
-				" from "+advisory.Publisher, nil, trail.Said(file.Filename, true)); err != nil {
-				return notRecorded(in.Logger, err)
-			}
-			return nil
-		}); err != nil {
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.ID, finding.Supplied{
+			Source:     finding.FromAdvisory,
+			Identifier: advisory.Identifier,
+			Publisher:  advisory.Publisher,
+			Document:   file.Filename,
+			Digest:     digest,
+		}, advisory.Claims, "Advisory "+advisory.Identifier+" from "+advisory.Publisher)
+		if err != nil {
 			return nil, err
 		}
 

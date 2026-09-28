@@ -563,18 +563,7 @@ func registerCarrying(api huma.API, in Ingest) {
 			Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
 		}
 	}, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		to, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		toTarget, err := targetRow(ctx, in, to.StreamID, to.VariantID)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -588,7 +577,7 @@ func registerCarrying(api huma.API, in Ingest) {
 		}
 
 		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
-			fromTarget.ID, toTarget.ID, input.Body.Decisions, triage.Bounds{})
+			fromTarget.ID, targetID, input.Body.Decisions, triage.Bounds{})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}

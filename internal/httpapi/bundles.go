@@ -300,22 +300,11 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
 	}) (*listOutput[PlannedBody], error) {
-		subject, err := reading(ctx)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
-		if err != nil {
-			return nil, err
-		}
-		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, target.ID)
+		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, targetID)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
@@ -340,25 +329,14 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Variant string `path:"variant"`
 		Format  string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		// Read whole before a byte is written, like the screen reads it: this
 		// is one build's plan rather than a paged list, and a refusal has to
 		// land before the status is gone.
-		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, target.ID)
+		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, targetID)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}

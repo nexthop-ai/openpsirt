@@ -69,22 +69,11 @@ func registerRun(api huma.API, in Ingest) {
 		Variant string `path:"variant"`
 		Run     int64  `path:"run" doc:"The run, as a receipt or a finding names it"`
 	}) (*struct{ Body RunBody }, error) {
-		subject, err := reading(ctx)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, noDatabase(in.logger())
-		}
-		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
-		if err != nil {
-			return nil, err
-		}
-		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, target.ID, input.Run)
+		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, targetID, input.Run)
 		if err != nil {
 			return nil, absent(in.Logger, err, "that run could not be looked up",
 				func() error { return huma.Error404NotFound("no such run on this build") })

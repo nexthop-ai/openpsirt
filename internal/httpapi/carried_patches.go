@@ -74,22 +74,11 @@ func registerCarried(api huma.API, in Ingest) {
 			Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
 		}
 	}, error) {
-		subject, err := reading(ctx)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
-		if err != nil {
-			return nil, err
-		}
-		rows, total, err := finding.NewStore(in.DB.DB).CarriedPatches(ctx, subject, target.ID,
+		rows, total, err := finding.NewStore(in.DB.DB).CarriedPatches(ctx, subject, targetID,
 			input.Component, input.Limit, input.Offset)
 		if err != nil {
 			return nil, refusedFinding(in, err)
