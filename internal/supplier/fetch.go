@@ -274,10 +274,13 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Skipped++
 		case errors.Is(err, errMismatched):
 			took.Mismatched++
-		case errors.As(err, &unreadable{}):
+		case errors.As(err, &unreadable{}), errors.Is(err, outward.ErrRefused):
 			// About this document rather than about the publisher, so the pass
 			// steps over it. Held instead, one withdrawn advisory still listed
-			// would stop everything issued after it, for ever.
+			// would stop everything issued after it, for ever. An address the
+			// client turns away itself — a redirect, a host an administrator
+			// excluded, a port other than https — is turned away on every
+			// pass, so it is about the document too.
 			took.Refused++
 		case ctx.Err() != nil:
 			return took, nil
@@ -468,9 +471,15 @@ func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
 	if err := f.json(ctx, client, address, &feed); err != nil {
 		return nil, err
 	}
+	// An entry's address is resolved against the feed's own, the way a link
+	// on the publisher's page is, as the list of changes is.
+	base, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]entry, 0, len(feed.Feed.Entries))
 	for _, one := range feed.Feed.Entries {
-		stamped, err := time.Parse(time.RFC3339, strings.TrimSpace(one.Updated))
+		stamped, err := stampOf(one.Updated)
 		if err != nil {
 			// An entry nobody can date cannot be placed against the mark, so
 			// taking it would mean taking it again on every pass for ever.
@@ -479,12 +488,30 @@ func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
 			continue
 		}
 		where := documentIn(one)
-		if !listable(where) {
+		if where == "" {
 			continue
 		}
-		out = append(out, entry{address: where, updated: stamped, sums: sumsIn(one)})
+		resolved, err := base.Parse(where)
+		if err != nil || !listable(resolved.String()) {
+			continue
+		}
+		out = append(out, entry{address: resolved.String(), updated: stamped, sums: sumsIn(one)})
 	}
 	return out, nil
+}
+
+// stampOf reads a listing's moment at the precision the mark is stored at.
+//
+// A publisher may write finer than a microsecond, and the mark is kept to the
+// microsecond: compared finer, the entry the mark was taken from is never equal
+// to it, so it is read again every pass, and a batch sharing one moment past
+// what a pass takes never drains.
+func stampOf(said string) (time.Time, error) {
+	stamped, err := time.Parse(time.RFC3339, strings.TrimSpace(said))
+	if err != nil {
+		return time.Time{}, err
+	}
+	return stamped.UTC().Truncate(time.Microsecond), nil
 }
 
 // sumsIn is where one feed entry says the digests of its document are: the
@@ -548,7 +575,7 @@ func (f *Fetcher) fromChanges(ctx context.Context, client *http.Client,
 		case len(row) < 2:
 			continue
 		}
-		stamped, err := time.Parse(time.RFC3339, strings.TrimSpace(row[1]))
+		stamped, err := stampOf(row[1])
 		if err != nil {
 			continue
 		}

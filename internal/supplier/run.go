@@ -30,6 +30,10 @@ const FetchLease = "supplier.fetch"
 // only once a day would take up to a day to notice they had.
 const betweenCycles = 5 * time.Minute
 
+// progressWrite bounds writing how far a pass reached once the pass itself
+// has been told to stop.
+const progressWrite = 5 * time.Second
+
 // allHistory is the most days of a supplier's history read, whatever the
 // setting says.
 //
@@ -186,6 +190,11 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 	took, err := p.fetch.From(ctx, recordedAs(source), source)
 	store := NewStore(p.db)
+	// Written even where the pass was cut short by shutdown, so the documents
+	// already recorded are not fetched again on the next start. Bounded, so a
+	// shutdown waits for one small write and no more.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), progressWrite)
+	defer cancel()
 	if took.Filled && err == nil {
 		if marked := store.CaughtUp(ctx, source.ID, took.CaughtUpTo, took.Mark); marked != nil {
 			p.logger.Error("recording how far a supplier was read",

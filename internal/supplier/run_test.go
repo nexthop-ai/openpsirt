@@ -4,6 +4,7 @@
 package supplier_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"strings"
@@ -197,6 +198,37 @@ func TestASupplierThatCannotBeReachedDoesNotStopTheNext(t *testing.T) {
 	})
 }
 
+// A pass cut short by shutdown still writes how far it reached, so what it
+// recorded is not fetched again on the next start.
+func TestAPassCutShortKeepsHowFarItReached(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		p := serving(t)
+		p.publishes("/2026/EL-40.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0040", "libnl-3-200", "3.7.1", "CVE-2026-9540"))
+		p.publishes("/2026/EL-41.json", "2026-09-21T00:00:00Z",
+			advisory("EL-2026-0041", "libnl-3-200", "3.7.2", "CVE-2026-9541"))
+		p.asking = func(path string) {
+			if path == "/2026/EL-41.json" {
+				stop()
+			}
+		}
+		store, _, pass := passOver(t, f, p, "test")
+		if _, err := pass.Once(ctx); err != nil && ctx.Err() == nil {
+			t.Fatal(err)
+		}
+		rows, err := store.For(t.Context(), f.by, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)
+		if len(rows) != 1 || rows[0].CaughtUpTo == nil || !rows[0].CaughtUpTo.UTC().Equal(want) {
+			t.Fatalf("the supplier reads as %+v after a pass cut short, want its mark at %v", rows, want)
+		}
+	})
+}
+
 func TestOneReplicaReachesOutAndTheOtherDoesNothing(t *testing.T) {
 	// The politeness this pass keeps to is a rate per deployment rather than
 	// per replica, and three replicas each keeping to it would be three times
@@ -207,15 +239,7 @@ func TestOneReplicaReachesOutAndTheOtherDoesNothing(t *testing.T) {
 		p.publishes("/2026/EL-9.json", "2026-09-20T00:00:00Z",
 			advisory("EL-2026-0009", "libnl-3-200", "3.7.1", "CVE-2026-9333"))
 
-		store := supplier.NewStore(f.db.DB)
-		row, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-			Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		store, _, second := passOver(t, f, p, "two")
 
 		// The lease is taken by one replica while the supplier is still due, so
 		// what stops the second is the lease and nothing else. Run the other
@@ -234,8 +258,6 @@ func TestOneReplicaReachesOutAndTheOtherDoesNothing(t *testing.T) {
 			t.Fatalf("the supplier is not due, so the lease is not what is being tested")
 		}
 
-		second := supplier.NewPass(f.db.DB, quiet(), "two", sbom.Limits{}, outward.Excluded{})
-		supplier.FetchForTest(second, fetching(t, f, p))
 		took, err := second.Once(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -268,18 +290,7 @@ func TestAnAdvisoryIsRecordedAsTheAdministratorWhoNamedTheSupplier(t *testing.T)
 		p.publishes("/2026/EL-10.json", "2026-09-20T00:00:00Z",
 			advisory("EL-2026-0010", "libnl-3-200", "3.7.1", "CVE-2026-9444"))
 
-		store := supplier.NewStore(f.db.DB)
-		row, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-			Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
-		supplier.FetchForTest(pass, fetching(t, f, p))
+		_, _, pass := passOver(t, f, p, "test")
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -310,18 +321,7 @@ func TestTheBoundOnOneCycleIsTheSameWhicheverWayTheFeedIsOrdered(t *testing.T) {
 					"CVE-2026-95"+byteName(i)))
 		}
 
-		store := supplier.NewStore(f.db.DB)
-		row, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-			Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
-		supplier.FetchForTest(pass, fetching(t, f, p))
+		store, _, pass := passOver(t, f, p, "test")
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
 		}

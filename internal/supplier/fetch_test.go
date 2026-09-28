@@ -46,6 +46,8 @@ type publisher struct {
 	// excluded are hosts the client refuses the way it refuses one an
 	// administrator excluded.
 	excluded []string
+	// asking runs as each path is asked for, before it is answered.
+	asking func(path string)
 }
 
 func serving(t *testing.T) *publisher {
@@ -59,6 +61,9 @@ func serving(t *testing.T) *publisher {
 	// whoever is between us and them.
 	p.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p.asked = append(p.asked, r.URL.Path)
+		if p.asking != nil {
+			p.asking(r.URL.Path)
+		}
 		if p.override != nil {
 			p.override(w, r)
 			return
@@ -358,6 +363,25 @@ func from(t *testing.T, f *ships, p *publisher) supplier.Source {
 	row.CaughtUpMark = ""
 	row.CreatedAt = long
 	return *row
+}
+
+// passOver configures one publisher as a supplier, wound back so the documents
+// in a test are ahead of its mark, and a pass reading it through the test's
+// client.
+func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.Store, *supplier.Source, *supplier.Pass) {
+	t.Helper()
+	store := supplier.NewStore(f.db.DB)
+	row, err := store.Add(t.Context(), f.by, f.product, "Example Linux", p.described())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
+		Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	pass := supplier.NewPass(f.db.DB, quiet(), replica, sbom.Limits{}, outward.Excluded{})
+	supplier.FetchForTest(pass, fetching(t, f, p))
+	return store, row, pass
 }
 
 func TestAnAdvisoryAboutSomethingThisProductShipsIsRecordedAsEvidence(t *testing.T) {
