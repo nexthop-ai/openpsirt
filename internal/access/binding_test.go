@@ -520,6 +520,41 @@ func TestAProxyCanReportMembershipToo(t *testing.T) {
 // that group then removed administration the group never granted. A switch
 // back to direct roles clears exactly the rows marked derived, so it was not
 // recoverable that way either.
+// A sign-in the mapping cannot give an account is refused as a stranger is,
+// never as a fault: asking again cannot change the answer, and a fault is
+// what tells a caller to ask again.
+func TestASignInWhoseNameIsSomebodyElsesIsRefusedAsAStranger(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.BindOver(ctx, "platform-admins", access.Administers); err != nil {
+			t.Fatal(err)
+		}
+		anna, err := f.store.Ensure(ctx, "anna", "Anna", access.Stated(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Claim(ctx, anna.ID, "ana"); err != nil {
+			t.Fatal(err)
+		}
+		first := access.Arrival{Provider: "https://idp.example.test", Subject: "one",
+			Username: "ana", DisplayName: "Anna"}
+		if _, err := f.store.AdmitByGroups(ctx, first, []string{"platform-admins"}); err != nil {
+			t.Fatalf("the person the name was claimed for was refused: %v", err)
+		}
+
+		// Somebody else at the provider now carries the name.
+		second := access.Arrival{Provider: "https://idp.example.test", Subject: "two",
+			Username: "ana", DisplayName: "Another Ana"}
+		_, err = f.store.AdmitByGroups(ctx, second, []string{"platform-admins"})
+		if err == nil {
+			t.Fatal("a second person was signed in under a name somebody else holds")
+		}
+		if !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a name somebody else holds was answered as a fault: %v", err)
+		}
+	})
+}
+
 func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

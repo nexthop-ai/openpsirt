@@ -5,11 +5,14 @@ package triage_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -324,4 +327,30 @@ func (f *fixture) anotherIssue(t *testing.T, identifier string) int64 {
 		t.Fatal(err)
 	}
 	return id
+}
+
+// A note that could not be read is a fault, not a note that is not there.
+func TestAnEarlierNoteThatCouldNotBeReadIsNotAbsent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gone.db")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target, err := database.ParseURL("sqlite://" + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err := database.Open(t.Context(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gone.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = triage.NewStore(gone.DB).EarlierNote(t.Context(), access.Everything("a test"), 1)
+	if err == nil {
+		t.Fatal("a database nobody can reach answered with earlier notes")
+	}
+	if errors.Is(err, triage.ErrNoSuchNote) {
+		t.Errorf("a database nobody can reach said the note is not there: %v", err)
+	}
 }

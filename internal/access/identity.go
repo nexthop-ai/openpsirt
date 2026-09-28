@@ -5,6 +5,7 @@ package access
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -84,6 +85,9 @@ func (s *Store) ClaimingWithin(window time.Duration) *Store {
 	return &within
 }
 
+// ErrNameTaken says a username is already another person's way in.
+var ErrNameTaken = errors.New("already somebody else here")
+
 // Claim authorizes somebody to sign in, before any provider has been asked
 // about them.
 //
@@ -104,7 +108,7 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 	err := s.db.NewSelect().Model(existing).Where("username = ?", username).Scan(ctx)
 	if err == nil {
 		if existing.PersonID != personID {
-			return fmt.Errorf("%q is already somebody else here", username)
+			return fmt.Errorf("%q is %w", username, ErrNameTaken)
 		}
 		// Authorizing somebody again restarts the window. Without this the
 		// window is written once and never again, so an authorization nobody

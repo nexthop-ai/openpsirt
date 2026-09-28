@@ -393,7 +393,11 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		}
 		// The mapping authorized them, so the way they arrived is recorded and
 		// pinned now rather than waiting for a second sign-in.
-		if err := s.Claim(ctx, person.ID, who.Username); err != nil {
+		// A name somebody else holds is a refusal, as any arrival nothing
+		// authorized is: asking again cannot change it.
+		if err := s.Claim(ctx, person.ID, who.Username); errors.Is(err, ErrNameTaken) {
+			return nil, ErrDenied
+		} else if err != nil {
 			return nil, err
 		}
 		if _, err := s.match(ctx, who); err != nil {
