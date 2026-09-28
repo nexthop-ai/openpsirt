@@ -263,6 +263,16 @@ func TestTheThirdVersionStatesStructureInOneDirection(t *testing.T) {
 			if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
 				t.Errorf("edges are %v", got)
 			}
+			// An optional dependency is recorded in the word the second
+			// version's type for it is, so a filter answers the same about
+			// it whichever version stated it.
+			want := ""
+			if kind == "hasOptionalDependency" {
+				want = "optional"
+			}
+			if got := doc.Dependencies[0].Kind; got != want {
+				t.Errorf("the edge says %q, want %q", got, want)
+			}
 		})
 	}
 }
@@ -303,15 +313,6 @@ func TestALifecycleScopeSaysWhenNotWhether(t *testing.T) {
 	scoped := func(scope string) string {
 		return strings.Replace(minimalSPDX3, `"type": "Relationship", "creationInfo": "_:creationInfo",`,
 			`"type": "LifecycleScopedRelationship", "creationInfo": "_:creationInfo", "scope": "`+scope+`",`, 1)
-	}
-
-	for _, scope := range []string{"build", "runtime", "design", "development", "other"} {
-		t.Run(scope+" ships", func(t *testing.T) {
-			doc := read(t, scoped(scope))
-			if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
-				t.Errorf("edges are %v", got)
-			}
-		})
 	}
 
 	t.Run("test does not", func(t *testing.T) {
@@ -363,7 +364,7 @@ func TestTheThirdVersionChargesTheSameBounds(t *testing.T) {
 		want  string
 	}{
 		{"elements", sbom.Limits{MaxComponents: 3}, "component limit"},
-		{"edges", sbom.Limits{MaxEdges: 0, MaxComponents: 100, MaxDepth: 3}, "level limit"},
+		{"depth", sbom.Limits{MaxComponents: 100, MaxDepth: 3}, "level limit"},
 		{"size", sbom.Limits{MaxBytes: 64}, "larger than the configured limit"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -733,10 +734,10 @@ func TestOnlyTheDocumentSaysWhatABuildIsAbout(t *testing.T) {
 }
 
 func TestARelationshipsScopeIsRecordedOnTheEdge(t *testing.T) {
-	// This version states the phase as a scope on an ordinary dependency. The
-	// reader already refused to read it as "does not ship", correctly, and
-	// then threw it away — which is a different thing and is what left the
-	// tool unable to express the deferral class at all.
+	// This version states the phase as a scope on an ordinary dependency,
+	// and the scope is kept on the edge. It says when a dependency matters,
+	// never whether it ships, and without it the deferral class cannot be
+	// expressed at all.
 	for _, tc := range []struct {
 		stated string
 		want   string
@@ -760,16 +761,46 @@ func TestARelationshipsScopeIsRecordedOnTheEdge(t *testing.T) {
 			}
 		})
 	}
+}
 
-	// The one exception, unchanged: a test dependency places nothing, and
-	// there is no edge for a word to sit on.
-	doc := read(t, strings.Replace(minimalSPDX3,
-		`"relationshipType": "dependsOn"`,
-		`"relationshipType": "dependsOn", "scope": "test"`, 1))
-	if len(doc.Dependencies) != 0 {
-		t.Errorf("a test-scoped dependency became %d edge(s)", len(doc.Dependencies))
+func TestCreationInformationWrittenInPlaceIsRead(t *testing.T) {
+	// The format lets an element write its creation information out as an
+	// object where it would otherwise refer to one.
+	const (
+		document = `"type": "SpdxDocument",
+     "creationInfo": "_:creationInfo"`
+		library = `"spdxId": "urn:a", "type": "software_Package", "creationInfo": "_:creationInfo"`
+	)
+	inline := func(on, created, version string) string {
+		stated := strings.Replace(on, `"_:creationInfo"`, `{"type": "CreationInfo",
+		  "specVersion": "`+version+`", "created": "`+created+`", "createdBy": ["urn:tool"]}`, 1)
+		return strings.Replace(minimalSPDX3, on, stated, 1)
+	}
+	onDocument := inline(document, "2026-09-01T00:00:00Z", "3.0.1")
+	if onDocument == minimalSPDX3 {
+		t.Fatal("the fixture no longer has the shape this rewrites")
+	}
+	doc := read(t, onDocument)
+	if want := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC); !doc.BuiltAt.Equal(want) {
+		t.Errorf("built at %v, want the time the document states in place, %v", doc.BuiltAt, want)
 	}
 	if len(doc.Components) != 1 {
-		t.Errorf("read %d components, want 1 — the component is still held", len(doc.Components))
+		t.Errorf("read %d components", len(doc.Components))
+	}
+
+	// Stated on a package it is that package's creation, not the build's.
+	onPackage := inline(library, "2020-01-01T00:00:00Z", "3.0.1")
+	if onPackage == minimalSPDX3 {
+		t.Fatal("the fixture no longer has the shape this rewrites")
+	}
+	doc = read(t, onPackage)
+	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !doc.BuiltAt.Equal(want) {
+		t.Errorf("built at %v, want the document's own %v", doc.BuiltAt, want)
+	}
+
+	// A version in place is checked as one referred to is.
+	if _, err := sbom.Read(strings.NewReader(inline(document,
+		"2026-09-01T00:00:00Z", "4.0.0")), sbom.Limits{}); err == nil {
+		t.Error("a document stating a version this does not read, in place, was read")
 	}
 }

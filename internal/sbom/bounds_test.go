@@ -32,16 +32,15 @@ func held(t *testing.T, body string, units int) float64 {
 
 func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 	// The bounds exist so that a document nobody could have meant cannot take
-	// the process down, and they were set by eye. Measured, an edge costs
-	// about half a kilobyte of heap while it is being read — so a ceiling of
-	// two million edges permitted about a gigabyte from a seventy-megabyte
-	// file, in the background reader that runs *after* the upload was
-	// answered 202. The uploader is told it worked and the process dies.
+	// the process down. Measured, an edge costs about half a kilobyte of heap
+	// while it is being read, so two million edges is about a gigabyte from a
+	// seventy-megabyte file, in the background reader that runs after the
+	// upload was answered 202.
 	//
 	// This is a wide bound rather than the measured number: heap accounting
 	// varies between runs and between versions of Go, and what it is for is
-	// catching a change that makes an edge an order of magnitude dearer,
-	// which is what would quietly put the ceiling back where it was.
+	// catching a change that makes an edge an order of magnitude dearer, which
+	// would quietly make the ceiling permit many times its budget.
 	const perEdge = 2048
 	const perComponent = 4096
 	const perFile = 1024
@@ -129,4 +128,53 @@ func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 				cost*float64(sbom.DefaultLimits().MaxComponents)/(1<<20))
 		}
 	})
+}
+
+func TestEveryLicenseEntryAComponentStatesIsCharged(t *testing.T) {
+	// Each entry is kept, so one component stating as many as the byte bound
+	// allows is held whole unless each is charged.
+	licensed := func(count int) string {
+		var b strings.Builder
+		for i := range count {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			fmt.Fprintf(&b, `{"expression": "L%d"}`, i)
+		}
+		return strings.Replace(minimal, `"purl": "pkg:deb/debian/libc6@2.41"`,
+			`"purl": "pkg:deb/debian/libc6@2.41", "licenses": [`+b.String()+`]`, 1)
+	}
+	if _, err := sbom.Read(strings.NewReader(licensed(5)), sbom.Limits{MaxStatements: 5}); err != nil {
+		t.Fatalf("five licenses at a bound of five: %v", err)
+	}
+	_, err := sbom.Read(strings.NewReader(licensed(6)), sbom.Limits{MaxStatements: 5})
+	if err == nil {
+		t.Fatal("six licenses were held under a bound of five")
+	}
+	if !strings.Contains(err.Error(), "limit") {
+		t.Errorf("the refusal does not name a limit: %v", err)
+	}
+}
+
+func TestARelationshipWithNoEndKeepsItsCharge(t *testing.T) {
+	// A relationship's ends are charged against the edge bound, and its
+	// component charge is handed back for that reason. One stating no end is
+	// charged nothing there and is still kept.
+	var b strings.Builder
+	b.WriteString(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [`)
+	for i := range 6 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"spdxId": "urn:r%d", "type": "Relationship", "from": "urn:x",
+		  "relationshipType": "describes"}`, i)
+	}
+	b.WriteString(`]}`)
+	_, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 5})
+	if err == nil {
+		t.Fatal("six relationships with no end were held under a bound of five")
+	}
+	if !strings.Contains(err.Error(), "component limit") {
+		t.Errorf("the refusal does not name the limit it hit: %v", err)
+	}
 }

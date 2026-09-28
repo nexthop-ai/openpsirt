@@ -140,6 +140,10 @@ type reader struct {
 	spdx3Order     []string
 	// spdx3DocumentCreation is the one the document itself points at.
 	spdx3DocumentCreation string
+	// spdx3DocumentCreated is the creation time the document states in place,
+	// where it writes its creation information out rather than referring to
+	// it. An element other than the document stating one sets nothing here.
+	spdx3DocumentCreated string
 	// spdx3DocumentRefs are the identifiers of the elements that are the
 	// document itself, which is what a relationship naming the build's roots
 	// has to come from. The second version names a constant for this; the

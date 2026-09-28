@@ -62,8 +62,8 @@ const csafVex = `{
 }`
 
 func TestACSAFVexDocumentReadsAsTheSameClaims(t *testing.T) {
-	// a supplier's VEX as evidence named CSAF-VEX from the start and it
-	// was refused with a sentence. The two formats say the same thing in
+	// A supplier's VEX arrives as CSAF-VEX as well as OpenVEX. The two
+	// formats say the same thing in
 	// different shapes — one puts the status on a statement, the other in
 	// which list a product identifier appears in — and both have to become
 	// the same claim, because what a build is telling us does not depend
