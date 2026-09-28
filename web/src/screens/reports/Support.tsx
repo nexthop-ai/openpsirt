@@ -11,6 +11,7 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Sheet } from "./Sheet";
+import { Segments, boundedAsked } from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // The releases still shipped and no longer maintained.
@@ -27,11 +28,11 @@ import { Wide } from "../../ui/Wide";
 export function Support() {
   const at = useScope();
   const scope = scopeQuery(at);
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   // The distance ahead to warn. Nothing by default, because this report is
   // about what has already gone and a second population appearing unasked would
   // change what the figures at the top of it count.
-  const within = aheadAsked(params);
+  const within = boundedAsked(params, "within", FURTHEST, 0);
   const ended = useQuery({
     queryKey: ["out-of-support", scope, within],
     queryFn: async () =>
@@ -56,23 +57,13 @@ export function Support() {
       answers="what is still shipped and no longer maintained."
     >
       <div className="controls">
-        <div className="seg" role="group" aria-label="Warn ahead">
-          {AHEAD.map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={within === n}
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                if (n === 0) next.delete("within");
-                else next.set("within", String(n));
-                setParams(next);
-              }}
-            >
-              {n === 0 ? "what has gone" : `and the next ${n} days`}
-            </button>
-          ))}
-        </div>
+        <Segments
+          label="Warn ahead"
+          param="within"
+          offered={AHEAD}
+          chosen={within}
+          words={(n) => (n === 0 ? "what has gone" : `and the next ${n} days`)}
+        />
       </div>
 
       {ended.isPending ? (
@@ -222,16 +213,6 @@ const AHEAD = [0, 30, 90] as const;
 // which refuses one it cannot answer for, and an edited address is the
 // ordinary way a wrong one arrives.
 const FURTHEST = 3650;
-
-// aheadAsked is how far ahead the address asks to look, checked rather than
-// trusted.
-function aheadAsked(params: URLSearchParams): number {
-  const asked = params.get("within");
-  if (asked === null) return 0;
-  const days = Number(asked);
-  if (!Number.isFinite(days) || days < 1 || days > FURTHEST) return 0;
-  return Math.floor(days);
-}
 
 // The address the file comes from. A link somebody follows rather than a
 // request this page makes, so the browser fetches it with the session it
