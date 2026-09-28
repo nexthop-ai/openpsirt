@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { positionedModifiers, rulesIn } from "./class-rules.mjs";
+import { emits, positionedModifiers, rulesIn, styleless } from "./class-rules.mjs";
 
 // A class used as a modifier beside another, which also has a rule of its own
 // that takes an element out of normal flow, positions anything carrying both
@@ -82,5 +82,22 @@ describe("which modifiers cannot be right", () => {
     // `background-position` is not `position`, and a gate that reported it
     // would be one people learn to work around.
     expect(found(`.over { background-position: 0 0; }\n.chip.over { color: red; }`)).toEqual([]);
+  });
+});
+
+describe("whether a class is styled", () => {
+  it("reads a rule for the whole name", () => {
+    expect(emits(".text { color: red; }", "text")).toBe(true);
+    expect(emits(".text:hover { color: red; }", "text")).toBe(true);
+    expect(emits(".a, .text { color: red; }", "text")).toBe(true);
+  });
+
+  it("is not absolved by a longer name that opens with it", () => {
+    expect(emits(".text-sm { font-size: 1px; }", "text")).toBe(false);
+  });
+
+  it("reports a bespoke name beside a utility that shares its opening", () => {
+    const css = ".text-sm { font-size: 1px; }\n.block { display: block; }";
+    expect(styleless(["text-sm", "text", "block"], css)).toEqual(["text"]);
   });
 });

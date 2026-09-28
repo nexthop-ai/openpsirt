@@ -54,3 +54,18 @@ export function rulesIn(text, into = { declared: new Map(), modifiers: new Map()
 export function positionedModifiers({ declared, modifiers }) {
   return [...modifiers.keys()].filter((name) => escapes.test(declared.get(name) ?? "")).sort();
 }
+
+// emits is whether a stylesheet holds a rule for a class, as a whole name.
+//
+// Bounded after the name, so a rule for `.text-sm` is not read as one for
+// `.text`. A bare substring test is absolved by every longer name that opens
+// with the one being asked about.
+export function emits(css, name) {
+  const quoted = name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&");
+  return new RegExp(`\\.${quoted}(?=[\\s,:{>+~])`).test(css);
+}
+
+// styleless is every name a stylesheet holds no rule for, in order.
+export function styleless(names, css) {
+  return names.filter((name) => !emits(css, name)).sort();
+}

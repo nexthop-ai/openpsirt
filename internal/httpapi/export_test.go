@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 )
 
 func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
@@ -844,4 +846,50 @@ func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
 			t.Fatal("no exports were read, so this checked nothing")
 		}
 	})
+}
+
+// The demo's seeders read the findings export and the review queue by name
+// (Makefile.demo, which nothing else runs): the export's issue, component,
+// version and upstream fix columns, and a waiting claim's identifier. A name
+// changed here leaves the demo seeding nothing, and saying so only as "no
+// findings yet".
+func TestWhatTheDemoSeedsFromIsStillThere(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		got := asPerson(t, r, "private-triage", http.MethodGet, "/v1/products/mine/findings.csv", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
+		}
+		lines, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var header []string
+		for _, line := range lines {
+			if len(line) > 0 && line[0] == "issue" {
+				header = line
+				break
+			}
+		}
+		if header == nil {
+			t.Fatal("the export has no header row opening with the issue")
+		}
+		for _, want := range []string{"issue", "component", "version", "upstream fix"} {
+			found := false
+			for _, column := range header {
+				found = found || column == want
+			}
+			if !found {
+				t.Errorf("the export has no %q column: %v", want, header)
+			}
+		}
+	})
+
+	waiting, err := json.Marshal(httpapi.WaitingBody{Claim: httpapi.ClaimBody{ID: 7}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(waiting), `{"claim":{"id":7`) {
+		t.Errorf("a waiting claim reads as %s, not opening with its identifier", waiting)
+	}
 }

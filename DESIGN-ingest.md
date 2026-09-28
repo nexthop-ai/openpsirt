@@ -25,6 +25,7 @@ REQ-69.
 - [Scheduled rescanning](#scheduled-rescanning)
 - [Scanner warnings](#scanner-warnings)
 - [Scanner output](#scanner-output)
+- [Scanner environment](#scanner-environment)
 - [Scan coverage](#scan-coverage)
 - [Receipts](#receipts)
 - [Document retrieval](#document-retrieval)
@@ -710,6 +711,23 @@ earlier. Across 6,883 issues, 4,959 carry a vector: 4,815 under version 3, 143
 under version 4, and one under version 2, which nothing here scores. Seven of
 the 143 state an exploit maturity. The remaining 1,924 issues carry no vector,
 and a severity word is all there is to rank them by.
+
+## Scanner environment
+
+The scanner is somebody else's program reading somebody else's inventory, and
+it starts helpers of its own. It is given only what it needs of this process's
+environment.
+
+| Given | Why |
+|---|---|
+| Where to find programs, home and scratch space, the time zone | What any program needs to run |
+| The certificate bundle and the proxy, in either case | What reaching its vulnerability data needs |
+| Every variable under the scanner's own prefix | Its own settings, which an operator sets for it |
+| Its check for a newer release of itself, off | A request on every run to its publisher's host, which nobody configured and an air-gapped deployment cannot reach. An operator who sets it is left alone |
+
+| Not given | Why |
+|---|---|
+| Anything else, this deployment's settings included | They hold the database address with its password, the sign-in client secrets, the mail password and the object store's keys, none of which the scanner needs, and what it is not handed it cannot disclose |
 
 ## Scan coverage
 

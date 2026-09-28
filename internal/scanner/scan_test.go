@@ -19,7 +19,10 @@ import (
 // environment variable saying what to be, which is how the standard library's
 // own os/exec tests do it: no shell script, nothing to install, and the
 // fixture is written in Go beside the test that uses it.
-const beingTheScanner = "OPENPSIRT_TEST_SCANNER"
+//
+// Named under the scanner's own prefix, because that is what reaches it: the
+// rest of this process's environment is not handed over.
+const beingTheScanner = "GRYPE_OPENPSIRT_TEST_AS"
 
 func TestMain(m *testing.M) {
 	switch os.Getenv(beingTheScanner) {
@@ -38,6 +41,22 @@ func TestMain(m *testing.M) {
 		fmt.Fprint(os.Stderr, "\nthe last thing it said")
 		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
 	case "empty":
+		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
+	case "environment":
+		// What it was given, one name per line, where the run keeps what a
+		// scanner says, bounded short: the value only for the scanner's own
+		// settings, and a mark for any value carrying the test's secret.
+		for _, kv := range os.Environ() {
+			name, value, _ := strings.Cut(kv, "=")
+			switch {
+			case strings.Contains(value, "hunter2"):
+				fmt.Fprintln(os.Stderr, "SECRET "+name)
+			case strings.HasPrefix(name, "GRYPE_CHECK") || strings.HasPrefix(name, "GRYPE_DB"):
+				fmt.Fprintln(os.Stderr, kv)
+			default:
+				fmt.Fprintln(os.Stderr, name)
+			}
+		}
 		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
 	}
 	os.Exit(0)
@@ -104,5 +123,52 @@ func TestAScanOfNothingIsNotAFailure(t *testing.T) {
 	}
 	if len(result.Reported) != 0 {
 		t.Errorf("an empty scan reported %d things", len(result.Reported))
+	}
+}
+
+// The scanner is somebody else's program reading somebody else's inventory, and
+// it is handed none of this process's secrets: nothing of the deployment's
+// own configuration reaches it, while where to find programs, the proxy and
+// its own settings do. Its check for a newer release of itself, a request to a
+// host nobody configured, is off unless an operator turned it on.
+func TestTheScannerIsGivenNoneOfThisProcesssSecrets(t *testing.T) {
+	t.Setenv("OPENPSIRT_DATABASE_URL", "postgres://u:hunter2@db/openpsirt")
+	t.Setenv("OPENPSIRT_MAIL_PASSWORD", "hunter2")
+	t.Setenv("HTTPS_PROXY", "http://proxy.example.test:3128")
+	t.Setenv("GRYPE_DB_AUTO_UPDATE", "false")
+	result, err := scanning(t, "environment", scanner.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	given := strings.Split(result.Caution, "\n")
+	if len(given) < 3 {
+		t.Fatalf("the scanner reported an environment of %d lines, so this checked nothing", len(given))
+	}
+	for _, kv := range given {
+		if strings.HasPrefix(kv, "OPENPSIRT_") || strings.HasPrefix(kv, "SECRET ") {
+			t.Errorf("the scanner was given %s", kv)
+		}
+	}
+	for _, want := range []string{"PATH", "HTTPS_PROXY", "GRYPE_DB_AUTO_UPDATE=false", "GRYPE_CHECK_FOR_APP_UPDATE=false"} {
+		found := false
+		for _, kv := range given {
+			found = found || kv == want
+		}
+		if !found {
+			t.Errorf("the scanner was not given %s", want)
+		}
+	}
+}
+
+// An operator who turns the scanner's update check on is left alone.
+func TestTheScannersUpdateCheckIsAnOperatorsToTurnOn(t *testing.T) {
+	t.Setenv("GRYPE_CHECK_FOR_APP_UPDATE", "true")
+	result, err := scanning(t, "environment", scanner.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result.Caution, "GRYPE_CHECK_FOR_APP_UPDATE=true") ||
+		strings.Contains(result.Caution, "GRYPE_CHECK_FOR_APP_UPDATE=false") {
+		t.Errorf("the operator's setting did not reach the scanner as written:\n%s", result.Caution)
 	}
 }

@@ -65,7 +65,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
 | `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `DESIGN-remediation.md` |
-| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gates that are not linters |
+| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the commands the makefile runs: the gates that are not linters, and the release, rehearsal and image-inventory tools |
 | `web/` | The interface source. See `DESIGN-interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
@@ -116,9 +116,9 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make sbom` | This project's own CycloneDX inventory |
 | `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests with coverage, class-name checks, and the generated client diffed against the API document. Refuses without npm rather than skipping |
 | `make unreachable` | Exported code nothing reaches |
-| `make negatives` | A 404 built from an error's own text: it asserts a name reaches nothing, and publishes whatever the error carried |
-| `make granted` | Every query outside the access package asks both grant tables |
-| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read |
+| `make negatives` | A 404 built from an error's own text, or given an error as a detail: it asserts a name reaches nothing, and publishes whatever the error carried. Read as parsed Go, so a call spread over lines and an error under any name are one shape. The text counts however it arrives: read with its method, formatted from a value named like an error, or bound to a name earlier in the same declaration |
+| `make granted` | Every function that reaches one grant table reaches the other, by the table's name, by the model bound to it, or through a package-level name whose value does. Each package-level name is judged by its own value as well. The functions that legitimately ask one — writing or listing that table's own rows — are named in the gate with a reason each, and a name nothing matches fails it |
+| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read. A resolution bound by an assignment or by `var` is followed; one used inline without a binding is not |
 | `make attached` | A doc comment describing something other than the declaration it sits on |
 | `make confined` | Engine-specific code outside the two places allowed to hold it |
 | `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
@@ -131,7 +131,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
 | `make weakness-names` | Rewrites the weakness names from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
-| `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
+| `make check-packaging` | The container image and the Helm chart. Needs `$(DOCKER)` — docker unless set — and helm, and says so where it has neither. `make dist` refuses to run without them, because it gates the image it builds |
 | `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |
 | `make release-freeze VERSION=vX.Y.Z` | The record of a release's migrations: the schema they build on every engine, then each file and its digest, then the check below. Run on a branch from the head of `main`, with the four engines up, and landed before the tag. See `DESIGN-database.md` § Release records |
 | `make release-check VERSION=vX.Y.Z` | That the release a tag names was frozen and the tree still ships what it froze. The release workflow runs it before it builds anything |
@@ -157,7 +157,7 @@ query runs both.
 | `web/**` alone | `web-check`, `spdx` |
 | Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
-| Go the API document is generated from | `openapi-current`, `web-api` |
+| Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
 
 | Rule | |
@@ -330,6 +330,7 @@ nothing failed, which is also what running almost nothing looks like.
 | Property | Reason |
 |---|---|
 | Each server is asked with its own client, inside its own container | A container reported "Up" is not one that answers, and nothing should depend on a client installed on the machine |
+| Each is published on the loopback address alone | They carry the password `test` and accept any statement, and a laptop on a shared network would otherwise offer them to anyone who can reach it |
 | `local.mk` is never overwritten | It is machine-local, and may point at an operator's own servers |
 | Starting is idempotent | A running engine is left alone; a stopped container is started rather than replaced |
 | Images are pinned and compared against CI's, in both directions, with CI running the check | A local four-engine pass means what CI's means only if they are the same servers |
@@ -650,10 +651,15 @@ whoever builds rather than whoever installs.
 | `@fontsource/*` under OFL-1.1 | The license fonts are published under. What it withholds is selling the fonts on their own, which is not something a shipped application does |
 | `argparse` under PSF-2.0 | A port of Python's argparse carrying the original's license. Permissive, and compatible |
 
+An exception names a package whole, wherever it is installed: `argparse`
+admits neither `argparse-lite` nor `@someone/argparse`. A name ending in `/`
+names a scope and admits every package in it.
+
 An SPDX expression is evaluated rather than matched: `MIT AND ISC` needs both
 allowed and `(MPL-2.0 OR Apache-2.0)` needs either. Treating the string as a
 name refuses both, and adding the strings to the allowlist accepts every other
-expression spelled that way.
+expression spelled that way. An expression read to anything short of its end,
+a group that never closes included, is refused.
 
 ### Copied files
 
@@ -726,8 +732,18 @@ database about what this deployment holds (REQ-43).
 
 ## Documentation
 
-Built with mkdocs-material and published to GitHub Pages on every push to `main`,
-with sets versioned by `mike` (REQ-63).
+Built with mkdocs-material and published to GitHub Pages, with sets versioned by
+`mike` (REQ-63).
+
+| Set | Published by |
+|---|---|
+| `main` | Every push to `main` |
+| Each release, by version | The release workflow, which also moves `latest` to the newest release (`DESIGN-packaging.md` § The release procedure) |
+
+| Rule | |
+|---|---|
+| The site's default is `latest` once a release carries it, and `main` until then | The root of the site is what a visitor reads first, and unreleased documentation there describes a version nobody can install |
+| A push to `main` sets the default to `latest` where a set carries it, and to `main` where none does | Set on every merge, so a default another run moved is put back rather than left until the next release |
 
 The configuration page lists every environment variable the process reads, with
 its meaning and default. A variable that is set and cannot be read stops the
@@ -785,7 +801,6 @@ generated address rather than at the organization's.
 | | |
 |---|---|
 | Branch protection is not enforced | The gate runs on every pull request but nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for early development, and it needs revisiting before outside contributions |
-| The documentation workflow publishes one set, `main`, as the default | Publishing a tag under its version and moving a `latest` alias belongs with a release process that does not exist. The versioning machinery is in place |
 | The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
 | The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer running the gate and a merge being blocked check different things |
 | A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |

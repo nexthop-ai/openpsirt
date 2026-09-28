@@ -234,9 +234,23 @@ func IsDuplicate(err error) bool {
 		return pg.Code == "23505"
 	}
 
-	// SQLite reports it as text, the same way it reports a busy database.
-	return strings.Contains(err.Error(), "UNIQUE constraint failed")
+	// SQLite carries the extended code in its own error type: a unique index,
+	// or a primary key. Read from the type rather than the message, so a
+	// sentence quoting the message, or an error that lost its type, is not
+	// taken for one.
+	var lite *sqlite.Error
+	if errors.As(err, &lite) {
+		code := lite.Code()
+		return code == sqliteConstraintUnique || code == sqliteConstraintPrimaryKey
+	}
+	return false
 }
+
+// The two extended result codes SQLite reports a duplicate with.
+const (
+	sqliteConstraintUnique     = 2067 // SQLITE_CONSTRAINT_UNIQUE
+	sqliteConstraintPrimaryKey = 1555 // SQLITE_CONSTRAINT_PRIMARYKEY
+)
 
 // Within runs fn in a transaction, or in the caller's if this handle is
 // already one.

@@ -7,21 +7,18 @@
 // for any class name in the source that it recognizes. Where that name is also
 // one of ours, both rules apply and Tailwind's wins for the properties it
 // sets — silently, because the element still has our class and most of our
-// rule still works. A column with `class="col fixed"` left the grid and
-// nothing failed.
+// rule still works: a column with `class="col fixed"` leaves the grid.
 //
-// Three names had already been renamed by hand after being found by eye, and a
-// fourth was found by a review months later. So the set is derived rather than
-// listed: every class our own stylesheet defines is put to Tailwind, and
-// anything it answers for is a collision. A name Tailwind adds in a later
-// version is caught the next time this runs.
+// So the set is derived rather than listed: every class our own stylesheet
+// defines is put to Tailwind, and anything it answers for is a collision. A
+// name Tailwind adds in a later version is caught the next time this runs.
 //
 // Utilities used deliberately in markup are not the subject. What is checked
 // is the names we *define a rule for*, which is where the two can disagree.
 import { compile } from "tailwindcss";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { positionedModifiers, rulesIn } from "./class-rules.mjs";
+import { emits, positionedModifiers, rulesIn, styleless as unstyled } from "./class-rules.mjs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -70,13 +67,9 @@ for (const file of await stylesheets(src)) {
 // somewhere else, at which point an element picks up a rule written for a
 // different element entirely.
 //
-// A two-word deadline chip did exactly this. `.over` was the full-screen
-// backdrop behind the component dialog — `position: fixed; inset: 0`, half
-// black, `z-index: 40` — and `.due.over` was the color an overdue chip is
-// written in. A findings row one day late rendered its chip as an overlay
-// across the whole viewport: the screen greyed out, nothing dismissed it, and
-// because the chip sits inside a row that navigates on click, every click
-// anywhere went to that finding.
+// A full-screen backdrop named `.over` and an overdue chip written as
+// `.due.over` render the chip as an overlay across the whole viewport, which
+// nothing dismisses.
 //
 const declared = new Map();
 const modifiers = new Map();
@@ -122,8 +115,7 @@ const compiler = await compile('@import "tailwindcss";', {
 // is what stylelint's standard configuration rewrites the string form into on
 // sight. Tailwind reads only the string form, so after that rewrite it emits
 // no utility at all — and nothing else changes, because the rest of the
-// stylesheet is ours and still applies. An editor toolbar rendered as
-// unstyled text for a day before anybody looked at it.
+// stylesheet is ours and still applies.
 //
 // Proved by compiling our own stylesheet and asking it for a utility, rather
 // than by matching the import line: what has to hold is that utilities come
@@ -151,15 +143,12 @@ if (!/\.rounded-lg[\s,:{]/.test(ours.build(["rounded-lg"]))) {
 const names = [...defined.keys()].sort();
 
 const emitted = compiler.build(names);
-const clashing = names.filter((name) =>
-  new RegExp(`\\.${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}(?=[\\s,:{>+~])`).test(emitted),
-);
+const clashing = names.filter((name) => emits(emitted, name));
 
 // Class names nothing applies.
 //
 // A rule for a class no element carries is dead weight that reads as working
-// code — `.ring` sat here styling nothing, and was only noticed because
-// Tailwind happened to define the same name.
+// code.
 //
 // Matched against what could reach an element — quoted and template text —
 // rather than against the whole of the source.
@@ -170,12 +159,11 @@ const clashing = names.filter((name) =>
 // plainly in use. That tolerance stays: a name at the head of a template still
 // matches, and so does one a helper returns.
 //
-// What does not stay is prose. Every one of these names is also an ordinary
-// English word somewhere in a comment — "editor", "found", "steps", "bar" —
-// and a space either side of a word in a sentence was a match, so ten rules
-// nothing applied were reported as in use by the check written to find exactly
-// that. Comments go first, then only the quoted runs are kept, nested ones
-// included: a class inside an interpolation is itself a quoted string.
+// What does not stay is prose. Many of these names are also ordinary English
+// words in a comment — "editor", "found", "steps", "bar" — and a space either
+// side of a word in a sentence would read as the class applied. Comments go
+// first, then only the quoted runs are kept, nested ones included: a class
+// inside an interpolation is itself a quoted string.
 //
 // The generated client is left out for the same reason its two sibling gates
 // leave it out: it is the API document as TypeScript, and a word in an
@@ -243,8 +231,12 @@ if (unused.length > 0) {
 // Tailwind is asked about every name that is not ours, because a utility used
 // in markup is styled by Tailwind rather than by us and is not the subject.
 // That absolves a wide set of names — a stray `block` or `border` would pass —
-// which is the same weakness the collision check above already lives with, and
-// it still catches every bespoke name.
+// which is the same weakness the collision check above already lives with.
+//
+// Asked of a compiler of its own, and answered by the whole name. The shared
+// one above has been given every name we define, and a Tailwind compiler
+// answers each build with every candidate it has seen; read as a substring,
+// the answer for `text` is absolved by a rule for `text-sm`.
 //
 // A class assembled entirely from interpolation produces no token and is
 // therefore quiet rather than noisy, which is the right way round for a check
@@ -280,9 +272,14 @@ async function markupClasses(dir) {
   }
 }
 await markupClasses(src);
-const styleless = [...written.keys()]
-  .filter((name) => !compiler.build([name]).includes(`.${name}`))
-  .sort();
+const alone = await compile('@import "tailwindcss";', {
+  base: process.cwd(),
+  loadStylesheet: loadTailwind,
+  async loadModule() {
+    throw new Error("this check compiles no modules");
+  },
+});
+const styleless = unstyled([...written.keys()], alone.build([...written.keys()]));
 
 if (styleless.length > 0) {
   console.error(`${styleless.length} class name(s) are applied and styled by nothing:\n`);

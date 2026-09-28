@@ -6,28 +6,34 @@
 # before the first one, and pinned in one place so three stages cannot drift
 # apart.
 #
-# **It has an end-of-life date and somebody has to move it.** 3.21, which this
-# carried until now, shipped in December 2024 and stops being supported on
-# 2026-11-01 — after which its packages get no security backports, and this
-# tool would report unfixable findings against its own image and be right about
-# them. 3.24 shipped 2026-06-09 and is supported to 2028-06-01.
+# **It has an end-of-life date and somebody has to move it.** Past it, a
+# release's packages get no security backports, and this tool would report
+# unfixable findings against its own image and be right about them. 3.24
+# shipped 2026-06-09 and is supported to 2028-06-01.
 #
 # Pinned rather than tracking latest for the reason the scanner is pinned: what
 # a finding means depends on what was measured, and a base that moves under a
 # rebuild changes the answer without anybody asking it to.
-ARG ALPINE_VERSION=3.24
+#
+# **Every base image is named by digest as well as tag.** A tag is a name a
+# registry lets its owner move, so a re-pushed or compromised one would be
+# pulled by the release build and its output signed with this project's
+# identity. The digest is what is pulled; the tag is kept so a reader can see
+# the version. Moving to a new release is changing both, and `make pins-check`
+# refuses a base named by tag alone.
+ARG ALPINE_IMAGE=alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 # The interface, built here rather than taken from the build context.
 #
 # The Go build embeds whatever `internal/webui/dist` holds, and that directory
-# is git-ignored — so building this image from a clean checkout produced an
-# image with no interface in it at all, which is what CI was testing. Nothing
-# said so, because an API-only binary is a supported build and the embed
-# tolerates an empty directory on purpose.
+# is git-ignored — so an image built from a clean checkout with the interface
+# taken from the build context carries no interface at all, and nothing says
+# so, because an API-only binary is a supported build and the embed tolerates
+# an empty directory on purpose.
 #
 # Building it here also means the image needs nothing of the builder's machine
 # but docker, which is what lets one command stand a working instance up.
-FROM node:26-alpine AS web
+FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS web
 
 WORKDIR /web
 
@@ -61,7 +67,7 @@ COPY web/ ./
 RUN npm run build
 
 # Build. Pinned to the same Go the module asks for.
-FROM golang:1.27.1-alpine AS build
+FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS build
 
 WORKDIR /src
 
@@ -138,7 +144,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Pinned and checksummed. Which scanner build answered is part of what a
 # finding means — counts are only comparable between products measured the same
 # way — so "whatever was latest at build time" is not good enough.
-FROM alpine:${ALPINE_VERSION} AS scanner
+FROM ${ALPINE_IMAGE} AS scanner
 ARG GRYPE_VERSION=0.119.0
 # Redeclared without a value, which is how a stage receives the architecture
 # the build is for. Given a default it takes the default: measured, a build
@@ -165,7 +171,7 @@ RUN apk add --no-cache curl ca-certificates \
 # Pinned by version and checksum, the same way the scanner is, and from the
 # same project — a build that fetches an unpinned tool over the network is a
 # build whose output depends on a day.
-FROM alpine:${ALPINE_VERSION} AS inventory-tool
+FROM ${ALPINE_IMAGE} AS inventory-tool
 ARG SYFT_VERSION=1.51.1
 # Without a value, for the reason the scanner stage above states.
 ARG TARGETARCH
@@ -182,7 +188,7 @@ RUN apk add --no-cache curl ca-certificates \
  && tar -xzf /tmp/syft.tar.gz -C /out syft \
  && chmod 0755 /out/syft
 
-FROM alpine:${ALPINE_VERSION} AS runtime
+FROM ${ALPINE_IMAGE} AS runtime
 
 # The packages this inherits from the base are upgraded before anything is
 # added to them (SCP-17).
@@ -231,7 +237,12 @@ COPY --from=scanner /out/grype /usr/local/bin/grype
 # here at all is that the data moves under an inventory that does not. The
 # directory has to be writable, which with a read-only root filesystem means a
 # mounted volume — the chart provides one.
+#
+# The scanner's check for a newer release of itself is off. Left on, every run
+# asks its publisher's host, which nobody configured and which an air-gapped
+# deployment cannot reach. The server hands the scanner the same setting.
 ENV GRYPE_DB_CACHE_DIR=/var/cache/openpsirt/grype \
+    GRYPE_CHECK_FOR_APP_UPDATE=false \
     OPENPSIRT_SCANNER_PATH=/usr/local/bin/grype
 RUN mkdir -p /var/cache/openpsirt/grype /var/cache/openpsirt/repositories \
  && chown -R 65532:65532 /var/cache/openpsirt
@@ -299,10 +310,10 @@ COPY --from=image-inventory /image.cdx.json /usr/share/openpsirt/image.cdx.json
 # What this image is, in the one place a registry, a scanner and a puller can
 # all read without running it.
 #
-# The image carried no labels at all: an image pulled by digest could not be
-# traced back to the commit that produced it, and the two inventories it ships
-# — which do carry the version — are inside a filesystem nobody has mounted
-# yet when the question is asked. The values are the same build arguments the
+# Without labels an image pulled by digest cannot be traced back to the commit
+# that produced it, and the two inventories it ships — which do carry the
+# version — are inside a filesystem nobody has mounted yet when the question
+# is asked. The values are the same build arguments the
 # binary was stamped with, so "openpsirt -version", the inventories and the
 # labels cannot disagree about one build.
 ARG VERSION=dev
@@ -324,8 +335,8 @@ EXPOSE 8080
 # which can act on it.
 #
 # This asks the running server, not a new process. Running "openpsirt -version"
-# proved only that the binary was on disk and executable — a deadlocked or
-# non-listening server passed it forever.
+# proves only that the binary is on disk and executable — a deadlocked or
+# non-listening server passes it forever.
 # Never through a proxy. A deployment that sets HTTP_PROXY so the scanner can
 # fetch its vulnerability database sets it for everything in the image, and
 # busybox wget honors the proxy variables while ignoring no_proxy — so the

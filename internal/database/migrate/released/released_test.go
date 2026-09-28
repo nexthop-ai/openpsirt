@@ -266,3 +266,83 @@ func TestAFileTheReleaseShippedAndIsGoneIsRefused(t *testing.T) {
 		t.Errorf("a shipped file removed answered %v", faults)
 	}
 }
+
+// A release's code is one digit per part, so a version with a part past nine
+// is refused rather than given a code another release already reads as.
+func TestAReleaseCodeNamesOneReleaseOnly(t *testing.T) {
+	for tag, want := range map[string]string{"v0.3.0": "v030", "v1.2.9-rc.1": "v129"} {
+		if got, err := Code(tag); err != nil || got != want {
+			t.Errorf("%s has code %q (%v), want %q", tag, got, err, want)
+		}
+	}
+	for _, tag := range []string{"v0.1.10", "v0.11.0", "v10.0.0"} {
+		if got, err := Code(tag); err == nil {
+			t.Errorf("%s was given the code %q, which another release also reads as", tag, got)
+		}
+	}
+}
+
+// The last migration in the tree is the tree's, whichever release owns it, so
+// freezing a release older than one already recorded is refused rather than
+// claiming the newer one's migration, and says the release cannot be cut.
+func TestFreezingAReleaseOlderThanOneRecordedIsRefused(t *testing.T) {
+	root, migrations := tree(t)
+	frozen(t, root, migrations, "v0.2.0", 3)
+	if _, err := Freeze(root, migrations, "v0.1.1"); err == nil ||
+		!strings.Contains(err.Error(), "older than v0.2.0") || !strings.Contains(err.Error(), "cannot be cut") {
+		t.Errorf("v0.1.1 after v0.2.0 answered %v", err)
+	}
+}
+
+// A tree whose last migration is behind the release before is not the tree
+// the release is cut from.
+func TestFreezingATreeBehindThePreviousReleaseIsRefused(t *testing.T) {
+	root, migrations := tree(t)
+	for _, name := range []string{"00002_second.go", "00003_v020.go"} {
+		if err := os.Remove(filepath.Join(migrations, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := Freeze(root, migrations, "v0.2.0"); err == nil ||
+		!strings.Contains(err.Error(), "behind 2") {
+		t.Errorf("a tree behind the previous release answered %v", err)
+	}
+}
+
+// A schema record that is there and empty says nothing was described, which
+// is no more a record than a missing one.
+func TestAReleaseWithAnEmptySchemaIsRefused(t *testing.T) {
+	root, migrations := tree(t)
+	atV010(t, migrations)
+	write(t, filepath.Join(root, "v0.1.0", Schema("mysql")), "")
+	faults := check(t, root, migrations, "v0.1.0")
+	if len(faults) != 1 || !strings.Contains(faults[0], "on mysql") {
+		t.Errorf("an empty schema record answered %v", faults)
+	}
+}
+
+// A digest is taken of what follows the license header, so a file without
+// the header, or with nothing after it, has none.
+func TestADigestNeedsTheHeaderAndABody(t *testing.T) {
+	for what, content := range map[string]string{
+		"no header":        "package migrations\n\n// one\n",
+		"nothing after it": "// Copyright Nexthop Systems Inc.\n// SPDX-License-Identifier: Apache-2.0\n",
+	} {
+		if _, err := Digest([]byte(content)); err == nil {
+			t.Errorf("%s: a digest was taken", what)
+		}
+	}
+	if _, err := Digest([]byte(header + "package migrations\n")); err != nil {
+		t.Errorf("a file with its header and a body: %v", err)
+	}
+}
+
+// A record line that is neither the last migration nor a digest and a file is
+// refused, naming the line, rather than skipped.
+func TestAMalformedRecordLineIsRefused(t *testing.T) {
+	root, _ := tree(t)
+	write(t, filepath.Join(root, "v0.1.0", Files), "last 2\nabc123  00001_first.go\n")
+	if _, err := Read(root, "v0.1.0"); err == nil || !strings.Contains(err.Error(), "line 2") {
+		t.Errorf("a short digest answered %v", err)
+	}
+}

@@ -3,16 +3,16 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { satisfies } from "./licenses.mjs";
+import { excepts, packageAt, satisfies } from "./licenses.mjs";
 
 // The interface ships inside the binary, so a copyleft dependency there is the
-// installer's problem — and it was not checked at all while the Go half was.
+// installer's problem.
 //
 // An SPDX expression is not a license name: "MIT AND ISC" is satisfied only if
 // both are allowed, "(MPL-2.0 OR Apache-2.0)" by either. Treating the whole
 // string as a name refuses both, and adding both strings to the allowlist
-// accepts every other expression spelled the same way. This gate had no test,
-// and its only consumer is an exit code.
+// accepts every other expression spelled the same way. The gate's only
+// consumer is an exit code.
 
 const permissive = new Set(["MIT", "ISC", "Apache-2.0", "BSD-3-Clause", "0BSD"]);
 const ok = (expression: string) => satisfies(expression, permissive) as boolean;
@@ -71,5 +71,38 @@ describe("what it will not guess at", () => {
     expect(ok("MIT OR")).toBe(false);
     expect(ok("(((")).toBe(false);
     expect(ok(")")).toBe(false);
+  });
+
+  it("refuses a group that never closes, rather than reading the next name as its bracket", () => {
+    expect(ok("(MIT GPL-3.0")).toBe(false);
+    expect(ok("(MIT AGPL-3.0 AND ISC")).toBe(false);
+    expect(ok("(MIT OR ISC)")).toBe(true);
+  });
+});
+
+describe("which package an exception names", () => {
+  it("reads the package installed at a location, scope included", () => {
+    expect(packageAt("argparse")).toBe("argparse");
+    expect(packageAt("@fontsource/inter")).toBe("@fontsource/inter");
+    expect(packageAt("js-yaml/argparse")).toBe("argparse");
+    expect(packageAt("@a/b/@c/d")).toBe("@c/d");
+  });
+
+  it("admits the named package wherever it is installed", () => {
+    expect(excepts("argparse", "argparse")).toBe(true);
+    expect(excepts("argparse", "js-yaml/argparse")).toBe(true);
+  });
+
+  it("admits no other package that shares the name's last part", () => {
+    expect(excepts("argparse", "@someone/argparse")).toBe(false);
+    expect(excepts("argparse", "argparse-lite")).toBe(false);
+    expect(excepts("argparse", "argparse/other")).toBe(false);
+  });
+
+  it("admits every package in a scope named with a trailing slash, and none outside it", () => {
+    expect(excepts("@fontsource/", "@fontsource/inter")).toBe(true);
+    expect(excepts("@fontsource/", "x/@fontsource/inter")).toBe(true);
+    expect(excepts("@fontsource/", "@fontsourcery/inter")).toBe(false);
+    expect(excepts("@fontsource/", "fontsource")).toBe(false);
   });
 });

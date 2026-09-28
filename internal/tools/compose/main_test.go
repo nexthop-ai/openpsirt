@@ -323,3 +323,14 @@ func TestAComponentPlacedOnlyByItsOwnDocumentsRootIsInTheImage(t *testing.T) {
 		t.Errorf("the image's children are %v, and the one component it holds is not among them", kids)
 	}
 }
+
+// An input is read below the working directory, and a path that directory
+// cannot address is refused in words rather than read somewhere else.
+func TestAnInputOutsideTheWorkingDirectoryIsRefusedInWords(t *testing.T) {
+	for _, path := range []string{"/tmp/a.cdx.json", "../a.cdx.json", "parts/../../a.cdx.json"} {
+		err := run("x", "1", t.TempDir()+"/out.json", []string{path})
+		if err == nil || !strings.Contains(err.Error(), "relative to the working directory") {
+			t.Errorf("%s: answered %v", path, err)
+		}
+	}
+}

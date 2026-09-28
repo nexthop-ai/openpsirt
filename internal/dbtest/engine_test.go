@@ -12,15 +12,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// The engines gate greps this test's output for each engine by name, and until
-// now that only proved a subtest with that *label* had run. The label comes
-// from a list in this package; the connection comes from an environment
-// variable. Nothing checked that the two agreed.
+// The engines gate greps this test's output for each engine by name, which
+// proves only that a subtest with that *label* ran. The label comes from a
+// list in this package; the connection comes from an environment variable.
 //
-// So pointing the MySQL and MariaDB URLs at the same PostgreSQL server — four
-// URLs differing only in a port digit, which is exactly the slip somebody
-// makes — produced four green lines and "every engine ran". The suite would
-// then have tested one engine three times while reporting three.
+// Pointed at the same PostgreSQL server — four URLs differing only in a port
+// digit, which is exactly the slip somebody makes — the MySQL and MariaDB
+// labels read as four green lines and "every engine ran", while one engine is
+// tested three times.
 //
 // This asks the server what it is and compares that against the name the
 // harness gave it.

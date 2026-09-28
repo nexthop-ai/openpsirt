@@ -6,6 +6,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -56,8 +57,20 @@ func InBatches[T any](ctx context.Context, db bun.IDB, rows []T) error {
 //
 // One of the few places an engine is asked directly, and it lives here for the
 // reason every other such answer does. There is no portable spelling: two of
-// them want ON CONFLICT and the other two want INSERT IGNORE.
+// them want ON CONFLICT DO NOTHING, and the other two an update on a duplicate
+// key that sets the key to itself. Not INSERT IGNORE, which on those two also
+// turns a value too wide for its column, a dangling reference and a missing
+// value into warnings, and stores the row cut to fit or skips it while the
+// insert reports success.
 func InBatchesKeeping[T any](ctx context.Context, db bun.IDB, rows []T) error {
+	var key string
+	if db.Dialect().Name().String() != "pg" && db.Dialect().Name().String() != "sqlite" {
+		table := db.Dialect().Tables().Get(reflect.TypeFor[T]())
+		if len(table.PKs) == 0 {
+			return fmt.Errorf("insert %s keeping another writer's rows: it has no key to match on", table.Name)
+		}
+		key = table.PKs[0].Name
+	}
 	for start := 0; start < len(rows); start += BatchSize {
 		end := min(start+BatchSize, len(rows))
 		batch := rows[start:end]
@@ -66,7 +79,7 @@ func InBatchesKeeping[T any](ctx context.Context, db bun.IDB, rows []T) error {
 		case "pg", "sqlite":
 			insert = insert.On("CONFLICT DO NOTHING")
 		default:
-			insert = insert.Ignore()
+			insert = insert.On("DUPLICATE KEY UPDATE").Set("? = ?", bun.Ident(key), bun.Ident(key))
 		}
 		if _, err := insert.Exec(ctx); err != nil {
 			return fmt.Errorf("insert rows %d to %d: %w", start, end, err)

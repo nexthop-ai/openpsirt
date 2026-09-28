@@ -41,6 +41,12 @@ jobs:
       # publishes under its version and moves the "latest" alias.
       - run: mike deploy --push --update-aliases main
       # Without a default the site root serves nothing — every version lives in
-      # its own directory. Until there is a release, unreleased work is what a
-      # visitor should land on; once releases exist this becomes "latest".
-      - run: mike set-default --push main
+      # its own directory. Once a release carries "latest", that is what a
+      # visitor lands on; until then, unreleased work is. Set on every merge,
+      # so a default that points anywhere else is put back.
+      - run: |
+          if mike list --json | jq -e 'any(.[]; .aliases | index("latest"))' > /dev/null; then
+            mike set-default --push latest
+          else
+            mike set-default --push main
+          fi

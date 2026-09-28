@@ -146,15 +146,18 @@ func TestWhatACallerAddsIsSkippedToo(t *testing.T) {
 
 func TestTheDefaultSkipSetIsNotSharedBetweenCallers(t *testing.T) {
 	// Skipped returns a fresh slice, which is what makes the append inside
-	// each() safe: a shared backing array would let one caller's extra reach
+	// each() safe: a shared backing array would let one caller's change reach
 	// the next caller's walk, and the next caller would read less than it
-	// says it does with nothing failing.
-	first, second := Skipped(), Skipped()
-	if widened := append(first, "web"); slices.Contains(second, "web") {
-		t.Errorf("appending to one caller's skip set reached another's: %v", widened)
-	}
+	// says it does with nothing failing. Asked by writing into one caller's
+	// slice: an append to a full slice reallocates whether or not the array
+	// behind it is shared, so an append cannot tell the two apart.
 	if len(Skipped()) == 0 {
 		t.Fatal("the default skip set is empty, so nothing would ever be skipped")
+	}
+	first := Skipped()
+	first[0] = "changed by one caller"
+	if slices.Contains(Skipped(), "changed by one caller") {
+		t.Error("Skipped hands every caller the same backing array")
 	}
 }
 

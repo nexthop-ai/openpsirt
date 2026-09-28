@@ -86,7 +86,7 @@ Engine-specific code is confined to these places:
 | Connection setup | Driver-specific settings |
 | Recognizing what an engine is telling us | All three drivers carry an error type of their own, SQLite included. Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
-| Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
+| Inserting a row another writer may already have written | Two of them want `ON CONFLICT DO NOTHING` and the other two `ON DUPLICATE KEY UPDATE` setting the key to itself. Not `INSERT IGNORE`, which on those two also turns a value too wide for its column, a dangling reference and a missing value into warnings, and writes the row cut to fit or skips it while reporting success. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
@@ -154,6 +154,8 @@ where the server offers it, the other connects in cleartext unless asked.
 | How anybody knows | The connection is asked what it negotiated, and the answer is in the line that logs the engine and version. A production engine connected in cleartext is warned about by name, with the setting that fixes it |
 | Required is a stated choice | A deployment says that encryption is required, and a connection that did not get it is refused as the process starts. Taking whatever the server offers stays available and is the other choice; what changed is that it is chosen rather than the only behavior |
 | Required is asked of the connection, never of the URL | The engines spell the transport differently and each spelling has several values, so a check reading the URL would be three parsers agreeing about what "encrypted" means — and would still be wrong about a server that ignored what was asked for |
+| Required is also imposed on every connection the pool opens | The question is asked of one connection at startup, and the pool opens connections for the life of the process. A transport that falls back to cleartext — `sslmode` of `prefer` or `allow`, `tls=preferred`, or none named — is replaced by one that does not, and one that asks for cleartext is refused, as is `allowFallbackToPlaintext` set true. One the deployment named that cannot fall back is left as written. A MySQL value is read as the driver reads it, in any case and with 0 and 1 as false and true |
+| A PostgreSQL URL naming no mode | The driver takes `PGSSLMODE` there, and a mode in the URL overrides it, so the environment's mode is judged in the URL's place. A mode is appended only where that one is weak, so a `verify-full` set in the environment is never replaced by one checking no certificate |
 | A server that will not say is refused under it | What the requirement asks for is certainty, and "we could not find out" is not it |
 | Required against SQLite is refused | A file opened directly has no connection to encrypt. Accepting it would make the setting one that changes nothing, which is worse than not offering it |
 
@@ -190,9 +192,9 @@ table is looked for before the version is read, so a read-only inspection does
 not create it. Selecting from the table to find out answers three questions at
 once and cannot tell them apart — it is not there, this credential may not read
 it, or the database is unreachable — and all three read as the first, so
-`migrate status` printed version 0 for a fully populated database whose
-credentials omitted that one table. The reasonable thing to do about "nothing
-is applied" is to migrate it.
+`migrate status` would print version 0 for a fully populated database whose
+credentials omit that one table. The reasonable thing to do about "nothing is
+applied" is to migrate it.
 
 The catalog is asked instead, which answers only the question being put to it.
 
@@ -215,6 +217,22 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
+The migrations applied are the ones registered in the binary, and no directory
+is read. The migration library otherwise globs the process's working directory:
+a stray `.sql` file there refuses every start, a numbered one is applied under
+the migration credential, and a numbered `.go` file narrows what is applied to
+the registered migrations with a file beside them.
+
+| An upgrade that fails | What the error says |
+|---|---|
+| On an empty database | The failure alone: there is nothing to recover |
+| On MySQL or MariaDB | That the schema is left part changed, and the backup taken before the upgrade is what recovers it; and that a database an unreleased build made is recreated rather than migrated |
+| On PostgreSQL or SQLite | That a database an unreleased build made is recreated rather than migrated. Data definition is transactional there, so a failed migration leaves nothing part changed |
+
+The version a database holds cannot say whether a release or an unreleased
+build made it, so both recoveries are named rather than one chosen by a
+version threshold.
+
 The chain is one part per release.
 
 | Migrations | What they are |
@@ -232,7 +250,8 @@ schema they build on each of the four engines, captured from the tag.
 | Held by the record | Why |
 |---|---|
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | A database the release built has applied exactly those. An edit changes a schema deployments already hold without changing the version they recorded |
-| The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit |
+| The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit. On SQLite the description also says whether each table's key is `AUTOINCREMENT` and whether each index is partial, which the engine's column and index listings leave out |
+| The SQLite records of v0.1.0 to v0.4.0 | Each carries a line per table saying whether its key is `AUTOINCREMENT`, and `partial=0` on every index line: none of those releases built a partial index. Those lines were added to records taken before the description named the two facts, and every other line is as the tag captured it. The addition corrects the record to what those releases always built, and changes no schema |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
 declares the table rather than adding a migration beside it — within the
@@ -279,7 +298,9 @@ asked.
 
 CI runs the success path on four engines, which is where this hides: the
 engines agree about what a migration does and disagree only about what is left
-when one stops half way.
+when one stops half way. So a migration stopped half way, with a table and an
+index already made, is run again on both of these engines, and `make
+check-engines` fails when either did not run it.
 
 ### Release upgrades
 
@@ -294,6 +315,7 @@ fresh install walks the whole chain. They are shaped the way every migration aft
 |---|---|
 | Every table and index is made by the release's own statement | The release's declaration of each table it creates or changes sits beside its migration, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
 | One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
+| Not retried in place | Migrations 37 and 38 open that transaction directly rather than through the one retrying helper, and the releases that shipped them froze them. On PostgreSQL and SQLite a lost race fails the migration and the next start runs it again whole. On MySQL and MariaDB it leaves the schema part changed, as § Migrations says of any failed upgrade. A later release's migration takes its transaction through the helper |
 | PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as the release declares it and costs no row rewrite on any of the three |
 | SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the release's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
@@ -425,9 +447,9 @@ anything.
 
 | Step | What happens |
 |---|---|
-| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0. Every schema change before the tag edits that migration and those declarations |
+| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0: one digit per part of the version, so a release with a part past nine has no code and is refused, since v0.1.10 and v0.11.0 would both read as `v0110`. Every schema change before the tag edits that migration and those declarations |
 | 2. Rehearse, from every earlier release, on each engine | A database the earlier release's own image built and seeded is upgraded by this tree and checked, as § Upgrade rehearsal says |
-| 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
+| 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration. A version older than one already recorded is refused: the last migration in the tree is the newer release's, and would be claimed |
 | 4. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
 | 5. Check, then tag | `make release-check` on the commit to be tagged, then the tag. The release workflow checks the record again before anything is built |
 | 6. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
@@ -438,7 +460,7 @@ anything.
 | A file the release owns that its record does not list, or lists with another digest | The record is stale: the tree moved after the freeze |
 | A migration numbered past the release's last | It would ship with nothing holding it |
 | Declarations named for a release nothing froze | The same, for the tables a migration reads |
-| A record missing one engine's schema | The schema test cannot hold that engine |
+| A record missing one engine's schema, or holding an empty one | The schema test cannot hold that engine |
 | A tag that is not a release | A release is `vX.Y.Z`, and a release candidate `vX.Y.Z-rc.N`, held to the record of the release it precedes. Any other suffix is refused, so the output of `git describe` is never read as a release |
 
 A file a release owns is a migration numbered after the previous release's
@@ -450,6 +472,7 @@ last migration as its own.
 |---|---|
 | The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
 | A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists, and a schema change is a migration numbered after its last, for the next release |
+| A patch to an older line, after a newer release is recorded | Not cut. A tag is refused unless it is on `main`, and `main` holds the newer release's record and migrations, so every release is newer than the last one recorded |
 
 ### Upgrade rehearsal
 
@@ -514,6 +537,13 @@ than assumed, because both engines report "you did not hold this" as a value.
 The wait is bounded on both engines. An unbounded wait means an instance wedged
 mid-migration blocks every replacement silently, and the startup probe kills each
 in turn.
+
+| Rule | |
+|---|---|
+| The pinned connection is used every half minute while the lock is held | It is checked out of the pool for the whole migration, beyond the pool's idle timeout. Idle, a server's or an intermediary's idle timeout ends the session, the server releases the lock, and a waiting replica migrates the half-migrated schema |
+| A keep-alive use carries no deadline | Both drivers close a connection whose query outlives its context, and the lock goes with the session, so a use that times out in a network stall is the same lost lock by another route |
+| A lock not held at its release fails the migration | The session was lost part way, and another instance may have migrated alongside. The work finished; what it ran under is not certain, and that is an error rather than a warning |
+| A pool of one connection is refused before the lock is taken, on the three servers | The lock holds one connection and the migration runs on another, so a pool of one waits for ever with nothing logged. The refusal names `OPENPSIRT_DB_MAX_OPEN` |
 
 The bound is a session setting, and it is unwound before the connection goes
 back — on every path, including the failing ones. Left set, one pooled
@@ -995,8 +1025,14 @@ skipped loudly otherwise.
 The schema is built once per test binary, not once per test. On SQLite a file is
 migrated on first use and copied per test; on each server the binary gets a
 database of its own, named for the package and the checkout it is tested from.
-The name hashes the directory as well as the import path — the import path alone
-was identical in two checkouts, and one dropped the other's database mid-run.
+The name hashes the directory as well as the import path, which is identical in
+two checkouts, so one cannot drop the other's database mid-run.
+
+| Rule | |
+|---|---|
+| The SQLite template is kept in this user's cache directory, readable by nobody else | Its name is derived from files anybody can read, so in the shared temporary directory another user could put a file there under it first |
+| A harness call that cannot run beside the others says why | On SQLite a package's tests run in parallel, and the testing package panics on a second harness call in one test function or on one after `t.Setenv`. The failure names the rule instead |
+| An engine left out is skipped with the reason, and a test holds the harness to it | A skip that passed silently would read as the engine having run |
 
 | A test pins | Runs on |
 |---|---|
@@ -1013,17 +1049,15 @@ The harness also offers a handle whose `COMMIT` can be made to fail.
 | Why it exists | A retry that is never exercised is a retry nobody has tested. The failure a cluster produces arrives at commit, on a transaction whose every statement already succeeded, and nothing else here can produce one — so the code that runs when it happens was reachable by no test at all |
 | What it does | Refuses a stated number of commits, in the words this engine's lost-race check matches, rolling the work back the way a refused commit does. A hook runs between the refusal and the retry, which is where a test puts what another worker did in the meantime |
 | What a test asserts with it | Both directions. That a value from the attempt which was rolled back does not survive into the next one, and that the work still happens — and that the path under test committed something the handle could refuse, because a write outside a transaction passes every other assertion by never running the code they are about |
-| Why it is SQLite underneath | What is pinned does not vary by engine: the retry is driven by the error, and the error is synthesized |
+| Why it is SQLite underneath | What is pinned does not vary by engine: the retry is driven by the error, and the error is synthesized. Opened with the pragmas every other SQLite connection gets, so foreign keys are enforced on it |
 
-The rule has to be applied, and a whole area arrived on two engines. Routing
-rules, VEX statements, teams, saved filters and the administration trail were
-written with handler tests on the two-engine form, and every one of them pins
-what a query returns. Between them they hold a `LIKE` with an explicit escape, a
-case-folded `IN`, and conditional updates read for whether the row was still
-there — three of the exact shapes the four-engine matrix exists to catch.
-
-The fix was a store test rather than a change to the handler tests, whose
-two-engine form is right for what they pin.
+The rule has to be applied. Routing rules, VEX statements, teams, saved filters
+and the administration trail have handler tests on the two-engine form, and
+between them they hold a `LIKE` with an explicit escape, a case-folded `IN`, and
+conditional updates read for whether the row was still there — three of the
+exact shapes the four-engine matrix exists to catch. Those are pinned by store
+tests on every engine, and the handler tests keep the two-engine form, which is
+right for what they pin.
 
 CI provides all four engines and then checks that all four ran, because a skipped
 engine passes silently.

@@ -156,6 +156,12 @@ func implyIn(ctx context.Context, db *database.DB, table, key string, carried []
 		held = append(held, grant{values: values, role: role})
 		has[fmt.Sprint(values[:len(splitColumns(key))], role)] = true
 	}
+	// A read that stopped part way ends the loop the same way the last row
+	// does, and would grant fewer roles and report success.
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, err
+	}
 	if err := rows.Close(); err != nil {
 		return 0, err
 	}

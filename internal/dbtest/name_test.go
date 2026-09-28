@@ -12,8 +12,8 @@ const schemaOne = "0f0f0f0f0f0f0f0f"
 
 func TestTwoCheckoutsOfOnePackageGetDifferentDatabases(t *testing.T) {
 	// The import path is the same in every checkout of this repository, so a
-	// name made from it alone was the same too — and a second worktree run
-	// against the same servers dropped the first one's database mid-run.
+	// name made from it alone is the same too, and a second worktree run
+	// against the same servers would drop the first one's database mid-run.
 	// The directory a package is tested from is what tells checkouts apart.
 	path := "github.com/nexthop-ai/openpsirt/internal/httpapi.test"
 	one := databaseName(path, "/home/somebody/git/openpsirt/internal/httpapi", schemaOne)

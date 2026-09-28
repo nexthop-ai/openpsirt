@@ -216,6 +216,40 @@ func plain(fn func(t *testing.T, db *database.DB)) body {
 	}
 }
 
+// skipped, where set, is told of every engine the harness skips and why, so a
+// test can hold the harness to reporting what it left out.
+var (
+	skippedMu sync.Mutex
+	skipped   func(test string, engine database.Engine, reason string)
+)
+
+// skip leaves an engine out of a test, saying why.
+func skip(t *testing.T, engine database.Engine, reason string) {
+	t.Helper()
+	skippedMu.Lock()
+	if skipped != nil {
+		skipped(t.Name(), engine, reason)
+	}
+	skippedMu.Unlock()
+	t.Skip(reason)
+}
+
+// parallel runs a test beside the others in its package, or says in words why
+// it cannot. The testing package panics where a test is made parallel twice —
+// two harness calls in one test function — or after it set an environment
+// variable, and a panic names neither the harness nor the rule.
+func parallel(t *testing.T) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("this test runs beside the others on SQLite and cannot here (%v): "+
+				"call the harness once per test function, giving each further call a t.Run "+
+				"of its own, and not after t.Setenv — or use dbtest.Alone", r)
+		}
+	}()
+	t.Parallel()
+	return nil
+}
+
 // seeder is a Seeded template of any type, which is what run needs of one.
 type seeder interface {
 	// sqlite is the seeded template's bytes and what the seed made, built
@@ -242,22 +276,24 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 	// 10.1 s for the API package on SQLite, 16.9 s against 12.0 s on MariaDB —
 	// so it runs on SQLite alone, which is the run this parallelism applies to.
 	if keep == beside && len(running) == 1 && running[0].name == database.SQLite {
-		t.Parallel()
+		if err := parallel(t); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for _, c := range candidates() {
 		t.Run(string(c.name), func(t *testing.T) {
 			if only != nil && !only[c.name] {
-				t.Skipf("%s is not asked for by this kind of test", c.name)
+				skip(t, c.name, fmt.Sprintf("%s is not asked for by this kind of test", c.name))
 			}
 			if wanted != nil && !wanted[c.name] {
-				t.Skipf("%s is excluded by %s", c.name, EnginesEnv)
+				skip(t, c.name, fmt.Sprintf("%s is excluded by %s", c.name, EnginesEnv))
 			}
 			base := ""
 			if c.env != "" {
 				base = os.Getenv(c.env)
 				if base == "" {
-					t.Skipf("%s is not set, so %s is untested here", c.env, c.name)
+					skip(t, c.name, fmt.Sprintf("%s is not set, so %s is untested here", c.env, c.name))
 				}
 			}
 			if c.name == database.SQLite {
@@ -396,13 +432,36 @@ func sqliteDir(t *testing.T) string {
 // One migration serves every binary. Each package is a binary of its own, and
 // migrating once in each was 6% of the race pass's processor time — 24 s of
 // 383 s sampled, a fresh install walking every migration under the detector.
-// So the first binary to ask migrates and leaves the file in the temporary
-// directory, named for what built it, and the others read it.
+// So the first binary to ask migrates and leaves the file in a directory of
+// this user's, named for what built it, and the others read it.
 func sqliteTemplate() ([]byte, error) {
 	sqliteOnce.Do(func() {
-		sqliteBytes, sqliteErr = sharedTemplate(os.TempDir())
+		dir, err := templateDir()
+		if err != nil {
+			sqliteErr = err
+			return
+		}
+		sqliteBytes, sqliteErr = sharedTemplate(dir)
 	})
 	return sqliteBytes, sqliteErr
+}
+
+// templateDir is where the shared template is kept: this user's cache,
+// readable by nobody else.
+//
+// Not the shared temporary directory. The name is derived from files anybody
+// can read, so on a machine where users share it another user can put a file
+// there first, and every test binary would copy a schema nobody here migrated.
+// Where there is no cache directory, the template is kept in a directory of
+// this binary's own and shared with nothing.
+func templateDir() (string, error) {
+	if cache, err := os.UserCacheDir(); err == nil {
+		dir := filepath.Join(cache, "openpsirt-dbtest")
+		if err := os.MkdirAll(dir, 0o700); err == nil {
+			return dir, nil
+		}
+	}
+	return os.MkdirTemp("", "openpsirt-dbtest-")
 }
 
 // sqliteHeader opens every SQLite database file.
@@ -557,11 +616,11 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 //
 // One pool rather than one per test, because a PostgreSQL connection is a
 // process of its own on the server, and a new one knows nothing of the schema.
-// Its first statement against the fifty-odd tables costs 43 ms and the same
-// statement on a warm connection 3.4 ms, and every test paid the first: the API
-// package spent 90 s on PostgreSQL with a pool per test and 48 s with this.
+// Its first statement against the schema costs 43 ms and the same
+// statement on a warm connection 3.4 ms: the API package spends 90 s on
+// PostgreSQL with a pool per test and 48 s with one.
 // Tests in a package run one after another on a server, so sharing the pool
-// shares nothing a test can see — the rows are emptied between tests as before.
+// shares nothing a test can see — the rows are emptied between tests.
 //
 // Each call wraps the pool in a query builder of its own. A test may add a
 // query hook to the handle it is given, to count statements, and a hook added
@@ -959,14 +1018,14 @@ func Reset(t *testing.T, db *database.DB) {
 // clear is Reset without a test to fail: the harness empties a database it
 // kept from an earlier run before any test sees it.
 func clear(ctx context.Context, db *database.DB) error {
-	// One transaction, not thirty statements. SQLite in its default mode syncs
-	// the file at every commit, and thirty commits of that between every pair
+	// One transaction, not a statement per table. SQLite in its default mode
+	// syncs the file at every commit, and a commit per table between every pair
 	// of tests is a large part of what a test on SQLite costs.
 	//
 	// And one statement per table that holds something, rather than one per
 	// table. A statement costs a round trip whether or not it changes a row —
 	// 203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL — and a test
-	// touches a handful of the fifty-odd tables, so most of the work is
+	// touches a few of the tables, so most of the work is
 	// emptying tables that are already empty. Which ones hold anything is one
 	// more statement, asked before the deletes and inside the same transaction.
 	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {

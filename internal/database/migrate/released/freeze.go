@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -96,6 +97,18 @@ func Freeze(root, migrations, tag string) (*Record, error) {
 	records, err := All(root)
 	if err != nil {
 		return nil, err
+	}
+	// The last migration here is the tree's, whichever release owns it, so a
+	// release older than one already recorded would claim the newer one's
+	// migrations as its own. A release is tagged on main, which holds every
+	// record, so such a release cannot be cut at all.
+	ov := order(version)
+	for _, r := range records {
+		if or := order(r.Version); slices.Compare(or[:], ov[:]) > 0 {
+			return nil, fmt.Errorf("%s is older than %s, which is recorded: a release is tagged on main "+
+				"after every release main records, so %s cannot be cut; the next release is newer than %s",
+				version, r.Version, version, r.Version)
+		}
 	}
 	names, err := migrationNames(migrations)
 	if err != nil {

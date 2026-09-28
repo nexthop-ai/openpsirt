@@ -16,6 +16,7 @@ requires, and the storage REQ-78 needs.
 - [Chart probes](#chart-probes)
 - [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
+- [Network policy](#network-policy)
 - [Render-time refusals](#render-time-refusals)
 - [Secret sources](#secret-sources)
 - [Self-inventories](#self-inventories)
@@ -59,6 +60,11 @@ Every stage that is not a third-party toolchain image starts from the same build
 argument, so the stages cannot drift apart. The version is pinned rather than
 tracking latest: what a finding means depends on what was measured, and a base
 that moves under a rebuild changes the answer.
+
+| Rule | |
+|---|---|
+| Every base image is named by digest as well as by tag | A tag is a name its owner can move. A re-pushed or compromised one would be pulled by the release build, and what it compiled signed with this project's identity. The tag stays for a reader to see the version. The check reads every `FROM` past its flags, and a base named with no tag, which is its `latest`, is refused the same way |
+| `make pins-check` refuses a base named by tag alone | The same rule the workflows' actions and the downloaded tools are held to, by commit and by checksum |
 
 The packages inside that release are upgraded at build time (REQ-04). This is
 distinct from moving the pin. A base tag's package set is frozen when that image
@@ -109,6 +115,7 @@ used; this is where they live.
 | The copies need a writable path, and the chart mounts one | The root filesystem is read-only. The image makes the directory and owns it to the unprivileged user |
 | Scratch space unless a claim is named | Holds nothing until the lookups are turned on. Bounded a fifth above the quota unless set, because a copy arriving adds to the copies kept and scratch space past its bound gets the pod evicted |
 | The quota is written as a whole number whatever the values file holds | A values file reads a whole number as a float, and 5.36870912e+10 is a value the server refuses |
+| The built-in quota the scratch space is sized for is the binary's own, held to it by `make pins-check` | Written in two languages, the two copies drift, and a larger quota than the volume allows gets the pod evicted |
 | The chart makes no claim for it | A deployment turning this on chooses its storage. A claim named in values is mounted instead |
 | The excluded hosts and the quota are chart values | Both are the deployment's boundary rather than an administrator's setting |
 | Turning the lookups on is a chart value too | Nothing about them works until the memory limit, the volume and the excluded hosts are set in the chart, so the person setting those is the one who turns them on. The value sets `OPENPSIRT_PATCH_BRANCHES` |
@@ -209,6 +216,27 @@ a file inside one pod. The chart sees only a URL given in values; one in an
 operator's own Secret is not checked here, and the process warns at startup that
 SQLite is not a production engine.
 
+## Network policy
+
+Sign-in by a trusted header is believed by address alone, and the addresses it
+is believed from are usually the pod network, which every pod in the cluster is
+on. So a trusted-header install renders a NetworkPolicy admitting only the
+ingress controller.
+
+| Rule | |
+|---|---|
+| Rendered whenever a trusted header is named, unless turned off | Off, any pod can send the header to the Service and be signed in as anybody, the bootstrap administrators included |
+| Admits the ingress controller by namespace and pod labels, both configurable, and any further peers named | The defaults are ingress-nginx's own labels. A controller on the host network needs an address block, and a metrics scraper a namespace of its own |
+| The controller's defaults apply only where neither label map is set, and are applied in the template | Helm merges a map an operator sets into a default map, so defaults held in the values would keep ingress-nginx's labels beside another controller's and admit nobody |
+| A controller named by its pods alone is looked for in every namespace | A pod selector alone selects pods in the policy's own namespace, which is never where the controller runs |
+| The controller's admission can be turned off, leaving the further peers alone | A controller on the host network is named by address, and its labels would admit nothing |
+| Anything reaching the Service directly is refused unless named as a further peer | A pipeline uploading with a key from inside the cluster is one |
+| Refused at render where it would admit nobody | See § Render-time refusals |
+| The install notes carry the warning about the header in every trusted-header install, with or without an ingress | An ingress is exactly the arrangement where the header's sources are widest |
+
+A policy is enforced only by a network plugin that supports it, and the
+kubelet's probes come from the node, which most plugins admit.
+
 ## Render-time refusals
 
 Each fails at render with a sentence naming the problem. Rendering manifests that
@@ -230,6 +258,7 @@ cannot work moves the failure to a crash-looping pod and a message nobody reads.
 | SQLite behind more than one replica | SQLite is one file on one pod, so a second replica starts with an empty database of its own |
 | A chart-made scanner cache claim that every replica mounts and only one node can | The replicas that land elsewhere stay Pending, which is a deployment that never becomes ready rather than one that fails |
 | A scanner cache claim given both ways at once | The same rule as a secret given twice: the claim the chart would make is not created when one is named |
+| A network policy for a trusted header that admits nobody | It would refuse the proxy that sets the header, which is every sign-in |
 
 Mail is opt-in, so refusing half of it costs a deployment that wants none of it
 nothing (REQ-49).
@@ -470,16 +499,17 @@ Everything after the tag is the `Release` workflow.
 |---|---|
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
 | Refuses a release whose migrations were not frozen | A database the release builds applies exactly what it shipped. Unfrozen, nothing holds those files once the next change lands. A release candidate, `-rc.N`, is held to the record of the release it precedes, and any other suffix is refused |
-| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
+| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything. The version and the image name are the ones this workflow pushes, handed to it rather than worked out again, so what is pushed is what was built |
 | Pushes the image and the chart to `ghcr.io` | |
 | Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
-| Creates the release and uploads every asset | |
-| Publishes the documentation under the version | And moves `latest`, unless this is a prerelease |
+| Creates the release and uploads every asset | Marked the repository's Latest only where this is the newest release, since GitHub marks a new release Latest unless told |
+| Publishes the documentation under the version | And moves `latest`, and makes it the site's default, where this is the newest release |
 
 | Rule | Why |
 |---|---|
 | A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice. The only prerelease the migration check accepts is a release candidate, `-rc.N` |
 | A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
+| A fix to an older line moves nothing past a newer release | `latest`, the image's, the documentation's and the repository's Latest release, moves only where the tag is the newest release, and `<major>.<minor>` only where it is the newest on its line. A patch to 0.2 after 0.3 would otherwise hand everybody who asked for the current version the older schema |
 | A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
 
 When a step fails, the tag stays and the release does not exist yet. Fix what

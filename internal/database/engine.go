@@ -303,10 +303,19 @@ func recursion(engine Engine, u *url.URL) string {
 // Written as a SQL string literal, not a Go one: under ANSI_QUOTES a
 // double-quoted value is an identifier, so quoting it that way would ask the
 // server for a mode named after the operator's text rather than the text.
+//
+// The driver documents a string variable written quoted, `%27value%27`, so a
+// value arriving in one pair of single quotes has them taken off first: quoted
+// again, it asks the server for a mode whose name begins with a quote, which it
+// refuses. No mode's name begins and ends with a quote.
 func mode(u *url.URL) string {
 	const ours = ",ANSI_QUOTES,STRICT_TRANS_TABLES"
 	base := "@@sql_mode"
-	if held := u.Query().Get("sql_mode"); held != "" {
+	held := u.Query().Get("sql_mode")
+	if len(held) >= 2 && held[0] == '\'' && held[len(held)-1] == '\'' {
+		held = held[1 : len(held)-1]
+	}
+	if held != "" {
 		base = "'" + strings.ReplaceAll(held, "'", "''") + "'"
 	}
 	return "CONCAT(" + base + ",'" + ours + "')"

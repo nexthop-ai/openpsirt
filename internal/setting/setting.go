@@ -278,10 +278,9 @@ const (
 	SavedPerPerson = "saved.max-per-person"
 	// AttachmentShare is how much of that one person may hold, in bytes.
 	//
-	// The deployment-wide quota bounds the store and nothing bounded any
-	// one uploader's part of it, so filling it was one person's to do and
-	// what it cost everybody else was every upload afterwards, in every
-	// product.
+	// The deployment-wide quota bounds the store, and without this one
+	// uploader could fill it, costing everybody else every upload
+	// afterwards, in every product.
 	AttachmentShare = "attachment.per-person-quota"
 	// The four periods after which work that has not moved is a condition
 	// somebody is told about.
@@ -544,8 +543,8 @@ type Store struct {
 	//
 	// A seam rather than a hope: without one the four writers race only if the
 	// scheduler happens to interleave them, so a run where nothing collided is
-	// indistinguishable from a run where the recovery worked — which is how a
-	// recovery broken on every server engine passed locally and failed in CI.
+	// indistinguishable from a run where the recovery worked, and a recovery
+	// broken on every server engine passes locally.
 	beforeInsert func()
 	// beforeWrite is the same seam for Change, between the read that answers
 	// what the setting held and the write that replaces it. Two writers held
@@ -564,8 +563,7 @@ func NewStore(db bun.IDB) *Store {
 // Unset is not an error. Every setting has a default, and a deployment that
 // has never been tuned is the ordinary case rather than a fault.
 //
-// A failure to read is not "unset", though, and treating the two as one
-// was worse than it looks. Every caller falls back to a default when a setting
+// A failure to read is not "unset", though. Every caller falls back to a default when a setting
 // is unset, so a database that could not answer would silently swap the
 // deployment's configuration for the shipped one — including the threshold
 // deciding which deferrals need a second person. A policy that quietly becomes
@@ -708,7 +706,7 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 				// Out whole, so the caller opens a new transaction whose read
 				// can see the row the winner committed. Left to fall through,
 				// one of two administrators setting a never-before-set value
-				// at once was handed a raw constraint violation.
+				// at once is handed a raw constraint violation.
 				if database.IsDuplicate(err) {
 					return err
 				}
@@ -725,13 +723,10 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 		}
 
 		// The rows the update matched, which is the question being asked
-		// — whether the row still holds what the read answered with. This
-		// counted the rows in a second statement instead, on the ground that
-		// two of the four engines report nothing touched when an update writes
-		// a value identical to the one already stored. The connection settings
-		// make that untrue: the count is rows matched on all four, so a match
-		// of none is the row having moved rather than the value already being
-		// the one being written.
+		// — whether the row still holds what the read answered with. The
+		// connection settings make the count rows matched on all four engines,
+		// so a match of none is the row having moved rather than the value
+		// already being the one being written.
 		n, err := database.Affected(res)
 		if err != nil {
 			return fmt.Errorf("record the %q setting: %w", name, err)

@@ -133,13 +133,20 @@ func TestAnUnknownSubcommandIsRefused(t *testing.T) {
 		{[]string{"migrate"}, false},
 		{[]string{"migrate", "status"}, false},
 	} {
-		// No database is configured here, so the one that is *not* refused as
-		// unknown fails further on — which is the distinction being pinned.
+		// No database is configured, whatever the shell running the tests
+		// exports: one that is set would be migrated by the case that is not
+		// refused. That case stops at the database instead, which is the
+		// distinction being pinned.
+		t.Setenv("OPENPSIRT_DATABASE_URL", "")
+		t.Setenv("OPENPSIRT_AUTO_MIGRATE", "false")
 		err := run(c.args, quiet, quiet)
 		named := err != nil && strings.Contains(err.Error(), "unknown command")
 		if named != c.refused {
 			t.Errorf("%v: refused as unknown = %v, want %v (err %v)",
 				c.args, named, c.refused, err)
+		}
+		if !c.refused && (err == nil || !strings.Contains(err.Error(), "no database configured")) {
+			t.Errorf("%v: stopped with %v, want it stopped at the database", c.args, err)
 		}
 	}
 }

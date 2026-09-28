@@ -123,3 +123,43 @@ func TestAStoreSentenceWrappingADriverFailureReadsAsTheFailure(t *testing.T) {
 		t.Errorf("a store sentence wrapping a driver failure hid it: %v", wrapped)
 	}
 }
+
+// A duplicate on SQLite is read from the driver's own error type, as on the
+// other engines: a unique index and a primary key are duplicates, another
+// constraint is not, and a sentence quoting the driver's message is not one
+// either. The errors come from the driver rather than being built here.
+func TestASQLiteDuplicateIsReadFromTheDriversType(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	ctx := t.Context()
+	for _, setup := range []string{
+		`CREATE TABLE "t" ("a" TEXT PRIMARY KEY, "b" TEXT NOT NULL UNIQUE)`,
+		`INSERT INTO "t" ("a", "b") VALUES ('x', 'y')`,
+	} {
+		if _, err := db.ExecContext(ctx, setup); err != nil {
+			t.Fatalf("%s: %v", setup, err)
+		}
+	}
+	for _, c := range []struct {
+		what, statement string
+		duplicate       bool
+	}{
+		{"a primary key", `INSERT INTO "t" ("a", "b") VALUES ('x', 'z')`, true},
+		{"a unique index", `INSERT INTO "t" ("a", "b") VALUES ('q', 'y')`, true},
+		{"a not-null constraint", `INSERT INTO "t" ("a", "b") VALUES ('r', NULL)`, false},
+	} {
+		_, err := db.ExecContext(ctx, c.statement)
+		if err == nil {
+			t.Fatalf("%s: the statement was accepted", c.what)
+		}
+		if got := database.IsDuplicate(fmt.Errorf("wrapped: %w", err)); got != c.duplicate {
+			t.Errorf("%s: read as a duplicate = %v, want %v: %v", c.what, got, c.duplicate, err)
+		}
+	}
+	if database.IsDuplicate(errors.New("UNIQUE constraint failed: t.a")) {
+		t.Error("a sentence quoting the message was read as a duplicate")
+	}
+}

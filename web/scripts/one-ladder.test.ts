@@ -5,17 +5,15 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
 import { laddersIn, listsIn, groupsIn } from "./one-ladder.mjs";
 
-// This gate refuses a second copy of the severity ladder, and had no test: it
-// is wired as `npm run ladder` and its only consumer is an exit code, which
-// cannot tell a check that found nothing from one that looked at nothing.
+// This gate refuses a second copy of the severity ladder. It is wired as
+// `npm run ladder` and its only consumer is an exit code, which cannot tell a
+// check that found nothing from one that looked at nothing.
 //
 // Both directions per shape — one input that must be reported and one that
 // must not — because the failure that matters here is the check going quiet.
 
-const found = (source: string) =>
-  laddersIn(source)
-    .filter((each: { rungs: string[] }) => each.rungs.length >= 2)
-    .map((each: { rungs: string[] }) => each.rungs);
+// What the program reports, which is what laddersIn returns and nothing more.
+const found = (source: string) => laddersIn(source).map((each: { rungs: string[] }) => each.rungs);
 
 describe("the shapes a ladder is written in", () => {
   it("reads a plain list of the words", () => {
@@ -24,9 +22,9 @@ describe("the shapes a ladder is written in", () => {
     ]);
   });
 
-  it("reads an array of objects, which is the shape that drew four bands", () => {
-    // The bug the whole check was written after: four bands beside a count of
-    // five, so a quarter of what was under a node was invisible.
+  it("reads an array of objects, which is the shape that draws bands", () => {
+    // Four bands beside a count of five leave a quarter of what is under a
+    // node invisible.
     expect(
       found(`const BANDS = [
         { key: "critical", color: "var(--sev-critical)" },
@@ -92,6 +90,8 @@ describe("what is not a ladder", () => {
 
   it("leaves one rung used as a word", () => {
     expect(found(`const x = ["critical", "banana"];`)).toEqual([]);
+    // Alone it is a majority of its list, and still one word.
+    expect(found(`const x = ["critical"];`)).toEqual([]);
   });
 
   it("leaves a switch, which is a mapping with every arm visible", () => {
@@ -101,6 +101,104 @@ describe("what is not a ladder", () => {
         case "high": return 3;
       }`),
     ).toEqual([]);
+  });
+});
+
+describe("a ladder of any length", () => {
+  it("reads an array of objects however long each entry runs", () => {
+    const hint = "x".repeat(90);
+    const entries = [
+      "critical",
+      "high",
+      "medium",
+      "low",
+      "unrated",
+      "unknown",
+      "negligible",
+      "none",
+    ]
+      .map(
+        (key) =>
+          `  { key: "${key}", label: "${key}", color: "var(--sev-${key})", hint: "${hint}" },`,
+      )
+      .join("\n");
+    const source = `const BANDS = [\n${entries}\n];`;
+    expect(source.length).toBeGreaterThan(800);
+    expect(found(source)).toEqual([
+      ["critical", "high", "medium", "low", "unrated", "unknown", "negligible", "none"],
+    ]);
+  });
+
+  it("is not closed by a bracket inside a string or a comment", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", label: "a ] b" }, // not the end ]
+        { key: "high", label: "c } d" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+});
+
+describe("text the bracket matcher cannot read", () => {
+  it("skips an escaped quote inside a string", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", hint: "a 5\\" gap" },
+        { key: "high", hint: 'it\\'s' },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads past an apostrophe in JSX text", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", note: <p>it's bad</p> },
+        { key: "high" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads past an escaped bracket in a regular expression", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", test: /\\]/ },
+        { key: "high" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads a block it cannot close over a window", () => {
+    expect(
+      found(`const BANDS = [
+        { key: "critical", test: /[(]/ },
+        { key: "high" },
+        { key: "medium" },
+      ];`),
+    ).toEqual([["critical", "high", "medium"]]);
+  });
+
+  it("reads a ladder nested among other entries", () => {
+    expect(
+      found(`const FIELDS = [
+        { name: "product" },
+        { name: "stream" },
+        { name: "variant" },
+        { name: "severity", options: [
+            ["critical", "C"],
+            ["high", "H"],
+        ] },
+      ];`),
+    ).toEqual([["critical", "high"]]);
+  });
+});
+
+describe("one report per copy", () => {
+  it("reports a line once, however many shapes match on it", () => {
+    expect(found(`const x = [["critical", "high"], ["medium", "low"]];`)).toHaveLength(1);
   });
 });
 

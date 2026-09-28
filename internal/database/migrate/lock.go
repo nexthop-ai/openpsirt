@@ -51,6 +51,49 @@ var lockWaitSeconds = 300
 // the pool. It is one round trip against a server that has just answered.
 const resetWait = 5 * time.Second
 
+// keepAliveEvery is how often the connection holding the lock is used while
+// the migration runs on another. A variable only so tests can shorten it.
+//
+// The lock is a session lock, so it lasts as long as the session. The pool's
+// idle timeout closes an idle connection before anything in the path kills it,
+// and it only reaches connections in the pool: this one is checked out for the
+// whole migration and issues nothing between taking the lock and releasing
+// it. A server's own idle timeout, or an intermediary's, would end the session
+// part way through, the server would release the lock, and a replica waiting
+// on it would migrate the half-migrated schema. Half a minute sits under the
+// common idle timeouts by the margin the pool's minute does.
+var keepAliveEvery = 30 * time.Second
+
+// keepAlive uses a pinned connection on a timer until stopped. The stop waits
+// for the last use to finish, because a connection is not safe to use from
+// two goroutines and the release comes next.
+func keepAlive(ctx context.Context, conn *sql.Conn) (stop func()) {
+	done := make(chan struct{})
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		tick := time.NewTicker(keepAliveEvery)
+		defer tick.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-tick.C:
+				// No deadline: both drivers close a connection whose query
+				// outlived its context, and the server releases the lock with
+				// the session. A use that fails says the session may be gone,
+				// which the release reports when it finds the lock no longer
+				// held.
+				_, _ = conn.ExecContext(context.WithoutCancel(ctx), "SELECT 1")
+			}
+		}
+	}()
+	return func() {
+		close(done)
+		<-finished
+	}
+}
+
 // unlock releases a migration lock and returns the pinned connection.
 type unlock func(context.Context) error
 
@@ -118,7 +161,9 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			closeConn()
 			return nil, fmt.Errorf("take migration lock: %w", err)
 		}
+		stop := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
+			stop()
 			defer closeConn()
 			// pg_advisory_unlock returns false when this session did not hold
 			// the lock. Executing it without reading the result would report
@@ -153,7 +198,9 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			closeConn()
 			return nil, fmt.Errorf("another instance holds the migration lock")
 		}
+		stop := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
+			stop()
 			defer closeConn()
 			// RELEASE_LOCK returns 0 when held by another session and NULL
 			// when no such lock exists. Neither is an error to the driver.
@@ -183,13 +230,12 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 //
 // The catalog is asked, rather than the table. Selecting from the table
 // answers three questions at once and cannot tell them apart: it is not there,
-// this credential may not read it, or the database is unreachable. All three
-// arrived as one error and read as the first, so "schema version 0" was
-// printed for a fully populated database whose credentials omitted this one
-// table — and the reasonable thing to do about "nothing is applied" is to
-// migrate. Running migrations under a credential of their own is the
-// documented reason automatic migration can be turned off, so that credential
-// is the ordinary arrangement rather than an exotic one.
+// this credential may not read it, or the database is unreachable. Read as the
+// first, a fully populated database whose credentials omit this one table
+// reports "schema version 0" — and the reasonable thing to do about "nothing
+// is applied" is to migrate. Running migrations under a credential of their
+// own is the documented reason automatic migration can be turned off, so that
+// credential is the ordinary arrangement rather than an exotic one.
 //
 // PostgreSQL is asked through pg_class rather than the information schema,
 // because the information schema is filtered by privilege on all three

@@ -4,12 +4,11 @@
 // Command negatives reports a 404 built from an error's own text.
 //
 // A 404 asserts that a name reaches nothing. Building its body from an
-// error publishes whatever that error carried, and the two failures compound:
-// the handlers wrote the 404 from the error, and the readers under them
-// returned the driver's message unwrapped. A connection failure reached an
-// authenticated caller as "that product does not exist", with the database
-// host, port and driver in the detail — a false statement about the catalog
-// and the address of the server in one answer.
+// error publishes whatever that error carried, and where the reader under it
+// returns the driver's message unwrapped, the two compound: a connection
+// failure reaches an authenticated caller as "that product does not exist",
+// with the database host, port and driver in the detail — a false statement
+// about the catalog and the address of the server in one answer.
 //
 // Only 404. The other refusals publish a store's own sentence deliberately,
 // and which of the two an error is has already been decided for them by the
@@ -26,17 +25,163 @@ package main
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
-	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
-// built matches a 404 whose message comes from an error value rather than from
-// a sentence the code chose.
-var built = regexp.MustCompile(
-	`huma\.Error404NotFound\([^)]*\b(?:err|cause|failure)\.Error\(\)`)
+// builtFromError reports whether a call is a 404 whose message comes from an
+// error value rather than from a sentence the code chose.
+//
+// Two shapes publish one. An error passed after the message is appended to the
+// body as a detail by the framework, whatever it is called. And any argument
+// carrying an error's text puts that text in the message, as readsError says.
+// `bound` holds the names in the enclosing function that were given an error's
+// text before the call.
+func builtFromError(call *ast.CallExpr, bound map[string]bool) bool {
+	fun, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || fun.Sel.Name != "Error404NotFound" {
+		return false
+	}
+	if pkg, ok := fun.X.(*ast.Ident); !ok || pkg.Name != "huma" {
+		return false
+	}
+	if len(call.Args) > 1 {
+		return true
+	}
+	for _, arg := range call.Args {
+		if readsError(arg, bound) {
+			return true
+		}
+	}
+	return false
+}
+
+// readsError reports whether an expression carries an error's text.
+//
+// Three shapes do: a method named Error called with nothing, on any value; a
+// formatting call handed a value named like an error, which formats its text;
+// and a name given one of those earlier in the function. A sentinel a package
+// declares, read as `pkg.ErrName.Error()`, is a sentence the code chose and is
+// left alone.
+func readsError(x ast.Expr, bound map[string]bool) bool {
+	found := false
+	ast.Inspect(x, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.Ident:
+			found = found || bound[n.Name]
+		case *ast.CallExpr:
+			method, ok := n.Fun.(*ast.SelectorExpr)
+			if !ok {
+				break
+			}
+			if len(n.Args) == 0 && method.Sel.Name == "Error" && !sentinel(method.X) {
+				found = true
+			}
+			if pkg, ok := method.X.(*ast.Ident); ok && pkg.Name == "fmt" && formats[method.Sel.Name] {
+				for _, arg := range n.Args {
+					if name, ok := arg.(*ast.Ident); ok && errorNamed(name.Name) {
+						found = true
+					}
+				}
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+// formats are the fmt functions that write their arguments' text into the
+// string they return.
+var formats = map[string]bool{"Sprint": true, "Sprintf": true, "Sprintln": true, "Errorf": true}
+
+// errorNamed is whether a name is spelled the way an error is named here:
+// err, or a word ending in Err, or err followed by a word.
+func errorNamed(name string) bool {
+	if name == "err" || strings.HasSuffix(name, "Err") && len(name) > 3 {
+		return true
+	}
+	return strings.HasPrefix(name, "err") && len(name) > 3 && unicode.IsUpper(rune(name[3]))
+}
+
+// boundIn is every name a function body gives an error's text, by assignment
+// or declaration. Read to a fixed point, so a name bound from another such name
+// is one too.
+func boundIn(body ast.Node) map[string]bool {
+	bound := map[string]bool{}
+	for changed := true; changed; {
+		changed = false
+		mark := func(names []ast.Expr, values []ast.Expr) {
+			for i, value := range values {
+				if i >= len(names) || !readsError(value, bound) {
+					continue
+				}
+				if name, ok := names[i].(*ast.Ident); ok && name.Name != "_" && !bound[name.Name] {
+					bound[name.Name] = true
+					changed = true
+				}
+			}
+		}
+		ast.Inspect(body, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.AssignStmt:
+				mark(n.Lhs, n.Rhs)
+			case *ast.ValueSpec:
+				names := make([]ast.Expr, len(n.Names))
+				for i, name := range n.Names {
+					names[i] = name
+				}
+				mark(names, n.Values)
+			}
+			return true
+		})
+	}
+	return bound
+}
+
+// sentinel is whether an expression is a package's exported error value,
+// `pkg.ErrName`, which holds a sentence rather than anything a driver wrote.
+func sentinel(x ast.Expr) bool {
+	sel, ok := x.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	if _, ok := sel.X.(*ast.Ident); !ok {
+		return false
+	}
+	name := sel.Sel.Name
+	return strings.HasPrefix(name, "Err") && len(name) > 3 && unicode.IsUpper(rune(name[3]))
+}
+
+// builtIn is the line of every such 404 in a file's source.
+//
+// Parsed rather than matched line by line: a call spread over lines, an error
+// under any name, and an error passed as a second argument are all one shape
+// to a parser and three to a pattern. Names are followed within the top-level
+// declaration that binds them.
+func builtIn(path string, src []byte) ([]int, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, src, 0)
+	if err != nil {
+		return nil, err
+	}
+	var lines []int
+	for _, decl := range file.Decls {
+		bound := boundIn(decl)
+		ast.Inspect(decl, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok && builtFromError(call, bound) {
+				lines = append(lines, fset.Position(call.Pos()).Line)
+			}
+			return true
+		})
+	}
+	return lines, nil
+}
 
 // allowed is the one place a 404 may publish an error's text, and why.
 //
@@ -59,21 +204,18 @@ func main() {
 		if _, ok := allowed[path]; ok {
 			return nil
 		}
-		for i, line := range strings.Split(string(body), "\n") {
-			// A comment quoting the shape is how this program and the
-			// documents describe it.
-			if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
-				continue
-			}
-			if !built.MatchString(line) {
-				continue
-			}
+		lines, err := builtIn(path, body)
+		if err != nil {
+			return err
+		}
+		source := strings.Split(string(body), "\n")
+		for _, at := range lines {
 			bad = append(bad, fmt.Sprintf(
 				"%s:%d: a 404 built from an error's own text. It asserts that a name "+
 					"reaches nothing, and publishes whatever the error carried — for a "+
 					"store read, the driver's message. Split on the sentinel, choose "+
 					"the sentence here, and send the error to the log:\n\t%s",
-				path, i+1, strings.TrimSpace(line)))
+				path, at, strings.TrimSpace(source[at-1])))
 		}
 		return nil
 	})

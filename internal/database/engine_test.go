@@ -366,4 +366,15 @@ func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
 	if !contains(got.DSN, url.QueryEscape("'IT''S'")) {
 		t.Errorf("DSN %q does not carry the operator's mode as a SQL string", got.DSN)
 	}
+
+	// Written the way the driver documents a string variable, in one pair of
+	// quotes, the value is the mode inside them rather than a name beginning
+	// with a quote.
+	got, err = ParseURL("mysql://u:p@h/db?sql_mode=%27ANSI%27")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	if !contains(got.DSN, url.QueryEscape("CONCAT('ANSI',")) {
+		t.Errorf("DSN %q quotes the operator's quoted mode a second time", got.DSN)
+	}
 }
