@@ -597,7 +597,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 		// The same handling the cross-product list gives severity: the line is
 		// applied per row inside the store, and asking for it as a filter as
 		// well would narrow twice and answer neither question.
-		narrowed, err := input.filter(finding.Floor{Word: input.Severity})
+		narrowed, err := input.filter(finding.Floor{Word: string(input.Severity)})
 		if err != nil {
 			return nil, err
 		}
@@ -658,7 +658,7 @@ func findingCells(g finding.Group) []string {
 		g.ScoreVersion, strconv.FormatBool(g.Exploited),
 		g.Component, g.Version, g.Ecosystem, g.FixedIn,
 		strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
-		g.State, opened, due,
+		string(g.State), opened, due,
 		g.Stream, g.Variant,
 	}
 }

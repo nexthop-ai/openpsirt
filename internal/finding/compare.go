@@ -66,7 +66,7 @@ type Changed struct {
 	// the VEX document already publishes under: a row decided one way at one
 	// place and another way at a second is not one claim, and stating either
 	// over both would be a claim nobody made.
-	State         string
+	State         ClaimStanding
 	Outcome       string
 	Justification string
 	// Due is the soonest deadline among the places still open, which is the
@@ -456,7 +456,7 @@ func pairKey(vulnerability, component string) string {
 
 // Stands is what a build has decided about one issue at one component.
 type Stands struct {
-	State         string
+	State         ClaimStanding
 	Outcome       string
 	Justification string
 	Due           *time.Time

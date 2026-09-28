@@ -54,8 +54,8 @@ type DecisionBody struct {
 	// FromStatement cites a VEX statement this was started from. A citation
 	// and never an application: their statement is not this claim, and the
 	// citation is what lets a later revision be noticed.
-	FromStatement int64  `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
-	State         string `json:"state,omitempty" enum:"proposed,approved,withdrawn,lapsed" doc:"The state it has reached"`
+	FromStatement int64      `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
+	State         claimState `json:"state,omitempty" doc:"The state it has reached"`
 	// NeedsApproval says whether this is waiting for a second person. A short
 	// deferral is not.
 	NeedsApproval bool `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
@@ -132,10 +132,10 @@ type SelectionBody struct {
 // ClaimBody is one proposer's action: what the review queue lists and what an
 // approver agrees to.
 type ClaimBody struct {
-	ID          int64  `json:"id"`
-	Kind        string `json:"kind" enum:"finding,together,extension,returned" doc:"The sort of action: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back"`
-	DerivedFrom int64  `json:"derived_from,omitempty" doc:"The claim this one came from, for an extension or a returned set"`
-	ProposedBy  string `json:"proposed_by" doc:"The person who took it, by sign-in identity"`
+	ID          int64     `json:"id"`
+	Kind        claimKind `json:"kind" doc:"The sort of action: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back"`
+	DerivedFrom int64     `json:"derived_from,omitempty" doc:"The claim this one came from, for an extension or a returned set"`
+	ProposedBy  string    `json:"proposed_by" doc:"The person who took it, by sign-in identity"`
 	// ProposedByName is the label beside the identity.
 	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string `json:"proposed_at" doc:"The moment the action was taken"`
@@ -232,7 +232,7 @@ type BecameBody struct {
 	// rows do not all end the same way — an approver agreeing to most of a
 	// bulk set and setting some aside, or half of it lapsing as one build
 	// moves — and is stated rather than picked between.
-	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome"`
+	Happened happened `json:"happened" doc:"The claim's outcome"`
 	// The moment it became that, and the person who did it where a person
 	// did. Both absent while it is waiting: nothing has happened to it yet.
 	When      string          `json:"when,omitempty" doc:"The moment it became that"`
@@ -273,7 +273,7 @@ type QueueOutput struct {
 type QueueNarrowing struct {
 	ProposedBy string    `query:"proposed_by" maxLength:"191" doc:"Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
 	OlderThan  int       `query:"older_than" minimum:"1" doc:"Keep only claims at least this many days old"`
-	Severity   string    `query:"severity" enum:"low,medium,high,critical" doc:"Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
+	Severity   rating    `query:"severity" doc:"Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
 	Outcome    []outcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep only claims of these outcomes. Any of them, not all"`
 	Release    string    `query:"release" maxLength:"191" doc:"Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
 }
@@ -293,7 +293,7 @@ func (n QueueNarrowing) filter(ctx context.Context, in Ingest, subject access.Su
 	}
 	filter := triage.QueueFilter{
 		Mine: mine, ProductID: within,
-		Severities: finding.AtLeast(n.Severity),
+		Severities: finding.AtLeast(string(n.Severity)),
 		Release:    n.Release,
 	}
 	for _, each := range n.Outcome {
@@ -547,7 +547,7 @@ func registerTriage(api huma.API, in Ingest) {
 				Decision:  decisionBody(row.Decision),
 				Place:     named[i].Place,
 				Reasoning: row.Reasoning,
-				Happened:  string(row.Happened),
+				Happened:  happened(row.Happened),
 				Decisions: row.Rows,
 				Issues:    row.Issues,
 				Places:    row.Places,
@@ -908,7 +908,7 @@ func decisionBody(d triage.Decision) DecisionBody {
 	// The argument is drawn the one way a claim's argument is drawn, and the
 	// row adds what belongs to it.
 	body := claimArgument(*d.Claim, "")
-	body.ID, body.ClaimID, body.State = d.ID, d.ClaimID, string(d.State)
+	body.ID, body.ClaimID, body.State = d.ID, d.ClaimID, claimState(d.State)
 	if d.SentBackAt != nil {
 		body.SentBackAt = d.SentBackAt.UTC().Format(time.RFC3339)
 	}

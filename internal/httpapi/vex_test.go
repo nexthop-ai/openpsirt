@@ -52,10 +52,7 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 			`{"outcome":"deferred","deferred_until":"2030-01-01",`+
 				`"reasoning":"Waiting on the vendor's next image."}`)
 		for _, id := range []int64{claim, later} {
-			if got := asPerson(t, r, "reviewer", http.MethodPost,
-				fmt.Sprintf("/v1/claims/%d/approval", id), `{}`); got.Code != http.StatusOK {
-				t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-			}
+			r.agreed(t, id)
 		}
 
 		var doc struct {
@@ -114,10 +111,7 @@ func TestAVEXDocumentCarriesNothingNobodyHasAnnounced(t *testing.T) {
 		r.scannedWithEvidence(t)
 		hidden := r.embargoed(t)
 		claim, _ := r.claimed(t, "private-triage", hidden, "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "private-dispatcher", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreedBy(t, "private-dispatcher", claim)
 
 		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
 		var doc struct {
@@ -174,10 +168,7 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 		}
 
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, claim)
 
 		var doc struct {
 			Statements []struct {
@@ -252,10 +243,7 @@ func TestAVEXStatementCoversEveryPlaceOrIsAbsent(t *testing.T) {
 		if err := json.Unmarshal(one.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, made.ClaimID)
 
 		var doc struct {
 			Statements []struct {
@@ -396,10 +384,7 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 		// Something for the document to carry, so that what is measured is a
 		// refusal rather than an empty answer either way.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		var doc struct {
 			Statements []any `json:"statements"`
 		}
@@ -475,10 +460,7 @@ func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarg
 		// reached: landing on the limit exactly is not a refusal.
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
 			claim, _ := r.claimed(t, "triager", issue, "linux-image", dismissal)
-			if ok := asPerson(t, r, "reviewer", http.MethodPost,
-				fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-				t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-			}
+			r.agreed(t, claim)
 		}
 
 		// The ceiling is brought down to the fixture rather than the fixture
@@ -519,10 +501,7 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"not-applicable","justification":"inline_mitigations_already_exist",`+
 				`"mitigation":"`+stops+`","reasoning":"`+argued+`"}`)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		var doc struct {
 			Statements []struct {
@@ -566,10 +545,7 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 		silent, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image",
 			`{"outcome":"wont-fix","reasoning":"Nothing can be done about this one."}`)
 		for _, id := range []int64{told, silent} {
-			if got := asPerson(t, r, "reviewer", http.MethodPost,
-				fmt.Sprintf("/v1/claims/%d/approval", id), `{}`); got.Code != http.StatusOK {
-				t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-			}
+			r.agreed(t, id)
 		}
 
 		var doc struct {
@@ -622,10 +598,7 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"mismatched","justification":"component_not_present",`+
 				`"reasoning":"The advisory is about an unrelated project of a similar name."}`)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		var doc struct {
 			Statements []struct {
@@ -684,10 +657,7 @@ func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
 		recordedIssuance(t, r, "triager")
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
 			claim, _ := r.claimed(t, "triager", issue, "linux-image", dismissal)
-			if ok := asPerson(t, r, "reviewer", http.MethodPost,
-				fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-				t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-			}
+			r.agreed(t, claim)
 		}
 		who, err := r.rights.Resolve(t.Context(), "triager")
 		if err != nil {
@@ -865,10 +835,7 @@ func TestAVEXDocumentIsOrderedByIssueWhateverOrderItWasDecidedIn(t *testing.T) {
 		first, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
 		second, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
 		for _, id := range []int64{first, second} {
-			if got := asPerson(t, r, "reviewer", http.MethodPost,
-				fmt.Sprintf("/v1/claims/%d/approval", id), `{}`); got.Code != http.StatusOK {
-				t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-			}
+			r.agreed(t, id)
 		}
 		got := r.vexStatements(t)
 		if len(got) != 2 || got[0][0] != "CVE-2026-1000" || got[1][0] != "CVE-2026-9999" {
@@ -886,10 +853,7 @@ func TestAnAlreadyFixedClaimPublishesAsFixed(t *testing.T) {
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"already-fixed","fixed_version":"5.10.0-27",`+
 				`"reasoning":"The vendor backported the fix into this kernel."}`)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		got := r.vexStatements(t)
 		if len(got) != 1 || got[0][1] != "fixed" {
 			t.Errorf("an already-fixed claim published as %v, want one fixed statement", got)
@@ -908,10 +872,7 @@ func TestAComponentWithNoPackageIdentifierIsNamedByItsName(t *testing.T) {
 		r.patchedRows(t, `UPDATE "graph_node" SET "purl" = NULL
 			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		got := r.vexStatements(t)
 		if len(got) != 1 || got[0][2] != "linux-image" {
 			t.Errorf("an agreed claim on a component with no identifier names %v, want linux-image", got)
@@ -943,10 +904,7 @@ func TestAVEXStatementNamesTheComponentAsThisBuildStatedIt(t *testing.T) {
 		r.patchedRows(t, `UPDATE "graph_node" SET "purl" = '`+stated+`'
 			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		var doc struct {
 			Statements []struct {

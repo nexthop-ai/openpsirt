@@ -126,9 +126,8 @@ const measuredAtMost = 5000
 
 // Measuring narrows the figures to part of the deployment.
 //
-// Without it there were no per-team figures at all, so a manager asking
-// how their own people are doing read the deployment's numbers and a large
-// deployment's answer was the same for everybody.
+// A manager asking how their own people are doing reads their team's figures
+// rather than the deployment's.
 type Measuring struct {
 	// Products keeps judgments made in these products.
 	Products []int64

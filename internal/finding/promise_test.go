@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // A commitment a claim argued for is moved only by that claim. A second claim
@@ -22,7 +23,7 @@ func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		component, err := f.graph.ComponentAt(ctx, f.target, "libnl-3-200")
+		component, err := f.graph.ComponentAs(ctx, f.target, "libnl-3-200", graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}

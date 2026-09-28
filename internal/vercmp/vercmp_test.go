@@ -434,7 +434,7 @@ func TestADistributionVersionThatIsNotOneIsRefused(t *testing.T) {
 	// a digit.
 	for _, scheme := range []vercmp.Scheme{vercmp.RPM, vercmp.Debian, vercmp.APK} {
 		for _, not := range []string{
-			"unfixed", "TBD", "none", "not fixed", "", "  ",
+			"", "  ",
 			// No leading digit, which is the rule each scheme states for
 			// itself.
 			"xyz10", "v1.0", "-1.0",
@@ -525,6 +525,32 @@ func TestAVersionLeadingToAReleaseIsToldApartFromOne(t *testing.T) {
 	} {
 		if _, ok := vercmp.Leads(each.scheme, each.v); ok {
 			t.Errorf("%v: %.40q was read, want a refusal", each.scheme, each.v)
+		}
+	}
+}
+
+// advisoryWords is what an advisory writes where a version belongs. No
+// reference suite carries them, because a reference implementation is asked
+// about versions rather than about what a security feed reports.
+var advisoryWords = []string{"unfixed", "TBD", "none", "not fixed", "see the advisory"}
+
+func TestAWordWhereAVersionBelongsIsRefused(t *testing.T) {
+	// Every scheme that orders refuses them, in either position. A comparison
+	// that answers for any two strings reads as a scheme that never fails, and
+	// a word sorts above every real release where a letter outranks a digit —
+	// so it would be recommended as the upgrade.
+	schemes := []vercmp.Scheme{
+		vercmp.Debian, vercmp.Semantic, vercmp.RPM, vercmp.APK,
+		vercmp.PyPI, vercmp.Maven, vercmp.NuGet,
+	}
+	for _, scheme := range schemes {
+		for _, not := range advisoryWords {
+			if _, ok := vercmp.Order(scheme, not, "1.0"); ok {
+				t.Errorf("%v ordered %q against a version", scheme, not)
+			}
+			if _, ok := vercmp.Order(scheme, "1.0", not); ok {
+				t.Errorf("%v ordered a version against %q", scheme, not)
+			}
 		}
 	}
 }

@@ -204,19 +204,6 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 	return applied, err
 }
 
-// DB exposes the underlying handle for queries this package does not wrap.
-func (s *Store) DB() bun.IDB { return s.db }
-
-// CurrentNodes returns the components present in a variant now.
-func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error) {
-	var nodes []Node
-	err := s.db.NewSelect().Model(&nodes).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
-		Scan(ctx)
-	return nodes, err
-}
-
 // CurrentComponents returns what a target contains now, as the scanner needs
 // to be given it.
 //
@@ -270,16 +257,6 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 		described = append(described, stated)
 	}
 	return described, nil
-}
-
-// ComponentAt resolves a component by name within one build.
-//
-// By name, because that is what a findings list gives out and what somebody
-// composing a request has. Scoped to the build so the name means what it means
-// there: two products can ship different things under one name, and a lookup
-// across everything would answer with whichever was interned first.
-func (s *Store) ComponentAt(ctx context.Context, targetID int64, name string) (int64, error) {
-	return s.ComponentVersionAt(ctx, targetID, name, "")
 }
 
 // ErrAmbiguous says a name matched more than one component and no version was
@@ -376,34 +353,9 @@ func (a *Ambiguous) Error() string {
 	return fmt.Sprintf("%s: %q as %s", ErrAmbiguous, a.Name, strings.Join(said, ", "))
 }
 
-// Versions are the distinct versions among the choices, in order.
-func (a *Ambiguous) Versions() []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, c := range a.Choices {
-		if !seen[c.Version] {
-			seen[c.Version] = true
-			out = append(out, c.Version)
-		}
-	}
-	return out
-}
-
 // Is makes errors.Is(err, ErrAmbiguous) hold for this, so callers that only
 // care that it was ambiguous keep working.
 func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
-
-// ComponentVersionAt resolves a component by name and, where one is given,
-// version.
-//
-// A name is not unique within a build, and not rarely: a real switch image
-// ships three vendored versions of one library. The version narrows it where
-// the caller has one, and an ambiguous name with no version is refused rather
-// than resolved to the lowest identifier, which answers about a version nobody
-// asked about.
-func (s *Store) ComponentVersionAt(ctx context.Context, targetID int64, name, version string) (int64, error) {
-	return s.ComponentAs(ctx, targetID, name, Choice{Version: version})
-}
 
 // ComponentAs resolves a component by name and, where they are given, the
 // version, ecosystem and namespace a choice names.
@@ -413,6 +365,11 @@ func (s *Store) ComponentVersionAt(ctx context.Context, targetID int64, name, ve
 // built from it share both, and so does one package a producer described under
 // two namespaces. An empty part means "any", which is what a caller who has
 // never needed it passes.
+//
+// A name is not unique within a build, and not rarely: a real switch image
+// ships three vendored versions of one library. An ambiguous name the choice
+// does not narrow is refused rather than resolved to the lowest identifier,
+// which answers about a version nobody asked about.
 func (s *Store) ComponentAs(ctx context.Context, targetID int64,
 	name string, which Choice) (int64, error) {
 
@@ -743,18 +700,14 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 	children int) (*Neighbor, error) {
 
 	row := &Neighbor{Children: children, ComponentID: componentID}
-	err := s.db.NewSelect().
-		TableExpr(`"component" AS "c"`).
+	// Counted exactly as the neighbors are. The root is one row, but a count
+	// that is not narrowed the same way is still a count of what the reader
+	// may not see.
+	err := openIssuesJoin(s.db.NewSelect().
+		TableExpr(`"component" AS "c"`), readable, targetID).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		// Narrowed exactly as the neighbors are. The root is one row, but a
-		// count that is not narrowed the same way is still a count of what the
-		// reader may not see.
-		ColumnExpr(`(SELECT COUNT(DISTINCT f.vulnerability_id) FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.component_id = c.id
-			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS "findings"`,
-			targetID, bun.List(readable)).
 		Where("c.id = ?", componentID).
 		Scan(ctx, row)
 	// No row is a fault like any other: an open node references its component
@@ -803,48 +756,12 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 	targetID int64) *bun.SelectQuery {
 
-	return query.
-		Join(`JOIN "component" AS "c" ON c.id = fn.component_id`).
-		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
-			FROM "graph_edge" AS "d"
-			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
-			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
-			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+	query = query.Join(`JOIN "component" AS "c" ON c.id = fn.component_id`)
+	return childrenJoin(openIssuesJoin(query, readable, targetID), targetID).
 		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		// Everything open against it here, so descending follows the findings
-		// rather than being exploration. Narrowed like every other count.
-		// Without this a reader browsing the tree gets an accurate count of
-		// the undisclosed findings under each component and can bisect down to
-		// which one holds them — a leak that needs no row to be shown.
-		//
-		// Counted once for the build and joined, like the children below,
-		// rather than asked per row. As a correlated subquery this had two
-		// indexes to choose from once the findings list's covering index
-		// existed — the target and the component, or the target, open and
-		// visibility — and SQLite without statistics took the second, which
-		// matches every open row in the build, once per child: 0.30 s for
-		// the root's thirty children against 0.09 s as one grouped pass.
-		Join(`LEFT JOIN (SELECT f.component_id AS "cid", COUNT(DISTINCT f.vulnerability_id) AS "n"
-			FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-			GROUP BY f.component_id) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
-		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`).
-		// Anything under it, so a node that opens can be told from
-		// one that does not before somebody clicks it.
-		//
-		// Counted once for the whole build and joined, rather than asked per
-		// row. As a correlated subquery this has no index to take: it is bound
-		// on the child's component, while the only way into the edge table is
-		// the target, so each row scanned every edge in the build. Measured on
-		// a switch operating-system image — 19,192 edges, 5,270 components
-		// directly under the root — that column alone cost 5.06 s against
-		// 0.106 s for one pass. An index on the node's component was tried
-		// first and made it worse (5.4 s to 10.0 s), because the scan being
-		// repeated is over the edges rather than the lookup it drives.
-		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`).
 		// kids.n and open.n are grouped on as well as selected. Each is one
 		// value per c.id and so adds nothing, but the engines that enforce
 		// the rule strictly will not take a column from a joined subquery on
@@ -860,6 +777,57 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
 		OrderExpr("CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, c.name")
+}
+
+// openIssuesJoin adds how many issues are open against each component "c" in
+// this build, as "findings", narrowed to the visibilities the reader may see.
+// Issues rather than finding rows: a library reachable under three parents is
+// one issue, not three.
+//
+// Narrowed like every other count. Without it a reader browsing the tree gets
+// an accurate count of the undisclosed findings under each component and can
+// bisect down to which one holds them — a leak that needs no row to be shown.
+//
+// Counted in one grouped pass over the build's open findings and joined,
+// rather than asked per row. The covering index over target, closure,
+// visibility, issue and component answers the pass without reading a row. As
+// a correlated subquery this has two indexes to choose from — the target and
+// the component, or the target, open and visibility — and SQLite without
+// statistics takes the second, which matches every open row in the build once
+// per row: 0.30 s for the root's thirty children against 0.09 s as one grouped
+// pass, and 17.1 s for a search for "li" on a switch image of 297,881 open
+// findings, where the pass takes 0.24 s.
+func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
+	targetID int64) *bun.SelectQuery {
+
+	return query.
+		Join(`LEFT JOIN (SELECT f.component_id AS "cid", COUNT(DISTINCT f.vulnerability_id) AS "n"
+			FROM "finding" AS "f"
+			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
+			GROUP BY f.component_id) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
+		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`)
+}
+
+// childrenJoin adds how many things each component "c" pulls in in this build,
+// as "children", so a node that opens can be told from one that does not
+// before somebody clicks it.
+//
+// Counted once for the whole build and joined, rather than asked per row. As a
+// correlated subquery this has no index to take: it is bound on the child's
+// component, while the only way into the edge table is the target, so each
+// row scans every edge in the build. Measured on a switch operating-system
+// image — 19,192 edges, 5,270 components directly under the root — that column
+// alone cost 5.06 s against 0.106 s for one pass. An index on the node's
+// component made it worse (5.4 s to 10.0 s), because the scan being repeated is
+// over the edges rather than the lookup it drives.
+func childrenJoin(query *bun.SelectQuery, targetID int64) *bun.SelectQuery {
+	return query.
+		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
+			FROM "graph_edge" AS "d"
+			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
+			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
+			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`)
 }
 
 // orphaned is the condition that nothing in the build pulls in the node the
@@ -1084,37 +1052,14 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		  AND m.name_folded LIKE ?` + database.LikeClause + `) AS "matched"`
 
 	var rows []Neighbor
-	err = s.db.NewSelect().
+	query := s.db.NewSelect().
 		TableExpr(matched, targetID, false, "%"+database.LikeEscaped(Folded(term))+"%").
-		Join(`JOIN "component" AS "c" ON c.id = matched.cid`).
-		// Issues rather than finding rows, which is what this field is and
-		// what the two queries that browse to the same component answer: a
-		// library reachable under three parents is one issue, not three.
-		//
-		// Counted in one grouped pass over the build's open findings, which
-		// the covering index over target, closure, visibility, issue and
-		// component answers without reading a row. Counted per matched
-		// component instead, SQLite reads the whole build's open findings once
-		// per component through the same index, and a term matching many
-		// names takes most of a minute: 17.1 s for "li" on a switch image of
-		// 297,881 open findings, where this takes 0.24 s.
-		Join(`LEFT JOIN (SELECT f.component_id AS "cid",
-				COUNT(DISTINCT f.vulnerability_id) AS "n"
-			FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-			GROUP BY f.component_id) AS "counted" ON counted.cid = c.id`,
-			targetID, bun.List(readable)).
-		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
-			FROM "graph_edge" AS "d"
-			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
-			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
-			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+		Join(`JOIN "component" AS "c" ON c.id = matched.cid`)
+	err = childrenJoin(openIssuesJoin(query, readable, targetID), targetID).
 		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`COALESCE(counted.n, 0) AS "findings"`).
-		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`).
 		OrderExpr(`"findings" DESC, c.name`).
 		Limit(limit).
 		Scan(ctx, &rows)

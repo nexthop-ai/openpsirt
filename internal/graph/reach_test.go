@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // The way down to a component is refused to somebody who may not know the
@@ -22,7 +23,7 @@ func TestAWayDownIsRefusedToSomebodyWhoHoldsNothingOnTheProduct(t *testing.T) {
 		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
-		curl, err := f.store.ComponentAt(ctx, f.targetID, "curl")
+		curl, err := f.store.ComponentAs(ctx, f.targetID, "curl", graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}

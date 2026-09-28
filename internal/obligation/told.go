@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -130,28 +129,15 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 				"the two is wrong", record.KnownAt.Format(time.RFC3339))
 		}
 		if windowID != nil {
-			in := new(Window)
-			if err := tx.NewSelect().Model(in).
-				Where("ow.id = ?", *windowID).Where("ow.retired_at IS NULL").
-				Scan(ctx); err != nil {
-				if database.IsNoRows(err) {
-					return ErrNoSuchWindow
-				}
-				return fmt.Errorf("read the window: %w", err)
+			window, err := inForce(ctx, tx, *windowID)
+			if err != nil {
+				return err
 			}
 			// Only a window that applies to this record's product. One limited
 			// to other products is not one this record answers, and its name
 			// is not the caller's to learn, so it is refused as one nobody
 			// declared.
-			var limited []int64
-			if err := tx.NewSelect().
-				TableExpr(`"obligation_window_product" AS "owp"`).
-				ColumnExpr("owp.product_id").
-				Where("owp.window_id = ?", *windowID).
-				Scan(ctx, &limited); err != nil {
-				return fmt.Errorf("read which products the window applies to: %w", err)
-			}
-			if len(limited) > 0 && !slices.Contains(limited, record.ProductID) {
+			if !window.AppliesTo(record.ProductID) {
 				return ErrNoSuchWindow
 			}
 		}
@@ -249,7 +235,7 @@ func (s *Store) WindowsNamed(ctx context.Context, subject access.Subject,
 		Where("ow.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which windows were answered: %w", err)
 	}
-	windows, err := s.withLimits(ctx, windows)
+	windows, err := withLimits(ctx, s.db, windows)
 	if err != nil {
 		return nil, err
 	}

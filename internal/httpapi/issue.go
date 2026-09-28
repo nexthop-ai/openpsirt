@@ -17,18 +17,18 @@ import (
 
 // SightingBody is one issue in one component of one build.
 type SightingBody struct {
-	Product     string `json:"product" doc:"The product's name, as an address takes it"`
-	ProductName string `json:"product_name" doc:"Its spelling on screen"`
-	Stream      string `json:"stream"`
-	Variant     string `json:"variant"`
-	Component   string `json:"component"`
-	Version     string `json:"version"`
-	Places      int    `json:"places" doc:"The number of times that component sits in that build carrying this issue"`
-	State       string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state here, by the definition the findings list uses"`
-	Undisclosed bool   `json:"undisclosed,omitempty"`
-	Recorded    bool   `json:"recorded,omitempty" doc:"Whether this is a flaw recorded in our own product rather than an issue a scanner reported"`
-	Due         string `json:"due,omitempty" doc:"The earliest deadline among its places"`
-	FixedIn     string `json:"fixed_in,omitempty"`
+	Product     string   `json:"product" doc:"The product's name, as an address takes it"`
+	ProductName string   `json:"product_name" doc:"Its spelling on screen"`
+	Stream      string   `json:"stream"`
+	Variant     string   `json:"variant"`
+	Component   string   `json:"component"`
+	Version     string   `json:"version"`
+	Places      int      `json:"places" doc:"The number of times that component sits in that build carrying this issue"`
+	State       standing `json:"state,omitempty" doc:"The decision state here, by the definition the findings list uses"`
+	Undisclosed bool     `json:"undisclosed,omitempty"`
+	Recorded    bool     `json:"recorded,omitempty" doc:"Whether this is a flaw recorded in our own product rather than an issue a scanner reported"`
+	Due         string   `json:"due,omitempty" doc:"The earliest deadline among its places"`
+	FixedIn     string   `json:"fixed_in,omitempty"`
 }
 
 // MergedBody is one issue merged into another because a report named both.
@@ -168,7 +168,7 @@ func registerIssue(api huma.API, in Ingest) {
 				Product: row.Product, ProductName: row.ProductName,
 				Stream: row.Stream, Variant: row.Variant,
 				Component: row.Component, Version: row.Version,
-				Places: row.Places, State: row.State,
+				Places: row.Places, State: standing(row.State),
 				Undisclosed: row.Undisclosed, Recorded: row.Recorded, FixedIn: row.FixedIn,
 			}
 			if row.DueAt != nil {

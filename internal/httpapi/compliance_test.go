@@ -107,11 +107,7 @@ func TestADeferralIsNotCountedAsAFailure(t *testing.T) {
 
 		// Agreed. Now it stops being late and becomes its own number — not a
 		// success, not a failure, and visible.
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", proposed.ClaimID),
-			`{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, proposed.ClaimID)
 		got := rate(t, "high")
 		if got.Deferred != 1 {
 			t.Errorf("a standing deferral reports %+v, want it counted as deferred", got)

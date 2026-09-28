@@ -242,7 +242,7 @@ func registerComparisonExport(api huma.API, in Ingest) {
 						rows = append(rows, []string{
 							group.what, body.Vulnerability, body.Component, body.Severity,
 							body.Because, body.FromVersion, body.MovedTo, body.ArrivedFrom,
-							closedRun, body.State, string(body.Outcome),
+							closedRun, string(body.State), string(body.Outcome),
 							string(body.Justification), body.Due,
 						})
 					}
@@ -353,7 +353,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
 						body.ProductName, body.Issue, body.Component, body.Version, body.Consumer,
 						string(body.Outcome), string(body.Justification), body.DeferredUntil,
-						body.FixedVersion, body.State,
+						body.FixedVersion, string(body.State),
 						strconv.FormatBool(body.Standing),
 						body.ProposedBy, strings.Join(agreed, "; "),
 						strconv.FormatBool(body.TwoPeople), body.EndedAt,

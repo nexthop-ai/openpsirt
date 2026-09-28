@@ -31,7 +31,7 @@ type AssessmentBody struct {
 	// the one a client feeds back to the filter beside it.
 	Product     string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
 	ProductName string `json:"product_name,omitempty" doc:"That product's spelling on screen"`
-	Severity    string `json:"severity" enum:"low,medium,high,critical" doc:"This product's own rating"`
+	Severity    rating `json:"severity" doc:"This product's own rating"`
 	Published   string `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
 	Reasoning   string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
 	State       string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
@@ -109,7 +109,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			return nil, absent(in.Logger, err, "that issue could not be looked up", noSuchIssue)
 		}
 		claim, err := finding.NewStore(in.DB.DB).Assess(ctx, subject, product.ID, issue,
-			input.Body.Severity, input.Body.Reasoning)
+			string(input.Body.Severity), input.Body.Reasoning)
 		if err != nil {
 			// Exactly what an unused name answers. An issue somebody may not
 			// be told about is not one they get to learn the severity of by
@@ -281,7 +281,7 @@ func registerAssessment(api huma.API, in Ingest) {
 
 func assessmentBody(a finding.Assessment, identifier string, asking int64) AssessmentBody {
 	body := AssessmentBody{
-		ID: a.ID, Vulnerability: identifier, Severity: a.Severity,
+		ID: a.ID, Vulnerability: identifier, Severity: rating(a.Severity),
 		Published: a.Published, Reasoning: a.Reasoning,
 		State: a.State, NeedsApproval: a.NeedsApproval,
 		Mine: a.ProposedBy == asking,

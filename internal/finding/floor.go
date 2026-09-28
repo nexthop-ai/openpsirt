@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -17,12 +18,10 @@ import (
 // ranked is the severity words, least first. A line admits one of them and
 // everything after it.
 //
-// The one list. It was three — this, an identical one beside the sort keys, and
-// a switch statement written twice in two packages — and three copies of an
-// ordering is three chances for a word added to one of them to be missing from
-// the others, which shows up as a rating that sorts one way and filters
-// another.
-var ranked = []string{"low", "medium", "high", "critical"}
+// The scorer's bands past "none", because the word a score falls in is stored
+// as a finding's severity and sorted by this: two spellings of one ordering
+// are a rating that sorts one way and filters another.
+var ranked = cvss.Bands()[1:]
 
 // Bands is the four rated words, worst first — the order a report reads in and
 // the order a person looks for.
@@ -159,6 +158,10 @@ type Floor struct {
 	// the product's own rating of the issue where it has made one.
 	ProductID int64
 }
+
+// LeastFirst is the four rated words, least first — the order a line's floor is
+// offered in.
+func LeastFirst() []string { return append([]string(nil), ranked...) }
 
 // TriageFloors are the words a line may be set to, least first, with the word
 // for no line at the head.

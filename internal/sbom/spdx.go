@@ -6,7 +6,6 @@ package sbom
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -153,14 +152,13 @@ func (c *reader) spdxCreationInfo() error {
 		if err != nil {
 			return err
 		}
-		if raw == "" {
-			return nil
-		}
-		built, err := time.Parse(time.RFC3339, raw)
+		built, err := buildTime(raw)
 		if err != nil {
-			return fmt.Errorf("build time %q is not a time: %w", trim(raw), err)
+			return err
 		}
-		c.doc.BuiltAt = built.UTC()
+		if !built.IsZero() {
+			c.doc.BuiltAt = built
+		}
 		return nil
 	})
 }

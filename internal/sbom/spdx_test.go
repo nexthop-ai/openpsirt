@@ -47,12 +47,7 @@ func TestTheHeaderOfTheSecondFormatIsReadWithoutItsContents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read header: %v", err)
 	}
-	if want := "https://example.invalid/product-1.0"; header.Serial != want {
-		t.Errorf("serial is %q, want %q", header.Serial, want)
-	}
-	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !header.BuiltAt.Equal(want) {
-		t.Errorf("built at %v, want %v", header.BuiltAt, want)
-	}
+	assertMinimalHeader(t, header.Serial, header.BuiltAt)
 	// The root is stated by pointing at a package, and the packages were not
 	// read — so this format answers the question the other one answers, and
 	// nothing asks it of a header.
@@ -286,19 +281,9 @@ func TestWhatAComponentWasDerivedFromIsTakenFromAPointer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			body := strings.Replace(minimalSPDX, `"packages": [`, `"packages": [`+ancestor+`,`, 1)
 			body = strings.Replace(body, `"relationships": [`, `"relationships": [`+tc.stated+`,`, 1)
-			doc := read(t, body)
-			var found bool
-			for _, c := range doc.Components {
-				if c.Name != "libc" {
-					continue
-				}
-				found = true
-				if c.UpstreamName != "openssl" || c.UpstreamVersion != "3.0.14" {
-					t.Errorf("derived from %q@%q, want openssl@3.0.14", c.UpstreamName, c.UpstreamVersion)
-				}
-			}
-			if !found {
-				t.Error("the component the relationship was about is not in the document")
+			name, version := upstreamOf(t, read(t, body), "libc")
+			if name != "openssl" || version != "3.0.14" {
+				t.Errorf("derived from %q@%q, want openssl@3.0.14", name, version)
 			}
 		})
 	}
@@ -720,22 +705,12 @@ func TestAStatedAncestorRefinesOneTakenFromAnIdentifier(t *testing.T) {
 	body = strings.Replace(body, `"relationships": [`, `"relationships": [`+
 		`{"spdxElementId": "SPDXRef-a", "relatedSpdxElement": "SPDXRef-up", "relationshipType": "DESCENDANT_OF"},`, 1)
 
-	doc := read(t, body)
-	var found bool
-	for _, c := range doc.Components {
-		if c.Name != "libc" {
-			continue
-		}
-		found = true
-		if c.UpstreamName != "glibc" {
-			t.Errorf("derived from %q, want glibc", c.UpstreamName)
-		}
-		if c.UpstreamVersion != "2.41-9" {
-			t.Errorf("derived from version %q, want 2.41-9 — the identifier states no version", c.UpstreamVersion)
-		}
+	name, version := upstreamOf(t, read(t, body), "libc")
+	if name != "glibc" {
+		t.Errorf("derived from %q, want glibc", name)
 	}
-	if !found {
-		t.Error("the component the relationship was about is not in the document")
+	if version != "2.41-9" {
+		t.Errorf("derived from version %q, want 2.41-9 — the identifier states no version", version)
 	}
 }
 
@@ -889,12 +864,7 @@ func assertMinimal(t *testing.T, doc *sbom.Document) {
 	if !doc.RootDeclared {
 		t.Error("the document named what it is about and that was not recorded")
 	}
-	if want := "https://example.invalid/product-1.0"; doc.Serial != want {
-		t.Errorf("serial is %q, want %q", doc.Serial, want)
-	}
-	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !doc.BuiltAt.Equal(want) {
-		t.Errorf("built at %v, want %v", doc.BuiltAt, want)
-	}
+	assertMinimalHeader(t, doc.Serial, doc.BuiltAt)
 	if len(doc.Components) != 1 {
 		t.Fatalf("read %d components, want 1 — the root is not repeated among them", len(doc.Components))
 	}
@@ -904,4 +874,29 @@ func assertMinimal(t *testing.T, doc *sbom.Document) {
 	if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
 		t.Errorf("edges are %v", got)
 	}
+}
+
+// assertMinimalHeader checks the serial and build time every vocabulary's
+// minimal document states, whether read whole or as a header.
+func assertMinimalHeader(t *testing.T, serial string, builtAt time.Time) {
+	t.Helper()
+	if want := "https://example.invalid/product-1.0"; serial != want {
+		t.Errorf("serial is %q, want %q", serial, want)
+	}
+	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !builtAt.Equal(want) {
+		t.Errorf("built at %v, want %v", builtAt, want)
+	}
+}
+
+// upstreamOf is the name and version a document says a component was derived
+// from, failing the test where the document holds no component of that name.
+func upstreamOf(t *testing.T, doc *sbom.Document, name string) (string, string) {
+	t.Helper()
+	for _, c := range doc.Components {
+		if c.Name == name {
+			return c.UpstreamName, c.UpstreamVersion
+		}
+	}
+	t.Fatalf("the document holds no component named %q", name)
+	return "", ""
 }

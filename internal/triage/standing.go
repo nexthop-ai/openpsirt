@@ -161,22 +161,15 @@ func (s *Store) groupByClaim(ctx context.Context, subject access.Subject, rows [
 		}
 	}
 
-	// The agreement that stands, where one does: the newest approval not
-	// since withdrawn. One per claim, because one act is one argument.
-	var approvals []Approval
-	if err := s.db.NewSelect().Model(&approvals).
-		Where("claim_id IN (?)", bun.List(claimsOf(rows))).
-		Where("withdrawn_at IS NULL").
-		Order("id DESC").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read who agreed: %w", err)
+	agreed, err := s.standingApprovals(ctx, claimsOf(rows))
+	if err != nil {
+		return nil, err
 	}
-	for _, approval := range approvals {
-		entry := byClaim[approval.ClaimID]
-		if entry == nil || entry.ApprovedAt != nil {
-			continue
+	for claimID, approval := range agreed {
+		if entry := byClaim[claimID]; entry != nil {
+			when := approval.ApprovedAt
+			entry.ApprovedBy, entry.ApprovedAt = approval.ApprovedBy, &when
 		}
-		when := approval.ApprovedAt
-		entry.ApprovedBy, entry.ApprovedAt = approval.ApprovedBy, &when
 	}
 
 	builds, err := s.buildsCovered(ctx, subject, order)
@@ -305,18 +298,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		return nil, nil
 	}
 
-	order := []int64{}
-	representative := map[int64]Decision{}
-	for _, row := range rows {
-		if _, seen := representative[row.ClaimID]; seen {
-			continue
-		}
-		representative[row.ClaimID] = row
-		order = append(order, row.ClaimID)
-		if len(order) == similarOffered {
-			break
-		}
-	}
+	order, representative := firstPerClaim(rows, similarOffered)
 
 	var claims []Claim
 	if err := s.db.NewSelect().Model(&claims).
@@ -353,18 +335,9 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	for _, row := range counted {
 		issues[row.ClaimID] = row.Issues
 	}
-	var approvals []Approval
-	if err := s.db.NewSelect().Model(&approvals).
-		Where("claim_id IN (?)", bun.List(order)).
-		Where("withdrawn_at IS NULL").
-		Order("id DESC").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read who agreed: %w", err)
-	}
-	agreed := map[int64]Approval{}
-	for _, approval := range approvals {
-		if _, seen := agreed[approval.ClaimID]; !seen {
-			agreed[approval.ClaimID] = approval
-		}
+	agreed, err := s.standingApprovals(ctx, order)
+	if err != nil {
+		return nil, err
 	}
 
 	heads := make([]Decision, 0, len(order))
@@ -449,18 +422,7 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 	// One entry per claim, and at most a handful. A deployment carrying twenty
 	// products would otherwise put twenty blocks of somebody else's reasoning
 	// on a screen somebody is trying to decide on.
-	order := []int64{}
-	representative := map[int64]Decision{}
-	for _, row := range rows {
-		if _, seen := representative[row.ClaimID]; seen {
-			continue
-		}
-		representative[row.ClaimID] = row
-		order = append(order, row.ClaimID)
-		if len(order) == similarOffered {
-			break
-		}
-	}
+	order, representative := firstPerClaim(rows, similarOffered)
 
 	var claims []Claim
 	if err := s.db.NewSelect().Model(&claims).
@@ -481,23 +443,9 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 		return nil, err
 	}
 
-	// Not one that has since been taken back, which both siblings in this file
-	// already ask. Undoing a batch withdraws its agreement and deliberately
-	// leaves the decision approved where another agreement still stands, so
-	// without this the newest row is the withdrawn one and the block names
-	// whoever took it back as the approver.
-	var approvals []Approval
-	if err := s.db.NewSelect().Model(&approvals).
-		Where("claim_id IN (?)", bun.List(order)).
-		Where("withdrawn_at IS NULL").
-		Order("id DESC").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read who agreed elsewhere: %w", err)
-	}
-	approver := map[int64]Approval{}
-	for _, approval := range approvals {
-		if _, seen := approver[approval.ClaimID]; !seen {
-			approver[approval.ClaimID] = approval
-		}
+	approver, err := s.standingApprovals(ctx, order)
+	if err != nil {
+		return nil, err
 	}
 
 	out := make([]Elsewhere, 0, len(order))
@@ -515,4 +463,51 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 		out = append(out, one)
 	}
 	return out, nil
+}
+
+// firstPerClaim keeps the first row of each claim, in the order the rows came,
+// and stops at most claims. It answers the claims in that order and the row
+// kept for each.
+func firstPerClaim(rows []Decision, most int) ([]int64, map[int64]Decision) {
+	order := []int64{}
+	representative := map[int64]Decision{}
+	for _, row := range rows {
+		if _, seen := representative[row.ClaimID]; seen {
+			continue
+		}
+		representative[row.ClaimID] = row
+		order = append(order, row.ClaimID)
+		if len(order) == most {
+			break
+		}
+	}
+	return order, representative
+}
+
+// standingApprovals reads the agreement that stands on each claim, where one
+// does: the newest approval not since withdrawn. One per claim, because one
+// act is one argument.
+//
+// A withdrawn approval is never the answer. Undoing a batch withdraws its
+// agreement and leaves the decision approved where another agreement still
+// stands, so the newest row can be the withdrawn one, and reading it would name
+// whoever took it back as the approver.
+func (s *Store) standingApprovals(ctx context.Context, claimIDs []int64) (map[int64]Approval, error) {
+	agreed := map[int64]Approval{}
+	if len(claimIDs) == 0 {
+		return agreed, nil
+	}
+	var approvals []Approval
+	if err := s.db.NewSelect().Model(&approvals).
+		Where("claim_id IN (?)", bun.List(claimIDs)).
+		Where("withdrawn_at IS NULL").
+		Order("id DESC").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read who agreed: %w", err)
+	}
+	for _, approval := range approvals {
+		if _, seen := agreed[approval.ClaimID]; !seen {
+			agreed[approval.ClaimID] = approval
+		}
+	}
+	return agreed, nil
 }

@@ -4,8 +4,6 @@
 package httpapi_test
 
 import (
-	"fmt"
-	"net/http"
 	"testing"
 )
 
@@ -46,10 +44,7 @@ func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
 		// Now the other issue at the same place is agreed as affected, and a
 		// second claim about the *first* issue is made somewhere else — which
 		// is the material an approver is entitled to see.
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		second, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
 
 		// A fresh value rather than the one above: a zero count is left out of
@@ -139,10 +134,7 @@ func TestWhatWasAgreedAboutTheSameIssueElsewhereIsCounted(t *testing.T) {
 			t.Errorf("an unapproved claim elsewhere was counted as evidence: %+v", said)
 		}
 
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", first), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, first)
 		if said := counter(second); said["affected"] == 0 {
 			t.Errorf("the card does not say the same issue is affected elsewhere: %+v", said)
 		}

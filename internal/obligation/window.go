@@ -234,12 +234,12 @@ func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
-	return s.withLimits(ctx, windows)
+	return withLimits(ctx, s.db, windows)
 }
 
 // withLimits fills in the products each window is limited to, which the
 // window row itself does not carry.
-func (s *Store) withLimits(ctx context.Context, windows []Window) ([]Window, error) {
+func withLimits(ctx context.Context, db bun.IDB, windows []Window) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
@@ -252,7 +252,7 @@ func (s *Store) withLimits(ctx context.Context, windows []Window) ([]Window, err
 		ProductID int64  `bun:"product_id"`
 		Product   string `bun:"product"`
 	}
-	err := s.db.NewSelect().
+	err := db.NewSelect().
 		TableExpr(`"obligation_window_product" AS "owp"`).
 		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
 		ColumnExpr(`owp.window_id AS "window_id"`).
@@ -358,8 +358,8 @@ func limit(ctx context.Context, tx bun.IDB, windowID int64, products []int64) er
 func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 	said WindowSaid) (*Window, error) {
 
-	if !subject.Admin || subject.Kind != access.Person {
-		return nil, access.Denied("declare a window")
+	if err := administers(subject, "declare a window"); err != nil {
+		return nil, err
 	}
 	said, err := windowSaid(said)
 	if err != nil {
@@ -404,8 +404,8 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int64,
 	said WindowSaid) (*Window, error) {
 
-	if !subject.Admin || subject.Kind != access.Person {
-		return nil, access.Denied("change a window")
+	if err := administers(subject, "change a window"); err != nil {
+		return nil, err
 	}
 	said, err := windowSaid(said)
 	if err != nil {
@@ -467,8 +467,8 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 // Retired rather than deleted: a notice recorded against it keeps naming it,
 // and the name is released so it may be declared again.
 func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int64) error {
-	if !subject.Admin || subject.Kind != access.Person {
-		return access.Denied("retire a window")
+	if err := administers(subject, "retire a window"); err != nil {
+		return err
 	}
 	return s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
 		window, err := inForce(ctx, tx, id)
@@ -497,8 +497,8 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 	})
 }
 
-// inForce reads a window still in force, with the names of the products it is
-// limited to, which is what the trail says a window was.
+// inForce reads a window still in force, with the products it is limited to
+// and their names, which is what the trail says a window was.
 func inForce(ctx context.Context, tx bun.IDB, id int64) (*Window, error) {
 	window := new(Window)
 	if err := tx.NewSelect().Model(window).
@@ -509,16 +509,19 @@ func inForce(ctx context.Context, tx bun.IDB, id int64) (*Window, error) {
 		}
 		return nil, fmt.Errorf("read the window: %w", err)
 	}
-	if err := tx.NewSelect().
-		TableExpr(`"obligation_window_product" AS "owp"`).
-		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
-		ColumnExpr("p.name").
-		Where("owp.window_id = ?", id).
-		Order("p.name ASC").
-		Scan(ctx, &window.ProductNames); err != nil {
-		return nil, fmt.Errorf("read which products the window applies to: %w", err)
+	limited, err := withLimits(ctx, tx, []Window{*window})
+	if err != nil {
+		return nil, err
 	}
-	return window, nil
+	return &limited[0], nil
+}
+
+// administers refuses anybody but a signed-in administrator the act named.
+func administers(subject access.Subject, act string) error {
+	if !subject.Admin || subject.Kind != access.Person {
+		return access.Denied(act)
+	}
+	return nil
 }
 
 // writing runs do inside one transaction, retried as a whole.

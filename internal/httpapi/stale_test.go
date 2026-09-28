@@ -67,10 +67,7 @@ func TestAClaimNobodyApprovesIsSaidToWhoeverCouldApproveIt(t *testing.T) {
 		}
 
 		// It clears by the thing happening, which nobody dismisses.
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		if told := r.alerts(t, "reviewer", "claim-waiting"); len(told) != 0 {
 			t.Errorf("after approval the claim is still reported as waiting: %v", told)
 		}
@@ -150,10 +147,7 @@ func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
 		if told := r.alerts(t, "triager", "deferral-ending"); len(told) != 0 {
 			t.Fatalf("a deferral nobody has agreed to is reported as ending: %v", told)
 		}
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, claim)
 
 		told := r.alerts(t, "triager", "deferral-ending")
 		if len(told) != 1 {
@@ -249,10 +243,7 @@ func TestTheProposerSeesWhatBecameOfEachClaim(t *testing.T) {
 			}
 		}
 
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", agreed), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, agreed)
 		if got := asPerson(t, r, "reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/send-back", sent),
 			`{"because":"Name the kconfig option."}`); got.Code != http.StatusNoContent {
@@ -326,10 +317,7 @@ func TestAnEditThatWithdrawsAnAgreementIsSaidToWhoeverAgreed(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		if told := r.told(t, "reviewer", "approval-withdrawn"); len(told) != 0 {
 			t.Fatalf("an approval told its own approver something: %v", told)
 		}
@@ -383,10 +371,7 @@ func TestAnApproverWhoEditsWhatTheyAgreedToIsNotToldTheirOwnEdit(t *testing.T) {
 		}
 
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		if got := asPerson(t, r, "reviewer", http.MethodPut,
 			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
 			`{"reasoning":"The parser is unreachable: the only caller is the encoder."}`); got.Code != http.StatusOK {

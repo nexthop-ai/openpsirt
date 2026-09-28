@@ -252,7 +252,7 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 		}
 		// The closed row is still there, stamped with the scan that ended it.
 		var closed []graph.Node
-		if err := f.store.DB().NewSelect().Model(&closed).
+		if err := f.db.DB.NewSelect().Model(&closed).
 			Where("target_id = ?", f.targetID).
 			Where("closed_scan_id IS NOT NULL").Scan(t.Context()); err != nil {
 			t.Fatal(err)
@@ -327,7 +327,7 @@ func rowCounts(t *testing.T, f *fixture) map[string]int {
 	t.Helper()
 	counts := map[string]int{}
 	for _, table := range []string{"component", "graph_node", "graph_edge"} {
-		n, err := f.store.DB().NewSelect().Table(table).Count(t.Context())
+		n, err := f.db.DB.NewSelect().Table(table).Count(t.Context())
 		if err != nil {
 			t.Fatalf("count %s: %v", table, err)
 		}

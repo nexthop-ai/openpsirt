@@ -17,14 +17,14 @@ import (
 
 // BuildStandingBody is one build of a product and how far its work has got.
 type BuildStandingBody struct {
-	Stream     string `json:"stream"`
-	StreamKind string `json:"stream_kind,omitempty" enum:"branch,tag" doc:"Whether the line moves or is fixed"`
-	Variant    string `json:"variant"`
-	Open       int    `json:"open" doc:"Issues at components, the unit every count here uses"`
-	Overdue    int    `json:"overdue,omitempty" doc:"The number past a deadline"`
-	Exploited  int    `json:"exploited,omitempty" doc:"The number somebody is known to be exploiting"`
-	Undecided  int    `json:"undecided,omitempty" doc:"The number nobody has claimed anything about"`
-	Agreed     int    `json:"agreed,omitempty" doc:"The number answered at every place by a standing decision"`
+	Stream     string   `json:"stream"`
+	StreamKind lineKind `json:"stream_kind,omitempty" doc:"Whether the line moves or is fixed"`
+	Variant    string   `json:"variant"`
+	Open       int      `json:"open" doc:"Issues at components, the unit every count here uses"`
+	Overdue    int      `json:"overdue,omitempty" doc:"The number past a deadline"`
+	Exploited  int      `json:"exploited,omitempty" doc:"The number somebody is known to be exploiting"`
+	Undecided  int      `json:"undecided,omitempty" doc:"The number nobody has claimed anything about"`
+	Agreed     int      `json:"agreed,omitempty" doc:"The number answered at every place by a standing decision"`
 	// LastScanAt is when a scan last arrived here, and Retired says the
 	// release is out of support — so a build that stopped being scanned
 	// because it stopped being supported reads as expected rather than as
@@ -160,7 +160,7 @@ func registerOverview(api huma.API, in Ingest) {
 				Undecided: row.Undecided, Agreed: row.Agreed,
 			}
 			if cover, has := covered[key]; has {
-				body.StreamKind = cover.StreamKind
+				body.StreamKind = lineKind(cover.StreamKind)
 				body.OutOfSupport = cover.OutOfSupport
 				if cover.LastReceivedAt != nil {
 					body.LastScanAt = stamp(*cover.LastReceivedAt)

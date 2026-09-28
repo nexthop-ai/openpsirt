@@ -24,10 +24,6 @@ var ErrNoSuchObject = errors.New("no such object")
 // who may have it are decided above this line, and a store decides only how to
 // hold bytes.
 type Storage interface {
-	// Name is what this store is called in a log line and in the readiness
-	// answer, so an operator can see which one a deployment came up with.
-	Name() string
-
 	// Put stores size bytes read from body under key. A body shorter or
 	// longer than size is an error, and nothing is stored under key.
 	//

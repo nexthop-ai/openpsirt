@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -103,8 +104,8 @@ func registerEntry(api huma.API, in Ingest) {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take"`
-			Summary  string `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
-			Severity string `json:"severity,omitempty" enum:"critical,high,medium,low,negligible,none" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
+			Summary  string     `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
+			Severity recordable `json:"severity,omitempty" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
 			// The vector rather than a score. The number is derived from it
 			// here, so the two cannot say different things.
 			Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
@@ -154,7 +155,7 @@ func registerEntry(api huma.API, in Ingest) {
 			TargetIDs: targets, Component: input.Body.Component,
 			Version: input.Body.Version, Ecosystem: input.Body.Ecosystem,
 			Namespace: input.Body.Namespace,
-			Summary:   input.Body.Summary, Severity: input.Body.Severity,
+			Summary:   input.Body.Summary, Severity: string(input.Body.Severity),
 			Vector: input.Body.Vector, Weaknesses: input.Body.Weaknesses,
 			Disclosed: input.Body.Disclosed,
 			Told: finding.Told{
@@ -178,7 +179,7 @@ func registerEntry(api huma.API, in Ingest) {
 				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
 			case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
 				return nil, asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNotAVector):
+			case errors.Is(err, cvss.ErrNotAVector):
 				return nil, asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNothingScanned):
 				return nil, huma.Error404NotFound(finding.ErrNothingScanned.Error())
@@ -384,7 +385,7 @@ func registerDisclosure(api huma.API, in Ingest) {
 // MovementBody is one time somebody moved the end of an embargo.
 type MovementBody struct {
 	ID             int64  `json:"id"`
-	Act            string `json:"act" enum:"extension,shortening,disclosure" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public"`
+	Act            act    `json:"act" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public"`
 	Was            string `json:"was" doc:"The embargo's previous end"`
 	Until          string `json:"until" doc:"The end that was asked for"`
 	Reason         string `json:"reason"`
@@ -406,7 +407,7 @@ type PendingMovementBody struct {
 	ID            int64  `json:"id"`
 	Product       string `json:"product"`
 	Vulnerability string `json:"vulnerability"`
-	Act           string `json:"act" enum:"extension,shortening,disclosure" doc:"Which act is being asked for"`
+	Act           act    `json:"act" doc:"Which act is being asked for"`
 	Was           string `json:"was" doc:"The embargo's end now"`
 	Until         string `json:"until" doc:"The end being asked for"`
 	Days          int    `json:"days" doc:"How far the date moves, in days, whichever way it moves"`
@@ -631,7 +632,7 @@ func registerMovements(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, PendingMovementBody{
 				ID:      row.ID,
 				Product: row.Product, Vulnerability: row.Vulnerability,
-				Act: string(row.Act),
+				Act: act(row.Act),
 				Was: row.Was.Format(time.DateOnly), Until: row.Until.Format(time.DateOnly),
 				By:      who.identity(row.AskedBy),
 				ByName:  who.label(row.AskedBy),
@@ -790,7 +791,7 @@ func movementBody(ctx context.Context, in Ingest, rows []finding.Movement) ([]Mo
 	out := make([]MovementBody, 0, len(rows))
 	for _, row := range rows {
 		body := MovementBody{
-			ID: row.ID, Act: string(row.Act), Was: stamp(row.Was), Until: stamp(row.Until),
+			ID: row.ID, Act: act(row.Act), Was: stamp(row.Was), Until: stamp(row.Until),
 			Reason: row.Reason, AskedBy: who.identity(row.AskedBy),
 			AskedByName: who.label(row.AskedBy),
 			AskedAt:     stamp(row.AskedAt), NeedsApproval: row.NeedsApproval,

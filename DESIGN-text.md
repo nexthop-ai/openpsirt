@@ -80,6 +80,7 @@ inline, a reference definition, and an autolink in angle brackets.
 | Leading and trailing control characters and spaces are removed, and every tab and newline wherever it sits | A browser's address parser does the same, so `/`, a tab, `/evil.example` is two separators |
 | The scheme runs to the first colon, with any control character inside it ignored | `java&#9;script:` is `javascript:` to a browser |
 | `attachment:` and `issue:` are refused unless written exactly so, in lower case | A renderer resolves them as written, so `Attachment:` is a link to nothing. The refusal names the spelling, because the identifier after it may be well formed |
+| An `attachment:` reference is the minted identifier, 32 lower-case hexadecimal characters, and an `issue:` reference is a letter then 2 to 63 letters, digits, dots, dashes or underscores | The corpus holds references on both sides of each edge. The submission check accepts exactly the ones the interface's renderer links, so accepted text is never a dead link |
 
 A link to somewhere in this deployment survives. The browser's sanitizer decides
 by **resolving** the destination against the page rather than matching it

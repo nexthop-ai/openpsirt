@@ -113,20 +113,10 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 		for start := 0; start < len(ids); start += database.InBulk.Most {
 			end := min(start+database.InBulk.Most, len(ids))
 			chunk := ids[start:end]
-			result, err := tx.NewUpdate().Model((*Decision)(nil)).
-				Set("state = ?", LapsedState).
-				Set("ended_at = ?", moment).
-				Set("live_key = ?", nil).
-				Where("de.id IN (?)", bun.List(chunk)).
-				Where("de.state IN (?, ?)", Proposed, Approved).
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("mark what a severity rise outgrew: %w", err)
-			}
 			// A row another sweep, a withdrawal or an approval moved in
 			// between is not this sweep's to report. Run again, the read no
 			// longer finds it, and nobody is told twice.
-			changed, err := database.Affected(result)
+			changed, err := markLapsed(ctx, tx, chunk, moment)
 			if err != nil {
 				return fmt.Errorf("mark what a severity rise outgrew: %w", err)
 			}

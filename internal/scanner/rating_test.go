@@ -6,7 +6,7 @@ package scanner
 import (
 	"testing"
 
-	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 )
 
 // A rating as a report states it, with the score in the place a report puts it.
@@ -85,7 +85,7 @@ func TestARatingStatingNoGenerationTakesTheOneItsVectorStates(t *testing.T) {
 			if got.version != "" {
 				t.Fatalf("the reader invented a generation of %q", got.version)
 			}
-			scored, err := finding.Score(got.vector)
+			scored, err := cvss.Score(got.vector)
 			if err != nil {
 				t.Fatalf("scoring what was recorded: %v", err)
 			}
@@ -103,7 +103,7 @@ func TestAVectorARatingCarriesIsOneThisCanScore(t *testing.T) {
 	for _, vector := range []string{four, three} {
 		t.Run(vector, func(t *testing.T) {
 			got, _ := rating([]publishedRating{published("", vector, 1)})
-			scored, err := finding.Score(got.vector)
+			scored, err := cvss.Score(got.vector)
 			if err != nil {
 				t.Fatalf("the vector as recorded does not score here: %v", err)
 			}

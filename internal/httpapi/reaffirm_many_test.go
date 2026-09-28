@@ -41,9 +41,16 @@ func (r *reach) agreedAcrossTheFold(t *testing.T, issue, justification string) i
 // agreed has the reviewer agree to a claim.
 func (r *reach) agreed(t *testing.T, claim int64) {
 	t.Helper()
-	if ok := asPerson(t, r, "reviewer", http.MethodPost,
+	r.agreedBy(t, "reviewer", claim)
+}
+
+// agreedBy is one person agreeing to a claim, failing the test where the
+// approval is refused.
+func (r *reach) agreedBy(t *testing.T, who string, claim int64) {
+	t.Helper()
+	if ok := asPerson(t, r, who, http.MethodPost,
 		fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-		t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
+		t.Fatalf("%s approving answered %d: %s", who, ok.Code, ok.Body.String())
 	}
 }
 

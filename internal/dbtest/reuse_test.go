@@ -37,7 +37,7 @@ import (
 func TestAKeptDatabaseIsRecognizedAndAnOlderSchemaDropped(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
-		admin := openAdmin(t, base)
+		admin := Open(t, base)
 
 		// Two names for one slot, differing only where the fingerprint of the
 		// migrations sits — which is exactly what an edited migration
@@ -102,7 +102,7 @@ func TestAKeptDatabaseIsRecognizedAndAnOlderSchemaDropped(t *testing.T) {
 func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
-		admin := openAdmin(t, base)
+		admin := Open(t, base)
 		name := fmt.Sprintf("openpsirt_t_halfbuilt_%s_aaaaaa", suffixFor(t, engine))
 		t.Cleanup(func() {
 			if _, err := admin.ExecContext(context.WithoutCancel(ctx),
@@ -195,26 +195,6 @@ func forEachServer(t *testing.T, fn func(t *testing.T, engine database.Engine, b
 			fn(t, engine, base)
 		})
 	}
-}
-
-// openAdmin connects to the server itself rather than to a database on it,
-// which is the connection the create and drop statements are issued over.
-func openAdmin(t *testing.T, base string) *database.DB {
-	t.Helper()
-	target, err := database.ParseURL(base)
-	if err != nil {
-		t.Fatalf("parse the database URL: %v", err)
-	}
-	admin, err := database.Open(context.Background(), target)
-	if err != nil {
-		t.Fatalf("open %s: %v", target.Redacted, err)
-	}
-	t.Cleanup(func() {
-		if err := admin.Close(); err != nil {
-			t.Errorf("close %s: %v", target.Engine, err)
-		}
-	})
-	return admin
 }
 
 // suffixFor keeps two engines' subtests from naming the same database, since

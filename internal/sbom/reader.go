@@ -136,11 +136,9 @@ type reader struct {
 	// them does not depend on what a map felt like doing.
 	upstreamOrder []string
 	// spdx3Creations is when each creation-information element says a document
-	// was made, and spdx3Order is the order they were read in. A format that
-	// puts the header inside the contents states several, because anything the
-	// document imported brought its own.
+	// was made. A format that puts the header inside the contents states
+	// several, because anything the document imported brought its own.
 	spdx3Creations map[string]string
-	spdx3Order     []string
 	// spdx3DocumentCreation is the one the document itself points at.
 	spdx3DocumentCreation string
 	// spdx3DocumentCreated is the creation time the document states in place,

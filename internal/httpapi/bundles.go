@@ -60,12 +60,12 @@ type BundleBody struct {
 type BundleQuery struct {
 	Stream    string     `query:"stream" doc:"Limit to one branch or tag"`
 	Variant   string     `query:"variant" doc:"Limit to one variant"`
-	Severity  string     `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse"`
+	Severity  rating     `query:"severity" doc:"Keep only issues rated this badly or worse"`
 	Exploited bool       `query:"exploited" doc:"Keep only upgrades closing something known to be exploited"`
 	Component string     `query:"component" doc:"Keep only upgrades moving a component of this name"`
 	Search    string     `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
 	Ecosystem string     `query:"ecosystem" doc:"Keep only components of one package kind"`
-	State     string     `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
+	State     standing   `query:"state" doc:"Keep only groups this far decided"`
 	Sort      bundleSort `query:"sort" doc:"The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for"`
 	Ascending bool       `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
 }
@@ -73,9 +73,9 @@ type BundleQuery struct {
 // narrow is the store's own filter, built from the request.
 func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
 	return finding.Filter{
-		MinSeverity: q.Severity, Exploited: q.Exploited,
+		MinSeverity: string(q.Severity), Exploited: q.Exploited,
 		Components: []string{q.Component}, Search: q.Search,
-		Ecosystems: []string{q.Ecosystem}, States: []string{q.State},
+		Ecosystems: []string{q.Ecosystem}, States: []finding.ClaimStanding{finding.ClaimStanding(q.State)},
 		BundleSort: finding.BundleSortKey(q.Sort), Ascending: q.Ascending,
 		Floor: floor,
 	}
@@ -300,22 +300,11 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
 	}) (*listOutput[PlannedBody], error) {
-		subject, err := reading(ctx)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
-		if err != nil {
-			return nil, err
-		}
-		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, target.ID)
+		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, targetID)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
@@ -340,25 +329,14 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Variant string `path:"variant"`
 		Format  string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
+		subject, targetID, err := visibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		// Read whole before a byte is written, like the screen reads it: this
 		// is one build's plan rather than a paged list, and a refusal has to
 		// land before the status is gone.
-		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, target.ID)
+		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, targetID)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}

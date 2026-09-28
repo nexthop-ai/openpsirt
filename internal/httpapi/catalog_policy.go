@@ -51,13 +51,9 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 			approvers = &in.Body.Approvers
 		}
 		return &struct{}{}, changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, err := productIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			was := thresholdsSaid(product.PairShare, product.PairApprovers)
 			if err := store.SetPairThresholds(ctx, product.ID, share, approvers); err != nil {
@@ -96,7 +92,7 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		// The same words the deployment's line takes, checked the same way. A
 		// product that could be set to something the deployment could not
 		// would be a second vocabulary for one idea.
-		word := strings.TrimSpace(strings.ToLower(in.Body.Floor))
+		word := strings.TrimSpace(strings.ToLower(string(in.Body.Floor)))
 		if word != "" && !slices.Contains(theFloor, word) {
 			return nil, huma.Error422UnprocessableEntity(
 				fmt.Sprintf("%q is not a line to triage from — write one of %s, "+
@@ -105,12 +101,10 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		var product *catalog.Product
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
-			if err != nil {
+			var store *catalog.Store
+			var err error
+			if store, product, err = productIn(ctx, d, tx, in.Product); err != nil {
 				return err
-			}
-			if product, err = store.ProductByName(ctx, in.Product); err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			// Absent means the product follows the deployment, which is a
 			// different act from stating the deployment's current line: a
@@ -163,12 +157,10 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		var product *catalog.Product
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
-			if err != nil {
+			var store *catalog.Store
+			var err error
+			if store, product, err = productIn(ctx, d, tx, in.Product); err != nil {
 				return err
-			}
-			if product, err = store.ProductByName(ctx, in.Product); err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			before := product.EOLOn
 			if err := store.SetProductEndOfLife(ctx, product.ID, on); err != nil {
@@ -232,17 +224,9 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		// is what a comparison walks, so the caller's refusal describes a
 		// state the database no longer has.
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, stream, err := streamIn(ctx, d, tx, in.Product, in.Stream)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
-			}
-			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
-			if err != nil {
-				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
 				from, err := store.StreamByName(ctx, product.ID, named)
@@ -300,15 +284,10 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		var product *catalog.Product
 		var stream *catalog.Stream
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
-			if err != nil {
+			var store *catalog.Store
+			var err error
+			if store, product, stream, err = streamIn(ctx, d, tx, in.Product, in.Stream); err != nil {
 				return err
-			}
-			if product, err = store.ProductByName(ctx, in.Product); err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
-			}
-			if stream, err = store.StreamByName(ctx, product.ID, in.Stream); err != nil {
-				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			before := stream.EOLOn
 			if err := store.SetStreamEndOfLife(ctx, stream.ID, on); err != nil {

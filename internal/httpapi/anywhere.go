@@ -58,7 +58,7 @@ func registerAnywhere(api huma.API, in Ingest) {
 		// The line is per product and is applied per row inside the store, so
 		// what is handed over here is only what the caller asked to raise it
 		// to — never a number chosen for a page that spans products.
-		narrowed, err := input.filter(finding.Floor{Word: input.Severity})
+		narrowed, err := input.filter(finding.Floor{Word: string(input.Severity)})
 		if err != nil {
 			return nil, err
 		}

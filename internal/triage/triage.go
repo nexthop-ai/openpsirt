@@ -301,3 +301,15 @@ const (
 	// everywhere else in this package.
 	LapsedState State = "lapsed"
 )
+
+// States is every state a decision row can reach, in the order a row moves
+// through them.
+func States() []State { return []State{Proposed, Approved, Withdrawn, LapsedState} }
+
+// Live reports whether a row in this state still holds its key: proposed or
+// approved.
+func (s State) Live() bool { return s == Proposed || s == Approved }
+
+// Ended reports whether a row in this state has stopped applying: withdrawn by
+// somebody, or lapsed when the code moved.
+func (s State) Ended() bool { return s == Withdrawn || s == LapsedState }

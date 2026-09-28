@@ -137,7 +137,7 @@ func TestTheFoldIsWrittenAsAComponentIsRecorded(t *testing.T) {
 	// column rather than an expression six queries each spell for themselves.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		components := graph.NewComponents(f.store.DB())
+		components := graph.NewComponents(f.db.DB)
 
 		siblings := []graph.Described{
 			described("pkg:deb/debian/curl@8.14.1-2?distro=debian-13",
@@ -153,7 +153,7 @@ func TestTheFoldIsWrittenAsAComponentIsRecorded(t *testing.T) {
 		}
 
 		var rows []graph.Component
-		if err := f.store.DB().NewSelect().Model(&rows).
+		if err := f.db.DB.NewSelect().Model(&rows).
 			Column("name", "version", "fold_key").Scan(ctx); err != nil {
 			t.Fatalf("read back: %v", err)
 		}

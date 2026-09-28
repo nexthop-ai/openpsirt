@@ -631,7 +631,7 @@ func (f *runFixture) undecided(t *testing.T, who access.Subject) int {
 	}
 	scope := finding.Scope{ProductID: &product.ID}
 	_, total, err := finding.NewStore(f.db.DB).Groups(t.Context(), who, scope, 50, 0,
-		finding.Filter{States: []string{"undecided"}})
+		finding.Filter{States: []finding.ClaimStanding{"undecided"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,7 +652,7 @@ func (f *runFixture) stateOf(t *testing.T, who access.Subject, component string)
 	}
 	for _, row := range rows {
 		if row.Component == component {
-			return row.State
+			return string(row.State)
 		}
 	}
 	t.Fatalf("no row for %s", component)

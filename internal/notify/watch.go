@@ -116,16 +116,41 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		for _, admin := range admins {
 			out[admin] = holding
 		}
-		for person, told := range out {
-			o, c, err := NewStore(w.db).Reconcile(ctx, person, each.kind, told)
-			if err != nil {
-				return opened, cleared, fmt.Errorf("tell %d %s: %w", person, each.what, err)
-			}
-			opened += o
-			cleared += c
+		o, c, err := w.tell(ctx, each.kind, out, each.what)
+		opened, cleared = opened+o, cleared+c
+		if err != nil {
+			return opened, cleared, err
 		}
 	}
 	return opened, cleared, nil
+}
+
+// tell makes what each person is told of one kind exactly what they are
+// handed, and sums what that opened and cleared.
+func (w *Watch) tell(ctx context.Context, kind Kind, holding map[int64][]Holds,
+	what string) (opened, cleared int, err error) {
+
+	for person, told := range holding {
+		o, c, err := NewStore(w.db).Reconcile(ctx, person, kind, told)
+		if err != nil {
+			return opened, cleared, fmt.Errorf("tell %d %s: %w", person, what, err)
+		}
+		opened += o
+		cleared += c
+	}
+	return opened, cleared, nil
+}
+
+// fanOut hands a condition about a product to everybody who may act on it
+// there.
+func fanOut(out map[int64][]Holds, acts map[int64]map[int64]acts, productID int64,
+	private bool, holds Holds) {
+
+	for personID, per := range acts {
+		if per[productID].triages(private) {
+			out[personID] = append(out[personID], holds)
+		}
+	}
 }
 
 // Once derives every condition and reconciles it against what is being said.
@@ -143,134 +168,59 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		return opened, cleared, err
 	}
 
-	// An embargo whose date has arrived is not a fact about the tool's health,
-	// so it is not the same list to the same people: administrators hear about
-	// all of them, and whoever holds one hears about theirs. Reconcile makes
-	// somebody's open set exactly what it is handed, so each person's whole
-	// list is worked out before any of it is written — an administrator who is
-	// also holding one has to be handed both halves at once or the second call
-	// would clear the first.
-	due, err := w.pastDisclosure(ctx, admins)
-	if err != nil {
-		return opened, cleared, err
-	}
-	for person, holding := range due {
-		o, c, err := NewStore(w.db).Reconcile(ctx, person, DisclosureDue, holding)
-		if err != nil {
-			return opened, cleared, fmt.Errorf("tell %d what is past its date: %w", person, err)
-		}
-		opened += o
-		cleared += c
-	}
-
-	// An embargo whose date is coming. Before the date, not on it: an
-	// approver who touches disclosure a few times a year has no reason to
-	// open the screen that would have told them, and an agreement to move a date
-	// is worthless without time to arrange it.
-	near, err := w.approachingDisclosure(ctx, admins)
-	if err != nil {
-		return opened, cleared, err
-	}
-	for person, holding := range near {
-		o, c, err := NewStore(w.db).Reconcile(ctx, person, DisclosureNear, holding)
-		if err != nil {
-			return opened, cleared,
-				fmt.Errorf("tell %d what is about to disclose: %w", person, err)
-		}
-		opened += o
-		cleared += c
-	}
-
-	// A window after an attack on a product, running and then passed, with
-	// nobody outside recorded as told. Per person for the reason the
-	// embargo conditions are: each names an issue in a product.
-	for _, window := range []struct {
+	// Each is per person, because each names something about a product or a
+	// finding, so who hears it follows who may read it. Reconcile makes
+	// somebody's open set of one kind exactly what it is handed, so each
+	// person's whole list of a kind is worked out before any of it is written
+	// — an administrator who is also holding an embargo has to be handed both
+	// halves at once or the second call would clear the first. And each kind
+	// is reconciled on its own, so a person holding two of them keeps both.
+	for _, each := range []struct {
 		kind Kind
 		of   func(context.Context) (map[int64][]Holds, error)
 		what string
 	}{
+		// An embargo whose date has arrived is not a fact about the tool's
+		// health, so it is not the same list to the same people:
+		// administrators hear about all of them, and whoever holds one hears
+		// about theirs.
+		{DisclosureDue, func(ctx context.Context) (map[int64][]Holds, error) {
+			return w.pastDisclosure(ctx, admins)
+		}, "what is past its date"},
+		// An embargo whose date is coming. Before the date, not on it: an
+		// approver who touches disclosure a few times a year has no reason to
+		// open the screen that would have told them, and an agreement to move
+		// a date is worthless without time to arrange it.
+		{DisclosureNear, func(ctx context.Context) (map[int64][]Holds, error) {
+			return w.approachingDisclosure(ctx, admins)
+		}, "what is about to disclose"},
+		// A window after an attack on a product, running and then passed,
+		// with nobody outside recorded as told.
 		{ObligationOpen, w.windowsOpen, "which windows after an attack are running"},
 		{ObligationNear, w.windowsNear, "which windows after an attack are about to end"},
 		{ObligationPassed, w.windowsPassed, "which windows after an attack have passed"},
-	} {
-		holding, err := window.of(ctx)
-		if err != nil {
-			return opened, cleared, err
-		}
-		for person, each := range holding {
-			o, c, err := NewStore(w.db).Reconcile(ctx, person, window.kind, each)
-			if err != nil {
-				return opened, cleared, fmt.Errorf("tell %d %s: %w", person, window.what, err)
-			}
-			opened += o
-			cleared += c
-		}
-	}
-
-	// A VEX publisher changing what they said about something a standing
-	// decision cited. Per person for the reason the two below are: it
-	// names an issue at a component, which is finding content, so who
-	// hears it follows who may read it.
-	moved, err := w.statementsRevised(ctx)
-	if err != nil {
-		return opened, cleared, err
-	}
-	for person, holding := range moved {
-		o, c, err := NewStore(w.db).Reconcile(ctx, person, StatementRevised, holding)
-		if err != nil {
-			return opened, cleared,
-				fmt.Errorf("tell %d what a publisher changed: %w", person, err)
-		}
-		opened += o
-		cleared += c
-	}
-
-	// Work that has stopped moving. A pass each rather than one over all of
-	// them, because they are different waits with different audiences — and
-	// each is reconciled on its own kind, so a person holding two of them
-	// keeps both.
-	for _, sitting := range []struct {
-		kind Kind
-		of   func(context.Context) (map[int64][]Holds, error)
-		what string
-	}{
+		// A VEX publisher changing what they said about something a standing
+		// decision cited.
+		{StatementRevised, w.statementsRevised, "what a publisher changed"},
+		// Work that has stopped moving: different waits with different
+		// audiences.
 		{ClaimWaiting, w.waitingClaims, "what is waiting on a second person"},
 		{SentBackWaiting, w.sentBackWaiting, "what was sent back and left"},
 		{DeferralEnding, w.deferralsEnding, "which deferrals are running out"},
 		{QueueUntaken, w.queuesUntaken, "what is sitting in a queue"},
 		{Unanswered, w.unanswered, "whose report nobody has answered"},
+		// A critical against something already shipped.
+		{CriticalOnRelease, w.criticalOnReleases, "what is critical on a release"},
 	} {
-		still, err := sitting.of(ctx)
+		holding, err := each.of(ctx)
 		if err != nil {
 			return opened, cleared, err
 		}
-		for person, holding := range still {
-			o, c, err := NewStore(w.db).Reconcile(ctx, person, sitting.kind, holding)
-			if err != nil {
-				return opened, cleared,
-					fmt.Errorf("tell %d %s: %w", person, sitting.what, err)
-			}
-			opened += o
-			cleared += c
-		}
-	}
-
-	// A critical against something already shipped. Like the embargo list
-	// and unlike the two above it, this is per person rather than the same
-	// list to everybody: it names an issue at a build, which is finding
-	// content, so who hears it follows who may read it.
-	shipped, err := w.criticalOnReleases(ctx)
-	if err != nil {
-		return opened, cleared, err
-	}
-	for person, holding := range shipped {
-		o, c, err := NewStore(w.db).Reconcile(ctx, person, CriticalOnRelease, holding)
+		o, c, err := w.tell(ctx, each.kind, holding, each.what)
+		opened, cleared = opened+o, cleared+c
 		if err != nil {
-			return opened, cleared,
-				fmt.Errorf("tell %d what is critical on a release: %w", person, err)
+			return opened, cleared, err
 		}
-		opened += o
-		cleared += c
 	}
 	return opened, cleared, nil
 }
@@ -365,12 +315,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
 		}
-		for personID, per := range acts {
-			if !per[row.ProductID].triages(private) {
-				continue
-			}
-			out[personID] = append(out[personID], holds)
-		}
+		fanOut(out, acts, row.ProductID, private, holds)
 	}
 	return out, nil
 }

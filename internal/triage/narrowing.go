@@ -63,11 +63,9 @@ func mayApprove(subject access.Subject, productID int64, visibility access.Visib
 // mayTakePart reports whether a subject may add to a decision rather than only
 // read it — writing a comment, or changing their own.
 //
-// This is what readable meant before the record readable at the finding's
-// visibility widened reading to the finding's own visibility. Writing had
-// leaned on the reading rule, so widening one widened the other, and a reader
-// could comment on a decision they may not argue about. Named separately so
-// the two cannot drift back together.
+// Taking part asks for triage or the approver capability; reading asks only for
+// the finding's visibility. Named separately from readable so that widening
+// who may read never widens who may comment.
 func mayTakePart(subject access.Subject, productID int64, visibility access.Visibility) bool {
 	return mayApprove(subject, productID, visibility) || mayDecide(subject, productID, visibility)
 }
@@ -79,18 +77,12 @@ func mayTakePart(subject access.Subject, productID int64, visibility access.Visi
 // part of the record of a finding, and who may read that record is who may
 // read the finding.
 //
-// It asked whether the subject may decide or approve, and that was narrower
-// than disclosure opening the record, which says the whole record — comments,
-// decisions, actors — goes public when a private issue is disclosed. Under the
-// old rule that was true only for people who could already see it: a reader
-// holding private reading on a product opened a finding and was told none of
-// its decisions existed, so they saw "deferred" with no way to see why or by
-// whom, and the screen called the record was empty for anybody who is not a
-// triager.
+// Disclosure opens the whole record — comments, decisions, actors — so a
+// reader who may read a finding reads why it stands as it does and by whom,
+// without holding triage.
 //
-// Acting on any of it is unchanged. Arguing still asks for triage (mayDecide)
-// and agreeing still asks for the approver capability (mayApprove); this
-// widens reading alone.
+// Acting on any of it asks for more. Arguing asks for triage (mayDecide) and
+// agreeing asks for the approver capability (mayApprove).
 func readable(subject access.Subject, productID int64, visibility access.Visibility) bool {
 	if subject.Kind != access.Person {
 		return false

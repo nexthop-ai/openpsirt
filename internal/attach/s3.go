@@ -223,8 +223,6 @@ func loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func (b *Bucket) Name() string { return "s3" }
-
 func (b *Bucket) Put(ctx context.Context, key string, body io.Reader, size int64,
 	contentType string) error {
 

@@ -4,8 +4,6 @@
 package httpapi_test
 
 import (
-	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
@@ -60,10 +58,7 @@ func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 		// so it leaves: a row somebody agreed to is not standing between the
 		// branch and the release.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		after := ready(t)
 		if after.Blockers != 1 || len(after.Blocking) != 1 {
 			t.Fatalf("after agreeing to one, %d of %d block",

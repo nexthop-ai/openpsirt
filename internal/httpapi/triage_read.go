@@ -51,11 +51,11 @@ type ClaimDetail struct {
 	Finding *FindingRefBody `json:"finding,omitempty" doc:"A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place"`
 	AgeDays int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 	// Happened is the claim's fate, read from its rows.
-	Happened     string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
-	When         string `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
-	By           string `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
-	ByName       string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Reaffirmable bool   `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it"`
+	Happened     happened `json:"happened" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
+	When         string   `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
+	By           string   `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
+	ByName       string   `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Reaffirmable bool     `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
@@ -86,11 +86,11 @@ type ClaimDetail struct {
 // EndedReachBody is the rows of a claim that stopped applying one way, and
 // what they reached at that moment.
 type EndedReachBody struct {
-	State  string   `json:"state" enum:"withdrawn,lapsed" doc:"How these rows stopped applying"`
-	At     string   `json:"at" doc:"The latest moment one of them stopped"`
-	Rows   int      `json:"rows" doc:"The number of decisions that stopped this way"`
-	Places int      `json:"places" doc:"The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now"`
-	Builds []string `json:"builds" doc:"Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant"`
+	State  claimStateEnded `json:"state" doc:"How these rows stopped applying"`
+	At     string          `json:"at" doc:"The latest moment one of them stopped"`
+	Rows   int             `json:"rows" doc:"The number of decisions that stopped this way"`
+	Places int             `json:"places" doc:"The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now"`
+	Builds []string        `json:"builds" doc:"Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant"`
 }
 
 // endedReach renders the parts of a claim that stopped applying.
@@ -98,7 +98,7 @@ func endedReach(parts []triage.EndedPart) []EndedReachBody {
 	out := make([]EndedReachBody, 0, len(parts))
 	for _, part := range parts {
 		body := EndedReachBody{
-			State: string(part.State), Rows: part.Rows, Places: part.Places,
+			State: claimStateEnded(part.State), Rows: part.Rows, Places: part.Places,
 			Builds: part.Builds,
 		}
 		if !part.At.IsZero() {
@@ -195,13 +195,13 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"and adding the totals counts some of them twice.",
 		Tags: []string{"Triage"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string  `query:"product" doc:"Limit to one product, by name"`
-		Outcome outcome `query:"outcome" doc:"Limit to one outcome"`
-		State   string  `query:"state" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to one state"`
-		Expired bool    `query:"expired" doc:"Only deferrals whose date has passed"`
-		Stopped bool    `query:"stopped" doc:"Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up"`
-		Limit   int     `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset  int     `query:"offset" minimum:"0"`
+		Product string     `query:"product" doc:"Limit to one product, by name"`
+		Outcome outcome    `query:"outcome" doc:"Limit to one outcome"`
+		State   claimState `query:"state" doc:"Limit to one state"`
+		Expired bool       `query:"expired" doc:"Only deferrals whose date has passed"`
+		Stopped bool       `query:"stopped" doc:"Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up"`
+		Limit   int        `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset  int        `query:"offset" minimum:"0"`
 	}) (*DecisionsOutput, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
@@ -317,7 +317,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			Place:              about.Place,
 			Finding:            about.Finding,
 			AgeDays:            about.AgeDays,
-			Happened:           string(whole.Happened),
+			Happened:           happened(whole.Happened),
 			PreviouslyApproved: whole.PreviouslyApproved,
 			Rows:               whole.Rows,
 			Issues:             whole.Issues,

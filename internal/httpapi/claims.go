@@ -274,7 +274,7 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 
 func claimBody(c triage.Claim, proposedBy, proposedByName string) ClaimBody {
 	body := ClaimBody{
-		ID: c.ID, Kind: string(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
+		ID: c.ID, Kind: claimKind(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
 		ProposedAt: c.ProposedAt.UTC().Format(time.RFC3339),
 		Elsewhere:  c.Elsewhere,
 	}
@@ -314,12 +314,12 @@ func outliersBody(o triage.Outliers) *OutliersBody {
 
 // StandingClaimBody is a live claim covering some of a finding's places.
 type StandingClaimBody struct {
-	ClaimID    int64  `json:"claim_id"`
-	Kind       string `json:"kind" enum:"finding,together,extension,returned"`
-	DecisionID int64  `json:"decision_id" doc:"A representative row of the claim at this finding"`
+	ClaimID    int64     `json:"claim_id"`
+	Kind       claimKind `json:"kind"`
+	DecisionID int64     `json:"decision_id" doc:"A representative row of the claim at this finding"`
 	// State is the claim's as a whole, not a representative row's: approved
 	// only where every live row here is.
-	State string           `json:"state" enum:"proposed,approved" doc:"The claim's state as a whole: approved only when every live row here is approved, otherwise proposed"`
+	State claimStateLive   `json:"state" doc:"The claim's state as a whole: approved only when every live row here is approved, otherwise proposed"`
 	Rows  RowsStandingBody `json:"rows" doc:"The state of the claim's rows here"`
 	// SentBackAt is the last time an approver asked for more, where rows were
 	// sent back.
@@ -362,16 +362,16 @@ type EarlierBody struct {
 	// FixedVersion is the evidence an approver checks the already-fixed claim
 	// against. Agreeing to a claim of fact without being shown the fact is
 	// the failure this outcome is most exposed to.
-	FixedVersion   string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
-	ProposedBy     string `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
-	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	ProposedAt     string `json:"proposed_at"`
-	Ended          string `json:"ended" enum:"lapsed,withdrawn" doc:"The reason it stopped applying"`
-	EndedAt        string `json:"ended_at,omitempty"`
-	About          string `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
-	Reasoning      string `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
-	ApprovedBy     string `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did, by sign-in identity"`
-	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	FixedVersion   string          `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
+	ProposedBy     string          `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
+	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ProposedAt     string          `json:"proposed_at"`
+	Ended          claimStateEnded `json:"ended" doc:"The reason it stopped applying"`
+	EndedAt        string          `json:"ended_at,omitempty"`
+	About          string          `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
+	Reasoning      string          `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
+	ApprovedBy     string          `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did, by sign-in identity"`
+	ApprovedByName string          `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 }
 
 // SimilarBody is an approved claim at the same places about another issue,
@@ -467,8 +467,8 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	standingOut := make([]StandingClaimBody, 0, len(standing))
 	for _, one := range standing {
 		body := StandingClaimBody{
-			ClaimID: one.Claim.ID, Kind: string(one.Claim.Kind), DecisionID: one.Decision.ID,
-			State: string(one.State), Outcome: outcome(one.Claim.Outcome),
+			ClaimID: one.Claim.ID, Kind: claimKind(one.Claim.Kind), DecisionID: one.Decision.ID,
+			State: claimStateLive(one.State), Outcome: outcome(one.Claim.Outcome),
 			Rows: RowsStandingBody{
 				Proposed: one.Rows.Proposed, SentBack: one.Rows.SentBack, Approved: one.Rows.Approved,
 			},
@@ -505,7 +505,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			Justification: justification(orBlank(said.Justification)),
 			ProposedBy:    who.identity(d.ProposedBy), ProposedByName: who.label(d.ProposedBy),
 			ProposedAt: d.ProposedAt.UTC().Format(time.RFC3339),
-			Ended:      string(d.State),
+			Ended:      claimStateEnded(d.State),
 			About:      orBlank(d.ComponentUpstreamVersion),
 			Reasoning:  one.Reasoning,
 		}

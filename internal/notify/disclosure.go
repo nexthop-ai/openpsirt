@@ -134,12 +134,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
 		}
-		for personID, per := range acts {
-			if !per[row.ProductID].triages(private) {
-				continue
-			}
-			out[personID] = append(out[personID], holds)
-		}
+		fanOut(out, acts, row.ProductID, private, holds)
 	}
 	return out, nil
 }

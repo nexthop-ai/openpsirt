@@ -42,7 +42,21 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	if err != nil {
 		return nil, err
 	}
-	body := &PersonBody{
+	body := personBody(person, doors, estate, held, named)
+	return &body, nil
+}
+
+// personBody is one person as the people list and the one-person read both
+// answer: who they are, their address and which source said so, how they sign
+// in, and what they hold.
+//
+// The estate grants come first, because they are the wider statement and a
+// reader scanning the list should meet "everywhere" before the exceptions to
+// it.
+func personBody(person *access.Account, doors []access.Identity, estate []access.EstateGrant,
+	held []access.Grant, named map[int64]named,
+) PersonBody {
+	body := PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName,
 		Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
@@ -53,24 +67,21 @@ func described(ctx context.Context, a Administering, store *access.Store,
 			Username: door.Username, Pinned: door.Subject != nil,
 		})
 	}
-	// The estate grants first, because they are the wider statement and a
-	// reader scanning the list should meet "everywhere" before the exceptions
-	// to it.
 	for _, grant := range estate {
 		body.Holds = append(body.Holds, HeldBody{
-			Everywhere: true, Role: string(grant.Role),
+			Everywhere: true, Role: role(grant.Role),
 			Effective: grant.Active, Source: string(grant.Source),
 		})
 	}
 	for _, grant := range held {
 		body.Holds = append(body.Holds, HeldBody{
-			Product: named[grant.ProductID].Address, Role: string(grant.Role),
+			Product: named[grant.ProductID].Address, Role: role(grant.Role),
 			ProductDisplayName: named[grant.ProductID].Display,
 			Effective:          grant.Active, Source: string(grant.Source),
 		})
 	}
 	body.SeesNothing = seesNothing(body.Holds)
-	return body, nil
+	return body
 }
 
 // Administering carries what the endpoints for people and credentials run on.
@@ -222,7 +233,7 @@ type RecordBody struct {
 type GrantBody struct {
 	// Product is the one it is held against, or empty with Everywhere set.
 	Product string `json:"product,omitempty" doc:"The product the role is held against. Omit it and set everywhere instead to hold it across the estate"`
-	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"The rights it carries"`
+	Role    role   `json:"role" doc:"The rights it carries"`
 	// Everywhere holds the role across every product, including products
 	// declared afterwards. Stated rather than implied by an absent product,
 	// so that a caller that forgot the product is refused instead of quietly
@@ -253,8 +264,8 @@ type HeldBody struct {
 	// declared afterwards. Reported rather than left to be inferred from an
 	// absent product: an access review asks what somebody holds, and "on
 	// nothing" and "on everything" must not read alike.
-	Everywhere bool   `json:"everywhere,omitempty" doc:"Held across every product, including products declared later"`
-	Role       string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"The rights it carries"`
+	Everywhere bool `json:"everywhere,omitempty" doc:"Held across every product, including products declared later"`
+	Role       role `json:"role" doc:"The rights it carries"`
 	// Effective says whether this grants anything right now. An assignment set
 	// aside by a change of role-assignment mode is kept so the change can be
 	// undone, and it grants nothing while it sits there — so it is shown, and
@@ -316,7 +327,7 @@ func registerAdministration(api huma.API, a Administering) {
 		Tags: []string{"Administration"},
 	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Keep only people holding something on this product, by the name that addresses it"`
-		Role    string `query:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"Keep only people holding this role"`
+		Role    role   `query:"role" doc:"Keep only people holding this role"`
 	}) (*listOutput[PersonBody], error) {
 		store, names, err := readable(ctx, a, a.handle())
 		if err != nil {
@@ -355,41 +366,12 @@ func registerAdministration(api huma.API, a Administering) {
 		out := &listOutput[PersonBody]{}
 		out.Body.Items = make([]PersonBody, 0, len(people))
 		for _, person := range people {
-			body := PersonBody{
-				Identity: person.Identity, DisplayName: person.DisplayName,
-				Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
-				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
-				// Their address, and which of the two sources said
-				// so. On the list as well as on the one-person read: the
-				// screen that records an address is the list, and a column
-				// drawing "none" over an address somebody has just typed
-				// reads as a refused write.
-				Email: person.Email, EmailSource: string(person.EmailSource),
-			}
 			doors, err := store.Identities(ctx, person.ID)
 			if err != nil {
 				return nil, wentWrong(a.Logger, "cannot read how they sign in", err)
 			}
-			for _, door := range doors {
-				body.SignsInBy = append(body.SignsInBy, SignInBody{
-					Username: door.Username, Pinned: door.Subject != nil,
-				})
-			}
-			for _, grant := range everywhere[person.ID] {
-				body.Holds = append(body.Holds, HeldBody{
-					Everywhere: true, Role: string(grant.Role),
-					Effective: grant.Active, Source: string(grant.Source),
-				})
-			}
-			for _, grant := range held[person.ID] {
-				body.Holds = append(body.Holds, HeldBody{
-					Product: named[grant.ProductID].Address, Role: string(grant.Role),
-					ProductDisplayName: named[grant.ProductID].Display,
-					Effective:          grant.Active, Source: string(grant.Source),
-				})
-			}
-			body.SeesNothing = seesNothing(body.Holds)
-			if !holding(body.Holds, onProduct, named, input.Role) {
+			body := personBody(&person, doors, everywhere[person.ID], held[person.ID], named)
+			if !holding(body.Holds, onProduct, named, string(input.Role)) {
 				continue
 			}
 			out.Body.Items = append(out.Body.Items, body)
@@ -524,7 +506,7 @@ func registerAdministration(api huma.API, a Administering) {
 						return asked(a.Logger, err)
 					}
 					if err := noted(ctx, db, trail.Role, person.Identity+" on every product",
-						nil, trail.Said(hold.Role, true)); err != nil {
+						nil, trail.Said(string(hold.Role), true)); err != nil {
 						return notRecorded(a.Logger, err)
 					}
 					continue
@@ -541,7 +523,7 @@ func registerAdministration(api huma.API, a Administering) {
 					return asked(a.Logger, err)
 				}
 				if err := noted(ctx, db, trail.Role, person.Identity+" on "+product.Name,
-					nil, trail.Said(hold.Role, true)); err != nil {
+					nil, trail.Said(string(hold.Role), true)); err != nil {
 					return notRecorded(a.Logger, err)
 				}
 			}
@@ -913,7 +895,7 @@ func holding(holds []HeldBody, productID int64, named map[int64]named, role stri
 		if !held.Effective {
 			continue
 		}
-		if role != "" && held.Role != role {
+		if role != "" && string(held.Role) != role {
 			continue
 		}
 		// A role held across every product is held on this one, including

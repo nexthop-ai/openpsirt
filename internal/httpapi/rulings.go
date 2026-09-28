@@ -19,31 +19,31 @@ import (
 
 // RulingBody is one act of saying what one or more reports are.
 type RulingBody struct {
-	ID              int64    `json:"id"`
-	Product         string   `json:"product" doc:"The product it was made in"`
-	Disposition     string   `json:"disposition" enum:"duplicate,not-reproducible,out-of-scope,rejected"`
-	Reasoning       string   `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited"`
-	DuplicateOf     string   `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
-	Reports         []string `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
-	State           string   `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
-	ProposedBy      string   `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
-	ProposedByName  string   `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	ProposedAt      string   `json:"proposed_at"`
-	Yours           bool     `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
-	ApprovedBy      string   `json:"approved_by,omitempty" doc:"The person who agreed, on a disposition that takes a second person, by sign-in identity"`
-	ApprovedByName  string   `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	ApprovedAt      string   `json:"approved_at,omitempty"`
-	WithdrawnBy     string   `json:"withdrawn_by,omitempty" doc:"The person who took it back, by sign-in identity"`
-	WithdrawnByName string   `json:"withdrawn_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	WithdrawnAt     string   `json:"withdrawn_at,omitempty"`
+	ID              int64              `json:"id"`
+	Product         string             `json:"product" doc:"The product it was made in"`
+	Disposition     dispositionRulable `json:"disposition"`
+	Reasoning       string             `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited"`
+	DuplicateOf     string             `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
+	Reports         []string           `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
+	State           string             `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
+	ProposedBy      string             `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
+	ProposedByName  string             `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ProposedAt      string             `json:"proposed_at"`
+	Yours           bool               `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
+	ApprovedBy      string             `json:"approved_by,omitempty" doc:"The person who agreed, on a disposition that takes a second person, by sign-in identity"`
+	ApprovedByName  string             `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ApprovedAt      string             `json:"approved_at,omitempty"`
+	WithdrawnBy     string             `json:"withdrawn_by,omitempty" doc:"The person who took it back, by sign-in identity"`
+	WithdrawnByName string             `json:"withdrawn_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	WithdrawnAt     string             `json:"withdrawn_at,omitempty"`
 }
 
 // RulingProposedBody is a ruling as somebody submits it.
 type RulingProposedBody struct {
-	Reports     []string `json:"reports" minItems:"1" maxItems:"10000" doc:"The references of the reports it covers. Naming one twice covers it once"`
-	Disposition string   `json:"disposition" enum:"duplicate,not-reproducible,out-of-scope,rejected"`
-	Reasoning   string   `json:"reasoning,omitempty" maxLength:"65536" doc:"Why, as markdown. Required on everything but a duplicate"`
-	DuplicateOf string   `json:"duplicate_of,omitempty" maxLength:"191" doc:"The open issue a duplicate points at, under any identifier it goes by. Only on a duplicate"`
+	Reports     []string           `json:"reports" minItems:"1" maxItems:"10000" doc:"The references of the reports it covers. Naming one twice covers it once"`
+	Disposition dispositionRulable `json:"disposition"`
+	Reasoning   string             `json:"reasoning,omitempty" maxLength:"65536" doc:"Why, as markdown. Required on everything but a duplicate"`
+	DuplicateOf string             `json:"duplicate_of,omitempty" maxLength:"191" doc:"The open issue a duplicate points at, under any identifier it goes by. Only on a duplicate"`
 }
 
 // registerRulings is saying what claims are when the answer is not an issue
@@ -338,7 +338,7 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 	for _, row := range rows {
 		body := RulingBody{
 			ID: row.ID, Product: row.Product,
-			Disposition: string(row.Disposition), Reasoning: row.Reasoning,
+			Disposition: dispositionRulable(row.Disposition), Reasoning: row.Reasoning,
 			Reports: row.References, State: rulingState(row),
 			ProposedBy: who.identity(row.ProposedBy), ProposedByName: who.label(row.ProposedBy),
 			ProposedAt: row.ProposedAt.UTC().Format(time.RFC3339),

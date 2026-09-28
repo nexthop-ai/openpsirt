@@ -480,7 +480,7 @@ func (f *fixture) wholeProduct() finding.Scope {
 // componentID is the component row one name resolves to in the fixture's build.
 func (f *fixture) componentID(t *testing.T, name string) int64 {
 	t.Helper()
-	id, err := graph.NewStore(f.db.DB).ComponentAt(t.Context(), f.target, name)
+	id, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.target, name, graph.Choice{})
 	if err != nil {
 		t.Fatalf("resolve %s: %v", name, err)
 	}

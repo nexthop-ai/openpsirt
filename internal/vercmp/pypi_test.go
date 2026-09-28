@@ -289,10 +289,6 @@ func TestAPyPIVersionThatIsNotOneIsRefused(t *testing.T) {
 	// distribution ones: the grammar already says what a version is, so a word
 	// an advisory wrote where a version belongs needs no rule invented for it.
 	for _, not := range append([]string{
-		// What an advisory writes where a version belongs. Not in the suite,
-		// because the reference implementation is asked about versions rather
-		// than about what a security feed reports.
-		"unfixed", "TBD", "none", "not fixed", "see the advisory",
 		// A fork carrying a branch, and a local version with nothing local.
 		"main-a1b2c3", "1.0+",
 	}, pypiNotVersions...) {

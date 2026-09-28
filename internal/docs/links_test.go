@@ -74,9 +74,6 @@ func linkProblems(docs map[string]string, exists func(string) bool) ([]string, l
 			}
 		}
 		for _, m := range crossLink.FindAllStringSubmatch(body, -1) {
-			if strings.Contains(m[0], "://") {
-				continue
-			}
 			count.across++
 			to := filepath.Clean(filepath.Join(filepath.Dir(path), m[1]))
 			anchors, read := anchorsIn[to]

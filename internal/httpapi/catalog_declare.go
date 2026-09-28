@@ -78,13 +78,9 @@ func registerDeclaring(api huma.API, d Declaring) {
 		}
 		var out *declaredOutput[StreamBody]
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, err := productIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 
 			var parent *catalog.Stream
@@ -115,7 +111,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 				}
 			}
 			out = answer(did.Changed(), StreamBody{
-				Name: stream.DisplayName, Kind: string(stream.Kind), Parent: in.Body.Parent,
+				Name: stream.DisplayName, Kind: lineKind(stream.Kind), Parent: in.Body.Parent,
 			})
 			return nil
 		}); err != nil {
@@ -146,13 +142,9 @@ func registerDeclaring(api huma.API, d Declaring) {
 		}
 		var out *declaredOutput[VariantBody]
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := storeFor(d, tx)
+			store, product, err := productIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
-			}
-			product, err := store.ProductByName(ctx, in.Product)
-			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			variant, did, err := store.EnsureVariant(ctx, product.ID, in.Body.Name, facing)
 			if err != nil {

@@ -74,7 +74,7 @@ func TestTwoSourceVersionsInOneBuildAreTwoEntriesAndOnePromiseEach(t *testing.T)
 		_, err = f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
 			[]int64{f.target}, "libcurl4t64", "")
 		var several *graph.Ambiguous
-		if !errors.As(err, &several) || len(several.Versions()) != 2 {
+		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a promise naming no version reached %v, want a refusal offering both", err)
 		}
 

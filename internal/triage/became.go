@@ -62,6 +62,13 @@ const (
 	SeveralWays WhatHappened = "mixed"
 )
 
+// WhatHappenedAll is every word for what became of a claim.
+func WhatHappenedAll() []WhatHappened {
+	return []WhatHappened{
+		StillWaiting, SentBackFor, AgreedTo, TakenBack, MovedUnder, AgreementUndone, SeveralWays,
+	}
+}
+
 // Became is one claim somebody proposed and what happened to it.
 type Became struct {
 	Claim Claim

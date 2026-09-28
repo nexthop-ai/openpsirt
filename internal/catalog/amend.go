@@ -74,15 +74,7 @@ func (s *Store) SetVariantCustomerFacing(ctx context.Context, variantID int64, f
 // it. Retiring one already retired is refused, so that two administrators
 // doing it at once do not both record having done it.
 func (s *Store) RetireVariant(ctx context.Context, variantID int64) error {
-	res, err := s.db.NewUpdate().Model((*Variant)(nil)).
-		Set("retired_at = ?", now()).
-		Where("id = ?", variantID).
-		Where("retired_at IS NULL").
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("retire variant %d: %w", variantID, err)
-	}
-	return counted(res, "variant", variantID, "retire")
+	return s.retire(ctx, (*Variant)(nil), variantID, "variant")
 }
 
 // restoreVariant brings a retired variant back, which is what declaring it
@@ -92,14 +84,7 @@ func (s *Store) RetireVariant(ctx context.Context, variantID int64) error {
 // retired name has to answer that call with the variant rather than with a
 // constraint violation.
 func (s *Store) restoreVariant(ctx context.Context, variantID int64) error {
-	res, err := s.db.NewUpdate().Model((*Variant)(nil)).
-		Set("retired_at = NULL").
-		Where("id = ?", variantID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("bring variant %d back: %w", variantID, err)
-	}
-	return counted(res, "variant", variantID, "bring it back")
+	return s.restore(ctx, (*Variant)(nil), variantID, "variant")
 }
 
 // RenameProduct corrects what a product is called.
@@ -158,26 +143,11 @@ func (s *Store) SetProductDisplayName(ctx context.Context, productID int64, show
 // effect is to make bringing the product back a second bulk write that has to
 // remember exactly what it changed.
 func (s *Store) RetireProduct(ctx context.Context, productID int64) error {
-	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set("retired_at = ?", now()).
-		Where("id = ?", productID).
-		Where("retired_at IS NULL").
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("retire product %d: %w", productID, err)
-	}
-	return counted(res, "product", productID, "retire")
+	return s.retire(ctx, (*Product)(nil), productID, "product")
 }
 
 func (s *Store) restoreProduct(ctx context.Context, productID int64) error {
-	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set("retired_at = NULL").
-		Where("id = ?", productID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("bring product %d back: %w", productID, err)
-	}
-	return counted(res, "product", productID, "bring it back")
+	return s.restore(ctx, (*Product)(nil), productID, "product")
 }
 
 // RenameStream corrects what a release is called.
@@ -210,26 +180,11 @@ func (s *Store) RenameStream(ctx context.Context, productID, streamID int64, nam
 
 // RetireStream takes a release out of use.
 func (s *Store) RetireStream(ctx context.Context, streamID int64) error {
-	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
-		Set("retired_at = ?", now()).
-		Where("id = ?", streamID).
-		Where("retired_at IS NULL").
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("retire release %d: %w", streamID, err)
-	}
-	return counted(res, "release", streamID, "retire")
+	return s.retire(ctx, (*Stream)(nil), streamID, "release")
 }
 
 func (s *Store) restoreStream(ctx context.Context, streamID int64) error {
-	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
-		Set("retired_at = NULL").
-		Where("id = ?", streamID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("bring release %d back: %w", streamID, err)
-	}
-	return counted(res, "release", streamID, "bring it back")
+	return s.restore(ctx, (*Stream)(nil), streamID, "release")
 }
 
 // EveryProduct lists every product, retired ones included.
@@ -249,6 +204,33 @@ func (s *Store) EveryProduct(ctx context.Context) ([]Product, error) {
 		return nil, fmt.Errorf("list every product: %w", err)
 	}
 	return rows, nil
+}
+
+// retire dates one row of model as out of use. A row already retired matches
+// nothing and is refused, so two administrators retiring it at once do not
+// both record having done it.
+func (s *Store) retire(ctx context.Context, model any, id int64, what string) error {
+	res, err := s.db.NewUpdate().Model(model).
+		Set("retired_at = ?", now()).
+		Where("id = ?", id).
+		Where("retired_at IS NULL").
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("retire %s %d: %w", what, id, err)
+	}
+	return counted(res, what, id, "retire")
+}
+
+// restore clears one row of model's retirement.
+func (s *Store) restore(ctx context.Context, model any, id int64, what string) error {
+	res, err := s.db.NewUpdate().Model(model).
+		Set("retired_at = NULL").
+		Where("id = ?", id).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("bring %s %d back: %w", what, id, err)
+	}
+	return counted(res, what, id, "bring it back")
 }
 
 // counted turns an update that matched nothing into the reason it did.

@@ -206,12 +206,7 @@ func TestTheHeaderOfTheThirdVersionIsReadFromInsideTheContents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a header read was refused for something in the contents: %v", err)
 	}
-	if want := "https://example.invalid/product-1.0"; header.Serial != want {
-		t.Errorf("serial is %q, want %q", header.Serial, want)
-	}
-	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !header.BuiltAt.Equal(want) {
-		t.Errorf("built at %v, want %v", header.BuiltAt, want)
-	}
+	assertMinimalHeader(t, header.Serial, header.BuiltAt)
 
 	// The bounds still hold on that pass, because what they stop is the walk.
 	var b strings.Builder
@@ -577,19 +572,9 @@ func TestADerivationTheThirdVersionStatesIsNotThrownAway(t *testing.T) {
 		`{"spdxId": "urn:anc", "type": "Relationship", "from": "urn:up",`+
 		` "relationshipType": "ancestorOf", "to": ["urn:a"]},`, 1)
 
-	doc := read(t, body)
-	var found bool
-	for _, c := range doc.Components {
-		if c.Name != "libc" {
-			continue
-		}
-		found = true
-		if c.UpstreamName != "glibc" || c.UpstreamVersion != "2.41-9" {
-			t.Errorf("derived from %q@%q, want glibc@2.41-9", c.UpstreamName, c.UpstreamVersion)
-		}
-	}
-	if !found {
-		t.Error("the component the relationship was about is not in the document")
+	name, version := upstreamOf(t, read(t, body), "libc")
+	if name != "glibc" || version != "2.41-9" {
+		t.Errorf("derived from %q@%q, want glibc@2.41-9", name, version)
 	}
 }
 

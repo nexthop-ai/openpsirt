@@ -1050,22 +1050,12 @@ func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
 func directoryStore(ctx context.Context, cfg config.Config,
 	logger *slog.Logger) (attach.Storage, error) {
 
-	bucket, err := attach.NewBucket(ctx, attach.BucketConfig{
-		Endpoint:  cfg.DirectoryEndpoint,
-		Bucket:    cfg.DirectoryBucket,
-		Region:    cfg.DirectoryRegion,
-		Key:       cfg.DirectoryKey,
-		Secret:    cfg.DirectorySecret,
-		Token:     cfg.DirectoryToken,
-		PathStyle: cfg.DirectoryPathStyle,
-		AllowHTTP: cfg.DirectoryAllowHTTP,
-		Names: attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
-			AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP",
-			Key:       "OPENPSIRT_DIRECTORY_KEY",
-			Secret:    "OPENPSIRT_DIRECTORY_SECRET",
-			Token:     "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
-		},
-	})
+	bucket, err := attach.NewBucket(ctx, bucketOf(cfg.Directory, attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+		AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP",
+		Key:       "OPENPSIRT_DIRECTORY_KEY",
+		Secret:    "OPENPSIRT_DIRECTORY_SECRET",
+		Token:     "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
+	}))
 	// Named as this store's, because an object store's refusal reads the
 	// same for either of the two it backs.
 	if err != nil {
@@ -1079,26 +1069,37 @@ func directoryStore(ctx context.Context, cfg config.Config,
 			return nil, fmt.Errorf("the published advisory directory's object store: %w", err)
 		}
 		logger.Info("published advisories are written to an object store",
-			"bucket", cfg.DirectoryBucket)
+			"bucket", cfg.Directory.Bucket)
 		return bucket, nil
 	}
-	local, err := attach.NewServedFiles(cfg.DirectoryDir)
+	local, err := attach.NewServedFiles(cfg.Directory.Dir)
 	// Named with the setting the operator typed. The store says "file
 	// directory" for either of the two it backs, so an operator who has just
 	// pointed this at a mount they cannot write would otherwise go and check
 	// attachment settings that are fine.
 	if err != nil {
-		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.DirectoryDir, err)
+		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.Directory.Dir, err)
 	}
 	if local == nil {
 		return nil, nil
 	}
 	if err := local.Reachable(ctx); err != nil {
-		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.DirectoryDir, err)
+		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.Directory.Dir, err)
 	}
 	logger.Info("published advisories are written to a directory on this machine",
-		"directory", cfg.DirectoryDir)
+		"directory", cfg.Directory.Dir)
 	return local, nil
+}
+
+// bucketOf is the object store one configured store names, refusing under the
+// setting names given.
+func bucketOf(s config.Store, names attach.SettingNames) attach.BucketConfig {
+	return attach.BucketConfig{
+		Endpoint: s.Endpoint, Bucket: s.Bucket, Region: s.Region,
+		Key: s.Key, Secret: s.Secret, Token: s.Token,
+		PathStyle: s.PathStyle, AllowHTTP: s.AllowHTTP,
+		Names: names,
+	}
 }
 
 // attachmentStore is where attachments go, or nothing where an operator
@@ -1108,22 +1109,12 @@ func directoryStore(ctx context.Context, cfg config.Config,
 // backend — one process and one disk — and a deployment that named a bucket
 // meant the bucket.
 func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger) (attach.Storage, error) {
-	bucket, err := attach.NewBucket(ctx, attach.BucketConfig{
-		Endpoint:  cfg.AttachmentEndpoint,
-		Bucket:    cfg.AttachmentBucket,
-		Region:    cfg.AttachmentRegion,
-		Key:       cfg.AttachmentKey,
-		Secret:    cfg.AttachmentSecret,
-		Token:     cfg.AttachmentToken,
-		PathStyle: cfg.AttachmentPathStyle,
-		AllowHTTP: cfg.AttachmentAllowHTTP,
-		Names: attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
-			AllowHTTP: "OPENPSIRT_ATTACHMENT_ALLOW_HTTP",
-			Key:       "OPENPSIRT_ATTACHMENT_KEY",
-			Secret:    "OPENPSIRT_ATTACHMENT_SECRET",
-			Token:     "OPENPSIRT_ATTACHMENT_SESSION_TOKEN",
-		},
-	})
+	bucket, err := attach.NewBucket(ctx, bucketOf(cfg.Attachments, attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+		AllowHTTP: "OPENPSIRT_ATTACHMENT_ALLOW_HTTP",
+		Key:       "OPENPSIRT_ATTACHMENT_KEY",
+		Secret:    "OPENPSIRT_ATTACHMENT_SECRET",
+		Token:     "OPENPSIRT_ATTACHMENT_SESSION_TOKEN",
+	}))
 	if err != nil {
 		return nil, err
 	}
@@ -1135,10 +1126,10 @@ func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger
 			return nil, err
 		}
 		noteStoreInTheClear(bucket, logger)
-		logger.Info("attachments are held in an object store", "bucket", cfg.AttachmentBucket)
+		logger.Info("attachments are held in an object store", "bucket", cfg.Attachments.Bucket)
 		return bucket, nil
 	}
-	local, err := attach.NewFiles(cfg.AttachmentDir)
+	local, err := attach.NewFiles(cfg.Attachments.Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -1152,6 +1143,6 @@ func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger
 	// option: one process and one disk, and two replicas would disagree about
 	// what exists.
 	logger.Warn("attachments are held on this machine's disk, which is for development",
-		"directory", cfg.AttachmentDir)
+		"directory", cfg.Attachments.Dir)
 	return local, nil
 }

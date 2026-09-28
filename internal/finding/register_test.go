@@ -319,7 +319,7 @@ func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
 			t.Fatal("the fixture's register is empty, so this checks nothing")
 		}
 		nonsense, err := f.store.RegisterPage(t.Context(), who, f.target,
-			finding.Registering{States: []string{"whatever"}}, 50, 0)
+			finding.Registering{States: []finding.ClaimStanding{"whatever"}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -378,7 +378,7 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 		}
 		states := map[string][]string{}
 		for _, row := range rows {
-			states[row.Place] = append(states[row.Place], row.State)
+			states[row.Place] = append(states[row.Place], string(row.State))
 		}
 		if got := states[withdrawn]; len(got) != 1 || got[0] != "waiting" {
 			t.Errorf("a place withdrawn and claimed again reads %v, want one row waiting", got)
@@ -390,7 +390,7 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 			t.Errorf("a place lapsed twice with nothing live reads %v, want one row lapsed", got)
 		}
 		undecided, total, err := f.store.Register(ctx, who, f.target,
-			finding.Registering{States: []string{"undecided"}}, 50, 0)
+			finding.Registering{States: []finding.ClaimStanding{"undecided"}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -443,7 +443,7 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
-			if total != 1 || len(rows) != 1 || rows[0].State != want {
+			if total != 1 || len(rows) != 1 || string(rows[0].State) != want {
 				t.Fatalf("build %d's register reads %+v (total %d), want one row %q", target, rows, total, want)
 			}
 			if want == "undecided" && (rows[0].Outcome != "" || rows[0].ProposedBy != "") {

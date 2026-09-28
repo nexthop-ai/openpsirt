@@ -92,7 +92,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 				Branches: shape.Branches, Tags: shape.Tags, Variants: shape.Variants,
 				Open:          counted(in.Counts, open, row.ID),
 				LastScanAt:    seen[row.Name],
-				TriageFloor:   stated(row.TriageFloor),
+				TriageFloor:   line(stated(row.TriageFloor)),
 				PairShare:     countedOr(row.PairShare),
 				PairApprovers: countedOr(row.PairApprovers),
 				EndOfLife:     onDate(row.EOLOn),
@@ -168,7 +168,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		for _, row := range rows {
 			body := StreamBody{
 				Name: row.Name, DisplayName: spelled(row.Name, row.DisplayName),
-				Kind: string(row.Kind),
+				Kind: lineKind(row.Kind),
 				Open: counted(in.Counts, open, row.ID), LastScanAt: seen[row.Name],
 				Retired: row.Retired(),
 			}

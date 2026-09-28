@@ -32,7 +32,7 @@ type DisposedBody struct {
 	Namespace     string        `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Place         string        `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
 	Consumer      string        `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
-	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state. undecided is a row nobody has decided anything about"`
+	State         standing      `json:"state" doc:"The decision state. undecided is a row nobody has decided anything about"`
 	Outcome       outcome       `json:"outcome,omitempty"`
 	Justification justification `json:"justification,omitempty"`
 	ProposedBy    string        `json:"proposed_by,omitempty"`
@@ -163,11 +163,11 @@ func stringOrNone(id int64) string {
 // component — each a way of reading the same complete answer rather than a
 // different question.
 type Registering struct {
-	State     []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" uniqueItems:"true" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
-	Outcome   []outcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
-	Component string    `query:"component" doc:"Keep one component, by name"`
-	Issue     string    `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
-	Standing  string    `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
+	State     []standing `query:"state,explode" uniqueItems:"true" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
+	Outcome   []outcome  `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
+	Component string     `query:"component" doc:"Keep one component, by name"`
+	Issue     string     `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
+	Standing  string     `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
 }
 
 // narrow is the store's own filter, built from the request.
@@ -178,7 +178,7 @@ func (r Registering) narrow() finding.Registering {
 	}
 	for _, word := range r.State {
 		if word != "" {
-			only.States = append(only.States, word)
+			only.States = append(only.States, finding.ClaimStanding(word))
 		}
 	}
 	for _, word := range r.Outcome {
@@ -315,7 +315,7 @@ func registerRegister(api huma.API, in Ingest) {
 						}
 						return each([]string{
 							body.Vulnerability, body.Severity, body.Component, body.Version,
-							body.Place, body.Consumer, body.State, string(body.Outcome), string(body.Justification),
+							body.Place, body.Consumer, string(body.State), string(body.Outcome), string(body.Justification),
 							body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 							strconv.FormatBool(body.AgreementCarried),
 							body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
@@ -342,7 +342,7 @@ func disposedBody(row finding.Disposed) DisposedBody {
 		Component: row.Component, Version: row.Version, Place: row.Place,
 		Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 		Consumer: row.Consumer,
-		State:    row.State, Outcome: outcome(row.Outcome),
+		State:    standing(row.State), Outcome: outcome(row.Outcome),
 		Justification: justification(row.Justification),
 		ProposedBy:    row.ProposedBy, ApprovedBy: row.ApprovedBy,
 		AgreementCarried: row.AgreementCarried,

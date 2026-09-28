@@ -181,8 +181,8 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			{"beneath nothing", finding.Filter{Beneath: &nowhere}, func(*group) bool { return false }},
 			{"beneath one", finding.Filter{Beneath: &swssID},
 				func(g *group) bool { return g.component == swssID || g.consumer[swssID] }},
-			{"undecided", finding.Filter{States: []string{"undecided"}}, func(*group) bool { return true }},
-			{"agreed", finding.Filter{States: []string{"agreed"}}, func(*group) bool { return false }},
+			{"undecided", finding.Filter{States: []finding.ClaimStanding{"undecided"}}, func(*group) bool { return true }},
+			{"agreed", finding.Filter{States: []finding.ClaimStanding{"agreed"}}, func(*group) bool { return false }},
 		}
 		for _, c := range cases {
 			want := expect(c.keep)
@@ -227,7 +227,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			filter finding.Filter
 		}{
 			{"everything", finding.Filter{}},
-			{"undecided", finding.Filter{States: []string{"undecided"}}},
+			{"undecided", finding.Filter{States: []finding.ClaimStanding{"undecided"}}},
 		} {
 			got, total, err := f.store.Groups(t.Context(), who, f.scope, 2, len(want), c.filter)
 			if err != nil {

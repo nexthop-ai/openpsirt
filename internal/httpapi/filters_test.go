@@ -314,10 +314,7 @@ func TestTheOutcomeFilterAnswersForWhatStandsNotWhatWasProposed(t *testing.T) {
 				"filter with %d rows, want none", got)
 		}
 
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, claim)
 		if got := dismissed(t); got != 1 {
 			t.Errorf("an agreed dismissal answers the outcome filter with %d rows, want the one", got)
 		}

@@ -70,10 +70,6 @@ func newFiles(dir string, folder, file os.FileMode) (*Files, error) {
 	return &Files{root: root, folder: folder, file: file}, nil
 }
 
-// Name is the kind of store rather than the directory it came up on: the
-// readiness answer and a log line say which backend is configured.
-func (f *Files) Name() string { return "files" }
-
 func (f *Files) Put(ctx context.Context, key string, body io.Reader, size int64, _ string) error {
 	if err := f.root.MkdirAll(path.Dir(key), f.folder); err != nil {
 		return fmt.Errorf("store a file: %w", err)
@@ -192,6 +188,3 @@ func (f *Files) Reachable(context.Context) error {
 	}
 	return f.root.Remove(probe)
 }
-
-// Close releases the directory handle.
-func (f *Files) Close() error { return f.root.Close() }

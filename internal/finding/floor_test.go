@@ -282,7 +282,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		products := catalog.NewStore(f.db.DB)
 		stream := f.streamOf(t, f.target)
 
-		held, err := products.EndOfLifeFor(ctx, stream)
+		held, err := products.EndOfLifeForTarget(ctx, f.target)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,7 +297,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetProductEndOfLife(ctx, f.productID, &march); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeFor(ctx, stream)
+		held, err = products.EndOfLifeForTarget(ctx, f.target)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,7 +310,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetStreamEndOfLife(ctx, stream, &june); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeFor(ctx, stream)
+		held, err = products.EndOfLifeForTarget(ctx, f.target)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -327,7 +327,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetStreamEndOfLife(ctx, stream, nil); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeFor(ctx, stream)
+		held, err = products.EndOfLifeForTarget(ctx, f.target)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -340,7 +340,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetProductEndOfLife(ctx, f.productID, nil); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeFor(ctx, stream)
+		held, err = products.EndOfLifeForTarget(ctx, f.target)
 		if err != nil {
 			t.Fatal(err)
 		}

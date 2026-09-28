@@ -685,10 +685,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 			t.Fatal("a bump this size no longer needs a second person, so the " +
 				"agreement this test takes back was never given")
 		}
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, made.ClaimID)
 
 		const plan = "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades"
 		var waiting struct {

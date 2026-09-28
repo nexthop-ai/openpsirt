@@ -22,12 +22,12 @@ type BuildCountsBody struct {
 	// Kind says whether this is a branch or a tag. The comparison only means
 	// something for a branch, and a screen asks before drawing the panel at
 	// all rather than drawing one that explains why it is empty.
-	Kind     string `json:"kind,omitempty" enum:"branch,tag"`
-	Critical int    `json:"critical"`
-	High     int    `json:"high"`
-	Medium   int    `json:"medium"`
-	Low      int    `json:"low"`
-	Total    int    `json:"total"`
+	Kind     lineKind `json:"kind,omitempty"`
+	Critical int      `json:"critical"`
+	High     int      `json:"high"`
+	Medium   int      `json:"medium"`
+	Low      int      `json:"low"`
+	Total    int      `json:"total"`
 	// LastScannedAt says how old this statement is. A count from a build
 	// nothing has scanned in a year is a statement about last year.
 	LastScannedAt string `json:"last_scanned_at,omitempty"`
@@ -65,14 +65,14 @@ type BlockingBody struct {
 	// so one issue at three versions of one component is three rows here.
 	// Without it they arrive identical: four rows reading "CVE-2026-46595
 	// golang.org/x/crypto", differing only in a count the panel does not draw.
-	Version   string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Severity  string `json:"severity,omitempty"`
-	Exploited bool   `json:"exploited,omitempty"`
-	Places    int    `json:"places" doc:"The number of places of the build it sits at"`
-	State     string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"The decision state. Anything agreed is not in this list"`
-	Due       string `json:"due,omitempty"`
+	Version   string            `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
+	Ecosystem string            `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace string            `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Severity  string            `json:"severity,omitempty"`
+	Exploited bool              `json:"exploited,omitempty"`
+	Places    int               `json:"places" doc:"The number of places of the build it sits at"`
+	State     standingUnsettled `json:"state,omitempty" doc:"The decision state. Anything agreed is not in this list"`
+	Due       string            `json:"due,omitempty"`
 }
 
 // blocking is how many of the worst are listed.
@@ -156,7 +156,7 @@ func registerReadiness(api huma.API, in Ingest) {
 				// Everything nobody has agreed to. An agreed row is a
 				// decision somebody made to ship with it, which is the
 				// opposite of a blocker.
-				States: []string{"undecided", "waiting", "lapsed"},
+				States: which(finding.ClaimStandings(), finding.ClaimStanding.Unsettled),
 			})
 		if err != nil {
 			return nil, refusedFinding(in, err)
@@ -168,7 +168,7 @@ func registerReadiness(api huma.API, in Ingest) {
 				Vulnerability: group.Vulnerability, Component: group.Component,
 				Version: group.Version, Ecosystem: group.Ecosystem, Namespace: group.Namespace,
 				Severity: group.Severity, Exploited: group.Exploited,
-				Places: group.Places, State: group.State,
+				Places: group.Places, State: standingUnsettled(group.State),
 			}
 			if group.DueAt != nil {
 				one.Due = group.DueAt.Format(time.DateOnly)
@@ -181,7 +181,7 @@ func registerReadiness(api huma.API, in Ingest) {
 
 func buildCounts(s finding.Standing) BuildCountsBody {
 	body := BuildCountsBody{
-		Stream: s.Stream, Variant: s.Variant, Kind: s.Kind, Total: s.Total,
+		Stream: s.Stream, Variant: s.Variant, Kind: lineKind(s.Kind), Total: s.Total,
 		StreamName:  s.StreamName,
 		VariantName: s.VariantName,
 		Critical:    s.ByBand["critical"], High: s.ByBand["high"],

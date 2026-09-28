@@ -5,7 +5,6 @@ package httpapi_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -78,10 +77,7 @@ func TestCarryingWritesClaimsWaitingForASecondPerson(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		place := r.scanned(t)
 		decision, claim := r.decidedAt(t, place)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		r.scannedTag(t, "v2.0", "3.7.1")
 
 		const at = "/v1/products/mine/streams/v2.0/variants/broadcom/carried" +

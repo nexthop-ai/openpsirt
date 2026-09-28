@@ -95,13 +95,11 @@ func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Decidin
 // ReachingAcross is Reaching for every place of one finding at once.
 //
 // The screen that asks this is deciding about an issue at a component, which
-// is a group of places rather than one — a kernel flaw sits at sixty. Asking
-// per place is a request each, so the screen sampled the first few and merged
-// what came back; and because what it merges becomes the set of other builds
-// offered to tick, a build reachable only from the ninth place was never
-// offered and the judgment silently did not travel there. The sample was a
-// cost control on the interface that had turned into a rule about what gets
-// written.
+// is a group of places rather than one — a kernel flaw sits at sixty. What it
+// answers becomes the set of other builds offered to tick, so it covers every
+// place: a build reachable only from the ninth place is offered like any
+// other, and a sample of the places would be a rule about where a judgment
+// travels.
 //
 // One query over every place answers it whole. Matches are merged across the
 // places by the build and versions they name, because two places of one
@@ -144,11 +142,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		seen[differing][key] = len(*into)
 		*into = append(*into, match)
 	}
-	// One statement over every place, which is what the paragraph above
-	// promised and what a loop calling the single-place read did not do: the
-	// screen deciding about a kernel flaw at sixty places issued sixty
-	// grouped five-join queries and two authorization checks each, so the
-	// cost the removed sampling was there to avoid came straight back.
+	// One statement over every place. A loop over the single-place read is
+	// sixty grouped five-join queries and two authorization checks each for a
+	// kernel flaw at sixty places.
 	at := places[0]
 	visible, err := access.ReadableOn(subject, at.ProductID, at.VulnerabilityID)
 	if err != nil {

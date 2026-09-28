@@ -42,7 +42,7 @@ type Disposed struct {
 	// State is where this stands, in the four words the state filter uses.
 	// "undecided" is the row an auditor is looking for and the one every other
 	// report leaves out.
-	State string
+	State ClaimStanding
 	// Outcome and Justification are what was claimed, where anything was.
 	Outcome       string
 	Justification string
@@ -265,7 +265,7 @@ type registerRow struct {
 type Registering struct {
 	// States keeps rows standing in any of these, by the four words the row
 	// itself carries.
-	States []string
+	States []ClaimStanding
 	// Outcomes keeps rows whose standing judgment is one of these.
 	Outcomes []string
 	// Component and Issue keep one of each, by name.
@@ -323,20 +323,21 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // registerState is the predicate behind one of the four words a register row
 // carries, spelled beside the column they are read from so the filter and the
 // word cannot come to mean different things.
-func registerState(word string) (string, bool) {
+func registerState(word ClaimStanding) (string, bool) {
 	live := "de.live_key IS NOT NULL"
 	lapsed := "de.state = 'lapsed'"
 	switch word {
-	case "undecided":
+	case StandingUndecided:
 		return "de.id IS NULL", true
-	case "agreed":
+	case StandingAgreed:
 		return "(" + live + " AND de.state = 'approved')", true
-	case "lapsed":
+	case StandingLapsed:
 		return "(" + lapsed + ")", true
-	case "waiting":
+	case StandingWaiting:
 		return "(" + live + " AND de.state NOT IN ('approved', 'lapsed'))", true
+	default:
+		return "", false
 	}
-	return "", false
 }
 
 // registerJoins is what both the page and the count read from: the build's
@@ -494,16 +495,7 @@ func disposedFrom(row registerRow) Disposed {
 	// place: a place has one standing decision or none, so there is no
 	// aggregate to take here and no way for this to disagree with the
 	// list.
-	switch row.DecisionState {
-	case "":
-		one.State = "undecided"
-	case "approved":
-		one.State = "agreed"
-	case "lapsed":
-		one.State = "lapsed"
-	default:
-		one.State = "waiting"
-	}
+	one.State = placeStanding(row.DecisionState)
 	// A deadline met, which is answerable only for something that closed: an
 	// open row has not missed its deadline, it has not reached the end of the
 	// question.
@@ -517,4 +509,20 @@ func disposedFrom(row registerRow) Disposed {
 		one.Met = &met
 	}
 	return one
+}
+
+// placeStanding is the standing of one place, from the state of the decision
+// standing there, or none. A place has one standing decision or none, so there
+// is no aggregate to take and no way for this to disagree with the list.
+func placeStanding(decision string) ClaimStanding {
+	switch decision {
+	case "":
+		return StandingUndecided
+	case "approved":
+		return StandingAgreed
+	case "lapsed":
+		return StandingLapsed
+	default:
+		return StandingWaiting
+	}
 }

@@ -125,22 +125,22 @@ func TestTheBucketWinsWhereBothAreSet(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer store.Close()
-	got, err := attachmentStore(t.Context(), config.Config{
-		AttachmentDir:       t.TempDir(),
-		AttachmentEndpoint:  store.URL,
-		AttachmentBucket:    "attachments",
-		AttachmentRegion:    "us-east-1",
-		AttachmentKey:       "key",
-		AttachmentSecret:    "secret",
-		AttachmentPathStyle: true,
-	}, discard())
+	got, err := attachmentStore(t.Context(), config.Config{Attachments: config.Store{
+		Dir:       t.TempDir(),
+		Endpoint:  store.URL,
+		Bucket:    "attachments",
+		Region:    "us-east-1",
+		Key:       "key",
+		Secret:    "secret",
+		PathStyle: true,
+	}}, discard())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, bucket := got.(*attach.Bucket); !bucket {
 		t.Errorf("with both set, attachments are held in %T", got)
 	}
-	only, err := attachmentStore(t.Context(), config.Config{AttachmentDir: t.TempDir()}, discard())
+	only, err := attachmentStore(t.Context(), config.Config{Attachments: config.Store{Dir: t.TempDir()}}, discard())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestTheDirectoryIsWrittenWhereItIsConfigured(t *testing.T) {
 	if err != nil || none != nil {
 		t.Errorf("nothing configured answered %T (%v)", none, err)
 	}
-	local, err := directoryStore(t.Context(), config.Config{DirectoryDir: t.TempDir()}, discard())
+	local, err := directoryStore(t.Context(), config.Config{Directory: config.Store{Dir: t.TempDir()}}, discard())
 	if err != nil {
 		t.Fatal(err)
 	}

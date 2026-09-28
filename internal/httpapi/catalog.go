@@ -89,7 +89,7 @@ type ProductBody struct {
 	// said something of its own. Absent means it follows the deployment, which
 	// is a different statement from stating the same word — a product that
 	// stated it would stop following when the deployment changed its mind.
-	TriageFloor string `json:"triage_floor,omitempty" enum:"everything,low,medium,high,critical" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
+	TriageFloor line `json:"triage_floor,omitempty" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
 	// PairShare and PairApprovers are this product's own thresholds for one
 	// pair agreeing to each other's work, where it states them. Absent follows
 	// the deployment.
@@ -128,7 +128,7 @@ func countedOr(n *int) int {
 type TriageFloorBody struct {
 	// Floor is the least severity worth triaging here, "everything" for a
 	// product that hides nothing, or empty to follow the deployment.
-	Floor string `json:"floor" enum:"everything,low,medium,high,critical," doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
+	Floor lineOrClear `json:"floor" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
 }
 
 // StreamBody is a branch or a tag.
@@ -137,8 +137,8 @@ type StreamBody struct {
 	// DisplayName is the same name as it was typed. It is stored beside the
 	// matched one at every level, and absent here a correction that moved only
 	// the capitals wrote a value nothing could read.
-	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
-	Kind        string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
+	DisplayName string   `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
+	Kind        lineKind `json:"kind" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
 	// Parent is the branch a tag was cut from, which is what lets a branch be
 	// compared against its last release.
 	Parent string `json:"parent,omitempty" doc:"For a tag, the branch it was cut from"`
@@ -286,6 +286,55 @@ func storeFor(d Declaring, db bun.IDB) (*catalog.Store, error) {
 		return nil, noDatabase(d.Logger)
 	}
 	return store, nil
+}
+
+// productIn resolves a product by name inside db, with the catalog store over
+// db. A name that resolves to nothing is refused as undeclared, and the
+// refusal names the product.
+func productIn(ctx context.Context, d Declaring, db bun.IDB,
+	product string) (*catalog.Store, *catalog.Product, error) {
+
+	store, err := storeFor(d, db)
+	if err != nil {
+		return nil, nil, err
+	}
+	found, err := store.ProductByName(ctx, product)
+	if err != nil {
+		return nil, nil, undeclared(d.Logger, err, "that product could not be looked up")
+	}
+	return store, found, nil
+}
+
+// streamIn is productIn, then one of the product's releases by name. A fault
+// on the second read is logged as the release's.
+func streamIn(ctx context.Context, d Declaring, db bun.IDB,
+	product, stream string) (*catalog.Store, *catalog.Product, *catalog.Stream, error) {
+
+	store, found, err := productIn(ctx, d, db, product)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	release, err := store.StreamByName(ctx, found.ID, stream)
+	if err != nil {
+		return nil, nil, nil, undeclared(d.Logger, err, "that release could not be looked up")
+	}
+	return store, found, release, nil
+}
+
+// variantIn is productIn, then one of the product's variants by name. A fault
+// on the second read is logged as the variant's.
+func variantIn(ctx context.Context, d Declaring, db bun.IDB,
+	product, variant string) (*catalog.Store, *catalog.Product, *catalog.Variant, error) {
+
+	store, found, err := productIn(ctx, d, db, product)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	built, err := store.VariantByName(ctx, found.ID, variant)
+	if err != nil {
+		return nil, nil, nil, undeclared(d.Logger, err, "that variant could not be looked up")
+	}
+	return store, found, built, nil
 }
 
 // answer reports a declaration, distinguishing one that made something from

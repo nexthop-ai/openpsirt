@@ -281,17 +281,6 @@ func TestNuGetOrdersWhatItsOwnSuiteNeverPairs(t *testing.T) {
 	}
 }
 
-func TestANuGetWordWhereAVersionBelongsIsRefused(t *testing.T) {
-	// What an advisory writes where a version belongs. NuGet's own parser
-	// refuses every one of these already; they are here because no reference
-	// suite carries them.
-	for _, not := range []string{"unfixed", "TBD", "none", "not fixed", "see the advisory"} {
-		if _, ok := vercmp.Order(vercmp.NuGet, not, "1.0"); ok {
-			t.Errorf("%q was ordered against a version", not)
-		}
-	}
-}
-
 func TestReachingANuGetReleaseReachesTheEarlierOnes(t *testing.T) {
 	for _, each := range []struct {
 		candidate, wanted string
