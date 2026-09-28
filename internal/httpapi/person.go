@@ -55,7 +55,7 @@ type AboutPersonBody struct {
 	// Told is what was sent to them, newest first, read and cleared included:
 	// a notification is a fact about what was sent.
 	Told      []ToldBody `json:"told,omitempty"`
-	ToldTotal int        `json:"told_total" doc:"The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"`
+	ToldTotal int        `json:"told_total" doc:"The number of things they were told about products you hold a role on, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"`
 }
 
 // HeldChangeBody is one role granted or withdrawn.
@@ -102,7 +102,9 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 			"cleared, because the question it answers is what was sent rather than what " +
 			"is waiting. It is not narrowed by what they may read now: a line about an " +
 			"undisclosed finding, sent while they held the role that reached it, is " +
-			"exactly what an investigation is looking for.\n\n" +
+			"exactly what an investigation is looking for. It is narrowed by what you " +
+			"hold: only lines about products you hold a role on, and undisclosed ones " +
+			"only where you read undisclosed work.\n\n" +
 			"`held` and `told` are the first page of each; `held_total` and `told_total` " +
 			"say how many there are.",
 		Tags: []string{"Administration"},

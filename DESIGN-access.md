@@ -311,10 +311,10 @@ than a leak, because granting it is a deliberate administrative act, and it is
 written down here so that granting it is an informed one. The alternative is an
 audit record with holes in it that nothing marks, which is worse than no record.
 
-What somebody was told is narrowed, and this is not a way to see more. The
-rows come back as the asker could have read them on their own account, which is
-the rule the administrator flag already follows — so an auditor who reaches no
-product is answered with nothing.
+What somebody was told is narrowed, and this is not a way to see more. Rows
+come back only about products the asker holds a role on, at the visibility
+they read there, which is the rule the administrator flag already follows — so
+an auditor who reaches no product is answered with nothing.
 
 ### Storage
 

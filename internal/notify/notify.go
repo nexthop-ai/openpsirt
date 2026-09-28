@@ -661,11 +661,6 @@ func readable(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 }
 
 // byProduct is readable's product half, with no arm for administration.
-//
-// Separate because administration is not a visibility grant. Reading a list
-// addressed to somebody else is the one read of this table that is not the
-// reader's own, and there the administrator flag says who may ask rather than
-// what the answer contains.
 func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	products, all := subject.Products()
 	if all {
@@ -695,6 +690,43 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	})
 }
 
+// inHeldProducts narrows to rows about a product this subject holds a role on:
+// a disclosed row in any such product, an undisclosed one where they read
+// undisclosed work, and the issues a case grant names. A row about no product
+// is about nothing they hold, and is left out.
+//
+// Stricter than readable, which lets anybody read a row about nothing
+// undisclosed. That rule is for somebody reading their own list; this one is
+// for reading another person's, where what they were told about a product the
+// reader holds nothing on is the reader's to learn only by being granted it.
+func inHeldProducts(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	products, all := subject.Products()
+	if all {
+		return q
+	}
+	var private []int64
+	for _, id := range products {
+		if subject.Reads(access.Private, id) {
+			private = append(private, id)
+		}
+	}
+	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where("1 = 0")
+		if len(products) > 0 {
+			q = q.WhereOr("(private = ? AND product_id IN (?))", false, bun.List(products))
+		}
+		if len(private) > 0 {
+			q = q.WhereOr("(private = ? AND product_id IN (?))", true, bun.List(private))
+		}
+		for _, product := range subject.CaseProducts() {
+			for _, issue := range subject.Cases(product) {
+				q = q.WhereOr("(product_id = ? AND vulnerability_id = ?)", product, issue)
+			}
+		}
+		return q
+	})
+}
+
 // ToldTo is what one person has been told, read by somebody else, newest
 // first. Read and cleared rows included: the question this answers is what
 // somebody was told, and a line they have already acknowledged is still a line
@@ -707,17 +739,16 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // because that is where the rest of this table's rules live (REQ-42 and
 // REQ-43).
 //
-// Narrowed by what the reader may see, and neither grant is a way to see
-// more. Holding one decides who may ask this question; the rows that come
-// back are the ones the asker could read on their own account, so somebody
-// holding nothing on a product reads the public half of a feed and not the
-// embargoed half — and an auditor, who holds no product, reads nothing.
+// Narrowed by the products the reader holds a role on, and neither grant is a
+// way to see more. Holding one decides who may ask this question; the rows
+// that come back are about products the asker holds, at the visibility they
+// read there, count included — so somebody holding nothing on a product reads
+// nothing about it, and an auditor who reaches no product reads nothing.
 //
-// The defense for answering it whole was that an administrator could grant
-// themselves the product and read it anyway. They can, and that grant lands in
-// the administrative record within seconds, where this read left nothing at
-// all — so the two are not equivalent, and the cheaper of them was the silent
-// one.
+// An administrator can grant themselves the product and read it anyway, and
+// that grant lands in the administrative record within seconds, where this
+// read leaves nothing at all — so the two are not equivalent, and the cheaper
+// of them would be the silent one.
 func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int64,
 	limit, offset int) ([]Notification, int, error) {
 
@@ -731,7 +762,7 @@ func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int
 	limit = database.AList.Of(limit)
 
 	theirs := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return byProduct(q.Where("person_id = ?", personID), subject)
+		return inHeldProducts(q.Where("person_id = ?", personID), subject)
 	}
 	total, err := theirs(s.db.NewSelect().Model((*Notification)(nil))).Count(ctx)
 	if err != nil {

@@ -221,6 +221,11 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 		if err := rights.GrantRole(ctx, nosy.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
+		// The administrator reads the product, so what they are answered is
+		// about administering rather than about what they hold.
+		if err := rights.GrantRole(ctx, boss.ID, product.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
 
 		store := notify.NewStore(db.DB)
 		if err := store.Tell(ctx, notify.Telling{
@@ -248,14 +253,14 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 // more in the answer.
 //
 // The flag says who may read a list addressed to somebody else. What comes back
-// is what the asker could read on their own account, so an administrator
-// holding nothing on a product gets the public half of a feed and not the
-// embargoed half.
+// is narrowed by the products the asker holds a role on, at the visibility they
+// read there: an administrator holding nothing on a product reads none of what
+// somebody was told about it, disclosed or not.
 //
-// The defense for answering it whole was that an administrator could grant
-// themselves the product and read it anyway — which is true, and lands in the
-// administrative record within seconds, where this read left nothing. Both
-// routes reach the same rows and only one of them is accountable.
+// An administrator can grant themselves the product and read it anyway, and
+// that grant lands in the administrative record within seconds, where this
+// read leaves nothing. Both routes reach the same rows and only one of them is
+// accountable.
 func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -266,10 +271,13 @@ func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		// One administrator holding nothing, and one holding private read on
-		// the product. The pair is the whole of the test: the same flag, the
-		// same question, two different answers.
+		// Administrators holding nothing, public read, and private read on the
+		// product: the same flag, the same question, three different answers.
 		bare, err := rights.Ensure(ctx, "bare@example.com", "Bare", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		public, err := rights.Ensure(ctx, "public@example.com", "Public", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,6 +291,9 @@ func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T
 			t.Fatal(err)
 		}
 		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, public.ID, product.ID, access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
 
@@ -317,7 +328,8 @@ func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T
 			want  int
 			shown string
 		}{
-			{"holding nothing on the product", bare, 1, "a public one"},
+			{"holding nothing on the product", bare, 0, ""},
+			{"holding public read", public, 1, "a public one"},
 			{"holding private read", reader, 2, ""},
 		} {
 			rows, total, err := store.ToldTo(ctx, asks(t, db, c.who), subjectOf.ID, 50, 0)
