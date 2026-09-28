@@ -325,6 +325,8 @@ func productsNamed(ctx context.Context, in Ingest,
 //
 // Reported and not fatal. The rating is recorded and correct, and a claim this
 // fails to mark stands until the next scan with the issue open sweeps again.
+// Whoever the sweep did name is told even when it failed after naming them:
+// their rows lapsed and were committed.
 func outgrown(ctx context.Context, in Ingest, productID, vulnerabilityID int64) {
 	worse, err := triage.NewStore(in.DB.DB).LapseRatedWorse(ctx, triage.RatedWorseWhere{
 		ProductID: productID, Vulnerabilities: []int64{vulnerabilityID},
@@ -332,7 +334,6 @@ func outgrown(ctx context.Context, in Ingest, productID, vulnerabilityID int64) 
 	if err != nil {
 		in.logger().Error("could not mark what a rating rise outgrew",
 			"product", productID, "vulnerability", vulnerabilityID, "error", err)
-		return
 	}
 	for _, one := range worse.Told {
 		tell(ctx, in, "could not say that a decision lapsed", notify.Lapse(one),
