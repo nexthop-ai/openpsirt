@@ -217,7 +217,7 @@ export function Saved({
       {saving && (
         <div className="advanced" style={{ width: "100%" }}>
           <label className="field">
-            <span>Call it</span>
+            <span className="l">Call it</span>
             <input
               {...notACredential}
               type="text"
@@ -237,7 +237,7 @@ export function Saved({
           {rule && (
             <>
               <label className="field">
-                <span>It would say</span>
+                <span className="l">It would say</span>
                 <select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
                   <option value="">Select one</option>
                   {Object.entries(PREPARES).map(([word, label]) => (
@@ -249,7 +249,7 @@ export function Saved({
               </label>
               {needsJustification && (
                 <label className="field">
-                  <span>Because</span>
+                  <span className="l">Because</span>
                   <select value={reason} onChange={(event) => setJustification(event.target.value)}>
                     <option value="">Select one</option>
                     {/* From the one list rather than typed out again, so the

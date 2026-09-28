@@ -327,8 +327,10 @@ a.kpi:hover {
   color: #fff;
   vertical-align: 1px;
 }
-:root[data-look="dark"] .kev {
-  color: #1a0a10;
+@media screen {
+  :root[data-look="dark"] .kev {
+    color: #1a0a10;
+  }
 }
 /* The record kept here, which is not the feed's word about the world. Drawn
    as an outline of the same color so the two read as the same kind of fact at
@@ -339,8 +341,10 @@ a.kpi:hover {
   color: var(--sev-exploited);
   box-shadow: inset 0 0 0 1.5px var(--sev-exploited);
 }
-:root[data-look="dark"] .kev.here {
-  color: var(--sev-exploited);
+@media screen {
+  :root[data-look="dark"] .kev.here {
+    color: var(--sev-exploited);
+  }
 }
 
 .state {
@@ -416,7 +420,8 @@ a.kpi:hover {
   font-size: 10.5px;
   opacity: 0.85;
 }
-.claimed.not-applicable {
+.claimed.not-applicable,
+.claimed.mismatched {
   --c: var(--sev-high);
 }
 .claimed.wont-fix {
@@ -428,10 +433,10 @@ a.kpi:hover {
 .claimed.affected {
   --c: var(--ok);
 }
-/* The three that had no arm and fell through to the neutral base. All six
-   non-affected outcomes hide risk, which is the distinction this queue is built
-   around — so three of them drew the same as a claim that hides none, and an
-   approver scanning the queue could not tell them apart at a glance. */
+/* Every outcome but affected hides risk, which is the distinction this queue
+   is built around, and is drawn in a warm color. One falling through to the
+   neutral base draws the same as a claim that hides none. A web test holds
+   every outcome the client names to an arm here. */
 .claimed.already-fixed {
   --c: var(--sev-high);
 }
