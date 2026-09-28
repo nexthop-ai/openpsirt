@@ -1019,10 +1019,10 @@ func TestRevisingYourOwnClaimIsNotSomebodyElseUndoingIt(t *testing.T) {
 
 // Holding rows back that an approval took meanwhile moves nothing it took.
 //
-// Both read the rows as waiting. The approval commits first, and the split's
-// write matched on the identifiers alone, so it moved approved rows into a new
-// claim and sent them back to their author. The servers only, because
-// SQLite's one connection cannot hold the two transactions open at once.
+// Both read the rows as waiting and the approval commits first. A split
+// matching on the identifiers alone would move approved rows into a new claim
+// and send them back to their author. The servers only, because SQLite's one
+// connection cannot hold the two transactions open at once.
 func TestHoldingRowsBackThatAnApprovalTookMovesNothing(t *testing.T) {
 	servers(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

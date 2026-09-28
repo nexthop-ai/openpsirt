@@ -912,11 +912,11 @@ func TestTheRatingsListIsPagedAndSaysHowManyThereAre(t *testing.T) {
 
 // An agreement that races a withdrawal does not bring the withdrawn claim back.
 //
-// Both read the claim as waiting. The withdrawal commits first, and the
-// agreement's write then matched on the key alone and put the claim in force
-// over it: the rating changed, and the record said it was withdrawn. The
-// servers only, because SQLite's one connection cannot hold the two
-// transactions open at once.
+// Both read the claim as waiting and the withdrawal commits first. An
+// agreement matching on the key alone would put the claim in force over it:
+// the rating changed, and the record saying it was withdrawn. The servers
+// only, because SQLite's one connection cannot hold the two transactions open
+// at once.
 func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 	servers(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())

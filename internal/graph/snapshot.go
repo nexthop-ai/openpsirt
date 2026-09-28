@@ -405,9 +405,12 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`c.name AS "name"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
-		Where("c.name = ?", name).
+		// A name somebody types is matched without regard to capitals,
+		// through the fold stored beside the name.
+		Where("c.name_folded = ?", Folded(name)).
 		OrderExpr("c.id")
 	if version != "" {
 		query = query.Where("c.version = ?", version)
@@ -425,6 +428,7 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 		ID      int64  `bun:"id"`
 		Version string `bun:"version"`
 		Purl    string `bun:"purl"`
+		Name    string `bun:"name"`
 	}
 	if err := query.Scan(ctx, &rows); err != nil {
 		return 0, fmt.Errorf("look up component %q: %w", name, err)
@@ -442,6 +446,21 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 		kept = append(kept, rows[i])
 	}
 	rows = kept
+	// Two components whose names differ only in capitals are both what a
+	// typed name means. The producer's own spelling, which every link
+	// carries, names the one spelled that way; any other spelling is
+	// answered with the choices.
+	if len(rows) > 1 {
+		exact := rows[:0:0]
+		for _, row := range rows {
+			if row.Name == strings.TrimSpace(name) {
+				exact = append(exact, row)
+			}
+		}
+		if len(exact) > 0 && len(exact) < len(rows) {
+			rows = exact
+		}
+	}
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("%w: %q", ErrNoComponent, name)
 	}

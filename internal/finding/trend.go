@@ -167,7 +167,8 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// one version of one package is a chart of a moment rather than of a
 	// component.
 	if name := strings.TrimSpace(within.Component); name != "" {
-		query = query.Where("f.component_id IN (?)", componentsWhere(query, "c.name = ?", name))
+		query = query.Where("f.component_id IN (?)",
+			componentsWhere(query, "c.name_folded = ?", graph.Folded(name)))
 	}
 	if under := strings.TrimSpace(within.Beneath); under != "" {
 		targets, err := s.Builds(ctx, scope)

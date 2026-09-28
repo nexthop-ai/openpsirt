@@ -233,6 +233,17 @@ An identity a sign-in provider hands over is compared exactly. It is not typed
 here and not ours to reinterpret; deciding that two accounts are one person
 merges access nobody granted.
 
+A component name is the producer's, and it is stored, reported and linked in
+the producer's spelling. Where a person types one — in an address, or in a
+filter — it is matched on the fold stored beside the name.
+
+| Rule | |
+|---|---|
+| A typed component name is matched without regard to capitals | Through the stored fold, the same one the routing rules and the search match on |
+| Two components whose names differ only in capitals are both what the name means | A lookup naming one component answers with the "which did you mean?" choices; a filter keeps both |
+| The producer's own spelling names the one spelled that way | Every link is built from the stored name, so a link reaches its component rather than the choices |
+| A clash in capitals alone, at one version, ecosystem and namespace, is reached only by its own spelling | The choices tell components apart by those three, and two components differing in nothing else cannot be told apart by them |
+
 ## Engine differences
 
 Only column declarations differ. Everything queried is portable.

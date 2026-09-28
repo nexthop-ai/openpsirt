@@ -589,9 +589,11 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		// nothing can make false.
 		q = q.Having("MIN(f.matched) = ?", ByIdentifier)
 	}
+	// A component name somebody types is matched without regard to
+	// capitals, through the fold stored beside the name.
 	if names := trimmed(f.Components); len(names) > 0 {
 		q = q.Where("f.component_id IN (?)",
-			componentsWhere(q, "c.name IN (?)", bun.List(names)))
+			componentsWhere(q, "c.name_folded IN (?)", bun.List(foldedNames(names))))
 	}
 	// Lowered on both sides rather than asked to compare loosely: the
 	// engines do not agree on what a case-insensitive comparison is, and
@@ -617,7 +619,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	if names := trimmed(f.Exclude); len(names) > 0 {
 		q = q.Where("f.component_id NOT IN (?)",
-			componentsWhere(q, "c.name IN (?)", bun.List(names)))
+			componentsWhere(q, "c.name_folded IN (?)", bun.List(foldedNames(names))))
 	}
 	if kinds := trimmed(f.Ecosystems); len(kinds) > 0 {
 		// One subquery holding an OR rather than one per kind, because a
@@ -652,7 +654,8 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.UnderTheBuild {
 		q = q.Where("f.consumer_id IS NULL")
 	} else if under := strings.TrimSpace(f.Under); under != "" {
-		q = q.Where("f.consumer_id IN (?)", componentsWhere(q, "c.name = ?", under))
+		q = q.Where("f.consumer_id IN (?)",
+			componentsWhere(q, "c.name_folded = ?", graph.Folded(under)))
 	}
 	// The party dealing with it. Set for the whole group at once, so a group
 	// is held when its places are — asked as MIN and MAX rather than as one
@@ -1069,6 +1072,15 @@ func (f Filter) at() time.Time {
 // as a subquery for a membership test on a finding's component or consumer.
 func componentsWhere(q *bun.SelectQuery, condition string, args ...any) *bun.SelectQuery {
 	return q.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").Where(condition, args...)
+}
+
+// foldedNames is typed component names as the fold stored beside each name.
+func foldedNames(names []string) []string {
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		out = append(out, graph.Folded(name))
+	}
+	return out
 }
 
 // Hidden counts what the line keeps out of a list, so that the list can say so

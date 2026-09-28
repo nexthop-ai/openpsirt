@@ -421,6 +421,11 @@ func TestTheRegisterNarrows(t *testing.T) {
 		if named := rows(t, "?component=linux-image"); len(named) != 2 {
 			t.Errorf("narrowed to the component both sit on, %d rows", len(named))
 		}
+		// A component name somebody types is matched without regard to
+		// capitals.
+		if named := rows(t, "?component=Linux-Image"); len(named) != 2 {
+			t.Errorf("narrowed to the component typed in capitals, %d rows", len(named))
+		}
 		if elsewhere := rows(t, "?component=nothing-is-called-this"); len(elsewhere) != 0 {
 			t.Errorf("a component the build does not hold kept %d rows", len(elsewhere))
 		}
