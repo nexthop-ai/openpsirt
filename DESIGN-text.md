@@ -175,7 +175,8 @@ renderer can tell which it is holding.
 The server puts third-party text into two documents of its own: the release
 note and the issue document, both served as markdown (`DESIGN-reporting.md`).
 Each value there that did not pass the submission policy is escaped as it is
-written, so a renderer shows it as the text it is.
+written, so a renderer shows it as the text it is. A webhook's subject and
+text are escaped by the same rule, line by line (`DESIGN-notifications.md`).
 
 | Escaped | Where | Opens |
 |---|---|---|

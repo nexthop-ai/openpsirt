@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -299,7 +300,7 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		// one here from the row instead would announce the identifier and the
 		// component to every server the request crosses, which is the whole of
 		// what the composed body was careful about.
-		Kind: string(row.Kind), Subject: chatText(message.Subject), Text: chatText(message.Text),
+		Kind: string(row.Kind), Subject: chatText(message.Subject, ""), Text: chatText(message.Text, message.Link),
 		Link: message.Link, Private: row.Private,
 		At: row.CreatedAt.UTC().Format(time.RFC3339),
 	})
@@ -397,13 +398,23 @@ var chatMarkup = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 
 // chatText is text as a chat channel has to receive it to show it as written.
 //
-// Slack and Teams incoming webhooks read `<!channel>` as a ping for everybody
-// in the channel and `<address|label>` as a link labelled anything. A body
-// carries a publisher's name, a supplier's failure text and component names,
-// none of them chosen here, so the three characters that open that markup are
-// escaped. The link travels in a field of its own and is composed from the
-// configured address, so it is sent as it is.
-func chatText(text string) string { return chatMarkup.Replace(text) }
+// A body carries a publisher's name, a supplier's failure text and component
+// names, none of them chosen here. Each line is escaped as markdown with the
+// helper the release note uses, because Teams renders `[label](address)` as a
+// link labelled anything. Then `&`, `<` and `>` are escaped as Slack and Teams
+// require, because both read `<!channel>` as a ping for everybody in the
+// channel and `<address|label>` as a link. The text this application writes
+// carries no markdown of its own. The line holding the link is composed from
+// the configured address, so it is left a link.
+func chatText(text, link string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if link == "" || line != link {
+			lines[i] = markdown.Literal(line)
+		}
+	}
+	return chatMarkup.Replace(strings.Join(lines, "\n"))
+}
 
 // trimTo bounds what is stored of a failure.
 func trimTo(text string, most int) string { return bound.Head(text, most) }

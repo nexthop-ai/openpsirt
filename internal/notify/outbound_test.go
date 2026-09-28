@@ -163,7 +163,8 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 		}
 		if err := store.Tell(ctx, notify.Telling{
 			PersonID: who.ID, Kind: notify.StatementRevised,
-			Body: "<!channel> <https://evil.example|security update> & Sons changed a statement",
+			Body: "<!channel> <https://evil.example|security update> & Sons changed a statement " +
+				"on [Download the fix](https://evil.example/p)",
 			Link: "/issues/CVE-2026-1?from=a&to=b",
 		}); err != nil {
 			t.Fatal(err)
@@ -185,9 +186,15 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 		if strings.ContainsAny(body.Text, "<>") || strings.ContainsAny(body.Subject, "<>") {
 			t.Errorf("chat markup reached a channel: %q", body.Text)
 		}
-		want := "&lt;!channel&gt; &lt;https://evil.example|security update&gt; &amp; Sons"
-		if !strings.Contains(body.Text, want) {
-			t.Errorf("the text reads %q, want it to carry %q", body.Text, want)
+		for _, want := range []string{
+			`\&lt;!channel&gt; \&lt;https\://evil.example\|security update&gt; &amp; Sons`,
+			`\[Download the fix\](https\://evil.example/p)`,
+			// The address this deployment composed is still one to follow.
+			"\nhttps://openpsirt.example/issues/CVE-2026-1?from=a&amp;to=b\n",
+		} {
+			if !strings.Contains(body.Text, want) {
+				t.Errorf("the text reads %q, want it to carry %q", body.Text, want)
+			}
 		}
 		// The address is ours and travels in its own field, as it is.
 		if body.Link != "https://openpsirt.example/issues/CVE-2026-1?from=a&to=b" {
