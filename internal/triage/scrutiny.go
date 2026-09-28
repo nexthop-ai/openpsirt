@@ -6,6 +6,7 @@ package triage
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -115,12 +116,9 @@ const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
 func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	productIDs []int64, since, until time.Time, limit int) (*Scrutiny, error) {
 
-	// Every section bounded, like every other read in this package. None of
-	// them was: a deployment that has been triaging for a while answered one
-	// row per approved claim in force, and the last of them then issued three
-	// more round trips each — thirty thousand of them in one request on ten
-	// thousand claims, with nothing checking whether the caller was still
-	// there.
+	// Every section's answer is bounded. The growth section reads every
+	// standing agreement to find which grew, in bounded statements, because
+	// growth is only known once what each claim covers now is counted.
 	limit = database.AList.Of(limit)
 	out := &Scrutiny{}
 	// One more than the ceiling, so that reaching it is distinguishable from
@@ -323,6 +321,11 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Outcome    string    `bun:"outcome"`
 		Covered    int       `bun:"covered"`
 	}
+	// Every standing agreement is a candidate, and growth is only known once
+	// what each claim covers now is counted, so the whole set is examined
+	// before any of it is cut: the most grown first, then by claim, and the
+	// cap applied to that. Capped taken off the oldest claims would leave a
+	// claim that grew after them out of every answer.
 	err = narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
@@ -337,26 +340,29 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where("ap.covered IS NOT NULL").
 		Where(standing, held...).
 		GroupExpr("de.claim_id, pe.identity, cl.outcome").
-		OrderExpr("de.claim_id").
-		Limit(room)).Scan(ctx, &grew)
+		OrderExpr("de.claim_id")).Scan(ctx, &grew)
 	if err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
-	if capped(len(grew)) {
-		out.Capped, grew = true, grew[:limit]
-	}
 	// Each one's present reach, asked the way a finding asks whether a
-	// decision applies to it — in one statement over the whole page. It was
-	// three round trips per claim, in a loop, with nothing between them: on
-	// ten thousand claims that is thirty thousand sequential statements in one
-	// request, and the work carried on after the caller had gone.
+	// decision applies to it, a bounded set of claims per statement.
 	claims := make([]int64, 0, len(grew))
+	seen := map[int64]bool{}
 	for _, row := range grew {
-		claims = append(claims, row.ClaimID)
+		if !seen[row.ClaimID] {
+			seen[row.ClaimID] = true
+			claims = append(claims, row.ClaimID)
+		}
 	}
-	now, err := s.coveringEach(ctx, subject, claims)
-	if err != nil {
-		return nil, err
+	now := make(map[int64]int, len(claims))
+	for start := 0; start < len(claims); start += database.InBulk.Most {
+		some, err := s.coveringEach(ctx, subject, claims[start:min(start+database.InBulk.Most, len(claims))])
+		if err != nil {
+			return nil, err
+		}
+		for id, n := range some {
+			now[id] = n
+		}
 	}
 	for _, row := range grew {
 		if now[row.ClaimID] <= row.Covered {
@@ -367,6 +373,16 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 			Outcome: Outcome(row.Outcome), Covered: row.Covered,
 			CoversNow: now[row.ClaimID],
 		})
+	}
+	sort.SliceStable(out.Grew, func(i, j int) bool {
+		a, b := out.Grew[i], out.Grew[j]
+		if a.CoversNow-a.Covered != b.CoversNow-b.Covered {
+			return a.CoversNow-a.Covered > b.CoversNow-b.Covered
+		}
+		return a.ClaimID < b.ClaimID
+	})
+	if len(out.Grew) > limit {
+		out.Capped, out.Grew = true, out.Grew[:limit]
 	}
 
 	return out, nil

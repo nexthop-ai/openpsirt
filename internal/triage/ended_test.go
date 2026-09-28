@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -177,6 +178,32 @@ func TestWhatAPersonGotThroughIsCountedInClaims(t *testing.T) {
 		}
 		if a := got["approver"]; a.Approved != 1 {
 			t.Errorf("the approver agreed to %d claims, want 1", a.Approved)
+		}
+	})
+}
+
+func TestAClaimThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
+	// The cap applies to the claims that grew, worst first. Taken off the
+	// oldest agreements, a claim agreed to after them never appears.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		in := f.build(t, f.product, "2026.03")
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		for _, place := range []string{"place-a", "place-b"} {
+			at := f.at()
+			at.PlaceIdentity = place
+			at.ConsumerUpstream = ""
+			f.agreed(t, at)
+		}
+		// The newer claim now reaches a finding nobody agreed to it covering.
+		f.finds(t, in, libfoo, "place-b", access.Public)
+
+		scrutiny, err := f.store.Scrutinize(ctx, f.reviewer, nil, time.Time{}, time.Time{}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(scrutiny.Grew) != 1 || scrutiny.Grew[0].CoversNow != 1 {
+			t.Fatalf("what grew reads %+v, want the claim at place-b covering one", scrutiny.Grew)
 		}
 	})
 }

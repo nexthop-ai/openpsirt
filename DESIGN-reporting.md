@@ -617,14 +617,14 @@ to, for the reason the record is: a judgment belongs to when it was argued, and
 dating it by its agreement moves it out of that period whenever an approval
 comes late.
 
-Every section is bounded and says when it reached the bound. Unbounded, a
-deployment that has been triaging for a while answers one row per approved
-claim in force, and the last section asks three more questions about each of
-them one at a time — thirty thousand sequential statements in one request on
-ten thousand claims, with nothing checking whether the caller is still there.
-What each claim covers now is one statement for the page. A capped section
+Every section is bounded and says when it reached the bound. A capped section
 reading as complete misleads the one reader this report is for, so it says it
 was capped.
+
+| Rule | |
+|---|---|
+| Growth is capped after it is found, most grown first | Whether a claim grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest claims fill the page and a claim that grew after them is in no answer |
+| What claims cover now is counted a bounded set of claims per statement | One statement per claim is ten thousand round trips on ten thousand claims |
 
 ## Fix-bundle page cost
 
