@@ -57,7 +57,7 @@ func TestWhetherAnyRowIsUndisclosedIsNeverAskedByOrderingTheWords(t *testing.T) 
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		source, err := os.ReadFile(path)
+		source, err := os.ReadFile(path) //nolint:gosec // G304: this repository's own source
 		if err != nil {
 			return err
 		}
