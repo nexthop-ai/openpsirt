@@ -6,7 +6,6 @@ package sbom
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -377,9 +376,6 @@ func (c *reader) spdx3Created(e spdx3Element) error {
 	if c.spdx3Creations == nil {
 		c.spdx3Creations = map[string]string{}
 	}
-	if _, held := c.spdx3Creations[e.id]; !held {
-		c.spdx3Order = append(c.spdx3Order, e.id)
-	}
 	c.spdx3Creations[e.id] = e.created
 	return nil
 }
@@ -608,10 +604,10 @@ func (c *reader) spdx3Settle() {
 		}
 		raw = referred
 	}
-	built, err := time.Parse(time.RFC3339, raw)
+	built, err := buildTime(raw)
 	if err != nil {
-		c.settleErr = fmt.Errorf("build time %q is not a time: %w", trim(raw), err)
+		c.settleErr = err
 		return
 	}
-	c.doc.BuiltAt = built.UTC()
+	c.doc.BuiltAt = built
 }

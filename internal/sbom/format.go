@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 )
 
 // vocabulary is one format's reading of a document's top-level keys.
@@ -172,4 +173,17 @@ func sentinel(value string) string {
 		return ""
 	}
 	return value
+}
+
+// buildTime reads the time an inventory says its build was made. An empty
+// value is no time, and anything else is an RFC 3339 time, held in UTC.
+func buildTime(raw string) (time.Time, error) {
+	if raw == "" {
+		return time.Time{}, nil
+	}
+	built, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("build time %q is not a time: %w", trim(raw), err)
+	}
+	return built.UTC(), nil
 }
