@@ -891,7 +891,8 @@ database by hand.
 
 The session lifetime has a ceiling of thirty days. It is the window in which a
 role a group withdrew can still be held, so left to whatever an administrator
-types, a lifetime of a year makes every browser sign-in last a year. Refused
+types, a lifetime of a year makes every browser sign-in last a year. Behind single
+sign-on, signing in again is one click, so a longer ceiling buys little. Refused
 rather than quietly shortened, at the settings write and at startup, so that
 somebody who asks for more hears the limit rather than discovering it later.
 
