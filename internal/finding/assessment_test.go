@@ -940,7 +940,7 @@ func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 
 		// The withdrawal lands between the agreement's read and its write.
 		hook := &beforeAgreeing{run: func() {
-			if err := f.store.Withdraw(context.Background(), who, claim.ID); err != nil {
+			if _, err := f.store.Withdraw(context.Background(), who, claim.ID); err != nil {
 				t.Errorf("withdrawing: %v", err)
 			}
 		}}
