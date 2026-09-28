@@ -112,7 +112,7 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 // things in different bodies — "places" is what a claim wrote in one and what
 // is still open in another. Each named field has to be carried by at least two
 // bodies, so a rename leaves this failing rather than checking nothing.
-var factsDescribedOnce = []string{"consumer", "product_name", "sees_nothing"}
+var factsDescribedOnce = []string{"consumer", "sees_nothing"}
 
 func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
