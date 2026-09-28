@@ -159,6 +159,7 @@ what every other application on the same screen calls them.
 | Nothing chosen means the operating system is answering, and keeps answering | A machine that turns dark at sunset turns this dark at sunset |
 | A person who picks one pins it, and picking "system" hands the question back | Otherwise choosing once is a door that opens one way, and somebody who tried dark at noon can never get their evening back |
 | Stamped on the root element before the first paint | Setting it after the first frame is a flash of the wrong look on every fresh page |
+| The page's stamp reads the key and the looks the application keeps | It cannot import them, so a web test holds the two copies together. A look the stamp does not know is replaced by the system's on every load |
 | Kept in the browser, changing nothing anybody else sees | The same rule as saved filters |
 | Severity never borrows the accent | Each look has its own accent and the same five-band severity scale beside it, with exploited above critical. A page that paints "critical" in the brand color has nothing left that means "act on this" |
 

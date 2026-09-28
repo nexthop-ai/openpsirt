@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
 import { rulesIn } from "./class-rules.mjs";
 // @ts-expect-error - plain ESM with no types of its own
-import { stylesheets } from "./stylesheets.mjs";
+import { stylesheets } from "./source.mjs";
 
 // A class reached as a modifier — `.state.warn`, `.timeline.past` — must not
 // also have a bare rule that draws a box. Every element carrying the modifier
