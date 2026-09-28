@@ -495,6 +495,13 @@ a rule with a spelling per package. They stay two questions rather than one,
 because triage implies reading and reading does not imply triage, so a single
 answer would have to be qualified at every call site.
 
+Whether any row of a group is undisclosed is one aggregate too: a count of the
+undisclosed rows, compared with zero. The visibility words are compared for
+equality and never ordered, because the smallest word of a group answers the
+question only while "private" sorts before "public", and it is asked where an
+outbound message decides whether it may name the issue. A test fails on an
+ordering taken over a visibility column anywhere in the source.
+
 | Question | Asked at |
 |---|---|
 | An act on one finding — a claim, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |

@@ -860,8 +860,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// marker on a row holding an undisclosed place. The four engines do
 		// not agree on a boolean aggregate either, and counting is the same
 		// question asked portably.
-		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
-			access.Private).
+		ColumnExpr(access.AnyPrivateAs("f.visibility", "undisclosed")).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Both ends of what the places say, because a group whose places
 		// disagree is what FixMixed is for and a minimum alone cannot say it:

@@ -82,8 +82,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		// Counted rather than taken from an aggregate over the word itself. A
 		// visibility is a name and MIN over names would be answering "is any
 		// of this private" by alphabetical accident.
-		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
-			access.Private).
+		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		Where("de.state = ?", triage.Proposed).
 		Where("de.needs_approval = ?", true).
 		Where("de.sent_back_at IS NULL").
@@ -246,8 +245,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(de.sent_back_at) AS "sent_back_at"`).
 		ColumnExpr(`COUNT(*) AS "rows_written"`).
-		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
-			access.Private).
+		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		Where("de.state = ?", triage.Proposed).
 		Where("de.sent_back_at IS NOT NULL").
 		Where("de.sent_back_at <= ?", since).
@@ -329,8 +327,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(cl.deferred_until) AS "until"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
-			access.Private).
+		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		// Standing only. A deferral that has been withdrawn or has lapsed is
 		// not one whose end anybody is waiting for — a lapsed one is already
 		// back in the queue, which is the thing this exists to give notice of.
@@ -454,8 +451,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`q.product_id AS "product_id"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
-		ColumnExpr(`SUM(CASE WHEN q.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
-			access.Private).
+		ColumnExpr(access.PrivateCountAs("q.visibility", "private_rows")).
 		Join(`JOIN "product" AS "p" ON p.id = q.product_id`).
 		GroupExpr("q.team_id, q.product_id").
 		Scan(ctx, &rows)

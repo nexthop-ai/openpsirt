@@ -920,7 +920,7 @@ func (s *Store) disclosedSince(ctx context.Context, rows []Decision) error {
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "private"`, access.Private).
+		ColumnExpr(access.PrivateCountAs("f.visibility", "private")).
 		Where("st.product_id IN (?)", bun.List(keysOf(products))).
 		Where("f.vulnerability_id IN (?)", bun.List(keysOf(issues))).
 		GroupExpr("st.product_id, f.vulnerability_id").

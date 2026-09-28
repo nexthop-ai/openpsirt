@@ -184,15 +184,20 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		// them.
 		OnTag int `bun:"on_tag"`
 	}
+	// Undisclosed where any open finding there is, disclosed where there are
+	// findings and none is, and nothing where there are none.
+	undisclosed, private := access.AnyPrivate("f.visibility")
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).
-		ColumnExpr(`COALESCE((SELECT MIN(f.visibility) FROM "finding" AS "f"
+		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
+				WHEN `+undisclosed+` THEN ? ELSE ? END
+			FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS "visibility"`, toTarget).
+			AS "visibility"`, private, string(access.Private), string(access.Public), toTarget).
 		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id

@@ -880,8 +880,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		// Any undisclosed row makes the group undisclosed. Written as a sum
 		// rather than a boolean aggregate: the four engines do not agree on
 		// one, and counting is the same question asked portably.
-		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
-			access.Private).
+		ColumnExpr(access.AnyPrivateAs("f.visibility", "undisclosed")).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// The total rides on the page, as the findings list's does: the
 		// groups the narrowing admits, counted after the grouping and before

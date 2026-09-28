@@ -139,7 +139,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 	}
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "places"`, access.Private).
+		ColumnExpr(access.PrivateCountAs("f.visibility", "places")).
 		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "public"`, access.Public).
 		ColumnExpr(`COALESCE(MAX(CASE WHEN f.visibility = ? AND f.closed_at IS NULL THEN f.disclose_at END), `+
 			`MAX(CASE WHEN f.visibility = ? THEN f.disclose_at END)) AS "ends"`,
