@@ -26,9 +26,9 @@ import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
 import { mayOf, useWho } from "../app/session";
 import type { Who } from "../app/session";
-import { Wide } from "../ui/Wide";
 import { allFindingsAt, findingAt } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
+import { OutlierRows } from "../ui/OutlierRows";
 
 // The stripe down the card, which says the claim's state before anybody reads
 // a word of it. Three colors and no fourth: waiting, in force, and finished
@@ -539,39 +539,11 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
       <p className="hint" style={{ margin: "0 0 10px" }}>
         Holding them back makes them a claim of yours. Revise it to say what differs.
       </p>
-      <Wide style={{ boxShadow: "none" }}>
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: 30 }} />
-              <th>Severity</th>
-              <th>Issue</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((one) => (
-              <tr key={one.decision_id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label="Hold back"
-                    checked={holding.has(one.decision_id)}
-                    onChange={(event) => setHolding(toggled(holding, one, event.target.checked))}
-                  />
-                </td>
-                <td>
-                  <Severity word={one.severity} />
-                </td>
-                <td>
-                  <span className="id">{one.vulnerability}</span> <Exploited when={one.exploited} />
-                </td>
-                <td className="hint">{(one.why ?? []).join(", ")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Wide>
+      <OutlierRows
+        rows={rows}
+        holding={holding}
+        onToggle={(one, on) => setHolding(toggled(holding, one, on))}
+      />
       {holding.size > 0 && (
         <div style={{ marginTop: 10 }}>
           {split.error != null && (
