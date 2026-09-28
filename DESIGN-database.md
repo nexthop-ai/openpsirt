@@ -472,15 +472,21 @@ a finding or a decision belongs to once they are one, so whoever rolls back
 removes one first. The refusal comes before any table changes, so the
 database is left as v0.5.0 left it on every engine.
 
-| Test, on each of the four engines | What it holds |
+One v0.4.0 database per engine holds the rows every check below puts in it,
+and is upgraded once and rolled back once. Each check reads its own rows by
+what identifies them, and asserts each step as a subtest named for what it
+holds. Building v0.4.0 walks every migration down and up again, which is most
+of what a check costs, so the checks share the build.
+
+| Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.4.0 database with named, derived and granted administrators | Upgraded, only the named-only one's grant here is cleared, and they still administer. Rolled back, every named one's grant is set |
 | A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
 | A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was. Rolled back, the column is gone and the names remain |
 | A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person. With a name shaped like a package's identifier beside it, the roll back is refused naming it and changes nothing. Without, rolled back, each is what v0.4.0 held |
 | A v0.4.0 destination | Upgraded, a webhook belonging to the deployment. Rolled back after a chat channel was added, the webhook alone remains |
-| v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it |
-| A v0.4.0 database holding two issues | Upgraded, each is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and both issues remain |
+| v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it. The scratch tables are dropped before the roll back |
+| A v0.4.0 database holding issues | Upgraded, every issue is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and the issues remain |
 
 ### Release records
 
