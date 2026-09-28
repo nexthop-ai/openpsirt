@@ -491,17 +491,8 @@ func exploited(match grypeMatch) bool {
 // A detail stating a range but deciding no kind is the fallback, because a
 // range is evidence and having none is worse than having the other one's.
 func matchedRange(details []matchDetail) string {
-	for _, detail := range details {
-		if strings.Contains(strings.ToLower(detail.Type), "cpe") {
-			return strings.TrimSpace(detail.Found.VersionConstraint)
-		}
-	}
-	// The detail matched() decided the kind by, where it names one.
-	for _, detail := range details {
-		switch strings.ToLower(detail.Type) {
-		case "exact-direct-match", "exact-indirect-match":
-			return strings.TrimSpace(detail.Found.VersionConstraint)
-		}
+	if _, detail := deciding(details); detail != nil {
+		return strings.TrimSpace(detail.Found.VersionConstraint)
 	}
 	for _, detail := range details {
 		if stated := strings.TrimSpace(detail.Found.VersionConstraint); stated != "" {
@@ -894,24 +885,31 @@ func firstFixDate(available []struct {
 // know is a word whose strength nobody here has checked, and treating it as
 // authoritative is the direction that hides something.
 func matched(details []matchDetail) finding.Matched {
-	for _, detail := range details {
+	kind, _ := deciding(details)
+	return kind
+}
+
+// deciding is the kind a match reads as and the detail that decided it, which
+// is nil where no detail names a type this knows. The kind and the range are
+// both read from it, so the two cannot come from different details.
+func deciding(details []matchDetail) (finding.Matched, *matchDetail) {
+	for i, detail := range details {
 		if strings.Contains(strings.ToLower(detail.Type), "cpe") {
-			return finding.ByIdentifier
+			return finding.ByIdentifier, &details[i]
 		}
 	}
 	if len(details) == 0 {
-		return ""
+		return "", nil
 	}
 	// An allowlist, which is what makes the paragraph above true. A denylist
 	// here — anything not naming a CPE is the ecosystem advisory — would read
 	// a match kind this does not know as the authoritative one, and that is
-	// the direction that hides something. A word nobody here has checked is a
-	// word whose strength nobody here has checked.
-	for _, detail := range details {
+	// the direction that hides something.
+	for i, detail := range details {
 		switch strings.ToLower(detail.Type) {
 		case "exact-direct-match", "exact-indirect-match":
-			return finding.ByAdvisory
+			return finding.ByAdvisory, &details[i]
 		}
 	}
-	return finding.ByIdentifier
+	return finding.ByIdentifier, nil
 }

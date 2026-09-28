@@ -513,7 +513,7 @@ func TestWhatLabelsAReferenceIsItsHostAndItsPath(t *testing.T) {
 	} {
 		got := scanner.KindOf(c.address)
 		if got != c.want {
-			t.Errorf("%s is labelled %q, want %q", c.address, got, c.want)
+			t.Errorf("%s is labeled %q, want %q", c.address, got, c.want)
 		}
 	}
 }
