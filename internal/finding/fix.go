@@ -68,7 +68,7 @@ type Upgrade struct {
 // build list settled beforehand describes a world that may be gone.
 func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 	productID, componentID int64, to string, by *time.Time, claimID *int64,
-	wanted []int64, retired map[int64]bool) (int, error) {
+	wanted []int64, retired map[int64]string) (int, error) {
 
 	fold, from, err := s.foldOf(ctx, db, componentID)
 	if err != nil {
@@ -110,13 +110,14 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	}
 
 	for _, id := range wanted {
-		if retired[id] {
+		if release, out := retired[id]; out {
 			// A release past end-of-life will not be fixed, so nothing can be
 			// committed for it. Refused rather than accepted and ignored:
 			// silently dropping it leaves somebody believing a release is
-			// covered.
-			return 0, access.Denied(fmt.Sprintf(
-				"declare a fix in build %d, which is out of support", id))
+			// covered. The caller may triage here and asked for something
+			// that cannot be done, so this is a sentence for them to act on
+			// rather than an authorization refusal.
+			return 0, fmt.Errorf("release %s is retired", release)
 		}
 		// Committing what is already committed keeps the first commitment.
 		// The moment somebody said they would do this is a fact, and
@@ -565,9 +566,10 @@ func (s *Store) BuildsForWithin(ctx context.Context, db bun.IDB, productID int64
 	return s.buildsOf(ctx, db, productID, builds)
 }
 
-// RetiredWithin says which of these builds are past end-of-life.
+// RetiredWithin says which of these builds are past end-of-life, each with the
+// name of its release.
 func (s *Store) RetiredWithin(ctx context.Context, db bun.IDB,
-	builds []int64) (map[int64]bool, error) {
+	builds []int64) (map[int64]string, error) {
 	return s.retired(ctx, db, builds)
 }
 
@@ -616,9 +618,10 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	return here, nil
 }
 
-// retired says which of these builds are out of support.
-func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64]bool, error) {
-	out := map[int64]bool{}
+// retired says which of these builds are out of support, each with the name
+// of its release.
+func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
+	out := map[int64]string{}
 	if len(ids) == 0 {
 		return out, nil
 	}
@@ -629,18 +632,23 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 	if len(past) == 0 {
 		return out, nil
 	}
-	var retired []int64
+	var retired []struct {
+		ID      int64  `bun:"id"`
+		Release string `bun:"release"`
+	}
 	err = db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		ColumnExpr("tg.id").
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`tg.id AS "id"`).
+		ColumnExpr(`st.name AS "release"`).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Where("tg.stream_id IN (?)", bun.List(past)).
 		Scan(ctx, &retired)
 	if err != nil {
 		return nil, fmt.Errorf("read which of these builds are out of support: %w", err)
 	}
-	for _, id := range retired {
-		out[id] = true
+	for _, row := range retired {
+		out[row.ID] = row.Release
 	}
 	return out, nil
 }

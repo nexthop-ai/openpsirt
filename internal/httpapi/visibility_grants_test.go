@@ -94,20 +94,21 @@ func TestProductWideTriageIsHeldByTheUndisclosedHalfAlone(t *testing.T) {
 		r.scanned(t)
 		hidden := r.embargoed(t)
 
-		// refused is the public-only reader's answer. The rules are answered as
-		// for a product they hold nothing on, since only triage sees them; an
-		// issue act is refused for the role before the issue's name is
-		// resolved, so it says nothing about whether the issue exists.
+		// refused is the public-only reader's answer. They can see the product,
+		// so the rules and an issue act are refused for the role; an issue act
+		// is refused before the issue's name is resolved, so it says nothing
+		// about whether the issue exists. Taking work is about one finding, and
+		// an undisclosed one is not there for them.
 		type ask struct {
 			what, method, path, body string
 			want, refused            int
 		}
 		asks := []ask{
 			{"listing routing rules", http.MethodGet, "/v1/products/mine/routing-rules", "",
-				http.StatusOK, http.StatusNotFound},
+				http.StatusOK, http.StatusForbidden},
 			{"previewing a routing rule", http.MethodGet,
 				"/v1/products/mine/routing-rules/preview?upstream=libnl", "", http.StatusOK,
-				http.StatusNotFound},
+				http.StatusForbidden},
 			{"rating an issue", http.MethodPost, "/v1/products/mine/issues/" + hidden + "/assessment",
 				`{"severity":"critical","reasoning":"Reachable from the management port."}`,
 				http.StatusCreated, http.StatusForbidden},

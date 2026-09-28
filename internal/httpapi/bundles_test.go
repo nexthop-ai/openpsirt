@@ -263,7 +263,12 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the bump.",`+
 				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
-		refusedWith(t, refused, http.StatusForbidden)
+		// The caller may triage here; what they asked for cannot be done, and
+		// the answer names the release so they know which one to drop.
+		refusedWith(t, refused, http.StatusUnprocessableEntity)
+		if !contains(refused.Body.String(), "release master is retired") {
+			t.Errorf("the refusal does not name the retired release: %s", refused.Body.String())
+		}
 		var left struct {
 			Total int `json:"total"`
 		}

@@ -13,7 +13,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -442,12 +441,15 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 
 // decidingAbout resolves the names in a path to the place a decision is made
 // about, authorized on the way.
+//
+// A build the caller cannot reach answers with the sentence every other
+// finding route gives. Naming which part of the address failed is for a
+// pipeline filing a scan; here it would tell a reader which products exist.
 func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	product, stream, variant, vulnerability, place string) (*finding.Deciding, int64, error) {
-	names := catalog.NewStore(in.DB.DB)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
-		return nil, 0, undeclared(in.Logger, err, "that build could not be looked up")
+		return nil, 0, err
 	}
 	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {

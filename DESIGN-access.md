@@ -435,6 +435,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | Rules are ordered, first match wins, and the finding records which rule placed it | An unwritten precedence rule is forgettable, and "where did this come from" is asked months later |
 | The order is settled | The ordinal is one past the highest under ordinary isolation, so two rules created at the same moment take the same number. Ties break by identifier rather than letting two rules swap places between batches |
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
+| Somebody who can see the product and lacks the right is refused with 403 | The same answer an issue act gives them. A product they cannot see answers as not declared, as every product route does |
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
 | A pattern naming most of a build is refused | A rule says where in the tree something sits, and a bare glob is not that. Refused when it is written and again at the preview, the way a rule matching nothing is refused: a rule that quietly applied to part of what it names is worse than one nobody could save. The subtree is one recursive walk per build rather than one per named component — it was tens of thousands of round trips inside one request, from a route anybody who may triage the product can reach |
 
