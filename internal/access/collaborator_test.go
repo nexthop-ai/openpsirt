@@ -4,16 +4,18 @@
 package access_test
 
 import (
+	"errors"
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // TestBringingSomebodyIntoACaseTwiceLeavesOneGrant pins the same idempotence
-// for a case, and reads back what the row carries.
-//
-// OnCase and CaseRows were both at 0.0%: who is on an embargoed case, and who
-// put them there, are what is asked after a disclosure goes wrong.
+// for a case, and reads back what the row carries: who is on an embargoed
+// case, and who put them there, are what is asked after a disclosure goes
+// wrong.
 func TestBringingSomebodyIntoACaseTwiceLeavesOneGrant(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -77,5 +79,59 @@ func TestBringingSomebodyIntoACaseTwiceLeavesOneGrant(t *testing.T) {
 		if len(rows) != 0 {
 			t.Errorf("CaseRows carries a withdrawn grant: %+v", rows)
 		}
+	})
+}
+
+// A revocation that matched nothing is ErrNothingMatched, never success. The
+// caller records a withdrawal on success, so answering one that did not
+// happen writes a trail row for an act nobody performed.
+func TestARevocationThatMatchedNothingSaysSo(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		product := f.products["sonic"]
+		person, err := f.store.Ensure(ctx, "ana", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, product, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := interned["CVE-2026-1"]
+
+		t.Run("a case they are not on", func(t *testing.T) {
+			err := f.store.RemoveFromCase(ctx, product, issue, person.ID, person.ID)
+			if !errors.Is(err, access.ErrNothingMatched) {
+				t.Errorf("taking somebody off a case they were never on answered %v", err)
+			}
+		})
+		t.Run("a token already revoked", func(t *testing.T) {
+			token, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := f.store.RevokeToken(ctx, token.ID); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.store.RevokeToken(ctx, token.ID); !errors.Is(err, access.ErrNothingMatched) {
+				t.Errorf("revoking a revoked token answered %v", err)
+			}
+		})
+		t.Run("a key already revoked", func(t *testing.T) {
+			key, _, err := f.store.NewKey(ctx, "nightly", access.Scope{ProductID: product})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := f.store.Revoke(ctx, key.ID); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.store.Revoke(ctx, key.ID); !errors.Is(err, access.ErrNothingMatched) {
+				t.Errorf("revoking a revoked key answered %v", err)
+			}
+		})
 	})
 }

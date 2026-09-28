@@ -319,12 +319,13 @@ func (s *Store) AllTokens(ctx context.Context) ([]Token, error) {
 // after it stops working.
 func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 	revoked := s.now().Truncate(time.Microsecond)
-	if _, err := s.db.NewUpdate().Model((*Token)(nil)).
+	result, err := s.db.NewUpdate().Model((*Token)(nil)).
 		Set("revoked_at = ?", revoked).
-		Where("id = ?", id).Where("revoked_at IS NULL").Exec(ctx); err != nil {
+		Where("id = ?", id).Where("revoked_at IS NULL").Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("revoke a token: %w", err)
 	}
-	return nil
+	return matched(result, "revoke a token", "that token is already revoked")
 }
 
 // TokenByName finds one of somebody's tokens.

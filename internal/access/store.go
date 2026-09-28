@@ -766,13 +766,13 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 
 // Revoke stops a key working, without removing what it did.
 func (s *Store) Revoke(ctx context.Context, keyID int64) error {
-	_, err := s.db.NewUpdate().Model((*Key)(nil)).
+	result, err := s.db.NewUpdate().Model((*Key)(nil)).
 		Set("revoked_at = ?", s.now().Truncate(time.Microsecond)).
 		Where("id = ?", keyID).Where("revoked_at IS NULL").Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("revoke key %d: %w", keyID, err)
 	}
-	return nil
+	return matched(result, fmt.Sprintf("revoke key %d", keyID), "that key is already revoked")
 }
 
 // hashSecret is what gets stored.

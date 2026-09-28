@@ -25,19 +25,23 @@
 // write that binds only the error from the statement and never reads how many
 // rows it matched answers the withdrawal of a role nobody holds as though it
 // had been withdrawn — and the caller then writes a trail row saying so and
-// hands back every finding the person was dealing with in that product. A
-// grant, an estate grant, a group binding, a group's administration and a team
-// membership all take access away, and all five read what they matched.
+// hands back every finding the person was dealing with in that product. Every
+// revocation here takes access away, and every one reads what it matched:
+// grants, estate grants, group bindings, a group's administration, team
+// memberships, case collaborators, personal tokens and pipeline keys.
 package access
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Role is what somebody may do with a product.
@@ -177,6 +181,19 @@ var ErrDenied = errors.New("not authorized")
 // "this grant has been removed" are different answers, and only one of them
 // means the caller should go on to record what it did.
 var ErrNothingMatched = errors.New("nothing matched")
+
+// matched reads how many rows a revocation matched, and answers one that
+// matched none with ErrNothingMatched, saying none.
+func matched(result sql.Result, act, none string) error {
+	n, err := database.Affected(result)
+	if err != nil {
+		return fmt.Errorf("%s: %w", act, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("%s: %w", none, ErrNothingMatched)
+	}
+	return nil
+}
 
 // Subject is who is asking.
 type Subject struct {

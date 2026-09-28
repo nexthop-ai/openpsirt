@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -181,7 +182,10 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				if err != nil {
 					return noSuchPerson()
 				}
-				if err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); err != nil {
+				switch err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); {
+				case errors.Is(err, access.ErrNothingMatched):
+					return huma.Error404NotFound("they are not on this case")
+				case err != nil:
 					return wentWrong(in.Logger, "they could not be taken off", err)
 				}
 				if err := noted(ctx, tx, trail.Case,

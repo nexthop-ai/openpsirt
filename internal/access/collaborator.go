@@ -73,7 +73,7 @@ func (s *Store) RemoveFromCase(ctx context.Context, productID, vulnerabilityID, 
 	by int64) error {
 
 	now := s.now().Truncate(time.Microsecond)
-	if _, err := s.db.NewUpdate().Model((*Collaborator)(nil)).
+	result, err := s.db.NewUpdate().Model((*Collaborator)(nil)).
 		Set("removed_at = ?", now).
 		Set("removed_by = ?", by).
 		Set("live_person_id = ?", nil).
@@ -81,10 +81,11 @@ func (s *Store) RemoveFromCase(ctx context.Context, productID, vulnerabilityID, 
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("person_id = ?", personID).
 		Where("live_person_id IS NOT NULL").
-		Exec(ctx); err != nil {
+		Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("take them off that case: %w", err)
 	}
-	return nil
+	return matched(result, "take them off that case", "they are not on that case")
 }
 
 // OnCase lists who is on one case, as person identifiers, oldest first.
