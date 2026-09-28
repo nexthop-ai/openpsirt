@@ -25,6 +25,7 @@ import { Because, called, labeled } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
 import { Count } from "../ui/Count";
 import { QueueFilters, queueNarrowing } from "./QueueFilters";
+import { issuesIn, toggled } from "./outliers";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
@@ -200,7 +201,7 @@ export function Queue() {
   const exporting = new URLSearchParams();
   if (mine) exporting.set("mine", "true");
   if (product) exporting.set("product", product);
-  if (!mine) {
+  if (!aside) {
     for (const [key, value] of Object.entries(narrowing)) {
       for (const each of Array.isArray(value) ? value : [value]) {
         exporting.append(key, String(each));
@@ -214,14 +215,13 @@ export function Queue() {
 
   async function approvePicked() {
     // Sequential rather than parallel: each is a separate claim and a refusal
-    // on one should not decide the fate of the rest — which is what the loop
-    // said and did not do. An unguarded await abandoned every claim after the
-    // first refusal, left the selection reading its original size, and never
-    // set the batch name, so the undo control for the approvals that did land
-    // never appeared.
+    // on one does not decide the fate of the rest. Every claim is tried, the
+    // selection is left holding what was refused, and the batch name is set
+    // whenever one landed, so the undo control appears for those.
     const named = batch.trim();
     const failed: string[] = [];
     let landed = 0;
+    const acted = new Set(picked.keys());
     for (const [key, claim] of picked) {
       try {
         await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
@@ -238,18 +238,9 @@ export function Queue() {
     // and made a second press report every one of them as refused.
     //
     // Kept from the current selection rather than from the snapshot this loop
-    // started with, so anything ticked while it ran survives.
-    setPicked((prev) => {
-      const left = new Map<string, Claim>();
-      for (const [key, claim] of prev) {
-        if (failed.includes(key)) left.set(key, claim);
-      }
-      for (const key of failed) {
-        const held = picked.get(key);
-        if (held) left.set(key, held);
-      }
-      return left;
-    });
+    // started with, so anything ticked while it ran survives and anything
+    // unticked while it ran stays unticked.
+    setPicked((prev) => stillPicked(prev, acted, failed));
     setRefused(failed.length);
     // The agreement just made under one name, so it can be taken back
     // without remembering the name. The control the queue already promised:
@@ -294,15 +285,18 @@ export function Queue() {
         </p>
         {/* The backlog as a file. One row per claim, the way this
             screen counts them, because that is the unit somebody works
-            through — and reporting a backlog was copying this out by hand. */}
-        <span style={{ marginLeft: "auto" }}>
-          <a className="btn quiet" href={`/v1/review-queue.csv${asked}`}>
-            CSV
-          </a>{" "}
-          <a className="btn quiet" href={`/v1/review-queue.json${asked}`}>
-            JSON
-          </a>
-        </span>
+            through. There is no file of what is to re-affirm, so that tab
+            offers none rather than the queue under its heading. */}
+        {!reaffirm && (
+          <span style={{ marginLeft: "auto" }}>
+            <a className="btn quiet" href={`/v1/review-queue.csv${asked}`}>
+              CSV
+            </a>{" "}
+            <a className="btn quiet" href={`/v1/review-queue.json${asked}`}>
+              JSON
+            </a>
+          </span>
+        )}
       </div>
 
       <div className="tabs2">
@@ -661,6 +655,9 @@ function Card({
   const f = claim.finding;
   const [because, setBecause] = useState("");
   const [aside, setAside] = useState<Set<number>>(new Set());
+  // Issues, which is what the claim counts: the set aside holds a decision per
+  // place, and one issue can sit at many.
+  const rejecting = issuesIn(claim.outliers?.rows ?? [], aside);
   const draftKey = `send-back:${claim.key}`;
   const bulk = claim.kind === "together";
   const extension = claim.kind === "extension";
@@ -969,14 +966,7 @@ function Card({
                           type="checkbox"
                           aria-label="Set aside"
                           checked={aside.has(row.decision_id)}
-                          onChange={(event) => {
-                            const next = new Set(aside);
-                            for (const id of row.decision_ids ?? [row.decision_id]) {
-                              if (event.target.checked) next.add(id);
-                              else next.delete(id);
-                            }
-                            setAside(next);
-                          }}
+                          onChange={(event) => setAside(toggled(aside, row, event.target.checked))}
                         />
                       </td>
                       <td>
@@ -1048,7 +1038,7 @@ function Card({
         <div className="actions">
           <button type="button" className="btn" disabled={busy} onClick={doApprove}>
             {bulk && aside.size > 0
-              ? `Approve ${(claim.issues - aside.size).toLocaleString()}, reject ${aside.size}`
+              ? `Approve ${(claim.issues - rejecting).toLocaleString()}, reject ${rejecting}`
               : bulk
                 ? `Approve all ${claim.issues.toLocaleString()}`
                 : "Approve"}
@@ -1113,4 +1103,19 @@ function Outcome({
       {until && <span className="why">until {until}</span>}
     </span>
   );
+}
+
+// What stays ticked once an approval loop has run: everything it did not act
+// on, as the selection now stands, and of what it acted on only what was
+// refused and is still ticked.
+export function stillPicked<T>(
+  now: Map<string, T>,
+  acted: Set<string>,
+  refused: string[],
+): Map<string, T> {
+  const left = new Map<string, T>();
+  for (const [key, claim] of now) {
+    if (!acted.has(key) || refused.includes(key)) left.set(key, claim);
+  }
+  return left;
 }

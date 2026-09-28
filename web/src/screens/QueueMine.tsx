@@ -13,6 +13,7 @@ import { Because } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { pathTo } from "./list";
+import { issuesIn, toggled } from "./outliers";
 
 // The fate of what you proposed.
 //
@@ -170,12 +171,9 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                             type="checkbox"
                             aria-label="Hold back"
                             checked={holding.has(one.decision_id)}
-                            onChange={(event) => {
-                              const next = new Set(holding);
-                              if (event.target.checked) next.add(one.decision_id);
-                              else next.delete(one.decision_id);
-                              setHolding(next);
-                            }}
+                            onChange={(event) =>
+                              setHolding(toggled(holding, one, event.target.checked))
+                            }
                           />
                         </td>
                         <td>
@@ -222,7 +220,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                       )
                     }
                   >
-                    Hold {holding.size} back
+                    Hold {issuesIn(outliers.rows ?? [], holding)} back
                   </button>
                 </div>
               )}

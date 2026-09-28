@@ -28,6 +28,7 @@ import { useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { pathTo } from "./list";
+import { issuesIn, toggled } from "./outliers";
 
 // The comparison between a product's two spellings: a name people type is
 // matched without regard to capitals, which is the rule the server applies to
@@ -576,12 +577,7 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
                     type="checkbox"
                     aria-label="Hold back"
                     checked={holding.has(one.decision_id)}
-                    onChange={(event) => {
-                      const next = new Set(holding);
-                      if (event.target.checked) next.add(one.decision_id);
-                      else next.delete(one.decision_id);
-                      setHolding(next);
-                    }}
+                    onChange={(event) => setHolding(toggled(holding, one, event.target.checked))}
                   />
                 </td>
                 <td>
@@ -625,7 +621,7 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
                 )
               }
             >
-              Hold {holding.size} back
+              Hold {issuesIn(rows, holding)} back
             </button>
           </div>
         </div>

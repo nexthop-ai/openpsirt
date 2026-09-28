@@ -119,7 +119,7 @@ export function Product() {
           <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
           <span className="d">no place has a decision of any kind</span>
         </Link>
-        <Link className="kpi" to="/review-queue">
+        <Link className="kpi" to={`/review-queue?product=${encodeURIComponent(product)}`}>
           <span className="l">Waiting on a second person</span>
           <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
           <span className="d">claims here that nobody has agreed to</span>

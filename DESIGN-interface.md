@@ -519,6 +519,7 @@ back in its own order rather than refusing.
 | **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them. Every change goes through the one function that holds the rule, including removing a single chip: today every chip only ever widens, so the rule held by a property of the chips rather than by construction |
 | **A figure about a selection counts what the selection holds** | The bulk-claim screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the ceiling is read against. The line under the list names whichever of the two limits the selection is past: issues, or findings written |
 | **The bulk-claim form asks before skipping what is decided** | A box, unticked, reading "Skip places already decided". Ticked, the result lists each place left out with a link to the decision standing there (`DESIGN-triage.md` § Decided places). Unticked, a decided place refuses the claim and the refusal names the decision |
+| **Approving a selection leaves ticked what was refused and what was ticked meanwhile** | The approvals run one at a time, and the selection can change while they do. What was acted on and agreed to goes; what was refused stays unless it was unticked while the loop ran; what was ticked while it ran stays |
 | **A list switched or narrowed starts at its own beginning** | A page into one list is past the end of a shorter one. Where an address still lands past the end, the pager is drawn rather than a statement that the list is empty |
 | **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
 | **Assigning a selection in one product is one request** | The picked rows travel together, and the server resolves them against the same filter the list is read with. A refusal is the whole act's, so nothing is left half assigned and the selection stays as it was. Rows a colleague holds and the caller may not take stay selected, with a count saying how many Across products each row is still its own request, under the loop below (`DESIGN-access.md` § Assignment by narrowing) |
@@ -950,7 +951,8 @@ adds:
 | | |
 |---|---|
 | **Approving and rejecting** | Work on the claim, and rejecting needs a reason. Selecting several and naming a batch approves them together, so they can be undone together |
-| **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M". An extension says which claim it rests on |
+| **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M", both counted in issues. An extension says which claim it rests on |
+| **An outlier is one issue, set aside or held back at every place it sits** | One row stands for the issue, and ticking it takes every decision the claim holds about the issue, one per place. A part of the issue left in the claim is agreed to with it. The author holding rows back and the approver setting them aside take the same set |
 | **A To reaffirm tab lists the reader's own lapsed claims** | Work handed back, which the lapse message links to. One row per claim with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many places and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every claim shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like the other two |
 | **Lapsed decisions and deferrals that ran out sit underneath** | Everybody's, where the To reaffirm tab is the reader's own. The row carries the decision and not the build it was made in, so a single place is reaffirmed on the finding, where its locations are, and a whole claim from the tab or the claim's page. One list, because a deferral that ran out on code that then moved is both — asked as two, the section merged them by hand and the count over it added the two totals |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
@@ -966,7 +968,8 @@ age of seven, thirty or ninety days, a severity, an outcome and a release
 somebody sends is the same list, and changing one clears the selection. The
 exports carry the same filters, so a file taken from a narrowed screen is the
 narrowed backlog. The filters sit on the queue proper and not on the two tabs
-about the reader's own claims.
+about the reader's own claims. The To reaffirm tab has no file of its own, so it
+offers none rather than the queue under its heading.
 
 The count beside the queue on the rail, and the home screen's figure for what is
 pending your approval, add the rulings on vulnerability reports the reader may
@@ -1111,7 +1114,7 @@ something is going.
 
 | Rule | |
 |---|---|
-| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves |
+| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves. The claims waiting on a second person open the review queue narrowed to the product |
 | Counted as issues at components | The unit the findings list counts, so the page and the list it opens agree. Counting rows would report how much the dependency graph shares |
 | The product's totals are not the sum of its builds | A library carrying one issue in two builds is one thing to decide about and two build rows. The totals are counted again over the product — a sum put 15,231 at the top of a page whose own list said 7,629 |
 | "Undecided" and "agreed" are the findings list's own words | By the same definition and from the same expression. Two screens with two definitions of "decided" is how they come to disagree in front of somebody |
