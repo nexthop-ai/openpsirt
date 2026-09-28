@@ -363,10 +363,8 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 
 	if !known {
 		// Somebody an administrator recorded who has not signed in yet is that
-		// person, not a second one. An identity is a username now, so the
-		// record waiting under it is theirs — where it was qualified by the
-		// path they arrived on, the two were different rows and this arrival
-		// quietly became a second account.
+		// person, not a second one. An identity is a username, so the record
+		// waiting under it is theirs whichever path they arrived by.
 		//
 		// Their administration is left alone: it is derived below from the
 		// groups they arrived with, and reading it from here would overwrite
@@ -599,9 +597,7 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	case Direct:
 		// Only the per-product table is cleared of derived rows, because only
 		// it holds any: a group binding names a product, so nothing derives a
-		// role across the estate. `DESIGN-access.md` states that as the rule,
-		// and the delete that stood here against the estate table matched
-		// nothing on every deployment there has ever been.
+		// role across the estate.
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 			Where("source = ?", Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)
@@ -671,10 +667,9 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 // the counts describe a database the delete has not reached.
 func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	// Somebody who has left cannot administer anything: they are refused at
-	// sign-in. Counted, a deactivated bootstrap administrator made this answer
-	// true on their strength alone — so the last admin group could be unbound
-	// and the deployment started cleanly with nobody able to administer it,
-	// which is exactly what this check exists to prevent.
+	// sign-in. Counting a deactivated bootstrap administrator would let the
+	// last admin group be unbound and the deployment start with nobody able to
+	// administer it, which is what this check exists to prevent.
 	bootstrapped, err := db.NewSelect().Model((*Account)(nil)).
 		Where("is_bootstrap = ?", true).
 		Where("deactivated_at IS NULL").Count(ctx)
@@ -710,7 +705,7 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 // NameBootstrapAdmins makes configuration authoritative over who is named.
 //
 // Applied at every startup rather than once, so that losing administration is
-// recoverable by naming somebody and restarting — the documented way back in .
+// recoverable by naming somebody and restarting — the documented way back in.
 // It is a pre-authorization and not a bypass: being named grants the role and
 // admits nobody who has not authenticated.
 //
@@ -730,16 +725,13 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) ([
 	named := make([]string, 0, len(identities))
 	for _, identity := range identities {
 		// Folded, because that is how an identity is stored and how a sign-in
-		// matches one. Compared with its capitals, a name written "Alice" in
-		// configuration cleared nobody and named nobody: the row is "alice",
-		// so the NOT IN below did not spare it and the update below did not
-		// find it — the way back into a deployment nobody can administer,
-		// silently doing nothing.
+		// matches one. A name written "Alice" in configuration names the row
+		// "alice", both in the NOT IN below and in the update that names them.
 		trimmed := folded(identity)
 		if trimmed == "" {
 			continue
 		}
-		// The old form was "provider:username". Accepted silently it makes an
+		// A name written "provider:username" is refused. Accepted it makes an
 		// administrator account literally called "okta:alice" that nobody can
 		// sign in as, while the real alice is refused — and the startup check
 		// that exists to catch a deployment nobody can administer is satisfied
