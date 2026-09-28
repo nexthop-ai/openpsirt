@@ -46,7 +46,6 @@ func boundedRefusals(file *ast.File, name string) []string {
 // branches not yet merged. An entry that no longer compares fails the test
 // below, so each is removed as its branch lands.
 var awaitingRebase = []string{
-	"component_test.go:TestAnUpgradeIsHandedToWhoeverCarriesIt",
 	"enter_test.go:TestARecordedSummaryGoesThroughTheSamePolicyAsAJustification",
 }
 
