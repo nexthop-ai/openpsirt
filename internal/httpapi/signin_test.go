@@ -85,6 +85,11 @@ type signInReach struct {
 	// db is the same database the handler reads, so a test can change a
 	// setting the sign-in path is supposed to obey.
 	db *database.DB
+	// product is the one product the people above hold a role on.
+	product int64
+	// mode is how the handler is told roles are assigned. Direct unless a
+	// test says otherwise.
+	mode access.Mode
 }
 
 // Most sign-in tests pin a redirect, a cookie or a refusal, not a query, and
@@ -146,8 +151,13 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		}
 
 		provider := &stubProvider{says: &signin.Identity{Subject: "1", Username: "granted"}}
+		reach := &signInReach{
+			provider: provider, rights: rights, db: db,
+			product: product.ID, mode: access.Direct,
+		}
 		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
-			DB: db, Queue: queue.New(db, queue.DefaultOptions()),
+			Mode: func(context.Context) access.Mode { return reach.mode },
+			DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
 			// Plain HTTP, so the cookies keep their bare names: a browser
 			// will not set a `__Host-` cookie without TLS, and a harness
 			// that prefixed them here would be testing a shape no
@@ -159,7 +169,8 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 			// it was registered with, so it cannot be taken from the request.
 			BaseURL: "http://example.com",
 		})
-		fn(t, &signInReach{handler: handler, provider: provider, rights: rights, db: db})
+		reach.handler = handler
+		fn(t, reach)
 	})
 }
 
@@ -764,3 +775,44 @@ func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
 // unexported. Stated here rather than reached for, so the test says what it
 // assumes.
 const pendingLifeForTest = 10 * time.Minute
+
+// A provider's verified address is recorded for somebody who has none, however
+// roles are assigned, and an address the provider did not verify never is.
+func TestAVerifiedAddressIsRecordedInEitherMode(t *testing.T) {
+	for _, mode := range []access.Mode{access.Direct, access.GroupBound} {
+		for _, verified := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s verified=%v", mode, verified), func(t *testing.T) {
+				twoSignIn(t, func(t *testing.T, r *signInReach) {
+					ctx := t.Context()
+					if mode == access.GroupBound {
+						if err := r.rights.Bind(ctx, "platform", r.product, access.PublicRead); err != nil {
+							t.Fatal(err)
+						}
+						if err := r.rights.SwitchTo(ctx, access.GroupBound); err != nil {
+							t.Fatal(err)
+						}
+						r.mode = access.GroupBound
+					}
+					r.provider.says = &signin.Identity{
+						Subject: "1", Username: "granted", Groups: []string{"platform"},
+						Email: "granted@example.com", EmailVerified: verified,
+					}
+					if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusFound {
+						t.Fatalf("signing in answered %d: %s", rec.Code, rec.Body.String())
+					}
+					person, err := r.rights.ByIdentity(ctx, "granted")
+					if err != nil {
+						t.Fatal(err)
+					}
+					want := ""
+					if verified {
+						want = "granted@example.com"
+					}
+					if person.Email != want {
+						t.Errorf("the recorded address is %q, want %q", person.Email, want)
+					}
+				})
+			})
+		}
+	}
+}

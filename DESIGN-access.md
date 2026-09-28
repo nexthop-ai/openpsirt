@@ -1245,7 +1245,8 @@ A person's record carries a mail address, and it is optional. Somebody without
 one is told nothing outside the application and keeps the area inside it.
 
 Two sources, one field. An administrator sets it with the rest of the record,
-and a sign-in provider fills in one nobody set. Which it came from is kept, so a
+and a sign-in provider fills in one nobody set, whether roles are assigned or
+derived from groups. Which it came from is kept, so a
 provider may refresh what a provider gave and may never overwrite what somebody
 here decided. Written the other way round, an administrator correcting a wrong
 address would watch the next sign-in put it back.

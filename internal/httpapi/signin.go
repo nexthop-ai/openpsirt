@@ -225,7 +225,12 @@ func admit(r *http.Request, in Ingest, rights *access.Store, identity *signin.Id
 		if _, err := rights.AdmitByGroups(r.Context(), who, identity.Groups); err != nil {
 			return nil, err
 		}
-		return rights.MatchProvider(r.Context(), who.Provider, who.Subject, who.Username)
+		person, err := rights.MatchProvider(r.Context(), who.Provider, who.Subject, who.Username)
+		if err != nil {
+			return nil, err
+		}
+		fillEmail(r, in, rights, person, identity)
+		return person, nil
 	}
 
 	person, err := rights.MatchProvider(r.Context(), who.Provider, who.Subject, who.Username)
