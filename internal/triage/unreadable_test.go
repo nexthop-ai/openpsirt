@@ -85,7 +85,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 						Place: another, Outcome: triage.NotApplicable,
 						Justification: triage.CodeNotInExecutePath,
 						Reasoning:     "The same code path.", By: f.proposer, NeedsApproval: true,
-					}}, triage.DefaultTogetherCap)
+					}})
 					return err
 				}},
 			{"changing a comment", `FROM "claim_comment" AS "dc"`, triage.ErrNotTheirs,
