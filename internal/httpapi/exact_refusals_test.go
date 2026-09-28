@@ -28,9 +28,10 @@ func boundedRefusals(file *ast.File, name string) []string {
 			if !ok || compared.Op != token.LSS {
 				return true
 			}
-			code, ok := compared.X.(*ast.SelectorExpr)
+			// Whatever holds the status: a recorder's Code, or a plain int a
+			// helper returned. Nothing but a status is compared with 400.
 			bound, isLiteral := compared.Y.(*ast.BasicLit)
-			if ok && code.Sel.Name == "Code" && isLiteral && bound.Value == "400" {
+			if isLiteral && bound.Value == "400" {
 				found = true
 			}
 			return true
@@ -87,6 +88,7 @@ func TestABoundedRefusalIsDetected(t *testing.T) {
 func bounded() { if got.Code < 400 { fail() } }
 func exact() { if got.Code != 404 { fail() } }
 func bothSides() { if got.Code < 400 || got.Code >= 500 { fail() } }
+func bareInt() { code := ask(); if code < 400 { fail() } }
 `
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "x_test.go", source, 0)
@@ -94,7 +96,7 @@ func bothSides() { if got.Code < 400 || got.Code >= 500 { fail() } }
 		t.Fatal(err)
 	}
 	got := strings.Join(boundedRefusals(file, "x_test.go"), ",")
-	if want := "x_test.go:bounded,x_test.go:bothSides"; got != want {
+	if want := "x_test.go:bounded,x_test.go:bothSides,x_test.go:bareInt"; got != want {
 		t.Errorf("reported %q, want %q", got, want)
 	}
 }

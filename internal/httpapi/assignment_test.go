@@ -408,7 +408,7 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 		// And the rule still holds for somebody else, which is what makes the
 		// above a spelling rather than a hole.
 		if got := asPerson(t, r, "triager", http.MethodPut, at,
-			`{"person":"reader"}`); got.Code < 300 {
+			`{"person":"reader"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("somebody without the right gave work away, answering %d", got.Code)
 		}
 		_ = place

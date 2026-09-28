@@ -24,7 +24,6 @@ import (
 func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		cat := catalog.NewStore(db.DB)
 		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
 		if err != nil {

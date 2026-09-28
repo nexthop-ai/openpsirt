@@ -13,8 +13,10 @@ import (
 //
 // A bound such as `got.Code < 400` also holds for a 404 from a renamed route, a
 // 422 for an unrelated body rule, a 403 that says a hidden product exists, and
-// the 500 chi's recovery middleware makes of a panic. An exact status is the
-// only assertion none of those satisfy.
+// the 500 chi's recovery middleware makes of a panic. An exact status rules
+// out every failure but the one that shares it: a 404 refusal still needs its
+// own sentence checked, or the same path answered successfully beside it, to
+// tell it from a route that moved.
 func refusedWith(t *testing.T, got *httptest.ResponseRecorder, want int) {
 	t.Helper()
 	if got.Code != want {
