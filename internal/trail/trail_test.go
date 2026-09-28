@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -28,11 +29,15 @@ func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)
 }
 
 func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
-	// Covered only through handlers, which run on two engines, neither this
-	// store's writes nor the ordering its reader depends on ever executes on
-	// MySQL or MariaDB.
+	// The store's writes and the ordering its reader depends on run here on
+	// all four engines; the handlers above it run on two.
 	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
 		ctx := t.Context()
+		// Every row shares one instant, so the order below is the tie-break
+		// alone: changes written inside one microsecond — one request
+		// granting several roles — are the case a paged reader meets.
+		at := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		s.SetClock(func() time.Time { return at })
 
 		// Absent before means nobody had set it; absent after means it was
 		// cleared. The two are different acts and a blank cannot tell them
@@ -64,7 +69,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 		// order an engine happens to hold them, which makes a paged reader
 		// skip and repeat rows.
 		for i := 1; i < len(all); i++ {
-			if all[i-1].ID < all[i].ID {
+			if all[i-1].ID <= all[i].ID {
 				t.Fatalf("the trail is not newest first: %d before %d",
 					all[i-1].ID, all[i].ID)
 			}
@@ -166,8 +171,8 @@ func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
 	})
 }
 
-// TestTheTrailRefusesAReaderWhoDoesNotAdminister pins the check that moved out
-// of the handler.
+// TestTheTrailRefusesAReaderWhoDoesNotAdminister pins that the store, rather
+// than a handler, refuses a reader who does not administer.
 //
 // A row names who was brought into which case, and an undisclosed case is
 // among them, so this is a question about who may read a query rather than a
@@ -243,11 +248,10 @@ func TestARecordCannotOverflowItsOwnColumn(t *testing.T) {
 // TestAMaximalCaseFitsTheColumn pins the width against the widest thing
 // recorded.
 //
-// Nothing held the number in place: written at a name's own width the column
-// took every row the fixtures happen to compose, because none of them is
-// anywhere near maximal. The overflow comes straight back the next time a
-// name's width moves or a composition gains a fourth part — and with the
-// record inside the act, what it takes down is the act.
+// The column is sized for three maximal names and their separators. The
+// fixtures compose nothing near maximal, so a composition gaining a part or a
+// name widening overflows the column only here — and with the record inside
+// the act, an overflow takes down the act.
 func TestAMaximalCaseFitsTheColumn(t *testing.T) {
 	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
 		ctx := t.Context()
@@ -341,6 +345,54 @@ func TestConfigurationsAdministratorsAreRecordedAgainstConfiguration(t *testing.
 		}
 		if len(changes) != 1 || changes[0].Actor != trail.ByPerson || changes[0].Person() != admin.ID {
 			t.Errorf("a person's change was recorded as %+v", changes)
+		}
+	})
+}
+
+// TestTheTrailPeriodIsHalfOpen pins the boundaries of a period.
+//
+// An audit asks what changed in the year a certificate covers, and the next
+// year's audit asks the same of the year after. A change stamped exactly at
+// the boundary belongs to one of the two and never both, so the start is
+// included and the end is not.
+func TestTheTrailPeriodIsHalfOpen(t *testing.T) {
+	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+		ctx := t.Context()
+		boundary := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		for _, one := range []struct {
+			name string
+			at   time.Time
+		}{
+			{"before", boundary.Add(-time.Second)},
+			{"at", boundary},
+			{"after", boundary.Add(time.Second)},
+		} {
+			s.SetClock(func() time.Time { return one.at })
+			if err := s.Record(ctx, by, trail.Setting, one.name, nil, trail.Said("x", true)); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		for _, want := range []struct {
+			over  trail.Over
+			names []string
+		}{
+			{trail.Over{Since: boundary}, []string{"after", "at"}},
+			{trail.Over{Until: boundary}, []string{"before"}},
+			{trail.Over{Since: boundary, Until: boundary.Add(time.Second)}, []string{"at"}},
+		} {
+			got, total, err := s.Changes(ctx, by, "", want.over, 100, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var names []string
+			for _, c := range got {
+				names = append(names, c.Name)
+			}
+			if strings.Join(names, ",") != strings.Join(want.names, ",") || total != len(want.names) {
+				t.Errorf("from %v to %v answered %v (total %d), want %v",
+					want.over.Since, want.over.Until, names, total, want.names)
+			}
 		}
 	})
 }
