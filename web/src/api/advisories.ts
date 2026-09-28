@@ -14,10 +14,10 @@ import { unwrap } from "./queries";
 // what it called would leave the agreement panel saying an agreement stands
 // against a document nobody has read.
 
-export type Listed = Body<"AdvisoryListedBody">;
+type Listed = Body<"AdvisoryListedBody">;
 export type Advisory = Body<"AdvisoryBody">;
 export type Covered = Body<"CoveredBody">;
-export type Issuance = Body<"IssuanceBody">;
+type Issuance = Body<"IssuanceBody">;
 
 // Everything an act against an advisory can move.
 //

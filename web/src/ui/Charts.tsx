@@ -23,7 +23,7 @@ import { BANDS as LADDER, COLORS } from "./severities";
 // legend — the panel says what they are, and a reading underneath says what
 // they mean, which is the part a number cannot say for itself.
 
-export type Point = {
+type Point = {
   at?: string;
   open?: number;
   opened?: number;

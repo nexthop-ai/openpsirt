@@ -20,7 +20,7 @@ import { keyOf } from "./treeshape";
 
 export type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
 
-export type WayDown = {
+type WayDown = {
   steps: Step[];
   // Rootless says the walk up from the first step reached nothing, so what is
   // above it is unknown rather than absent.

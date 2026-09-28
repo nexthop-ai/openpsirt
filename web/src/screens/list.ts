@@ -306,7 +306,7 @@ export function num(raw: string | null, least: number, most: number): number | u
 // so the summary above the list can offer one chip each and take one back off.
 // A comma-joined value is still read, because that is how it was written
 // before and an address somebody saved should still open the list they saved.
-export function hiddenIn(params: URLSearchParams): string[] {
+function hiddenIn(params: URLSearchParams): string[] {
   return [
     ...new Set(
       params

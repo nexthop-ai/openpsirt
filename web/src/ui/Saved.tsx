@@ -11,7 +11,7 @@ import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 
-export type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
+type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
 
 // The outcomes a saved filter may prepare, driven off the generated request
 // type rather than retyped as options. Fewer than a person may record one at a

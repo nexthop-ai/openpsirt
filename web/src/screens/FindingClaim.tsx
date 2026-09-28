@@ -565,7 +565,7 @@ export function PreviousCard({
   );
 }
 
-export function Prior({
+function Prior({
   item,
   at,
   undecided,

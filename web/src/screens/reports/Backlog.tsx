@@ -37,7 +37,7 @@ const WEEKS = [4, 13, 26, 52, 104] as const;
 // weeksAsked is the window the address asks for, checked rather than trusted:
 // it reaches the server, which refuses what it cannot answer, and a value that
 // is not a whole number of weeks in range falls back to a quarter.
-export function weeksAsked(params: URLSearchParams, fallback = 13): number {
+function weeksAsked(params: URLSearchParams, fallback = 13): number {
   const asked = params.get("weeks");
   if (asked === null) return fallback;
   const weeks = Number(asked);

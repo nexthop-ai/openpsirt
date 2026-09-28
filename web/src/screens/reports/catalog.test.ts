@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { CATALOG, leadsTo, reportAt, scopeWords } from "./catalog";
+import { CATALOG, leadsTo, scopeWords } from "./catalog";
 import { PAGES } from "./Report";
 import { matchPath } from "react-router-dom";
 import { ROUTES as NAMED } from "../../app/App";
@@ -28,7 +28,7 @@ describe("the catalog and the addresses that answer it", () => {
 
 describe("where a catalog row leads", () => {
   it("addresses a report the catalog owns by its name", () => {
-    const overview = reportAt("program-overview");
+    const overview = CATALOG.find((report) => report.slug === "program-overview");
     expect(overview).toBeDefined();
     expect(leadsTo(overview!, {})).toEqual({ to: "/reports/program-overview", why: null });
   });
@@ -56,10 +56,6 @@ describe("where a catalog row leads", () => {
   it("leads somewhere that needs nothing picked", () => {
     const disclosing = CATALOG.find((report) => report.name === "Embargo and disclosure")!;
     expect(leadsTo(disclosing, {}).to).toBe("/disclosing");
-  });
-
-  it("holds no name the catalog does not", () => {
-    expect(reportAt("nothing-of-the-sort")).toBeUndefined();
   });
 });
 

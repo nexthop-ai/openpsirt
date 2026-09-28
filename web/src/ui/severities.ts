@@ -39,7 +39,7 @@ export const RECORDABLE = [...BANDS, "negligible", "none"] as const;
 // rather than in the ladder above.
 export const THE_LINE = ["everything", ...FLOORS] as const;
 
-export type Band = (typeof BANDS)[number];
+type Band = (typeof BANDS)[number];
 
 // COLORS is the token each band is drawn in.
 //

@@ -50,7 +50,7 @@ function titled(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-export const FIX_STATES = [
+const FIX_STATES = [
   ["", "Any"],
   ["fixed", "Fixed upstream"],
   ["none", "No fix released"],
@@ -61,7 +61,7 @@ export const FIX_STATES = [
 
 // How a group is spread over the variants of a branch. "Only this variant"
 // is offered where one is named, because it is a question about that one.
-export const SPREADS = [
+const SPREADS = [
   ["", "Any"],
   ["only", "Only this variant"],
   ["every", "Every variant"],
@@ -102,7 +102,7 @@ export const ASSIGNED = [
   ["nobody", "No one"],
 ] as const;
 
-export const PLANNED = [
+const PLANNED = [
   ["either", "Covered or not"],
   ["unplanned", "Not covered by a planned upgrade"],
   ["planned", "Covered by a planned upgrade"],
@@ -111,23 +111,23 @@ export const PLANNED = [
 // The sort of release, and its support. Two questions
 // kept apart because they are two: a tag can be in support and a branch can be
 // past its date.
-export const RELEASES = [
+const RELEASES = [
   ["branch", "Branches"],
   ["tag", "Tags"],
 ] as const;
 
-export const SUPPORT = [
+const SUPPORT = [
   ["in-support", "In support"],
   ["past-eol", "Past end-of-life"],
 ] as const;
 
-export const ORIGINS = [
+const ORIGINS = [
   ["", "Any"],
   ["scanner", "Scanner"],
   ["manual", "Entered by hand"],
 ] as const;
 
-export const VEX_STATUS = [
+const VEX_STATUS = [
   ["", "Any"],
   ["not_affected", "Not affected"],
   ["affected", "Affected"],
@@ -166,7 +166,7 @@ export const DEADLINES = [
 // itself. What it has no way to do is offer it, and the durable answer to that
 // is the kinds actually present travelling with the read rather than a longer
 // list here — which is a question the server does not answer yet.
-export const ECOSYSTEMS = [
+const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
   ["golang", "Go (golang)"],
@@ -190,7 +190,7 @@ export const ECOSYSTEMS = [
 // different words, and a label claiming they are the same word would be a
 // reading the tool deliberately does not make. The label says which format the
 // word comes from for the same reason.
-export const DECLARED_AS = [
+const DECLARED_AS = [
   ["required", "required (CycloneDX)"],
   ["optional", "optional (CycloneDX or SPDX)"],
   ["excluded", "excluded (CycloneDX)"],

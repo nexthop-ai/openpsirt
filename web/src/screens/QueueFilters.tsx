@@ -9,13 +9,7 @@ import type { paths } from "../api/schema";
 // The review queue's filters, as the address carries them and the queue and
 // its export are asked with. One list, so the screen, the file and a link
 // somebody sends ask the same question.
-export const QUEUE_FILTERS = [
-  "proposed_by",
-  "older_than",
-  "severity",
-  "outcome",
-  "release",
-] as const;
+const QUEUE_FILTERS = ["proposed_by", "older_than", "severity", "outcome", "release"] as const;
 
 // The filters as the queue's own parameters declare them.
 type Narrowing = Pick<

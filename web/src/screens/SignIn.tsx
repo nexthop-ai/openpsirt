@@ -46,7 +46,7 @@ const triedKey = "signin-forwarded";
 // One value, exported, so that the screen and the sign-out button cannot drift
 // apart: a test asserting the address sign-out actually goes to is what catches
 // one of them changing.
-export const signedOut = "signed-out";
+const signedOut = "signed-out";
 export const signedOutHere = "/?" + signedOut;
 
 function alreadyTried(): boolean {

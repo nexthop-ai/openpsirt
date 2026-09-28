@@ -8,11 +8,11 @@ import { unwrap } from "./queries";
 // The review queue at the grain of a claim: one proposer's action, however
 // many decisions it wrote. The row carries the claim, what it wrote, how far
 // it reaches, and — for a claim over many issues — its outliers.
-export type QueueRow = Body<"WaitingBody">;
+type QueueRow = Body<"WaitingBody">;
 export type Outliers = Body<"OutliersBody">;
-export type FindingRef = Body<"FindingRefBody">;
+type FindingRef = Body<"FindingRefBody">;
 // The case against agreeing.
-export type Counter = Body<"CounterBody">;
+type Counter = Body<"CounterBody">;
 
 export type Claim = {
   key: string;

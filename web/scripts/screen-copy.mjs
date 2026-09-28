@@ -27,7 +27,7 @@ export const BOUND = 20;
 // Paragraphs that stay longer, each with the reason. Keyed on file and the
 // paragraph's first words, so an edit that moves it keeps it allowed and an
 // edit that rewrites it has to earn its place again.
-export const ALLOWED = new Map([]);
+const ALLOWED = new Map([]);
 
 // Props that render as standing text: a field's hint and an empty state's
 // detail. A title is a tooltip, which is where clarification belongs.
@@ -128,7 +128,7 @@ export function proseIn(text, file = "x.tsx", bound = BOUND) {
 
 // A control whose whole text names nothing: what it leads to or does is left
 // for the reader to guess from where it sits.
-export const VAGUE = new Set([
+const VAGUE = new Set([
   "read them",
   "see them",
   "read more",

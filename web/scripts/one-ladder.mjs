@@ -22,7 +22,7 @@ const src = path.join(here, "..", "src");
 // Where the ladder is allowed to be written down.
 const home = path.join(src, "ui", "severities.ts");
 
-export const RUNGS = new Set([
+const RUNGS = new Set([
   "critical",
   "high",
   "medium",

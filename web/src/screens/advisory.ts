@@ -66,7 +66,7 @@ export function missing(covers: number, agreed: number): Missing {
 
 // One flaw somebody may name on this advisory, and whether it is fixed
 // wherever it was found.
-export type Nameable = { vulnerability: string; summary: string; fixed: boolean };
+type Nameable = { vulnerability: string; summary: string; fixed: boolean };
 
 // The flaws recorded in a product that this advisory does not already name
 // there.

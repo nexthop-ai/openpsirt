@@ -326,6 +326,12 @@ modifier, at the same specificity. The later rule wins, so a chip in a table cel
 draws as a block-level callout. A modifier's bare rule may set a font and a
 color and nothing that shapes the box. A web test reads every stylesheet for it.
 
+An export of the interface that nothing else names. A web test reads every
+module and fails on an export no other file mentions, which is the interface's
+half of `make unreachable`. A test counts as a caller, as it does there. It
+matches names rather than walking imports, so a name that is also an ordinary
+word elsewhere passes.
+
 ## Database engines
 
 The suite runs against SQLite alone unless pointed at real servers, and a

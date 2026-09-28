@@ -672,7 +672,7 @@ function bundlesFile(
 // somebody follows, not a request this page makes: the browser fetches it with
 // the session it already has. The filters are the ones on screen, so the file
 // and the table cannot disagree about what was asked for.
-export function componentsFile(
+function componentsFile(
   at: { product: string; stream?: string; variant?: string },
   query: Record<string, unknown>,
   format: string,

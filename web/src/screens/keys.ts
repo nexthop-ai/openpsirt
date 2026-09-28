@@ -13,7 +13,7 @@
 // the part worth pinning: a triager typing "j" into a justification does not
 // mean "next row".
 
-export type Meaning = "next" | "previous" | "open" | "close" | "openFull" | null;
+type Meaning = "next" | "previous" | "open" | "close" | "openFull" | null;
 
 // A focused control that takes typing, in which case no key here means
 // anything. A contenteditable is the editor's own body, which is where a
