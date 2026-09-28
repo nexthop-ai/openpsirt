@@ -175,7 +175,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, WasSaidBody{
 				Version: row.Ordinal, Body: row.Body,
-				ReplacedAt: row.ReplacedAt.Format(time.RFC3339),
+				ReplacedAt: row.ReplacedAt.UTC().Format(time.RFC3339),
 			})
 		}
 		return out, nil
@@ -252,10 +252,10 @@ func notesOut(ctx context.Context, in Ingest, notes []triage.IssueNote) (*listOu
 			ID: note.ID, Body: note.Body,
 			WrittenBy:     who.identity(note.WrittenBy),
 			WrittenByName: who.label(note.WrittenBy),
-			WrittenAt:     note.WrittenAt.Format(time.RFC3339),
+			WrittenAt:     note.WrittenAt.UTC().Format(time.RFC3339),
 		}
 		if note.EditedAt != nil {
-			body.EditedAt = note.EditedAt.Format(time.RFC3339)
+			body.EditedAt = note.EditedAt.UTC().Format(time.RFC3339)
 		}
 		out.Body.Items = append(out.Body.Items, body)
 	}

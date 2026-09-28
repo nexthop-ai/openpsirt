@@ -554,7 +554,7 @@ func registerTriage(api huma.API, in Ingest) {
 				Finding:   named[i].Finding,
 			}
 			if row.When != nil {
-				entry.When = row.When.Format(time.RFC3339)
+				entry.When = row.When.UTC().Format(time.RFC3339)
 			}
 			if row.By != 0 {
 				entry.By, entry.ByName = who.identity(row.By), who.label(row.By)

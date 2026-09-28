@@ -191,7 +191,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		body.ToldTotal = toldTotal
 		for _, row := range told {
 			body.Told = append(body.Told, ToldBody{
-				At: row.CreatedAt.Format(time.RFC3339), Kind: string(row.Kind),
+				At: row.CreatedAt.UTC().Format(time.RFC3339), Kind: string(row.Kind),
 				Body: row.Body, Link: row.Link, Private: row.Private,
 				Read: row.ReadAt != nil, Cleared: row.ClearedAt != nil,
 			})
@@ -231,7 +231,7 @@ func orAbsent(at *time.Time) string {
 	if at == nil {
 		return ""
 	}
-	return at.Format(time.RFC3339)
+	return at.UTC().Format(time.RFC3339)
 }
 
 // registerDeactivation is somebody leaving, and somebody coming back.
@@ -308,7 +308,7 @@ func registerDeactivation(api huma.API, a Administering) {
 					return wentWrong(a.Logger, "when they left could not be read", err)
 				}
 				if again.DeactivatedAt != nil {
-					out.Body.Since = again.DeactivatedAt.Format(time.RFC3339)
+					out.Body.Since = again.DeactivatedAt.UTC().Format(time.RFC3339)
 				}
 				return nil
 			}

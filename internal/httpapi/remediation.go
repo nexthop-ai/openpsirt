@@ -246,7 +246,7 @@ func repeatBodies(rows []triage.Repeated) []RepeatBody {
 			Standing:  row.Standing,
 		}
 		if !row.LastUntil.IsZero() {
-			item.LastUntil = row.LastUntil.Format(time.RFC3339)
+			item.LastUntil = row.LastUntil.UTC().Format(time.RFC3339)
 		}
 		out = append(out, item)
 	}

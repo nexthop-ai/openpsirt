@@ -100,7 +100,7 @@ func registerReaffirmMany(api huma.API, in Ingest) {
 				Now:        finding.SeverityWord(row.Now),
 			}
 			if row.LapsedAt != nil {
-				entry.LapsedAt = row.LapsedAt.Format(time.RFC3339)
+				entry.LapsedAt = row.LapsedAt.UTC().Format(time.RFC3339)
 			}
 			out.Body.Items = append(out.Body.Items, entry)
 		}

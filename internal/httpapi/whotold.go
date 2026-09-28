@@ -251,13 +251,13 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 			FoundHere:  row.FoundHere,
 			RecordedBy: who.identity(row.RecordedBy), RecordedByName: who.label(row.RecordedBy),
-			RecordedAt: row.RecordedAt.Format(time.RFC3339),
+			RecordedAt: row.RecordedAt.UTC().Format(time.RFC3339),
 		}
 		if row.ReceivedOn != nil {
 			body.Received = row.ReceivedOn.Format(time.DateOnly)
 		}
 		if row.AcknowledgedAt != nil {
-			body.Acknowledged = row.AcknowledgedAt.Format(time.RFC3339)
+			body.Acknowledged = row.AcknowledgedAt.UTC().Format(time.RFC3339)
 		}
 		if row.AcknowledgedBy != nil {
 			body.AcknowledgedBy = who.identity(*row.AcknowledgedBy)
@@ -280,7 +280,7 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			}
 		}
 		if row.EvaluatedAt != nil {
-			body.Evaluated = row.EvaluatedAt.Format(time.RFC3339)
+			body.Evaluated = row.EvaluatedAt.UTC().Format(time.RFC3339)
 		}
 		if row.EvaluatedBy != nil {
 			body.EvaluatedBy = who.identity(*row.EvaluatedBy)

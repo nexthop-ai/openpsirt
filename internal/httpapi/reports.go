@@ -317,7 +317,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		out.Body.Items = make([]ReleasePointBody, 0, len(points))
 		for _, point := range points {
 			out.Body.Items = append(out.Body.Items, ReleasePointBody{
-				Stream: point.Stream, Cut: point.Cut.Format(time.RFC3339),
+				Stream: point.Stream, Cut: point.Cut.UTC().Format(time.RFC3339),
 				StreamName: point.StreamName,
 				Open:       point.Open, BySeverity: point.BySeverity,
 			})

@@ -111,7 +111,7 @@ func registerVEX(api huma.API, in Ingest) {
 			for _, one := range gone {
 				out.Body.Items = append(out.Body.Items, VEXIssuanceBody{
 					Version: one.Ordinal, Digest: one.Digest, IssuedBy: one.IssuedBy,
-					IssuedAt: one.IssuedAt.Format(time.RFC3339),
+					IssuedAt: one.IssuedAt.UTC().Format(time.RFC3339),
 				})
 			}
 			return out, nil
@@ -166,7 +166,7 @@ func registerVEX(api huma.API, in Ingest) {
 				VEXIssuanceBody: VEXIssuanceBody{
 					Version: recorded.Ordinal, Digest: recorded.Digest,
 					IssuedBy: subject.Identity,
-					IssuedAt: recorded.IssuedAt.Format(time.RFC3339),
+					IssuedAt: recorded.IssuedAt.UTC().Format(time.RFC3339),
 				},
 				Document: json.RawMessage(recorded.Document),
 			}}, nil

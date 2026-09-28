@@ -388,7 +388,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 				ID: revision.ID, Ordinal: revision.Ordinal, Body: revision.Body,
 				WrittenBy:     who.identity(revision.WrittenBy),
 				WrittenByName: who.label(revision.WrittenBy),
-				WrittenAt:     revision.WrittenAt.Format(time.RFC3339),
+				WrittenAt:     revision.WrittenAt.UTC().Format(time.RFC3339),
 			})
 		}
 		return out, nil
@@ -439,10 +439,10 @@ func registerTriageReading(api huma.API, in Ingest) {
 				ID: approval.ID, RevisionID: approval.RevisionID,
 				ApprovedBy:     who.identity(approval.ApprovedBy),
 				ApprovedByName: who.label(approval.ApprovedBy),
-				ApprovedAt:     approval.ApprovedAt.Format(time.RFC3339),
+				ApprovedAt:     approval.ApprovedAt.UTC().Format(time.RFC3339),
 			}
 			if approval.WithdrawnAt != nil {
-				body.WithdrawnAt = approval.WithdrawnAt.Format(time.RFC3339)
+				body.WithdrawnAt = approval.WithdrawnAt.UTC().Format(time.RFC3339)
 			}
 			if approval.Batch != nil {
 				body.Batch = *approval.Batch
@@ -515,7 +515,7 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 			Reasoning:      reasoning[decision.ID],
 			ProposedBy:     who.identity(decision.ProposedBy),
 			ProposedByName: who.label(decision.ProposedBy),
-			ProposedAt:     decision.ProposedAt.Format(time.RFC3339),
+			ProposedAt:     decision.ProposedAt.UTC().Format(time.RFC3339),
 			AgeDays:        int(store.Age(&decision).Hours() / 24),
 		})
 	}

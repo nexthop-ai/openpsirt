@@ -633,7 +633,7 @@ func registerMovements(api huma.API, in Ingest) {
 				Was: row.Was.Format(time.DateOnly), Until: row.Until.Format(time.DateOnly),
 				By:      who.identity(row.AskedBy),
 				ByName:  who.label(row.AskedBy),
-				AskedAt: row.AskedAt.Format(time.RFC3339),
+				AskedAt: row.AskedAt.UTC().Format(time.RFC3339),
 				Reason:  row.Reason,
 				// Said rather than left to be worked out: the person who asked
 				// may not be the one who agrees, and a row somebody cannot act

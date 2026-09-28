@@ -341,7 +341,7 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 			Disposition: string(row.Disposition), Reasoning: row.Reasoning,
 			Reports: row.References, State: rulingState(row),
 			ProposedBy: who.identity(row.ProposedBy), ProposedByName: who.label(row.ProposedBy),
-			ProposedAt: row.ProposedAt.Format(time.RFC3339),
+			ProposedAt: row.ProposedAt.UTC().Format(time.RFC3339),
 			Yours:      row.ProposedBy == subject.ID,
 		}
 		if body.Reports == nil {
@@ -354,13 +354,13 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 			body.ApprovedBy, body.ApprovedByName = who.identity(*row.ApprovedBy), who.label(*row.ApprovedBy)
 		}
 		if row.ApprovedAt != nil {
-			body.ApprovedAt = row.ApprovedAt.Format(time.RFC3339)
+			body.ApprovedAt = row.ApprovedAt.UTC().Format(time.RFC3339)
 		}
 		if row.WithdrawnBy != nil {
 			body.WithdrawnBy, body.WithdrawnByName = who.identity(*row.WithdrawnBy), who.label(*row.WithdrawnBy)
 		}
 		if row.WithdrawnAt != nil {
-			body.WithdrawnAt = row.WithdrawnAt.Format(time.RFC3339)
+			body.WithdrawnAt = row.WithdrawnAt.UTC().Format(time.RFC3339)
 		}
 		out = append(out, body)
 	}

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -1088,13 +1089,15 @@ func TestACaseIsRecordedByTheNamesItResolvedTo(t *testing.T) {
 // The list of administrative changes and its file state a change's moment
 // alike, in UTC.
 //
-// The list formatted the time the driver handed back behind a literal Z. A
-// driver hands back a time in the process's own zone, so on a deployment not
-// running in UTC the list was off by the zone's offset and disagreed with the
-// file, which converts first. Run with TZ set to a zone other than UTC to see
-// the difference.
+// A driver hands back a time in the process's own zone, so a moment formatted
+// without converting it first is off by the zone's offset. The process zone is
+// set away from UTC here, which is why the test runs alone: the zone is the
+// whole process's.
 func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	was := time.Local
+	time.Local = time.FixedZone("east", 5*3600)
+	t.Cleanup(func() { time.Local = was })
+	reachOn(t, castSeed.Alone, func(t *testing.T, r *reach) {
 		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
 			`{"value":"high"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
@@ -1118,6 +1121,9 @@ func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
 		}
 		if trail.Items[0].At != body[1][at] {
 			t.Errorf("the list says %s and the file says %s", trail.Items[0].At, body[1][at])
+		}
+		if !strings.HasSuffix(trail.Items[0].At, "Z") {
+			t.Errorf("the list states %s, which is not UTC", trail.Items[0].At)
 		}
 	})
 }

@@ -53,10 +53,10 @@ func registerComments(api huma.API, in Ingest) {
 				ID: comment.ID, Body: comment.Body,
 				WrittenBy:     who.identity(comment.WrittenBy),
 				WrittenByName: who.label(comment.WrittenBy),
-				WrittenAt:     comment.WrittenAt.Format(time.RFC3339),
+				WrittenAt:     comment.WrittenAt.UTC().Format(time.RFC3339),
 			}
 			if comment.EditedAt != nil {
-				body.EditedAt = comment.EditedAt.Format(time.RFC3339)
+				body.EditedAt = comment.EditedAt.UTC().Format(time.RFC3339)
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
@@ -118,7 +118,7 @@ func registerComments(api huma.API, in Ingest) {
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, WasSaidBody{
 				Version: row.Ordinal, Body: row.Body,
-				ReplacedAt: row.ReplacedAt.Format(time.RFC3339),
+				ReplacedAt: row.ReplacedAt.UTC().Format(time.RFC3339),
 			})
 		}
 		return out, nil

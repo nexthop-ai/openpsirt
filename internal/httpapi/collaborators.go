@@ -258,7 +258,7 @@ func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64
 		body := CollaboratorBody{
 			Identity: handles[id], AddedBy: by.identity(row.AddedBy),
 			AddedByName: by.label(row.AddedBy),
-			AddedAt:     row.AddedAt.Format(time.RFC3339),
+			AddedAt:     row.AddedAt.UTC().Format(time.RFC3339),
 		}
 		body.Name = labelBeside(names[id], handles[id])
 		out = append(out, body)

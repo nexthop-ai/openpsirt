@@ -188,7 +188,7 @@ func buildCounts(s finding.Standing) BuildCountsBody {
 		Medium: s.ByBand["medium"], Low: s.ByBand["low"],
 	}
 	if s.LastScanned != nil {
-		body.LastScannedAt = s.LastScanned.Format(time.RFC3339)
+		body.LastScannedAt = s.LastScanned.UTC().Format(time.RFC3339)
 	}
 	return body
 }
