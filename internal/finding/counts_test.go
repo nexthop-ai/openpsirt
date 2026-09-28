@@ -71,8 +71,12 @@ func TestCountingWhatIsOpenAgreesWithTheListAndCarriesVisibility(t *testing.T) {
 
 func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 	// The three levels answer different questions and must not answer each
-	// other's: a grouping that ignored its level would still look right on a
-	// fixture with one product, one branch and one variant.
+	// other's. The issue is open in two releases of one product, built as one
+	// variant, so each level has a different number of buckets and each
+	// bucket is keyed by what that level names.
+	//
+	// Verified by grouping every level by the stream's column: the product
+	// and variant levels then answer two buckets keyed by streams.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -81,22 +85,34 @@ func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+		release := f.anotherBuild(t, "v2")
+		f.shippedTo(t, release, twoConsumers())
+		if _, err := f.store.Apply(ctx, release, f.runOn(t, release), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
 		who := f.holding(t, access.PublicRead)
 
-		for _, level := range []finding.Level{
-			finding.ByProduct, finding.ByStream, finding.ByVariant,
+		for _, want := range []struct {
+			level   finding.Level
+			buckets int
+			holds   int64
+		}{
+			{finding.ByProduct, 1, f.productID},
+			{finding.ByStream, 2, *f.scope.StreamID},
+			{finding.ByVariant, 1, *f.scope.VariantID},
 		} {
-			counts, err := f.store.OpenBy(ctx, who, finding.Scope{}, level)
+			counts, err := f.store.OpenBy(ctx, who, finding.Scope{}, want.level)
 			if err != nil {
-				t.Fatalf("level %d: %v", level, err)
+				t.Fatalf("level %d: %v", want.level, err)
 			}
-			if len(counts) != 1 {
-				t.Errorf("level %d grouped into %d buckets, want 1", level, len(counts))
+			if len(counts) != want.buckets {
+				t.Errorf("level %d grouped into %d buckets, want %d: %v",
+					want.level, len(counts), want.buckets, counts)
 			}
-			for _, n := range counts {
-				if n != 1 {
-					t.Errorf("level %d counted %d, want the one issue at one component", level, n)
-				}
+			if counts[want.holds] == 0 {
+				t.Errorf("level %d has no bucket for %d: %v", want.level, want.holds, counts)
 			}
 		}
 
