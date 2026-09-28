@@ -288,3 +288,13 @@ func TestStreamedExportsPastTheSlotsAreRefused(t *testing.T) {
 		again()
 	}
 }
+
+// SQLite's pool is one connection, so a streamed export is given one slot
+// there: a second would wait for the connection the first holds.
+func TestSQLiteGivesStreamedExportsOneSlot(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		if got := cap(newStreamSlots(db)); got != 1 {
+			t.Errorf("SQLite's one connection is shared by %d streamed exports", got)
+		}
+	})
+}

@@ -7,8 +7,12 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/uptrace/bun/dialect"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -100,6 +104,100 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 			t.Errorf("somebody holding no read role exported the register: %d", refused.Code)
 		}
 	})
+}
+
+// Register exports held open by slow readers take the slots, and the next one
+// is refused with a time to ask again rather than queued for a connection.
+// On SQLite, whose pool is one connection, one export takes the only slot.
+func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register.csv"
+		ask := func() *http.Request {
+			req := httptest.NewRequest(http.MethodGet, at, nil)
+			req.Header.Set(testHeader, "triager")
+			fromOurOwnPage(req)
+			return req
+		}
+
+		var held []*heldOpen
+		var finishing []chan struct{}
+		defer func() {
+			for i, w := range held {
+				close(w.release)
+				<-finishing[i]
+			}
+		}()
+		var refused *heldOpen
+		for range 64 {
+			w := &heldOpen{header: http.Header{}, started: make(chan struct{}),
+				release: make(chan struct{})}
+			finished := make(chan struct{})
+			go func() {
+				defer close(finished)
+				r.handler.ServeHTTP(w, ask())
+			}()
+			select {
+			case <-w.started:
+				held = append(held, w)
+				finishing = append(finishing, finished)
+				continue
+			case <-finished:
+				refused = w
+			}
+			break
+		}
+		if refused == nil {
+			t.Fatal("64 exports held open at once, and none was refused")
+		}
+		if refused.code != http.StatusServiceUnavailable {
+			t.Fatalf("an export past the slots answered %d", refused.code)
+		}
+		if refused.header.Get("Retry-After") == "" {
+			t.Error("an export past the slots was not told when to ask again")
+		}
+		if r.db.Dialect().Name() == dialect.SQLite && len(held) != 1 {
+			t.Errorf("SQLite held %d exports open at once, where its pool is one connection",
+				len(held))
+		}
+
+		// A slot given back is taken by the next export, which is written whole.
+		close(held[0].release)
+		<-finishing[0]
+		held, finishing = held[1:], finishing[1:]
+		got := asPerson(t, r, "triager", http.MethodGet, at, "")
+		if got.Code != http.StatusOK || !contains(got.Body.String(), "CVE-2026-9999") {
+			t.Errorf("an export after a slot was given back answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+// heldOpen is a response whose reader stops at the first byte of a successful
+// body until it is released, as a slow client's socket does.
+type heldOpen struct {
+	header  http.Header
+	code    int
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (h *heldOpen) Header() http.Header { return h.header }
+func (h *heldOpen) WriteHeader(code int) {
+	if h.code == 0 {
+		h.code = code
+	}
+}
+func (h *heldOpen) Write(b []byte) (int, error) {
+	if h.code == 0 {
+		h.code = http.StatusOK
+	}
+	if h.code == http.StatusOK {
+		h.once.Do(func() { close(h.started) })
+		<-h.release
+	}
+	return len(b), nil
 }
 
 func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
