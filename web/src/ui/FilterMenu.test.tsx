@@ -2,13 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mounted } from "../test/mount";
 import { FilterMenu, type MenuOption } from "./FilterMenu";
-
-declare global {
-  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
-}
 
 const STATES: readonly MenuOption[] = [
   ["", "Any"],
@@ -23,9 +19,8 @@ const STEPS: readonly MenuOption[] = [
   ["always", "Always"],
 ];
 
-let host: HTMLDivElement;
+const mount = mounted();
 let outside: HTMLButtonElement;
-let root: Root;
 let last: string[] = [];
 
 function Harness({ multi, start }: { multi: boolean; start: string[] }) {
@@ -45,26 +40,22 @@ function Harness({ multi, start }: { multi: boolean; start: string[] }) {
 }
 
 beforeEach(() => {
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   last = [];
-  host = document.createElement("div");
   outside = document.createElement("button");
-  document.body.append(host, outside);
-  root = createRoot(host);
+  document.body.append(outside);
 });
 
 afterEach(() => {
-  act(() => root.unmount());
-  host.remove();
   outside.remove();
 });
 
-const trigger = () => host.querySelector<HTMLButtonElement>(".filterbtn")!;
-const menu = () => host.querySelector('[role="menu"]');
-const items = () => Array.from(host.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'));
+const trigger = () => mount.host().querySelector<HTMLButtonElement>(".filterbtn")!;
+const menu = () => mount.host().querySelector('[role="menu"]');
+const items = () =>
+  Array.from(mount.host().querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'));
 
 function press(key: string) {
-  const target = document.activeElement ?? host;
+  const target = document.activeElement ?? mount.host();
   act(() => {
     target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
   });
@@ -72,20 +63,20 @@ function press(key: string) {
 
 describe("filter menu", () => {
   it("names itself and what it is set to, and says when it narrows", () => {
-    act(() => root.render(<Harness multi start={[]} />));
+    mount.render(<Harness multi start={[]} />);
     expect(trigger().textContent).toContain("Decision");
     expect(trigger().textContent).toContain("Any");
     expect(trigger().dataset.on).toBeUndefined();
   });
 
   it("names one value and counts the rest", () => {
-    act(() => root.render(<Harness multi start={["undecided", "waiting"]} />));
+    mount.render(<Harness multi start={["undecided", "waiting"]} />);
     expect(trigger().textContent).toContain("Undecided +1");
     expect(trigger().dataset.on).toBe("yes");
   });
 
   it("opens on click and closes on a click outside", () => {
-    act(() => root.render(<Harness multi start={[]} />));
+    mount.render(<Harness multi start={[]} />);
     expect(menu()).toBeNull();
     act(() => trigger().click());
     expect(menu()).not.toBeNull();
@@ -97,7 +88,7 @@ describe("filter menu", () => {
   });
 
   it("ticks several values and stays open", () => {
-    act(() => root.render(<Harness multi start={[]} />));
+    mount.render(<Harness multi start={[]} />);
     act(() => trigger().click());
     expect(items().map((each) => each.getAttribute("role"))).toEqual([
       "menuitemcheckbox",
@@ -113,7 +104,7 @@ describe("filter menu", () => {
   });
 
   it("picks one value, closes, and gives focus back", () => {
-    act(() => root.render(<Harness multi={false} start={[]} />));
+    mount.render(<Harness multi={false} start={[]} />);
     act(() => trigger().click());
     expect(items()[0]!.getAttribute("aria-checked")).toBe("true");
     act(() => items()[2]!.click());
@@ -126,7 +117,7 @@ describe("filter menu", () => {
   });
 
   it("moves with the arrow keys, wrapping, and closes on Escape", () => {
-    act(() => root.render(<Harness multi={false} start={["often"]} />));
+    mount.render(<Harness multi={false} start={["often"]} />);
     act(() => trigger().focus());
     press("ArrowDown");
     expect(menu()).not.toBeNull();
