@@ -44,7 +44,8 @@ true is cleared, and running the same pass twice changes nothing.
 |---|---|
 | A condition that returns is a new row, not an edit of an old one | It makes "this cleared, then came back" visible |
 | Acknowledging a condition hides it rather than resolving it | The thing it is about is still true. Worth offering because somebody may have decided to live with it, and worth distinguishing on screen |
-| A standing condition states what is true now | A condition's sentence carries a count, and a row written once and left alone reports the number it had when somebody first looked. The row stays the same row and the sentence changes |
+| A standing condition states what is true now | A condition's sentence carries a count, and a row written once and left alone reports the number it had when somebody first looked. The row stays the same row and the sentence changes. So do its link, whether it is undisclosed, and the product and issue it is about, because every read narrows by those |
+| Everybody holding a condition is handed a list each sweep, even an empty one | A condition clears only by being left off a list. Somebody who stops being an administrator, or the last administrator demoted, would otherwise go on being told about products and people they no longer read |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds
@@ -155,7 +156,7 @@ occurred, which nothing driven by an event can do.
 
 | Condition | Told to |
 |---|---|
-| A claim waiting for approval | Whoever may approve it, never its proposer |
+| A claim waiting for approval | Whoever may approve every place it covers — the approver capability or triage at each visibility among them, over reading all of them — never its proposer |
 | A ruling on reports waiting for approval | Whoever may triage undisclosed work in that product, never its proposer |
 | A deferral whose end is approaching | The proposer |
 | A claim sent back and untouched | The proposer |
@@ -168,6 +169,11 @@ turn, one sent back is the author's own, a deferral needs enough warning to do
 the work again before it lapses, and a queue is nobody's turn at all. An
 unanswered report carries no period — the answer to how long that may go
 unanswered is "not at all".
+
+A claim sent back and a deferral ending link to the review queue narrowed to
+the reader's own claims, which the approver queue leaves out. Every link to the
+queue asks only for narrowings the queue reads; one it does not read opens it on
+its default.
 
 A claim nobody has judged is raised the same way and named differently. It has
 no issue to name, so the alert carries the reference it was minted with and
@@ -502,9 +508,12 @@ request-forgery primitive unless governed:
 | The subject and the text are escaped as markdown, line by line, by the rule the release note uses, and then carry `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;` | Teams renders markdown in the text, so `[label](address)` is a link labelled anything, and Slack and Teams read `<!channel>` as a ping for the whole channel and `<address\|label>` as a link. A body carries publisher names, supplier failure text and component names nobody here chose, and the text this application writes carries no markdown of its own. The line holding the address this deployment composed stays an address, and the link field is sent as it is. A mail is plain text and carries the text unescaped |
 | What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
 | Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event is tracked by its own identity, unless it names what it is one of |
+| A condition's delivery covers one opening of it | The delivery is claimed for the row that was first in the window. Once that row has cleared, the condition opening again is news, and the delivery is taken again for the new row. A condition that cleared and came back is otherwise never carried again |
 | An event that says the same sentence to many people names what it is one of | One upload changing much of a build is one thing to carry however many people read that product. Without it a product with twenty-five readers posts twenty-five identical messages a night, and a night of builds crowds every other kind out of a sweep. What is personal — a decision of yours, you were named — carries none, because those are as many things as there are people |
 | The claim is staked before the request is made | A row with no sent-at stops a second replica, or the next sweep, sending the same thing while the first is in flight |
 | What a sweep reads is what this destination has not settled | Read as "everything not cleared", the window is the oldest two hundred, and an event is never cleared because only a condition is. Past two hundred events the same two hundred are re-read every cycle and nothing created afterwards is ever carried, with no error, no log and no counter |
+| A destination's kind is a kind some notification is of, or every kind | A mistyped kind would be listed as configured and working and never receive anything, so it is refused naming the kinds there are |
+| A destination's reason is why the last delivery that settled failed | Nothing once one has gone since, because the destination works again |
 | A destination's kind is normalized where it is written | Stored as typed and compared loosely, a destination added under one spelling is retired by another only by accident, and one believed retired goes on receiving everything it takes, undisclosed findings included |
 | Reading and changing where things go is refused in the data layer | It is this table's own rule and the rest of them live there (REQ-42 and REQ-43). What an operator's question needs is named field by field rather than embedding the row, so the signing secret cannot reach a caller that forgets to drop it |
 
@@ -518,6 +527,11 @@ Two conditions, not one. An embargo that is coming and one that has arrived
 clear differently, and a single alert would go on saying "coming" after the date
 had passed. The approaching one clears when the date arrives, at which point the
 other opens, or when the embargo is extended past the lead time.
+
+Each is one condition per place the finding sits at, because the link and
+whoever holds the work are per place. A condition naming several names is
+identified by each name with its length, so two sets of names that join to the
+same text are two conditions.
 
 The approaching notice states that extending needs a second person and that
 arranging it takes time, which is the reason for warning early rather than on the

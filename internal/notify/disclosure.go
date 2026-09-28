@@ -88,7 +88,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
-		ColumnExpr(`MIN(ss.publisher) AS "publisher"`).
+		ColumnExpr(`ss.publisher AS "publisher"`).
 		ColumnExpr(`MIN(de.visibility) AS "visibility"`).
 		// Standing, because a decision nobody is relying on any more is not
 		// one whose evidence moving matters.
@@ -96,7 +96,9 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where("de.state = ?", triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where("ss.superseded_at IS NOT NULL").
-		GroupExpr("de.product_id, de.vulnerability_id, de.from_statement_id").
+		// Grouped exactly as the condition is identified, so one condition is
+		// one row and its link does not depend on which of several came last.
+		GroupExpr("de.product_id, de.vulnerability_id, ss.publisher").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where a publisher changed their mind: %w", err)
@@ -224,23 +226,27 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		return nil, err
 	}
 	for _, row := range rows {
-		where := row.Product + " " + row.Stream + " " + row.Variant + " " + row.Vulnerability
 		// Two conditions, two identities: an embargo that is coming and one
 		// that has arrived clear differently, and a single alert would go on
 		// saying "coming" after the date had passed.
-		about, body := "disclosure "+where,
-			row.Vulnerability+" in "+row.Product+" reached its disclosure date on "+
+		about, body := "disclosure",
+			row.Vulnerability+" in "+row.Product+" at "+row.Component+
+				" reached its disclosure date on "+
 				row.DiscloseAt.Format(time.DateOnly)+" and nothing has been decided."
 		if lead > 0 {
-			about = "disclosure-near " + where
-			body = row.Vulnerability + " in " + row.Product + " discloses on " +
+			about = "disclosure-near"
+			body = row.Vulnerability + " in " + row.Product + " at " + row.Component +
+				" discloses on " +
 				row.DiscloseAt.Format(time.DateOnly) +
 				" and nothing has been decided. Extending it needs a second person, " +
 				"and that takes time to arrange."
 		}
 		holds := Holds{
-			About: identify(about),
-			Body:  body,
+			// One condition per place, because the link and whoever holds the
+			// work are per place.
+			About: identify(about, row.Product, row.Stream, row.Variant,
+				row.Vulnerability, row.Component),
+			Body: body,
 			Link: "/products/" + url.PathEscape(row.Product) +
 				"/streams/" + url.PathEscape(row.Stream) +
 				"/variants/" + url.PathEscape(row.Variant) +

@@ -55,6 +55,18 @@ func (a acts) readsAll(public, private int) bool {
 	return (public == 0 || a.readsPublic) && (private == 0 || a.readsPrivate)
 }
 
+// approvesAll is whether they may agree to every row of something spanning
+// both visibilities: the approver capability, or the right to triage at each
+// visibility the rows are at, over the right to read all of them. A triager
+// may approve somebody else's claim.
+func (a acts) approvesAll(public, private int) bool {
+	if !a.readsAll(public, private) {
+		return false
+	}
+	return a.approves ||
+		((public == 0 || a.triagesPublic) && (private == 0 || a.triagesPrivate))
+}
+
 // readsIn is whether they read the product at either visibility: the question
 // for something about the product that names no finding.
 func (a acts) readsIn() bool { return a.readsPublic || a.readsPrivate }

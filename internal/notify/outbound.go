@@ -10,11 +10,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -212,7 +214,10 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 		Where(`NOT EXISTS (SELECT 1 FROM "outbound_delivery" AS "settled" `+
 			`WHERE "settled"."outbound_id" = ? `+
 			`AND ("settled"."notification_id" = "nt"."id" `+
-			`     OR ("nt"."about" <> ? AND "settled"."about" = "nt"."about") `+
+			`     OR ("nt"."about" <> ? AND "settled"."about" = "nt"."about" `+
+			`         AND EXISTS (SELECT 1 FROM "notification" AS "prior" `+
+			`             WHERE "prior"."id" = "settled"."notification_id" `+
+			`             AND "prior"."cleared_at" IS NULL)) `+
 			`     OR ("nt"."together" <> ? AND "settled"."about" = "nt"."together")) `+
 			`AND ("settled"."sent_at" IS NOT NULL OR "settled"."attempts" >= ?))`,
 			to.ID, "", "", tries).
@@ -229,6 +234,44 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 		return nil, fmt.Errorf("read what there is to say: %w", err)
 	}
 	return rows, nil
+}
+
+// reopened takes a condition's delivery again for a new opening, where the
+// row it was claimed for has cleared. Reports whether this pass took it.
+//
+// Conditional on the delivery still pointing at the cleared row, so two
+// replicas reaching it together take it once.
+func (s *Signal) reopened(ctx context.Context, held Delivery, rowID int64,
+	now time.Time) (bool, error) {
+
+	ended, err := s.db.NewSelect().
+		TableExpr(`"notification" AS "prior"`).
+		Where(`"prior"."id" = ?`, held.NotificationID).
+		Where(`"prior"."cleared_at" IS NOT NULL`).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether a condition opened again: %w", err)
+	}
+	if !ended {
+		return false, nil
+	}
+	res, err := s.db.NewUpdate().Model((*Delivery)(nil)).
+		Set("sent_at = NULL").
+		Set("attempts = 0").
+		Set("failed = ?", "").
+		Set("notification_id = ?", rowID).
+		Set("first_seen = ?", now).
+		Where("id = ?", held.ID).
+		Where("notification_id = ?", held.NotificationID).
+		Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("take a delivery again for a condition that returned: %w", err)
+	}
+	n, err := database.Affected(res)
+	if err != nil {
+		return false, fmt.Errorf("take a delivery again for a condition that returned: %w", err)
+	}
+	return n > 0, nil
 }
 
 // what one attempt came to.
@@ -273,6 +316,18 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 			// a fault rather than an answer: reported as one, not as a
 			// delivery somebody else is handling.
 			return already, fmt.Errorf("read who has this delivery: %w", err)
+		}
+		// A condition that cleared and came back is news again. The
+		// delivery covers the opening it was claimed for, which has ended
+		// once the row that claimed it has cleared.
+		if row.About != "" && held.NotificationID != row.ID {
+			taken, err := s.reopened(ctx, held, row.ID, now)
+			if err != nil {
+				return already, err
+			}
+			if taken {
+				held.SentAt, held.Attempts = nil, 0
+			}
 		}
 		if held.SentAt != nil || held.Attempts >= tries {
 			return already, nil
@@ -527,20 +582,34 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 	for _, row := range rows {
 		one := Configured{Name: row.Name, Kind: row.Kind, URL: row.URL}
 		var counts []struct {
-			Sent    int    `bun:"sent"`
-			Failing int    `bun:"failing"`
-			Because string `bun:"because"`
+			Sent    int `bun:"sent"`
+			Failing int `bun:"failing"`
 		}
 		if err := s.db.NewSelect().Model((*Delivery)(nil)).
 			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NOT NULL THEN 1 ELSE 0 END) AS "sent"`).
 			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NULL THEN 1 ELSE 0 END) AS "failing"`).
-			ColumnExpr(`MAX(COALESCE(od.failed, '')) AS "because"`).
 			Where("od.outbound_id = ?", row.ID).
 			Scan(ctx, &counts); err != nil {
 			return nil, fmt.Errorf("read how it is doing: %w", err)
 		}
 		if len(counts) > 0 {
-			one.Sent, one.Failing, one.Because = counts[0].Sent, counts[0].Failing, counts[0].Because
+			one.Sent, one.Failing = counts[0].Sent, counts[0].Failing
+		}
+		// Why the last delivery that settled failed, where it did. One that
+		// went since answers with nothing, because the destination works.
+		var last []Delivery
+		if err := s.db.NewSelect().Model(&last).
+			Where("od.outbound_id = ?", row.ID).
+			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.WhereOr("od.sent_at IS NOT NULL").WhereOr("od.failed <> ''")
+			}).
+			OrderExpr("od.first_seen DESC, od.id DESC").
+			Limit(1).
+			Scan(ctx); err != nil {
+			return nil, fmt.Errorf("read why it last failed: %w", err)
+		}
+		if len(last) > 0 && last[0].SentAt == nil {
+			one.Because = last[0].Failed
 		}
 		out = append(out, one)
 	}
@@ -575,6 +644,16 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 	}
 	if row.Name == "" || row.Kind == "" || row.URL == "" {
 		return nil, fmt.Errorf("a destination needs a name, a kind and an address")
+	}
+	// A kind nothing is ever of is a destination that never receives
+	// anything, listed as configured and working.
+	if row.Kind != Everything && !slices.Contains(Kinds(), Kind(row.Kind)) {
+		named := make([]string, 0, len(Kinds()))
+		for _, each := range Kinds() {
+			named = append(named, string(each))
+		}
+		return nil, fmt.Errorf("no notification is of the kind %q: the kind is %q for every "+
+			"notification, or one of %s", row.Kind, Everything, strings.Join(named, ", "))
 	}
 	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
 		Set("retired_at = ?", nil).
@@ -650,17 +729,31 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 // know which destination it is about, and the host is the part that says so
 // without being the part that authenticates.
 func withoutTheAddress(err error, address string) string {
-	said := err.Error()
 	if address == "" {
-		return said
+		return err.Error()
 	}
 	// The host is put back in place of the whole address. An operator reading
 	// "why is this failing" needs to know which destination it is about, and
 	// the host is the part that says so without being the part that
 	// authenticates.
 	host := "the destination"
-	if parsed, bad := url.Parse(address); bad == nil && parsed.Hostname() != "" {
+	parsed, bad := url.Parse(address)
+	if bad == nil && parsed.Hostname() != "" {
 		host = parsed.Hostname()
+	}
+	// Replaced in the error rather than in its text. The standard library
+	// writes the address quoted, escaping a quote or a backslash in it, so the
+	// text no longer holds the address as it was configured.
+	// Only where the error is the request's own, so text wrapped around one is
+	// not lost; the replacements below remain for that.
+	var failed *url.Error
+	if errors.As(err, &failed) && error(failed) == err {
+		redacted := *failed
+		redacted.URL = host
+		err = &redacted
+	}
+	said := err.Error()
+	if bad == nil && parsed.Hostname() != "" {
 		if path := parsed.RequestURI(); path != "" && path != "/" {
 			said = strings.ReplaceAll(said, path, "")
 		}

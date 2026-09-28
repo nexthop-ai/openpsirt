@@ -4,6 +4,7 @@
 package notify_test
 
 import (
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -80,5 +81,52 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 				"a window it will not take falls back to the sheet's own default, which is "+
 				"the narrowing the link exists to get past", slug, days, windows[1])
 		}
+	}
+}
+
+// Every address a notification opens the review queue at asks for what the
+// queue reads.
+//
+// The queue reads its narrowing from the address, and a parameter it does not
+// read opens it on its default: the approver queue, which leaves out the
+// reader's own claims. An alert telling somebody their claim was sent back
+// would then open on everybody else's work.
+func TestAQueueLinkAsksForWhatTheQueueReads(t *testing.T) {
+	screen, err := os.ReadFile("../../web/src/screens/Queue.tsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := map[string]bool{}
+	for _, found := range regexp.MustCompile(`params\.get\("([a-z]+)"\)`).
+		FindAllStringSubmatch(string(screen), -1) {
+		read[found[1]] = true
+	}
+	if len(read) == 0 {
+		t.Fatal("the queue reads no parameter, so this checked nothing")
+	}
+
+	linked := regexp.MustCompile(`"/review-queue(\?[^"]*)?"`)
+	links := 0
+	for _, file := range []string{"stale.go", "lapsed.go"} {
+		source, err := os.ReadFile(file) //nolint:gosec // G304: every path here is a literal
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, found := range linked.FindAllStringSubmatch(string(source), -1) {
+			links++
+			query, err := url.ParseQuery(strings.TrimPrefix(found[1], "?"))
+			if err != nil {
+				t.Errorf("%s: %s: %v", file, found[0], err)
+				continue
+			}
+			for key := range query {
+				if !read[key] {
+					t.Errorf("%s links %s, and the queue does not read %q", file, found[0], key)
+				}
+			}
+		}
+	}
+	if links == 0 {
+		t.Fatal("no notification links the queue, so this checked nothing")
 	}
 }

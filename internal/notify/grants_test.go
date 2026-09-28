@@ -179,7 +179,7 @@ func saying(bodies []string, phrases ...string) []string {
 	return found
 }
 
-func TestAClaimWaitingReachesOnlyApproversWhoReadEveryRowOfIt(t *testing.T) {
+func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		s := aSplit(t, db)
 		proposer := s.person(t, "proposer", access.PublicTriage, access.PrivateTriage)
@@ -187,6 +187,11 @@ func TestAClaimWaitingReachesOnlyApproversWhoReadEveryRowOfIt(t *testing.T) {
 		privateTriager := s.person(t, "private-triager", access.PrivateTriage, access.Approver)
 		publicReader := s.person(t, "public-reader", access.PublicRead, access.Approver)
 		both := s.person(t, "both", access.PublicRead, access.PrivateRead, access.Approver)
+		// A triager may approve somebody else's claim, capability or not.
+		triager := s.person(t, "triager", access.PublicTriage, access.PrivateTriage)
+		undisclosedTriager := s.person(t, "undisclosed-triager", access.PrivateTriage)
+		// Reading both and triaging one is not agreeing to the other half.
+		halfTriager := s.person(t, "half-triager", access.PublicRead, access.PrivateTriage)
 
 		// Told apart by size: a disclosed claim over one place, an undisclosed
 		// one over two, and one over three mixing both.
@@ -207,6 +212,9 @@ func TestAClaimWaitingReachesOnlyApproversWhoReadEveryRowOfIt(t *testing.T) {
 			{"an approver triaging only undisclosed work", privateTriager, all[1:2]},
 			{"an approver reading only disclosed work", publicReader, all[0:1]},
 			{"an approver reading both", both, all},
+			{"a triager of both, holding no capability", triager, all},
+			{"a triager of undisclosed work alone", undisclosedTriager, all[1:2]},
+			{"a triager of one half reading the other", halfTriager, all[1:2]},
 		} {
 			bodies := openFor(t, db, want.id, notify.ClaimWaiting)
 			if got := saying(bodies, all...); strings.Join(got, "; ") != strings.Join(want.told, "; ") ||

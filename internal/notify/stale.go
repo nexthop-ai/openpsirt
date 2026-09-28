@@ -126,7 +126,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 				continue
 			}
 			at := per[row.ProductID]
-			if !at.approves || !at.readsAll(row.Rows-row.PrivateRows, row.PrivateRows) {
+			if !at.approvesAll(row.Rows-row.PrivateRows, row.PrivateRows) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -282,7 +282,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 			Body: fmt.Sprintf("A claim of yours in %s was sent back %s ago and has not "+
 				"been revised. It applies to nothing until it is.",
 				row.Product, plainly(days)),
-			Link:      "/review-queue?tab=mine",
+			Link:      "/review-queue?mine=1",
 			Private:   private,
 			ProductID: &row.ProductID,
 		})
@@ -369,7 +369,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 			Body: fmt.Sprintf("A deferral of yours in %s ends on %s, covering %s. "+
 				"On that date it stops applying and the finding is open again.",
 				row.Product, row.Until.Format(time.DateOnly), rowsWritten(row.Places)),
-			Link:      "/review-queue?tab=mine",
+			Link:      "/review-queue?mine=1",
 			Private:   private,
 			ProductID: &row.ProductID,
 		})
@@ -591,7 +591,7 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Identifier, row.Product, when),
 			Link: fmt.Sprintf("/products/%s/findings?q=%s",
-				url.QueryEscape(row.Product), url.QueryEscape(row.Identifier)),
+				url.PathEscape(row.Product), url.QueryEscape(row.Identifier)),
 			Private: row.Undisclosed,
 			// One issue, so a collaborator brought onto that case keeps
 			// reading it after the pass that wrote it.

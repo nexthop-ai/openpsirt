@@ -332,6 +332,17 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 		if saw.requests != 0 {
 			t.Errorf("it received %d requests", saw.requests)
 		}
+
+		// A kind nothing is of is refused rather than stored as a
+		// destination that never receives anything. Case is folded first.
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "typo", "asigned",
+			server.URL, "a-shared-secret-long-enough"); err == nil {
+			t.Error("a destination was stored for a kind nothing is of")
+		}
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "folded", " Assigned ",
+			server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Errorf("a kind written in capitals was refused: %v", err)
+		}
 	})
 }
 
@@ -635,6 +646,134 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 		if left != 0 {
 			t.Errorf("%d of the six rows can never be settled, so they hold the front "+
 				"of the window for ever", left)
+		}
+	})
+}
+
+// A condition that clears and later comes back is carried again. The
+// delivery is keyed on the condition, so without scoping it to one opening
+// the second failure of a control reaches no channel at all.
+func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, admin), "chat",
+			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+		held := []notify.Holds{{
+			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
+			Link: "/reports/rubber-stamp",
+		}}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		requests := func() int {
+			saw.mu.Lock()
+			defer saw.mu.Unlock()
+			return saw.requests
+		}
+
+		for _, step := range []struct {
+			holding []notify.Holds
+			want    int
+		}{
+			{held, 1},
+			{nil, 1},  // it cleared, which is not news
+			{held, 2}, // it came back, which is
+			{held, 2}, // and is still the same opening
+		} {
+			if _, _, err := store.Reconcile(ctx, admin.ID, notify.RiskUnagreed, step.holding); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := signal.Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if got := requests(); got != step.want {
+				t.Fatalf("the channel was sent %d requests, want %d", got, step.want)
+			}
+		}
+		left, err := notify.StillToTell(signal, ctx, "chat")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left != 0 {
+			t.Errorf("%d rows are still to tell after the returned condition was carried", left)
+		}
+	})
+}
+
+// A destination's reason is why the last delivery failed, and nothing once one
+// has gone since.
+func TestADestinationSaysWhyItLastFailed(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		// Answers by what it is sent, so each delivery fails its own way.
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			switch {
+			case strings.Contains(string(body), "first"):
+				w.WriteHeader(http.StatusInternalServerError)
+			case strings.Contains(string(body), "second"):
+				w.WriteHeader(http.StatusForbidden)
+			default:
+				w.WriteHeader(http.StatusNoContent)
+			}
+		}))
+		defer server.Close()
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, admin), "chat",
+			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+
+		var holding []notify.Holds
+		for _, step := range []struct{ said, want string }{
+			{"first", "500"},
+			{"second", "403"},
+			{"third", ""},
+		} {
+			holding = append(holding, notify.Holds{About: step.said, Body: "The " + step.said + " thing."})
+			if _, _, err := store.Reconcile(ctx, admin.ID, notify.RiskUnagreed, holding); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := signal.Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			listed, err := store.Destinations(ctx, asks(t, db, admin))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(listed) != 1 {
+				t.Fatalf("%d destinations listed", len(listed))
+			}
+			because := listed[0].Because
+			if (step.want == "") != (because == "") || !strings.Contains(because, step.want) {
+				t.Errorf("after the %s delivery the reason reads %q, want one naming %q",
+					step.said, because, step.want)
+			}
 		}
 	})
 }

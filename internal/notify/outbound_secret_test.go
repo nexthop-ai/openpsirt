@@ -42,6 +42,24 @@ func TestAFailureDoesNotCarryTheAddressBack(t *testing.T) {
 	}
 }
 
+// An address holding a quote or a backslash is written escaped in the error's
+// text, so it is taken out of the error rather than out of the text.
+func TestAFailureDoesNotCarryBackAnAddressItWroteEscaped(t *testing.T) {
+	for _, address := range []string{
+		`https://hooks.slack.example/services/T000/B000/SUPERSECRETTOKEN?x="a`,
+		`https://hooks.slack.example/services/T000/B000/SUPERSECRETTOKEN?x=a\b`,
+	} {
+		wrapped := &url.Error{Op: "Post", URL: address, Err: fmt.Errorf("connection refused")}
+		said := withoutTheAddress(wrapped, address)
+		if strings.Contains(said, "SUPERSECRETTOKEN") {
+			t.Errorf("the stored failure carries the credential: %q", said)
+		}
+		if !strings.Contains(said, "hooks.slack.example") || !strings.Contains(said, "connection refused") {
+			t.Errorf("the stored failure no longer says where or what: %q", said)
+		}
+	}
+}
+
 func TestAFailureOutsideASCIIIsStillStorableOnceItIsBounded(t *testing.T) {
 	// The stored failure is the standard library's own error text, which
 	// quotes an address somebody else chose, so it can carry characters

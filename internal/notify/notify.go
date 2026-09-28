@@ -459,18 +459,24 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 				// Still true, and possibly true of more than it was. The
 				// sentence is what the condition currently says — how many
 				// pieces of work are sitting in a queue, how many places a
-				// deferral covers — and a row opened once and never touched
-				// again went on saying what was true the first time anybody
-				// looked. A queue that grew from three to forty thousand
-				// overnight still read "3 pieces of work waiting", which is a
-				// count four orders of magnitude out standing beside the queue
-				// it is about.
-				if row.Body == still.Body && row.Link == still.Link {
+				// deferral covers — so it is rewritten whenever it moves.
+				//
+				// So is what it is about, and whether that is undisclosed:
+				// the reads narrow by both, and a queue that held only
+				// disclosed work when the condition opened may hold
+				// undisclosed work under the same key now.
+				if row.Body == still.Body && row.Link == still.Link &&
+					row.Private == still.Private &&
+					sameID(row.ProductID, still.ProductID) &&
+					sameID(row.VulnerabilityID, still.VulnerabilityID) {
 					continue
 				}
 				if _, err := tx.NewUpdate().Model((*Notification)(nil)).
 					Set("body = ?", still.Body).
 					Set("link = ?", still.Link).
+					Set("private = ?", still.Private).
+					Set("product_id = ?", still.ProductID).
+					Set("vulnerability_id = ?", still.VulnerabilityID).
 					Where("id = ?", row.ID).Exec(ctx); err != nil {
 					return fmt.Errorf("say what a standing condition says now: %w", err)
 				}
@@ -541,6 +547,14 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 		return 0, 0, err
 	}
 	return opened, cleared, nil
+}
+
+// sameID reports whether two optional identifiers name the same thing.
+func sameID(a, b *int64) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // attributable refuses a private notification that names no product.

@@ -79,55 +79,47 @@ func (w *Watch) Run(ctx context.Context, interval time.Duration) {
 // The same list to each of them. An alert about the tool's health is not
 // somebody's personal work item, and the first administrator to look should
 // not be the only one who ever sees it.
+//
+// Somebody who stops being an administrator is handed an empty list, which
+// clears what they were told: these name products and people they may no
+// longer read, and nothing else would ever reconcile them.
 func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened, cleared int, err error) {
-	quiet, err := w.quietBuilds(ctx)
-	if err != nil {
-		return 0, 0, err
-	}
-	for _, admin := range admins {
-		o, c, err := NewStore(w.db).Reconcile(ctx, admin, BuildQuiet, quiet)
-		if err != nil {
-			return opened, cleared, fmt.Errorf("tell %d what has gone quiet: %w", admin, err)
-		}
-		opened += o
-		cleared += c
-	}
-
-	// Somebody away and still holding work.
-	away, err := w.holdingAbsent(ctx)
-	if err != nil {
-		return opened, cleared, err
-	}
-	for _, admin := range admins {
-		o, c, err := NewStore(w.db).Reconcile(ctx, admin, HoldingAbsent, away)
-		if err != nil {
-			return opened, cleared, fmt.Errorf("tell %d who is away: %w", admin, err)
-		}
-		opened += o
-		cleared += c
-	}
-
-	// The tool's own health, and the second-person control. Each is a report
-	// that nobody opens unless it has something to say, asked as a condition — see health.go
-	// for why that is not the same as mailing the report.
+	// Somebody away and still holding work, what has gone quiet, the tool's
+	// own health, and the second-person control. Each of the last four is a
+	// report that nobody opens unless it has something to say, asked as a
+	// condition — see health.go for why that is not the same as mailing the
+	// report.
 	for _, each := range []struct {
 		kind Kind
 		of   func(context.Context) ([]Holds, error)
 		what string
 	}{
+		{BuildQuiet, w.quietBuilds, "what has gone quiet"},
+		{HoldingAbsent, w.holdingAbsent, "who is away"},
 		{VulnerabilityDataStale, w.dataStale, "that the vulnerability data has stopped moving"},
 		{RiskUnagreed, w.riskUnagreed, "what stands with nobody agreeing"},
 		{PairsConcentrated, w.pairsConcentrated, "which pairs agree to most of a product's work"},
 		{SupplierSilent, w.suppliersSilent, "which suppliers have stopped answering"},
 	} {
-		holding, err := each.of(ctx)
+		// Derived only where somebody will hear it. With no administrator
+		// the lists are empty, which clears whatever was being said.
+		var holding []Holds
+		if len(admins) > 0 {
+			if holding, err = each.of(ctx); err != nil {
+				return opened, cleared, err
+			}
+		}
+		out, err := w.everybodyAnd(ctx, each.kind, nil, admins)
 		if err != nil {
 			return opened, cleared, err
 		}
 		for _, admin := range admins {
-			o, c, err := NewStore(w.db).Reconcile(ctx, admin, each.kind, holding)
+			out[admin] = holding
+		}
+		for person, told := range out {
+			o, c, err := NewStore(w.db).Reconcile(ctx, person, each.kind, told)
 			if err != nil {
-				return opened, cleared, fmt.Errorf("tell %d %s: %w", admin, each.what, err)
+				return opened, cleared, fmt.Errorf("tell %d %s: %w", person, each.what, err)
 			}
 			opened += o
 			cleared += c
@@ -143,19 +135,12 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		return 0, 0, err
 	}
 
-	// The two conditions that go to administrators and to nobody else are
-	// skipped where none is recorded, and nothing else is. Returning here
-	// skipped the nine per-person conditions as well — every alert a triager
-	// holds, neither derived nor cleared, each one standing with nothing able
-	// to resolve it. A deployment with no administrator recorded cannot
-	// start, so this is the window between the table existing and the first
-	// sign-in, and the rest of the sweep has work to do in it.
-	if len(admins) > 0 {
-		o, c, err := w.tellAdministrators(ctx, admins)
-		opened, cleared = opened+o, cleared+c
-		if err != nil {
-			return opened, cleared, err
-		}
+	// Run with no administrator too, so the last one to be demoted has what
+	// they were told cleared.
+	o, c, err := w.tellAdministrators(ctx, admins)
+	opened, cleared = opened+o, cleared+c
+	if err != nil {
+		return opened, cleared, err
 	}
 
 	// An embargo whose date has arrived is not a fact about the tool's health,
@@ -370,7 +355,8 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 			why = "is being exploited"
 		}
 		holds := Holds{
-			About: identify("critical-on-release " + where + " " + row.Vulnerability + " " + row.Component),
+			About: identify("critical-on-release", row.Product, row.Stream, row.Variant,
+				row.Vulnerability, row.Component),
 			Body: fmt.Sprintf("%s %s and is open against %s, which has been released. Nothing has been decided about it.",
 				row.Vulnerability, why, where),
 			Link: fmt.Sprintf("/products/%s/streams/%s/variants/%s/findings/%s/components/%s",
@@ -459,19 +445,11 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 				row.LastRefusedAt.Format("2006-01-02"), why)
 		}
 		holding = append(holding, Holds{
-			// Hashed rather than the three names joined.
-			//
-			// Each of them may be 191 characters and the column holds 191, so
-			// the obvious key does not fit — and what happens then depends on
-			// the engine: three of them refuse the write and abort the sweep,
-			// one truncates and silently collides. Joining them also collides
-			// on its own, because a name may contain the separator: product
-			// "a/b" branch "c" and product "a" branch "b/c" are one key.
-			//
-			// A hash is a fixed width, so it fits by construction, and it is
-			// only ever compared for equality — nothing reads it back. The
-			// names people read are in the body.
-			About: identify(where),
+			// Hashed rather than the three names joined. Each of them may be
+			// 191 characters and the column holds 191, and a hash is a fixed
+			// width that is only ever compared for equality. The names people
+			// read are in the body.
+			About: identify("quiet", row.Product, row.Stream, row.Variant),
 			Body:  body,
 			Link: "/products/" + url.PathEscape(row.Product) +
 				"/streams/" + url.PathEscape(row.Stream) +
@@ -501,9 +479,21 @@ func (w *Watch) administrators(ctx context.Context) ([]int64, error) {
 // Hashed for the reason every other identity here is: it is compared for
 // equality and never read, and a fixed width fits a column whatever the names
 // were.
-func identify(what string) string {
-	sum := sha256.Sum256([]byte(what))
-	return hex.EncodeToString(sum[:])
+//
+// Several fields are each written with their length first, because a name may
+// contain whatever separator would join them: product "a b" and stream "c"
+// joined with a space are product "a" and stream "b c". One field is hashed as
+// it is.
+func identify(fields ...string) string {
+	if len(fields) == 1 {
+		sum := sha256.Sum256([]byte(fields[0]))
+		return hex.EncodeToString(sum[:])
+	}
+	h := sha256.New()
+	for _, field := range fields {
+		_, _ = fmt.Fprintf(h, "%d:%s", len(field), field)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // beingTold is everybody holding an open condition of one kind.
