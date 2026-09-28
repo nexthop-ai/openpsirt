@@ -69,8 +69,9 @@ made in is not part of the key.
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they
-copy are not. A version that will not fit is refused, not shortened;
-shortening would key the decision on something the finding does not hold.
+copy are not. The bound is in characters, as the columns hold them. A version
+that will not fit is refused, not shortened; shortening would key the decision
+on something the finding does not hold.
 
 Measured before settling the bound: the reference producer's real output is
 6,845 components, longest version 49 characters, none over the limit.

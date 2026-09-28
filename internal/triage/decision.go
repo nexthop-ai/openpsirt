@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -744,12 +745,13 @@ func keyable(at Place) error {
 		"component": at.ComponentUpstream,
 		"consumer":  at.ConsumerUpstream,
 	} {
-		if len(version(held)) > versionLimit {
+		// Counted in characters, which is what the columns hold.
+		if n := utf8.RuneCountInString(version(held)); n > versionLimit {
 			return fmt.Errorf(
 				"the %s's upstream version is %d characters and a decision is keyed on at most "+
 					"%d, so this cannot be matched to a finding later — a version that long is "+
 					"usually a producer putting something else in the field",
-				what, len(version(held)), versionLimit)
+				what, n, versionLimit)
 		}
 	}
 	return nil
