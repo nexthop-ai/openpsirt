@@ -830,6 +830,8 @@ product ships.
 | An advisory that names no publisher or carries no tracking identifier is refused | Whose judgment it is decides what it supersedes and whose name stands beside it, and the tracking identifier is the key a revision replaces. Both are mandatory in the format |
 | Every product-status list the format defines is read, at the versions it names | Two of the eight are the only status a real advisory carries. What is not read is the range a list implies — that everything after a first fixed version is fixed — because the document enumerates the versions it is about and nothing else |
 | Words are attached to the products they name, by identifier or by group | The format lets either say which products a flag, a remediation or a threat is about, and they mean the same thing. Read only the first and a remediation scoped by a group falls through to the words written about the status at large, so an upgrade instruction lands on a claim the document never made |
+| A group is expanded once the document is closed | The tree defining it may come after the words naming it. Words scoped by a group are about what the group holds, and a group holding nothing scopes them to nothing rather than to the whole claim |
+| A CVE is the issue's name wherever the document states it, and every other identifier is an alias | The producer chooses the key order. Where no CVE is stated, the first other identifier is the name |
 | The claims come back in the order the document stated them | A map has no first. Which of several sentences stands for a claim, which order its products are carried in and which order the claims are written would otherwise be whatever the runtime chose, so the same bytes uploaded twice would store different reasoning under a digest saying nothing moved |
 | A version stated as a branch is the version the claim is about | A publisher that states no package identifier states the version as the branch its product sits in. Dropped, a claim about one release of an appliance answers for every release of it, and the screen has no version to show beside the status |
 | A claim naming a version offers a prefill only at that version | An advisory exists to name the version that carries the fix, which is not the version shipped here. Offered against another, the control comes prefilled with a claim the publisher never made, with their name on it |
@@ -844,14 +846,21 @@ case for an equipment vendor, whose advisories carry no package identifier
 anywhere, and it resolves the way a claim against a source tree does — a
 component of that name is the one meant.
 
-The bound is what the reader holds, so an identifier is charged once however
-often the document names it. Measured on a real distribution advisory about a
-kernel: 794 distinct product identifiers, mentioned 220,088 times — 341 issues
-over 279 composed products, each listed under a status and again in the
-remediation about it. Charged per mention that document is refused at a
-ceiling of 100,000 while holding under eight hundred entries; charged per
-identifier it is nowhere near. The same file is 27 MB against a size default of
-256 MB.
+A CSAF document is held to two bounds.
+
+| Bound | What it charges |
+|---|---|
+| The component bound | Each distinct identifier the document states, once however often it is named |
+| Ten times the component bound | Each entry the reader keeps: a product defined, a group member, a product listed under a status by each claim, a product or group a sentence names, an alias, and every member a group reference stands for when it is expanded |
+
+Measured on a real distribution advisory about a kernel: 794 distinct product
+identifiers, mentioned 220,088 times — 341 issues over 279 composed products,
+each listed under a status and again in the remediation about it. The first
+bound is nowhere near, and the second is a fifth spent. The same file is 27 MB
+against a size default of 256 MB. An entry held costs about 170 bytes, so the
+second bound at its default is about 170 MB. A group reference is charged what
+it expands into: without that, one group of fifty thousand products referenced
+four thousand times is two hundred million entries from under a megabyte.
 
 One distribution VEX document about a single issue composes 1,669 of its 1,669
 product identifiers through relationships, so a reader that resolves only

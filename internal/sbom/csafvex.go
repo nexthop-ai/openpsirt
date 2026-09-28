@@ -75,20 +75,41 @@ type claimed struct {
 	// would store different reasoning under a digest saying nothing moved.
 	byProduct map[string]Status
 	listed    []string
-	// flagged is the justification a flag gave each product.
-	flagged map[string]string
+	// flags are the justifications in the order the document gave them, each
+	// with the products it names. A later flag naming a product wins over an
+	// earlier one.
+	flags []scoped
 	// said is the prose, per status, for the words that named no product. An
 	// impact statement belongs to the products called not affected and an
 	// action statement to the affected ones, and reading either into both
 	// would attach an argument to a claim it was not made about.
 	said map[Status]string
-	// toldAbout is the prose that named the products it was about, which is
-	// the precise answer where a document gives one. An advisory's remediation
+	// told is the prose that named the products it was about, which is the
+	// precise answer where a document gives one. An advisory's remediation
 	// names the packages to upgrade, and those are listed as fixed rather than
 	// as affected — so the category alone puts the one useful sentence in an
-	// advisory on a claim that does not exist.
-	toldAbout map[string]string
+	// advisory on a claim that does not exist. The first sentence naming a
+	// product is the one it keeps.
+	told []scoped
 }
+
+// scoped is words the document wrote and the products it wrote them about,
+// by identifier and by group.
+//
+// Groups are kept as named rather than expanded as they are read. The tree
+// that defines them may arrive after the claims, and a group expanded before
+// it is read holds nothing — which turns words about some products into
+// words about the whole claim.
+type scoped struct {
+	words  string
+	ids    []string
+	groups []string
+}
+
+// names reports whether the words were scoped to any product at all. A list
+// of groups is a scope even where no group it names holds anything: the
+// document said which products it meant, and none of them is the whole claim.
+func (s scoped) names() bool { return len(s.ids) > 0 || len(s.groups) > 0 }
 
 type csafReader struct {
 	b   *bounded
@@ -125,19 +146,24 @@ type csafReader struct {
 	//
 	// Kept as a set rather than a count because one identifier is named in
 	// several places — a product listed under a status and again in the
-	// remediation about it — and what the bound is for is what is retained.
-	// Counted per mention, a document naming each of its products twice costs
-	// twice what it holds, and a real advisory that fits is refused.
+	// remediation about it — and what this bound is for is how many distinct
+	// things the document describes.
 	charged map[string]struct{}
+	// held is every entry the reader keeps, one per mention: a product the
+	// tree defines, a member of a group, a product a claim lists, a product or
+	// group a sentence names, an identifier an issue also goes by, and each
+	// member a group stands for once a reference to it is expanded. The set
+	// above charges a re-mention nothing, and a re-mention is still an entry
+	// held.
+	held int
 }
 
-// name charges one more identifier this document makes the reader hold.
+// name charges one more distinct identifier this document describes.
 //
-// Charged on the way in, before anything is kept. The claim count is the only
-// other bound either VEX reader carries, and it counts vulnerability objects —
-// so one claim listing ten million product identifiers is under it, and the
-// map holding them is charged against nothing. What a bound has to stop is the
-// walk, and a count taken after the walk has already done the work.
+// Charged on the way in, before anything is kept. The claim count counts
+// vulnerability objects, so one claim listing ten million product identifiers
+// is under it. What a bound has to stop is the walk, and a count taken after
+// the walk has already done the work.
 //
 // Against the component bound, because these are what a suppression document
 // describes and they cost what a component costs to hold. A ceiling of its own
@@ -151,6 +177,34 @@ func (r *csafReader) name(id string) error {
 			r.lim.MaxComponents)
 	}
 	r.charged[id] = struct{}{}
+	return nil
+}
+
+// mentionsPerProduct is how many entries the reader may hold for each
+// product the component bound allows.
+//
+// A real advisory names each product many times — under a status and again
+// in the remediation about it, once per issue. A distribution's kernel
+// advisory names 794 products 220,088 times, a fifth of the million entries
+// the default bound allows. Measured, an entry held costs about 170 bytes
+// through to the claims returned, so a million is about 170 MB, inside the
+// budget one document is read in. Without the ceiling, one group of fifty
+// thousand products referenced four thousand times is two hundred million
+// entries from under a megabyte.
+const mentionsPerProduct = 10
+
+// hold charges entries the reader is about to keep, before it keeps them.
+//
+// Called with a group's size before a reference to it is expanded, so a
+// reference costs what it stands for rather than the one identifier it is
+// written as.
+func (r *csafReader) hold(n int) error {
+	ceiling := r.lim.MaxComponents * mentionsPerProduct
+	if n > ceiling-r.held {
+		return fmt.Errorf("the document names its products more than the %d times "+
+			"the %d product limit allows", ceiling, r.lim.MaxComponents)
+	}
+	r.held += n
 	return nil
 }
 
@@ -339,6 +393,9 @@ func (r *csafReader) productGroup() error {
 				}
 				if product != "" {
 					if err := r.name(product); err != nil {
+						return err
+					}
+					if err := r.hold(1); err != nil {
 						return err
 					}
 					has = append(has, product)
@@ -534,6 +591,11 @@ func (r *csafReader) product() (string, error) {
 	if err := r.name(id); err != nil {
 		return "", err
 	}
+	// Held once per definition as well: the branch walk keeps every product
+	// it defined, so a product defined again is another entry.
+	if err := r.hold(1); err != nil {
+		return "", err
+	}
 	// The version inside the identifier where there is one, so that a branch
 	// above cannot overwrite what the document already stated precisely.
 	_, one.version = purlParts(one.purl)
@@ -549,20 +611,22 @@ func (r *csafReader) vulnerability() error {
 	}
 	one := &claimed{
 		byProduct: map[string]Status{},
-		flagged:   map[string]string{},
 		said:      map[Status]string{},
-		toldAbout: map[string]string{},
 	}
+	var (
+		cve string
+		ids []string
+	)
 	err := r.b.object(func(key string) error {
 		switch key {
 		case "cve":
 			value, err := r.b.str()
-			if one.vulnerability == "" {
-				one.vulnerability = value
+			if cve == "" {
+				cve = value
 			}
 			return err
 		case "ids":
-			return r.ids(one)
+			return r.ids(&ids)
 		case "product_status":
 			return r.productStatus(one)
 		case "flags":
@@ -578,17 +642,25 @@ func (r *csafReader) vulnerability() error {
 	if err != nil {
 		return err
 	}
-	if one.vulnerability == "" {
+	// Settled once the object is closed, because the producer chooses the key
+	// order. The CVE is the issue's name wherever the document states one, and
+	// the other identifiers are what the same issue also goes by.
+	switch {
+	case cve != "":
+		one.vulnerability, one.aliases = cve, ids
+	case len(ids) > 0:
+		one.vulnerability, one.aliases = ids[0], ids[1:]
+	default:
 		return fmt.Errorf("a claim names no vulnerability, so there is nothing it could be about")
 	}
 	r.claims = append(r.claims, one)
 	return nil
 }
 
-// ids reads the other names one issue goes by. The first is taken as the
-// issue's own name where no CVE was given: a document about something with no
-// CVE still names it something, and refusing it would drop the claim.
-func (r *csafReader) ids(one *claimed) error {
+// ids reads the other names one issue goes by. The first is the issue's own
+// name where no CVE is given: a document about something with no CVE still
+// names it something, and refusing it would drop the claim.
+func (r *csafReader) ids(into *[]string) error {
 	return r.b.array(func() error {
 		var text string
 		if err := r.b.object(func(key string) error {
@@ -604,14 +676,13 @@ func (r *csafReader) ids(one *claimed) error {
 		if text == "" {
 			return nil
 		}
-		if one.vulnerability == "" {
-			one.vulnerability = text
-			return nil
-		}
 		if err := r.name(text); err != nil {
 			return err
 		}
-		one.aliases = append(one.aliases, text)
+		if err := r.hold(1); err != nil {
+			return err
+		}
+		*into = append(*into, text)
 		return nil
 	})
 }
@@ -630,18 +701,58 @@ func (r *csafReader) productStatus(one *claimed) error {
 			if err != nil {
 				return err
 			}
-			if id != "" {
-				if err := r.name(id); err != nil {
+			if id == "" {
+				return nil
+			}
+			if err := r.name(id); err != nil {
+				return err
+			}
+			if _, held := one.byProduct[id]; !held {
+				if err := r.hold(1); err != nil {
 					return err
 				}
-				if _, held := one.byProduct[id]; !held {
-					one.listed = append(one.listed, id)
-				}
-				one.byProduct[id] = status
+				one.listed = append(one.listed, id)
 			}
+			one.byProduct[id] = status
 			return nil
 		})
 	})
+}
+
+// scope reads the products one set of words is about, by identifier or by
+// group — the two ways the format allows, which mean the same thing. It
+// reports whether the key was one of those two.
+func (r *csafReader) scope(key string, into *scoped) (bool, error) {
+	switch key {
+	case "product_ids":
+		return true, r.b.array(func() error {
+			id, err := r.b.str()
+			if err != nil || id == "" {
+				return err
+			}
+			if err := r.name(id); err != nil {
+				return err
+			}
+			if err := r.hold(1); err != nil {
+				return err
+			}
+			into.ids = append(into.ids, id)
+			return nil
+		})
+	case "group_ids":
+		return true, r.b.array(func() error {
+			group, err := r.b.str()
+			if err != nil || group == "" {
+				return err
+			}
+			if err := r.hold(1); err != nil {
+				return err
+			}
+			into.groups = append(into.groups, group)
+			return nil
+		})
+	}
+	return false, nil
 }
 
 // flags are the justifications, each naming the products it applies to. A flag
@@ -649,55 +760,22 @@ func (r *csafReader) productStatus(one *claimed) error {
 // format spells "the whole claim".
 func (r *csafReader) flags(one *claimed) error {
 	return r.b.array(func() error {
-		var (
-			label string
-			ids   []string
-		)
+		var flag scoped
 		if err := r.b.object(func(key string) error {
-			switch key {
-			case "label":
+			if key == "label" {
 				value, err := r.b.str()
-				label = value
+				flag.words = value
 				return err
-			case "product_ids":
-				return r.b.array(func() error {
-					id, err := r.b.str()
-					if err != nil {
-						return err
-					}
-					if id != "" {
-						if err := r.name(id); err != nil {
-							return err
-						}
-						ids = append(ids, id)
-					}
-					return nil
-				})
-			case "group_ids":
-				// The same thing said the other way the format allows.
-				return r.b.array(func() error {
-					group, err := r.b.str()
-					if err != nil {
-						return err
-					}
-					ids = append(ids, r.groups[group]...)
-					return nil
-				})
-			default:
-				return r.b.skip()
 			}
+			if read, err := r.scope(key, &flag); read {
+				return err
+			}
+			return r.b.skip()
 		}); err != nil {
 			return err
 		}
-		if label == "" {
-			return nil
-		}
-		if len(ids) == 0 {
-			one.flagged[""] = label
-			return nil
-		}
-		for _, id := range ids {
-			one.flagged[id] = label
+		if flag.words != "" {
+			one.flags = append(one.flags, flag)
 		}
 		return nil
 	})
@@ -717,62 +795,80 @@ func (r *csafReader) flags(one *claimed) error {
 // argument to a claim it was not made about.
 func (r *csafReader) prose(one *claimed, to Status, field string) error {
 	return r.b.array(func() error {
-		var (
-			said string
-			ids  []string
-		)
+		var words scoped
 		if err := r.b.object(func(key string) error {
-			switch key {
-			case field:
+			if key == field {
 				value, err := r.b.str()
-				said = value
+				words.words = value
 				return err
-			case "product_ids":
-				return r.b.array(func() error {
-					id, err := r.b.str()
-					if err != nil {
-						return err
-					}
-					if id != "" {
-						if err := r.name(id); err != nil {
-							return err
-						}
-						ids = append(ids, id)
-					}
-					return nil
-				})
-			case "group_ids":
-				// The same thing said the other way the format allows.
-				return r.b.array(func() error {
-					group, err := r.b.str()
-					if err != nil {
-						return err
-					}
-					ids = append(ids, r.groups[group]...)
-					return nil
-				})
-			default:
-				return r.b.skip()
 			}
+			if read, err := r.scope(key, &words); read {
+				return err
+			}
+			return r.b.skip()
 		}); err != nil {
 			return err
 		}
-		if said == "" {
-			return nil
-		}
-		if len(ids) == 0 {
-			if one.said[to] == "" {
-				one.said[to] = said
-			}
-			return nil
-		}
-		for _, id := range ids {
-			if one.toldAbout[id] == "" {
-				one.toldAbout[id] = said
-			}
+		switch {
+		case words.words == "":
+		case words.names():
+			one.told = append(one.told, words)
+		case one.said[to] == "":
+			one.said[to] = words.words
 		}
 		return nil
 	})
+}
+
+// expand is every product a set of words names, with each group reference
+// replaced by what the group holds.
+//
+// Asked once the document is closed, so a group defined after the words that
+// name it holds what the tree says it holds. Each member is charged before it
+// is visited.
+func (r *csafReader) expand(words scoped, visit func(id string)) error {
+	for _, id := range words.ids {
+		visit(id)
+	}
+	for _, group := range words.groups {
+		members := r.groups[group]
+		if err := r.hold(len(members)); err != nil {
+			return err
+		}
+		for _, id := range members {
+			visit(id)
+		}
+	}
+	return nil
+}
+
+// scopedWords is what a claim's flags and prose say about each product it
+// names. A justification the document gave the whole claim is under the empty
+// identifier. A later flag wins over an earlier one and the first sentence
+// naming a product wins over the rest, which is the order the document gave
+// them in.
+func (r *csafReader) scopedWords(one *claimed) (flagged, told map[string]string, err error) {
+	flagged, told = map[string]string{}, map[string]string{}
+	for _, flag := range one.flags {
+		if !flag.names() {
+			flagged[""] = flag.words
+			continue
+		}
+		if err := r.expand(flag, func(id string) { flagged[id] = flag.words }); err != nil {
+			return nil, nil, err
+		}
+	}
+	for _, words := range one.told {
+		err := r.expand(words, func(id string) {
+			if told[id] == "" {
+				told[id] = words.words
+			}
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return flagged, told, nil
 }
 
 // resolve turns the collected claims into the one shape the rest of this reads,
@@ -784,6 +880,10 @@ func (r *csafReader) prose(one *claimed, to Status, field string) error {
 func (r *csafReader) resolve() ([]Suppression, error) {
 	out := make([]Suppression, 0, len(r.claims))
 	for _, one := range r.claims {
+		flagged, told, err := r.scopedWords(one)
+		if err != nil {
+			return nil, err
+		}
 		byStatus := map[Status]*Suppression{}
 		order := make([]Status, 0, 4)
 		for _, id := range one.listed {
@@ -807,15 +907,15 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 			// Words that named this product say what the document is arguing
 			// about it, and the first of them stands for the claim — one claim
 			// carries one sentence and every product under it shares a status.
-			if said := one.toldAbout[id]; said != "" && claim.Statement == "" {
+			if said := told[id]; said != "" && claim.Statement == "" {
 				claim.Statement = said
 			}
 			// The justification for this product, or the one the document
 			// gave for the whole claim.
 			if claim.Justification == "" {
-				if said, held := one.flagged[id]; held {
+				if said, held := flagged[id]; held {
 					claim.Justification = said
-				} else if said, held := one.flagged[""]; held {
+				} else if said, held := flagged[""]; held {
 					claim.Justification = said
 				}
 			}

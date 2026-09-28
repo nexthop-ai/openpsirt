@@ -4,6 +4,7 @@
 package sbom_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -216,5 +217,199 @@ func TestAClaimNamingNoPackageIdentifierStillCoversWhatItNames(t *testing.T) {
 	}
 	if got[0].Covers(elsewhere) {
 		t.Error("a claim naming a source tree reached a component that merely starts the same")
+	}
+}
+
+// csafDocument wraps a product tree and a list of vulnerabilities in the
+// document a reader of the given category takes.
+func csafDocument(category, tree, vulnerabilities string) string {
+	return `{"document": {"category": "` + category + `", "csaf_version": "2.0",
+	  "publisher": {"category": "vendor", "name": "Example"},
+	  "title": "x", "tracking": {"id": "EX-1", "version": "1", "status": "final",
+	    "current_release_date": "2026-09-01T00:00:00Z",
+	    "initial_release_date": "2026-09-01T00:00:00Z",
+	    "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z", "summary": "First"}]}},
+	 "product_tree": ` + tree + `,
+	 "vulnerabilities": ` + vulnerabilities + `}`
+}
+
+// csafProducts is a tree defining count products, P0 onwards, with the groups
+// given, and the list of the products' identifiers as a JSON array.
+func csafProducts(count int, groups string) (tree, ids string) {
+	var products, listed strings.Builder
+	for i := range count {
+		if i > 0 {
+			products.WriteString(",")
+			listed.WriteString(",")
+		}
+		fmt.Fprintf(&products, `{"product_id": "P%d", "name": "p%d",
+		 "product_identification_helper": {"purl": "pkg:deb/debian/p%d@1.0"}}`, i, i, i)
+		fmt.Fprintf(&listed, `"P%d"`, i)
+	}
+	tree = `{"full_product_names": [` + products.String() + `]`
+	if groups != "" {
+		tree += `, "product_groups": ` + groups
+	}
+	return tree + `}`, "[" + listed.String() + "]"
+}
+
+// bothCSAFReaders reads one document through the reader of each category.
+// They share the walk, and each is asked for its bounds rather than having
+// them assumed from the other.
+func bothCSAFReaders(tree, vulnerabilities string, lim sbom.Limits) map[string]error {
+	_, vex := sbom.ReadSuppressions(strings.NewReader(
+		csafDocument("csaf_vex", tree, vulnerabilities)), lim)
+	_, advisory := sbom.ReadAdvisory(strings.NewReader(
+		csafDocument("csaf_security_advisory", tree, vulnerabilities)), lim)
+	return map[string]error{"VEX": vex, "advisory": advisory}
+}
+
+func TestAGroupReferenceIsChargedWhatItStandsFor(t *testing.T) {
+	// A reference to a group is one short identifier standing for every
+	// product the group holds, and the distinct-identifier bound charges a
+	// repeat of it nothing. Fifty products named through one group thirty
+	// times is fifteen hundred entries from a few hundred bytes of flags.
+	lim := sbom.Limits{MaxComponents: 100}
+	_, ids := csafProducts(50, "")
+	tree, _ := csafProducts(50, `[{"group_id": "G", "product_ids": `+ids+`}]`)
+	vulnerabilities := func(groups string) string {
+		return `[{"cve": "CVE-2026-1", "product_status": {"known_not_affected": ` + ids + `},
+		  "flags": [{"label": "vulnerable_code_not_present", "group_ids": [` + groups + `]}]}]`
+	}
+	for reader, err := range bothCSAFReaders(tree, vulnerabilities(`"G"`), lim) {
+		if err != nil {
+			t.Errorf("the %s reader refused one reference to a group of fifty: %v", reader, err)
+		}
+	}
+	references := strings.TrimSuffix(strings.Repeat(`"G",`, 30), ",")
+	for reader, err := range bothCSAFReaders(tree, vulnerabilities(references), lim) {
+		if err == nil {
+			t.Errorf("the %s reader expanded a group of fifty thirty times over under a "+
+				"bound of a hundred products", reader)
+			continue
+		}
+		if !strings.Contains(err.Error(), "product limit") {
+			t.Errorf("the %s refusal does not name the limit it hit: %v", reader, err)
+		}
+	}
+}
+
+func TestEveryClaimListingTheSameProductsIsCharged(t *testing.T) {
+	// Each claim keeps its own list of the products under it, so a product
+	// listed by eleven claims is eleven entries held while the set of distinct
+	// identifiers stays at a hundred.
+	lim := sbom.Limits{MaxComponents: 100}
+	tree, ids := csafProducts(100, "")
+	claims := func(count int) string {
+		var out strings.Builder
+		out.WriteString("[")
+		for i := range count {
+			if i > 0 {
+				out.WriteString(",")
+			}
+			fmt.Fprintf(&out, `{"cve": "CVE-2026-%d", "product_status": {"fixed": %s}}`, i+1, ids)
+		}
+		return out.String() + "]"
+	}
+	for reader, err := range bothCSAFReaders(tree, claims(2), lim) {
+		if err != nil {
+			t.Errorf("the %s reader refused two claims about a hundred products: %v", reader, err)
+		}
+	}
+	for reader, err := range bothCSAFReaders(tree, claims(11), lim) {
+		if err == nil {
+			t.Errorf("the %s reader held eleven lists of a hundred products under a bound "+
+				"of a hundred", reader)
+			continue
+		}
+		if !strings.Contains(err.Error(), "product limit") {
+			t.Errorf("the %s refusal does not name the limit it hit: %v", reader, err)
+		}
+	}
+}
+
+func TestTheCVEIsTheIssuesNameWhereverTheDocumentStatesIt(t *testing.T) {
+	// A producer chooses the key order. The other identifiers the issue goes
+	// by are aliases whether they come before the CVE or after it.
+	tree, _ := csafProducts(1, "")
+	for _, order := range []struct{ name, keys string }{
+		{"ids first", `"ids": [{"system_name": "GHSA", "text": "GHSA-aaaa-bbbb-cccc"}], "cve": "CVE-2026-1",`},
+		{"cve first", `"cve": "CVE-2026-1", "ids": [{"system_name": "GHSA", "text": "GHSA-aaaa-bbbb-cccc"}],`},
+	} {
+		got, err := sbom.ReadSuppressions(strings.NewReader(csafDocument("csaf_vex", tree,
+			`[{`+order.keys+` "product_status": {"known_not_affected": ["P0"]}}]`)), sbom.Limits{})
+		if err != nil {
+			t.Fatalf("%s: reading: %v", order.name, err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("%s: %d claims", order.name, len(got))
+		}
+		if got[0].Vulnerability != "CVE-2026-1" {
+			t.Errorf("%s: the claim is about %q", order.name, got[0].Vulnerability)
+		}
+		if len(got[0].Aliases) != 1 || got[0].Aliases[0] != "GHSA-aaaa-bbbb-cccc" {
+			t.Errorf("%s: the claim also goes by %q", order.name, got[0].Aliases)
+		}
+	}
+}
+
+func TestAnIssueWithNoCVEIsNamedByItsFirstIdentifier(t *testing.T) {
+	tree, _ := csafProducts(1, "")
+	got, err := sbom.ReadSuppressions(strings.NewReader(csafDocument("csaf_vex", tree,
+		`[{"ids": [{"system_name": "Example", "text": "EX-1"},
+		           {"system_name": "GHSA", "text": "GHSA-aaaa-bbbb-cccc"}],
+		  "product_status": {"known_not_affected": ["P0"]}}]`)), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	if got[0].Vulnerability != "EX-1" {
+		t.Errorf("the claim is about %q", got[0].Vulnerability)
+	}
+	if len(got[0].Aliases) != 1 || got[0].Aliases[0] != "GHSA-aaaa-bbbb-cccc" {
+		t.Errorf("the claim also goes by %q", got[0].Aliases)
+	}
+}
+
+func TestWordsScopedByGroupStayScopedWhenTheTreeComesLast(t *testing.T) {
+	// A group named before the tree that defines it has been read holds
+	// nothing yet. Words scoped by it are about the products it holds once
+	// the document is closed, and never about the whole claim.
+	const vulnerabilities = `[{"cve": "CVE-2026-1",
+	    "product_status": {"fixed": ["P1"], "known_not_affected": ["P2"]},
+	    "flags": [{"label": "vulnerable_code_not_present", "group_ids": ["G1"]}],
+	    "remediations": [{"category": "vendor_fix",
+	      "details": "Upgrade to p1 1.0.", "group_ids": ["G1"]}]}]`
+	const tree = `{"full_product_names": [
+	      {"product_id": "P1", "name": "p1",
+	       "product_identification_helper": {"purl": "pkg:deb/debian/p1@1.0"}},
+	      {"product_id": "P2", "name": "p2",
+	       "product_identification_helper": {"purl": "pkg:deb/debian/p2@1.0"}}],
+	    "product_groups": [{"group_id": "G1", "product_ids": ["P1"]}]}`
+	const head = `{"document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
+	  "publisher": {"category": "vendor", "name": "Example"},
+	  "title": "x", "tracking": {"id": "EX-1"}}`
+	got, err := sbom.ReadAdvisory(strings.NewReader(head+
+		`, "vulnerabilities": `+vulnerabilities+`, "product_tree": `+tree+`}`), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	if len(got.Claims) != 2 {
+		t.Fatalf("%d claims", len(got.Claims))
+	}
+	for _, one := range got.Claims {
+		switch one.Status {
+		case sbom.AlreadyFixed:
+			if one.Statement != "Upgrade to p1 1.0." {
+				t.Errorf("the fixed claim says %q, and the group named its product", one.Statement)
+			}
+			if one.Justification != "vulnerable_code_not_present" {
+				t.Errorf("the fixed claim is justified by %q", one.Justification)
+			}
+		case sbom.NotAffected:
+			if one.Justification != "" {
+				t.Errorf("the not-affected claim is justified by %q, a flag about another "+
+					"product", one.Justification)
+			}
+		}
 	}
 }
