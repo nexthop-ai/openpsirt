@@ -144,13 +144,7 @@ func TestAnUpdateReportsRowsMatchedNotRowsChanged(t *testing.T) {
 	// touched.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		if _, err := db.NewRaw(`CREATE TABLE "matched_rows" ("id" INTEGER PRIMARY KEY, "note" VARCHAR(16))`).
-			Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			_, _ = db.NewRaw(`DROP TABLE "matched_rows"`).Exec(context.WithoutCancel(ctx))
-		})
+		scratchTable(t, db, "matched_rows", `"id" INTEGER PRIMARY KEY, "note" VARCHAR(16)`)
 		if _, err := db.NewRaw(`INSERT INTO "matched_rows" ("id", "note") VALUES (1, 'same')`).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
