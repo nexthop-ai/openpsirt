@@ -7,10 +7,8 @@ package queue
 //
 // Here rather than each in the package that does the work, because the name of
 // a job is shared between whoever adds it and whoever claims it, and those are
-// deliberately different packages. Kept where they were, reading an accepted
-// upload had to import the whole scanner package for one string — a dependency
-// pointing backwards against the flow of the work, and one that would have made
-// a second producer of scan jobs import it too.
+// deliberately different packages. Kept outside the worker packages, so a
+// producer of a job does not import the package that does it for one string.
 //
 // The strings themselves are stored in the queue table and read by a running
 // deployment's rows, so they are not renamed casually: a rename leaves queued

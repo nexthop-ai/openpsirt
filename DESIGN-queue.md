@@ -110,7 +110,7 @@ Renewal is bounded in total, not only per renewal.
 | It is recorded as this job's failed attempt, not as a handover | Nobody else holds the job. Counting the attempt is what eventually sets the job aside rather than handing it to a succession of workers that each wedge in turn |
 | A subprocess is given a delay to release the pipes once it is killed | Killing a process does not close a pipe a helper it spawned still holds, and waiting on the copy blocks past the deadline that killed it — which is how a worker wedges in the first place |
 
-Zero is no ceiling, for work whose caller states that it has no upper bound.
+Zero is no ceiling, for work whose caller states that it has no upper bound. No caller in this deployment builds a queue that way: every bound comes from a setting, and a setting refuses zero.
 That is asked for rather than arrived at by omission.
 
 ## Passes on a timer
@@ -142,7 +142,7 @@ update.
 | Expiry | A lease lapses rather than only being handed back |
 | Retention | The holder keeps it by asking for it again each cycle |
 | Release | Handed back on a clean shutdown |
-| Duration | Outlasts a cycle of the work. Not renewed mid-pass |
+| Duration | Outlasts a cycle of the work, sized from how often the pass runs rather than how often its subject recurs, so a replica that stops without handing it back holds the work for a few passes. Not renewed mid-pass |
 
 | Work shape | On losing the race | Passes |
 |---|---|---|
@@ -185,7 +185,7 @@ queue may get is the sixth and is a stored setting.
 |---|---|
 | The environment, not a stored setting | The settings store reads the database, so the database and the queue cannot read a setting without inverting that import. What it costs is that changing one needs a restart, which is said here rather than discovered |
 | How deep the queue may get is the exception | That refusal lands on a build server, and the operator meeting it needs a remedy that is not a restart |
-| Zero or negative is refused rather than taken | The rule every setting is held to. So "no ceiling on one hold" cannot be asked for from the environment: it is what a caller whose work has no upper bound of its own states where the queue is built |
+| Zero or negative is refused rather than taken | The rule every setting is held to. So "no ceiling on one hold" cannot be asked for from the environment: it is what a caller whose work has no upper bound of its own would state where the queue is built, and no caller here does |
 | Two pairs are compared as the process starts | A heartbeat no shorter than the claim timeout hands running work to a second worker; a hold ceiling no larger than the claim timeout cancels work that is running normally. Both read as a fault in the work rather than in the configuration, so the process refuses to start and names the pair |
 | The defaults live where the queue is built | Every reader takes them from there rather than carrying its own, so two spellings cannot disagree. The configuration reference prints them in its Default column as it does for every other setting, which is the one restatement and the one an operator reads; the chart carries none, and a deployment that wants one sets the environment variable |
 

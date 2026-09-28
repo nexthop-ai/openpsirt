@@ -109,6 +109,52 @@ func TestFinishingWorkSurvivesACommitThatLosesARace(t *testing.T) {
 	}
 }
 
+// Work that succeeded and whose ending could not be recorded reports the
+// failure to record, rather than success.
+func TestWorkWhoseEndingCannotBeRecordedSaysSo(t *testing.T) {
+	ctx := t.Context()
+	handle, owner := dbtest.Racing(t, nil)
+	q := queue.New(handle, queue.DefaultOptions())
+	if _, err := q.Add(ctx, "ingest", "unrecorded"); err != nil {
+		t.Fatal(err)
+	}
+	job, err := q.Claim(ctx, "worker", "ingest")
+	if err != nil || job == nil {
+		t.Fatalf("claiming: %v", err)
+	}
+	owner.Arm(database.Attempts)
+	ending := q.Settle(ctx, job, "worker", "upload", nil, nil, nil, nil)
+	if ending.Err == nil || ending.HandedOver {
+		t.Errorf("work whose success could not be recorded settled as %+v", ending)
+	}
+}
+
+// Finishing work whose row already reads finished, on a retry, is finished:
+// a commit that went through and whose answer was lost is not a lost claim.
+func TestFinishingWorkAlreadyRecordedAsFinishedIsNotALostClaim(t *testing.T) {
+	ctx := t.Context()
+	var handle *database.DB
+	var owner *dbtest.Race
+	handle, owner = dbtest.Racing(t, func() {
+		if _, err := handle.ExecContext(context.WithoutCancel(ctx),
+			`UPDATE "job" SET "state" = 'done', "claimed_by" = NULL`); err != nil {
+			t.Errorf("recording the job done between attempts: %v", err)
+		}
+	})
+	q := queue.New(handle, queue.DefaultOptions())
+	if _, err := q.Add(ctx, "ingest", "answer-lost"); err != nil {
+		t.Fatal(err)
+	}
+	job, err := q.Claim(ctx, "worker", "ingest")
+	if err != nil || job == nil {
+		t.Fatalf("claiming: %v", err)
+	}
+	owner.Arm(1)
+	if err := q.Succeed(ctx, job.ID, "worker"); err != nil {
+		t.Errorf("finishing work that reads finished answered %v", err)
+	}
+}
+
 func TestQueueingWorkSurvivesACommitThatLosesARace(t *testing.T) {
 	// The same at the other end: a refused commit on the insert meant the work
 	// was never queued, and the caller was told so.

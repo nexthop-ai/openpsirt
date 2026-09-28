@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
 )
@@ -68,4 +69,44 @@ func TestAProgramAndWhatItStartsRunBehindTheServer(t *testing.T) {
 	if got := niceness(t, string(after)); got != server {
 		t.Errorf("the server moved from niceness %d to %d", server, got)
 	}
+
+	// Niceness belongs to a thread, and the one lowered to start the program
+	// is never handed back to the scheduler, so no thread of this process is
+	// left behind the server. The lowered thread exits once its goroutine
+	// has, which is shortly after, so this asks until none remains.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		lowered := loweredThreads(t)
+		if lowered == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d threads of the server still run at niceness %d", lowered, background.Behind)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// loweredThreads counts this process's threads running at the niceness a
+// program is started at.
+func loweredThreads(t *testing.T) int {
+	t.Helper()
+	tasks, err := os.ReadDir("/proc/self/task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) == 0 {
+		t.Fatal("this process has no threads to read, so this checked nothing")
+	}
+	lowered := 0
+	for _, task := range tasks {
+		stat, err := os.ReadFile("/proc/self/task/" + task.Name() + "/stat")
+		if err != nil {
+			continue // a thread that exited between the listing and the read
+		}
+		if niceness(t, string(stat)) == background.Behind {
+			lowered++
+		}
+	}
+	return lowered
 }
