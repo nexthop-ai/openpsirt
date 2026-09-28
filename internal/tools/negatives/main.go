@@ -40,10 +40,10 @@ import (
 //
 // Two shapes publish one. An error passed after the message is appended to the
 // body as a detail by the framework, whatever it is called. And any argument
-// reading an error's text — a method named Error called with nothing, on any
-// value — puts that text in the message. A sentinel a package declares, read
-// as `pkg.ErrName.Error()`, is a sentence the code chose and is left alone.
-func builtFromError(call *ast.CallExpr) bool {
+// carrying an error's text puts that text in the message, as readsError says.
+// `bound` holds the names in the enclosing function that were given an error's
+// text before the call.
+func builtFromError(call *ast.CallExpr, bound map[string]bool) bool {
 	fun, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok || fun.Sel.Name != "Error404NotFound" {
 		return false
@@ -54,21 +54,94 @@ func builtFromError(call *ast.CallExpr) bool {
 	if len(call.Args) > 1 {
 		return true
 	}
-	found := false
 	for _, arg := range call.Args {
-		ast.Inspect(arg, func(n ast.Node) bool {
-			inner, ok := n.(*ast.CallExpr)
-			if !ok || len(inner.Args) != 0 {
-				return !found
+		if readsError(arg, bound) {
+			return true
+		}
+	}
+	return false
+}
+
+// readsError reports whether an expression carries an error's text.
+//
+// Three shapes do: a method named Error called with nothing, on any value; a
+// formatting call handed a value named like an error, which formats its text;
+// and a name given one of those earlier in the function. A sentinel a package
+// declares, read as `pkg.ErrName.Error()`, is a sentence the code chose and is
+// left alone.
+func readsError(x ast.Expr, bound map[string]bool) bool {
+	found := false
+	ast.Inspect(x, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.Ident:
+			found = found || bound[n.Name]
+		case *ast.CallExpr:
+			method, ok := n.Fun.(*ast.SelectorExpr)
+			if !ok {
+				break
 			}
-			method, ok := inner.Fun.(*ast.SelectorExpr)
-			if ok && method.Sel.Name == "Error" && !sentinel(method.X) {
+			if len(n.Args) == 0 && method.Sel.Name == "Error" && !sentinel(method.X) {
 				found = true
 			}
-			return !found
+			if pkg, ok := method.X.(*ast.Ident); ok && pkg.Name == "fmt" && formats[method.Sel.Name] {
+				for _, arg := range n.Args {
+					if name, ok := arg.(*ast.Ident); ok && errorNamed(name.Name) {
+						found = true
+					}
+				}
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+// formats are the fmt functions that write their arguments' text into the
+// string they return.
+var formats = map[string]bool{"Sprint": true, "Sprintf": true, "Sprintln": true, "Errorf": true}
+
+// errorNamed is whether a name is spelled the way an error is named here:
+// err, or a word ending in Err, or err followed by a word.
+func errorNamed(name string) bool {
+	if name == "err" || strings.HasSuffix(name, "Err") && len(name) > 3 {
+		return true
+	}
+	return strings.HasPrefix(name, "err") && len(name) > 3 && unicode.IsUpper(rune(name[3]))
+}
+
+// boundIn is every name a function body gives an error's text, by assignment
+// or declaration. Read to a fixed point, so a name bound from another such name
+// is one too.
+func boundIn(body ast.Node) map[string]bool {
+	bound := map[string]bool{}
+	for changed := true; changed; {
+		changed = false
+		mark := func(names []ast.Expr, values []ast.Expr) {
+			for i, value := range values {
+				if i >= len(names) || !readsError(value, bound) {
+					continue
+				}
+				if name, ok := names[i].(*ast.Ident); ok && name.Name != "_" && !bound[name.Name] {
+					bound[name.Name] = true
+					changed = true
+				}
+			}
+		}
+		ast.Inspect(body, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.AssignStmt:
+				mark(n.Lhs, n.Rhs)
+			case *ast.ValueSpec:
+				names := make([]ast.Expr, len(n.Names))
+				for i, name := range n.Names {
+					names[i] = name
+				}
+				mark(names, n.Values)
+			}
+			return true
 		})
 	}
-	return found
+	return bound
 }
 
 // sentinel is whether an expression is a package's exported error value,
@@ -89,7 +162,8 @@ func sentinel(x ast.Expr) bool {
 //
 // Parsed rather than matched line by line: a call spread over lines, an error
 // under any name, and an error passed as a second argument are all one shape
-// to a parser and three to a pattern.
+// to a parser and three to a pattern. Names are followed within the top-level
+// declaration that binds them.
 func builtIn(path string, src []byte) ([]int, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, src, 0)
@@ -97,12 +171,15 @@ func builtIn(path string, src []byte) ([]int, error) {
 		return nil, err
 	}
 	var lines []int
-	ast.Inspect(file, func(n ast.Node) bool {
-		if call, ok := n.(*ast.CallExpr); ok && builtFromError(call) {
-			lines = append(lines, fset.Position(call.Pos()).Line)
-		}
-		return true
-	})
+	for _, decl := range file.Decls {
+		bound := boundIn(decl)
+		ast.Inspect(decl, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok && builtFromError(call, bound) {
+				lines = append(lines, fset.Position(call.Pos()).Line)
+			}
+			return true
+		})
+	}
 	return lines, nil
 }
 

@@ -77,6 +77,26 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			map[string]string{"f": "role_grant_all", "g": "role_grant"},
 		},
 		{
+			// Each name in a block is judged by its own value, so a block
+			// holding one query per table is two names that each ask one.
+			"a block of one query per table",
+			`package p
+			const (
+				perProduct = "role_grant"
+				estate     = "role_grant_all"
+			)`,
+			map[string]string{"perProduct": "role_grant_all", "estate": "role_grant"},
+		},
+		{
+			"a function reaching one table through a package-level name",
+			`package p
+			var perProduct = []string{"role_grant"}
+			var estate = []string{"role_grant_all"}
+			func f() { q.Join(perProduct[0]) }
+			func g() { q.Join(perProduct[0]).Join(estate[0]) }`,
+			map[string]string{"perProduct": "role_grant_all", "estate": "role_grant", "f": "role_grant_all"},
+		},
+		{
 			// A field of the same name on something else is not the model.
 			"a field that shares the model's name",
 			`package p
@@ -84,7 +104,7 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			map[string]string{},
 		},
 	} {
-		got, err := oneAlone("x.go", []byte(c.src))
+		got, err := oneAlone("x.go", []byte(c.src), nil)
 		if err != nil {
 			t.Fatalf("%s: %v", c.what, err)
 		}

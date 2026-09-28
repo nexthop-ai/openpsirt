@@ -56,6 +56,26 @@ func TestWhatCountsAsA404BuiltFromAnError(t *testing.T) {
 			"	return huma.Error404NotFound(\n\t\t\"cannot read that: \" +\n\t\terr.Error())", true,
 		},
 		{
+			"an error formatted into the message",
+			`	return huma.Error404NotFound(fmt.Sprintf("no such product: %v", err))`, true,
+		},
+		{
+			"an error under another name formatted into the message",
+			`	return huma.Error404NotFound(fmt.Sprint("no such product: ", lookupErr))`, true,
+		},
+		{
+			"an error's text bound to a name first",
+			"	msg := err.Error()\n	return huma.Error404NotFound(msg)", true,
+		},
+		{
+			"a name bound from one that holds an error's text",
+			"	var text = fmt.Sprintf(\"%v\", errRead)\n	msg := \"x: \" + text\n	return huma.Error404NotFound(msg)", true,
+		},
+		{
+			"a name bound from a sentence",
+			"	msg := fmt.Sprintf(\"no product called %q\", name)\n	return huma.Error404NotFound(msg)", false,
+		},
+		{
 			"a package's sentinel, which is a sentence the code chose",
 			`	return huma.Error404NotFound(catalog.ErrNotFound.Error())`, false,
 		},

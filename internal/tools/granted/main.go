@@ -33,6 +33,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -81,9 +82,10 @@ var inside = map[string]string{
 type reach struct{ perProduct, estate bool }
 
 // reached reports which grant tables a node reaches: by a table's name in a
-// string, or by the model bound to it. Inside the access package the model is
-// a bare name; elsewhere it is qualified by the package.
-func reached(n ast.Node, inAccess bool) reach {
+// string, by the model bound to it, or by a package-level name in `names`
+// whose declaration reaches one. Inside the access package the model is a bare
+// name; elsewhere it is qualified by the package.
+func reached(n ast.Node, inAccess bool, names map[string]reach) reach {
 	var r reach
 	ast.Inspect(n, func(n ast.Node) bool {
 		switch n := n.(type) {
@@ -107,12 +109,13 @@ func reached(n ast.Node, inAccess bool) reach {
 			}
 			// A field or method of that name on something else is not the
 			// model, so the selected name is not visited on its own.
-			r = r.or(reached(n.X, inAccess))
+			r = r.or(reached(n.X, inAccess, names))
 			return false
 		case *ast.Ident:
 			if inAccess {
 				r.model(n.Name)
 			}
+			r = r.or(names[n.Name])
 		}
 		return true
 	})
@@ -144,47 +147,106 @@ func (r reach) missing() (string, bool) {
 	}
 }
 
-// oneAlone is every function or declaration in a file that reaches one grant
-// table and not the other, with the table it leaves out.
+// declared is the reach of every package-level constant and variable a file
+// declares, by name. Each name is judged by its own value, so a block holding
+// one query per grant table is two names that each reach one.
+func declared(file *ast.File, inAccess bool) map[string]reach {
+	names := map[string]reach{}
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok == token.TYPE || gen.Tok == token.IMPORT {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			value, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for i, name := range value.Names {
+				var r reach
+				if i < len(value.Values) {
+					r = reached(value.Values[i], inAccess, nil)
+				}
+				if value.Type != nil {
+					r = r.or(reached(value.Type, inAccess, nil))
+				}
+				names[name.Name] = names[name.Name].or(r)
+			}
+		}
+	}
+	return names
+}
+
+// oneAlone is every function or package-level name in a file that reaches one
+// grant table and not the other, with the table it leaves out.
+//
+// A function reaches what its body names, including the package-level names
+// it uses: `pkg` holds those of the file's package, and where it is nil the
+// file's own are read. A package-level name is reported by itself, since a
+// name reaching one table is a query that asks one.
 //
 // Lifted out of the walk so it can be asked directly: a gate reachable only by
 // running the program over the tree has an exit code for its only evidence.
-func oneAlone(path string, src []byte) (map[string]string, error) {
+func oneAlone(path string, src []byte, pkg map[string]reach) (map[string]string, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), path, src, 0)
 	if err != nil {
 		return nil, err
 	}
 	inAccess := file.Name.Name == accessPackage
+	own := declared(file, inAccess)
+	if pkg == nil {
+		pkg = own
+	}
 	found := map[string]string{}
 	for _, decl := range file.Decls {
-		var name string
-		var body ast.Node
-		switch d := decl.(type) {
-		case *ast.FuncDecl:
-			if d.Body == nil {
-				continue
-			}
-			name, body = d.Name.Name, d.Body
-		case *ast.GenDecl:
-			// A type declares a model rather than querying one, and an import
-			// names nothing.
-			if d.Tok == token.TYPE || d.Tok == token.IMPORT {
-				continue
-			}
-			name, body = "the declarations at line "+strconv.Itoa(int(d.Pos())), d
-		default:
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
 			continue
 		}
-		if table, only := reached(body, inAccess).missing(); only {
+		if table, only := reached(fn.Body, inAccess, pkg).missing(); only {
+			found[fn.Name.Name] = table
+		}
+	}
+	for name, r := range own {
+		if table, only := r.missing(); only {
 			found[name] = table
 		}
 	}
 	return found, nil
 }
 
+// packageNames is the reach of every package-level name each directory's
+// files declare, tests aside.
+func packageNames() (map[string]map[string]reach, error) {
+	byDir := map[string]map[string]reach{}
+	_, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
+		if strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, text, 0)
+		if err != nil {
+			return err
+		}
+		dir := filepath.Dir(path)
+		if byDir[dir] == nil {
+			byDir[dir] = map[string]reach{}
+		}
+		for name, r := range declared(file, file.Name.Name == accessPackage) {
+			byDir[dir][name] = byDir[dir][name].or(r)
+		}
+		return nil
+	})
+	return byDir, err
+}
+
 func main() {
 	var bad []string
 	used := map[string]bool{}
+	names, err := packageNames()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "granted:", err)
+		os.Exit(1)
+	}
 	// web holds the interface, which reaches no table: it asks this server.
 	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
 		// A test may assert about one table on purpose: it is saying what is
@@ -197,7 +259,11 @@ func main() {
 				return nil
 			}
 		}
-		found, err := oneAlone(path, text)
+		pkg := names[filepath.Dir(path)]
+		if pkg == nil {
+			pkg = map[string]reach{}
+		}
+		found, err := oneAlone(path, text, pkg)
 		if err != nil {
 			return err
 		}
