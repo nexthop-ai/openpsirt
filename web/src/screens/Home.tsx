@@ -907,10 +907,9 @@ function Lapsed() {
   const lapsedTotal = lapsed.data?.total ?? 0;
   const expiredTotal = expired.data?.total ?? 0;
   const allTotal = everywhere.data?.total ?? 0;
-  // A read that did not happen is not a count of nothing. Falling through, the
-  // panel stated "Nothing has lapsed" over a failed read and the tally beside
-  // the heading drew a confident zero — which is the defect this whole change
-  // is about, on the busiest screen there is.
+  // A read that did not happen is not a count of nothing, and "Nothing has
+  // lapsed" over a failed read is a confident zero on the busiest screen there
+  // is.
   const unread = stopped.isError || lapsed.isError || expired.isError;
 
   return (

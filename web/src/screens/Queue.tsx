@@ -157,11 +157,9 @@ export function Queue() {
       unwrap(await api.GET("/v1/decisions", { params: { query: { stopped: true, limit: 50 } } })),
   });
   // A milder rating of an issue waits for a second person the same way a
-  // dismissal does, and there was nowhere to be that second person: the route
-  // existed and no screen reached it. Requests to keep something hidden longer
-  // that nobody has agreed to . Until now there was nowhere to be that second
-  // person: a request could be read on the finding it belongs to and nowhere
-  // else, so the only way to find one was to already know it existed.
+  // dismissal does, and so does a request to keep something hidden longer.
+  // Both are listed here, where a request is otherwise read only on the
+  // finding it belongs to.
   //
   // It is on this screen because this is where somebody goes to be a second
   // person, and it is a separate list rather than a queue card because what is

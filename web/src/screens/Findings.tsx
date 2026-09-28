@@ -392,8 +392,8 @@ export function Findings() {
   //
   // The three answer the same narrowing at three grains, and the difference
   // between them is the whole reason to switch: a product whose by-issue list
-  // is 7,455 rows is 341 by component and 284 by upgrade, and nothing said so
-  // — so the list opened on its longest view and read as the only one.
+  // is 7,455 rows is 341 by component and 284 by upgrade. Without the counts
+  // the list opens on its longest view and reads as the only one.
   //
   // Asked with a page of one, because the total is what is wanted. The
   // by-issue count is the one the screen already holds where the by-issue view

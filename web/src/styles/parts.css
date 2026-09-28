@@ -1543,10 +1543,9 @@ tr.places td {
   color: var(--sev-high);
   vertical-align: 1px;
 }
-/* Number and date were not in this list, so every one of them drew as an
-   unstyled browser default — no border, no background, the wrong font. It
-   showed up the moment a panel put one beside a text field, and it was
-   already true of the settings screen. */
+/* Every kind of field a form draws, number and date among them: one left out
+   draws as the browser's default — no border, no background, the wrong font —
+   beside a text field that has them. */
 select,
 textarea,
 input[type="text"],

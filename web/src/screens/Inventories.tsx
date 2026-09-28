@@ -464,11 +464,9 @@ type Uploaded = NonNullable<Body<"ReceiptBody">["state"]>;
 
 // The states an upload passes through, and the one it can end in.
 //
-// One table keyed on the vocabulary the server declares, rather than three
-// parallel ones over the same four words: a state added to one of the three
-// and not the others drew a label with the wrong color, or a color with no
-// label, and nothing here would have said so. Keyed on the generated union, a
-// fifth state is a compile error at this table rather than a silent neutral
+// One table keyed on the vocabulary the server declares, so a state has its
+// label and its color together. Keyed on the generated union, a state the
+// server adds is a compile error at this table rather than a silent neutral
 // badge.
 const STATES: Record<Uploaded, { cls: string; label: string; means: string }> = {
   reading: {

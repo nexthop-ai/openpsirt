@@ -34,9 +34,9 @@ export function Disclosing() {
   const queries = useQueryClient();
   const who = useWho().data;
   // The distance ahead to look. Empty is this deployment's own embargo length,
-  // which the server supplies: a fixed thirty days against the ninety-day
-  // policy that ships drew an empty screen while embargoes were running, and
-  // an empty screen reads as "nothing is coming".
+  // which the server supplies: a fixed window shorter than the policy leaves
+  // the screen empty while embargoes are running, and an empty screen reads as
+  // "nothing is coming".
   const [days, setDays] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
   // Which act is being recorded. Chosen rather than read off the date typed:

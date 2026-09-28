@@ -222,11 +222,8 @@ export function ByComponent({
               return (
                 <tr key={`${name} ${row.version} ${row.ecosystem ?? ""}`} className="row">
                   <td>
-                    {/* The name opens the component. It used to narrow the
-                        list, with the component itself behind a small
-                        "Open →" in the last column next to "Hide" — an act
-                        parked away from the thing it acts on, which is the
-                        shape the By fix view was deleted for. */}
+                    {/* The name opens the component: the act sits on the
+                        thing it acts on rather than in a column of its own. */}
                     <Link
                       className="linkish id"
                       title={`Open ${name}`}

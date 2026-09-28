@@ -91,11 +91,9 @@ export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
 // Work nobody holds and nobody has decided, as filters on this list.
 //
 // One spelling, because three places open it: the sidebar entry, the badge
-// beside that entry, and the route the old `/unassigned` address resolves
-// through. The screen that used to answer this went — it asked the server a
-// question with no decision predicate in it, so it counted differently from
-// its own heading, and it carried no deadline, no age, no filters and no sort
-// over a list that runs to thousands of rows.
+// beside that entry, and the route the `/unassigned` address resolves through.
+// It is the findings list, so it carries the deadline, the age, the filters and
+// the sort a list running to thousands of rows needs.
 export const UNOWNED = "assigned=nobody&state=undecided";
 export const UNOWNED_LIST = `/findings?${UNOWNED}`;
 
@@ -290,11 +288,11 @@ function one<K extends ClosedParameter>(name: K, value: string): Word<K> | undef
 
 // A number the address carries, or nothing where it is not one.
 //
-// `Number("")` is 0 and `Number("soon")` is NaN, and both went to the server
-// as they were: NaN reached it as the text "NaN" and 0 reached a parameter
-// whose minimum is 1. The address is somebody else's text like any other, and
-// a value outside what the server takes is a parameter to leave off rather
-// than one to send wrong.
+// `Number("")` is 0 and `Number("soon")` is NaN: sent as they are, NaN
+// reaches the server as the text "NaN" and 0 reaches a parameter whose
+// minimum is 1. The address is somebody else's text like any other, and a
+// value outside what the server takes is a parameter to leave off rather than
+// one to send wrong.
 export function num(raw: string | null, least: number, most: number): number | undefined {
   if (raw === null || raw.trim() === "") return undefined;
   const asked = Number(raw);

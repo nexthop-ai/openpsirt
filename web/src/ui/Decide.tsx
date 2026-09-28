@@ -126,8 +126,8 @@ export type Recorded = {
 // the row sits open with nothing true to say about it.
 //
 // Driven off the generated request type rather than retyped: the server
-// generates these words from the domain vocabulary, and a third copy here is
-// the shape that change removed from eight struct tags. Written as a record so
+// generates these words from the domain vocabulary, and a copy here would be a
+// second list to keep in step. Written as a record so
 // the check runs both ways — a word the domain gains and this does not is a
 // missing key, and a word this keeps after the domain drops it is an excess
 // one. Both are compile errors rather than a screen offering something the

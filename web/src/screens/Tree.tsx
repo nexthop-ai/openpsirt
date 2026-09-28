@@ -113,8 +113,8 @@ export function Tree() {
   // ask.
   if (who.isPending) return <Loading />;
   // The tree somebody gets, of the two, turns on what they may read, so a
-  // failed identity read is not an answer: falling through drew the whole
-  // build's inventory for a subject nobody had established may see it.
+  // failed identity read is not an answer: the whole build's inventory is not
+  // drawn for a subject nobody has established may see it.
   if (who.isError) {
     return <Failed error={who.error} what="Your reach here could not be read." />;
   }
@@ -326,9 +326,9 @@ function Whole() {
   });
 
   // The rows under each opened node, and which of the three states that is
-  // in. A read that failed and a read still in flight both had no rows, and
-  // both were drawn as the second — so a container whose children could not be
-  // read spun for ever with nothing said.
+  // in. A read that failed and a read still in flight both have no rows, and
+  // are told apart here, so a container whose children cannot be read says so
+  // rather than spinning.
   const below = useMemo(() => {
     const map = new Map<string, Under>();
     if (rootKey) map.set(rootKey, { kids: (top.data?.items ?? []) as Node[] });
