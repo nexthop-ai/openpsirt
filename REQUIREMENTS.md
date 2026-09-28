@@ -174,6 +174,7 @@ inputs.
 | REQ-53 | Dismissals, deadlines, approvals and how long triage is taking are reportable in their own right, including the exception report that should come back empty | An auditor's first question is which dismissals nobody agreed to |
 | REQ-54 | Trends are plotted on the axis the subject has: calendar time for a branch, release over release for tags | Tagged releases are frozen points, not a time series |
 | REQ-77 | Reporting obligations are recorded, never computed. OpenPSIRT stores the facts a regulatory report needs — when something became known, what was known, who was told and when — and does not determine whether an obligation applies, when it falls due, or whether it was met. In particular, a vulnerability reported as exploited in the wild is not evidence that this deployment's product has been exploited; those are different facts and only the second is a reportable event | This is a general product deployed by organizations under different obligations, in different places, reading their own counsel. An interpretation encoded here is one every deployment inherits and none of them chose, and it is wrong for most of them the moment a rule is amended. What every deployment does need is the same: the facts, with the times they happened, in a form somebody can answer a regulator with |
+| REQ-79 | Match coverage is reportable: for each build, which components the scanner had no way to match, and why | A component nothing can match reports no findings, which looks exactly like a component that has none |
 
 ### 3.13 Interface
 
