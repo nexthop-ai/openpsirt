@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -1087,17 +1086,11 @@ func TestACaseIsRecordedByTheNamesItResolvedTo(t *testing.T) {
 }
 
 // The list of administrative changes and its file state a change's moment
-// alike, in UTC.
-//
-// A driver hands back a time in the process's own zone, so a moment formatted
-// without converting it first is off by the zone's offset. The process zone is
-// set away from UTC here, which is why the test runs alone: the zone is the
-// whole process's.
+// alike, in UTC. The conversion itself is pinned where a moment is formatted,
+// against a time in another zone: the process zone cannot be moved under a
+// running server without racing every goroutine that reads it.
 func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
-	was := time.Local
-	time.Local = time.FixedZone("east", 5*3600)
-	t.Cleanup(func() { time.Local = was })
-	reachOn(t, castSeed.Alone, func(t *testing.T, r *reach) {
+	twoReach(t, func(t *testing.T, r *reach) {
 		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
 			`{"value":"high"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())

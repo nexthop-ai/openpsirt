@@ -26,3 +26,14 @@ func TestAWaitIsRoundedToATenthOfADay(t *testing.T) {
 		}
 	}
 }
+
+// A moment is stated in UTC whatever zone the driver handed it back in.
+func TestAMomentIsStatedInUTC(t *testing.T) {
+	east := time.Date(2026, 9, 28, 19, 0, 0, 0, time.FixedZone("east", 5*3600))
+	if got := stamp(east); got != "2026-09-28T14:00:00Z" {
+		t.Errorf("19:00 at +05:00 is stated as %s", got)
+	}
+	if got := stamp(time.Time{}); got != "" {
+		t.Errorf("no moment is stated as %q", got)
+	}
+}
