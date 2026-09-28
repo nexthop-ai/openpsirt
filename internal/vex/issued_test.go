@@ -15,8 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -25,23 +24,10 @@ func TestADocumentRecordedAfterSomebodyElsesStatesTheLaterVersion(t *testing.T) 
 	// A second issuance committing between the document being generated and
 	// the write recording it moves the count. The document handed back has to
 	// carry the number it is recorded under.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.Resolve(ctx, "sonic", "master", "broadcom"); err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
 			access.Stated(false), nil)
 		if err != nil {
@@ -101,26 +87,13 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 	// the whole attempt is taken again, reads the number the first wrote, and
 	// records the next one. SQLite has one connection, so nothing lands
 	// between the read and the write there.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		if db.Stats().MaxOpenConnections == 1 {
 			t.Skip("one connection: nothing lands between a read and a write")
 		}
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.Resolve(ctx, "sonic", "master", "broadcom"); err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
 			access.Stated(false), nil)
 		if err != nil {
@@ -162,24 +135,11 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 // rename committing in between would record one naming what the build had
 // been called.
 func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.Resolve(ctx, "sonic", "master", "broadcom"); err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
+		variant := w.Customer
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
 			access.Stated(false), nil)
 		if err != nil {
