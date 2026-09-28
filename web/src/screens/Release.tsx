@@ -16,9 +16,8 @@ import { Wide } from "../ui/Wide";
 // A release is a hand-off, not a fifth summary page. What belongs here is
 // everything handed over when a tag is cut — what changed since the last one,
 // what was said publicly, what a customer's own scanner reads, and the record
-// somebody audits — which until now sat in four places reached four ways.
-// Navigating to a tag landed on a build's findings list, as though a tag were a
-// branch.
+// somebody audits — gathered in one place. A tag is not a branch, so it opens
+// here rather than on a build's findings list.
 //
 // No overdue section. A tag never changes, so nothing on it has a deadline
 // to miss.
@@ -75,11 +74,16 @@ export function Release({ product, stream }: { product: string; stream: string }
       />
     );
   }
+  // Without the variants there is no count to add, and an empty list reads as
+  // a release nothing was ever filed against.
+  if (built.isError) {
+    return <Failed error={built.error} what="The variants of this release could not be read." />;
+  }
 
   const bands = totalled(counts.map((one) => one.data?.now));
   // Every variant answered, not merely every variant finished asking. A read
-  // that failed is not pending either, so the weaker test drew the totals as a
-  // finished answer with the failed variants counted as zero.
+  // that failed is not pending either, and a total drawn over it counts the
+  // failed variants as zero.
   const settled = counts.every((one) => one.isSuccess);
   const unread = counts.filter((one) => one.isError).length;
 
@@ -137,8 +141,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                   // Off the same answer the severity split below is added
                   // from, rather than off the variant list: that endpoint
                   // lists what a release was built as and never fills the
-                  // count in, so reading it here drew a column of zeroes
-                  // under a section reporting twenty-six.
+                  // count in.
                   const mine = counts[at_]?.data?.now;
                   return (
                     <tr key={variant.name}>

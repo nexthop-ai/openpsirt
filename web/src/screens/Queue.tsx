@@ -537,6 +537,7 @@ export function Queue() {
         total={embargoes.data?.total}
         offset={embargoAt}
         onGo={setEmbargoAt}
+        error={embargoes.isError ? embargoes.error : undefined}
       />
 
       {/* A ruling setting reports aside waits for a second person the way a
