@@ -199,25 +199,61 @@ func Reachable(address string) error {
 		// rather than a name still awaiting resolution.
 		return fmt.Errorf("refused a connection to %q: not an address", host)
 	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() ||
-		sharedAddressSpace(ip) {
+	if !reachable(ip) {
 		return fmt.Errorf("refused a connection to %s: a provider is not reached inside this network", ip)
 	}
 	return nil
 }
 
+// reachable says an address is on the public internet. An address in the
+// well-known NAT64 prefix is judged by the IPv4 address it translates to.
+func reachable(ip net.IP) bool {
+	if v4 := translated(ip); v4 != nil {
+		ip = v4
+	}
+	return !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() &&
+		!ip.IsLinkLocalMulticast() && !ip.IsUnspecified() && !ip.IsMulticast() &&
+		!sharedAddressSpace(ip)
+}
+
+// wellKnownNAT64 is the prefix a NAT64 gateway translates into IPv4 with the
+// address in its last 32 bits. On a network with DNS64, a name with no IPv6
+// address answers inside it: 64:ff9b::8c52:7904 reaches 140.82.121.4, and
+// 64:ff9b::a00:5 reaches 10.0.0.5.
+var wellKnownNAT64 = mustNetwork("64:ff9b::/96")
+
+// translated is the IPv4 address a well-known NAT64 address reaches, or nil
+// for any other address.
+func translated(ip net.IP) net.IP {
+	if ip.To4() != nil || !wellKnownNAT64.Contains(ip) {
+		return nil
+	}
+	return net.IPv4(ip[12], ip[13], ip[14], ip[15])
+}
+
 // sharedAddressSpace covers the ranges the standard library does not treat as
 // private but which are not the public internet either: the carrier-grade
-// translation block, the block meaning "this network", and the two prefixes a
-// NAT64 gateway translates into IPv4 — on a network with DNS64, a name
-// answering 64:ff9b::a00:5 reaches 10.0.0.5.
+// translation block, the block meaning "this network", and the local-use
+// NAT64 prefix. A local-use prefix places the IPv4 address at whichever
+// length the network chose, so nothing here can read which address it
+// reaches, and it is refused whole.
 func sharedAddressSpace(ip net.IP) bool {
-	for _, block := range []string{"100.64.0.0/10", "0.0.0.0/8", "64:ff9b::/96", "64:ff9b:1::/48"} {
-		_, network, err := net.ParseCIDR(block)
-		if err == nil && network.Contains(ip) {
+	for _, network := range shared {
+		if network.Contains(ip) {
 			return true
 		}
 	}
 	return false
+}
+
+var shared = []*net.IPNet{
+	mustNetwork("100.64.0.0/10"), mustNetwork("0.0.0.0/8"), mustNetwork("64:ff9b:1::/48"),
+}
+
+func mustNetwork(block string) *net.IPNet {
+	_, network, err := net.ParseCIDR(block)
+	if err != nil {
+		panic(err)
+	}
+	return network
 }

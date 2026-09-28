@@ -80,8 +80,12 @@ func (e Excluded) Host(host string) bool {
 }
 
 // address reports whether an address is in a network an administrator
-// excluded.
+// excluded. An address in the well-known NAT64 prefix is judged by the IPv4
+// address it translates to as well.
 func (e Excluded) address(ip net.IP) bool {
+	if v4 := translated(ip); v4 != nil && e.address(v4) {
+		return true
+	}
 	for _, network := range e.networks {
 		if network.Contains(ip) {
 			return true
