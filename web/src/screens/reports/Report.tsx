@@ -12,6 +12,7 @@ import { Published } from "./Published";
 import { Register } from "./Register";
 import { Scrutiny } from "./Scrutiny";
 import { Support } from "./Support";
+import { own } from "../../ui/own";
 
 // The page a report address draws.
 //
@@ -37,5 +38,5 @@ export function Report() {
   // A name this catalog does not hold goes back to the catalog rather than
   // home: somebody following a stale link is looking for a report, and the
   // list of them is the answer nearest to what they asked for.
-  return PAGES[report] ?? <Navigate to="/reports" replace />;
+  return own(PAGES, report) ?? <Navigate to="/reports" replace />;
 }

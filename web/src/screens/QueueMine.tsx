@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { at } from "../ui/when";
+import { own } from "../ui/own";
 
 import { type Body } from "../api/client";
 import { useSplitClaim } from "../api/claims";
@@ -246,7 +247,7 @@ export function Happened({ word, by }: { word?: string; by?: string }) {
     undone: { cls: "lapsed", said: "Agreement undone" },
     mixed: { cls: "waiting", said: "Ended several ways" },
   };
-  const shown = how[word ?? ""] ?? { cls: "", said: word ?? "" };
+  const shown = own(how, word) ?? { cls: "", said: word ?? "" };
   return (
     <>
       <span className={`state ${shown.cls}`}>{shown.said}</span>

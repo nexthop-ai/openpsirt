@@ -8,6 +8,7 @@ import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
 import { DAY_MS, on } from "../ui/when";
+import { own } from "../ui/own";
 import { Peek, Sits } from "./FindingsViews";
 import { SORTS, identityOf, pathTo, type Row } from "./list";
 import { bandOf } from "../ui/severities";
@@ -51,7 +52,7 @@ function dueSays(row: { due?: string; days_left?: number; no_deadline?: string }
 } {
   if (!row.due) {
     return {
-      text: noDeadlineSays[row.no_deadline ?? ""] ?? "no deadline",
+      text: own(noDeadlineSays, row.no_deadline) ?? "no deadline",
       tone: "none",
     };
   }

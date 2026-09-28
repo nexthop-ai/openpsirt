@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { own } from "../ui/own";
 import { api } from "../api/client";
 import type { Body } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -417,7 +418,9 @@ function Column({
               </span>
               <span className="why">
                 {row.because && (
-                  <span className={`mark ${row.because}`}>{WENT[row.because] ?? row.because}</span>
+                  <span className={`mark ${row.because}`}>
+                    {own(WENT, row.because) ?? row.because}
+                  </span>
                 )}
                 <span className="id">{row.component}</span>
                 {row.arrived_from && (
