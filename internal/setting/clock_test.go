@@ -11,18 +11,21 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// TestTwoWritesInOneInstantStillRecordTheSetting pins why existence is asked
-// rather than read from the number of rows an update touched.
+// TestTwoWritesInOneInstantStillRecordTheSetting pins that an update writing
+// the values a row already holds, at the timestamp it already holds, still
+// counts as the row matched.
 //
-// Two of the four engines count rows *changed*, not rows matched: an update
-// writing values identical to the stored ones reports zero, which is the same
-// number "no such row" reports. Ordinarily the timestamp moves and hides this,
-// so the only way to reach it is to stop the clock — which is exactly what a
-// second write inside the same microsecond does.
+// The write reads the affected count and takes zero for a row that moved. By
+// default two of the four engines count rows *changed*, not rows matched, and
+// an identical write reports zero there; it counts as a match only because the
+// connection settings ask those two for rows matched. Ordinarily the timestamp
+// moves and hides the difference, so the only way to reach it is to stop the
+// clock — which is exactly what a second write inside the same microsecond
+// does.
 //
-// Measured directly on MySQL 8.4: updating a row to the value it already holds
-// reports 0, updating it to a different value reports 1, and updating a row
-// that does not exist reports 0.
+// Measured directly on MySQL 8.4 with the default count: updating a row to the
+// value it already holds reports 0, updating it to a different value reports 1,
+// and updating a row that does not exist reports 0.
 func TestTwoWritesInOneInstantStillRecordTheSetting(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		dbtest.Reset(t, db)

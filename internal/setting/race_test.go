@@ -4,10 +4,15 @@
 package setting
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -238,6 +243,65 @@ func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 		if stored != lost.wrote {
 			t.Errorf("the setting holds %q and the writer that wrote last wrote %q",
 				stored, lost.wrote)
+		}
+	})
+}
+
+// A writer inside somebody else's transaction hands a lost race back to that
+// transaction's retry, rather than going again itself on a transaction the
+// failed statement has poisoned, or swallowing it. The race is forced inside
+// the one transaction: between the read and the write, the row moves, or a
+// row arrives where the read found none.
+func TestAWriterInsideACallersTransactionHandsTheLostRaceBack(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		for _, c := range []struct {
+			what   string
+			seeded bool
+			race   string
+		}{
+			{"the row moved after the read", true,
+				`UPDATE "application_setting" SET "value" = 'moved' WHERE "name" = ?`},
+			{"a row arrived after the read", false,
+				`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, 'arrived', ?)`},
+		} {
+			dbtest.Reset(t, db)
+			if c.seeded {
+				if err := NewStore(db.DB).Set(ctx, TriageFloor, "critical"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var first error
+			attempts := 0
+			err := database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
+				attempts++
+				store := &Store{db: tx, now: time.Now}
+				if attempts == 1 {
+					store.beforeWrite = func() {
+						args := []any{TriageFloor}
+						if !c.seeded {
+							args = append(args, time.Now().UTC())
+						}
+						if _, err := tx.ExecContext(ctx, c.race, args...); err != nil {
+							t.Errorf("%s: the race could not be arranged: %v", c.what, err)
+						}
+					}
+				}
+				_, _, err := store.Change(ctx, TriageFloor, "low")
+				if attempts == 1 {
+					first = err
+				}
+				return err
+			})
+			if err != nil {
+				t.Errorf("%s: the transaction did not recover: %v", c.what, err)
+			}
+			if !errors.Is(first, database.ErrGoAgain) {
+				t.Errorf("%s: the first attempt answered %v, want it handed back to go again", c.what, first)
+			}
+			if attempts != 2 {
+				t.Errorf("%s: the transaction ran %d times, want 2", c.what, attempts)
+			}
 		}
 	})
 }

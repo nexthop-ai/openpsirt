@@ -32,14 +32,59 @@ var bareAfter = regexp.MustCompile(`(?i)\b(TABLE|INDEX|CONSTRAINT|REFERENCES)\s+
 var bareColumn = regexp.MustCompile(
 	`(?i)(?:^|[(,])\s*(?:(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|REFERENCES|ON|DEFAULT|NOT|NULL)\b|([A-Za-z_][A-Za-z0-9_]*)\s*(?:[\s,)]|$))`)
 
+// onTable matches the table an index is built on, or a clause beginning ON.
+// Only the first is an identifier, and Go's patterns have no lookahead, so the
+// words that open the others are set aside in code.
+var onTable = regexp.MustCompile(`(?i)\bON\s+([A-Za-z_][A-Za-z0-9_]*)`)
+
+// notATable is what follows ON in a clause that names no table.
+var notATable = map[string]bool{"DELETE": true, "UPDATE": true, "CONFLICT": true}
+
+// bareIn is every identifier a statement writes bare, as the words that say
+// where: the keyword before it, or the column it declares.
+func bareIn(statement string) []string {
+	bare := withoutComments(statement)
+	var found []string
+	for _, m := range bareAfter.FindAllStringSubmatch(bare, -1) {
+		found = append(found, strings.ToUpper(m[1])+" "+m[2])
+	}
+	for _, m := range onTable.FindAllStringSubmatch(bare, -1) {
+		if !notATable[strings.ToUpper(m[1])] {
+			found = append(found, "ON "+m[1])
+		}
+	}
+	for _, m := range bareColumn.FindAllStringSubmatch(body(bare), -1) {
+		if m[2] != "" {
+			found = append(found, "column "+m[2])
+		}
+	}
+	return found
+}
+
+// Each shape a bare name takes is reported, and the quoted form of each is not.
+func TestABareNameIsFoundWhereverTheSchemaWritesOne(t *testing.T) {
+	for _, c := range []struct {
+		statement string
+		bare      bool
+	}{
+		{`CREATE TABLE finding ("a" INTEGER)`, true},
+		{`CREATE TABLE "finding" (a INTEGER)`, true},
+		{`CREATE INDEX "finding_idx" ON finding ("a")`, true},
+		{`CREATE INDEX "finding_idx" ON "finding" (a)`, true},
+		{`CREATE TABLE "finding" ("a" INTEGER REFERENCES product ("id") ON DELETE CASCADE)`, true},
+		{`CREATE INDEX "finding_idx" ON "finding" ("a")`, false},
+		{`CREATE TABLE "finding" ("a" INTEGER REFERENCES "product" ("id") ON DELETE CASCADE ON UPDATE CASCADE)`, false},
+	} {
+		if got := len(bareIn(c.statement)) > 0; got != c.bare {
+			t.Errorf("%s: reported bare = %v (%v), want %v", c.statement, got, bareIn(c.statement), c.bare)
+		}
+	}
+}
+
 func TestEveryIdentifierInTheSchemaIsQuoted(t *testing.T) {
-	// AGENTS.md states this three times and two things claimed to enforce it.
-	// Neither did: the gate named for it compared each name against a list of
-	// 321 words the four engines reserve, which is a strictly weaker property
-	// — a name nobody has reserved yet passes, and MySQL 8.0 reserved four
-	// more without anything refreshing the list. And the test named for it
-	// built its own probe table, so it could not observe a single identifier
-	// in the schema.
+	// Every identifier the schema declares is quoted, and a check against the
+	// list of words the engines reserve is strictly weaker: a name nobody has
+	// reserved yet passes it.
 	//
 	// Read from the database rather than from the migration source, on the
 	// same principle as the index test beside this: what matters is the schema
@@ -49,7 +94,9 @@ func TestEveryIdentifierInTheSchemaIsQuoted(t *testing.T) {
 	//
 	// SQLite alone, for the reason the index test gives at length: this asks
 	// what we wrote rather than what an engine did with it, and SQLite is the
-	// one engine that hands back the statement as it was typed.
+	// one engine that hands back the statement as it was typed. So what a
+	// migration writes only for another engine is not read here; the
+	// source-reading reserved-word gate is what reaches that.
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		if err := schema.Up(ctx, db, quiet()); err != nil {
@@ -74,15 +121,9 @@ func TestEveryIdentifierInTheSchemaIsQuoted(t *testing.T) {
 				continue
 			}
 			read++
-			bare := withoutComments(statement)
-			for _, m := range bareAfter.FindAllStringSubmatch(bare, -1) {
-				t.Errorf("%s: %s names %q bare — a reserved word is only reserved when it is",
-					name, strings.ToUpper(m[1]), m[2])
-			}
-			for _, m := range bareColumn.FindAllStringSubmatch(body(bare), -1) {
-				if m[2] != "" {
-					t.Errorf("%s: the column %q is declared bare", name, m[2])
-				}
+			for _, where := range bareIn(statement) {
+				t.Errorf("%s: %s is written bare — a reserved word is only reserved when it is",
+					name, where)
 			}
 		}
 		if err := rows.Err(); err != nil {

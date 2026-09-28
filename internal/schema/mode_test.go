@@ -40,59 +40,20 @@ func refused(t *testing.T, err error) bool {
 	return true
 }
 
-func TestAnOversizedValueIsRefusedRatherThanTruncated(t *testing.T) {
-	// A request to two of the engines for standard identifier quoting nearly
-	// cost this the strictness that makes an oversized value an error. Setting
-	// a mode replaces it rather than adding to it, and what it replaced
-	// included the rule that refuses a value too long for its column — so a
-	// nine character string went into a four character column and came back
-	// four characters long, with no error, on two engines and not on the other
-	// two.
-	//
-	// Silent truncation is the worst shape a portability difference can take:
-	// nothing fails, and the data is wrong. This is here so that the quoting
-	// setting can never be written in a way that turns it off again.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := context.Background()
-		probe := probeTable(t)
-		if _, err := db.ExecContext(ctx,
-			`CREATE TABLE "`+probe+`" ("c" VARCHAR(4))`); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-		t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DROP TABLE "`+probe+`"`) })
-
-		const written = "123456789"
-		_, err := db.ExecContext(ctx, `INSERT INTO "`+probe+`" ("c") VALUES (?)`, written)
-		if refused(t, err) {
-			return // Refused outright, which is one correct answer.
-		}
-
-		// The other correct answer is to store it whole — one engine does not
-		// constrain a text column's width at all, which is documented
-		// behavior and loses nothing. What must never happen is the third
-		// outcome: accepted, changed, and no error.
-		var stored string
-		if err := db.QueryRowContext(ctx, `SELECT "c" FROM "`+probe+`"`).Scan(&stored); err != nil {
-			t.Fatalf("read back: %v", err)
-		}
-		if stored != written {
-			t.Errorf("a value was accepted and silently changed: wrote %q, read %q", written, stored)
-		}
-	})
-}
-
 func TestStandardQuotingSurvivesAlongsideStrictness(t *testing.T) {
-	// Both at once, because the fix for one is what broke the other: the
-	// quoting is asked for by appending to the mode, and appending is only
-	// correct if what was already there is still in force.
+	// Both at once: the quoting is asked for by appending to the mode, and
+	// appending is only correct if what was already there is still in force.
+	// Setting a mode replaces it rather than adding to it, and what it would
+	// replace includes the rule that refuses a value too long for its column —
+	// a nine character string into a four character column, back four
+	// characters long with no error, on two engines and not the other two.
+	// Silent truncation is the worst shape a portability difference takes:
+	// nothing fails, and the data is wrong.
 	//
-	// The two have to meet on one column, or this cannot fail for the
-	// reason it is named. It declared a reserved word and an ordinary integer,
-	// wrote 1 and 2, and read 1 back — which passes with strictness entirely
-	// off, leaving the conjunction pinned by nothing. A reserved word carrying
-	// a width is one column that both halves have to be in force for: the
-	// CREATE fails without the quoting, and the write below is wrong without
-	// the strictness.
+	// The two meet on one column, or this cannot fail for the reason it is
+	// named: a reserved word carrying a width is one column that both halves
+	// have to be in force for. The CREATE fails without the quoting, and the
+	// write below is wrong without the strictness.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := context.Background()
 		probe := probeTable(t)

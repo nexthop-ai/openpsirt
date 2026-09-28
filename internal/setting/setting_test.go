@@ -5,7 +5,6 @@ package setting_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -40,9 +39,9 @@ func TestASettingNobodyHasChangedReadsAsItsDefault(t *testing.T) {
 }
 
 func TestSettingSomethingTwiceRecordsTheSecondValue(t *testing.T) {
-	// Written as an update and then an insert, because no upsert spelling is
-	// portable across the four engines. Setting twice is what exercises both
-	// halves.
+	// A read, then an insert or a conditional update, because no upsert
+	// spelling is portable across the four engines. Setting twice exercises
+	// both arms.
 	eachSetting(t, func(t *testing.T, s *setting.Store) {
 		ctx := t.Context()
 		if err := s.Set(ctx, setting.SessionLifetime, "1h"); err != nil {
@@ -57,29 +56,6 @@ func TestSettingSomethingTwiceRecordsTheSecondValue(t *testing.T) {
 		}
 		if got != 30*time.Minute {
 			t.Errorf("read back %v, want 30m", got)
-		}
-	})
-}
-
-func TestSettingSomethingToWhatItAlreadySaysIsNotAFailure(t *testing.T) {
-	// The ordinary shape of setting something back to what it already said.
-	// The timestamp still moves, so this does not by itself reach the case
-	// where an engine reports nothing touched — the frozen-clock test beside
-	// this one is what pins that.
-	eachSetting(t, func(t *testing.T, s *setting.Store) {
-		ctx := t.Context()
-		if err := s.Set(ctx, setting.SessionLifetime, "8h"); err != nil {
-			t.Fatal(err)
-		}
-		if err := s.Set(ctx, setting.SessionLifetime, "8h"); err != nil {
-			t.Fatalf("setting a value to what it already said: %v", err)
-		}
-		got, err := s.Duration(ctx, setting.SessionLifetime, time.Hour)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != 8*time.Hour {
-			t.Errorf("read back %v, want 8h", got)
 		}
 	})
 }
@@ -99,6 +75,20 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 			}
 			if got != 12*time.Hour {
 				t.Errorf("%q read as %v, want the default", bad, got)
+			}
+		}
+		// A count the same way: nothing, or nothing positive, is the default.
+		// Read as written, a zero cap refuses every bulk act it bounds.
+		for _, bad := range []string{"lots", "", "-5", "0"} {
+			if err := s.Set(ctx, setting.TogetherCap, bad); err != nil {
+				t.Fatal(err)
+			}
+			got, err := s.Count(ctx, setting.TogetherCap, 100)
+			if err != nil {
+				t.Fatalf("%q: %v", bad, err)
+			}
+			if got != 100 {
+				t.Errorf("%q read as %d, want the default", bad, got)
 			}
 		}
 	})
@@ -140,11 +130,11 @@ func TestASettingThatCannotBeReadIsNotReportedAsUnset(t *testing.T) {
 // TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt pins what the
 // append-only trail records.
 //
-// The prior value was read in a statement of its own, before the write. Two
-// administrators moving the same setting at once both read the original, so
-// the second recorded a "before" that nothing ever held afterwards — a trail
-// of who changed what, wrong about the what, and unfixable later because the
-// value is gone.
+// Read in a statement of its own before the write, the prior value is the
+// original for two administrators moving the same setting at once, so the
+// second records a "before" that nothing held — a trail of who changed what,
+// wrong about the what, and unfixable later because the value is gone. The
+// collision itself is forced in race_test.go.
 func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		dbtest.Reset(t, db)
@@ -167,40 +157,6 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		}
 		if !had || before != "high" {
 			t.Errorf("the change reports it held %q, held=%v, want \"high\"", before, had)
-		}
-
-		// Two at once. Nothing holds them at the line, so this does not force
-		// the interleave and does not claim to: what it pins is that whatever
-		// order they land in, neither reports a value nothing ever held. The
-		// collision itself is forced in race_test.go, where a seam holds each
-		// writer after its read.
-		var wait sync.WaitGroup
-		held := make([]string, 2)
-		failures := make([]error, 2)
-		wait.Add(2)
-		for i, to := range []string{"medium", "low"} {
-			go func() {
-				defer wait.Done()
-				held[i], _, failures[i] = store.Change(ctx, setting.TriageFloor, to)
-			}()
-		}
-		wait.Wait()
-		for i, err := range failures {
-			if err != nil {
-				t.Fatalf("changing a setting twice at once: caller %d: %v", i+1, err)
-			}
-		}
-		// One replaced "critical" and the other replaced whatever the first
-		// wrote. Neither may report a value nothing ever held.
-		for i, was := range held {
-			switch was {
-			case "critical", "medium", "low":
-			default:
-				t.Errorf("caller %d reports it held %q, which nothing ever did", i+1, was)
-			}
-		}
-		if held[0] == held[1] {
-			t.Errorf("both callers report replacing %q, so one of them did not", held[0])
 		}
 	})
 }
