@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,6 +134,29 @@ func TestAV040DatabaseTakesItsIdentitiesNodesAndSendersAcross(t *testing.T) {
 		}
 		if got := columnOf(t, db, "scan_refusal", "credential"); !slices.Equal(got, wantSenders[1:2]) {
 			t.Errorf("upgraded, the refusal was sent by %v, want %v", got, wantSenders[1:2])
+		}
+
+		// A name shaped like the real package's identifier is its own component
+		// here and the real one to v0.4.0, which cannot hold both.
+		shaped := graph.Described{Name: "pkg:npm/lodash", Version: "4.17.22"}
+		if _, err := db.DB.NewRaw(`INSERT INTO "component" ("identity", "name", "version",
+			"fold_key", "first_seen_at") VALUES (?, ?, ?, ?, ?)`,
+			shaped.Identity(), shaped.Name, shaped.Version, shaped.FoldKey(), now).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		err = schema.Down(ctx, db, quiet())
+		if err == nil || !strings.Contains(err.Error(), "one component") ||
+			!strings.Contains(err.Error(), "pkg:npm/lodash") {
+			t.Fatalf("rolled back over two components v0.4.0 identifies alike: %v", err)
+		}
+		if got := read(t, ctx, db, "component", []string{"id", "identity"}); len(got) != 3 ||
+			got[0]["identity"] != described[0].Identity() {
+			t.Fatalf("a refused roll back left the components as %v", got)
+		}
+		if _, err := db.DB.NewRaw(`DELETE FROM "component" WHERE "identity" = ?`,
+			shaped.Identity()).Exec(ctx); err != nil {
+			t.Fatal(err)
 		}
 
 		if err := schema.Down(ctx, db, quiet()); err != nil {

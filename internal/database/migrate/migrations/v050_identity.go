@@ -34,9 +34,16 @@ func statedFromComponents(ctx context.Context, tx bun.Tx) error {
 // Read in pages by identifier and written one row at a time. A row's new
 // identity is never another row's old one, because the two rules hash into
 // spaces that do not meet, so the unique index holds at every step.
+//
+// Two rows the rule identifies alike are refused, naming both. v0.5.0 holds
+// apart a name shaped like a package identifier and that package, and a name
+// and version that join to the same text, and v0.4.0 has one row for each
+// pair. Nothing here can say which row's findings and decisions are the
+// pair's, so the choice is left to whoever is rolling back.
 func reidentified(ctx context.Context, tx bun.Tx, identity func(purl, name, version string) string) error {
 	const page = 1000
 	var after int64
+	held := map[string]string{}
 	for {
 		var rows []struct {
 			ID      int64          `bun:"id"`
@@ -52,8 +59,16 @@ func reidentified(ctx context.Context, tx bun.Tx, identity func(purl, name, vers
 			return fmt.Errorf("read components to identify again: %w", err)
 		}
 		for _, row := range rows {
+			becomes := identity(row.Purl.String, row.Name, row.Version)
+			this := fmt.Sprintf("%d (%q at %q, package identifier %q)",
+				row.ID, row.Name, row.Version, row.Purl.String)
+			if other, taken := held[becomes]; taken {
+				return fmt.Errorf("components %s and %s are one component to the release "+
+					"being restored, which cannot hold both: remove one of them first", other, this)
+			}
+			held[becomes] = this
 			if _, err := tx.NewRaw(`UPDATE "component" SET "identity" = ? WHERE "id" = ?`,
-				identity(row.Purl.String, row.Name, row.Version), row.ID).Exec(ctx); err != nil {
+				becomes, row.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("identify component %d again: %w", row.ID, err)
 			}
 			after = row.ID
@@ -65,14 +80,16 @@ func reidentified(ctx context.Context, tx bun.Tx, identity func(purl, name, vers
 }
 
 // identityV050 is a component's identity as v0.5.0 works it out: the package
-// identifier and the name with a version hashed apart.
+// identifier and the name with a version hashed apart, the name prefixed with
+// its length.
 //
 // Copied rather than called, as every rule a migration applies is: the
 // function the graph reads is free to change, and this migration is not.
 func identityV050(purl, name, version string) string {
 	basis := canonicalPurlV040(purl)
 	if basis == "" {
-		basis = "name\x00" + strings.TrimSpace(name) + "\x00" + strings.TrimSpace(version)
+		name = strings.TrimSpace(name)
+		basis = "name\x00" + strconv.Itoa(len(name)) + "\x00" + name + strings.TrimSpace(version)
 	} else {
 		basis = "purl\x00" + basis
 	}

@@ -187,7 +187,7 @@ worked.
 |---|---|
 | Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
 | Equal | Served, and the two versions are logged |
-| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migration 37 is the exception: it reshapes what v0.1.0 reads, so going back to v0.1.0 is rolling it back with the newer binary first |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migrations 37 and 39 are the exceptions. 37 reshapes what v0.1.0 reads, and 39 re-identifies every component v0.4.0 matches by and records senders in a form v0.4.0 does not read. Going back to either release is rolling its migration back with the newer binary first |
 
 What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
@@ -435,7 +435,7 @@ stands.
 | A name an issue answers to | Not typed by a person, whoever recorded it: v0.4.0 kept nothing beside the name saying so |
 | An administrator named in configuration, whose administration no group derived | Administration granted here cleared. They administer through the name, as `DESIGN-access.md` § The administration trail and the section on configuration's administration describe |
 | Any other account | Unchanged |
-| An open graph node | Gains the package identifier and platform enumeration its build stated, and takes its component's. The next scan of its build writes its own |
+| An open graph node | Gains columns for the package identifier and platform enumeration its build states, filled with its component's. The next scan of its build writes its own. The scan file is not kept, so a build nobody sends again keeps the component's |
 | A closed graph node | Gains the two columns, holding nothing |
 | A component's identity | Worked out again with the package identifier and the name with a version hashed apart. No two rows meet: two rows v0.4.0 held apart differ in what is hashed |
 | A scan or refused upload's sender, recorded as a name | The key holding the name, else the person holding it, recorded as a key or a person and its identifier. A name held by neither is left as it is |
@@ -447,12 +447,19 @@ again, which is where v0.4.0 reads the name. Which names a person typed goes
 with its column, and the names stay. Each component takes v0.4.0's identity
 again, each sender is recorded by name, and the node columns go.
 
+Two components v0.4.0 identifies alike refuse the roll back, and the refusal
+names both: a name shaped like a package identifier beside that package, or a
+name and a version that join to the same text. Nothing records which of the two
+a finding or a decision belongs to once they are one, so whoever rolls back
+removes one first. The refusal comes before any table changes, so the
+database is left as v0.5.0 left it on every engine.
+
 | Test, on each of the four engines | What it holds |
 |---|---|
 | A v0.4.0 database with named, derived and granted administrators | Upgraded, only the named-only one's grant here is cleared, and they still administer. Rolled back, every named one's grant is set |
 | A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
 | A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was. Rolled back, the column is gone and the names remain |
-| A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person. Rolled back, each is what v0.4.0 held |
+| A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person. With a name shaped like a package's identifier beside it, the roll back is refused naming it and changes nothing. Without, rolled back, each is what v0.4.0 held |
 | v0.5.0's declarations | The trail, the names an issue answers to and the graph node table as the release declares them, each built beside the real one under a scratch name, are described exactly as the chain builds them |
 
 ### Release records

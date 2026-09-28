@@ -18,6 +18,9 @@ func TestANameShapedLikeAPackageIdentifierIsNotThatPackage(t *testing.T) {
 		{{Name: "pkg:npm/lodash", Version: "4.17.22"}, {Purl: "pkg:npm/lodash@4.17.22"}},
 		// And a separator inside a name or a version moves nothing across.
 		{{Name: "a@b", Version: "c"}, {Name: "a", Version: "b@c"}},
+		// Including a byte a producer's JSON can spell and three of the four
+		// engines store.
+		{{Name: "a\x00b", Version: "c"}, {Name: "a", Version: "b\x00c"}},
 	} {
 		if pair[0].Identity() == pair[1].Identity() {
 			t.Errorf("%+v and %+v are one component", pair[0], pair[1])

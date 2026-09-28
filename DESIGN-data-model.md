@@ -302,12 +302,12 @@ Derived from what the component is — the package identifier where the producer
 emits one, name and version where it does not — and hashed to a fixed width.
 
 The two bases are hashed apart: each is marked with which it is, and a name is
-separated from its version by a byte no name holds.
+prefixed with its length.
 
 | Rule | Reason |
 |---|---|
 | A name shaped like a package identifier is not that package | Hashed in one space, a component named `pkg:npm/lodash` at `4.17.22` with no identifier is the real package's row. Whichever arrives first decides for every product whether that row carries an identifier a scanner can match |
-| A separator inside a name or a version moves nothing across | Joined by `@`, the name `a@b` at `c` is the name `a` at `b@c` |
+| No byte inside a name or a version moves anything across | Joined by `@`, the name `a@b` at `c` is the name `a` at `b@c`. A producer's JSON can spell any byte, a null included, so no separator is one a name never holds |
 
 Identifiers the file supplies are not used. Nothing guarantees they are stable
 between builds or consistent between producers, and an identity that moves takes
@@ -460,7 +460,7 @@ node.
 
 | Held on the node | Reason |
 |---|---|
-| The package identifier as the build stated it, qualifiers included, and the platform enumeration. A scanner is given these, with what the build did not state taken from the component | A distribution qualifier decides which advisories a scanner matches, and two products ship one package version built for two distribution releases |
+| The package identifier as the build stated it, qualifiers included, and the platform enumeration. A scanner is given these, with what the build did not state taken from the component, and a VEX statement names the component by the identifier | A distribution qualifier decides which advisories a scanner matches, and two products ship one package version built for two distribution releases |
 
 A build restating an identifier writes its node where it stands and opens and
 closes nothing: the component has not changed. Every other node an unchanged

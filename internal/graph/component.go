@@ -17,6 +17,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -136,16 +137,18 @@ type Described struct {
 // it is hashed. A real inventory spells one package several ways, and taking
 // the identifier verbatim makes each spelling a component of its own.
 //
-// The two bases are hashed apart, each marked with which it is and its parts
-// separated by a byte no name holds. Hashed alike, a component named
-// "pkg:npm/lodash" at "4.17.22" with no identifier is the same component as
-// the real one, and whichever arrives first decides for every product whether
-// it carries an identifier a scanner can match; and "a@b" at "c" is "a" at
-// "b@c".
+// The two bases are hashed apart, each marked with which it is, and a name is
+// prefixed with its length. A producer's JSON can spell any byte, a null
+// included, so no separator is one a name never holds. Hashed alike, a
+// component named "pkg:npm/lodash" at "4.17.22" with no identifier is the same
+// component as the real one, and whichever arrives first decides for every
+// product whether it carries an identifier a scanner can match; and "a@b" at
+// "c" is "a" at "b@c".
 func (d Described) Identity() string {
 	basis := canonicalPurl(d.Purl)
 	if basis == "" {
-		basis = "name\x00" + strings.TrimSpace(d.Name) + "\x00" + strings.TrimSpace(d.Version)
+		name := strings.TrimSpace(d.Name)
+		basis = "name\x00" + strconv.Itoa(len(name)) + "\x00" + name + strings.TrimSpace(d.Version)
 	} else {
 		basis = "purl\x00" + basis
 	}
