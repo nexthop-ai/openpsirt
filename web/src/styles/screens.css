@@ -891,6 +891,20 @@
   border-top: 1px solid var(--line);
   background: var(--surface);
 }
+.tabbar a {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  padding: 9px 4px 11px;
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 0;
+  background: none;
+}
+.tabbar a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+}
 .tabbar button {
   flex: 1;
   border: 0;

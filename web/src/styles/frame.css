@@ -177,6 +177,17 @@ button {
   cursor: not-allowed;
 }
 
+/* NavLink marks the active entry with aria-current="page". */
+.nav[aria-current="page"] {
+  background: var(--side-active);
+  color: var(--side-active-ink);
+  font-weight: 600;
+}
+.nav[aria-current="page"] .count {
+  background: rgb(255 255 255 / 22%);
+  color: var(--side-active-ink);
+}
+
 /* ---------- top bar ---------- */
 
 .chrome {
@@ -428,6 +439,112 @@ button {
 }
 .colophon a:hover {
   text-decoration: underline;
+}
+
+/* What is waiting on you, hanging under the bell that opened it. */
+.notices {
+  position: relative;
+}
+.noticelist {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: var(--z-menu);
+  width: min(420px, 90vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--step--1);
+}
+.noticelist header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap);
+  margin-bottom: 8px;
+}
+.noticelist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.noticelist li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap);
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.noticelist li:first-child {
+  border-top: 0;
+}
+.noticelist li > div {
+  flex: 1;
+  min-width: 0;
+}
+.noticelist li a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.noticelist .when {
+  display: block;
+  color: var(--faint);
+  font-size: 11px;
+}
+/* What kind of thing a notice is, said before what it says. A condition is
+   marked, because acknowledging one hides it rather than resolving it. */
+.noticekind {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--faint);
+  /* On its own line, because what follows it is a sentence. Inline, the kind
+     and the first word of the notice run together — "assigned to you" and the
+     name of the thing read as one phrase. */
+  display: block;
+}
+.noticekind.holds {
+  color: var(--wait);
+}
+
+/* The look menu on the avatar. */
+.lookmenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: var(--z-menu);
+  min-width: 220px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  font-size: var(--step--1);
+}
+.lookmenu h5 {
+  margin: 4px 8px 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  font-weight: 600;
+}
+.lookmenu .opt .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgb(0 0 0 / 18%);
+  background: linear-gradient(135deg, var(--a) 50%, var(--b) 50%);
+  flex: none;
+}
+.lookmenu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 6px 0;
 }
 
 /* ---------- the stage ---------- */

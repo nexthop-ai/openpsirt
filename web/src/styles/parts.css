@@ -334,13 +334,8 @@ a.kpi:hover {
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--sev-exploited);
-  color: #fff;
+  color: var(--on-exploited);
   vertical-align: 1px;
-}
-@media screen {
-  :root[data-look="dark"] .kev {
-    color: #1a0a10;
-  }
 }
 /* The record kept here, which is not the feed's word about the world. Drawn
    as an outline of the same color so the two read as the same kind of fact at
@@ -350,11 +345,6 @@ a.kpi:hover {
   background: transparent;
   color: var(--sev-exploited);
   box-shadow: inset 0 0 0 1.5px var(--sev-exploited);
-}
-@media screen {
-  :root[data-look="dark"] .kev.here {
-    color: var(--sev-exploited);
-  }
 }
 
 .state {
@@ -1523,13 +1513,16 @@ tr.places td {
 }
 /* Every kind of field a form draws, number and date among them: one left out
    draws as the browser's default — no border, no background, the wrong font —
-   beside a text field that has them. */
+   beside a text field that has them. The two buttons that open a list of
+   choices take the same look, with a padding and width of their own. */
 select,
 textarea,
 input[type="text"],
 input[type="search"],
 input[type="number"],
-input[type="date"] {
+input[type="date"],
+.choicesat,
+.filterbtn {
   font: inherit;
   font-size: var(--step--1);
   color: var(--ink);
@@ -1839,13 +1832,6 @@ textarea:disabled {
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-tight);
-  width: 100%;
-  font: inherit;
-  font-size: var(--step--1);
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
   padding: 7px 10px;
   cursor: pointer;
   text-align: left;
@@ -1854,6 +1840,7 @@ textarea:disabled {
   border-color: var(--ink);
   color: var(--ink);
 }
+/* After the picked state, which it outranks by position. */
 .choicesat:focus-visible {
   border-color: var(--accent);
   box-shadow: var(--ring);
@@ -1919,12 +1906,7 @@ textarea:disabled {
   display: inline-flex;
   align-items: center;
   gap: var(--gap-tight);
-  font: inherit;
-  font-size: var(--step--1);
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  width: auto;
   padding: 4px 10px;
   cursor: pointer;
   white-space: nowrap;
@@ -1932,6 +1914,7 @@ textarea:disabled {
 .filterbtn:hover {
   border-color: var(--accent-line);
 }
+/* After the hover, which it outranks by position. */
 .filterbtn:focus-visible {
   border-color: var(--accent);
   box-shadow: var(--ring);
@@ -2213,4 +2196,274 @@ td.rowacts > :last-child {
    different word — "deploy" where the value is the deployment's own line. */
 select.triageline {
   min-width: 13ch;
+}
+
+/* Rendered markdown, wherever a person's text is shown. */
+.prose-openpsirt p {
+  margin: 0 0 8px;
+}
+.prose-openpsirt p:last-child {
+  margin-bottom: 0;
+}
+.prose-openpsirt pre {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 0 0 8px;
+  font-size: 0.95em;
+}
+.prose-openpsirt code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--raised);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.prose-openpsirt pre code {
+  background: none;
+  padding: 0;
+}
+.prose-openpsirt a {
+  color: var(--accent);
+}
+.prose-openpsirt ul,
+.prose-openpsirt ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.prose-openpsirt blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--muted);
+}
+
+/* An icon inside a button sits on the text line. */
+.btn svg {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 6px;
+  stroke: currentcolor;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A drop zone is a label, and not the small-caps kind. */
+.field > label.dropzone {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--step--1);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The finding an approver is judging, above the argument about it. */
+.about {
+  font-size: var(--step--1);
+  color: var(--ink);
+  padding: 8px 11px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.about .clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Files attached to an issue. A list rather than a grid of thumbnails: what
+   is attached is usually one or two things, and the name is what somebody is
+   looking for. */
+.files {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+.files > li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.files > li:last-child {
+  border-bottom: 0;
+}
+
+/* The report catalog: a name on its own line, what it answers beneath it.
+   Side by side the two wrap into each other on a narrow screen, and a report
+   is found by its name. */
+.catalog > li {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* An image attached to a finding, inside rendered text. Bounded so that a
+   screenshot somebody took on a large display does not push the reasoning it
+   belongs to off the screen. */
+.prose-openpsirt img {
+  max-width: min(100%, 640px);
+  max-height: 480px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: block;
+  margin: 8px 0;
+}
+
+/* Release notes, as the markdown somebody pastes rather than as rendered
+   markup: what is on screen has to be exactly what lands in the document. */
+.notes {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  font-family: var(--mono);
+  font-size: var(--step--1);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 60vh;
+}
+
+/* A set chosen by ticking. Not a multiple-select box: those are hard to use
+   with a mouse and impossible to read the state of at a glance, and what
+   somebody needs here is to see which builds they are about to file against. */
+.ticks {
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.ticks label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* The words people put on a finding. Deliberately quieter than a severity or
+   a state chip: a mark is somebody's own note about the work, not a judgment
+   the tool made, and one styled like a verdict would be read as one. */
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-tight);
+  margin-top: 8px;
+}
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-hair);
+  font-size: var(--step--1);
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  padding: 1px 4px 1px 9px;
+  color: var(--ink);
+  background: var(--canvas);
+  white-space: nowrap;
+}
+.mark button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--pill);
+}
+.mark button:hover:not(:disabled) {
+  color: var(--sev-high);
+  background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+}
+.mark.add {
+  border-style: dashed;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 1px 9px;
+}
+.mark.add:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.marking {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.marking .field {
+  margin: 0;
+  min-width: 220px;
+}
+
+/* The tree seen upward, for somebody narrowed to their own work.
+   Indented rather than expandable: every row is already on the page, because
+   what is drawn is the chains their own findings sit on and there is nothing
+   under them to open. */
+.branchlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.branch {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-tight);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.branch:last-child {
+  border-bottom: 0;
+}
+.branch .counts {
+  margin-left: auto;
+  display: flex;
+  gap: var(--gap-loose);
+  white-space: nowrap;
+}
+.branch .counts .n {
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+/* Each count opens the list it counts, and a link brings its own color with
+   it. The underline arrives on hover, where it says the number is a way
+   through rather than decorating every row. */
+a.n {
+  color: inherit;
+  text-decoration: none;
+}
+a.n:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Filters somebody kept. Beside the chips rather than above them: opening one
+   is the same act as pressing a chip, and putting it somewhere else would
+   read as a mode. */
+.kept {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.kept select {
+  width: auto;
+  min-width: 150px;
 }

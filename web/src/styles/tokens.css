@@ -56,6 +56,8 @@
   --top-line: #e2e6ec;
 
   --sev-exploited: #a3123e;
+  /* Text on a fill of the exploited color. */
+  --on-exploited: #fff;
   --sev-critical: #d12b2b;
   --sev-high: #d9700a;
   --sev-medium: #a3760c;
@@ -131,7 +133,6 @@
   :root[data-look="dark"] {
     /* ---- Dark mode — dark throughout, cool blue accent ---- */
     --font: "Manrope", ui-sans-serif, system-ui, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
 
     --canvas: #0e1117;
     --surface: #151a22;
@@ -163,6 +164,7 @@
     --top-line: #1f2632;
 
     --sev-exploited: #ff6b8f;
+    --on-exploited: #1a0a10;
     --sev-critical: #ff7a6e;
     --sev-high: #ffb054;
     --sev-medium: #e0c65a;
@@ -174,16 +176,33 @@
     --shadow: 0 1px 0 rgb(255 255 255 / 3%) inset;
     --shade: rgb(0 0 0 / 45%);
     --shadow-lg: 0 18px 50px rgb(0 0 0 / 55%);
-    --radius: 6px;
-    --radius-lg: 8px;
-    --pill: 999px;
-
-    --step--1: 12.5px;
-    --step-0: 13.5px;
-    --step-1: 15px;
-    --step-2: 19px;
-    --step-3: 25px;
 
     color-scheme: dark;
   }
+}
+
+/* ---------- tinted backgrounds, mixed from the color they tint ---------- */
+/* One definition each, so a tint and the color it is taken from cannot drift
+   apart. */
+:root,
+:root[data-look="dark"] {
+  --sev-exploited-bg: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
+}
+
+/* ---------- base element rules ---------- */
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
 }
