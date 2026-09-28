@@ -1638,6 +1638,10 @@ going back to v0.4.0.</p>
 <td>Migrating with <code>OPENPSIRT_DB_MAX_OPEN=1</code> on PostgreSQL, MySQL or MariaDB is refused</td>
 <td>Set it to 2 or more</td>
 </tr>
+<tr>
+<td>Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity</td>
+<td>Set <code>OPENPSIRT_ATTACHMENT_KEY</code> and <code>OPENPSIRT_ATTACHMENT_SECRET</code> together or not at all, and the same for <code>OPENPSIRT_DIRECTORY_KEY</code> and <code>OPENPSIRT_DIRECTORY_SECRET</code></td>
+</tr>
 </tbody>
 </table>
 <table>
@@ -1655,6 +1659,14 @@ going back to v0.4.0.</p>
 <tr>
 <td>Somebody named in <code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
 <td>Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom</td>
+</tr>
+<tr>
+<td>An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo</td>
+<td>Opens once more, and every outbound destination is sent it once more</td>
+</tr>
+<tr>
+<td>Re-scans</td>
+<td>Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped</td>
 </tr>
 </tbody>
 </table>
@@ -2028,12 +2040,12 @@ web server serves them, at the address you give below.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_DIRECTORY_SECRET</code></td>
-<td>Its secret</td>
+<td>Its secret. The key and the secret are set together or not at all</td>
 <td>unset</td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_DIRECTORY_SESSION_TOKEN</code></td>
-<td>A session token, where the credentials are temporary ones</td>
+<td>A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -2184,7 +2196,8 @@ has announced, and a public index records every request made of it.</p>
 </tbody>
 </table>
 <p>Nothing else is reached, and a redirect is not followed. A distribution
-package is never asked about.</p>
+package is never asked about, and nor is a component no current build carries:
+it keeps the answer it last had.</p>
 <p>Where egress is restricted, allow the hosts for the ecosystems your builds
 carry. An index that cannot be reached is asked once a pass and then left for
 the rest of it, so the others are still asked; its components stay due, and
@@ -2758,12 +2771,12 @@ environment rather than a key somebody stored.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_ATTACHMENT_SECRET</code></td>
-<td>Its secret</td>
+<td>Its secret. The key and the secret are set together or not at all</td>
 <td>unset</td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_ATTACHMENT_SESSION_TOKEN</code></td>
-<td>A session token, where the credentials are temporary ones</td>
+<td>A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint</td>
 <td>unset</td>
 </tr>
 <tr>
