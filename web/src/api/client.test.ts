@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it } from "vitest";
-import { csrf, csrfCookie } from "./client";
+import { api, csrf, csrfCookie } from "./client";
 
 // The `__Host-` prefix is the only thing stopping a sibling host under the
 // same registrable domain writing a cookie this deployment then reads. Two
@@ -74,5 +74,28 @@ describe("which requests carry the CSRF token", () => {
   it("sends no empty header where there is no cookie", async () => {
     set("");
     expect((await sent("POST")).headers.has("X-CSRF-Token")).toBe(false);
+  });
+});
+
+// The middleware above does nothing unless the client every screen uses runs
+// it. Verified by removing the registration: this request then leaves with no
+// token, which every write in the application would too.
+describe("the application's client", () => {
+  it("runs the CSRF middleware on what it sends", async () => {
+    set("__Host-openpsirt_csrf=ours");
+    let seen: Request | undefined;
+    await api.POST("/v1/teams", {
+      body: { name: "desk" },
+      // A test has no page to resolve the client's relative base against.
+      baseUrl: "http://psirt.example",
+      fetch: async (request: Request) => {
+        seen = request;
+        return new Response("{}", {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    } as never);
+    expect(seen?.headers.get("X-CSRF-Token")).toBe("ours");
   });
 });
