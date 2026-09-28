@@ -654,7 +654,10 @@ func registerMovements(api huma.API, in Ingest) {
 			"agreed to makes the issue public in its product.\n\n" +
 			"The person who asked may not be the one who agrees. That is the control the " +
 			"threshold exists to reach, and a movement somebody approved for themselves is " +
-			"the same as one nobody approved.",
+			"the same as one nobody approved.\n\n" +
+			"A movement the date has since overtaken — an extension to a date no longer " +
+			"later, or a shortening to one no longer earlier — is refused with 409. Ask " +
+			"again from the date as it stands.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "Not the person who asked for it.", []access.Role{access.PrivateTriage}...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
@@ -682,8 +685,11 @@ func registerMovements(api huma.API, in Ingest) {
 			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNotLater), errors.Is(err, finding.ErrNotEarlier):
 			// The date moved after the request was made, and the request no
-			// longer moves it the way its act says.
-			return nil, huma.Error409Conflict(err.Error())
+			// longer moves it the way its act says. The store's sentence says
+			// what the act is, which reads as a malformed request; this says
+			// what happened.
+			return nil, huma.Error409Conflict(
+				"the date has moved since this was asked for; ask again from the date as it stands")
 		case err != nil:
 			return nil, refusedFinding(in, err)
 		}

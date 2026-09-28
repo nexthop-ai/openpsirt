@@ -57,6 +57,10 @@ func TestAgreeingToAMovementTheDateHasPassedIsAConflict(t *testing.T) {
 		if got := agree(further); got.Code != http.StatusNoContent {
 			t.Fatalf("agreeing to the later date answered %d: %s", got.Code, got.Body.String())
 		}
-		refusedWith(t, agree(nearer), http.StatusConflict)
+		overtaken := agree(nearer)
+		refusedWith(t, overtaken, http.StatusConflict)
+		if !contains(overtaken.Body.String(), "the date has moved since this was asked for") {
+			t.Errorf("the refusal does not say the date moved: %s", overtaken.Body.String())
+		}
 	})
 }

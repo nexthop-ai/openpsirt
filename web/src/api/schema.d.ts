@@ -1131,6 +1131,8 @@ export interface paths {
          *
          *     The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and a movement somebody approved for themselves is the same as one nobody approved.
          *
+         *     A movement the date has since overtaken — an extension to a date no longer later, or a shortening to one no longer earlier — is refused with 409. Ask again from the date as it stands.
+         *
          *     Requires: private-triage on the product. Not the person who asked for it.
          */
         post: operations["agree-to-disclosure-movement"];
