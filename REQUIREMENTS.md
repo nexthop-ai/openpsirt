@@ -159,7 +159,7 @@ inputs.
 
 | # | Requirement | Why |
 |---|---|---|
-| REQ-46 | Every channel sits behind one interface and delivery is queued and retried. Email is required; chat adapters are **not built** | A channel that drops a message about a critical is worse than no channel |
+| REQ-46 | What is said is composed once for every channel, each kind of channel sits behind one interface, and delivery is queued and retried. Email is required | A channel that drops a message about a critical is worse than no channel |
 | REQ-47 | Immediate mail only for something a person must act on. Everything else is an opt-in digest | A tool that mails on every scan is a tool people filter to a folder |
 | REQ-48 | Nothing leaving this deployment about an undisclosed finding carries detail — not the identifier, not the component, not the summary. That there is something, and a link | The channel is somebody else's infrastructure |
 | REQ-49 | Operational alerts are their own category: condition-based ones clear themselves, event-based ones are acknowledged, and each goes to somebody who may read what it names | An alert nobody can clear is an alert everybody ignores, and a notification is a read of the thing it names |

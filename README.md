@@ -322,8 +322,8 @@ says what turns each on.
 - Nothing leaving this deployment about an undisclosed finding carries detail:
   no identifier, no component, no summary. It says there is something, and
   links to it
-- Every channel sits behind one interface, and delivery is queued and retried.
-  The channels are mail, a signed webhook, and Slack and Zulip
+- What is said is composed once for every channel, and delivery is queued and
+  retried. The channels are mail, a signed webhook, and Slack and Zulip
 - Chat carries every notification as it happens, a minute's worth as one
   message. Somebody's own work goes to them directly; the rest goes to the
   narrowest channel for its team, its product or the deployment, and a channel
