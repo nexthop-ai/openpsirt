@@ -350,25 +350,18 @@ function Whole() {
     });
   }
 
-  // Selecting also opens, because the question "what is under this" is the one
-  // being asked by clicking it — and clicking the row you are already on is
-  // the second half of that pair, which can only mean close it again. Without
-  // that, the name opened and never closed: the triangle beside it toggled and
-  // the larger target, the one people actually hit, did not.
+  // Selecting names a component in the address and marks its row. It opens
+  // nothing: a row with something under it is opened and closed by its own
+  // control, and a search hit carries no chain to its root, so the tree has no
+  // position to open it at. The list of hits stays while the term does.
   //
-  // A node with nothing under it is only selected, never opened. Opening one
-  // asked the server for children it does not have, and the row drew "Loading"
-  // underneath until the empty answer arrived and took it away again — a
-  // flicker under a leaf, which is what it looked like.
   // The version travels with the name. A build that ships one name as two
   // components refuses to answer about "that name" — rightly, since the two
   // are two components — and the tree knows which one was clicked, so asking
   // without it turned every such component into one nobody could look at.
-  function select(name: string, children = 0, version = "", ecosystem = "", namespace = "") {
-    const key = keyOf({ component: name, version, ecosystem, namespace });
-    // The search term survives the selection. Replaced wholesale, a hit
-    // cleared the search it was found through: the list went away, the tree
-    // redrew from the root, and the component clicked was not on screen.
+  function select(name: string, version = "", ecosystem = "", namespace = "") {
+    // The search term survives the selection, so the list a hit was found in
+    // stays on screen with the hit marked.
     const next = new URLSearchParams(params);
     for (const key of ["at", "version", "ecosystem", "namespace"]) next.delete(key);
     if (name) {
@@ -378,13 +371,6 @@ function Whole() {
       if (namespace) next.set("namespace", namespace);
     }
     setParams(next);
-    if (!name || children === 0) return;
-    setOpened((prev) => {
-      const next = new Set(prev);
-      if (prev.has(key) && key === focus) next.delete(key);
-      else next.add(key);
-      return next;
-    });
   }
 
   return (
@@ -491,9 +477,8 @@ function Whole() {
 }
 
 // A search answers with a set of components rather than a position, so it is
-// drawn as a list and not as a tree with one branch. Selecting one positions
-// the tree on it; the control beside it opens the component's own screen, which
-// is the same pair of acts a row in the tree offers.
+// drawn as a list and not as a tree with one branch. Selecting one marks it
+// here; the control beside it opens the component's own screen.
 function Matches({
   at,
   found,
@@ -503,13 +488,7 @@ function Matches({
   at: At;
   found: Node[];
   focus: string;
-  onSelect: (
-    name: string,
-    children?: number,
-    version?: string,
-    ecosystem?: string,
-    namespace?: string,
-  ) => void;
+  onSelect: (name: string, version?: string, ecosystem?: string, namespace?: string) => void;
 }) {
   return (
     <div className="tree">
@@ -522,9 +501,7 @@ function Matches({
           <button
             type="button"
             className="id"
-            onClick={() =>
-              onSelect(node.component, node.children, node.version, node.ecosystem, node.namespace)
-            }
+            onClick={() => onSelect(node.component, node.version, node.ecosystem, node.namespace)}
           >
             {node.component}
           </button>
@@ -615,13 +592,7 @@ function Branches({
   onPath: Set<string>;
   focus: string;
   onToggle: (key: string) => void;
-  onSelect: (
-    name: string,
-    children?: number,
-    version?: string,
-    ecosystem?: string,
-    namespace?: string,
-  ) => void;
+  onSelect: (name: string, version?: string, ecosystem?: string, namespace?: string) => void;
   onWiden: (key: string) => void;
 }) {
   const rows: React.ReactNode[] = [];
@@ -703,9 +674,7 @@ function Branches({
           type="button"
           className="id"
           onClick={() =>
-            openable
-              ? onToggle(key)
-              : onSelect(name, 0, node.version, node.ecosystem, node.namespace)
+            openable ? onToggle(key) : onSelect(name, node.version, node.ecosystem, node.namespace)
           }
         >
           {name}
