@@ -4,6 +4,9 @@
 package triage_test
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,6 +62,27 @@ func TestUndoingAnApprovalLeavesARowThatHasEndedAlone(t *testing.T) {
 		lapsed := f.row(t, made[1].ID)
 		if lapsed.State != triage.LapsedState || lapsed.LiveKey != nil {
 			t.Errorf("the lapsed row became %q holding key %v", lapsed.State, lapsed.LiveKey)
+		}
+	})
+}
+
+func TestRevivingAClaimWhosePlaceIsTakenNamesTheClaimStandingThere(t *testing.T) {
+	// Revising a withdrawn claim retakes its places. Where another claim
+	// holds one since, the refusal is the one proposing there gets.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		first := f.claims(t, f.at())
+		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+		standing := f.claims(t, f.at())
+
+		_, err := f.store.Revise(ctx, f.triager, first.ClaimID, "On reflection it holds.")
+		if !errors.Is(err, triage.ErrAlreadyDecided) {
+			t.Fatalf("reviving onto a taken place answered %v, want it already decided", err)
+		}
+		if !strings.Contains(err.Error(), fmt.Sprintf("decision %d ", standing.ID)) {
+			t.Errorf("the refusal %q does not name decision %d", err, standing.ID)
 		}
 	})
 }

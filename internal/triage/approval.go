@@ -37,8 +37,21 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int6
 		written, err = within.revise(ctx, subject, claimID, reasoning)
 		return err
 	})
+	var taken *placeTaken
+	if errors.As(err, &taken) {
+		return written, s.alreadyDecided(ctx, ErrAlreadyDecided, taken.places)
+	}
 	return written, err
 }
+
+// placeTaken is a revision refused because another claim now stands at one of
+// the places the revised claim would retake, with the places to name it from.
+// The standing claim is read once the transaction has unwound, as every
+// refusal naming one is.
+type placeTaken struct{ places []Place }
+
+func (e *placeTaken) Error() string { return ErrAlreadyDecided.Error() }
+func (e *placeTaken) Unwrap() error { return ErrAlreadyDecided }
 
 // Revised is a revision, and the people whose agreement it took back.
 type Revised struct {
@@ -128,20 +141,22 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	}
 	claim.RevisionID = &revision.ID
 
+	places := make([]Place, 0, len(rows))
 	for _, row := range rows {
-		// Retaken, because revising a withdrawn or lapsed claim brings it back
-		// to life and the key is what the uniqueness rule is enforced through.
-		// Without this the row is live and holds nothing, the unique index
-		// cannot see it, and a second contradictory claim about the same code
-		// is accepted — both can then be approved, with one silently
-		// governing. That is the exact failure the rule exists to prevent,
-		// walked around rather than raced.
-		key := liveKeyFor(Place{
+		places = append(places, Place{
 			ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
 			PlaceIdentity:     row.PlaceIdentity,
 			ComponentUpstream: orEmpty(row.ComponentUpstreamVersion),
 			ConsumerUpstream:  orEmpty(row.ConsumerUpstreamVersion),
-		}, claim.Outcome.StandsAtAnyVersion())
+		})
+	}
+	for i, row := range rows {
+		// Retaken, because revising a withdrawn or lapsed claim brings it back
+		// to life and the key is what the uniqueness rule is enforced through.
+		// Without it the row is live and holds nothing, the unique index
+		// cannot see it, and a second contradictory claim about the same code
+		// is accepted, both approvable, with one silently governing.
+		key := liveKeyFor(places[i], claim.Outcome.StandsAtAnyVersion())
 		if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
 			Set("state = ?", Proposed).
 			Set("live_key = ?", key).
@@ -151,6 +166,12 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			// unusable.
 			Set("sent_back_at = ?", nil).
 			Where("id = ?", row.ID).Exec(ctx); err != nil {
+			// Another claim has taken the place since this one ended. The
+			// unique index is the only thing that can say so, for the reason
+			// proposing relies on it.
+			if database.IsDuplicate(err) {
+				return Revised{}, &placeTaken{places: places}
+			}
 			return Revised{}, fmt.Errorf("record a revision: %w", err)
 		}
 	}

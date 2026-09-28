@@ -187,6 +187,7 @@ deployment with one person cannot approve anything.
 | **The row count is the control, so an engine that cannot report it refuses** | The rows move only while the approved revision is still what the claim rests on, and that condition is checked by counting what moved. Read as optional, the check was skipped on any driver that does not answer — after the approval row was already written |
 | The reasoning is revised, never overwritten; every revision is readable | |
 | Editing the reasoning takes back the approval | The item returns to the queue marked as previously approved rather than as a fresh proposal |
+| Revising a claim that has ended brings it back, and is refused where another claim now stands | Its rows retake their places. A place somebody has claimed since is refused naming the decision standing there, the same refusal proposing there gets |
 | Withdrawing, revising and sending back need no approval | Hiding risk needs a second person; putting it back on the table does not |
 | Undoing works at the size it was done | A bulk approval records what it covered; undoing takes the whole batch back to *proposed*. The claims still stand — it is the agreement that was taken back |
 | Undoing and withdrawing leave an ended row as it ended | Only approved rows return to *proposed*, and only rows still proposed or approved become *withdrawn*. A lapsed row holds no live key, so returned to waiting it is a proposal nothing keeps unique at its place; rewritten as withdrawn it loses when and why it stopped applying |
