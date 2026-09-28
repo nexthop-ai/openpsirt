@@ -754,7 +754,7 @@ finding it names may since have been decided, closed or reopened.
 |---|---|
 | Teams and Google Chat | Slack and Zulip are built. § Chat says what each of the other two needs |
 | A message when a rule routes work to a team | Routed work arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
-| The HTML part of a mail | The only remaining reader for the server-side renderer, and the reason it is kept rather than deleted |
+| The HTML part of a mail | It needs a markdown renderer on the server, and none exists |
 
 ## Limits
 

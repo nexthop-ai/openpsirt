@@ -116,12 +116,13 @@ anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
 those three are worked out on every read — nothing stores them, nothing refreshes
 them, and nothing has to be invalidated when a scan closes a finding.
 
-A roll-up across the builds one issue was promised in is not built. "Two of
-three chosen releases are clear" is the reading, and its only source is a
-screen offering a set of builds to tick with no version, no date and no
-reasoning attached — which is the shape this refuses. What is built answers per
-build, the grain a commitment is made at, and where an issue stands across
-several is read from the findings list, which has a row per build.
+A roll-up of one promise across the builds it names is not built. "Landed in
+two of three releases, planned in the third, due on the first" is the reading,
+and its source is the promise itself: the releases it names, the version and
+the date, each release's part resolved by that release's next scan. What is
+built answers per build, the grain a commitment is made at, and where an issue
+stands across several is read from the findings list, which has a row per
+build.
 
 ## Deadlines
 
@@ -141,6 +142,13 @@ and never arriving.
 | The fix already existed when the finding opened | The sighting. The ordinary case, and the response time genuinely is from when it was learned |
 | The flaw was seen before upstream released anything | **The fix.** Counting from the sighting sets a deadline against a version that did not exist, which is the common case for an inventory made of distribution packages |
 | The issue became exploited later | The learning. Counted from the opening, an issue exploited after six months lands three days before anybody knew |
+
+Exploitation is learned on the date the known-exploited catalog added the
+issue, bounded by the moment of the scan, the same bound a fix's date takes.
+The days before a scan sees a listing are the pipeline's lag, and they do not
+extend the window. A finding opened after the listing still counts from its
+opening, because the latest moment wins. Not built: the moment a scan first
+saw the listing stands in for the catalog's date, which is not read.
 
 The same rule governs every writer. A scan counts it per finding, and an edited
 window rewrites every open deadline as three passes, one per moment, each over
@@ -586,6 +594,8 @@ Nothing is sent anywhere.
 
 | Rule | Reason |
 |---|---|
+| Written as CSAF 2.0 | It is the published OASIS standard and ISO/IEC 20153, and the version the consumers' validators check against. CSAF 2.1 is a committee draft, and a document claiming a draft version risks refusal by exactly those consumers. The document moves to 2.1 once 2.1 is an OASIS standard |
+| A version 4 score with no version 3 rating beside it is stated in a note | CSAF 2.0's score object has fields for versions 2 and 3 only. The note gives the version, the base score, the severity and the vector, so a person reading the document sees the score. Tooling does not read a score from prose. Not built: such a flaw is published with no score |
 | Only for a flaw in what this deployment ships | An issue a scanner reported against a third-party component is refused by name rather than answered with a document that looks the same and means something else |
 | The document's identity is the advisory's minted identifier | A document naming an issue's identifier as its own tracking identifier claims to be the authority on that issue, which a coordinator is and this deployment is not |
 | One entry per issue, and one branch per product | The tree carries a vendor branch holding one product branch for each product the advisory covers, and every status names releases of the product the issue was covered in |
@@ -850,14 +860,14 @@ material is a class of configuration this deployment does not take. The layout
 leaves room: a signature sits beside the document under the same name, and the
 feed already names the file beside each entry that answers for it.
 
-A version 4 score in the published document. The standard's score object gains
-a field for one in CSAF 2.1, and the document is written as CSAF 2.0; the
-rating is held, and is stated once the document is written in a version that
-carries it.
+A version 4 score in the document. CSAF 2.1 gains a field for one, and the
+document is written as CSAF 2.0 until 2.1 is an OASIS standard. The note that
+states the score until then is not built either, so a flaw rated under version
+4 alone is published with no score.
 
-Prose of the deployment's own in the document beyond its title. An edition
-carries the title, and the rest of what a reader acts on is assembled from the
-flaws the advisory covers.
+Document-level notes of the deployment's own. An edition carries the title and
+each issuance carries a typed revision summary; the rest of what a reader acts
+on is assembled from the flaws the advisory covers.
 
 ## Limits
 

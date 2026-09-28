@@ -430,8 +430,10 @@ is sent — dropped from the query rather than left in the address, because a
 filter somebody can no longer see or clear is one that narrows a list for
 reasons it does not show. "Only this variant" is likewise offered and sent only
 where the selection names a variant, because it is a question about that one.
-Saved filters, deciding from the list and the export are a product's own and
-come back the moment a product is picked.
+Deciding from the list and the export are a product's own and come back the
+moment a product is picked. Saved filters are offered here as on every list,
+because a saved filter keeps no scope. Not built: they are a product's own, and
+come back only when a product is picked.
 
 The product becomes a column where it varies, and the row links to that product's
 list.
@@ -481,7 +483,7 @@ Three filters need defining:
 
 | Filter | |
 |---|---|
-| **Package kind** | Read from the package identifier rather than stored beside it. It is also the closest the data comes to "userland and not the rest": a kernel and its modules are Debian packages and a statically linked service is Go, and somebody triaging one is usually not triaging the other |
+| **Package kind** | Read from the package identifier rather than stored beside it. It is also the closest the data comes to "userland and not the rest": a kernel and its modules are Debian packages and a statically linked service is Go, and somebody triaging one is usually not triaging the other. The kinds offered are the ones present in the scope on screen, as the server reports them under the same visibility as the list, so a kind the build ships is always offered and one it does not is never offered. Not built: the screen offers a fixed list, and a kind outside it is reached only through the address |
 | **What holds it** | The consumer a place records. What the build holds directly has no container to name, so it is asked for separately rather than by typing something |
 | **How far it has been decided** | A group covers places that can be in different states: undecided is no place decided, waiting is a claim standing proposed, agreed is every place answered, lapsed is a decision that stopped applying with nothing replacing it. *Partly answered* is deliberately not one of them — the row already says "12 places · 3 answered" |
 
@@ -574,12 +576,12 @@ something half-formed.
 
 | Rule | |
 |---|---|
-| They belong to the product they narrow | The query names branches and variants, which belong to one product and usually exist in no other. A filter offered everywhere was offered where it matched nothing, and picking one *replaces* what is on screen, so the wrong narrowing was applied rather than merely suggested |
+| A saved filter keeps what the list is narrowed by, never where | One list per person, offered on every findings list. The product, the branch, the variant, and anything naming one build or one run are the scope picker's, so they are left out of what is kept. Picking one applies it within the scope on screen: across every product from home, within one product where one is picked. A PSIRT working several products keeps a filter once. Not built: a saved filter belongs to the product it was saved in, and the list across every product offers none |
 | What is kept is the list's own query string, not a column per filter | The filters belong to the list and they move; a table mirroring them would need a migration every time one was added while still being a second place where what a filter means is decided. A saved filter naming something the list no longer offers stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one |
 | Saving over a name replaces it | The act is deciding what that name means, and refusing would make somebody delete before they could correct |
 | Two saves of one new name at once keep one filter | Both find nothing to replace and both add it; the unique index refuses the later addition, which is taken again as a lost race and replaces what the other kept |
 | Personal is enforced at the query, not only on the screen | A name somebody else kept is not there, which is the same answer a name nobody kept gives |
-| Opening one goes back to exactly the list that was on screen | The saved address wins outright rather than merging. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
+| Opening one replaces the filters on screen and keeps the scope | The saved filters win outright rather than merging. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
 | The list is bounded by the per-person limit and says how many are kept in all | A limit lowered after filters were saved leaves somebody keeping more than it shows, and saving is refused until they are under it. The picker says how many it left out rather than reading as the whole of what they keep |
 
 A saved filter can prepare a claim, and proposes nothing (REQ-27). Where it
@@ -1698,7 +1700,7 @@ said so.
 
 | Rule | |
 |---|---|
-| **The kind of flaw, all of it and named** | One identifier shown and the rest dropped, as a bare number, leaves a reader with "CWE-401" — and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of them named. The common ones are named inline and every one links to where it is written up, built from the identifier rather than stored. The two words a feed uses to say it has no classification are stated rather than drawn as one |
+| **The kind of flaw, all of it and named** | One identifier shown and the rest dropped, as a bare number, leaves a reader with "CWE-401" — and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of them named. The common ones are named inline in a few plain words, every other one by the catalog's name the server sends beside the identifier, and every one links to where it is written up, built from the identifier rather than stored. Not built: the server sends no name, so a weakness outside the common ones is drawn as its number. The two words a feed uses to say it has no classification are stated rather than drawn as one |
 | **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
@@ -1990,6 +1992,8 @@ the one that made it too long.
 
 | | |
 |---|---|
+| No component library | The interface is built from the mockup's tokens and from components written here |
+| Sibling components are not folded on the dependency tree | On a real image folding removes 281 of 36,991 child rows and shrinks the largest level from 4,867 rows to 4,679, which stays too large to browse |
 | Color and the brand mark resolve through tokens in one place | How an operator overrides them is deliberately unsettled — that gets decided against real screens — but keeping the whole palette in one stylesheet means the answer will be a stylesheet rather than a hunt through components |
 | Dependencies are pinned exactly, not by range | A range resolves at build time and CI stops being reproducible; a caret in a manifest does exactly that. `npm ci` installs the lockfile |
 | A failure shows what the server said | Inventing a friendlier sentence hides the one the server wrote, which names the line to fix or which part of a declaration is missing — and is the more useful of the two |

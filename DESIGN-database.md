@@ -264,8 +264,9 @@ Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
 declares the table rather than adding a migration beside it — within the
 untagged release's migration. Once a release has tagged a migration, a change is
 a migration after it.
-The chain collapses into a single initial migration before 1.0 (REQ-72), and a
-database any 0.x release built is recreated then.
+The chain collapses into a single initial migration before 1.0, beside one
+migration that upgrades a database the last 0.x release built. A database an
+earlier 0.x release built is upgraded to that release first.
 
 Migrations 1 to 36 each create something, which is why rolling one back is
 dropping what it made. Migrations 37, 38 and 39 change existing tables, and
