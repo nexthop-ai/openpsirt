@@ -4,11 +4,13 @@
 package database_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 )
 
 func TestOpenIdentifiesTheServer(t *testing.T) {
@@ -194,6 +196,94 @@ func TestAConnectionIsRefusedWhereEncryptionWasRequiredAndNotGot(t *testing.T) {
 		// meets it is the operator who set it.
 		if !strings.Contains(err.Error(), database.RequiredEncryption) {
 			t.Errorf("%s: the refusal does not name the setting: %v", c.what, err)
+		}
+	}
+}
+
+// A sql_mode written the way the driver documents a string variable, in one
+// pair of quotes, is a connection the server accepts, on both engines that
+// read one.
+func TestAQuotedSQLModeIsAcceptedByTheServer(t *testing.T) {
+	for engine, env := range map[database.Engine]string{
+		database.MySQL:   dbtest.MySQLURLEnv,
+		database.MariaDB: dbtest.MariaDBURLEnv,
+	} {
+		t.Run(string(engine), func(t *testing.T) {
+			engines.SkipUnless(t, engine)
+			address := os.Getenv(env)
+			if address == "" {
+				t.Skipf("%s is not set", env)
+			}
+			target, err := database.ParseURL(address + "?sql_mode=%27NO_ZERO_DATE%27")
+			if err != nil {
+				t.Fatal(err)
+			}
+			db, err := database.Open(t.Context(), target)
+			if err != nil {
+				t.Fatalf("a quoted mode was refused: %v", err)
+			}
+			defer func() { _ = db.Close() }()
+			var held string
+			if err := db.QueryRowContext(t.Context(), "SELECT @@SESSION.sql_mode").Scan(&held); err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range []string{"NO_ZERO_DATE", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
+				if !strings.Contains(held, want) {
+					t.Errorf("the session mode %q lacks %s", held, want)
+				}
+			}
+		})
+	}
+}
+
+// Where encryption is required, every connection the pool opens carries a
+// transport that cannot fall back to cleartext, not only the one asked at
+// startup. A transport that may fall back is made one that may not, one that
+// is cleartext outright is refused, and one the deployment named that cannot
+// fall back is left as written.
+func TestARequiredTransportIsImposedOnEveryConnection(t *testing.T) {
+	for _, c := range []struct {
+		url      string
+		required bool
+		want     string // a fragment of the connection string, or "" where refused
+	}{
+		{"postgres://u:p@db/openpsirt", true, "sslmode=require"},
+		{"postgres://u:p@db/openpsirt?sslmode=prefer", true, "sslmode=require"},
+		{"postgres://u:p@db/openpsirt?sslmode=allow&x=1", true, "sslmode=require&x=1"},
+		{"postgres://u:p@db/openpsirt?sslmode=verify-full", true, "sslmode=verify-full"},
+		{"postgres://u:p@db/openpsirt?sslmode=disable", true, ""},
+		{"postgres://u:p@db/openpsirt?sslmode=prefer", false, "sslmode=prefer"},
+		{"mysql://u:p@db/openpsirt", true, "tls=skip-verify"},
+		{"mysql://u:p@db/openpsirt?tls=preferred", true, "tls=skip-verify"},
+		{"mariadb://u:p@db/openpsirt?tls=true", true, "tls=true"},
+		{"mysql://u:p@db/openpsirt?tls=false", true, ""},
+		{"mysql://u:p@db/openpsirt", false, "tls=preferred"},
+	} {
+		target, err := database.ParseURL(c.url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target.RequireEncryption = c.required
+		dsn, err := database.MandatoryTransport(target)
+		if c.want == "" {
+			if err == nil {
+				t.Errorf("%s: a transport in cleartext was accepted as %q", c.url, dsn)
+			} else if !strings.Contains(err.Error(), database.RequiredEncryption) {
+				t.Errorf("%s: the refusal does not name the setting: %v", c.url, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s: %v", c.url, err)
+			continue
+		}
+		if !strings.Contains(dsn, c.want) {
+			t.Errorf("%s (required %v): opened as %q, want it to carry %s", c.url, c.required, dsn, c.want)
+		}
+		for _, weak := range []string{"sslmode=prefer", "sslmode=allow", "tls=preferred"} {
+			if c.required && strings.Contains(dsn, weak) {
+				t.Errorf("%s: required, and still opened with %s", c.url, weak)
+			}
 		}
 	}
 }

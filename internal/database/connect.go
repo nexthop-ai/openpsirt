@@ -7,7 +7,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -121,8 +123,12 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	dsn, err := mandatoryTransport(target)
+	if err != nil {
+		return nil, err
+	}
 
-	sqldb, err := sql.Open(driver, target.DSN)
+	sqldb, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", target.Engine, scrub(err, target))
 	}
@@ -161,6 +167,78 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 // deployment took whatever it was given. That stays available and is now one
 // of two stated choices rather than the only behavior.
 const RequiredEncryption = "OPENPSIRT_DB_REQUIRE_ENCRYPTION"
+
+// mandatoryTransport is the connection string a pool opens every connection
+// with, where the deployment requires encryption.
+//
+// The check below asks one connection, at startup, and a pool opens
+// connections for the whole life of the process. A transport that falls back
+// to cleartext where the server does not offer encryption — PostgreSQL's
+// default, and the floor this sets for MySQL and MariaDB — would let any later
+// connection go out in cleartext with nothing refused and nothing logged,
+// whether the server stopped offering it, a failover reached one that never
+// did, or something on the path answered for it. So where encryption is
+// required, a transport that may fall back is made one that may not, and one
+// that is cleartext outright is refused. A transport the deployment named that
+// cannot fall back is left as written.
+func mandatoryTransport(target Target) (string, error) {
+	if !target.RequireEncryption {
+		return target.DSN, nil
+	}
+	var name, mandatory string
+	var weak, cleartext []string
+	switch target.Engine {
+	case Postgres:
+		name, mandatory = "sslmode", "require"
+		weak, cleartext = []string{"", "prefer", "allow"}, []string{"disable"}
+	case MySQL, MariaDB:
+		name, mandatory = "tls", "skip-verify"
+		weak, cleartext = []string{"", "preferred"}, []string{"false"}
+	default:
+		// SQLite has no connection, and the check below says so.
+		return target.DSN, nil
+	}
+	// The query is what follows the address: after the host for a URL, and
+	// after the database for the MySQL driver's form, whose password is not
+	// escaped and may hold a question mark.
+	after := 0
+	if target.Engine != Postgres {
+		after = strings.Index(target.DSN, ")/")
+		if after < 0 {
+			return "", fmt.Errorf("%s: the connection string names no database", target.Redacted)
+		}
+	}
+	at := strings.Index(target.DSN[after:], "?")
+	if at < 0 {
+		return target.DSN + "?" + name + "=" + mandatory, nil
+	}
+	head, query := target.DSN[:after+at], target.DSN[after+at+1:]
+	pairs := strings.Split(query, "&")
+	named := false
+	for i, pair := range pairs {
+		key, value, _ := strings.Cut(pair, "=")
+		if key != name {
+			continue
+		}
+		named = true
+		value, err := url.QueryUnescape(value)
+		if err != nil {
+			return "", fmt.Errorf("%s: %s is unreadable", target.Redacted, name)
+		}
+		switch {
+		case slices.Contains(cleartext, value):
+			return "", fmt.Errorf("%s is set and %s asks for a connection in cleartext, "+
+				"with %s=%s: ask for encryption in the database URL, or unset it",
+				RequiredEncryption, target.Redacted, name, value)
+		case slices.Contains(weak, value):
+			pairs[i] = name + "=" + mandatory
+		}
+	}
+	if !named {
+		pairs = append(pairs, name+"="+mandatory)
+	}
+	return head + "?" + strings.Join(pairs, "&"), nil
+}
 
 // encryptionAsAsked refuses a connection that did not get the encryption the
 // deployment said it must have.

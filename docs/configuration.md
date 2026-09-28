@@ -168,6 +168,8 @@ read.
 
 | Where it is set | |
 |---|---|
+| The URL asks for a transport that falls back to cleartext, or says nothing | Every connection is opened with one that does not: `sslmode=require` on PostgreSQL where the URL says `prefer`, `allow` or nothing, and `tls=skip-verify` on MySQL and MariaDB where it says `preferred` or nothing. Encrypted, with no certificate checked, which is what the default already gave where the server offered it |
+| The URL asks for cleartext | `sslmode=disable` or `tls=false`: refused at startup, naming the setting |
 | The connection is encrypted | Nothing happens. The transport is logged as it always is |
 | The connection is in cleartext | Refused at startup, naming the setting |
 | The server will not say which | Refused. What this asks for is certainty, and "we could not find out" is not it |

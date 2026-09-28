@@ -19,9 +19,9 @@ import (
 // once, whatever a test needs to reach what was seeded.
 //
 // On SQLite the seed runs once per binary, against the migrated template, and
-// every test copies the result — so a fixture of sixty transactions costs a
-// file write per test rather than sixty transactions per test, which for the
-// API package was half of what a test cost under the race detector. On the
+// every test copies the result — so a fixture of many transactions costs a
+// file write per test rather than those transactions per test, which for the
+// API package is half of what a test costs under the race detector. On the
 // three servers a package has one database, so the seed runs per test, after
 // the database is emptied.
 //

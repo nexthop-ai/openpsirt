@@ -53,10 +53,9 @@ type World struct {
 	// which is how a release compares against the line it was cut from.
 	Branch *catalog.Stream
 	Tag    *catalog.Stream
-	// Customer reaches customers and Internal does not. Before this there was
-	// no non-customer-facing variant anywhere in the repository, so every
-	// narrowing, label and disclosure rule keyed on that flag was demonstrated
-	// on one side only.
+	// Customer reaches customers and Internal does not, so every narrowing,
+	// label and disclosure rule keyed on that flag is demonstrated on both
+	// sides.
 	Customer *catalog.Variant
 	Internal *catalog.Variant
 	// Target is the branch built as the customer-facing variant: the ordinary

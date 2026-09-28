@@ -141,7 +141,14 @@ func Racing(t *testing.T, between func()) (*database.DB, *Race) {
 	t.Helper()
 	file := filepath.Join(t.TempDir(), "queue.db")
 
-	base, err := (&sqliteConnector{dsn: file}).connector()
+	// Opened with the pragmas every other SQLite connection gets, so a test on
+	// this handle runs against enforced foreign keys and the application's
+	// journal, as production does.
+	target, err := database.ParseURL("sqlite://" + file + sqliteTestPragmas)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := (&sqliteConnector{dsn: target.DSN}).connector()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -86,7 +86,7 @@ Engine-specific code is confined to these places:
 | Connection setup | Driver-specific settings |
 | Recognizing what an engine is telling us | All three drivers carry an error type of their own, SQLite included. Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
-| Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
+| Inserting a row another writer may already have written | Two of them want `ON CONFLICT DO NOTHING` and the other two `ON DUPLICATE KEY UPDATE` setting the key to itself. Not `INSERT IGNORE`, which on those two also turns a value too wide for its column, a dangling reference and a missing value into warnings, and writes the row cut to fit or skips it while reporting success. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
@@ -154,6 +154,7 @@ where the server offers it, the other connects in cleartext unless asked.
 | How anybody knows | The connection is asked what it negotiated, and the answer is in the line that logs the engine and version. A production engine connected in cleartext is warned about by name, with the setting that fixes it |
 | Required is a stated choice | A deployment says that encryption is required, and a connection that did not get it is refused as the process starts. Taking whatever the server offers stays available and is the other choice; what changed is that it is chosen rather than the only behavior |
 | Required is asked of the connection, never of the URL | The engines spell the transport differently and each spelling has several values, so a check reading the URL would be three parsers agreeing about what "encrypted" means — and would still be wrong about a server that ignored what was asked for |
+| Required is also imposed on every connection the pool opens | The question is asked of one connection at startup, and the pool opens connections for the life of the process. A transport that falls back to cleartext — `sslmode` of `prefer` or `allow`, `tls=preferred`, or none named — is replaced by one that does not, and one that asks for cleartext is refused. One the deployment named that cannot fall back is left as written |
 | A server that will not say is refused under it | What the requirement asks for is certainty, and "we could not find out" is not it |
 | Required against SQLite is refused | A file opened directly has no connection to encrypt. Accepting it would make the setting one that changes nothing, which is worse than not offering it |
 
@@ -312,6 +313,7 @@ fresh install walks the whole chain. They are shaped the way every migration aft
 |---|---|
 | Every table and index is made by the release's own statement | The release's declaration of each table it creates or changes sits beside its migration, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
 | One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
+| Not retried in place | Migrations 37 and 38 open that transaction directly rather than through the one retrying helper, and the releases that shipped them froze them. A lost race fails the migration and the next start runs it again whole, which is the same retry one level up. A later release's migration takes its transaction through the helper |
 | PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as the release declares it and costs no row rewrite on any of the three |
 | SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the release's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
@@ -1019,8 +1021,14 @@ skipped loudly otherwise.
 The schema is built once per test binary, not once per test. On SQLite a file is
 migrated on first use and copied per test; on each server the binary gets a
 database of its own, named for the package and the checkout it is tested from.
-The name hashes the directory as well as the import path — the import path alone
-was identical in two checkouts, and one dropped the other's database mid-run.
+The name hashes the directory as well as the import path, which is identical in
+two checkouts, so one cannot drop the other's database mid-run.
+
+| Rule | |
+|---|---|
+| The SQLite template is kept in this user's cache directory, readable by nobody else | Its name is derived from files anybody can read, so in the shared temporary directory another user could put a file there under it first |
+| A harness call that cannot run beside the others says why | On SQLite a package's tests run in parallel, and the testing package panics on a second harness call in one test function or on one after `t.Setenv`. The failure names the rule instead |
+| An engine left out is skipped with the reason, and a test holds the harness to it | A skip that passed silently would read as the engine having run |
 
 | A test pins | Runs on |
 |---|---|
@@ -1037,17 +1045,15 @@ The harness also offers a handle whose `COMMIT` can be made to fail.
 | Why it exists | A retry that is never exercised is a retry nobody has tested. The failure a cluster produces arrives at commit, on a transaction whose every statement already succeeded, and nothing else here can produce one — so the code that runs when it happens was reachable by no test at all |
 | What it does | Refuses a stated number of commits, in the words this engine's lost-race check matches, rolling the work back the way a refused commit does. A hook runs between the refusal and the retry, which is where a test puts what another worker did in the meantime |
 | What a test asserts with it | Both directions. That a value from the attempt which was rolled back does not survive into the next one, and that the work still happens — and that the path under test committed something the handle could refuse, because a write outside a transaction passes every other assertion by never running the code they are about |
-| Why it is SQLite underneath | What is pinned does not vary by engine: the retry is driven by the error, and the error is synthesized |
+| Why it is SQLite underneath | What is pinned does not vary by engine: the retry is driven by the error, and the error is synthesized. Opened with the pragmas every other SQLite connection gets, so foreign keys are enforced on it |
 
-The rule has to be applied, and a whole area arrived on two engines. Routing
-rules, VEX statements, teams, saved filters and the administration trail were
-written with handler tests on the two-engine form, and every one of them pins
-what a query returns. Between them they hold a `LIKE` with an explicit escape, a
-case-folded `IN`, and conditional updates read for whether the row was still
-there — three of the exact shapes the four-engine matrix exists to catch.
-
-The fix was a store test rather than a change to the handler tests, whose
-two-engine form is right for what they pin.
+The rule has to be applied. Routing rules, VEX statements, teams, saved filters
+and the administration trail have handler tests on the two-engine form, and
+between them they hold a `LIKE` with an explicit escape, a case-folded `IN`, and
+conditional updates read for whether the row was still there — three of the
+exact shapes the four-engine matrix exists to catch. Those are pinned by store
+tests on every engine, and the handler tests keep the two-engine form, which is
+right for what they pin.
 
 CI provides all four engines and then checks that all four ran, because a skipped
 engine passes silently.

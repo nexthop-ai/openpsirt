@@ -63,10 +63,10 @@ func Selected() map[database.Engine]bool {
 //
 // For a test that opens a connection itself rather than through dbtest,
 // because what it pins is a property of the connection rather than of a
-// query: the pool's idle reaper, the migration lock, the version floor.
-// Three of those read the URL and connected without consulting Env at all,
-// so a run narrowed to SQLite reached three servers — which is why the quick
-// loop, documented as needing no server, failed when the servers stopped.
+// query: the pool's idle reaper, the migration lock, the version floor. One
+// that reads the URL and connects without consulting Env reaches the servers
+// from a run narrowed to SQLite, and the quick loop, which needs no server,
+// fails when they stop.
 func SkipUnless(t *testing.T, engine database.Engine) {
 	t.Helper()
 	if !Wanted(engine) {

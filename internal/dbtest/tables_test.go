@@ -18,8 +18,8 @@ import (
 // on the three server engines, where a package's tests share one database, its
 // rows leak from one test into the next and surface as an order-dependent
 // failure somewhere else entirely. A name in the list that no migration makes
-// is the mirror case: a DELETE against a table that is not there, which the
-// harness swallows.
+// is the mirror case, and fails every Reset: the question of which tables hold
+// rows names it, and the engine refuses a table that is not there.
 //
 // SQLite alone. The list is one list for all four engines and the migrations
 // are one list of statements, so a second engine would answer the same

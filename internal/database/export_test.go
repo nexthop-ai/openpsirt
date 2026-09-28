@@ -14,3 +14,11 @@ package database
 func EncryptionAsAsked(server Server, target Target) error {
 	return encryptionAsAsked(server, target)
 }
+
+// MandatoryTransport is the connection string a deployment that requires
+// encryption opens every connection with, for the test: what it decides is a
+// rewrite of text, and a server that negotiates encryption either way would
+// pass for the wrong reason.
+func MandatoryTransport(target Target) (string, error) {
+	return mandatoryTransport(target)
+}

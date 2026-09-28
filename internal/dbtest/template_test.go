@@ -52,3 +52,26 @@ func TestAKeptTemplateIsReadAndAnUnreadableOneReplaced(t *testing.T) {
 		t.Error("the migrated template was not kept for the next binary")
 	}
 }
+
+// The template is kept where only this user can write, not in the shared
+// temporary directory: its name is derived from files anybody can read, so
+// another user could put a file there under it first.
+func TestTheTemplateIsKeptWhereOnlyThisUserCanWrite(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	t.Setenv("HOME", cache)
+	dir, err := templateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.HasPrefix(dir, os.TempDir()) && !strings.HasPrefix(dir, cache) {
+		t.Errorf("the template is kept in the shared temporary directory, at %s", dir)
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		t.Errorf("the template's directory is open to other users: %v", perm)
+	}
+}
