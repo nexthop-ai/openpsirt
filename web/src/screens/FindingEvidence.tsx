@@ -10,7 +10,7 @@
 import { Fragment, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
@@ -313,8 +313,19 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
 // Acknowledging records that it happened rather than doing it. What
 // reaches a researcher is a mail somebody sends from an address they already
 // have; recording it turns "somebody probably replied" into a date.
-export function Reporter({ product, vulnerability }: { product: string; vulnerability: string }) {
+export function Reporter({
+  product,
+  vulnerability,
+  byHand = [],
+}: {
+  product: string;
+  vulnerability: string;
+  // The names somebody typed here, which are the ones that may be removed.
+  byHand?: string[];
+}) {
   const queries = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [alias, setAlias] = useState("");
   // Reading who reported it asks for reading undisclosed work; answering them
   // is working the report, which asks for triage of it.
@@ -349,6 +360,25 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
       ),
     onSuccess: () => {
       setAlias("");
+      void queries.invalidateQueries({ queryKey: ["finding"] });
+    },
+  });
+  const unnamed = useMutation({
+    mutationFn: async (name: string) =>
+      unwrap(
+        await api.DELETE("/v1/products/{product}/issues/{vulnerability}/aliases/{alias}", {
+          params: { path: { product, vulnerability, alias: name } },
+        }),
+      ),
+    onSuccess: (removed) => {
+      // Removing the name it was filed under refiles it, and the address
+      // this screen was reached by names it no more.
+      const now = removed?.filed_under;
+      if (now && now !== vulnerability) {
+        const from = `/${encodeURIComponent(vulnerability)}`;
+        const to = `/${encodeURIComponent(now)}`;
+        navigate(location.pathname.replace(from, to) + location.search, { replace: true });
+      }
       void queries.invalidateQueries({ queryKey: ["finding"] });
     },
   });
@@ -443,10 +473,30 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
           </button>
         </div>
         <span className="hint">
-          A CVE assigned after we minted our own. Findings and decisions are unaffected.
+          A CVE or GHSA assigned after we minted our own. Findings and decisions are unaffected.
         </span>
         {alsoKnown.error != null && (
           <Failed error={alsoKnown.error} what="That name could not be recorded." />
+        )}
+        {byHand.length > 0 && (
+          <ul className="refs" style={{ margin: "8px 0 0" }}>
+            {byHand.map((name) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  className="chip"
+                  title="Remove this name. Scans reporting it stop landing here"
+                  disabled={unnamed.isPending}
+                  onClick={() => unnamed.mutate(name)}
+                >
+                  {name} ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {unnamed.error != null && (
+          <Failed error={unnamed.error} what="That name could not be removed." />
         )}
       </div>
     </div>

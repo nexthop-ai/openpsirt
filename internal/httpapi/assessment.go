@@ -181,7 +181,8 @@ func registerAssessment(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		if err := finding.NewStore(in.DB.DB).Withdraw(ctx, subject, input.ID); err != nil {
+		withdrawn, err := finding.NewStore(in.DB.DB).Withdraw(ctx, subject, input.ID)
+		if err != nil {
 			if errors.Is(err, finding.ErrNoSuchAssessment) {
 				return nil, noSuchAssessment()
 			}
@@ -192,14 +193,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		}
 		// The published rating back in force can be worse than the one taken
 		// back.
-		var withdrawn finding.Assessment
-		if err := in.DB.DB.NewSelect().Model(&withdrawn).
-			Where("id = ?", input.ID).Scan(ctx); err != nil {
-			in.logger().Error("could not read the assessment just withdrawn",
-				"assessment", input.ID, "error", err)
-		} else {
-			outgrown(ctx, in, withdrawn.ProductID, withdrawn.VulnerabilityID)
-		}
+		outgrown(ctx, in, withdrawn.ProductID, withdrawn.VulnerabilityID)
 		return &struct{}{}, nil
 	})
 

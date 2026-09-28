@@ -121,7 +121,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`MIN(c.version) AS "version"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`, access.Private).
+		ColumnExpr(access.PrivateCountAs("f.visibility", "private")).
 		ColumnExpr(`SUM(CASE WHEN f.kind = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 		// The version a fix arrived in, where any place knows one. Folded to

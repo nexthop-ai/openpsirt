@@ -61,6 +61,20 @@ func TestARealFileIsServedAsItself(t *testing.T) {
 	}
 }
 
+func TestADirectoryOfBuiltFilesIsAnsweredWithThePage(t *testing.T) {
+	// A directory is not a file, and a listing of what was built is nothing
+	// the interface asks for. It is a route belonging to the page like any
+	// other path that names no file.
+	handler := serving(t, built())
+	for _, path := range []string{"/assets", "/assets/"} {
+		got := fetch(t, handler, http.MethodGet, path)
+		if body := got.Body.String(); got.Code != http.StatusOK ||
+			body != "<!doctype html><div id=root></div>" {
+			t.Errorf("GET %s answered %d with %q, want the page", path, got.Code, body)
+		}
+	}
+}
+
 func TestAnUnknownEndpointStaysAnEndpoint(t *testing.T) {
 	// The API answers for itself, including for paths it does not have.
 	// Handing back a page here reports a mistyped endpoint to a client parsing

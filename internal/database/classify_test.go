@@ -9,6 +9,8 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"testing"
 
 	"github.com/go-sql-driver/mysql"
@@ -43,6 +45,13 @@ func TestAnEngineFailureIsToldFromSomebodyAskingTheImpossible(t *testing.T) {
 		// something impossible, and answering it as one puts the statement
 		// text in a 422 and logs nothing.
 		{"a query whose caller went away", context.Canceled, true},
+		// Failures below the protocol, where a store's message is the
+		// driver's and names the address and the user it dialed.
+		{"a connection that could not be made", fmt.Errorf("read what is open there: %w",
+			&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}), true},
+		{"a connection MySQL's driver gave up on", mysql.ErrInvalidConn, true},
+		{"a connection cut short mid-reply", fmt.Errorf("read: %w", io.ErrUnexpectedEOF), true},
+		{"a PostgreSQL connection that could not be made", &pgconn.ConnectError{}, true},
 
 		{"nothing at all", nil, false},
 		{"a sentence a store wrote",

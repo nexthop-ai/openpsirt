@@ -76,8 +76,9 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Product         string `bun:"product"`
 		Vulnerability   string `bun:"vulnerability"`
 		Publisher       string `bun:"publisher"`
-		Visibility      string `bun:"visibility"`
+		Undisclosed     bool   `bun:"undisclosed"`
 	}
+	undisclosed, private := access.AnyPrivate("de.visibility")
 	err := w.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "vex_statement" AS "ss" ON ss.id = de.from_statement_id`).
@@ -89,7 +90,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
 		ColumnExpr(`ss.publisher AS "publisher"`).
-		ColumnExpr(`MIN(de.visibility) AS "visibility"`).
+		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
 		// Standing, because a decision nobody is relying on any more is not
 		// one whose evidence moving matters.
 		Where("de.live_key IS NOT NULL").
@@ -117,7 +118,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 	}
 
 	for _, row := range rows {
-		private := row.Visibility == string(access.Private)
+		private := row.Undisclosed
 		holds := Holds{
 			About: identify(fmt.Sprintf("statement-revised %d %s %s",
 				row.ProductID, row.Vulnerability, row.Publisher)),

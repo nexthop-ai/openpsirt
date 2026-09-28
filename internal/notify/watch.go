@@ -306,12 +306,13 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		ProductID     int64  `bun:"product_id"`
 		// Read so that a collaborator brought onto this one case keeps the
 		// line after the pass that wrote it: the narrowing is a pair.
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Visibility      string `bun:"visibility"`
-		Exploited       bool   `bun:"exploited"`
+		VulnerabilityID int64 `bun:"vulnerability_id"`
+		Undisclosed     bool  `bun:"undisclosed"`
+		Exploited       bool  `bun:"exploited"`
 	}
+	undisclosed, private := access.AnyPrivate("f.visibility")
 	err := findingsWith(w.db.NewSelect(), true).
-		ColumnExpr(`MIN(f.visibility) AS "visibility"`).
+		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
 		ColumnExpr(`MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) = 1 AS "exploited"`).
 		Where("st.kind = ?", catalog.Tag).
 		Where("f.closed_at IS NULL").
@@ -347,7 +348,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 	}
 
 	for _, row := range rows {
-		private := row.Visibility == string(access.Private)
+		private := row.Undisclosed
 		where := row.Product + " " + row.Stream + " " + row.Variant
 		why := "is rated critical"
 		if row.Exploited {

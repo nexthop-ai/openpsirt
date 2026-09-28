@@ -454,7 +454,7 @@ of this table's rules are.
 | Rule | Reason |
 |---|---|
 | Read and cleared rows are included | The question is what was sent, not what is waiting. A line already acknowledged is still a line they were sent |
-| Narrowed by what the reader may see, and the administrator flag is not a way to see more | The flag decides who may ask a question about somebody else's list; the rows that come back are the ones the asker could read on their own account, count included. Granting themselves the product reaches the same rows and lands in the administrative record, which this read does not — so the two are not equivalent, and the cheaper of them would be the silent one |
+| Narrowed by the products the reader holds a role on, and the administrator flag is not a way to see more | The flag decides who may ask a question about somebody else's list. A row comes back only where it is about a product the asker holds a role on: a disclosed row in any of them, an undisclosed one where they read undisclosed work, and the issues a case grant names. A row about no product, or about a product they hold nothing on, is left out, count included. Granting themselves the product reaches those rows and lands in the administrative record, which this read does not — so the two are not equivalent, and the cheaper of them would be the silent one |
 
 ## Delivery
 

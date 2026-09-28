@@ -277,8 +277,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`MIN(v.identifier) AS "identifier"`).
 		ColumnExpr(`MIN(fr.reported_by) AS "reported_by"`).
 		ColumnExpr(`MIN(fr.received_on) AS "received_on"`).
-		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`,
-			access.Private).
+		ColumnExpr(access.PrivateCountAs("f.visibility", "private")).
 		Where("fr.acknowledged_at IS NULL").
 		// A flaw found here has nobody outside to answer.
 		Where("fr.found_here = ?", false).

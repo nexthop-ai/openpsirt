@@ -116,7 +116,20 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 }
 
 // Rules lists a product's standing rules, in the order they are tried.
-func (s *Store) Rules(ctx context.Context, productID int64) ([]Routing, error) {
+//
+// Read by whoever triages the product. The rules are its triage configuration
+// and carry no finding, so there is nothing to narrow: a reader gets the whole
+// precedence order or none of it.
+func (s *Store) Rules(ctx context.Context, subject access.Subject, productID int64) ([]Routing, error) {
+	if !subject.TriagesIn(productID) {
+		return nil, access.Denied(fmt.Sprintf("read the routing rules of product %d", productID))
+	}
+	return s.rules(ctx, productID)
+}
+
+// rules is every rule in force for a product, for the sweep that applies them
+// as the deployment and for Rules once it has authorized the reader.
+func (s *Store) rules(ctx context.Context, productID int64) ([]Routing, error) {
 	var rules []Routing
 	if err := s.db.NewSelect().Model(&rules).
 		Where("product_id = ?", productID).
@@ -187,7 +200,7 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 	if cap <= 0 {
 		cap = setting.DefaultRoutingBatch
 	}
-	rules, err := s.Rules(ctx, productID)
+	rules, err := s.rules(ctx, productID)
 	if err != nil {
 		return 0, false, nil, err
 	}

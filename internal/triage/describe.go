@@ -92,8 +92,6 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		ids = append(ids, decision.ID)
 		claims = append(claims, decision.ClaimID)
 	}
-	readable := readableVisibilities(subject, ids, s, ctx)
-
 	var rows []describedRow
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
@@ -133,7 +131,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("st.product_id = de.product_id").
 		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(readable)).
+		Apply(readableFindingsBy(subject, "f", "st.product_id")).
 		OrderExpr("de.id, exact DESC, st.name, va.name, c.name").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -196,6 +194,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
@@ -204,7 +204,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where("f.vulnerability_id IN (?)", bun.List(wanted)).
 		Where("f.component_id IN (?)", bun.List(components)).
 		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(readable)).
+		Apply(readableFindingsBy(subject, "f", "st.product_id")).
 		GroupExpr("f.target_id, f.vulnerability_id, f.component_id").
 		Scan(ctx, &counts); err != nil {
 		return nil, fmt.Errorf("count where these sit: %w", err)
@@ -252,7 +252,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.component_id IN (?)", bun.List(components)).
 		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(readable)).
+		Apply(readableFindingsBy(subject, "f", "st.product_id")).
 		GroupExpr("de.claim_id, f.target_id, f.vulnerability_id, f.component_id").
 		Scan(ctx, &covered); err != nil {
 		return nil, fmt.Errorf("count what these claims cover: %w", err)

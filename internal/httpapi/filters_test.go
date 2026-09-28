@@ -8,9 +8,100 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/danielgtaylor/huma/v2"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
+
+func TestAWordNamedTwiceInARepeatableFilterIsRefused(t *testing.T) {
+	// Each word of a repeatable filter becomes a member of a list bound into
+	// the statement, so the set of legal words is only a bound on its length
+	// where a word may appear once.
+	twoReach(t, func(t *testing.T, r *reach) {
+		for _, query := range []string{
+			"state=agreed&state=agreed",
+			"outcome=wont-fix&outcome=wont-fix",
+			"assigned=me&assigned=me",
+			"fix_state=fixed&fix_state=fixed",
+			"support=in-support&support=in-support",
+			"vex_status=affected&vex_status=affected",
+		} {
+			got := asPerson(t, r, "triager", http.MethodGet, "/v1/products/mine/findings?"+query, "")
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("?%s answered %d, want 422", query, got.Code)
+			}
+		}
+	})
+}
+
+// unboundedRepeat says why a repeatable query parameter puts no bound on how
+// many values reach a statement, or nothing where it does. A parameter taking
+// words from a fixed set is bounded by the set only where each word may appear
+// once; any other carries a count of its own.
+func unboundedRepeat(schema *huma.Schema, resolve func(string) *huma.Schema) string {
+	if schema == nil || schema.Type != "array" || schema.Items == nil {
+		return ""
+	}
+	items := schema.Items
+	if items.Ref != "" {
+		items = resolve(items.Ref)
+	}
+	if items != nil && len(items.Enum) > 0 {
+		if !schema.UniqueItems {
+			return "takes words from a set and does not declare them unique"
+		}
+		return ""
+	}
+	if schema.MaxItems == nil {
+		return "takes free values and declares no count"
+	}
+	return ""
+}
+
+func TestTheDetectorFindsARepeatableFilterWithNoBound(t *testing.T) {
+	none := func(string) *huma.Schema { return nil }
+	words := &huma.Schema{Type: "string", Enum: []any{"a", "b"}}
+	free := &huma.Schema{Type: "string"}
+	two := 2
+	for _, c := range []struct {
+		what   string
+		schema *huma.Schema
+		flawed bool
+	}{
+		{"words, repeatable", &huma.Schema{Type: "array", Items: words}, true},
+		{"words, each once", &huma.Schema{Type: "array", Items: words, UniqueItems: true}, false},
+		{"free text, uncounted", &huma.Schema{Type: "array", Items: free}, true},
+		{"free text, counted", &huma.Schema{Type: "array", Items: free, MaxItems: &two}, false},
+	} {
+		if got := unboundedRepeat(c.schema, none) != ""; got != c.flawed {
+			t.Errorf("%s was reported %v, want %v", c.what, got, c.flawed)
+		}
+	}
+}
+
+func TestEveryRepeatableFilterIsBounded(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		registry := r.api.OpenAPI().Components.Schemas
+		examined := 0
+		for path, item := range r.api.OpenAPI().Paths {
+			for method, op := range operations(item) {
+				for _, param := range op.Parameters {
+					if param.In != "query" || param.Schema == nil || param.Schema.Type != "array" {
+						continue
+					}
+					examined++
+					if why := unboundedRepeat(param.Schema, registry.SchemaFromRef); why != "" {
+						t.Errorf("%s %s: ?%s %s", method, path, param.Name, why)
+					}
+				}
+			}
+		}
+		if examined == 0 {
+			t.Fatal("no repeatable query parameter was found, so this checked nothing")
+		}
+	})
+}
 
 func TestTheFiltersATriagerReachesFor(t *testing.T) {
 	// Every filter the server offered was on the screen and the screen was

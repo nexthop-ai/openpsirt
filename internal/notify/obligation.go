@@ -61,7 +61,7 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 	if err != nil {
 		return nil, err
 	}
-	windows, err := store.Windows(ctx)
+	windows, err := store.Windows(ctx, everything)
 	if err != nil {
 		return nil, err
 	}

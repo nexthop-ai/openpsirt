@@ -24,15 +24,37 @@ import (
 // pass — telling those apart is the whole point of a declaration step.
 var ErrDiffers = errors.New("already declared, differently")
 
+// Declared is what a declaration did.
+//
+// Separate answers rather than one flag, because they are recorded
+// differently: making something is declaring what exists, while bringing back
+// something retired undoes a retirement the administration trail records, and
+// filling in what a tag was cut from is a release detail it records too.
+type Declared struct {
+	// Created is a row that did not exist before.
+	Created bool
+	// Restored is a retired row brought back into use.
+	Restored bool
+	// FilledIn is a tag whose branch was not stated before and is now.
+	FilledIn bool
+}
+
+// Changed reports whether the declaration made or brought back something,
+// which is what a caller told "created" needs to know.
+func (d Declared) Changed() bool { return d.Created || d.Restored }
+
 // EnsureProduct declares a product, or confirms one already declared.
 //
-// The returned flag says which happened, because a caller scripting this into
-// whatever cuts a branch needs to know whether anything changed, and a person
-// reading the answer needs to know whether they created something.
-func (s *Store) EnsureProduct(ctx context.Context, name, displayName string) (*Product, bool, error) {
+// What it did is returned, because a caller scripting this into whatever cuts
+// a branch needs to know whether anything changed, and a person reading the
+// answer needs to know whether they created something.
+func (s *Store) EnsureProduct(ctx context.Context, name, displayName string) (*Product, Declared, error) {
 	for again := true; ; again = false {
 		product, made, err := s.ensureProduct(ctx, name, displayName)
 		if again && raced(err) {
+			if err := s.goAgain(err); err != nil {
+				return nil, Declared{}, err
+			}
 			continue
 		}
 		return product, made, err
@@ -54,7 +76,18 @@ func raced(err error) bool {
 	return database.IsDuplicate(err) || errors.Is(err, ErrExists)
 }
 
-func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*Product, bool, error) {
+// goAgain is how a lost race is taken again. A store over its own handle goes
+// round itself; one handed somebody else's transaction cannot — the failed
+// statement has already aborted it on one engine — so it says it lost, and
+// the helper that opened the transaction takes the whole act again.
+func (s *Store) goAgain(err error) error {
+	if _, inside := s.db.(bun.Tx); inside {
+		return fmt.Errorf("%w: %w", database.ErrGoAgain, err)
+	}
+	return nil
+}
+
+func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*Product, Declared, error) {
 	// Trimmed as DeclareProduct stores it, so a repeat declaration compares
 	// what is kept rather than what was typed around it.
 	displayName = strings.TrimSpace(displayName)
@@ -62,40 +95,43 @@ func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*P
 	switch {
 	case err == nil:
 		if displayName != "" && displayName != existing.DisplayName {
-			return nil, false, fmt.Errorf("product %q: %w: it is displayed as %q, not %q",
+			return nil, Declared{}, fmt.Errorf("product %q: %w: it is displayed as %q, not %q",
 				name, ErrDiffers, existing.DisplayName, displayName)
 		}
 		if existing.Retired() {
 			if err := s.restoreProduct(ctx, existing.ID); err != nil {
-				return nil, false, err
+				return nil, Declared{}, err
 			}
 			existing.RetiredAt = nil
-			return existing, true, nil
+			return existing, Declared{Restored: true}, nil
 		}
-		return existing, false, nil
+		return existing, Declared{}, nil
 	case !errors.Is(err, ErrNotFound):
-		return nil, false, err
+		return nil, Declared{}, err
 	}
 
 	created, err := s.DeclareProduct(ctx, name, displayName)
 	if err != nil {
-		return nil, false, err
+		return nil, Declared{}, err
 	}
-	return created, true, nil
+	return created, Declared{Created: true}, nil
 }
 
 // EnsureStream declares a branch or tag, or confirms one already declared.
-func (s *Store) EnsureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, bool, error) {
+func (s *Store) EnsureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, Declared, error) {
 	for again := true; ; again = false {
 		stream, made, err := s.ensureStream(ctx, productID, name, kind, parentID)
 		if again && raced(err) {
+			if err := s.goAgain(err); err != nil {
+				return nil, Declared{}, err
+			}
 			continue
 		}
 		return stream, made, err
 	}
 }
 
-func (s *Store) ensureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, bool, error) {
+func (s *Store) ensureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, Declared, error) {
 	existing, err := s.StreamByName(ctx, productID, name)
 	switch {
 	case err == nil:
@@ -103,26 +139,26 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 		// that became a branch would make everything filed against it as a
 		// frozen point into something that is rebuilt nightly.
 		if existing.Kind != kind {
-			return nil, false, fmt.Errorf("%q: %w: it was declared as a %s, not a %s",
+			return nil, Declared{}, fmt.Errorf("%q: %w: it was declared as a %s, not a %s",
 				name, ErrDiffers, existing.Kind, kind)
 		}
 		// A claim that it was cut from a *different* branch is a change, and a
 		// contradiction: a tag is one frozen point and it came from wherever
 		// it came from.
 		if parentID != nil && existing.ParentID != nil && *existing.ParentID != *parentID {
-			return nil, false, fmt.Errorf("%q: %w: it was not cut from the branch now being named",
+			return nil, Declared{}, fmt.Errorf("%q: %w: it was not cut from the branch now being named",
 				name, ErrDiffers)
 		}
 		// Declaring a retired one brings it back, the way a product and a
 		// variant come back. A pipeline runs this on every build and the name
 		// is still spoken for while retired.
-		back := false
+		var did Declared
 		if existing.Retired() {
 			if err := s.restoreStream(ctx, existing.ID); err != nil {
-				return nil, false, err
+				return nil, Declared{}, err
 			}
 			existing.RetiredAt = nil
-			back = true
+			did.Restored = true
 		}
 		// Filling in one that was never stated is not a change. Without it
 		// a tag declared with no parent stays that way, and release
@@ -131,37 +167,41 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 		// as recording it at the time, arriving late, and it is held to the
 		// same check as filling it in anywhere else.
 		if parentID != nil && existing.ParentID == nil {
-			if err := s.FillInParent(ctx, existing.ID, *parentID); err != nil {
-				return nil, false, fmt.Errorf("%q: %w", name, err)
+			filled, err := s.FillInParent(ctx, existing.ID, *parentID)
+			if err != nil {
+				return nil, Declared{}, fmt.Errorf("%q: %w", name, err)
 			}
 			existing.ParentID = parentID
-			return existing, back, nil
+			did.FilledIn = filled
 		}
-		return existing, back, nil
+		return existing, did, nil
 	case !errors.Is(err, ErrNotFound):
-		return nil, false, err
+		return nil, Declared{}, err
 	}
 
 	created, err := s.DeclareStream(ctx, productID, name, kind, parentID)
 	if err != nil {
-		return nil, false, err
+		return nil, Declared{}, err
 	}
-	return created, true, nil
+	return created, Declared{Created: true}, nil
 }
 
 // EnsureVariant declares a way a product is built, or confirms one already
 // declared.
-func (s *Store) EnsureVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, bool, error) {
+func (s *Store) EnsureVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, Declared, error) {
 	for again := true; ; again = false {
 		variant, made, err := s.ensureVariant(ctx, productID, name, customerFacing)
 		if again && raced(err) {
+			if err := s.goAgain(err); err != nil {
+				return nil, Declared{}, err
+			}
 			continue
 		}
 		return variant, made, err
 	}
 }
 
-func (s *Store) ensureVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, bool, error) {
+func (s *Store) ensureVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, Declared, error) {
 	existing, err := s.VariantByName(ctx, productID, name)
 	switch {
 	case err == nil:
@@ -170,7 +210,7 @@ func (s *Store) ensureVariant(ctx context.Context, productID int64, name string,
 		// decision somebody should make deliberately rather than a field a
 		// pipeline overwrites on its next run.
 		if existing.CustomerFacing != customerFacing {
-			return nil, false, fmt.Errorf("variant %q: %w: it was declared as %s",
+			return nil, Declared{}, fmt.Errorf("variant %q: %w: it was declared as %s",
 				name, ErrDiffers, facing(existing.CustomerFacing))
 		}
 		// Declaring a retired one brings it back, which is how retiring is
@@ -179,21 +219,21 @@ func (s *Store) ensureVariant(ctx context.Context, productID int64, name string,
 		// starts failing because an administrator tidied a list.
 		if existing.Retired() {
 			if err := s.restoreVariant(ctx, existing.ID); err != nil {
-				return nil, false, err
+				return nil, Declared{}, err
 			}
 			existing.RetiredAt = nil
-			return existing, true, nil
+			return existing, Declared{Restored: true}, nil
 		}
-		return existing, false, nil
+		return existing, Declared{}, nil
 	case !errors.Is(err, ErrNotFound):
-		return nil, false, err
+		return nil, Declared{}, err
 	}
 
 	created, err := s.DeclareVariant(ctx, productID, name, customerFacing)
 	if err != nil {
-		return nil, false, err
+		return nil, Declared{}, err
 	}
-	return created, true, nil
+	return created, Declared{Created: true}, nil
 }
 
 // facing names the two states in the words somebody reading an error would.

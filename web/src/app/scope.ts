@@ -3,7 +3,7 @@
 
 import { matchPath, useLocation } from "react-router-dom";
 
-import { SCOPE_KEPT } from "./drafts";
+import { ownsSession, SCOPE_KEPT } from "./drafts";
 
 // The selection in hand.
 //
@@ -143,7 +143,11 @@ export function remember(scope: Scoped) {
 // object there would become `[object Object]` in a query parameter. So each
 // level is taken only when it is a non-empty string, and anything else is
 // forgotten.
+//
+// Nothing at all where the selection was somebody else's: the product they
+// were in is a name the person here may hold no grant on.
 function remembered(): Scoped {
+  if (!ownsSession()) return {};
   try {
     const kept = window.sessionStorage.getItem(KEPT);
     if (!kept) return {};

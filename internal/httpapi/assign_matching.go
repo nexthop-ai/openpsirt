@@ -88,7 +88,7 @@ func registerAssignMatching(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		only, err := piecesNamed(ctx, in, input.Body.Only)
+		only, err := piecesNamed(ctx, in, subject, product, input.Body.Only)
 		if err != nil {
 			return nil, err
 		}
@@ -176,10 +176,13 @@ func registerAssignMatching(api huma.API, in Ingest) {
 
 // piecesNamed resolves the rows somebody picked to the issues they name.
 //
-// Resolved in one statement, like a bulk claim's names. A name nothing is
-// filed under is refused by name, because a person who picked it from a list
-// wants to know which row went wrong rather than bisect the selection.
-func piecesNamed(ctx context.Context, in Ingest, picked []PieceBody) ([]finding.Piece, error) {
+// Resolved the way a bulk claim's names are. A name nothing is filed under is
+// refused by name, because a person who picked it from a list wants to know
+// which row went wrong rather than bisect the selection — and a name filed
+// only where this person may not look is refused in the same words.
+func piecesNamed(ctx context.Context, in Ingest, subject access.Subject, productID int64,
+	picked []PieceBody) ([]finding.Piece, error) {
+
 	if len(picked) == 0 {
 		return nil, nil
 	}
@@ -187,19 +190,15 @@ func piecesNamed(ctx context.Context, in Ingest, picked []PieceBody) ([]finding.
 	for _, each := range picked {
 		names = append(names, each.Vulnerability)
 	}
-	found, err := finding.NewVulnerabilities(in.DB.DB).IDsByName(ctx, names)
+	found, unknown, err := issuesHere(ctx, in, subject, productID, names)
 	if err != nil {
-		return nil, wentWrong(in.Logger, "which issues these are could not be read", err)
+		return nil, err
 	}
 	out := make([]finding.Piece, 0, len(picked))
-	var unknown []string
 	for _, each := range picked {
-		id, ok := found[each.Vulnerability]
-		if !ok {
-			unknown = append(unknown, each.Vulnerability)
-			continue
+		if id, ok := found[each.Vulnerability]; ok {
+			out = append(out, finding.Piece{VulnerabilityID: id, Fold: each.Fold})
 		}
-		out = append(out, finding.Piece{VulnerabilityID: id, Fold: each.Fold})
 	}
 	if len(unknown) > 0 {
 		return nil, huma.Error404NotFound(

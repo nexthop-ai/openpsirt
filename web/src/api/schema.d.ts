@@ -263,7 +263,7 @@ export interface paths {
          *
          *     Answers 409 where nobody has agreed to what the advisory says.
          *
-         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         post: operations["record-advisory-issued"];
         delete?: never;
@@ -1809,7 +1809,7 @@ export interface paths {
          * Read one user
          * @description Returns one person: the roles in force for them, every grant and withdrawal against them, how much of the triage record they proposed and agreed to, and what this deployment has told them.
          *
-         *     `told` includes what they have already acknowledged and what has since cleared, because the question it answers is what was sent rather than what is waiting. It is not narrowed by what they may read now: a line about an undisclosed finding, sent while they held the role that reached it, is exactly what an investigation is looking for.
+         *     `told` includes what they have already acknowledged and what has since cleared, because the question it answers is what was sent rather than what is waiting. It is not narrowed by what they may read now: a line about an undisclosed finding, sent while they held the role that reached it, is exactly what an investigation is looking for. It is narrowed by what you hold: only lines about products you hold a role on, and undisclosed ones only where you read undisclosed work.
          *
          *     `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
          *
@@ -2668,13 +2668,27 @@ export interface paths {
          *
          *     A name is identity, and identity is deployment-wide. From here on a scan of any product reporting that name resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused rather than partly done.
          *
+         *     Only on a flaw recorded here: an issue a scan reported answers 422, because its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.
+         *
          *     Recording a name it already goes by succeeds and changes nothing.
          *
          *     Requires: public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
          */
         put: operations["add-alias"];
         post?: never;
-        delete?: never;
+        /**
+         * Remove another name for an issue
+         * @description Removes a name somebody recorded by hand for this issue.
+         *
+         *     From here on a scan reporting that name no longer resolves here. Findings that did resolve here through it split back out on the next scan that reports it, under an issue of their own.
+         *
+         *     Where the issue is filed under the name removed, it is refiled under the next best name it has: a CVE where one is left, and otherwise the reference it was minted under. The answer says which, and the issue is read by that name afterwards.
+         *
+         *     Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported answers 422, including the name the issue is filed under when a scan reported it. A name the issue does not answer to answers 404.
+         *
+         *     Requires: public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
+         */
+        delete: operations["remove-alias"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5835,7 +5849,7 @@ export interface components {
             told?: components["schemas"]["ToldBody"][] | null;
             /**
              * Format: int64
-             * @description The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains
+             * @description The number of things they were told about products you hold a role on, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains
              */
             told_total: number;
         };
@@ -6067,6 +6081,16 @@ export interface components {
             agreed_at: string;
             /** @description Who agrees, by sign-in identity */
             person: string;
+        };
+        AliasRemovedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AliasRemovedBody.json
+             */
+            readonly $schema?: string;
+            /** @description The name the issue is filed under now, which is the name to read it by */
+            filed_under: string;
         };
         AlsoBuild: {
             stream: string;
@@ -7653,6 +7677,8 @@ export interface components {
             advisory?: string;
             /** @description Other names the same issue is known by */
             aliases?: string[] | null;
+            /** @description Every name somebody recorded by hand, the one it is filed under included, which are the ones that may be removed */
+            aliases_by_hand?: string[] | null;
             /** @description The version this was upgraded from, where the upgrade did not resolve it */
             arrived_from?: string;
             /** @description This deployment's own rating, where somebody has said something. This is what ranks; severity is the published word */
@@ -10471,7 +10497,7 @@ export interface components {
             vector?: string;
             /** @description The version, where the build holds that name at several */
             version?: string;
-            /** @description The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which */
+            /** @description The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
         };
         RecordBody: {
@@ -16671,6 +16697,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                vulnerability: string;
+                /** @description The name to remove, as it is written */
+                alias: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AliasRemovedBody"];
+                };
             };
             /** @description Error */
             default: {

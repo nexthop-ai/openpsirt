@@ -464,3 +464,20 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 		}
 	})
 }
+
+func TestADocumentCutOffPartwayIsRefusedAsMalformed(t *testing.T) {
+	// A document ending inside a string is the sender's to fix, and the
+	// parser's to report in words.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		whole := said("not_affected", "vulnerable_code_not_present", "The routine is not built here.")
+		cut := whole[:strings.Index(whole, "Example Distri")+len("Example Distri")]
+		got := r.vexed(t, "admin", "debian", cut)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a document cut off partway answered %d, want 422: %s", got.Code, got.Body.String())
+		}
+		if !strings.Contains(got.Body.String(), "partway through a value") {
+			t.Errorf("the refusal does not say the document ends partway: %s", got.Body.String())
+		}
+	})
+}

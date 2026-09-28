@@ -97,9 +97,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	standing, held := InForce()
 	deferred := `EXISTS (SELECT 1 FROM "decision" AS "de"
 		JOIN "claim" AS "cl" ON cl.id = de.claim_id
-		WHERE de.product_id = ?
-		  AND de.vulnerability_id = f.vulnerability_id
-		  AND de.place_identity = f.place_identity
+		WHERE ` + DecisionAt("?") + `
 		  AND de.live_key IS NOT NULL
 		  AND ` + standing + `
 		  AND cl.outcome = 'deferred')`

@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
@@ -257,6 +258,10 @@ func vexRefused(in Ingest, err error, what string) error {
 	case errors.Is(err, vex.ErrRenamed):
 		// The caller's to ask again, and the sentence says so.
 		return huma.Error409Conflict(vex.ErrRenamed.Error())
+	case database.FromEngine(err):
+		// A database that broke, whatever else is true. Logged, and answered
+		// in words that name nothing about it.
+		return wentWrong(in.Logger, what, err)
 	case errors.Is(err, vex.ErrTooLarge):
 		// Something to narrow rather than something broken, and the sentence
 		// says which build and what the limit is. Answered as a fault it is a

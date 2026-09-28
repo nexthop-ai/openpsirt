@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -143,6 +144,9 @@ func registerWhoTold(api huma.API, in Ingest) {
 			"decisions. So this asks for the right to triage the issue in every product it " +
 			"is currently open in, at the visibility each one carries, and is refused rather " +
 			"than partly done.\n\n" +
+			"Only on a flaw recorded here: an issue a scan reported answers 422, because " +
+			"its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or " +
+			"a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.\n\n" +
 			"Recording a name it already goes by succeeds and changes nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "Also asks for triage in every other product the issue is open in.",
@@ -192,6 +196,66 @@ func registerWhoTold(api huma.API, in Ingest) {
 		}
 		return &struct{}{}, nil
 	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "remove-alias", Method: http.MethodDelete,
+		Path:    "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}",
+		Summary: "Remove another name for an issue",
+		Description: "Removes a name somebody recorded by hand for this issue.\n\n" +
+			"From here on a scan reporting that name no longer resolves here. Findings " +
+			"that did resolve here through it split back out on the next scan that " +
+			"reports it, under an issue of their own.\n\n" +
+			"Where the issue is filed under the name removed, it is refiled under the " +
+			"next best name it has: a CVE where one is left, and otherwise the reference " +
+			"it was minted under. The answer says which, and the issue is read by that " +
+			"name afterwards.\n\n" +
+			"Asks for the same right recording it does: triage in every product the " +
+			"issue is open in. A name a scan reported answers 422, including the name " +
+			"the issue is filed under when a scan reported it. A name the issue does not " +
+			"answer to answers 404.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusOK,
+	}, perProduct, "Also asks for triage in every other product the issue is open in.",
+		triageRights()...), func(ctx context.Context, input *struct {
+		Product       string `path:"product"`
+		Vulnerability string `path:"vulnerability"`
+		Alias         string `path:"alias" maxLength:"191" doc:"The name to remove, as it is written"`
+	}) (*struct{ Body AliasRemovedBody }, error) {
+		subject, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
+		if err != nil {
+			return nil, err
+		}
+		out := &struct{ Body AliasRemovedBody }{}
+		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			named, err := finding.NewVulnerabilities(tx).NamesByID(ctx, []int64{issue})
+			if err != nil {
+				return wentWrong(in.Logger, "that issue could not be looked up", err)
+			}
+			filedUnder, err := finding.NewVulnerabilities(tx).
+				NoLongerKnownAs(ctx, subject, issue, input.Alias)
+			out.Body.FiledUnder = filedUnder
+			switch {
+			case errors.Is(err, finding.ErrNoSuchName):
+				return huma.Error404NotFound(finding.ErrNoSuchName.Error())
+			case err != nil:
+				return asked(in.Logger, err)
+			}
+			// Every removal is a row, for the reason recording one is: it
+			// changes what a later scan of any product means.
+			if err := noted(ctx, tx, trail.Alias, named[issue],
+				trail.Said(strings.ToUpper(strings.TrimSpace(input.Alias)), true), nil); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return out, nil
+	})
+}
+
+// AliasRemovedBody is an issue after one of its names was removed.
+type AliasRemovedBody struct {
+	FiledUnder string `json:"filed_under" doc:"The name the issue is filed under now, which is the name to read it by"`
 }
 
 // reportBody names the people and the issue one report refers to.

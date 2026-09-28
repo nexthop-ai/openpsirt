@@ -341,7 +341,7 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	if len(held) == 0 {
 		return nil, nil, ErrNothingToSay
 	}
-	gone, err := s.issuances(ctx, row)
+	gone, err := s.issuances(ctx, subject, row)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -742,6 +742,12 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	if err != nil {
 		return nil, err
 	}
+	// Recording that it went out publishes it to the directory and fixes what
+	// each release was fixed from, which is a statement about every product it
+	// covers, so it takes the role every other change to the advisory does.
+	if err := s.mayWrite(ctx, subject, row, "record that an advisory went out"); err != nil {
+		return nil, err
+	}
 	// A second person has agreed to what it says, checked here because this
 	// is the act of the document leaving. Generating one is reading;
 	// recording that it went out is the publication.
@@ -952,7 +958,7 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	return s.issuances(ctx, row)
+	return s.issuances(ctx, subject, row)
 }
 
 // Changed reports whether what an advisory's document says now differs from
@@ -973,7 +979,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	if err != nil {
 		return nil, err
 	}
-	gone, err := s.issuances(ctx, row)
+	gone, err := s.issuances(ctx, subject, row)
 	if err != nil || len(gone) == 0 {
 		return nil, err
 	}
@@ -1005,7 +1011,16 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 // It takes the advisory rather than its identifier for the reason the read of
 // what it covers does: the clearance is the argument, and the only things that
 // answer with one have narrowed or just minted it.
-func (s *Store) issuances(ctx context.Context, row *Advisory) ([]Issuance, error) {
+//
+// Where anything has gone out, the reader must also read what every issuance
+// named, which is the narrowing the report of what went out applies. Reading
+// an advisory by name asks only of what it covers now, and each issuance carries a summary written about what it covered then —
+// which the list of issuances and the document's revision history both show.
+// A reader who fails it is told the advisory does not exist, since answering
+// "nothing went out" would be a false statement they could act on.
+func (s *Store) issuances(ctx context.Context, subject access.Subject,
+	row *Advisory) ([]Issuance, error) {
+
 	var rows []Issuance
 	err := s.db.NewSelect().Model(&rows).
 		// Without the documents. This answers the revision history and the
@@ -1017,6 +1032,20 @@ func (s *Store) issuances(ctx context.Context, row *Advisory) ([]Issuance, error
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what has gone out: %w", err)
+	}
+	if len(rows) == 0 {
+		return rows, nil
+	}
+	// Every issuance, each at what it named, or none of them.
+	readable, err := narrowed(s.db.NewSelect().
+		TableExpr(`"advisory_issuance" AS "ai"`).
+		Join(`JOIN "advisory" AS "ad" ON ad.id = ai.advisory_id`).
+		Where("ai.advisory_id = ?", row.ID), subject).Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("check what advisory %q has named: %w", row.Identifier, err)
+	}
+	if readable != len(rows) {
+		return nil, ErrNoSuchAdvisory
 	}
 	return rows, nil
 }

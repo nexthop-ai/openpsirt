@@ -16,7 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
-// startsAdvisory is what starting one and editing it asks for.
+// startsAdvisory is what starting one asks for.
 //
 // An advisory names no product until an issue is added to it, so there is no
 // product to hold a role on at the moment it is minted. What the handler asks
@@ -35,11 +35,11 @@ const namesAFlaw = "A triage role on the product named in the request, and on ev
 	"the advisory already covers. Naming a flaw on an advisory is what puts it into a document " +
 	"published about that product, and opens an edition of the whole document."
 
-// changesWhatItSays is what retitling an advisory, agreeing to it and taking
-// an agreement back ask for.
+// changesWhatItSays is what retitling an advisory, agreeing to it, taking an
+// agreement back and recording that it went out ask for.
 //
-// Every product it covers rather than one named in the request, because these
-// three name no product at all.
+// Every product it covers rather than one named in the request, because none
+// of these names a product at all.
 const changesWhatItSays = "A triage role on every product the advisory covers. What it says " +
 	"about one product is part of the same document as what it says about another."
 
@@ -518,7 +518,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"anything sent — a digest of whatever a caller says answers nothing.\n\n" +
 			"Answers 409 where nobody has agreed to what the advisory says.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, anyPerson, startsAdvisory, triageRights()...), func(ctx context.Context, input *struct {
+	}, anyPerson, changesWhatItSays, triageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
 			Summary string `json:"summary,omitempty" maxLength:"191" doc:"The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads"`

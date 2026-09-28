@@ -12,6 +12,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -227,20 +228,23 @@ func registerBulk(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		// Resolved in one statement. One lookup per name is fine for three
-		// names and is two thousand round trips for the case this exists for.
-		found, err := finding.NewVulnerabilities(in.DB.DB).
-			IDsByName(ctx, input.Body.Vulnerabilities)
+		// Resolved in one statement per batch. One lookup per name is fine for
+		// three names and is two thousand round trips for the case this
+		// exists for. A name filed only where this person may not look is
+		// answered as a name nobody filed.
+		productID, err := catalog.NewStore(in.DB.DB).ProductOf(ctx, target)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "which issues these are could not be read", err)
+			return nil, wentWrong(in.Logger, "which product this is could not be read", err)
+		}
+		found, unknown, err := issuesHere(ctx, in, subject, productID, input.Body.Vulnerabilities)
+		if err != nil {
+			return nil, err
 		}
 		issues := make([]int64, 0, len(input.Body.Vulnerabilities))
-		unknown := make([]string, 0)
 		seen := map[int64]bool{}
 		for _, name := range input.Body.Vulnerabilities {
 			id, ok := found[name]
 			if !ok {
-				unknown = append(unknown, name)
 				continue
 			}
 			if seen[id] {

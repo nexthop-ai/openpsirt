@@ -102,6 +102,43 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 	})
 }
 
+func TestAFlawIsClassifiedByABoundedListOfWeaknessIdentifiers(t *testing.T) {
+	// Each weakness is a row, and the column holding it is a name's width on
+	// three engines. One request states a bounded number of them, each a
+	// weakness identifier, so nothing it sends is a count of rows nobody
+	// chose or a string one engine stores and three refuse.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		entering := func(weaknesses ...string) finding.Entering {
+			return finding.Entering{
+				TargetIDs: []int64{f.target}, Severity: "high",
+				Summary: "The parser reads past its buffer.", Weaknesses: weaknesses,
+			}
+		}
+		many := make([]string, 0, 17)
+		for i := 1; i <= 17; i++ {
+			many = append(many, "CWE-"+strconv.Itoa(i))
+		}
+		for what, refused := range map[string]finding.Entering{
+			"seventeen weaknesses":         entering(many...),
+			"a weakness with a suffix":     entering("CWE-79x"),
+			"a weakness of three hundred":  entering("CWE-" + strings.Repeat("7", 300)),
+			"a weakness numbered from one": entering("CWE-0"),
+		} {
+			if _, _, err := f.store.Enter(t.Context(), who, refused); !errors.Is(err, finding.ErrNotAWeakness) {
+				t.Errorf("%s answered %v", what, err)
+			}
+		}
+		if _, _, err := f.store.Enter(t.Context(), who, entering(many[:16]...)); err != nil {
+			t.Errorf("sixteen weaknesses answered %v", err)
+		}
+		if _, _, err := f.store.Enter(t.Context(), who, entering(" cwe-125 ")); err != nil {
+			t.Errorf("a weakness written in lower case answered %v", err)
+		}
+	})
+}
+
 func TestRecordingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 	// Somebody who may argue about known issues in shipped components has not
 	// been handed the ones nobody has announced. The two rights are separate

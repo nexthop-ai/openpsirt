@@ -576,6 +576,13 @@ somebody holds and a name nobody holds identically (REQ-43).
 |---|---|
 | A CVE assigned later is another name for the same issue (REQ-18) | Identity is the issue rather than what it is called, so nothing moves: not the finding, not the decisions, not the approvals. The issue is then filed under the better-known name and the minted one stays an alias |
 | A name another issue already answers to is refused, checked before the write | A constraint violation cannot distinguish "already recorded" from "that would merge two issues" |
+| A name is typed only onto a flaw recorded here | An issue a scan reported takes its names from the scans that report it. A name typed onto one would redirect every scan reporting it, in every product, on one person's word. The case it exists for is internal disclosure: a CVE the numbering authority returns for our own flaw, recorded so later scan reports of it land on the record |
+| A typed name is a CVE or a GitHub advisory, in the shape its scheme issues | `CVE-`, a four-digit year and four or more digits, or `GHSA-` and three groups of four in the advisory alphabet. Those are the two schemes an internal flaw is given a public name in, and a typo in one redirects scans nobody expected |
+| Recording or removing one asks for triage in every product the issue is open in, and no second person | A name is identity across products. A second approval adds nothing a format check and the trail row do not, for an act that is rare and reversible |
+| Each name records whether a person typed it | A name a scan reported is recorded again by the next scan reporting it, so only a typed one is removed, and that includes the name the issue is filed under. A name typed before v0.5.0 reads as reported, because v0.4.0 kept nothing beside the name saying otherwise |
+| Removing a name is undone by the next scan, not by this act | The findings that resolved here through it stay where they are; the next scan reporting the name opens them under an issue of their own, and the ones here close as that scan stops reporting them here |
+| Removing the typed name an issue is filed under refiles it under the next best name it has | A CVE where one is left, and otherwise the oldest name, which for a flaw recorded here is the reference it was minted under. A mistyped CVE becomes the filed-under name the moment it is recorded, so removal has to reach it. The answer names where it is filed now, and the screen follows it |
+| Every name recorded or removed leaves a row in the administrative record | It changes what a later scan of any product means |
 | It starts undisclosed, and recording one asks for the private triage right (REQ-37) | Defaulting the other way makes the dangerous mistake the quiet one. Somebody who may argue about known issues in shipped components has not been handed the ones nobody has announced. Already-public is a flag on the request, asking the ordinary right |
 | Every flaw is recorded with a report | One recorded from a report accepts that report. One recorded without names where it came from on the same request, and a report is written from it, already accepted. The Inbox is then the one list of where every flaw came from, whether somebody sent it or somebody here found it |
 | A flaw found here is marked so on its report | It carries no disclosure date (REQ-37) and nobody is owed an answer. Unmarked is a report from outside, because that is the case with somebody counting down to a publication |
@@ -784,6 +791,7 @@ is never raised: there is nobody outside to answer.
 | The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `DESIGN-ingest.md` holds which rating in a generation is kept |
 | Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's. Where a published document has to name one, the name is looked up then rather than checked now, and an identifier no catalog assigns is left out of that document rather than out of the record |
 | Which one is the root cause is carried rather than picked | A published advisory states one weakness and an issue is commonly classified as several. The feeds say which they call primary, and a person recording a flaw names theirs first — the same statement made by hand. Choosing the lowest number or the earliest string instead is an answer with nothing behind it, and the two disagree: `CWE-20` is the lower number and `CWE-119` the earlier string |
+| A person recording a flaw states at most sixteen weaknesses, each CWE- and a number | Each is a row, and the column holding it is a name's width on three engines. Anything else is refused before anything is written, where the insert would otherwise succeed on one engine and fail as a fault on three |
 
 ### Version 4 classes
 
@@ -865,6 +873,12 @@ though the issue went away, and nothing reporting it.
 The kind exists ahead of the second thing to put in it for that reason: a model
 assuming every finding came from a scan cannot take one that did not without
 changing how closure works.
+
+Closing a recorded flaw by hand is asked of the rows at that build the caller
+may read. A row they may not read is left out before anything else is asked of
+it, so an undisclosed scanner finding there is answered as nothing open, the
+same as a build holding nothing. A readable recorded row they may not triage is
+refused.
 
 ## Interval storage
 

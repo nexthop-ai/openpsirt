@@ -143,6 +143,8 @@ A record that somebody outside was told about an attack.
 | Refused before the attack became known, and in the future | One of two moments is wrong, and the record is the one already kept |
 | Allowed on a cleared record | A notice given before the clearing still happened |
 | A retired window cannot be named by a new notice | A window nobody counts any more is not one a new notice answers |
+| A window limited to other products cannot be named by a notice | It is not one this record answers, and its name is not the caller's to learn. Refused as a window nobody declared |
+| A notice names its window only to a reader who may read the window | Read as the list of windows is. A window limited since to products the reader may not know exist is shown as no window, because its current name is a statement about those products |
 | Shown at the finding beside the record, and on the shelf | The record's history is read in one place wherever somebody arrives from |
 
 ## The shelf

@@ -1266,7 +1266,13 @@ export function Finding() {
         {/* Who told us, where somebody outside did, and the names
             this issue answers to. Both are about a flaw recorded
             here rather than one a scanner reported. */}
-        {it.recorded && <Reporter product={product} vulnerability={vulnerability} />}
+        {it.recorded && (
+          <Reporter
+            product={product}
+            vulnerability={vulnerability}
+            byHand={it.aliases_by_hand ?? []}
+          />
+        )}
         {!it.recorded && <Duplicates product={product} vulnerability={vulnerability} card />}
 
         {/* And which builds it affects, which the first belief about

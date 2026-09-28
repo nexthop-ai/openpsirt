@@ -122,7 +122,8 @@ type Arriving struct {
 	Serial string
 	// ParserVersion is the version of the code that will read it.
 	ParserVersion string
-	// Credential identifies what sent it. Blank until sign-in exists.
+	// Credential identifies what sent it: the identity of the key or the person
+	// the upload was authenticated as.
 	Credential string
 }
 
@@ -381,7 +382,13 @@ func (s *Store) ByID(ctx context.Context, id int64) (*Scan, error) {
 // then quietly did nothing.
 func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 	reason := ""
-	if cause != nil {
+	switch {
+	case database.FromEngine(cause):
+		// The receipt is read back by the key that sent the scan, and a
+		// database's failure names the address and the user it dialed. The
+		// cause is in the log the reader writes.
+		reason = "the scan could not be applied"
+	case cause != nil:
 		reason = cause.Error()
 	}
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).

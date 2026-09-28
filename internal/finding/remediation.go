@@ -252,9 +252,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 			Where("f.closed_at IS NULL").
 			Where("f.opened_at <= ?", older).
 			Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
-				WHERE de.product_id = st.product_id
-				  AND de.vulnerability_id = f.vulnerability_id
-				  AND de.place_identity = f.place_identity
+				WHERE `+DecisionAt("st.product_id")+`
 				  AND de.live_key IS NOT NULL
 				  AND `+standing+`)`, held...).
 			GroupExpr("f.vulnerability_id")

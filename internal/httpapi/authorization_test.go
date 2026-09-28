@@ -10,8 +10,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -144,6 +147,30 @@ func (r *reach) as(t *testing.T, who, method, path string) int {
 	rec := httptest.NewRecorder()
 	r.handler.ServeHTTP(rec, req)
 	return rec.Code
+}
+
+// sentByTheKey files an upload against the built product as the cast's key,
+// and answers which scan it is.
+func (r *reach) sentByTheKey(t *testing.T) int64 {
+	t.Helper()
+	ctx := t.Context()
+	names := catalog.NewStore(r.db.DB)
+	located, err := names.Locate(ctx, "mine", "master", "broadcom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	made, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
+		ParserVersion: "test", Credential: "nightly",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	return made.ID
 }
 
 func (r *reach) asKey(t *testing.T, method, path string) int {
@@ -818,8 +845,10 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 		// counts on the receipt. A key holds no reading role, so this is
 		// reached as the sender rather than as a reader — and outside its
 		// scope it is the same refusal a receipt gets.
+		sent := r.sentByTheKey(t)
 		if got := r.asKey(t, http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/scans/1/changes"); got != http.StatusOK {
+			"/v1/products/mine/streams/master/variants/broadcom/scans/"+
+				strconv.FormatInt(sent, 10)+"/changes"); got != http.StatusOK {
 			t.Errorf("a pipeline could not read what its own upload changed: %d", got)
 		}
 		if got := r.asKey(t, http.MethodGet,

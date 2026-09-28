@@ -259,6 +259,114 @@ func TestANoticeNamingAWindowAnswersThatWindowAlone(t *testing.T) {
 	})
 }
 
+func TestAWindowIsReadNarrowedToTheProductsTheReaderMayKnow(t *testing.T) {
+	// The list of products is a statement about what an organization ships,
+	// so a window limited to products the reader may not know exist is left
+	// out, and the products a window names are narrowed to the ones they may.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		hidden, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Sonic only", Hours: 24, Products: []string{"sonic"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		both, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Both", Hours: 48, Products: []string{"sonic", "other"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		everywhere := f.window(t, "Everywhere", 72)
+
+		read, err := f.store.Windows(ctx, f.outsider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		held := map[int64][]string{}
+		for _, window := range read {
+			held[window.ID] = window.ProductNames
+		}
+		if _, ok := held[hidden.ID]; ok {
+			t.Error("a window limited to a product the reader may not know was read")
+		}
+		if names, ok := held[both.ID]; !ok || len(names) != 1 || names[0] != "other" {
+			t.Errorf("a window over two products reads as limited to %v, want [other]", names)
+		}
+		if names, ok := held[everywhere.ID]; !ok || len(names) != 0 {
+			t.Errorf("a window over every product reads as %v (listed: %v)", names, ok)
+		}
+
+		// The deployment's own pass reads every window whole.
+		all, err := f.store.Windows(ctx, access.Everything("the obligation sweep"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(all) != 3 {
+			t.Errorf("the pass read %d windows, want all 3", len(all))
+		}
+	})
+}
+
+func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
+	// A window limited to other products is not one this record answers, and
+	// its name is not the triager's to learn: it is refused as a window
+	// nobody declared.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Other's window", Hours: 24, Products: []string{"other"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		here, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Sonic's window", Hours: 24, Products: []string{"sonic"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := f.attacked(t)
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &elsewhere.ID, "ENISA",
+			knownAt.Add(time.Hour), "Told."); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			t.Errorf("a notice naming a window limited to another product answered %v", err)
+		}
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &here.ID, "ENISA",
+			knownAt.Add(time.Hour), "Told."); err != nil {
+			t.Fatalf("a notice naming a window limited to its own product answered %v", err)
+		}
+
+		// Renamed and limited since to a product the triager may not know,
+		// the window is read as the list of windows reads it: not at all.
+		if _, err := f.store.ChangeWindow(ctx, f.admin, here.ID, obligation.WindowSaid{
+			Name: "Other's second window", Hours: 24, Products: []string{"other"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		told, err := f.store.ToldAbout(ctx, f.triager, []int64{record.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(told[record.ID]) != 1 {
+			t.Fatalf("the triager read %d notices, want 1", len(told[record.ID]))
+		}
+		named, err := f.store.WindowsNamed(ctx, f.triager, told)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name, ok := named[here.ID]; ok {
+			t.Errorf("a notice names %q, a window since limited to a product the reader may not know", name)
+		}
+		named, err = f.store.WindowsNamed(ctx, access.Everything("a check"), told)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if named[here.ID] != "Other's second window" {
+			t.Errorf("read as the deployment, the notice names %v", named)
+		}
+	})
+}
+
 func TestANoticeIsNotBeforeTheAttackBecameKnown(t *testing.T) {
 	// One of the two moments is wrong, and the record is the one already
 	// kept.
@@ -408,7 +516,7 @@ func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		named, err := f.store.WindowsNamed(ctx, told)
+		named, err := f.store.WindowsNamed(ctx, f.triager, told)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -674,7 +782,7 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 
 		counted := func(t *testing.T) (products []int64, onShelf bool) {
 			t.Helper()
-			windows, err := f.store.Windows(ctx)
+			windows, err := f.store.Windows(ctx, f.admin)
 			if err != nil {
 				t.Fatal(err)
 			}

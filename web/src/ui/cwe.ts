@@ -99,3 +99,15 @@ export function readAbout(id: string): string | null {
   if (!number) return null;
   return `https://cwe.mitre.org/data/definitions/${number[1]}.html`;
 }
+
+// The most a recorded flaw states, which the server refuses past.
+export const MOST_WEAKNESSES = 16;
+
+// A typed weakness as the server takes it: CWE- and a number from one. A bare
+// number is read as that CWE. Anything else is null, because the record
+// would be refused whole over it.
+export function asWeakness(typed: string): string | null {
+  const clean = typed.trim().toUpperCase();
+  const shaped = /^(?:CWE-)?([1-9][0-9]{0,5})$/.exec(clean);
+  return shaped ? `CWE-${shaped[1]}` : null;
+}

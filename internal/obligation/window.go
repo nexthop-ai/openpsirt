@@ -183,9 +183,46 @@ func nameSaid(name string, hours int) (string, error) {
 	return name, nil
 }
 
-// Windows is every window in force, shortest first: the order they close in
-// for any one incident.
-func (s *Store) Windows(ctx context.Context) ([]Window, error) {
+// Windows is every window in force this subject may read, shortest first: the
+// order they close in for any one incident.
+//
+// A window limited to products the subject may not know exist is left out,
+// and the products a window names are narrowed to the ones they may: the list
+// of products is itself a statement about what an organization ships. The
+// deployment's own passes read as a subject that knows every product.
+func (s *Store) Windows(ctx context.Context, subject access.Subject) ([]Window, error) {
+	windows, err := s.inForce(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Window, 0, len(windows))
+	for _, window := range windows {
+		if shown, ok := window.As(subject); ok {
+			out = append(out, shown)
+		}
+	}
+	return out, nil
+}
+
+// As is a window as this subject may read it, and whether they may read it at
+// all.
+func (w Window) As(subject access.Subject) (Window, bool) {
+	if len(w.Products) == 0 {
+		return w, true
+	}
+	shown := w
+	shown.Products, shown.ProductNames = nil, nil
+	for i, id := range w.Products {
+		if subject.Sees(id) {
+			shown.Products = append(shown.Products, id)
+			shown.ProductNames = append(shown.ProductNames, w.ProductNames[i])
+		}
+	}
+	return shown, len(shown.Products) > 0
+}
+
+// inForce is every window in force, whole.
+func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 	var windows []Window
 	err := s.db.NewSelect().Model(&windows).
 		Where("ow.retired_at IS NULL").
@@ -194,6 +231,15 @@ func (s *Store) Windows(ctx context.Context) ([]Window, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the windows in force: %w", err)
 	}
+	if len(windows) == 0 {
+		return windows, nil
+	}
+	return s.withLimits(ctx, windows)
+}
+
+// withLimits fills in the products each window is limited to, which the
+// window row itself does not carry.
+func (s *Store) withLimits(ctx context.Context, windows []Window) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
@@ -206,7 +252,7 @@ func (s *Store) Windows(ctx context.Context) ([]Window, error) {
 		ProductID int64  `bun:"product_id"`
 		Product   string `bun:"product"`
 	}
-	err = s.db.NewSelect().
+	err := s.db.NewSelect().
 		TableExpr(`"obligation_window_product" AS "owp"`).
 		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
 		ColumnExpr(`owp.window_id AS "window_id"`).

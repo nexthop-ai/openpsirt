@@ -51,6 +51,10 @@ type Measured struct {
 type Evidence struct {
 	Vulnerability string
 	Aliases       []string
+	// AliasesByHand is every name a person recorded, the one it is filed
+	// under included where a person typed it. These are the ones that may be
+	// removed.
+	AliasesByHand []string
 	Severity      string
 	// ScoreCenti and Vector are the severity as a number and the statement of
 	// what that number assumes. Network-reachable and unauthenticated is a
@@ -369,6 +373,11 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		if alias.Identifier != issue.Identifier {
 			evidence.Aliases = append(evidence.Aliases, alias.Identifier)
 		}
+		// The name it is filed under among them where a person typed it,
+		// because that one may be removed too.
+		if alias.ByHand {
+			evidence.AliasesByHand = append(evidence.AliasesByHand, alias.Identifier)
+		}
 	}
 	for _, weakness := range weaknesses {
 		evidence.Weaknesses = append(evidence.Weaknesses, weakness.CWE)
@@ -504,11 +513,9 @@ type evidenceRow struct {
 //
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
-const standingHere = `FROM "decision" AS "de"
+var standingHere = `FROM "decision" AS "de"
 	JOIN "claim" AS "cl" ON cl.id = de.claim_id
-	WHERE de.product_id = ?
-	  AND de.vulnerability_id = f.vulnerability_id
-	  AND de.place_identity = f.place_identity
+	WHERE ` + DecisionAt("?") + `
 	  AND de.live_key IS NOT NULL
 	  AND ` + KeyMatches + `
 	ORDER BY CASE WHEN cl.outcome = '` + Mismatched + `'

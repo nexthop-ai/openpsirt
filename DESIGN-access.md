@@ -173,6 +173,12 @@ rather than checked at each route, because the leak is the *ordering*. The
 identifier carries no sequence, so the names cannot be walked or counted even
 before a route is asked.
 
+A route taking a list of names — one judgment about many issues, an
+assignment of rows somebody picked — goes through the list form of the same
+resolver, one statement per batch. A name filed only where the caller may not
+read a finding of it in this product is answered in the words a name nobody
+filed gets.
+
 Nobody learns what a build ships either. The graph reads that take a component
 *name* refuse before resolving it, for the same reason and with a sharper edge:
 a name the build does not hold answered one way, a name it holds at two versions
@@ -305,10 +311,10 @@ than a leak, because granting it is a deliberate administrative act, and it is
 written down here so that granting it is an informed one. The alternative is an
 audit record with holes in it that nothing marks, which is worse than no record.
 
-What somebody was told is narrowed, and this is not a way to see more. The
-rows come back as the asker could have read them on their own account, which is
-the rule the administrator flag already follows — so an auditor who reaches no
-product is answered with nothing.
+What somebody was told is narrowed, and this is not a way to see more. Rows
+come back only about products the asker holds a role on, at the visibility
+they read there, which is the rule the administrator flag already follows — so
+an auditor who reaches no product is answered with nothing.
 
 ### Storage
 
@@ -469,6 +475,13 @@ are in use on a product both read findings and both answer for the whole
 product, so a reader reached straight from a request is a product-wide read
 with nobody attached.
 
+Product-scoped configuration is no exception. A product's routing rules, the
+obligation windows and the products each is limited to, an upload's receipt and
+the documents it kept are each read with the subject, and the store decides
+what that subject reaches: the rules for whoever triages the product, a window
+narrowed to the products the reader may know exist, and a key's own uploads.
+The sweeps that apply rules and watch windows read as the deployment.
+
 The trail's readers are the same shape. A row there names who was brought into
 which case, undisclosed ones among them, so a line in the handler is the only
 thing between that and a caller. Each takes a subject and refuses one that does
@@ -481,6 +494,13 @@ asked in one place. Both live on the subject: a rule written out per package is
 a rule with a spelling per package. They stay two questions rather than one,
 because triage implies reading and reading does not imply triage, so a single
 answer would have to be qualified at every call site.
+
+Whether any row of a group is undisclosed is one aggregate too: a count of the
+undisclosed rows, compared with zero. The visibility words are compared for
+equality and never ordered, because the smallest word of a group answers the
+question only while "private" sorts before "public", and it is asked where an
+outbound message decides whether it may name the issue. A test fails on an
+ordering taken over a visibility column anywhere in the source.
 
 | Question | Asked at |
 |---|---|
@@ -582,7 +602,7 @@ being applied correctly to it.
 |---|---|
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
 | A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its full target |
-| A key reads back its own receipts and nothing else | An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many builds somebody else runs |
+| A key reads back its own receipts and nothing else | The same holds for the documents it sent and what its own uploads changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many builds somebody else runs |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 
 ## Provider sign-in
@@ -1074,7 +1094,7 @@ that is neither.
 | | |
 |---|---|
 | **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group bindings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
-| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue |
+| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because
 absorbing a route that should leave a row is the failure the walk exists to

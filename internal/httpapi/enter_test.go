@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,31 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
+
+func TestAWeaknessThatIsNotAnIdentifierIsTheCallersToFix(t *testing.T) {
+	// Refused in words before anything is written, rather than answered as a
+	// fault by the engines whose column is narrower than what was sent.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		many := make([]string, 0, 17)
+		for i := 1; i <= 17; i++ {
+			many = append(many, `"CWE-`+strconv.Itoa(i)+`"`)
+		}
+		for what, weaknesses := range map[string]string{
+			"seventeen":         strings.Join(many, ","),
+			"one with a suffix": `"CWE-79x"`,
+			"one too long":      `"CWE-` + strings.Repeat("7", 300) + `"`,
+		} {
+			body := `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+				`"summary":"The parser reads past its buffer.","severity":"high",` +
+				`"weaknesses":[` + weaknesses + `]}`
+			got := asPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings", body)
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("%s answered %d: %s", what, got.Code, got.Body.String())
+			}
+		}
+	})
+}
 
 func TestAFlawInOurOwnProductIsRecordedAndReadBackLikeAnyOther(t *testing.T) {
 	// The point of doing this before the reports and the channels: from the

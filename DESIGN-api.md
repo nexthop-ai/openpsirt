@@ -68,7 +68,7 @@ inferred from a rule, so adding a route never adds an exception.
 | `/healthz`, `/readyz` | Whether the process is up and whether it can reach its database |
 | `/v1/sign-in` | The providers an operator configured. A sign-in page draws a button per provider and cannot ask for that list while holding nothing |
 | `/v1/sign-in/…` | Redirects to a provider, or refuses. What it reads and writes is its own: the sign-in key, the session, and the account a first arrival needs. A route added here is checked against that rather than assumed harmless |
-| The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential |
+| The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential. A path naming a directory of them is answered with the page, never a listing |
 
 ## Operation descriptions
 
@@ -144,8 +144,14 @@ A store's own sentence and a failed query are distinguished by the engine's
 error types, asked in one place, rather than by the message text. Answered
 alike as a 422 with the message in it, a broken database reaches the caller as
 a bad request carrying the statement text and, for a connection failure, the
-address and user it tried. Where the type cannot decide, the error is treated
-as a refusal.
+address and user it tried. A connection that could not be made or was cut
+short is read from the network's and each driver's own error for it. The
+document parser states a file ending inside a value in its own words, because
+the error it would otherwise return is the one a driver returns for a
+connection cut short, and a truncated upload is the sender's to fix. Every
+mapper from a store's error to an answer asks this before publishing a
+message, and a failed upload's receipt carries a fixed sentence in place of
+one. Where the type cannot decide, the error is treated as a refusal.
 
 A 404 is never built from an error's own text. It asserts that a name reaches
 nothing, and the body then publishes whatever the error carried — for a store
@@ -241,7 +247,7 @@ part of the statement.
 | The issue table is joined only where the chosen order needs it | The ordinary page still reads one covering index |
 | A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody. Dropping the condition hands the caller every finding there is while the screen goes on showing the filter as on, so a filter asking for a set nothing is in answers with nothing |
 | A filter with three answers is a word, not a flag | Origin is one: a screen offering "Scanner" as a flag can only send the absence of "entered by hand", so choosing it filters nothing |
-| A repeated value is one value | A set of one word sent twice otherwise reads as both kinds and no narrowing, which silently puts tags back into a list somebody asked to see branches of |
+| A filter taking words from a fixed set takes each word once, and is refused with a 422 where one repeats | Each word is bound into the statement, and the set of words bounds how many there are only where none repeats. A free-text filter carries a count of items instead. A test walks every repeatable query parameter the document declares and fails one declaring neither |
 | A query parameter the operation does not declare is refused with a 400 naming it | Ignored, a mistyped filter returns the unfiltered list, which reads as a correct answer. The list is read from the operation's own declaration, so what is accepted is what the document publishes |
 | That refusal comes after the scope on the operation's declaration is checked | A caller outside the scope learns nothing about what it takes. A role on the product is checked by the handler, after it; the parameters are published, so the order discloses nothing there |
 

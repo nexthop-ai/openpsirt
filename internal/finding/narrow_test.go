@@ -213,6 +213,28 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 				undecided)
 		}
 
+		// Nobody here claimed anything lately, so asking for what was claimed
+		// since yesterday finds nothing — in this product's list and in the
+		// list across products, where the product is the row's own.
+		yesterday := time.Now().UTC().Add(-24 * time.Hour)
+		_, claimed, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{ProposedAfter: &yesterday})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if claimed != 0 {
+			t.Errorf("a claim in another product made %d rows here read as recently claimed", claimed)
+		}
+		_, claimed, err = f.store.Anywhere(ctx, who, 50, 0,
+			finding.Filter{ProposedAfter: &yesterday})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if claimed != 0 {
+			t.Errorf("a claim in another product made %d rows across products read as recently claimed",
+				claimed)
+		}
+
 		// And the finding's own screen, which names the decision standing at
 		// each place, names nothing: it showed the other product's claim as
 		// standing here, an identifier the reader could not open.

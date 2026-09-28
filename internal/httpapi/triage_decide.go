@@ -432,7 +432,8 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which, func(err error) error { return ambiguousOrMissing(in.Logger, err) })
+	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which,
+		func(err error) error { return ambiguousOrMissing(in.Logger, err) })
 	if err != nil {
 		return 0, 0, 0, err
 	}

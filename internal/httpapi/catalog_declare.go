@@ -8,8 +8,10 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // registerDeclaring registers the writes that say what exists.
@@ -19,6 +21,11 @@ import (
 // declaring what is already there succeeds and changes nothing, because a
 // pipeline that has to know whether a branch exists before cutting it is a
 // pipeline with a race in it.
+//
+// Declaring what exists leaves no row in the administration trail. Bringing
+// back something retired does, because it undoes a retirement the trail
+// records, and so does filling in what a tag was cut from, which is a release
+// detail the trail records. Each is written in the transaction that makes it.
 func registerDeclaring(api huma.API, d Declaring) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "declare-product", Method: http.MethodPost, Path: "/v1/products",
@@ -32,15 +39,28 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d, d.handle())
-		if err != nil {
+		var out *declaredOutput[ProductBody]
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			product, did, err := store.EnsureProduct(ctx, in.Body.Name, in.Body.DisplayName)
+			if err != nil {
+				return declineDeclaration(d.Logger, err)
+			}
+			if did.Restored {
+				if err := noted(ctx, tx, trail.Catalog, product.Name,
+					nil, trail.Said("in use", true)); err != nil {
+					return notRecorded(d.Logger, err)
+				}
+			}
+			out = answer(did.Changed(), ProductBody{Name: product.Name, DisplayName: product.DisplayName})
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		product, created, err := store.EnsureProduct(ctx, in.Body.Name, in.Body.DisplayName)
-		if err != nil {
-			return nil, declineDeclaration(err)
-		}
-		return answer(created, ProductBody{Name: product.Name, DisplayName: product.DisplayName}), nil
+		return out, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -56,32 +76,52 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d, d.handle())
-		if err != nil {
+		var out *declaredOutput[StreamBody]
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			product, err := store.ProductByName(ctx, in.Product)
+			if err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+
+			var parent *catalog.Stream
+			var parentID *int64
+			if in.Body.Parent != "" {
+				parent, err = store.StreamByName(ctx, product.ID, in.Body.Parent)
+				if err != nil {
+					return undeclared(d.Logger, err, "the release it was cut from could not be looked up")
+				}
+				parentID = &parent.ID
+			}
+
+			stream, did, err := store.EnsureStream(ctx, product.ID, in.Body.Name,
+				catalog.Kind(in.Body.Kind), parentID)
+			if err != nil {
+				return declineDeclaration(d.Logger, err)
+			}
+			if did.Restored {
+				if err := noted(ctx, tx, trail.Catalog, product.Name+" "+stream.Name,
+					nil, trail.Said("in use", true)); err != nil {
+					return notRecorded(d.Logger, err)
+				}
+			}
+			if did.FilledIn {
+				if err := noted(ctx, tx, trail.Release, product.Name+" "+stream.Name+" cut from",
+					nil, trail.Said(parent.Name, true)); err != nil {
+					return notRecorded(d.Logger, err)
+				}
+			}
+			out = answer(did.Changed(), StreamBody{
+				Name: stream.DisplayName, Kind: string(stream.Kind), Parent: in.Body.Parent,
+			})
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		product, err := store.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-
-		var parentID *int64
-		if in.Body.Parent != "" {
-			parent, err := store.StreamByName(ctx, product.ID, in.Body.Parent)
-			if err != nil {
-				return nil, undeclared(d.Logger, err, "the release it was cut from could not be looked up")
-			}
-			parentID = &parent.ID
-		}
-
-		stream, created, err := store.EnsureStream(ctx, product.ID, in.Body.Name,
-			catalog.Kind(in.Body.Kind), parentID)
-		if err != nil {
-			return nil, declineDeclaration(err)
-		}
-		return answer(created, StreamBody{
-			Name: stream.DisplayName, Kind: string(stream.Kind), Parent: in.Body.Parent,
-		}), nil
+		return out, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -100,23 +140,35 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d, d.handle())
-		if err != nil {
-			return nil, err
-		}
-		product, err := store.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-
 		facing := true
 		if in.Body.CustomerFacing != nil {
 			facing = *in.Body.CustomerFacing
 		}
-		variant, created, err := store.EnsureVariant(ctx, product.ID, in.Body.Name, facing)
-		if err != nil {
-			return nil, declineDeclaration(err)
+		var out *declaredOutput[VariantBody]
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			product, err := store.ProductByName(ctx, in.Product)
+			if err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+			variant, did, err := store.EnsureVariant(ctx, product.ID, in.Body.Name, facing)
+			if err != nil {
+				return declineDeclaration(d.Logger, err)
+			}
+			if did.Restored {
+				if err := noted(ctx, tx, trail.Catalog, product.Name+" "+variant.Name,
+					nil, trail.Said("in use", true)); err != nil {
+					return notRecorded(d.Logger, err)
+				}
+			}
+			out = answer(did.Changed(), VariantBody{Name: variant.DisplayName, CustomerFacing: &variant.CustomerFacing})
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		return answer(created, VariantBody{Name: variant.DisplayName, CustomerFacing: &variant.CustomerFacing}), nil
+		return out, nil
 	})
 }

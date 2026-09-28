@@ -55,7 +55,7 @@ components:
             - array
             - "null"
         told_total:
-          description: "The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
+          description: "The number of things they were told about products you hold a role on, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
           format: int64
           type: integer
       required:
@@ -436,6 +436,22 @@ components:
       required:
         - person
         - agreed_at
+      type: object
+    AliasRemovedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AliasRemovedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        filed_under:
+          description: The name the issue is filed under now, which is the name to read it by
+          type: string
+      required:
+        - filed_under
       type: object
     AlsoBuild:
       additionalProperties: false
@@ -3154,6 +3170,13 @@ components:
           type: string
         aliases:
           description: Other names the same issue is known by
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        aliases_by_hand:
+          description: Every name somebody recorded by hand, the one it is filed under included, which are the ones that may be removed
           items:
             type: string
           type:
@@ -8117,9 +8140,11 @@ components:
           description: The version, where the build holds that name at several
           type: string
         weaknesses:
-          description: The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which
+          description: "The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"
           items:
+            pattern: ^(\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\s*$
             type: string
+          maxItems: 16
           type:
             - array
             - "null"
@@ -11732,7 +11757,7 @@ paths:
 
         Answers 409 where nobody has agreed to what the advisory says.
 
-        Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: record-advisory-issued
       parameters:
         - in: path
@@ -11767,7 +11792,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
-        note: A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+        note: A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
   /v1/advisories/{advisory}/issues:
     post:
       description: |-
@@ -12243,7 +12268,9 @@ paths:
           schema:
             description: Limit to these products, by name. Repeatable; any of them matches
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12267,6 +12294,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Limit to these states. Repeatable; any of them matches
           explode: true
           in: query
@@ -12283,6 +12311,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Only judgments proposed on or after this date, as YYYY-MM-DD
           explode: false
           in: query
@@ -12411,7 +12440,9 @@ paths:
           schema:
             description: Limit to these products, by name. Repeatable; any of them matches
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12435,6 +12466,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Limit to these states. Repeatable; any of them matches
           explode: true
           in: query
@@ -12451,6 +12483,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Only judgments proposed on or after this date, as YYYY-MM-DD
           explode: false
           in: query
@@ -13967,6 +14000,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -14019,6 +14053,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -14039,6 +14074,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -14054,6 +14090,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -14115,6 +14152,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -14227,6 +14265,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -14466,6 +14505,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -14518,6 +14558,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -14538,6 +14579,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -14553,6 +14595,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -14614,6 +14657,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -14726,6 +14770,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -15726,7 +15771,7 @@ paths:
       description: |-
         Returns one person: the roles in force for them, every grant and withdrawal against them, how much of the triage record they proposed and agreed to, and what this deployment has told them.
 
-        `told` includes what they have already acknowledged and what has since cleared, because the question it answers is what was sent rather than what is waiting. It is not narrowed by what they may read now: a line about an undisclosed finding, sent while they held the role that reached it, is exactly what an investigation is looking for.
+        `told` includes what they have already acknowledged and what has since cleared, because the question it answers is what was sent rather than what is waiting. It is not narrowed by what they may read now: a line about an undisclosed finding, sent while they held the role that reached it, is exactly what an investigation is looking for. It is narrowed by what you hold: only lines about products you hold a role on, and undisclosed ones only where you read undisclosed work.
 
         `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
 
@@ -17150,6 +17195,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -17202,6 +17248,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -17222,6 +17269,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -17237,6 +17285,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -17298,6 +17347,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -17410,6 +17460,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -17763,6 +17814,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -17815,6 +17867,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -17835,6 +17888,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -17850,6 +17904,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -17911,6 +17966,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -18023,6 +18079,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -18296,6 +18353,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -18348,6 +18406,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -18368,6 +18427,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -18383,6 +18443,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -18444,6 +18505,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -18556,6 +18618,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -18840,6 +18903,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -18892,6 +18956,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -18912,6 +18977,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -18927,6 +18993,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -18988,6 +19055,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -19100,6 +19168,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -19397,6 +19466,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits inside the container of this name
           explode: false
           in: query
@@ -19449,6 +19519,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"
           explode: true
           in: query
@@ -19469,6 +19540,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"
           explode: true
           in: query
@@ -19484,6 +19556,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1
           explode: false
           in: query
@@ -19545,6 +19618,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: "Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"
           explode: true
           in: query
@@ -19657,6 +19731,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -20085,6 +20160,59 @@ paths:
           - private-triage
         note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
   /v1/products/{product}/issues/{vulnerability}/aliases/{alias}:
+    delete:
+      description: |-
+        Removes a name somebody recorded by hand for this issue.
+
+        From here on a scan reporting that name no longer resolves here. Findings that did resolve here through it split back out on the next scan that reports it, under an issue of their own.
+
+        Where the issue is filed under the name removed, it is refiled under the next best name it has: a CVE where one is left, and otherwise the reference it was minted under. The answer says which, and the issue is read by that name afterwards.
+
+        Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported answers 422, including the name the issue is filed under when a scan reported it. A name the issue does not answer to answers 404.
+
+        Requires: public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
+      operationId: remove-alias
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: vulnerability
+          required: true
+          schema:
+            type: string
+        - description: The name to remove, as it is written
+          in: path
+          name: alias
+          required: true
+          schema:
+            description: The name to remove, as it is written
+            maxLength: 191
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AliasRemovedBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Remove another name for an issue
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: Also asks for triage in every other product the issue is open in.
     put:
       description: |-
         Records that this issue is also known by another identifier — a CVE or a GHSA assigned after we minted our own.
@@ -20092,6 +20220,8 @@ paths:
         Nothing about the finding, the decisions or the approvals moves, because they are keyed on the issue rather than on what it is called. What changes is that the name travels with it: a report arriving under the new name resolves here rather than opening a second issue, the finding shows it, and the advisory carries it in the field a reader looks in — which is the one lookup a published advisory exists to serve.
 
         A name is identity, and identity is deployment-wide. From here on a scan of any product reporting that name resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused rather than partly done.
+
+        Only on a flaw recorded here: an issue a scan reported answers 422, because its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.
 
         Recording a name it already goes by succeeds and changes nothing.
 
@@ -24061,6 +24191,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep rows whose standing judgment is one of these. Repeatable
           explode: true
           in: query
@@ -24081,6 +24212,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep one component, by name
           explode: false
           in: query
@@ -24187,6 +24319,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep rows whose standing judgment is one of these. Repeatable
           explode: true
           in: query
@@ -24207,6 +24340,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep one component, by name
           explode: false
           in: query
@@ -25426,7 +25560,9 @@ paths:
           schema:
             description: Limit to these products, by name. Repeatable; any of them matches
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -25573,6 +25709,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
           explode: false
           in: query
@@ -25699,6 +25836,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
           explode: false
           in: query

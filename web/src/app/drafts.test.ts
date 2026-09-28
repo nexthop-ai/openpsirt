@@ -9,12 +9,14 @@ import {
   forgetSession,
   keep,
   keepAnswer,
+  ownsSession,
   restore,
   restoreAnswer,
 } from "./drafts";
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   belongTo(undefined);
 });
 
@@ -176,8 +178,8 @@ describe("drafts", () => {
     // The store the scope actually lives in, asserted against it.
     // forgetAll walks the local store alone; what the tab holds is taken away
     // by forgetSession, and sign-out calls both.
-    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
     belongTo("oidc:ana");
+    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
 
     forgetAll();
 
@@ -220,6 +222,63 @@ describe("what signing out takes away", () => {
     };
     expect(() => forgetSession()).not.toThrow();
     window.sessionStorage.removeItem = kept;
+  });
+});
+
+describe("what somebody else signing in takes away", () => {
+  // A lapsed session is resumed by signing in again in the same tab, which is
+  // not a sign-out, so the session store is still there for whoever does it.
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    belongTo(undefined);
+  });
+
+  function seeded() {
+    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
+    window.sessionStorage.setItem("openpsirt.decide.last", '{"outcome":"wont-fix"}');
+  }
+
+  it("keeps the session's state for the same person", () => {
+    belongTo("oidc:ana");
+    seeded();
+    belongTo(undefined);
+    belongTo("oidc:ana");
+
+    expect(window.sessionStorage.getItem("openpsirt.scope")).toBe('{"product":"sonic"}');
+    expect(window.sessionStorage.getItem("openpsirt.decide.last")).toBe('{"outcome":"wont-fix"}');
+    expect(ownsSession()).toBe(true);
+  });
+
+  it("clears state nobody claimed when somebody is first recognized", () => {
+    // A tab holding state written before the owner was recorded has no
+    // owner key, and it may be anybody's.
+    seeded();
+    belongTo("oidc:ben");
+
+    expect(window.sessionStorage.getItem("openpsirt.scope")).toBeNull();
+    expect(window.sessionStorage.getItem("openpsirt.decide.last")).toBeNull();
+    expect(ownsSession()).toBe(true);
+  });
+
+  it("clears the session's state for somebody else", () => {
+    belongTo("oidc:ana");
+    seeded();
+    belongTo(undefined);
+    belongTo("oidc:ben");
+
+    expect(window.sessionStorage.getItem("openpsirt.scope")).toBeNull();
+    expect(window.sessionStorage.getItem("openpsirt.decide.last")).toBeNull();
+    expect(ownsSession()).toBe(true);
+  });
+
+  it("offers nothing kept for a person before anybody is recognized", () => {
+    // A screen can render before the session is known, which is before the
+    // clear above has had its chance.
+    belongTo("oidc:ana");
+    seeded();
+    belongTo(undefined);
+
+    expect(ownsSession()).toBe(false);
   });
 });
 

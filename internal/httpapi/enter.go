@@ -108,7 +108,7 @@ func registerEntry(api huma.API, in Ingest) {
 			// The vector rather than a score. The number is derived from it
 			// here, so the two cannot say different things.
 			Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
-			Weaknesses []string `json:"weaknesses,omitempty" doc:"The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which"`
+			Weaknesses []string `json:"weaknesses,omitempty" maxItems:"16" pattern:"^(\\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\\s*$" doc:"The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"`
 			Component  string   `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Version    string   `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
 			Ecosystem  string   `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
@@ -176,7 +176,7 @@ func registerEntry(api huma.API, in Ingest) {
 					"version, and ecosystem and namespace where two share one")
 			case errors.Is(err, finding.ErrNoSuchComponent):
 				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
-			case errors.Is(err, finding.ErrNothingSaid):
+			case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
 				return nil, asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNotAVector):
 				return nil, asked(in.Logger, err)

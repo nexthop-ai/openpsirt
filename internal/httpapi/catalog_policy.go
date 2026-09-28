@@ -249,8 +249,15 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 				if err != nil {
 					return undeclared(d.Logger, err, "the release it was cut from could not be looked up")
 				}
-				if err := store.FillInParent(ctx, stream.ID, from.ID); err != nil {
+				filled, err := store.FillInParent(ctx, stream.ID, from.ID)
+				if err != nil {
 					return asked(d.Logger, err)
+				}
+				if filled {
+					if err := noted(ctx, tx, trail.Release, product.Name+" "+stream.Name+" cut from",
+						nil, trail.Said(from.Name, true)); err != nil {
+						return notRecorded(d.Logger, err)
+					}
 				}
 			}
 			if err := store.SetReleasedOn(ctx, stream.ID, on); err != nil {

@@ -361,7 +361,7 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 
 	t.Helper()
 	start := time.Now()
-	first, filed, err := scans.Receipts(ctx, who, target, "", 50, 0)
+	first, filed, err := scans.Receipts(ctx, who, target, 50, 0)
 	if err != nil {
 		t.Fatalf("receipts: %v", err)
 	}
@@ -375,7 +375,7 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 		deep = filed - 50
 	}
 	start = time.Now()
-	last, _, err := scans.Receipts(ctx, who, target, "", 50, deep)
+	last, _, err := scans.Receipts(ctx, who, target, 50, deep)
 	if err != nil {
 		t.Fatalf("receipts at %d: %v", deep, err)
 	}

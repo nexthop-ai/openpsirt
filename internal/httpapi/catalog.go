@@ -299,8 +299,17 @@ func answer[T any](created bool, item T) *declaredOutput[T] {
 }
 
 // declineDeclaration turns a refusal into the answer that describes it.
-func declineDeclaration(err error) error {
+//
+// A database that broke is logged and answered as a fault, whose words name
+// nothing about it. What remains is a sentence the catalog wrote for the
+// caller: a name that is empty, too long or malformed.
+func declineDeclaration(logger *slog.Logger, err error) error {
 	switch {
+	case errors.Is(err, database.ErrGoAgain):
+		// A lost race, which the transaction around the act takes again.
+		return err
+	case database.FromEngine(err):
+		return wentWrong(logger, "that could not be declared", err)
 	case errors.Is(err, catalog.ErrDiffers):
 		// Declared before, meaning something else. Answering with success
 		// would let a pipeline quietly redefine what a name refers to.

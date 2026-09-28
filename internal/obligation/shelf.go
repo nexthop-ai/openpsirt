@@ -138,7 +138,7 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 	if len(kept) == 0 {
 		return nil, nil
 	}
-	windows, err := s.Windows(ctx)
+	windows, err := s.Windows(ctx, subject)
 	if err != nil {
 		return nil, err
 	}

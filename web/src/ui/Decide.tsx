@@ -13,7 +13,7 @@ import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
-import { DECIDE_KEPT, keepAnswer, restoreAnswer } from "../app/drafts";
+import { DECIDE_KEPT, keepAnswer, ownsSession, restoreAnswer } from "../app/drafts";
 
 // One judgment about this finding. Outcome, the justification where it does
 // not apply, a date where it is deferred, the reasoning, which places it
@@ -161,14 +161,17 @@ const OFFERED = Object.keys(OFFERS) as OneAtATime[];
 // Per session rather than remembered: what somebody was doing this morning is
 // not what they are doing now, and a default that survives a night is a
 // default nobody chose.
+//
 // The place the tab remembers the last judgment, to offer back. Named beside
-// the
-// sign-out clear that takes it away, so the two cannot drift apart.
+// the sign-out clear that takes it away, so the two cannot drift apart.
 const LAST = DECIDE_KEPT;
 
 type Same = { outcome: string; justification: string };
 
+// Nothing where the judgment was somebody else's, whose reasoning is not the
+// person here's to be offered.
 function lastUsed(): Same | null {
+  if (!ownsSession()) return null;
   try {
     const kept = window.sessionStorage.getItem(LAST);
     if (!kept) return null;

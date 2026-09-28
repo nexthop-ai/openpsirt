@@ -3,7 +3,7 @@
 
 import { notACredential } from "./noautofill";
 import { useState } from "react";
-import { COMMON, nameOf } from "./cwe";
+import { asWeakness, COMMON, MOST_WEAKNESSES, nameOf } from "./cwe";
 
 // The picker for what kind of flaw something is. The vocabulary, the names and
 // where to read about one live beside it in `cwe.ts`, because the finding
@@ -17,12 +17,27 @@ export function Weaknesses({
   onChange: (next: string[]) => void;
 }) {
   const [typed, setTyped] = useState("");
+  const [problem, setProblem] = useState("");
 
   function add(id: string) {
-    const clean = id.trim().toUpperCase();
-    if (clean === "" || chosen.includes(clean)) return;
+    if (id.trim() === "") return;
+    const clean = asWeakness(id);
+    if (clean === null) {
+      setProblem("Type CWE- and a number, like CWE-125.");
+      return;
+    }
+    if (chosen.includes(clean)) {
+      setTyped("");
+      setProblem("");
+      return;
+    }
+    if (chosen.length >= MOST_WEAKNESSES) {
+      setProblem(`${MOST_WEAKNESSES} at most.`);
+      return;
+    }
     onChange([...chosen, clean]);
     setTyped("");
+    setProblem("");
   }
 
   return (
@@ -73,7 +88,12 @@ export function Weaknesses({
           </option>
         ))}
       </datalist>
-      <span className="hint">Anything may be typed. These are the most common.</span>
+      {problem !== "" && (
+        <span className="hint" role="alert">
+          {problem}
+        </span>
+      )}
+      <span className="hint">CWE- and a number. These are the most common.</span>
     </div>
   );
 }

@@ -384,6 +384,16 @@ func TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers(t *testing
 		if _, err := f.store.Approve(ctx, f.approver, named); err != nil {
 			t.Errorf("somebody triaging both products could not agree: %v", err)
 		}
+
+		// Recording that it went out publishes it about both products, so an
+		// agreed advisory is still not theirs to issue.
+		if _, err := f.store.Issued(ctx, partly, issuer, named, ""); !errors.Is(
+			err, access.ErrDenied) {
+			t.Errorf("issuing with triage on one of two products answered %v", err)
+		}
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, ""); err != nil {
+			t.Errorf("somebody triaging both products could not issue: %v", err)
+		}
 	})
 }
 

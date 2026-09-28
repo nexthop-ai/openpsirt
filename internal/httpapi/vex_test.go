@@ -165,10 +165,12 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 		r.scannedTwoIssues(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
 
-		if got := asPerson(t, r, "triager", http.MethodPut,
-			"/v1/products/mine/issues/CVE-2026-9999/aliases/GHSA-xxxx-yyyy-zzzz",
-			""); got.Code >= 300 {
-			t.Fatalf("recording another name answered %d: %s", got.Code, got.Body.String())
+		// A later scan reporting the issue under a second name, which is how
+		// a scanner's issue gains one.
+		if _, err := finding.NewVulnerabilities(r.db.DB).Intern(t.Context(), []finding.Named{{
+			Identifier: "CVE-2026-9999", Aliases: []string{"GHSA-xxxx-yyyy-zzzz"}, Severity: "high",
+		}}); err != nil {
+			t.Fatal(err)
 		}
 
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)

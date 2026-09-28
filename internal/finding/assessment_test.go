@@ -143,7 +143,7 @@ func TestReadingAProductDoesNotCarryRatingAnIssueInIt(t *testing.T) {
 		if _, err := f.store.Agree(t.Context(), onlooker, claim.ID); err == nil {
 			t.Error("somebody who triages nothing agreed to a milder rating")
 		}
-		if err := f.store.Withdraw(t.Context(), onlooker, claim.ID); err == nil {
+		if _, err := f.store.Withdraw(t.Context(), onlooker, claim.ID); err == nil {
 			t.Error("somebody who triages nothing took a rating back")
 		}
 	})
@@ -168,7 +168,7 @@ func TestWithdrawingTakesThePublishedRatingBack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Withdraw(t.Context(), who, claim.ID); err != nil {
+		if _, err := f.store.Withdraw(t.Context(), who, claim.ID); err != nil {
 			t.Fatal(err)
 		}
 		if after := f.urgency(t, "CVE-2026-BACK"); after != before {
@@ -226,7 +226,7 @@ func TestAWithdrawnAssessmentDoesNotStandInTheWayOfAFreshOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Withdraw(t.Context(), who, first.ID); err != nil {
+		if _, err := f.store.Withdraw(t.Context(), who, first.ID); err != nil {
 			t.Fatal(err)
 		}
 		again, err := f.store.Assess(t.Context(), who, f.productID, id, "critical", "Worse than that.")
@@ -345,7 +345,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		}
 
 		// Milder still, and now it crosses.
-		if err := f.store.Withdraw(ctx, who, claim.ID); err != nil {
+		if _, err := f.store.Withdraw(ctx, who, claim.ID); err != nil {
 			t.Fatal(err)
 		}
 		crossing, err := f.store.Assess(ctx, who, f.productID, id, "low", "Not worth an afternoon.")
@@ -588,7 +588,7 @@ func TestAgreeingAndWithdrawingAnswerAsThoughTheClaimWereAbsent(t *testing.T) {
 		if !errors.Is(err, finding.ErrNoSuchAssessment) {
 			t.Errorf("agreeing to a claim about an undisclosed flaw gave %v", err)
 		}
-		if err := f.store.Withdraw(t.Context(), outsider, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
+		if _, err := f.store.Withdraw(t.Context(), outsider, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
 			t.Errorf("withdrawing a claim about an undisclosed flaw gave %v", err)
 		}
 		// The same answer a claim nobody ever recorded gives.
@@ -764,7 +764,7 @@ func TestAgreeingToARatingAsksForTheRoleOnItsOwnProduct(t *testing.T) {
 		}
 
 		// And withdrawing is the same question asked the other way round.
-		if err := f.store.Withdraw(ctx, theirs, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
+		if _, err := f.store.Withdraw(ctx, theirs, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
 			t.Errorf("a triager of another product withdrew this one's rating: %v", err)
 		}
 	})
@@ -940,7 +940,7 @@ func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 
 		// The withdrawal lands between the agreement's read and its write.
 		hook := &beforeAgreeing{run: func() {
-			if err := f.store.Withdraw(context.Background(), who, claim.ID); err != nil {
+			if _, err := f.store.Withdraw(context.Background(), who, claim.ID); err != nil {
 				t.Errorf("withdrawing: %v", err)
 			}
 		}}

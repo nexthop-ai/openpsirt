@@ -84,13 +84,17 @@ func mountInterface(router interface {
 
 		// A real file is served as itself. Anything else is a route belonging
 		// to the page, which is index.html — the page then reads the path and
-		// decides what to draw.
+		// decides what to draw. A directory is not a file: served as itself
+		// it is a listing of everything that was built.
 		name := strings.TrimPrefix(asked, "/")
 		if name != "" && name != "." {
 			if f, err := ui.Files.Open(name); err == nil {
+				info, err := f.Stat()
 				_ = f.Close()
-				files.ServeHTTP(w, r)
-				return
+				if err == nil && !info.IsDir() {
+					files.ServeHTTP(w, r)
+					return
+				}
 			}
 		}
 		serveIndex(w, r, ui.Files)

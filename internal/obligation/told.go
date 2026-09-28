@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -138,6 +139,21 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 				}
 				return fmt.Errorf("read the window: %w", err)
 			}
+			// Only a window that applies to this record's product. One limited
+			// to other products is not one this record answers, and its name
+			// is not the caller's to learn, so it is refused as one nobody
+			// declared.
+			var limited []int64
+			if err := tx.NewSelect().
+				TableExpr(`"obligation_window_product" AS "owp"`).
+				ColumnExpr("owp.product_id").
+				Where("owp.window_id = ?", *windowID).
+				Scan(ctx, &limited); err != nil {
+				return fmt.Errorf("read which products the window applies to: %w", err)
+			}
+			if len(limited) > 0 && !slices.Contains(limited, record.ProductID) {
+				return ErrNoSuchWindow
+			}
 		}
 		*told = Told{
 			ExploitedHereID: record.ID, WindowID: windowID,
@@ -202,9 +218,16 @@ func (s *Store) ToldAbout(ctx context.Context, subject access.Subject,
 	return out, nil
 }
 
-// WindowsNamed is the name of every window these notices point at, retired
-// ones included: a notice keeps naming the window it answered.
-func (s *Store) WindowsNamed(ctx context.Context, told map[int64][]Told) (map[int64]string, error) {
+// WindowsNamed is the name of every window these notices point at that this
+// subject may read, retired ones included: a notice keeps naming the window it
+// answered.
+//
+// Read as the list of windows is. A window limited since to products the
+// subject may not know exist is left out, and its notices name no window,
+// because its current name is the administrator's statement about those
+// products.
+func (s *Store) WindowsNamed(ctx context.Context, subject access.Subject,
+	told map[int64][]Told) (map[int64]string, error) {
 	wanted := map[int64]bool{}
 	for _, each := range told {
 		for _, one := range each {
@@ -226,8 +249,14 @@ func (s *Store) WindowsNamed(ctx context.Context, told map[int64][]Told) (map[in
 		Where("ow.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which windows were answered: %w", err)
 	}
+	windows, err := s.withLimits(ctx, windows)
+	if err != nil {
+		return nil, err
+	}
 	for _, window := range windows {
-		named[window.ID] = window.Name
+		if shown, ok := window.As(subject); ok {
+			named[shown.ID] = shown.Name
+		}
 	}
 	return named, nil
 }
