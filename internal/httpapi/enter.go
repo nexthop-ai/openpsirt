@@ -680,6 +680,10 @@ func registerMovements(api huma.API, in Ingest) {
 			// The same shape as the self-approval case beside it: somebody
 			// else got there first, which is a conflict rather than a fault.
 			return nil, huma.Error409Conflict(err.Error())
+		case errors.Is(err, finding.ErrNotLater), errors.Is(err, finding.ErrNotEarlier):
+			// The date moved after the request was made, and the request no
+			// longer moves it the way its act says.
+			return nil, huma.Error409Conflict(err.Error())
 		case err != nil:
 			return nil, refusedFinding(in, err)
 		}
@@ -730,6 +734,11 @@ func refusedMovement(in Ingest, err error) error {
 	var unreasoned finding.Unreasoned
 	if errors.As(err, &unreasoned) {
 		return huma.Error422UnprocessableEntity(unreasoned.Error())
+	}
+	// A date that moves the other way is the other act, which the caller
+	// asks for by its own route.
+	if errors.Is(err, finding.ErrNotLater) || errors.Is(err, finding.ErrNotEarlier) {
+		return huma.Error422UnprocessableEntity(err.Error())
 	}
 	return refusedFinding(in, err)
 }

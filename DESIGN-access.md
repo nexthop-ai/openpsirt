@@ -1216,7 +1216,8 @@ Three acts, recorded apart.
 | Rule | Reason |
 |---|---|
 | Which act it was is stored, not read off the two dates | "We extended it because the fix slipped" and "we shortened it because it leaked" are different events, and a reader inferring which from the direction a date moved is reading an inference |
-| Each act refuses the date the other takes | A date typed the wrong way round would otherwise be recorded as a decision somebody made |
+| Each act refuses the date the other takes, as the caller's to correct | A date typed the wrong way round would otherwise be recorded as a decision somebody made |
+| Agreement is refused as a conflict when the date has since moved past the request | The request was measured against a date that is no longer the embargo's end, and agreeing to it would move the date the other way |
 | A reason is required always, however short | One with no reason is a record saying somebody moved it and nothing else |
 | The threshold is measured against how far the end has already been carried | Measured per request, the exception swallows the rule three weeks at a time. Only movements that took effect count, and each counts by its distance rather than by its direction — a date pulled in and pushed back is a date nobody can rely on, whichever way it went last |
 | A movement that needs agreement moves nothing until it has it | An embargo running on while somebody thought about it would be the movement taking effect on one person's say-so with a queue entry as decoration |
