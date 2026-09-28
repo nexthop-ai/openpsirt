@@ -4,7 +4,7 @@
 import { THE_LINE } from "../ui/severities";
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
-import { on, since } from "../ui/when";
+import { DAY_MS, on, since } from "../ui/when";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
@@ -195,16 +195,14 @@ export function Products({ who }: { who: Who }) {
             <tbody>
               {items.map((product) => {
                 const stale =
-                  !!product.last_scan_at &&
-                  asOf - Date.parse(product.last_scan_at) > 7 * 86_400_000;
+                  !!product.last_scan_at && asOf - Date.parse(product.last_scan_at) > 7 * DAY_MS;
                 return (
                   <tr key={product.name} className="row">
                     <td>
-                      {/* The product's own page rather than its branches
-. This table is an administration surface —
-                          a triage line in a select, a date in an input — and
-                          "how is this one doing" is a different question that
-                          had nowhere to go. */}
+                      {/* The product's own page rather than its branches.
+                          This table is an administration surface — a triage
+                          line in a select, a date in an input — and "how is
+                          this one doing" is a different question. */}
                       <Link to={`/products/${encodeURIComponent(product.name)}`} className="id">
                         {product.display_name || product.name}
                       </Link>

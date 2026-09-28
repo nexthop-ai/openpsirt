@@ -7,7 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
-import { on } from "../ui/when";
+import { DAY_MS, on } from "../ui/when";
 import { Peek, Sits } from "./FindingsViews";
 import { SORTS, identityOf, pathTo, type Row } from "./list";
 import { bandOf } from "../ui/severities";
@@ -27,7 +27,7 @@ import { bandOf } from "../ui/severities";
 // anybody who wants it. This is also the age a deadline relates to.
 function openFor(opened: string | undefined): string | null {
   if (!opened) return null;
-  const days = Math.floor((Date.now() - Date.parse(opened + "T00:00:00Z")) / 86_400_000);
+  const days = Math.floor((Date.now() - Date.parse(opened + "T00:00:00Z")) / DAY_MS);
   if (!Number.isFinite(days) || days < 0) return null;
   if (days < 60) return `open ${days}d`;
   if (days < 730) return `open ${Math.floor(days / 30)}mo`;
@@ -86,7 +86,6 @@ export function FindingsTable({
   pick,
   pickAll,
   spanning,
-  columns,
   oneBuild,
   sortable,
   buildOf,
@@ -106,10 +105,8 @@ export function FindingsTable({
   picked: Map<string, Row>;
   pick: (key: string, row: Row, on: boolean) => void;
   pickAll: (rows: Row[], keys: string[], on: boolean) => void;
-  // A list spanning every product, which is what decides the extra
-  // column — and `columns`, which is how many the preview row has to span.
+  // A list spanning every product, which is what decides the extra column.
   spanning: boolean;
-  columns: number;
   oneBuild: boolean;
   sortable: (label: keyof typeof SORTS) => React.ReactNode;
   // The build a row's actions and links are about.
@@ -134,6 +131,10 @@ export function FindingsTable({
   cursor: number;
 }) {
   const navigate = useNavigate();
+  // The columns the header below draws, counted where it draws them, so the
+  // preview row spans all of them, the product among them on a list spanning
+  // every product.
+  const columns = spanning ? 11 : 10;
   return (
     <div className="findings">
       <Wide>

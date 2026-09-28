@@ -104,13 +104,9 @@ const NAMED_AT_ONCE = 2000;
 export function Findings() {
   const { product = "", stream: named = "", variant: builtAs = "" } = useParams();
   // No product in the path means every product the reader may see. The server
-  // has taken the same filters for both lists from the start — one struct,
-  // embedded in each — so what differed was only ever the screen.
+  // takes the same filters for both lists, so the screen is the one thing that
+  // differs.
   const spanning = product === "";
-  // The columns the header renders, so the preview row spans all of them.
-  // Written as a literal it was one short on the spanning list, which draws
-  // the product as a column of its own.
-  const COLUMNS = spanning ? 11 : 10;
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   // The branch and the variant come from the path on a build's own list and
@@ -893,12 +889,7 @@ export function Findings() {
               .filter((each) => BUMPABLE.has(each.key) && asked.getAll(each.key).length > 1)
               .map((each) => each.label + " past the first"),
           ]}
-          onPage={(next) => {
-            const now = new URLSearchParams(params);
-            if (next === 0) now.delete("offset");
-            else now.set("offset", String(next));
-            setParams(now);
-          }}
+          onPage={go}
         />
       </>
     );
@@ -917,10 +908,8 @@ export function Findings() {
         <ByComponent
           at={{ product, stream, variant }}
           // The same question the by-issue view asks, built in the one place
-          // that builds it. This was a hand-copied subset of nine filters, so
-          // switching views quietly widened the list back out by everything
-          // the subset left out — a deadline, an assignee, an outcome — while
-          // the chips above went on saying they were on.
+          // that builds it, so switching views keeps every filter the chips
+          // above say is on.
           query={query}
           offset={offset}
           size={page}
@@ -933,12 +922,7 @@ export function Findings() {
             next.set("component", name);
             setParams(next);
           }}
-          onPage={(next) => {
-            const now = new URLSearchParams(params);
-            if (next === 0) now.delete("offset");
-            else now.set("offset", String(next));
-            setParams(now);
-          }}
+          onPage={go}
         />
       </>
     );
@@ -1153,7 +1137,6 @@ export function Findings() {
             pick={pick}
             pickAll={pickAll}
             spanning={spanning}
-            columns={COLUMNS}
             oneBuild={oneBuild}
             sortable={sortable}
             buildOf={buildOf}
