@@ -100,7 +100,12 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 		// is what puts it in front of an operator.
 		settled, done := queue.Settling(ctx)
 		defer done()
-		_ = s.queue.Fail(settled, job.ID, s.name, fmt.Errorf("not a product: %q", job.Reference))
+		// A failure to fail it is returned, and the loop reports it: the job
+		// otherwise sits claimed until its lease runs out, and nobody hears.
+		if err := s.queue.Fail(settled, job.ID, s.name,
+			fmt.Errorf("not a product: %q", job.Reference)); err != nil {
+			return 0, fmt.Errorf("fail routing job %d, whose reference is not a product: %w", job.ID, err)
+		}
 		return 0, nil
 	}
 
