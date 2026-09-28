@@ -6,26 +6,27 @@ package dbtest
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/uptrace/bun"
 )
 
-// The harness has two paths, and an ordinary run reaches only one of them.
-//
 // A server database is created and migrated on first use, and kept between
 // runs because applying the migrations is nearly the whole cost of a server
-// engine. An ordinary run takes the create-and-migrate path, so nothing in the
-// suite otherwise reaches the other one: recognizing a database that is
-// already there, emptying it instead of migrating it, or dropping what an
-// edited migration left behind. The DROP in particular is quoted the standard
-// way, which the MySQL connections accept, and only running it says so.
+// engine. An ordinary run takes one of the harness's paths, so nothing else in
+// the suite reaches the others: recognizing a database that is already there,
+// building again one an interrupted run left half migrated, and dropping what
+// an edited migration left behind. The DROP in particular is quoted the
+// standard way, which the MySQL connections accept, and only running it says
+// so.
 //
 // These run against the servers only. SQLite has no reuse path: each test
 // takes a copy of a migrated template file.
@@ -90,59 +91,90 @@ func TestAKeptDatabaseIsRecognizedAndAnOlderSchemaDropped(t *testing.T) {
 	})
 }
 
-// Clearing a kept database empties it and leaves the schema alone. The
-// distinction matters: the first test in a package must see an empty database
-// whether or not somebody ran it before, and it must not have to migrate one.
-func TestClearingAKeptDatabaseEmptiesItAndLeavesTheSchema(t *testing.T) {
+// A run killed while it migrated leaves the package's database holding part
+// of the schema. The next run builds it again, where using it as it stands
+// fails every test in the package until somebody drops it by hand.
+//
+// Verified by making whole answer true for any database: the half-built one is
+// then handed back at the version it stopped at. And by skipping the drop: the
+// database is then migrated forward and keeps the table no migration made.
+func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
+		admin := openAdmin(t, base)
+		name := fmt.Sprintf("openpsirt_t_halfbuilt_%s_aaaaaa", suffixFor(t, engine))
+		t.Cleanup(func() {
+			if _, err := admin.ExecContext(context.WithoutCancel(ctx),
+				`DROP DATABASE IF EXISTS "`+name+`"`); err != nil {
+				t.Errorf("clean up %s: %v", name, err)
+			}
+		})
 
-		// This package's own database, already made and migrated by the
-		// harness. Building a second one would apply every migration again,
-		// which is the cost reuse exists to avoid.
-		own, err := serverDatabase(engine, base)
-		if err != nil {
-			t.Fatalf("prepare a %s database: %v", engine, err)
+		// The database an interrupted run leaves: made, and migrated no
+		// further than the first migration.
+		if _, err := ensureDatabase(ctx, admin, engine, name); err != nil {
+			t.Fatalf("make %s: %v", name, err)
 		}
-		db := Open(t, own)
+		own, err := databaseURL(base, engine, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		half := openClosed(t, own)
+		if err := migrate.UpTo(ctx, half, slog.New(slog.NewTextHandler(io.Discard, nil)), 1); err != nil {
+			t.Fatalf("apply the first migration: %v", err)
+		}
+		// What an interrupted schema statement leaves on MySQL and MariaDB:
+		// something no recorded version accounts for. Migrating forward
+		// keeps it; only the drop removes it.
+		if _, err := half.ExecContext(ctx, `CREATE TABLE "dbtest_leftover" ("id" INT)`); err != nil {
+			t.Fatalf("leave a table no migration made: %v", err)
+		}
+		if err := half.Close(); err != nil {
+			t.Fatal(err)
+		}
 
-		before, err := schema.Version(ctx, db)
+		got, err := prepareServer(ctx, engine, base, name)
+		if err != nil {
+			t.Fatalf("prepare the half-built database: %v", err)
+		}
+		db := Open(t, got)
+		applied, err := schema.Version(ctx, db)
 		if err != nil {
 			t.Fatalf("read the schema version: %v", err)
 		}
-		if before == 0 {
-			t.Fatal("the database reports schema version 0, so it was never migrated")
-		}
-
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
-			"dbtest.reuse", "left behind by an earlier run", time.Now().UTC()); err != nil {
-			t.Fatalf("write a row for the clear to find: %v", err)
-		}
-
-		if err := clearFresh(own); err != nil {
-			t.Fatalf("clear %s: %v", engine, err)
-		}
-
-		var rows int
-		if err := db.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM "application_setting"`).Scan(&rows); err != nil {
-			t.Fatalf("count what survived: %v", err)
-		}
-		if rows != 0 {
-			t.Errorf("%d row(s) survived the clear, so a kept database hands "+
-				"the next run the last one's rows", rows)
-		}
-
-		after, err := schema.Version(ctx, db)
+		expected, err := schema.Expected()
 		if err != nil {
-			t.Fatalf("read the schema version back: %v", err)
+			t.Fatal(err)
 		}
-		if after != before {
-			t.Errorf("the schema version moved from %d to %d, so clearing "+
-				"took the schema with it", before, after)
+		if applied != expected {
+			t.Errorf("the database was handed back at version %d, want %d", applied, expected)
+		}
+		var leftover int
+		if err := db.NewSelect().TableExpr(`"dbtest_leftover"`).ColumnExpr("COUNT(*)").
+			Scan(ctx, &leftover); err == nil {
+			t.Errorf("a table no migration made survived: the database was migrated " +
+				"forward rather than built again")
+		}
+		// The first test's clear reads every declared table, so a schema
+		// missing one fails here rather than in the package's tests.
+		if err := clear(ctx, db); err != nil {
+			t.Errorf("empty the rebuilt database: %v", err)
 		}
 	})
+}
+
+// openClosed opens the database at url for a test that closes it itself.
+func openClosed(t *testing.T, url string) *database.DB {
+	t.Helper()
+	target, err := database.ParseURL(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(t.Context(), target)
+	if err != nil {
+		t.Fatalf("open %s: %v", target.Redacted, err)
+	}
+	return db
 }
 
 // forEachServer runs fn against every configured server engine, as a subtest.

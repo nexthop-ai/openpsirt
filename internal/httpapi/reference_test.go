@@ -5,6 +5,7 @@ package httpapi_test
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -105,38 +106,40 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 //
 // A description lives in a struct tag, which has to be a literal, so a field
 // two bodies both carry is written out twice with nothing holding the two
-// equal. Left to drift, the person screen's body and the administration body
-// describe `sees_nothing` differently, and the published reference carries
-// whichever of the two was registered first.
+// equal, and the published reference carries whichever was registered first.
 //
 // Named fields rather than every repeated name: plenty of names mean different
 // things in different bodies — "places" is what a claim wrote in one and what
-// is still open in another — and a rule over all of them would be a rule
-// nobody could keep.
+// is still open in another. Each named field has to be carried by at least two
+// bodies, so a rename leaves this failing rather than checking nothing.
+var factsDescribedOnce = []string{"consumer", "sees_nothing"}
+
 func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
-	said := map[string]map[string][]string{}
 	twoReach(t, func(t *testing.T, r *reach) {
+		said := map[string]map[string][]string{}
+		carried := map[string]int{}
 		for name, schema := range r.api.OpenAPI().Components.Schemas.Map() {
 			for field, property := range schema.Properties {
-				switch field {
-				case "sees_nothing":
-					if said[field] == nil {
-						said[field] = map[string][]string{}
-					}
-					said[field][property.Description] = append(said[field][property.Description], name)
+				if !slices.Contains(factsDescribedOnce, field) {
+					continue
 				}
+				carried[field]++
+				if said[field] == nil {
+					said[field] = map[string][]string{}
+				}
+				said[field][property.Description] = append(said[field][property.Description], name)
 			}
 		}
-		for field, descriptions := range said {
-			if len(descriptions) > 1 {
+		for _, field := range factsDescribedOnce {
+			if carried[field] < 2 {
+				t.Errorf("%s is carried by %d bodies, so there is nothing to hold equal", field, carried[field])
+			}
+			if descriptions := said[field]; len(descriptions) > 1 {
 				for description, bodies := range descriptions {
 					t.Errorf("%s is described as %q in %s", field, description, strings.Join(bodies, ", "))
 				}
 				t.Errorf("%s carries %d descriptions, want one", field, len(descriptions))
 			}
-		}
-		if len(said) == 0 {
-			t.Fatal("no field was found to check: this is not walking the schemas")
 		}
 	})
 }

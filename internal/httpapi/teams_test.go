@@ -421,25 +421,26 @@ func TestAnActThatCouldNotFinishLeavesNothingBehind(t *testing.T) {
 		r.scannedWithEvidence(t)
 
 		// A team whose second member is nobody.
-		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
-			`{"name":"kernel","members":["triager","nobody-at-all"]}`); made.Code == http.StatusCreated {
-			t.Fatalf("a team naming somebody who is not there was recorded: %s", made.Body.String())
+		refusedWith(t, asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"kernel","members":["triager","nobody-at-all"]}`), http.StatusNotFound)
+		teams := asPerson(t, r, "admin", http.MethodGet, "/v1/teams", "")
+		if teams.Code != http.StatusOK {
+			t.Fatalf("listing teams answered %d: %s", teams.Code, teams.Body.String())
 		}
-		if got := asPerson(t, r, "admin", http.MethodGet, "/v1/teams", ""); got.Code == http.StatusOK &&
-			strings.Contains(got.Body.String(), `"kernel"`) {
+		if strings.Contains(teams.Body.String(), `"kernel"`) {
 			t.Errorf("the team was left behind by a request that answered a refusal: %s",
-				got.Body.String())
+				teams.Body.String())
 		}
 
 		// A person whose second role names a product nobody has declared.
-		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+		refusedWith(t, asPerson(t, r, "admin", http.MethodPost, "/v1/people",
 			`{"identity":"newcomer","holds":[{"product":"mine","role":"public-triage"},`+
-				`{"product":"not-declared","role":"public-triage"}]}`); made.Code == http.StatusCreated {
-			t.Fatalf("a person holding a role on a product that is not there was recorded: %s",
-				made.Body.String())
-		}
+				`{"product":"not-declared","role":"public-triage"}]}`), http.StatusNotFound)
 		got := asPerson(t, r, "admin", http.MethodGet, "/v1/people", "")
-		if got.Code == http.StatusOK && strings.Contains(got.Body.String(), `"newcomer"`) {
+		if got.Code != http.StatusOK {
+			t.Fatalf("listing people answered %d: %s", got.Code, got.Body.String())
+		}
+		if strings.Contains(got.Body.String(), `"newcomer"`) {
 			t.Errorf("the person was left behind by a request that answered a refusal: %s",
 				got.Body.String())
 		}

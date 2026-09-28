@@ -36,10 +36,8 @@ func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
 		}
 
 		// Somebody who may only read it cannot point it anywhere.
-		if got := asPerson(t, r, "reader", http.MethodPut,
+		refusedWith(t, asPerson(t, r, "reader", http.MethodPut,
 			fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
-			`{"elsewhere":"https://elsewhere.example/1"}`); got.Code < 400 {
-			t.Errorf("somebody who may only read pointed a claim elsewhere: %d", got.Code)
-		}
+			`{"elsewhere":"https://elsewhere.example/1"}`), http.StatusNotFound)
 	})
 }

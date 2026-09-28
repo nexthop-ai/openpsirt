@@ -77,10 +77,8 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 		if mine := worked(t, "?product=mine"); len(mine) != 2 {
 			t.Errorf("the product the work happened in reports %v", mine)
 		}
-		if got := asPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/measures?product=theirs", ""); got.Code < 400 {
-			t.Errorf("a product this reader cannot see answered %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/measures?product=theirs", ""), http.StatusNotFound)
 
 		// A team nobody declared is a 404 rather than the deployment's
 		// figures: a narrowing that silently widens is the one mistake a

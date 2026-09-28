@@ -63,9 +63,7 @@ func TestAFlawInOurOwnProductIsRecordedAndReadBackLikeAnyOther(t *testing.T) {
 			`"summary":"The management socket answers before anyone authenticated.",` +
 			`"severity":"critical"}`
 		for _, who := range []string{"reader", "triager"} {
-			if got := asPerson(t, r, who, http.MethodPost, at, body); got.Code < 400 {
-				t.Errorf("%s recorded an undisclosed flaw: %d", who, got.Code)
-			}
+			refusedWith(t, asPerson(t, r, who, http.MethodPost, at, body), http.StatusNotFound)
 		}
 
 		got := asPerson(t, r, "private-triage", http.MethodPost, at, body)
@@ -195,21 +193,18 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		extend := at + "/extension"
 
 		// A reason is required.
-		if got := asPerson(t, r, "private-triage", http.MethodPost, extend,
-			`{"until":"2030-01-01","reason":""}`); got.Code < 400 {
-			t.Errorf("an embargo was extended for no stated reason: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodPost, extend,
+			`{"until":"2030-01-01","reason":""}`), http.StatusUnprocessableEntity)
 		// And somebody who may not see undisclosed work cannot move one.
-		if got := asPerson(t, r, "triager", http.MethodPost, extend,
-			`{"until":"2030-01-01","reason":"Because."}`); got.Code < 400 {
-			t.Errorf("somebody holding only public triage moved an embargo: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, extend,
+			`{"until":"2030-01-01","reason":"Because."}`), http.StatusNotFound)
 		// Each act refuses the date the other one takes, so neither is ever
-		// recorded as the other.
-		if got := asPerson(t, r, "private-triage", http.MethodPost, at+"/shortening",
-			`{"until":"2030-01-01","reason":"Pulling it in."}`); got.Code < 400 {
-			t.Errorf("a later date was recorded as a shortening: %d", got.Code)
-		}
+		// recorded as the other. The refusal is the caller's to correct. Verified
+		// by deleting the wrong-direction arm of refusedMovement: both answer 500.
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodPost, at+"/shortening",
+			`{"until":"2030-01-01","reason":"Pulling it in."}`), http.StatusUnprocessableEntity)
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodPost, extend,
+			`{"until":"2020-01-01","reason":"Pushing it out."}`), http.StatusUnprocessableEntity)
 
 		// Years out, so well past the threshold: it waits.
 		got = asPerson(t, r, "private-triage", http.MethodPost, extend,
@@ -709,8 +704,8 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 				t.Errorf("%s: a hidden issue answers %d and an unused name %d",
 					route.what, hidden.Code, unused.Code)
 			}
-			if hidden.Code < 400 {
-				t.Errorf("%s: probing a hidden issue succeeded with %d: %s",
+			if hidden.Code != http.StatusNotFound {
+				t.Errorf("%s: probing a hidden issue answered %d, want 404: %s",
 					route.what, hidden.Code, hidden.Body.String())
 			}
 			if hidden.Body.String() != unused.Body.String() {
@@ -829,9 +824,8 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 
 func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
 	// A parameter that is required is checked for being there rather than for
-	// saying anything, and scoring nothing answers nothing — so an empty one
-	// came back 200 with every field empty, including a severity this
-	// operation's own enumeration has no word for.
+	// saying anything, and scoring nothing answers every field empty,
+	// including a severity this operation's own enumeration has no word for.
 	twoReach(t, func(t *testing.T, r *reach) {
 		got := asPerson(t, r, "triager", http.MethodGet, "/v1/score?vector=", "")
 		if got.Code != http.StatusUnprocessableEntity {

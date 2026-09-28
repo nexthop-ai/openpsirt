@@ -362,7 +362,7 @@ on each engine, so packages share nothing and run in parallel.
 | Engine | What a test gets | Emptied between tests |
 |---|---|---|
 | SQLite | A copy of a template migrated once per run and kept in the temporary directory, and a connection of its own | Not needed — each test holds its own file |
-| The three servers | The package's own database on the server, through one pool every test in the binary shares | By deleting from the tables that hold rows |
+| The three servers | The package's own database on the server, through one pool every test in the binary shares | Before every test, by deleting from the tables that hold rows |
 
 The pool on a server is shared because a PostgreSQL connection is a process on
 the server that starts knowing nothing of the schema. Its first statement over
@@ -414,8 +414,12 @@ version does not move and only the content of the migrations tells one
 schema from another. The name therefore carries a fingerprint of the migration
 sources: an edited migration names a different database rather than reusing a
 stale one, and the databases the older fingerprints named are dropped as the new
-one is created, so a server does not accumulate them. A kept database is emptied
-before the first test sees it.
+one is created, so a server does not accumulate them.
+
+| A kept database | What the harness does |
+|---|---|
+| At the version this build's migrations end at | Uses it; the first test empties it as every test does |
+| At any other version, or none | Drops it and builds it again. A run killed while it migrated leaves one, and on MySQL and MariaDB a schema statement commits on its own, so the part a migration applied before it stopped is recorded by no version |
 
 The race detector runs on SQLite alone. A Go data race does not vary by database
 engine, and the detector's cost is in-process work — which is most of what

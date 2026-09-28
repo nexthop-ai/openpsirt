@@ -19,6 +19,7 @@ import (
 	"testing/fstest"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5"
 )
 
 func newTestHandler(t *testing.T) http.Handler {
@@ -93,11 +94,20 @@ func TestOpenAPIDocumentDescribesTheRegisteredRoutes(t *testing.T) {
 func TestDocumentationIsNotServed(t *testing.T) {
 	// Documentation is published separately. Serving it here would be the only
 	// unauthenticated route in the application.
+	//
+	// Asked of the router rather than of a response: without credentials every
+	// routed path answers 401, so a response cannot tell a documentation route
+	// from no route. Verified by leaving the document path set, which routes it.
 	h := newTestHandler(t)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs", nil))
-	if rec.Code == http.StatusOK {
-		t.Error("GET /docs served something; documentation should not be served")
+	routes, ok := h.(chi.Routes)
+	if !ok {
+		t.Fatalf("the handler is a %T, which has no routes to ask", h)
+	}
+	for _, path := range []string{"/docs", "/v1/version"} {
+		routed := routes.Match(chi.NewRouteContext(), http.MethodGet, path)
+		if want := path != "/docs"; routed != want {
+			t.Errorf("GET %s routed is %v, want %v", path, routed, want)
+		}
 	}
 }
 

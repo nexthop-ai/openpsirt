@@ -175,8 +175,8 @@ func TestAnAddressThatIsNotAPublishersDirectoryIsRefusedAtTheRequest(t *testing.
 			`{"name":"Relative","url":"/provider-metadata.json"}`,
 		} {
 			rec := r.named(t, "admin", http.MethodPost, sources, body)
-			if rec.Code == http.StatusCreated {
-				t.Errorf("%s was stored", body)
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("%s answered %d, want 422: %s", body, rec.Code, rec.Body.String())
 			}
 		}
 		if listed := r.suppliers(t, sources); len(listed) != 0 {

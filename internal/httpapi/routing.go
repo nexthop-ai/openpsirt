@@ -72,10 +72,12 @@ func registerRouting(api huma.API, in Ingest) {
 			return nil, err
 		}
 		// The store asks for triage on the product, which is what the
-		// declaration says and what its sibling routes enforce.
+		// declaration says and what its sibling routes enforce. Somebody who
+		// can see the product already knows it exists, so they are refused
+		// for the role, as an issue act refuses them.
 		rules, err := finding.NewStore(in.DB.DB).Rules(ctx, subject, product.ID)
 		if errors.Is(err, access.ErrDenied) {
-			return nil, noSuchProduct()
+			return nil, huma.Error403Forbidden("not authorized")
 		}
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the rules could not be read", err)
@@ -127,7 +129,7 @@ func registerRouting(api huma.API, in Ingest) {
 		// writing a rule and nobody who may not write one has a reason to run
 		// it.
 		if !subject.TriagesIn(product.ID) {
-			return nil, noSuchProduct()
+			return nil, huma.Error403Forbidden("not authorized")
 		}
 		if input.Upstream == "" && input.Beneath == "" {
 			return nil, huma.Error422UnprocessableEntity(
@@ -270,9 +272,9 @@ func routable(ctx context.Context, in Ingest, name string) (access.Subject, int6
 		return access.Subject{}, 0, nil, err
 	}
 	if !subject.Holds(access.Assigner, product.ID) {
-		// Answered as a product that is not there, the way every other
-		// refusal about a finding is: guessing a name says nothing.
-		return access.Subject{}, 0, nil, noSuchProduct()
+		// The product resolved, so the caller can see it: refused for the
+		// role. A product they cannot see was answered as not there above.
+		return access.Subject{}, 0, nil, huma.Error403Forbidden("not authorized")
 	}
 	return subject, product.ID, access.NewStore(in.DB.DB), nil
 }

@@ -4,12 +4,16 @@
 package patchbranch
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
@@ -57,25 +61,56 @@ func TestATunnelTheGuardOpensCarriesTLSEndToEnd(t *testing.T) {
 	}
 }
 
+// The address a name resolved to is checked against the administrator's
+// excluded networks at the moment of connecting.
+//
+// The tunnel is asked for by a name no exclusion mentions, which resolves to
+// a listener in a network an exclusion does name, so only the connect-time
+// check stands between the tunnel and the listener. Verified by deleting the
+// dialer's Control in guard.tunnel: the tunnel opens with 200.
 func TestTheGuardRefusesAnAddressInAnExcludedNetworkWhateverNameReachedIt(t *testing.T) {
-	excluded, err := outward.ParseExcluded("203.0.113.0/24")
+	listening := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer listening.Close()
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(listening.URL, "http://"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A public name the administrator never mentioned, resolving into a
-	// network they did. The name passes; the address it resolved to does not.
-	door, err := openGuard("git.example.org", excluded)
+	excluded, err := outward.ParseExcluded("127.0.0.0/8, ::1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	door, err := openGuard("localhost", excluded)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer door.close()
-	if excluded.Host("git.example.org") {
+	if excluded.Host("localhost") {
 		t.Fatal("the name itself was excluded, so this tests nothing about the address")
 	}
-	if err := door.reachable("203.0.113.9:443"); err == nil {
-		t.Error("the guard would connect to an address in an excluded network")
+	// The port is relaxed to the listener's; the address check stays as
+	// openGuard made it.
+	door.port = port
+
+	conn, err := net.DialTimeout("tcp", strings.TrimPrefix(door.address(), "http://"), 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := door.reachable("198.51.100.9:443"); err != nil {
-		t.Errorf("the guard refused an address outside every excluded network: %v", err)
+	defer func() { _ = conn.Close() }()
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	target := net.JoinHostPort("localhost", port)
+	if _, err := fmt.Fprintf(conn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", target, target); err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: http.MethodConnect})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode == http.StatusOK {
+		t.Fatal("the guard opened a tunnel to an address in an excluded network")
+	}
+	reason, _ := io.ReadAll(response.Body)
+	if !strings.Contains(string(reason), "an administrator excluded it") {
+		t.Errorf("the tunnel was refused for another reason: %d %s", response.StatusCode, reason)
 	}
 }

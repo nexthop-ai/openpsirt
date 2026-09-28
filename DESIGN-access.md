@@ -435,6 +435,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | Rules are ordered, first match wins, and the finding records which rule placed it | An unwritten precedence rule is forgettable, and "where did this come from" is asked months later |
 | The order is settled | The ordinal is one past the highest under ordinary isolation, so two rules created at the same moment take the same number. Ties break by identifier rather than letting two rules swap places between batches |
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
+| Somebody who can see the product and lacks the right is refused with 403 | The same answer an issue act gives them. A product they cannot see answers as not declared, as every product route does |
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
 | A pattern naming most of a build is refused | A rule says where in the tree something sits, and a bare glob is not that. Refused when it is written and again at the preview, the way a rule matching nothing is refused: a rule that quietly applied to part of what it names is worse than one nobody could save. The subtree is one recursive walk per build rather than one per named component — it was tens of thousands of round trips inside one request, from a route anybody who may triage the product can reach |
 
@@ -1216,7 +1217,8 @@ Three acts, recorded apart.
 | Rule | Reason |
 |---|---|
 | Which act it was is stored, not read off the two dates | "We extended it because the fix slipped" and "we shortened it because it leaked" are different events, and a reader inferring which from the direction a date moved is reading an inference |
-| Each act refuses the date the other takes | A date typed the wrong way round would otherwise be recorded as a decision somebody made |
+| Each act refuses the date the other takes, as the caller's to correct | A date typed the wrong way round would otherwise be recorded as a decision somebody made |
+| Agreement is refused as a conflict when the date has since moved past the request | The request was measured against a date that is no longer the embargo's end, and agreeing to it would move the date the other way |
 | A reason is required always, however short | One with no reason is a record saying somebody moved it and nothing else |
 | The threshold is measured against how far the end has already been carried | Measured per request, the exception swallows the rule three weeks at a time. Only movements that took effect count, and each counts by its distance rather than by its direction — a date pulled in and pushed back is a date nobody can rely on, whichever way it went last |
 | A movement that needs agreement moves nothing until it has it | An embargo running on while somebody thought about it would be the movement taking effect on one person's say-so with a queue entry as decoration |

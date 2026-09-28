@@ -694,7 +694,7 @@ type SittingBody struct {
 	// named only by its consumer leaves a reader unable to tell one from
 	// another.
 	Component string `json:"component" doc:"The package of the source package this place is"`
-	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in here. Absent under the product itself"`
+	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 	// DeclaredAs is the producer's own word and nothing here reads it. It is
 	// not a rank input, not a prefilled outcome, and nothing is hidden by it:
 	// reading "build" as "does not ship" is wrong for every compiled language.

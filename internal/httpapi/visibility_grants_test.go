@@ -94,34 +94,46 @@ func TestProductWideTriageIsHeldByTheUndisclosedHalfAlone(t *testing.T) {
 		r.scanned(t)
 		hidden := r.embargoed(t)
 
+		// refused is the public-only reader's answer. They can see the product,
+		// so the rules and an issue act are refused for the role; an issue act
+		// is refused before the issue's name is resolved, so it says nothing
+		// about whether the issue exists. Taking work is about one finding, and
+		// an undisclosed one is not there for them.
 		type ask struct {
 			what, method, path, body string
-			want                     int
+			want, refused            int
 		}
 		asks := []ask{
 			{"listing routing rules", http.MethodGet, "/v1/products/mine/routing-rules", "",
-				http.StatusOK},
+				http.StatusOK, http.StatusForbidden},
 			{"previewing a routing rule", http.MethodGet,
-				"/v1/products/mine/routing-rules/preview?upstream=libnl", "", http.StatusOK},
+				"/v1/products/mine/routing-rules/preview?upstream=libnl", "", http.StatusOK,
+				http.StatusForbidden},
 			{"rating an issue", http.MethodPost, "/v1/products/mine/issues/" + hidden + "/assessment",
 				`{"severity":"critical","reasoning":"Reachable from the management port."}`,
-				http.StatusCreated},
+				http.StatusCreated, http.StatusForbidden},
 			{"recording exploitation here", http.MethodPost,
 				"/v1/products/mine/issues/" + hidden + "/exploited-here",
 				`{"known_at":"2026-09-20T14:00:00Z","grounds":"A customer sent captures."}`,
-				http.StatusCreated},
+				http.StatusCreated, http.StatusForbidden},
 			{"taking work nobody holds", http.MethodPut, findingAt(hidden) + "/assignment",
-				`{"person":"embargo-triager"}`, http.StatusNoContent},
+				`{"person":"embargo-triager"}`, http.StatusNoContent, http.StatusNotFound},
 		}
 		for _, each := range asks {
-			if got := asPerson(t, r, "reader", each.method, each.path, each.body); got.Code < 400 || got.Code >= 500 {
-				t.Errorf("%s: a public-only reader answered %d: %s", each.what, got.Code, got.Body.String())
+			if got := asPerson(t, r, "reader", each.method, each.path, each.body); got.Code != each.refused {
+				t.Errorf("%s: a public-only reader answered %d, want %d: %s",
+					each.what, got.Code, each.refused, got.Body.String())
 			}
 			if got := asPerson(t, r, "embargo-triager", each.method, each.path, each.body); got.Code != each.want {
 				t.Errorf("%s: private-only triage answered %d, want %d: %s",
 					each.what, got.Code, each.want, got.Body.String())
 			}
 		}
+		// The same act on an issue nobody recorded is refused the same way.
+		refusedWith(t, asPerson(t, r, "reader", http.MethodPost,
+			"/v1/products/mine/issues/CVE-2099-0001/assessment",
+			`{"severity":"critical","reasoning":"Reachable from the management port."}`),
+			http.StatusForbidden)
 	})
 }
 
@@ -170,8 +182,8 @@ func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
 		undisclosed, _ := r.claimed(t, "private-triage", hidden, "libnl-3-200", dismissal)
 
 		if got := asPerson(t, r, "split-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", disclosed), `{}`); got.Code < 400 || got.Code >= 500 {
-			t.Errorf("triage of undisclosed work agreed to a disclosed claim: %d %s",
+			fmt.Sprintf("/v1/claims/%d/approval", disclosed), `{}`); got.Code != http.StatusNotFound {
+			t.Errorf("triage of undisclosed work agreeing to a disclosed claim answered %d: %s",
 				got.Code, got.Body.String())
 		}
 		if got := asPerson(t, r, "split-triager", http.MethodPost,
@@ -197,10 +209,7 @@ func TestArguingIsAskedAtTheFindingsOwnVisibility(t *testing.T) {
 		}
 		made := asPerson(t, r, "split-triager", http.MethodPost,
 			findingAt("CVE-2026-9999")+"/decision", dismissal)
-		if made.Code < 400 || made.Code >= 500 {
-			t.Errorf("triage of undisclosed work argued about a disclosed finding: %d %s",
-				made.Code, made.Body.String())
-		}
+		refusedWith(t, made, http.StatusNotFound)
 
 		// And arguing about the undisclosed one is theirs.
 		if got := asPerson(t, r, "split-triager", http.MethodPost,

@@ -102,6 +102,14 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 // rollBack takes a migrated database back to nothing.
 func rollBack(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
+	// A test that fails before it migrates forward again leaves the schema
+	// short, and every later test in the package on this engine would fail
+	// in the harness's clear rather than here. Restored whatever happens.
+	t.Cleanup(func() {
+		if err := schema.Up(context.WithoutCancel(ctx), db, quiet()); err != nil {
+			t.Errorf("migrate back to the latest: %v", err)
+		}
+	})
 	dbtest.Reset(t, db)
 	for {
 		at, err := schema.Version(ctx, db)

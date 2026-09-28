@@ -179,6 +179,13 @@ export function laddersIn(text) {
     .filter((found) => !lines.has(found.at) && lines.add(found.at));
 }
 
+// What to say where the walk read no file, or nothing where it read some. A
+// tree moved out from under the walk holds no copy of the ladder for the
+// reason that nothing was looked at.
+export function checkedNothing(looked) {
+  return looked === 0 ? "no source file was found under src/, so this checked nothing" : "";
+}
+
 // Run when this is the program, not when a test imports it.
 //
 // A script that does its work at import time cannot have a test beside it: the
@@ -199,6 +206,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
           `out again — import it from ui/severities.ts, and add the word there if it is missing`,
       );
     }
+  }
+  const nothing = checkedNothing(looked);
+  if (nothing) {
+    console.error(nothing);
+    process.exit(1);
   }
   if (bad > 0) {
     console.error(

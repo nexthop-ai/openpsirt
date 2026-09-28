@@ -735,7 +735,7 @@ func TestACommitmentFollowsAFoldALaterInventoryMoves(t *testing.T) {
 		who := f.someoneElse(t, access.PublicTriage)
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
 			f.componentID(t, libnl.Name), "3.9.0", nil, nil,
-			[]int64{f.target}, map[int64]bool{}); err != nil {
+			[]int64{f.target}, map[int64]string{}); err != nil {
 			t.Fatal(err)
 		}
 

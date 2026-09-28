@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import createClient from "openapi-fetch";
+import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./schema";
 
 // A response shape, by the name the OpenAPI document gives it.
@@ -9,9 +9,8 @@ import type { components, paths } from "./schema";
 // Screens use this rather than restating the fields, which is the same rule as
 // the client itself applied one level in. A hand-copied row type compiles
 // perfectly while quietly missing whatever the server grew since it was
-// written — that is not hypothetical: the running-out rows gained the version
-// a link needs, three screens kept their own copies without it, and every link
-// they drew to a component shipped at two versions dead-ended.
+// written, and a link drawn from a row missing the version it needs
+// dead-ends.
 export type Body<K extends keyof components["schemas"]> = components["schemas"][K];
 
 // One client for the whole application, generated from the same OpenAPI
@@ -47,12 +46,11 @@ export function csrfCookie(): string {
     if (name === "__Host-openpsirt_csrf") prefixed = rest.join("=");
     else if (name === "openpsirt_csrf") bare = rest.join("=");
   }
-  // The prefixed one wins where both are there. Returning whichever came
-  // first gave the control away: a sibling host under the same registrable
-  // domain can set the unprefixed name for this deployment to read, and
-  // browsers order two cookies of equal path length by when they were
-  // created — so one planted first was the one sent, every write was refused
-  // against the value bound to the session, and nothing in the page said why.
+  // The prefixed one wins where both are there. A sibling host under the same
+  // registrable domain can set the unprefixed name for this deployment to
+  // read, and browsers order two cookies of equal path length by when they
+  // were created, so taking whichever comes first sends a planted one and
+  // every write is refused against the value bound to the session.
   //
   // The fallback stays: a deployment served without TLS holds only the bare
   // name, because a browser refuses the prefix over plain HTTP.
@@ -77,8 +75,9 @@ function decoded(raw: string): string {
 
 // Every unsafe request carries the token. Registered as middleware rather than
 // passed per call, because the one call somebody forgets is the one that
-// breaks in production and not in review.
-api.use({
+// breaks in production and not in review. Exported so the rule can be pinned
+// without a server.
+export const csrf: Middleware = {
   onRequest({ request }) {
     if (request.method !== "GET" && request.method !== "HEAD") {
       const token = csrfCookie();
@@ -86,4 +85,6 @@ api.use({
     }
     return request;
   },
-});
+};
+
+api.use(csrf);

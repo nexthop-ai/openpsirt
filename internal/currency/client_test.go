@@ -56,10 +56,10 @@ func client(a *answering) *currency.Client {
 	return c
 }
 
-// A package identifier is somebody else's input, and the Go proxy was the one
-// asker interpolating the name into the URL unescaped. `pkg:golang/foo%3Fx=1`
-// decodes to a name carrying a `?`, which turned the rest of the path into a
-// query string — an uploaded document choosing part of our request.
+// A package identifier is somebody else's input, and every asker escapes the
+// name it puts into a URL. `pkg:golang/foo%3Fx=1` decodes to a name carrying a
+// `?`, which unescaped turns the rest of the path into a query string — an
+// uploaded document choosing part of our request.
 func TestAnIdentifierCannotSteerTheRequest(t *testing.T) {
 	for _, c := range []struct {
 		what string
@@ -316,12 +316,10 @@ func TestAnEcosystemWithNoIndexIsNotAsked(t *testing.T) {
 }
 
 func TestThePublicIndexesAreReachedThroughTheGuardedClient(t *testing.T) {
-	// one configured host names this feed as the case it was written for,
-	// and this was the one client in the process that had none of it: no
-	// host pin, no refusal to follow a redirect, nothing stopping a
-	// connection inside this network. A background pass nobody watches
-	// followed whatever an index answered with, ten hops deep, downgrading
-	// to plain HTTP if it was told to.
+	// The indexes are reached through the guarded client: pinned to the
+	// configured hosts, over https, following no redirect and connecting to
+	// nothing inside this network. A background pass nobody watches is the
+	// one that would follow whatever an index answered with.
 	//
 	// Asserted on the reason rather than on the failure. Every address
 	// below fails one way or another without a guard — a name that does
@@ -345,8 +343,18 @@ func TestThePublicIndexesAreReachedThroughTheGuardedClient(t *testing.T) {
 			t.Errorf("%s was refused for the wrong reason: %v", each.at, err)
 		}
 	}
+	// Asked of the hook itself, since a hook that answers nil follows every
+	// redirect as surely as no hook at all. Verified by making the guarded
+	// client's CheckRedirect return nil.
 	if c.HTTP.CheckRedirect == nil {
-		t.Error("the client follows redirects, which is what a public index is not trusted to choose")
+		t.Fatal("the client follows redirects, which is what a public index is not trusted to choose")
+	}
+	elsewhere, err := http.NewRequest(http.MethodGet, "https://elsewhere.test/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.HTTP.CheckRedirect(elsewhere, nil); !errors.Is(err, outward.ErrRefused) {
+		t.Errorf("the client would follow a redirect to another host: %v", err)
 	}
 	if c.HTTP.Timeout == 0 {
 		t.Error("the client has no timeout")
@@ -439,11 +447,11 @@ func TestTheProjectsOwnPagesAreOfferedBeforeItsRepository(t *testing.T) {
 }
 
 func TestEveryAskableEcosystemHasAnAsker(t *testing.T) {
-	// The list and the switch were separate spellings of one fact, with
-	// nothing joining them: a fifth index added to one and forgotten in the
-	// other is either components selected and never asked, or asked about
-	// and never selected, and neither says anything. Derived from one table
-	// now, and this is what says the derivation is still a derivation.
+	// The ecosystems selected for asking and the askers are derived from one
+	// table. An index added to one and forgotten in the other is either
+	// components selected and never asked, or asked about and never
+	// selected, and neither says anything; this says the derivation still
+	// holds.
 	client := currency.New()
 	askable := currency.Askable()
 	if len(askable) == 0 {

@@ -123,7 +123,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 		// prefill without it is refused: a button that proposes a dismissal
 		// saying nothing is the shape this decision exists to avoid.
 		if code, said := keep(t, "kernel-modules", `{"query":"component=linux-image",
-			"prepares":{"outcome":"not-applicable","justification":"vulnerable_code_not_present"}}`); code < 400 {
+			"prepares":{"outcome":"not-applicable","justification":"vulnerable_code_not_present"}}`); code != http.StatusUnprocessableEntity {
 			t.Errorf("a prefill with no reasoning was kept: %d %s", code, said)
 		}
 

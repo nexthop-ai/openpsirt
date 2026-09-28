@@ -4,6 +4,7 @@
 package schema_test
 
 import (
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -15,12 +16,20 @@ import (
 func TestConcurrentMigrationsInOneProcessDoNotCollide(t *testing.T) {
 	// This covers goroutines in a single process, and nothing more.
 	//
-	// It cannot test the advisory lock: every caller serializes on the
-	// in-process mutex before reaching it, so this passes with the entire
-	// advisory lock deleted — verified. The lock that excludes *other
-	// instances* is tested in internal/database/migrate, driving acquire
-	// directly from two pools.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	// Two things serialize the callers: the in-process mutex, and the lock
+	// that excludes other instances — on SQLite a lock on a file beside the
+	// database. Either alone is enough, so this pins the pair; the lock that
+	// excludes other instances is tested on its own in
+	// internal/database/migrate, driving acquire directly from two pools.
+	//
+	// The database starts empty, so every migration is applied while the
+	// four callers race for it; on one already migrated each Up has nothing
+	// to do and no collision is possible. A new empty database is a file on
+	// SQLite and a server-side database elsewhere, so this runs on SQLite.
+	// Verified by deleting the mutex's Lock and Unlock and making the file
+	// lock a no-op: every caller but one fails creating the version table.
+	dbtest.Only(t, database.SQLite, func(t *testing.T, _ *database.DB) {
+		db := dbtest.Open(t, "sqlite://"+filepath.Join(t.TempDir(), "fresh.db"))
 		const instances = 4
 
 		var wg sync.WaitGroup

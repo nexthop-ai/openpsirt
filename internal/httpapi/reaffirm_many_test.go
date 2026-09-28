@@ -426,7 +426,7 @@ func TestALapsedClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testi
 				t.Errorf("as %s, a lapsed claim elsewhere answered %d %s and a missing one %d %s",
 					who, code, invisible, absentCode, absent)
 			}
-			if code < 400 || strings.Contains(invisible, "CVE-2026-9999") {
+			if code != http.StatusNotFound || strings.Contains(invisible, "CVE-2026-9999") {
 				t.Errorf("as %s, the refusal answered %d and named: %s", who, code, invisible)
 			}
 		}

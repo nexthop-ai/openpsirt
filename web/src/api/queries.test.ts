@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Refused, notYours, statusOf, unwrap } from "./queries";
+import { Refused, at, notYours, statusOf, unwrap } from "./queries";
 
 const answered = (status: number, statusText: string, error?: unknown) => ({
   error,
@@ -61,7 +61,7 @@ describe("what a refusal says", () => {
   it("falls back to the status where there is no reason phrase", () => {
     // Every HTTP/2 response: the protocol carries the code and dropped the
     // phrase, so `statusText` is the empty string and a screen showing it
-    // showed nothing at all.
+    // shows nothing at all.
     expect(() => unwrap(answered(500, ""))).toThrow("HTTP 500");
   });
 
@@ -78,5 +78,53 @@ describe("what a refusal says", () => {
     expect(
       unwrap({ data: { items: [] }, response: { ok: true, status: 200 } as Response }),
     ).toEqual({ items: [] });
+  });
+});
+
+// A refusal naming several versions offers them as choices. The error list is
+// read item by item, and only the items at the asked location that carry a
+// version become a choice.
+describe("the choices a refusal offers", () => {
+  const refused = (error: unknown): unknown => {
+    try {
+      unwrap(answered(409, "", error));
+    } catch (err) {
+      return err;
+    }
+    throw new Error("the refusal was not thrown");
+  };
+  const several = () =>
+    refused({
+      detail: "which one",
+      errors: [
+        { location: "component", message: "1.0", value: { ecosystem: "deb", namespace: "debian" } },
+        { location: "component", message: "2.0" },
+        { location: "other", message: "x" },
+        { location: "component" },
+        "not an object",
+        null,
+        { location: "component", message: "3.0", value: { ecosystem: 7 } },
+      ],
+    });
+
+  it("reads the versions at one location, with what else picks each", () => {
+    expect(at(several(), "component")).toEqual([
+      { version: "1.0", ecosystem: "deb", namespace: "debian" },
+      { version: "2.0", ecosystem: undefined, namespace: undefined },
+      { version: "3.0", ecosystem: undefined, namespace: undefined },
+    ]);
+  });
+
+  it("reads nothing at a location the refusal did not name", () => {
+    expect(at(several(), "nowhere")).toEqual([]);
+  });
+
+  it("reads nothing from a refusal without a list", () => {
+    expect(at(refused({ detail: "which one", errors: "not a list" }), "component")).toEqual([]);
+    expect(at(refused({ detail: "which one" }), "component")).toEqual([]);
+  });
+
+  it("reads nothing from something that is not a refusal", () => {
+    expect(at(new Error("network"), "component")).toEqual([]);
   });
 });

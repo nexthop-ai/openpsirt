@@ -836,11 +836,9 @@ func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
 
 		// Somebody who did not make it cannot hold part of it back: that is
 		// setting rows aside, and setting rows aside agrees to the rest.
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
+		refusedWith(t, asPerson(t, r, "reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/split", made.ClaimID),
-			fmt.Sprintf(`{"rows":[%d],"because":"Not this one."}`, made.IDs[0])); got.Code < 400 {
-			t.Errorf("an approver held part of somebody's claim back: %d", got.Code)
-		}
+			fmt.Sprintf(`{"rows":[%d],"because":"Not this one."}`, made.IDs[0])), http.StatusNotFound)
 
 		got = asPerson(t, r, "triager", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/split", made.ClaimID),
@@ -938,12 +936,9 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		// And nobody else may do it. Re-affirming is the claimant's right: an
 		// approver doing it becomes proposer of the new claim while their own
 		// earlier agreement is carried onto it.
-		if theirs := asPerson(t, r, "reviewer", http.MethodPost,
+		refusedWith(t, asPerson(t, r, "reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
-			`{"reasoning":"Looks fine to me."}`); theirs.Code < 400 {
-			t.Errorf("somebody else re-affirmed the claim: %d %s",
-				theirs.Code, theirs.Body.String())
-		}
+			`{"reasoning":"Looks fine to me."}`), http.StatusNotFound)
 	})
 }
 

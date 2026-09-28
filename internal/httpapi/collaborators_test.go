@@ -98,11 +98,8 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 			""); got.Code != http.StatusNoContent {
 			t.Fatalf("bringing a second person in answered %d", got.Code)
 		}
-		if got := asPerson(t, r, "reader", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim.ClaimID), `{}`); got.Code < 400 {
-			t.Errorf("a collaborator agreed to a claim on the case: %d %s",
-				got.Code, got.Body.String())
-		}
+		refusedWith(t, asPerson(t, r, "reader", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim.ClaimID), `{}`), http.StatusNotFound)
 
 		// Being brought in is said at once, and says which issue: this is the
 		// one message that names an undisclosed finding on purpose, and it
@@ -366,9 +363,7 @@ func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testin
 			"/v1/products/mine/findings",
 			"/v1/products/mine/streams/master/variants/broadcom/vex",
 		} {
-			if got := asPerson(t, r, "outsider", http.MethodGet, path, ""); got.Code < 400 {
-				t.Errorf("a case collaborator reached %s: %d", path, got.Code)
-			}
+			refusedWith(t, asPerson(t, r, "outsider", http.MethodGet, path, ""), http.StatusNotFound)
 		}
 	})
 }
@@ -419,9 +414,7 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 				`{"builds":[{"stream":"master","variant":"broadcom"}]}`},
 		} {
 			got := asPerson(t, r, "outsider", c.method, c.path, c.body)
-			if got.Code < 400 {
-				t.Errorf("%s %s answered %d for a case collaborator", c.method, c.path, got.Code)
-			}
+			refusedWith(t, got, http.StatusNotFound)
 			if contains(got.Body.String(), invisible) {
 				t.Errorf("%s %s says the product does not exist, having admitted them "+
 					"to the same product elsewhere in the same breath: %s",
@@ -431,9 +424,11 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 
 		// And a route about the product as a whole is not theirs, which is
 		// where that answer is the right one.
-		got := asPerson(t, r, "outsider", http.MethodGet, "/v1/products/mine/assessments", "")
-		if got.Code < 400 {
-			t.Errorf("a case collaborator reached the product's assessments: %d", got.Code)
+		got := asPerson(t, r, "outsider", http.MethodGet, "/v1/products/mine/overview", "")
+		refusedWith(t, got, http.StatusNotFound)
+		if !contains(got.Body.String(), invisible) {
+			t.Errorf("the product's overview refused a case collaborator for something "+
+				"other than the product: %s", got.Body.String())
 		}
 	})
 }

@@ -582,9 +582,9 @@ func TestAScanCutShortByShutdownHandsItsJobBack(t *testing.T) {
 }
 
 func TestWhatTheScannerSaidWhileSucceedingReachesTheRun(t *testing.T) {
-	// It was read only on failure, so a run that answered while warning that
-	// its answer was coarse threw the warning away — and that warning
-	// qualifies every finding the run produced.
+	// A scanner can answer while warning that its answer is coarse, and that
+	// warning qualifies every finding the run produced, so it is kept on a
+	// run that succeeded as well as on one that failed.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		const said = "go binary packages were found but none carry function symbols"
 		s := &stub{caution: said, reported: []finding.Reported{{
@@ -626,6 +626,11 @@ func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testin
 	// back and scanned again later, so it is not an error — and a process that
 	// logged one at every stop would teach an operator to ignore the level
 	// that means something.
+	//
+	// Two builds are queued before the loop starts, and the wake interval is
+	// longer than the test, so only draining reaches the second. Verified by
+	// breaking the drain loop after its first scan: the second build is never
+	// scanned and the wait times out.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
@@ -637,6 +642,11 @@ func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testin
 		}}}, slog.New(said), "test")
 
 		f.waiting(t)
+		second := f.anotherBuild(t, "202411")
+		f.withInventory(t, second, "sha256:second")
+		if _, err := f.queue.Add(ctx, queue.Scan, strconv.FormatInt(second, 10)); err != nil {
+			t.Fatal(err)
+		}
 		returned := make(chan struct{})
 		go func() {
 			defer close(returned)
@@ -645,7 +655,8 @@ func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testin
 			runner.Run(ctx, time.Hour)
 		}()
 
-		waitFor(t, func() bool { return f.finishedRuns(t) > 0 }, "the queued build to be scanned")
+		waitFor(t, func() bool { return f.finishedRuns(t) > 0 && f.finishedRunsOn(t, second) > 0 },
+			"both queued builds to be scanned")
 
 		stop()
 		select {
@@ -663,8 +674,14 @@ func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testin
 // finishedRuns is how many scan runs have finished against this build.
 func (f *runFixture) finishedRuns(t *testing.T) int {
 	t.Helper()
+	return f.finishedRunsOn(t, f.target)
+}
+
+// finishedRunsOn is how many scan runs have finished against a build.
+func (f *runFixture) finishedRunsOn(t *testing.T, target int64) int {
+	t.Helper()
 	n, err := f.db.DB.NewSelect().Model((*finding.Run)(nil)).
-		Where("target_id = ?", f.target).
+		Where("target_id = ?", target).
 		Where("finished_at IS NOT NULL").
 		Count(t.Context())
 	if err != nil {

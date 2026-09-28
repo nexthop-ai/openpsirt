@@ -902,6 +902,7 @@ feature.
 | Where the same place is undisclosed in one build and public in another, the single decision carries the stricter | |
 | Everything it decides from is read inside the transaction | The builds the request names, which are past end-of-life, and the places the bump reaches are all reads, and a retry re-runs the closure against a database that has moved |
 | One request, one transaction, one claim | Half of it written would be a pending upgrade that says a bump is declared for a release it is not, so the judgments and the fix targets are written together |
+| A release past end-of-life named in the request refuses the whole of it as 422, "release X is retired" | The caller may triage there and asked for something that cannot be done; naming the release says which one to drop |
 
 Proposing per row instead writes the same key twice, and the second collides
 with the index that keeps one claim standing per place, taking the whole

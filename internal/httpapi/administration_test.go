@@ -13,22 +13,17 @@ import (
 	"time"
 )
 
-// TestRecordingARoleReadsTheModeBeforeItOpensTheWrite pins that where roles
-// come from is read before the transaction recording somebody opens, rather
-// than from inside it.
+// TestRecordingARoleReadsTheModeThroughTheWritesOwnConnection pins that where
+// roles come from is read through the transaction's own handle.
 //
-// Read from inside, it reached the settings store, which holds the root
-// database handle. SQLite lends one connection, so the read waited for the
-// connection the transaction was already holding and the request never
-// answered at all: nobody could be given a role, and everything else touching
-// the database queued behind it for as long as the caller waited. The other
-// engines answered, through a second connection, which is the same read outside
-// the transaction with the symptom removed.
+// A read through the root handle waits on SQLite's single connection, which
+// the transaction already holds, so the request never answers; the deadline
+// turns that hang into a failure. The other engines answer through a second
+// connection and would pass either way.
 //
-// Both arms, because the guard has two and neither ran anywhere: nothing else
-// in this package wires the mode, so the nil check short-circuited and a
-// running deployment was the only thing that executed the line.
-func TestRecordingARoleReadsTheModeBeforeItOpensTheWrite(t *testing.T) {
+// Both arms of the mode are exercised, since this package wires the mode
+// nowhere else.
+func TestRecordingARoleReadsTheModeThroughTheWritesOwnConnection(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		for _, c := range []struct {
 			what   string
@@ -422,10 +417,8 @@ func TestTheUserListNarrowsToWhoHoldsWhat(t *testing.T) {
 			"/v1/people?product=no-such-product", ""); got.Code != http.StatusNotFound {
 			t.Errorf("narrowing to a product nobody declared answered %d, want 404", got.Code)
 		}
-		if got := asPerson(t, r, "admin", http.MethodGet,
-			"/v1/people?role=nonsense", ""); got.Code < 400 {
-			t.Errorf("narrowing to a word that is not a role answered %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "admin", http.MethodGet,
+			"/v1/people?role=nonsense", ""), http.StatusUnprocessableEntity)
 	})
 }
 

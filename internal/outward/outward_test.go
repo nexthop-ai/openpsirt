@@ -160,6 +160,10 @@ func TestAProviderIsNeverReachedInsideThisNetwork(t *testing.T) {
 		"172.16.0.1:443",
 		"169.254.169.254:443", // the address cloud metadata services answer on
 		"0.0.0.0:443",
+		// Neither of these is private or unspecified to the standard
+		// library, so each reaches only its own arm of the shared ranges.
+		"100.64.0.1:443",         // carrier-grade translation
+		"0.1.2.3:443",            // this network, other than its unspecified address
 		"[64:ff9b::a00:5]:443",   // 10.0.0.5 through a NAT64 gateway
 		"[64:ff9b:1::a00:5]:443", // the same, through a local-use NAT64 prefix
 		"100.64.0.1:443",         // carrier-grade translation

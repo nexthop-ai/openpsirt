@@ -5,10 +5,8 @@
 //
 // A `var(--thing)` naming a token that does not exist is not an error anywhere:
 // CSS drops the declaration, the element keeps whatever it inherited, and the
-// screen looks nearly right. Three of them were in the stylesheet — a radius, a
-// type step and a color for something bad — each the result of a token being
-// renamed with one reference left behind, and each invisible until somebody
-// compared two screens side by side.
+// screen looks nearly right. A token renamed with one reference left behind is
+// invisible until somebody compares two screens side by side.
 //
 // So every reference is put to the set of definitions. A fallback counts as a
 // definition of nothing: `var(--gone, 8px)` is a deliberate default and is
@@ -31,9 +29,8 @@ const src = path.join(here, "..", "src");
 // The words that name a token appear in the comments that explain it — a block
 // saying why a color is not composed at run time has to write the shape it is
 // not composing, and read as a reference that is a token named and defined
-// nowhere. The CSS pass below already strips comments for this reason; the
-// TypeScript one did not, so the first comment to name a token made this gate
-// report a failure nothing had.
+// nowhere. Both the stylesheets and the TypeScript are stripped of comments
+// before they are read.
 //
 // Line comments and block comments alike, and a URL's `//` is left alone
 // because it is inside quotes by the time it matters here.
@@ -55,10 +52,10 @@ export function withoutComments(text) {
 
 // tokensIn reads one file as the tokens it defines and the tokens it names.
 //
-// Lifted out of the walk so a test can reach the comment stripping *through*
-// the thing that broke. Asked of `withoutComments` directly, a test passes
-// while the three calls to it are deleted — which is the missing-call shape
-// this gate exists to catch, in the gate itself.
+// Lifted out of the walk so a test reaches the comment stripping through the
+// reader. Asked of `withoutComments` directly, a test passes with the calls
+// to it deleted — the missing-call shape this gate exists to catch, in the
+// gate itself.
 export function tokensIn(text, at = "") {
   const source = withoutComments(text);
   const lines = source.split("\n");
@@ -77,6 +74,18 @@ export function tokensIn(text, at = "") {
     }
   }
   return { defined, named };
+}
+
+// What to say where the walk examined nothing, or nothing where it examined
+// something. A gate over an empty tree, or over files holding no token at all,
+// finds nothing wrong for the reason that it looked at nothing.
+export function checkedNothing({ files, defined, named }) {
+  if (files === 0)
+    return "no stylesheet or source file was found under src/, so this checked nothing";
+  if (defined === 0 || named === 0) {
+    return `${files} file(s) held ${defined} token definition(s) and ${named} reference(s), so this checked nothing`;
+  }
+  return "";
 }
 
 async function sources(dir) {
@@ -151,6 +160,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       console.error(`${name} is defined at ${at} and named nowhere`);
     }
     console.error(`\n${orphaned.length} token(s) defined and never used. Delete the definition.`);
+    process.exit(1);
+  }
+
+  const nothing = checkedNothing({
+    files: files.length,
+    defined: definedAt.size,
+    named: refersToIt.size,
+  });
+  if (nothing) {
+    console.error(nothing);
     process.exit(1);
   }
 

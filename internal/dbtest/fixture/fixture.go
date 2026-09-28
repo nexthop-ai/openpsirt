@@ -98,13 +98,10 @@ func Two(t *testing.T, fn func(t *testing.T, w *World)) {
 	})
 }
 
-// New empties db and seeds the default world in it.
-//
-// The database arrives migrated, so nothing here migrates it. Reset is called
-// because a package's tests share one database on the three server engines.
+// New seeds the default world in db, which the harness hands over migrated
+// and empty.
 func New(t *testing.T, db *database.DB) *World {
 	t.Helper()
-	dbtest.Reset(t, db)
 	w := &World{
 		DB:      db,
 		Catalog: catalog.NewStore(db.DB),

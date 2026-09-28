@@ -35,22 +35,34 @@ func asPerson(t *testing.T, r *reach, who, method, path, body string) *httptest.
 }
 
 func TestTheReviewQueueIsReadableAndNarrowed(t *testing.T) {
-	// The queue is the screen somebody works down. It has to be reachable by
-	// whoever reads the product, and empty for somebody who holds nothing.
+	// The queue is the screen somebody works down. A claim waiting in one
+	// product is on the queue of whoever may agree to it there, and absent
+	// from the queue of somebody who reads only another product.
 	eachReach(t, func(t *testing.T, r *reach) {
-		got := asPerson(t, r, "triager", http.MethodGet, "/v1/review-queue", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("a triager reading the queue answered %d: %s", got.Code, got.Body.String())
+		r.decidedAt(t, r.scanned(t))
+		waiting := func(who string) int {
+			t.Helper()
+			got := asPerson(t, r, who, http.MethodGet, "/v1/review-queue", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s reading the queue answered %d: %s", who, got.Code, got.Body.String())
+			}
+			var out struct {
+				Items []map[string]any `json:"items"`
+				Total int              `json:"total"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+				t.Fatalf("decode: %v (%s)", err, got.Body.String())
+			}
+			if out.Total != len(out.Items) {
+				t.Errorf("%s's queue says %d and lists %d", who, out.Total, len(out.Items))
+			}
+			return out.Total
 		}
-		var out struct {
-			Items []map[string]any `json:"items"`
-			Total int              `json:"total"`
+		if got := waiting("reviewer"); got != 1 {
+			t.Errorf("the one claim waiting is %d rows on the queue of somebody who may agree to it", got)
 		}
-		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
-			t.Fatalf("decode: %v (%s)", err, got.Body.String())
-		}
-		if out.Total != 0 || len(out.Items) != 0 {
-			t.Errorf("a deployment that has decided nothing has %d waiting", out.Total)
+		if got := waiting("outsider"); got != 0 {
+			t.Errorf("somebody who reads only another product sees %d waiting here", got)
 		}
 	})
 }
@@ -70,22 +82,24 @@ func TestDecidingAboutSomethingNobodyScannedIsNotThere(t *testing.T) {
 }
 
 func TestDecidingIsRefusedToSomebodyWhoOnlyReads(t *testing.T) {
+	// Against a finding that is there, which a triager then decides on the
+	// same path, so the refusal is the role's rather than the finding's
+	// absence. The act a reader may not take answers as a finding not there.
 	twoReach(t, func(t *testing.T, r *reach) {
+		place := r.scanned(t)
 		const body = `{"outcome":"wont-fix","reasoning":"Not worth it."}`
-		got := asPerson(t, r, "reader", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-1/places/somewhere/decision", body)
-		// Not there rather than forbidden: a build nothing was scanned against
-		// answers the same way whoever asks, and somebody who may not decide
-		// learns nothing from the difference.
-		if got.Code != http.StatusNotFound && got.Code != http.StatusForbidden {
-			t.Errorf("a reader deciding answered %d: %s", got.Code, got.Body.String())
+		at := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999/places/" +
+			place + "/decision"
+		refusedWith(t, asPerson(t, r, "reader", http.MethodPost, at, body), http.StatusNotFound)
+		if got := asPerson(t, r, "triager", http.MethodPost, at, body); got.Code != http.StatusCreated {
+			t.Fatalf("a triager deciding the same finding answered %d: %s", got.Code, got.Body.String())
 		}
 	})
 }
 
 func TestApprovingSomethingThatIsNotThereSaysSo(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
-		got := asPerson(t, r, "triager", http.MethodPost, "/v1/decisions/999999/approval", `{}`)
+		got := asPerson(t, r, "triager", http.MethodPost, "/v1/claims/999999/approval", `{}`)
 		if got.Code != http.StatusNotFound {
 			t.Errorf("approving a decision that does not exist answered %d", got.Code)
 		}
@@ -260,18 +274,4 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 			t.Errorf("asking for what is being backported found %d rows", page.Total)
 		}
 	})
-}
-
-// refusedWith pins the status a refusal answers with.
-//
-// `got.Code < 400` held for a 404 from a renamed route, a 422 for an unrelated
-// body rule, and the 500 chi's recovery middleware makes of a panic — so a
-// control that stopped running, a route that moved and a handler that crashes
-// were all indistinguishable from the refusal working.
-func refusedWith(t *testing.T, got *httptest.ResponseRecorder, want int) {
-	t.Helper()
-	if got.Code != want {
-		t.Fatalf("got %d %s, want %d %s: %s", got.Code, http.StatusText(got.Code),
-			want, http.StatusText(want), got.Body.String())
-	}
 }

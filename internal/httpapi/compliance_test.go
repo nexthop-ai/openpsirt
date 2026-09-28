@@ -184,10 +184,8 @@ func TestTheListFiltersOnWhenThingsHappened(t *testing.T) {
 			t.Errorf("proposed since yesterday is %d rows in a fixture nobody decided", got)
 		}
 		// And a date nothing can read is refused rather than ignored.
-		if got := asPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/findings?opened_after=last+week", ""); got.Code < 400 {
-			t.Errorf("a date nothing can read answered %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/findings?opened_after=last+week", ""), http.StatusUnprocessableEntity)
 	})
 }
 

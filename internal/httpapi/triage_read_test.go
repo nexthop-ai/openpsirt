@@ -483,11 +483,15 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 
 		// Reading is not acting. Arguing still asks for triage, and the
 		// refusal says nothing about whether the decision is there.
-		if got := asPerson(t, r, "reader", http.MethodPost,
+		// The decision's own sentence, so a route that moved and answers 404
+		// for itself does not pass for the refusal.
+		wrote := asPerson(t, r, "reader", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/comments", claim),
-			`{"body":"a reader should not be able to write this"}`); got.Code == http.StatusOK ||
-			got.Code == http.StatusCreated {
-			t.Errorf("a reader wrote on a decision: %d", got.Code)
+			`{"body":"a reader should not be able to write this"}`)
+		refusedWith(t, wrote, http.StatusNotFound)
+		if !contains(wrote.Body.String(), "no decision is recorded there") {
+			t.Errorf("a reader writing on a decision was refused in other words: %s",
+				wrote.Body.String())
 		}
 
 		// The finding's visibility is the whole of the rule, so an undisclosed

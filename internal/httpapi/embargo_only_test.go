@@ -78,10 +78,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 				"/findings/CVE-2026-9999/places/"+place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The parser is never reached."}`)
-		if made.Code < 400 || made.Code >= 500 {
-			t.Errorf("private triage argued about a disclosed finding: %d %s",
-				made.Code, made.Body.String())
-		}
+		refusedWith(t, made, http.StatusNotFound)
 
 		// Handed a disclosed finding, they see it: an assignment carries a
 		// disclosed row to whoever holds it, whatever they read.
@@ -98,8 +95,9 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 		if got := asPerson(t, r, "embargo-triager", http.MethodPost, "/v1/products/mine/findings",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"disclosed":true,`+
 				`"summary":"A flaw somebody announced last week.",`+
-				`"severity":"high","component":"libnl-3-200"}`); got.Code < 400 || got.Code >= 500 {
-			t.Errorf("private triage recorded a disclosed flaw: %d %s", got.Code, got.Body.String())
+				`"severity":"high","component":"libnl-3-200"}`); got.Code != http.StatusNotFound {
+			t.Errorf("private triage recording a disclosed flaw answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }
