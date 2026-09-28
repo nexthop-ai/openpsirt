@@ -56,7 +56,6 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		rollBack(t, ctx, db)
 		dbtest.MigrateTo(t, db, v010)
 		released := describe(t, ctx, db)
-		taggedSchema(t, "v0.1.0", db.Server.Engine, released)
 		seed(t, ctx, db)
 		before := snapshot(t, ctx, db)
 

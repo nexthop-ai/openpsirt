@@ -85,6 +85,11 @@ func describe(t *testing.T, ctx context.Context, db *database.DB) []string {
 //
 // SQLite does not name a foreign key or a unique constraint anywhere it can be
 // read back, so those lines carry what is constrained rather than a name.
+//
+// Two things the pragmas do not report are read beside them: whether a table's
+// key is AUTOINCREMENT, which decides whether an identifier is reused after the
+// highest row is deleted and is spelled by a helper later changes are free to
+// edit, and whether an index is partial.
 func describeSQLite(t *testing.T, ctx context.Context, db *database.DB) []string {
 	t.Helper()
 	conn := db.DB.DB
@@ -92,6 +97,9 @@ func describeSQLite(t *testing.T, ctx context.Context, db *database.DB) []string
 		`SELECT "name" FROM "sqlite_master" WHERE "type" = 'table' AND "name" NOT LIKE 'sqlite_%'`)
 	var lines []string
 	for _, table := range tables {
+		lines = append(lines, queryLines(t, ctx, conn, fmt.Sprintf(
+			`SELECT 'table %[1]s autoincrement=' || ("sql" LIKE '%%AUTOINCREMENT%%')
+			 FROM "sqlite_master" WHERE "type" = 'table' AND "name" = '%[1]s'`, table))...)
 		lines = append(lines, queryLines(t, ctx, conn, fmt.Sprintf(
 			`SELECT 'column %[1]s.' || "name" || ' ' || "type" || ' notnull=' || "notnull" ||
 				' default=' || COALESCE("dflt_value", '-') || ' pk=' || "pk"
@@ -102,7 +110,7 @@ func describeSQLite(t *testing.T, ctx context.Context, db *database.DB) []string
 			 FROM pragma_foreign_key_list('%[1]s') GROUP BY "id"`, table))...)
 		lines = append(lines, queryLines(t, ctx, conn, fmt.Sprintf(
 			`SELECT 'index %[1]s ' || CASE WHEN "l"."origin" = 'c' THEN "l"."name" ELSE "l"."origin" END ||
-				' unique=' || "l"."unique" || ' (' ||
+				' unique=' || "l"."unique" || ' partial=' || "l"."partial" || ' (' ||
 				(SELECT group_concat("i"."name", ', ') FROM pragma_index_info("l"."name") AS "i") || ')'
 			 FROM pragma_index_list('%[1]s') AS "l"`, table))...)
 	}

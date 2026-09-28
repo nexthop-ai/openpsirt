@@ -814,127 +814,201 @@ foreign key vulnerability_alias (vulnerability_id) -> vulnerability (id) NO ACTI
 foreign key vulnerability_rating (vulnerability_id) -> vulnerability (id) NO ACTION
 foreign key vulnerability_reference (vulnerability_id) -> vulnerability (id) NO ACTION
 foreign key vulnerability_weakness (vulnerability_id) -> vulnerability (id) NO ACTION
-index admin_change admin_change_about_idx unique=0 (about, at)
-index admin_change admin_change_kind_idx unique=0 (kind, at)
-index admin_change admin_change_recent_idx unique=0 (at)
-index advisory u unique=1 (identifier_folded)
-index advisory u unique=1 (minted_year, mint_number)
-index advisory_approval advisory_approval_edition_idx unique=0 (edition_id)
-index advisory_edition u unique=1 (advisory_id, ordinal)
-index advisory_issuance u unique=1 (advisory_id, ordinal)
-index advisory_issue u unique=1 (advisory_id, product_id, vulnerability_id)
-index advisory_source advisory_source_due_idx unique=0 (retired_at, fetched_at)
-index advisory_source u unique=1 (product_id, name)
-index api_key api_key_product_idx unique=0 (product_id)
-index api_key u unique=1 (name)
-index api_key u unique=1 (secret_hash)
-index application_setting pk unique=1 (name)
-index assessment assessment_issue_idx unique=0 (vulnerability_id, product_id, state)
-index assessment assessment_waiting_idx unique=0 (state, needs_approval)
-index assessment u unique=1 (live_vulnerability_id, product_id)
-index attachment attachment_issue_idx unique=0 (product_id, vulnerability_id)
-index attachment attachment_report_idx unique=0 (flaw_report_id)
-index attachment attachment_unattached_idx unique=0 (attached_at, uploaded_at)
-index attachment u unique=1 (token)
-index case_collaborator case_collaborator_live_idx unique=1 (product_id, vulnerability_id, live_person_id)
-index case_collaborator case_collaborator_person_idx unique=0 (person_id, live_person_id)
-index claim claim_derived_idx unique=0 (derived_from)
-index claim_approval claim_approval_batch_idx unique=0 (batch)
-index claim_approval claim_approval_claim_idx unique=0 (claim_id)
-index claim_comment claim_comment_claim_idx unique=0 (claim_id)
-index claim_comment_revision u unique=1 (comment_id, ordinal)
-index claim_revision u unique=1 (claim_id, ordinal)
-index component component_fold_idx unique=0 (fold_key)
-index component component_folded_idx unique=0 (name_folded)
-index component component_upstream_folded_idx unique=0 (upstream_folded)
-index component u unique=1 (identity)
-index decision decision_applies_idx unique=0 (product_id, vulnerability_id, place_identity, component_upstream_version, consumer_upstream_version)
-index decision decision_claim_idx unique=0 (claim_id)
-index decision u unique=1 (live_key)
-index disclosure_movement disclosure_movement_place_idx unique=0 (vulnerability_id, product_id)
-index exploited_here exploited_here_issue_idx unique=0 (vulnerability_id, product_id)
-index exploited_here exploited_here_product_idx unique=0 (product_id, recorded_at)
-index exploited_here u unique=1 (live_vulnerability_id, product_id)
-index finding finding_assigned_idx unique=0 (assigned_to, closed_at)
-index finding finding_component_idx unique=0 (target_id, component_id, closed_at)
-index finding finding_due_idx unique=0 (closed_at, suppressed_by, due_at)
-index finding finding_group_idx unique=0 (target_id, closed_at, visibility, vulnerability_id, component_id, urgency, urgency_exploited, urgency_exploited_here)
-index finding finding_open_idx unique=0 (target_id, closed_at)
-index finding finding_place_idx unique=0 (place_identity, vulnerability_id)
-index finding finding_vulnerability_idx unique=0 (vulnerability_id, closed_at)
-index finding_tag finding_tag_named_idx unique=0 (product_id, tag)
-index finding_tag u unique=1 (product_id, vulnerability_id, component_id, tag)
-index flaw_report flaw_report_product_idx unique=0 (product_id, recorded_at)
-index flaw_report flaw_report_ruling_idx unique=0 (ruling_id)
-index flaw_report flaw_report_unanswered_idx unique=0 (acknowledged_at, received_on)
-index flaw_report u unique=1 (reference)
-index flaw_report u unique=1 (vulnerability_id)
-index graph_edge graph_edge_child_idx unique=0 (child_id, closed_scan_id)
-index graph_edge graph_edge_current_idx unique=0 (target_id, closed_scan_id, parent_id, child_id)
-index graph_node graph_node_current_idx unique=0 (target_id, closed_scan_id, component_id)
-index group_admin u unique=1 (group_name, grants)
-index group_role u unique=1 (group_name, product_id, role)
-index issue_note issue_note_thread_idx unique=0 (vulnerability_id, product_id, id)
-index issue_note_revision u unique=1 (note_id, ordinal)
-index issue_rating u unique=1 (vulnerability_id, product_id)
-index job job_runnable_idx unique=0 (kind, state, run_after, id)
-index job job_set_aside_idx unique=0 (state, updated_at, id)
-index lease pk unique=1 (name)
-index notification notification_condition_idx unique=1 (person_id, kind, about_open)
-index notification notification_unread_idx unique=0 (person_id, read_at, cleared_at)
-index obligation_window u unique=1 (live_name)
-index obligation_window_product pk unique=1 (window_id, product_id)
-index outbound outbound_kind_idx unique=0 (kind, retired_at)
-index outbound u unique=1 (name, kind)
-index outbound_delivery outbound_delivery_settled_idx unique=0 (outbound_id, notification_id)
-index outbound_delivery u unique=1 (outbound_id, about)
-index patch_commit patch_commit_due_idx unique=0 (repository_id, looked_at)
-index patch_commit u unique=1 (repository_id, commit_hash)
-index patch_commit_branch u unique=1 (commit_id, branch)
-index patch_repository u unique=1 (url_identity)
-index person u unique=1 (identity)
-index person u unique=1 (party_id)
-index person_identity person_identity_person_idx unique=0 (person_id)
-index person_identity u unique=1 (subject)
-index person_identity u unique=1 (username)
-index personal_token u unique=1 (person_id, name)
-index personal_token u unique=1 (secret_hash)
-index product u unique=1 (name)
-index report_ruled pk unique=1 (ruling_id, flaw_report_id)
-index report_ruled report_ruled_report_idx unique=0 (flaw_report_id)
-index report_ruling report_ruling_duplicate_idx unique=0 (duplicate_of)
-index report_ruling report_ruling_waiting_idx unique=0 (product_id, settled_at, withdrawn_at)
-index role_grant u unique=1 (person_id, product_id, role, source)
-index role_grant_all u unique=1 (person_id, role, source)
-index routing_rule routing_rule_order_idx unique=0 (product_id, retired_at, ordinal)
-index saved_filter u unique=1 (person_id, product_id, name)
-index scan scan_newest_idx unique=0 (target_id, status, built_at)
-index scan scan_recency_idx unique=0 (target_id, received_at)
-index scan u unique=1 (target_id, content_hash)
-index scan_document u unique=1 (scan_id, kind, ordinal)
-index scan_document_chunk u unique=1 (document_id, seq)
-index scan_refusal u unique=1 (target_id)
-index session session_expires_idx unique=0 (expires_at)
-index session session_person_idx unique=0 (person_id)
-index session u unique=1 (token_hash)
-index stream u unique=1 (product_id, name)
-index suppression suppression_open_idx unique=0 (target_id, closed_scan_id)
-index target target_variant_idx unique=0 (variant_id)
-index target u unique=1 (stream_id, variant_id)
-index team u unique=1 (name)
-index team u unique=1 (party_id)
-index team_member pk unique=1 (team_id, person_id)
-index team_member team_member_person_idx unique=0 (person_id)
-index told_outside told_outside_record_idx unique=0 (exploited_here_id, told_at)
-index upgrade u unique=1 (target_id, fold_key)
-index variant u unique=1 (product_id, name)
-index vex_issuance u unique=1 (target_id, ordinal)
-index vex_statement vex_statement_about_idx unique=0 (product_id, vulnerability, component, superseded_at)
-index vex_statement vex_statement_from_idx unique=0 (product_id, publisher, source, document_id, superseded_at)
-index vulnerability u unique=1 (identifier_folded)
-index vulnerability_alias u unique=1 (identifier)
-index vulnerability_alias vulnerability_alias_folded_idx unique=0 (identifier_folded, vulnerability_id)
-index vulnerability_rating u unique=1 (vulnerability_id, generation)
-index vulnerability_reference u unique=1 (vulnerability_id, url_identity)
-index vulnerability_weakness u unique=1 (vulnerability_id, cwe)
-index vulnerability_weakness vulnerability_weakness_cwe_idx unique=0 (cwe)
+index admin_change admin_change_about_idx unique=0 partial=0 (about, at)
+index admin_change admin_change_kind_idx unique=0 partial=0 (kind, at)
+index admin_change admin_change_recent_idx unique=0 partial=0 (at)
+index advisory u unique=1 partial=0 (identifier_folded)
+index advisory u unique=1 partial=0 (minted_year, mint_number)
+index advisory_approval advisory_approval_edition_idx unique=0 partial=0 (edition_id)
+index advisory_edition u unique=1 partial=0 (advisory_id, ordinal)
+index advisory_issuance u unique=1 partial=0 (advisory_id, ordinal)
+index advisory_issue u unique=1 partial=0 (advisory_id, product_id, vulnerability_id)
+index advisory_source advisory_source_due_idx unique=0 partial=0 (retired_at, fetched_at)
+index advisory_source u unique=1 partial=0 (product_id, name)
+index api_key api_key_product_idx unique=0 partial=0 (product_id)
+index api_key u unique=1 partial=0 (name)
+index api_key u unique=1 partial=0 (secret_hash)
+index application_setting pk unique=1 partial=0 (name)
+index assessment assessment_issue_idx unique=0 partial=0 (vulnerability_id, product_id, state)
+index assessment assessment_waiting_idx unique=0 partial=0 (state, needs_approval)
+index assessment u unique=1 partial=0 (live_vulnerability_id, product_id)
+index attachment attachment_issue_idx unique=0 partial=0 (product_id, vulnerability_id)
+index attachment attachment_report_idx unique=0 partial=0 (flaw_report_id)
+index attachment attachment_unattached_idx unique=0 partial=0 (attached_at, uploaded_at)
+index attachment u unique=1 partial=0 (token)
+index case_collaborator case_collaborator_live_idx unique=1 partial=0 (product_id, vulnerability_id, live_person_id)
+index case_collaborator case_collaborator_person_idx unique=0 partial=0 (person_id, live_person_id)
+index claim claim_derived_idx unique=0 partial=0 (derived_from)
+index claim_approval claim_approval_batch_idx unique=0 partial=0 (batch)
+index claim_approval claim_approval_claim_idx unique=0 partial=0 (claim_id)
+index claim_comment claim_comment_claim_idx unique=0 partial=0 (claim_id)
+index claim_comment_revision u unique=1 partial=0 (comment_id, ordinal)
+index claim_revision u unique=1 partial=0 (claim_id, ordinal)
+index component component_fold_idx unique=0 partial=0 (fold_key)
+index component component_folded_idx unique=0 partial=0 (name_folded)
+index component component_upstream_folded_idx unique=0 partial=0 (upstream_folded)
+index component u unique=1 partial=0 (identity)
+index decision decision_applies_idx unique=0 partial=0 (product_id, vulnerability_id, place_identity, component_upstream_version, consumer_upstream_version)
+index decision decision_claim_idx unique=0 partial=0 (claim_id)
+index decision u unique=1 partial=0 (live_key)
+index disclosure_movement disclosure_movement_place_idx unique=0 partial=0 (vulnerability_id, product_id)
+index exploited_here exploited_here_issue_idx unique=0 partial=0 (vulnerability_id, product_id)
+index exploited_here exploited_here_product_idx unique=0 partial=0 (product_id, recorded_at)
+index exploited_here u unique=1 partial=0 (live_vulnerability_id, product_id)
+index finding finding_assigned_idx unique=0 partial=0 (assigned_to, closed_at)
+index finding finding_component_idx unique=0 partial=0 (target_id, component_id, closed_at)
+index finding finding_due_idx unique=0 partial=0 (closed_at, suppressed_by, due_at)
+index finding finding_group_idx unique=0 partial=0 (target_id, closed_at, visibility, vulnerability_id, component_id, urgency, urgency_exploited, urgency_exploited_here)
+index finding finding_open_idx unique=0 partial=0 (target_id, closed_at)
+index finding finding_place_idx unique=0 partial=0 (place_identity, vulnerability_id)
+index finding finding_vulnerability_idx unique=0 partial=0 (vulnerability_id, closed_at)
+index finding_tag finding_tag_named_idx unique=0 partial=0 (product_id, tag)
+index finding_tag u unique=1 partial=0 (product_id, vulnerability_id, component_id, tag)
+index flaw_report flaw_report_product_idx unique=0 partial=0 (product_id, recorded_at)
+index flaw_report flaw_report_ruling_idx unique=0 partial=0 (ruling_id)
+index flaw_report flaw_report_unanswered_idx unique=0 partial=0 (acknowledged_at, received_on)
+index flaw_report u unique=1 partial=0 (reference)
+index flaw_report u unique=1 partial=0 (vulnerability_id)
+index graph_edge graph_edge_child_idx unique=0 partial=0 (child_id, closed_scan_id)
+index graph_edge graph_edge_current_idx unique=0 partial=0 (target_id, closed_scan_id, parent_id, child_id)
+index graph_node graph_node_current_idx unique=0 partial=0 (target_id, closed_scan_id, component_id)
+index group_admin u unique=1 partial=0 (group_name, grants)
+index group_role u unique=1 partial=0 (group_name, product_id, role)
+index issue_note issue_note_thread_idx unique=0 partial=0 (vulnerability_id, product_id, id)
+index issue_note_revision u unique=1 partial=0 (note_id, ordinal)
+index issue_rating u unique=1 partial=0 (vulnerability_id, product_id)
+index job job_runnable_idx unique=0 partial=0 (kind, state, run_after, id)
+index job job_set_aside_idx unique=0 partial=0 (state, updated_at, id)
+index lease pk unique=1 partial=0 (name)
+index notification notification_condition_idx unique=1 partial=0 (person_id, kind, about_open)
+index notification notification_unread_idx unique=0 partial=0 (person_id, read_at, cleared_at)
+index obligation_window u unique=1 partial=0 (live_name)
+index obligation_window_product pk unique=1 partial=0 (window_id, product_id)
+index outbound outbound_kind_idx unique=0 partial=0 (kind, retired_at)
+index outbound u unique=1 partial=0 (name, kind)
+index outbound_delivery outbound_delivery_settled_idx unique=0 partial=0 (outbound_id, notification_id)
+index outbound_delivery u unique=1 partial=0 (outbound_id, about)
+index patch_commit patch_commit_due_idx unique=0 partial=0 (repository_id, looked_at)
+index patch_commit u unique=1 partial=0 (repository_id, commit_hash)
+index patch_commit_branch u unique=1 partial=0 (commit_id, branch)
+index patch_repository u unique=1 partial=0 (url_identity)
+index person u unique=1 partial=0 (identity)
+index person u unique=1 partial=0 (party_id)
+index person_identity person_identity_person_idx unique=0 partial=0 (person_id)
+index person_identity u unique=1 partial=0 (subject)
+index person_identity u unique=1 partial=0 (username)
+index personal_token u unique=1 partial=0 (person_id, name)
+index personal_token u unique=1 partial=0 (secret_hash)
+index product u unique=1 partial=0 (name)
+index report_ruled pk unique=1 partial=0 (ruling_id, flaw_report_id)
+index report_ruled report_ruled_report_idx unique=0 partial=0 (flaw_report_id)
+index report_ruling report_ruling_duplicate_idx unique=0 partial=0 (duplicate_of)
+index report_ruling report_ruling_waiting_idx unique=0 partial=0 (product_id, settled_at, withdrawn_at)
+index role_grant u unique=1 partial=0 (person_id, product_id, role, source)
+index role_grant_all u unique=1 partial=0 (person_id, role, source)
+index routing_rule routing_rule_order_idx unique=0 partial=0 (product_id, retired_at, ordinal)
+index saved_filter u unique=1 partial=0 (person_id, product_id, name)
+index scan scan_newest_idx unique=0 partial=0 (target_id, status, built_at)
+index scan scan_recency_idx unique=0 partial=0 (target_id, received_at)
+index scan u unique=1 partial=0 (target_id, content_hash)
+index scan_document u unique=1 partial=0 (scan_id, kind, ordinal)
+index scan_document_chunk u unique=1 partial=0 (document_id, seq)
+index scan_refusal u unique=1 partial=0 (target_id)
+index session session_expires_idx unique=0 partial=0 (expires_at)
+index session session_person_idx unique=0 partial=0 (person_id)
+index session u unique=1 partial=0 (token_hash)
+index stream u unique=1 partial=0 (product_id, name)
+index suppression suppression_open_idx unique=0 partial=0 (target_id, closed_scan_id)
+index target target_variant_idx unique=0 partial=0 (variant_id)
+index target u unique=1 partial=0 (stream_id, variant_id)
+index team u unique=1 partial=0 (name)
+index team u unique=1 partial=0 (party_id)
+index team_member pk unique=1 partial=0 (team_id, person_id)
+index team_member team_member_person_idx unique=0 partial=0 (person_id)
+index told_outside told_outside_record_idx unique=0 partial=0 (exploited_here_id, told_at)
+index upgrade u unique=1 partial=0 (target_id, fold_key)
+index variant u unique=1 partial=0 (product_id, name)
+index vex_issuance u unique=1 partial=0 (target_id, ordinal)
+index vex_statement vex_statement_about_idx unique=0 partial=0 (product_id, vulnerability, component, superseded_at)
+index vex_statement vex_statement_from_idx unique=0 partial=0 (product_id, publisher, source, document_id, superseded_at)
+index vulnerability u unique=1 partial=0 (identifier_folded)
+index vulnerability_alias u unique=1 partial=0 (identifier)
+index vulnerability_alias vulnerability_alias_folded_idx unique=0 partial=0 (identifier_folded, vulnerability_id)
+index vulnerability_rating u unique=1 partial=0 (vulnerability_id, generation)
+index vulnerability_reference u unique=1 partial=0 (vulnerability_id, url_identity)
+index vulnerability_weakness u unique=1 partial=0 (vulnerability_id, cwe)
+index vulnerability_weakness vulnerability_weakness_cwe_idx unique=0 partial=0 (cwe)
+table admin_change autoincrement=1
+table advisory autoincrement=1
+table advisory_approval autoincrement=1
+table advisory_edition autoincrement=1
+table advisory_issuance autoincrement=1
+table advisory_issue autoincrement=1
+table advisory_source autoincrement=1
+table api_key autoincrement=1
+table application_setting autoincrement=0
+table assessment autoincrement=1
+table attachment autoincrement=1
+table case_collaborator autoincrement=1
+table claim autoincrement=1
+table claim_approval autoincrement=1
+table claim_comment autoincrement=1
+table claim_comment_revision autoincrement=1
+table claim_revision autoincrement=1
+table component autoincrement=1
+table decision autoincrement=1
+table disclosure_movement autoincrement=1
+table exploited_here autoincrement=1
+table finding autoincrement=1
+table finding_tag autoincrement=1
+table flaw_report autoincrement=1
+table goose_db_version autoincrement=1
+table graph_edge autoincrement=1
+table graph_node autoincrement=1
+table group_admin autoincrement=1
+table group_role autoincrement=1
+table issue_note autoincrement=1
+table issue_note_revision autoincrement=1
+table issue_rating autoincrement=1
+table job autoincrement=1
+table lease autoincrement=0
+table notification autoincrement=1
+table obligation_window autoincrement=1
+table obligation_window_product autoincrement=0
+table outbound autoincrement=1
+table outbound_delivery autoincrement=1
+table party autoincrement=1
+table patch_commit autoincrement=1
+table patch_commit_branch autoincrement=1
+table patch_repository autoincrement=1
+table person autoincrement=1
+table person_identity autoincrement=1
+table personal_token autoincrement=1
+table product autoincrement=1
+table report_ruled autoincrement=0
+table report_ruling autoincrement=1
+table role_grant autoincrement=1
+table role_grant_all autoincrement=1
+table routing_rule autoincrement=1
+table saved_filter autoincrement=1
+table scan autoincrement=1
+table scan_document autoincrement=1
+table scan_document_chunk autoincrement=1
+table scan_refusal autoincrement=1
+table scan_run autoincrement=1
+table session autoincrement=1
+table stream autoincrement=1
+table suppression autoincrement=1
+table target autoincrement=1
+table team autoincrement=1
+table team_member autoincrement=0
+table told_outside autoincrement=1
+table upgrade autoincrement=1
+table variant autoincrement=1
+table vex_issuance autoincrement=1
+table vex_statement autoincrement=1
+table vulnerability autoincrement=1
+table vulnerability_alias autoincrement=1
+table vulnerability_rating autoincrement=1
+table vulnerability_reference autoincrement=1
+table vulnerability_weakness autoincrement=1

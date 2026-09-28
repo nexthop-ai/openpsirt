@@ -190,9 +190,9 @@ table is looked for before the version is read, so a read-only inspection does
 not create it. Selecting from the table to find out answers three questions at
 once and cannot tell them apart — it is not there, this credential may not read
 it, or the database is unreachable — and all three read as the first, so
-`migrate status` printed version 0 for a fully populated database whose
-credentials omitted that one table. The reasonable thing to do about "nothing
-is applied" is to migrate it.
+`migrate status` would print version 0 for a fully populated database whose
+credentials omit that one table. The reasonable thing to do about "nothing is
+applied" is to migrate it.
 
 The catalog is asked instead, which answers only the question being put to it.
 
@@ -215,6 +215,22 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
+The migrations applied are the ones registered in the binary, and no directory
+is read. The migration library otherwise globs the process's working directory:
+a stray `.sql` file there refuses every start, a numbered one is applied under
+the migration credential, and a numbered `.go` file narrows what is applied to
+the registered migrations with a file beside them.
+
+| An upgrade that fails | What the error says |
+|---|---|
+| On an empty database | The failure alone: there is nothing to recover |
+| On MySQL or MariaDB | That the schema is left part changed, and the backup taken before the upgrade is what recovers it; and that a database an unreleased build made is recreated rather than migrated |
+| On PostgreSQL or SQLite | That a database an unreleased build made is recreated rather than migrated. Data definition is transactional there, so a failed migration leaves nothing part changed |
+
+The version a database holds cannot say whether a release or an unreleased
+build made it, so both recoveries are named rather than one chosen by a
+version threshold.
+
 The chain is one part per release.
 
 | Migrations | What they are |
@@ -232,7 +248,7 @@ schema they build on each of the four engines, captured from the tag.
 | Held by the record | Why |
 |---|---|
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | A database the release built has applied exactly those. An edit changes a schema deployments already hold without changing the version they recorded |
-| The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit |
+| The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit. On SQLite the description also says whether each table's key is `AUTOINCREMENT` and whether each index is partial, which the engine's column and index listings leave out |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
 declares the table rather than adding a migration beside it — within the
@@ -279,7 +295,9 @@ asked.
 
 CI runs the success path on four engines, which is where this hides: the
 engines agree about what a migration does and disagree only about what is left
-when one stops half way.
+when one stops half way. So a migration stopped half way, with a table and an
+index already made, is run again on both of these engines, and `make
+check-engines` fails when either did not run it.
 
 ### Release upgrades
 
@@ -425,9 +443,9 @@ anything.
 
 | Step | What happens |
 |---|---|
-| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0. Every schema change before the tag edits that migration and those declarations |
+| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0: one digit per part of the version, so a release with a part past nine has no code and is refused, since v0.1.10 and v0.11.0 would both read as `v0110`. Every schema change before the tag edits that migration and those declarations |
 | 2. Rehearse, from every earlier release, on each engine | A database the earlier release's own image built and seeded is upgraded by this tree and checked, as § Upgrade rehearsal says |
-| 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
+| 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration. A version older than one already recorded is refused: the last migration in the tree is the newer release's, and would be claimed |
 | 4. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
 | 5. Check, then tag | `make release-check` on the commit to be tagged, then the tag. The release workflow checks the record again before anything is built |
 | 6. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
@@ -438,7 +456,7 @@ anything.
 | A file the release owns that its record does not list, or lists with another digest | The record is stale: the tree moved after the freeze |
 | A migration numbered past the release's last | It would ship with nothing holding it |
 | Declarations named for a release nothing froze | The same, for the tables a migration reads |
-| A record missing one engine's schema | The schema test cannot hold that engine |
+| A record missing one engine's schema, or holding an empty one | The schema test cannot hold that engine |
 | A tag that is not a release | A release is `vX.Y.Z`, and a release candidate `vX.Y.Z-rc.N`, held to the record of the release it precedes. Any other suffix is refused, so the output of `git describe` is never read as a release |
 
 A file a release owns is a migration numbered after the previous release's
@@ -514,6 +532,12 @@ than assumed, because both engines report "you did not hold this" as a value.
 The wait is bounded on both engines. An unbounded wait means an instance wedged
 mid-migration blocks every replacement silently, and the startup probe kills each
 in turn.
+
+| Rule | |
+|---|---|
+| The pinned connection is used every half minute while the lock is held | It is checked out of the pool for the whole migration, beyond the pool's idle timeout. Idle, a server's or an intermediary's idle timeout ends the session, the server releases the lock, and a waiting replica migrates the half-migrated schema |
+| A lock not held at its release fails the migration | The session was lost part way, and another instance may have migrated alongside. The work finished; what it ran under is not certain, and that is an error rather than a warning |
+| A pool of one connection is refused before the lock is taken, on the three servers | The lock holds one connection and the migration runs on another, so a pool of one waits for ever with nothing logged. The refusal names `OPENPSIRT_DB_MAX_OPEN` |
 
 The bound is a session setting, and it is unwound before the connection goes
 back — on every path, including the failing ones. Left set, one pooled

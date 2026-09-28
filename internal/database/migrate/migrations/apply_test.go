@@ -8,17 +8,22 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 )
 
 // This package cannot use dbtest: dbtest builds the schema and the schema is
 // these migrations, and Go allows no such cycle. The migration lock's own test
 // is in the same position and opens a connection the same way.
-const mysqlURLEnv = "OPENPSIRT_TEST_MYSQL_URL"
+var resumableURLs = map[database.Engine]string{
+	database.MySQL:   "OPENPSIRT_TEST_MYSQL_URL",
+	database.MariaDB: "OPENPSIRT_TEST_MARIADB_URL",
+}
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
@@ -34,13 +39,23 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	//
 	// PostgreSQL and SQLite have transactional data definition and never
 	// reach this, which is why a four-engine run that only exercises the
-	// success path says nothing about it.
-	engines.SkipUnless(t, database.MySQL)
-	url := os.Getenv(mysqlURLEnv)
-	if url == "" {
-		t.Skipf("%s is not set, so resuming is untested here", mysqlURLEnv)
+	// success path says nothing about it. Both of the other two run it, and
+	// both kinds of object a migration makes, a table and an index, are
+	// stepped over.
+	for engine, env := range resumableURLs {
+		t.Run(string(engine), func(t *testing.T) {
+			engines.SkipUnless(t, engine)
+			address := os.Getenv(env)
+			if address == "" {
+				t.Skipf("%s is not set, so resuming is untested here", env)
+			}
+			resumes(t, address)
+		})
 	}
-	target, err := database.ParseURL(url)
+}
+
+func resumes(t *testing.T, address string) {
+	target, err := database.ParseURL(address)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -54,6 +69,7 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	const (
 		first  = "resume_probe_one"
 		second = "resume_probe_two"
+		index  = "resume_probe_idx"
 	)
 	drop := func() {
 		for _, name := range []string{second, first} {
@@ -63,12 +79,13 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	drop()
 	t.Cleanup(drop)
 
-	// A migration whose third statement cannot work — for a reason that is
+	// A migration whose last statement cannot work — for a reason that is
 	// not a name already taken, since that is the case the resume is *for*.
-	// The first two are committed on this engine whatever happens to the
-	// transaction around them.
+	// The ones before it are committed on this engine whatever happens to the
+	// transaction around them. The index goes with its table.
 	broken := []string{
 		`CREATE TABLE "` + first + `" ("id" BIGINT)`,
+		`CREATE INDEX "` + index + `" ON "` + first + `" ("id")`,
 		`CREATE TABLE "` + second + `" ("id" BIGINT)`,
 		`CREATE TABLE "resume_probe_three" ("id" NOTATYPE)`,
 	}
@@ -92,13 +109,9 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	}
 
 	// The same migration again, repaired — which is what the next start runs.
-	// The first two statements are already done and must be stepped over
-	// rather than collided with.
-	repaired := []string{
-		broken[0],
-		broken[1],
-		`CREATE TABLE "resume_probe_three" ("id" BIGINT)`,
-	}
+	// What is already done must be stepped over rather than collided with.
+	repaired := append(append([]string{}, broken[:len(broken)-1]...),
+		`CREATE TABLE "resume_probe_three" ("id" BIGINT)`)
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.WithoutCancel(ctx), `DROP TABLE IF EXISTS "resume_probe_three"`)
 	})
@@ -112,6 +125,55 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit: %v", err)
+	}
+}
+
+// The migrations are registered functions, and the process's working
+// directory is not read. A stray migration file there, numbered or not, is
+// neither applied nor a reason to refuse the start.
+func TestMigratingReadsNothingFromTheWorkingDirectory(t *testing.T) {
+	names, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var highest int64
+	for _, name := range names {
+		if n := released.Number(name.Name()); n > highest && !strings.HasSuffix(name.Name(), "_test.go") {
+			highest = n
+		}
+	}
+	if highest == 0 {
+		t.Fatal("no migration was found beside this test, so there is nothing to compare against")
+	}
+
+	t.Chdir(t.TempDir())
+	for name, body := range map[string]string{
+		"99999_stray.sql": "-- +goose Up\nCREATE TABLE \"stray\" (\"id\" INTEGER);\n",
+		"notnumbered.sql": "SELECT 1;\n",
+		"00001_other.go":  "package other\n",
+	} {
+		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target, err := database.ParseURL("sqlite://:memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(t.Context(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := migrate.Up(t.Context(), db, quiet()); err != nil {
+		t.Fatalf("a file in the working directory stopped the migration: %v", err)
+	}
+	version, err := migrate.Version(t.Context(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != highest {
+		t.Errorf("migrated to %d, want %d, the highest registered migration", version, highest)
 	}
 }
 

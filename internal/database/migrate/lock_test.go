@@ -5,7 +5,10 @@ package migrate
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -22,8 +25,7 @@ import (
 // The engines a run may touch are *not* copied here. That rule lives
 // in dbtest/engines, which imports neither this package nor dbtest, precisely
 // so the copy in this file does not have to exist — it is the rule the quick
-// loop and the race run set, and this test follows it rather than opening
-// three servers regardless.
+// loop and the race run set.
 const (
 	postgresURLEnv = "OPENPSIRT_TEST_POSTGRES_URL"
 	mysqlURLEnv    = "OPENPSIRT_TEST_MYSQL_URL"
@@ -67,15 +69,15 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 			// depends on migrate, so the narrowing comes from the package
 			// below both rather than from a second copy of the parsing here.
 			engines.SkipUnless(t, name)
-			url := os.Getenv(env)
-			if url == "" {
+			address := os.Getenv(env)
+			if address == "" {
 				t.Skipf("%s is not set, so the migration lock is untested here", env)
 			}
 			ctx := t.Context()
 
 			// Two pools, as two instances would be.
-			first := open(t, url)
-			second := open(t, url)
+			first := open(t, address)
+			second := open(t, address)
 
 			release, err := acquire(ctx, first)
 			if err != nil {
@@ -114,11 +116,11 @@ func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
 	// the same query afterwards either waits indefinitely or is canceled,
 	// decided by which connection the pool happens to hand out.
 	engines.SkipUnless(t, database.Postgres)
-	url := os.Getenv(postgresURLEnv)
-	if url == "" {
+	address := os.Getenv(postgresURLEnv)
+	if address == "" {
 		t.Skipf("%s is not set", postgresURLEnv)
 	}
-	db := open(t, url)
+	db := open(t, address)
 	ctx := context.Background()
 
 	var before string
@@ -154,11 +156,11 @@ func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
 	//
 	// The catalog is asked now, which answers only the question being asked.
 	engines.SkipUnless(t, database.Postgres)
-	url := os.Getenv(postgresURLEnv)
-	if url == "" {
+	address := os.Getenv(postgresURLEnv)
+	if address == "" {
 		t.Skipf("%s is not set", postgresURLEnv)
 	}
-	db := open(t, url)
+	db := open(t, address)
 	ctx := context.Background()
 
 	// A database with no bookkeeping table reads as "not migrated", which is
@@ -170,7 +172,7 @@ func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
 	t.Logf("the version table is there: %v", there)
 
 	// And one that cannot be reached at all reports that, rather than zero.
-	closed := open(t, url)
+	closed := open(t, address)
 	if err := closed.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -186,42 +188,56 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 	// the bookkeeping table is the ordinary arrangement rather than an exotic
 	// one — and it read as a database nobody had ever migrated.
 	engines.SkipUnless(t, database.Postgres)
-	url := os.Getenv(postgresURLEnv)
-	if url == "" {
+	address := os.Getenv(postgresURLEnv)
+	if address == "" {
 		t.Skipf("%s is not set", postgresURLEnv)
 	}
-	owner := open(t, url)
+	owner := open(t, address)
 	ctx := context.Background()
 
 	// A table standing in for the bookkeeping one, so this test neither
-	// depends on the migrations having run nor disturbs them.
+	// depends on the migrations having run nor disturbs them. The database is
+	// whichever one the URL names, asked rather than assumed.
+	var name string
+	if err := owner.QueryRowContext(ctx, "SELECT current_database()").Scan(&name); err != nil {
+		t.Fatalf("ask which database this is: %v", err)
+	}
+	quoted := `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 	probe := fmt.Sprintf("probe_unreadable_%d", time.Now().UnixNano())
 	role := probe + "_role"
+	// Registered before anything is made, so a setup refused part way is
+	// undone as far as it got.
+	t.Cleanup(func() {
+		clean := context.WithoutCancel(ctx)
+		for _, stmt := range []string{
+			`DROP TABLE IF EXISTS "` + probe + `"`,
+			`REVOKE ALL ON SCHEMA "public" FROM "` + role + `"`,
+			`REVOKE ALL ON DATABASE ` + quoted + ` FROM "` + role + `"`,
+			`DROP ROLE IF EXISTS "` + role + `"`,
+		} {
+			_, _ = owner.ExecContext(clean, stmt)
+		}
+	})
 	for _, stmt := range []string{
 		`CREATE TABLE "` + probe + `" ("id" INTEGER)`,
 		`CREATE ROLE "` + role + `" LOGIN PASSWORD 'probe'`,
-		`GRANT CONNECT ON DATABASE "openpsirt" TO "` + role + `"`,
+		`GRANT CONNECT ON DATABASE ` + quoted + ` TO "` + role + `"`,
 		`GRANT USAGE ON SCHEMA "public" TO "` + role + `"`,
 	} {
 		if _, err := owner.ExecContext(ctx, stmt); err != nil {
 			t.Skipf("this server will not let the test arrange a restricted role (%v)", err)
 		}
 	}
-	t.Cleanup(func() {
-		clean := context.WithoutCancel(ctx)
-		for _, stmt := range []string{
-			`DROP TABLE IF EXISTS "` + probe + `"`,
-			`REVOKE ALL ON SCHEMA "public" FROM "` + role + `"`,
-			`REVOKE ALL ON DATABASE "openpsirt" FROM "` + role + `"`,
-			`DROP ROLE IF EXISTS "` + role + `"`,
-		} {
-			_, _ = owner.ExecContext(clean, stmt)
-		}
-	})
 
 	// The role may reach the database and read the catalog, and may not read
-	// the table. That is exactly the arrangement being described.
-	restricted := open(t, strings.Replace(url, "postgres:test@", role+":probe@", 1))
+	// the table. That is exactly the arrangement being described. The same
+	// address as the owner's, whoever the owner is, signed in as the role.
+	as, err := url.Parse(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	as.User = url.UserPassword(role, "probe")
+	restricted := open(t, as.String())
 	var probed int
 	readErr := restricted.QueryRowContext(ctx,
 		`SELECT 1 FROM "`+probe+`" LIMIT 1`).Scan(&probed)
@@ -303,7 +319,10 @@ func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 func TestAnInMemoryDatabaseHasNoSecondProcessToExclude(t *testing.T) {
 	// It belongs to the process that opened it, so there is no file to lock
 	// and nothing that could reach it. Worth pinning because the lock is taken
-	// on a path, and an empty path is what this case gives it.
+	// on a path, and an empty path is what this case gives it: locked anyway,
+	// it is a file made in the working directory, which in a container with a
+	// read-only root cannot be written at all.
+	t.Chdir(t.TempDir())
 	db := open(t, "sqlite://:memory:")
 	release, err := acquire(context.Background(), db)
 	if err != nil {
@@ -311,5 +330,131 @@ func TestAnInMemoryDatabaseHasNoSecondProcessToExclude(t *testing.T) {
 	}
 	if err := release(context.Background()); err != nil {
 		t.Errorf("release: %v", err)
+	}
+	left, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 0 {
+		t.Errorf("locking an in-memory database left %s in the working directory", left[0].Name())
+	}
+}
+
+// servers is each server engine a run may reach, with its address.
+func servers(t *testing.T, each func(t *testing.T, engine database.Engine, address string)) {
+	for engine, env := range map[database.Engine]string{
+		database.Postgres: postgresURLEnv,
+		database.MySQL:    mysqlURLEnv,
+		database.MariaDB:  mariadbURLEnv,
+	} {
+		t.Run(string(engine), func(t *testing.T) {
+			engines.SkipUnless(t, engine)
+			address := os.Getenv(env)
+			if address == "" {
+				t.Skipf("%s is not set", env)
+			}
+			each(t, engine, address)
+		})
+	}
+}
+
+// The lock holds one pooled connection for the whole migration and the
+// migration runs on another, so a pool of one is refused in words. Waited on,
+// it is a start that hangs with no deadline and nothing logged.
+func TestAPoolOfOneIsRefusedRatherThanWaitedOn(t *testing.T) {
+	servers(t, func(t *testing.T, _ database.Engine, address string) {
+		target, err := database.ParseURL(address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pool := database.DefaultPool()
+		pool.MaxOpen, pool.MaxIdle = 1, 1
+		db, err := database.OpenWithPool(t.Context(), target, pool)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = db.Close() })
+
+		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+		defer cancel()
+		err = withLock(ctx, db, slog.Default(), func(context.Context) error { return nil })
+		if err == nil {
+			t.Fatal("a pool of one connection was accepted for a migration")
+		}
+		if errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), dbMaxOpen) {
+			t.Errorf("the refusal does not name the setting that fixes it: %v", err)
+		}
+	})
+}
+
+// A session lock lasts as long as its session, and the connection holding it
+// is checked out of the pool for the whole migration, beyond the pool's idle
+// timeout. It is used while held, so a server that ends idle sessions does not
+// end this one and hand the lock to a waiting replica.
+func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
+	restoreWait, restoreEvery := lockWaitSeconds, keepAliveEvery
+	lockWaitSeconds, keepAliveEvery = 1, 500*time.Millisecond
+	t.Cleanup(func() { lockWaitSeconds, keepAliveEvery = restoreWait, restoreEvery })
+
+	servers(t, func(t *testing.T, engine database.Engine, address string) {
+		// Every session of the holder's pool is ended after two idle seconds.
+		idle, err := url.Parse(address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q := idle.Query()
+		if engine == database.Postgres {
+			q.Set("idle_session_timeout", "2s")
+		} else {
+			q.Set("wait_timeout", "2")
+		}
+		idle.RawQuery = q.Encode()
+		holder := open(t, idle.String())
+		waiting := open(t, address)
+		ctx := t.Context()
+
+		release, err := acquire(ctx, holder)
+		if err != nil {
+			t.Fatalf("the first instance could not take the lock: %v", err)
+		}
+		time.Sleep(4 * time.Second)
+		if again, err := acquire(ctx, waiting); err == nil {
+			_ = again(ctx)
+			t.Fatal("the holder's session was ended while idle and a waiting instance took the lock")
+		}
+		if err := release(ctx); err != nil {
+			t.Errorf("the lock was not held to its release: %v", err)
+		}
+	})
+}
+
+// What a failed upgrade tells an operator depends on what it leaves behind:
+// nothing for an empty database, and a part-changed schema only on the two
+// engines that change a schema outside a transaction.
+func TestAFailedUpgradeNamesTheRecoveryItsEngineNeeds(t *testing.T) {
+	cause := errors.New("no such table")
+	for _, c := range []struct {
+		engine  database.Engine
+		before  int64
+		backup  bool
+		recover bool
+	}{
+		{database.Postgres, 0, false, false},
+		{database.MySQL, 0, false, false},
+		{database.Postgres, 38, false, true},
+		{database.SQLite, 12, false, true},
+		{database.MySQL, 38, true, true},
+		{database.MariaDB, 3, true, true},
+	} {
+		err := upFailed(c.engine, c.before, cause)
+		if !errors.Is(err, cause) {
+			t.Errorf("%s from %d: the cause is lost: %v", c.engine, c.before, err)
+		}
+		if got := strings.Contains(err.Error(), "restore the backup"); got != c.backup {
+			t.Errorf("%s from %d: names the backup = %v, want %v: %v", c.engine, c.before, got, c.backup, err)
+		}
+		if got := strings.Contains(err.Error(), "recreated"); got != c.recover {
+			t.Errorf("%s from %d: names recreating = %v, want %v: %v", c.engine, c.before, got, c.recover, err)
+		}
 	}
 }

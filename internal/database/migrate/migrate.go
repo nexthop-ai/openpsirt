@@ -11,6 +11,7 @@ package migrate
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -19,10 +20,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
-
-// lastOfV010 is the last migration the v0.1.0 release shipped. A database at
-// it or later is one a release built.
-const lastOfV010 = 36
 
 // running serializes migration work within this process.
 //
@@ -97,25 +94,7 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 			return fmt.Errorf("read schema version: %w", err)
 		}
 		if err := goose.UpContext(ctx, db.DB.DB, "."); err != nil {
-			// A database a release built is upgraded by the migrations after
-			// the ones it shipped. On MySQL and MariaDB one that fails part
-			// way leaves the schema part changed and the version where it
-			// was, so the backup is what recovers it.
-			if before >= lastOfV010 {
-				return fmt.Errorf("upgrade the schema from version %d: %w — on MySQL and "+
-					"MariaDB an upgrade that fails part way leaves the schema part "+
-					"changed; restore the backup taken before it and start again", before, err)
-			}
-			// Named, because the commonest way this fails says a migration is
-			// missing and then prints the path of a file that is sitting right
-			// there. Below 1.0 a schema change edits what declares the thing
-			// rather than adding a migration beside it, so a database an
-			// unreleased build made can hold a version this set no longer
-			// issues, and recreating it is the answer rather than migrating.
-			return fmt.Errorf("apply migrations: %w — before 1.0 a schema change "+
-				"edits what declares the thing rather than adding a migration, so "+
-				"a database built by an unreleased build is recreated rather than "+
-				"migrated", err)
+			return upFailed(db.Server.Engine, before, err)
 		}
 		after, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {
@@ -128,6 +107,30 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 		}
 		return nil
 	})
+}
+
+// upFailed says what a failed upgrade leaves behind, and what recovers it.
+//
+// An empty database has nothing to recover, so its failure is reported alone.
+// Otherwise the version number cannot say whether a release or an unreleased
+// build made the database, so both recoveries are named: below 1.0 a schema
+// change edits what declares the thing rather than adding a migration beside
+// it, so a database an unreleased build made can hold a version this build no
+// longer issues, and is recreated. MySQL and MariaDB apply a schema change
+// outside any transaction, so on those two an upgrade that fails part way
+// leaves the schema part changed and the version where it was.
+func upFailed(engine database.Engine, before int64, err error) error {
+	if before == 0 {
+		return fmt.Errorf("apply migrations to an empty database: %w", err)
+	}
+	const unreleased = "a database an unreleased build made can hold a version this " +
+		"build no longer issues, and is recreated rather than migrated"
+	if engine == database.MySQL || engine == database.MariaDB {
+		return fmt.Errorf("upgrade the schema from version %d: %w — on %s an upgrade that "+
+			"fails part way leaves the schema part changed, so restore the backup taken "+
+			"before it and start again; %s", before, err, engine, unreleased)
+	}
+	return fmt.Errorf("upgrade the schema from version %d: %w — %s", before, err, unreleased)
 }
 
 // UpTo applies the outstanding migrations up to and including a version,
@@ -185,12 +188,24 @@ func Version(ctx context.Context, db *database.DB) (int64, error) {
 	return goose.GetDBVersionContext(ctx, db.DB.DB)
 }
 
-func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func(context.Context) error) error {
+// dbMaxOpen names the setting a pool too small to migrate through is refused
+// in terms of.
+const dbMaxOpen = "OPENPSIRT_DB_MAX_OPEN"
+
+func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func(context.Context) error) (failed error) {
 	running.Lock()
 	defer running.Unlock()
 
 	if err := prepare(db); err != nil {
 		return err
+	}
+	// The lock holds one pooled connection for the whole migration and the
+	// migration runs on another. A pool of one would have the migration wait
+	// for the lock's connection, with no deadline, for ever. SQLite is exempt:
+	// its lock is on a file rather than a connection.
+	if db.Server.Engine != database.SQLite && db.Stats().MaxOpenConnections == 1 {
+		return fmt.Errorf("the migration lock holds one connection and the migrations "+
+			"need another: raise %s to at least 2", dbMaxOpen)
 	}
 	ctx = WithEngine(ctx, db.Server.Engine, logger)
 
@@ -199,7 +214,17 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 		return err
 	}
 	defer func() {
-		if err := release(context.WithoutCancel(ctx)); err != nil {
+		err := release(context.WithoutCancel(ctx))
+		switch {
+		case err == nil:
+		case failed == nil:
+			// A lock this session no longer holds when the work is done is
+			// one it may have lost part way, and another instance may have
+			// migrated alongside it. The work finished; what it ran under is
+			// not certain, and that is reported rather than logged.
+			failed = fmt.Errorf("the migration finished and its lock could not be released "+
+				"as held, so another instance may have migrated at the same time: %w", err)
+		default:
 			logger.Warn("could not release the migration lock", "error", err)
 		}
 	}()
@@ -215,6 +240,12 @@ func prepare(db *database.DB) error {
 	if err := goose.SetDialect(string(dialect)); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
 	}
+	// The migrations are Go functions registered with the library, and no
+	// directory is read. Left at its default, the library globs the process's
+	// working directory for migration files: a stray `*.sql` there fails every
+	// start, a numbered one is applied, and a numbered `.go` file narrows the
+	// registered set to the ones with a file beside it.
+	goose.SetBaseFS(embed.FS{})
 	goose.SetLogger(goose.NopLogger())
 	return nil
 }

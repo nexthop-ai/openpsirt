@@ -60,10 +60,20 @@ func Base(tag string) (string, error) {
 }
 
 // Code is the prefix a release's table declarations carry: v030 for v0.3.0.
+//
+// One digit per part, so a version with a part past nine has no code: v0.1.10
+// and v0.11.0 would both read as v0110 and each claim the other's files. Such
+// a release is refused here until the scheme is widened.
 func Code(version string) (string, error) {
 	base, err := Base(version)
 	if err != nil {
 		return "", err
+	}
+	for _, part := range order(base) {
+		if part > 9 {
+			return "", fmt.Errorf("%s has a part past nine, which a release's code "+
+				"cannot carry without reading as another release's", base)
+		}
 	}
 	return "v" + strings.ReplaceAll(strings.TrimPrefix(base, "v"), ".", ""), nil
 }

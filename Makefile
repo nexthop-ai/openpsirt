@@ -880,6 +880,13 @@ endif
 	  for engine in $$every; do \
 	    grep -q "PASS: TestEachEngineIsTheEngineItSaysItIs/$$engine" "$$out" \
 	      || { echo "$$engine was not checked for being itself"; exit 1; }; \
+	  done; \
+	  $(GO) test ./internal/database/migrate/migrations/ -count=1 -v \
+	    -run TestAMigrationThatFailedPartWayThroughCanBeRunAgain \
+	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
+	  for engine in mysql mariadb; do \
+	    grep -q "PASS: TestAMigrationThatFailedPartWayThroughCanBeRunAgain/$$engine" "$$out" \
+	      || { echo "a half-applied migration was not run again on $$engine"; exit 1; }; \
 	  done
 	$(MAKE) reserved-current
 ifneq ($(strip $(OPENPSIRT_TEST_TOO_OLD_URL)),)

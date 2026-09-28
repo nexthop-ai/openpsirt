@@ -740,13 +740,14 @@ slip there is, and it reports fully green to a grep.
 `make check` names the engines it did not test, rather than staying silent
 unless all three are missing.
 
-It does not cover everything. It asserts three test functions in three
+It does not cover everything. It asserts four test functions in four
 packages, and that the committed reserved-word list is what the engines answer
 today. The
 rest of the suite runs against whatever is configured, so `check-engines`
 passing does not prove that every test ran on every engine — it proves the
-configuration is real and that the migrations, the lock, the identity checks
-and the word list exercised all four.
+configuration is real, that the migrations, the lock, the identity checks and
+the word list exercised all four, and that a half-applied migration was run
+again on the two engines that leave one.
 
 This is not hypothetical: a table added with a foreign key to `person` was
 missing from the test cleanup, and SQLite alone never noticed. It failed 40
