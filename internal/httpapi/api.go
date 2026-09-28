@@ -30,6 +30,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -566,6 +567,11 @@ func asked(logger *slog.Logger, err error) error {
 	// caller to go again, and the retry helper never sees it.
 	if errors.Is(err, database.ErrGoAgain) || database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
+	}
+	// Writing the policy refused, a detail per fault, each naming its line.
+	var faults markdown.Faults
+	if errors.As(err, &faults) {
+		return refusedText(faults)
 	}
 	return huma.Error422UnprocessableEntity(err.Error())
 }
