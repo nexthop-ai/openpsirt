@@ -69,9 +69,9 @@ describe("comparing the components of two builds", () => {
     served();
     draw(PAIR);
     await settle();
-    const later = mount.host().querySelector<HTMLSelectElement>(
-      'select[aria-label="Later build stream"]',
-    );
+    const later = mount
+      .host()
+      .querySelector<HTMLSelectElement>('select[aria-label="Later build stream"]');
     expect(later?.value).toBe("4.3");
     expect(mount.host().textContent).toContain("zlib");
   });
