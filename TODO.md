@@ -36,7 +36,6 @@ The owner has chosen to wait on each of these.
 | Exploitation sources beyond the known-exploited catalog | A commercial catalog or an exploit feed. Each needs somewhere to configure a license and a key, and none exists |
 | Remediation deadline windows per product | There are two sets of windows for the whole deployment: one for scanned findings, one for flaws in our own product |
 | The VEX profile of the CSAF advisory | Needs a mapping from each decision to the releases it covers |
-| PDF reports rendered on the server | Reports are printed from the browser |
 | Asking GitHub or GitLab which branches hold a commit | Patch branches clone each repository. An API call would skip the clone for a repository with few linked commits |
 | Fetching a repository from a mirror | The kernel stable tree is 5.1 GB from kernel.org and 1.1 GB from a mirror that sends commits only |
 | Publishing which outcomes dismiss and which state a reason | The interface holds a copy of both classes, so an outcome the server moves to another class is not a compile error there |
