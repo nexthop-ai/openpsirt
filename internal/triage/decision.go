@@ -1008,8 +1008,9 @@ func (s *Store) reaching(ctx context.Context, subject access.Subject, decisionID
 	if err := s.db.NewSelect().Model(decision).Relation("Claim").
 		Where("de.id = ?", decisionID).Scan(ctx); err != nil {
 		// A decision somebody may not reach and one that does not exist get
-		// the same answer, so that guessing identifiers says nothing.
-		return nil, ErrNotTheirs
+		// the same answer, so that guessing identifiers says nothing. A read
+		// that failed is neither, and says so.
+		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read decision %d", decisionID))
 	}
 	if !allowed(subject, decision.ProductID, decision.Visibility) {
 		// The case grant is the pair of a product and an issue, so it

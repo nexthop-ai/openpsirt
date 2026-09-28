@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -81,7 +82,7 @@ type Reach struct {
 func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64) (*Whole, error) {
 	claim := new(Claim)
 	if err := s.db.NewSelect().Model(claim).Where("id = ?", claimID).Scan(ctx); err != nil {
-		return nil, ErrNotTheirs
+		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", claimID))
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").

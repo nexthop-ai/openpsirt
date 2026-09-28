@@ -95,7 +95,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	// it was.
 	if err := s.db.NewSelect().Model(previous).Relation("Claim").
 		Where("de.id = ?", r.PreviousID).Scan(ctx); err != nil {
-		return nil, ErrNotTheirs
+		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read decision %d", r.PreviousID))
 	}
 	// Authorized against the row, not against what the caller said about it.
 	// Checking the stated visibility would let somebody trusted only with what
@@ -977,7 +977,8 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	previous := new(Claim)
 	if err := s.db.NewSelect().Model(previous).
 		Where("id = ?", previousClaimID).Scan(ctx); err != nil {
-		return reaffirmPlan{}, ErrNotTheirs
+		return reaffirmPlan{}, database.FromRead(err, ErrNotTheirs,
+			fmt.Sprintf("read claim %d", previousClaimID))
 	}
 	var lapsed []Decision
 	if err := stillLatest(s.db.NewSelect().Model(&lapsed).
