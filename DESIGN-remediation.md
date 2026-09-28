@@ -594,6 +594,8 @@ Nothing is sent anywhere.
 
 | Rule | Reason |
 |---|---|
+| Written as CSAF 2.0 | It is the published OASIS standard and ISO/IEC 20153, and the version the consumers' validators check against. CSAF 2.1 is a committee draft, and a document claiming a draft version risks refusal by exactly those consumers. The document moves to 2.1 once 2.1 is an OASIS standard |
+| A version 4 score with no version 3 rating beside it is stated in a note | CSAF 2.0's score object has fields for versions 2 and 3 only. The note gives the version, the base score, the severity and the vector, so a person reading the document sees the score. Tooling does not read a score from prose. Not built: such a flaw is published with no score |
 | Only for a flaw in what this deployment ships | An issue a scanner reported against a third-party component is refused by name rather than answered with a document that looks the same and means something else |
 | The document's identity is the advisory's minted identifier | A document naming an issue's identifier as its own tracking identifier claims to be the authority on that issue, which a coordinator is and this deployment is not |
 | One entry per issue, and one branch per product | The tree carries a vendor branch holding one product branch for each product the advisory covers, and every status names releases of the product the issue was covered in |
@@ -858,10 +860,10 @@ material is a class of configuration this deployment does not take. The layout
 leaves room: a signature sits beside the document under the same name, and the
 feed already names the file beside each entry that answers for it.
 
-A version 4 score in the published document. The standard's score object gains
-a field for one in CSAF 2.1, and the document is written as CSAF 2.0; the
-rating is held, and is stated once the document is written in a version that
-carries it.
+A version 4 score in the document. CSAF 2.1 gains a field for one, and the
+document is written as CSAF 2.0 until 2.1 is an OASIS standard. The note that
+states the score until then is not built either, so a flaw rated under version
+4 alone is published with no score.
 
 Document-level notes of the deployment's own. An edition carries the title and
 each issuance carries a typed revision summary; the rest of what a reader acts

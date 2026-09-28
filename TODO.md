@@ -62,7 +62,8 @@ Missing or wrong, with no decision needed to fix it.
 | No distribution package index is asked what a package is | A language package gets a summary and a project address from its index. A distribution package gets only a link to its distribution's package page, built from its name |
 | A build cannot be asked which licenses it ships | Each component's license is read and shown on its page. No listing, filter or export gathers them across a build |
 | The component screen's twelve-week chart does not mark version changes | It shows findings opened and closed, and not which version the build shipped each week, so it cannot show whether an upgrade worked |
-| A version 4 CVSS score is left out of published advisories | CSAF 2.0 has no field for one. A flaw rated only under 4.0 publishes no score until the document moves to CSAF 2.1 |
+| A version 4 CVSS score is left out of published advisories | CSAF 2.0 has no field for one. A flaw rated under 4.0 alone publishes no score. `DESIGN-remediation.md` states the fix: the score, severity and vector in a note on the vulnerability |
+| Advisories move to CSAF 2.1 once it is an OASIS standard | CSAF 2.1 is a committee draft. The move gives a version 4 score its own field |
 | Advisories carry no document-level notes of our own | The title and each issuance's revision summary are typed here. Everything else is assembled from the flaws it covers |
 | The review queue cannot be narrowed by what is waiting | A claim awaiting agreement, a lapsed decision, a deferral that ran out and a promise past its date share one list |
 | No single view of an upgrade promise across the builds it names | Each build answers for itself. The promise already records the releases, the version and the date, so the view reads nothing new |
