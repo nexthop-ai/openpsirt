@@ -5,7 +5,6 @@ package httpapi_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -63,10 +62,7 @@ func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 			} `json:"record"`
 		}
 		_, claim := r.decidedAt(t, r.scanned(t))
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		if got := asPerson(t, r, "assigner", http.MethodPut, findingAt("CVE-2026-9999")+"/assignment",
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("handing the finding over answered %d: %s", got.Code, got.Body.String())

@@ -137,8 +137,8 @@ type StreamBody struct {
 	// DisplayName is the same name as it was typed. It is stored beside the
 	// matched one at every level, and absent here a correction that moved only
 	// the capitals wrote a value nothing could read.
-	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
-	Kind        string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
+	DisplayName string   `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
+	Kind        lineKind `json:"kind" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
 	// Parent is the branch a tag was cut from, which is what lets a branch be
 	// compared against its last release.
 	Parent string `json:"parent,omitempty" doc:"For a tag, the branch it was cut from"`

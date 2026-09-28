@@ -7,6 +7,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -21,8 +22,8 @@ import (
 // neighbours give a union. Asked of the package that owns the words, the
 // document cannot say something the store does not mean.
 //
-// A subset is a named rule in `internal/triage` rather than a shorter literal
-// here, so what is left out is stated and stays stated.
+// A subset is a named rule in the package that owns the vocabulary rather than
+// a shorter literal here, so what is left out is stated and stays stated.
 
 // words is a closed vocabulary as a schema, in the order the domain lists it.
 func words[T ~string](all []T) *huma.Schema {
@@ -124,6 +125,12 @@ type roleOrOver string
 func (roleOrOver) Schema(huma.Registry) *huma.Schema {
 	return words(append(plainly(access.Roles()), plainly(access.OverTheDeployment())...))
 }
+
+// lineKind is whether a release line moves.
+type lineKind string
+
+// Schema offers every kind a release line can be.
+func (lineKind) Schema(huma.Registry) *huma.Schema { return words(catalog.Kinds()) }
 
 // act is an act on an embargo.
 type act string

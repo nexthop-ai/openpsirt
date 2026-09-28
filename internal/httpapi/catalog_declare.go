@@ -111,7 +111,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 				}
 			}
 			out = answer(did.Changed(), StreamBody{
-				Name: stream.DisplayName, Kind: string(stream.Kind), Parent: in.Body.Parent,
+				Name: stream.DisplayName, Kind: lineKind(stream.Kind), Parent: in.Body.Parent,
 			})
 			return nil
 		}); err != nil {

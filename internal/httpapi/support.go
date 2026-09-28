@@ -19,9 +19,9 @@ import (
 // RetiredBody is one release that has gone out of support, and what is still
 // open against it.
 type RetiredBody struct {
-	Product string `json:"product"`
-	Stream  string `json:"stream"`
-	Kind    string `json:"kind" enum:"branch,tag" doc:"Whether this line moves"`
+	Product string   `json:"product"`
+	Stream  string   `json:"stream"`
+	Kind    lineKind `json:"kind" doc:"Whether this line moves"`
 	// EndedOn is the date support ended: the release's own where it stated
 	// one, its product's otherwise.
 	EndedOn string `json:"ended_on" doc:"The date support ended, as YYYY-MM-DD"`
@@ -152,7 +152,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 						state = "ended"
 					}
 					written = append(written, []string{
-						row.Product, row.Stream, row.Kind, state, row.EndedOn,
+						row.Product, row.Stream, string(row.Kind), state, row.EndedOn,
 						strconv.FormatBool(row.Inherited),
 						strconv.Itoa(row.EndedDays), strconv.Itoa(row.Open),
 					})
@@ -235,7 +235,7 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
 			Product: release.Product, Stream: release.Stream,
-			Kind: string(release.Kind), EndedOn: release.EndedOn.Format(time.DateOnly),
+			Kind: lineKind(release.Kind), EndedOn: release.EndedOn.Format(time.DateOnly),
 			Inherited: release.Inherited,
 			EndedDays: since,
 			Ended:     !release.EndedOn.After(now),

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -226,6 +227,7 @@ func TestEveryEnumOfADomainVocabularyIsOneTheDomainNames(t *testing.T) {
 			append(words(access.Roles()), words(access.OverTheDeployment())...),
 		}},
 		{"embargo acts", [][]string{words(finding.Acts())}},
+		{"release line kinds", [][]string{words(catalog.Kinds())}},
 		{"dispositions", [][]string{
 			words(finding.Dispositions()),
 			keeping(finding.Dispositions(), finding.Disposition.Rulable),

@@ -285,7 +285,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		Exclude:       n.Exclude,
 		Floor:         floor,
 		BelowFloor:    n.BelowFloor,
-		Workable:      finding.Working(n.On, n.Support),
+		Workable:      finding.Working(plainly(n.On), n.Support),
 		// Straight through: what reaches the statement is the
 		// allowlist's own expression, chosen by this key, never the
 		// key itself. A word that is not one of them is not a sort
@@ -375,7 +375,7 @@ type Narrowing struct {
 	// the working population, and both say so on the screen: a default that
 	// narrows silently makes the count something other than the whole count
 	// with nothing saying so.
-	On           []string     `query:"on,explode" enum:"branch,tag" uniqueItems:"true" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
+	On           []lineKind   `query:"on,explode" uniqueItems:"true" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
 	Support      []string     `query:"support,explode" enum:"in-support,past-eol" uniqueItems:"true" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
 	Under        string       `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
 	DeclaredAs   []string     `query:"declared_as,explode" enum:"required,optional,excluded,build,design,development,other,runtime" uniqueItems:"true" doc:"Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"`

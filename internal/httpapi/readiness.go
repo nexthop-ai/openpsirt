@@ -22,12 +22,12 @@ type BuildCountsBody struct {
 	// Kind says whether this is a branch or a tag. The comparison only means
 	// something for a branch, and a screen asks before drawing the panel at
 	// all rather than drawing one that explains why it is empty.
-	Kind     string `json:"kind,omitempty" enum:"branch,tag"`
-	Critical int    `json:"critical"`
-	High     int    `json:"high"`
-	Medium   int    `json:"medium"`
-	Low      int    `json:"low"`
-	Total    int    `json:"total"`
+	Kind     lineKind `json:"kind,omitempty"`
+	Critical int      `json:"critical"`
+	High     int      `json:"high"`
+	Medium   int      `json:"medium"`
+	Low      int      `json:"low"`
+	Total    int      `json:"total"`
 	// LastScannedAt says how old this statement is. A count from a build
 	// nothing has scanned in a year is a statement about last year.
 	LastScannedAt string `json:"last_scanned_at,omitempty"`
@@ -181,7 +181,7 @@ func registerReadiness(api huma.API, in Ingest) {
 
 func buildCounts(s finding.Standing) BuildCountsBody {
 	body := BuildCountsBody{
-		Stream: s.Stream, Variant: s.Variant, Kind: s.Kind, Total: s.Total,
+		Stream: s.Stream, Variant: s.Variant, Kind: lineKind(s.Kind), Total: s.Total,
 		StreamName:  s.StreamName,
 		VariantName: s.VariantName,
 		Critical:    s.ByBand["critical"], High: s.ByBand["high"],

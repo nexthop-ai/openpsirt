@@ -6,7 +6,6 @@ package httpapi_test
 import (
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -80,10 +79,7 @@ func TestHowLongTriageIsTakingIsAddedUpSomewhere(t *testing.T) {
 		// Agreeing to it gives the second wait a value, and counts against the
 		// approver rather than the proposer: an approver's week is the week
 		// they approved in.
-		if agreed := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); agreed.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", agreed.Code, agreed.Body.String())
-		}
+		r.agreed(t, claim)
 		after := measured(t, "triager")
 		if len(after.ToAgree) != 1 {
 			t.Errorf("an agreed claim has no agreement wait: %+v", after.ToAgree)
@@ -118,10 +114,7 @@ func TestWhatIsStillThereSaysWhetherAnybodyDecidedIt(t *testing.T) {
 		r.scannedTwoIssues(t)
 		// One of the two argued away and agreed to; the other untouched.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		var out struct {
 			Still []struct {
@@ -199,10 +192,7 @@ func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		file := asPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/products/mine/comparison.csv?from=master&from_variant=broadcom"+

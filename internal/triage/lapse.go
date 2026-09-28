@@ -132,8 +132,8 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// Who to tell is gathered once, over every row that lapsed, so a proposer
 	// whose rows span batches hears once. A batch that fails leaves the ones
 	// before it committed, and those are still reported alongside the error.
-	// A lapsed row is never lapsable again, so each pass reads rows no pass
-	// before it read, and the sweep ends at the pass that marks none.
+	// A row this sweep lapsed leaves the lapsable set unless somebody revises
+	// it in between, so the sweep ends at the pass that marks none.
 	out := Lapsed{}
 	var all []int64
 	var failed error

@@ -234,12 +234,12 @@ func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
-	return s.withLimits(ctx, windows)
+	return withLimits(ctx, s.db, windows)
 }
 
 // withLimits fills in the products each window is limited to, which the
 // window row itself does not carry.
-func (s *Store) withLimits(ctx context.Context, windows []Window) ([]Window, error) {
+func withLimits(ctx context.Context, db bun.IDB, windows []Window) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
@@ -252,7 +252,7 @@ func (s *Store) withLimits(ctx context.Context, windows []Window) ([]Window, err
 		ProductID int64  `bun:"product_id"`
 		Product   string `bun:"product"`
 	}
-	err := s.db.NewSelect().
+	err := db.NewSelect().
 		TableExpr(`"obligation_window_product" AS "owp"`).
 		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
 		ColumnExpr(`owp.window_id AS "window_id"`).
@@ -509,25 +509,11 @@ func inForce(ctx context.Context, tx bun.IDB, id int64) (*Window, error) {
 		}
 		return nil, fmt.Errorf("read the window: %w", err)
 	}
-	var limits []struct {
-		ProductID int64  `bun:"product_id"`
-		Product   string `bun:"product"`
+	limited, err := withLimits(ctx, tx, []Window{*window})
+	if err != nil {
+		return nil, err
 	}
-	if err := tx.NewSelect().
-		TableExpr(`"obligation_window_product" AS "owp"`).
-		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
-		ColumnExpr(`owp.product_id AS "product_id"`).
-		ColumnExpr(`p.name AS "product"`).
-		Where("owp.window_id = ?", id).
-		Order("p.name ASC").
-		Scan(ctx, &limits); err != nil {
-		return nil, fmt.Errorf("read which products the window applies to: %w", err)
-	}
-	for _, one := range limits {
-		window.Products = append(window.Products, one.ProductID)
-		window.ProductNames = append(window.ProductNames, one.Product)
-	}
-	return window, nil
+	return &limited[0], nil
 }
 
 // administers refuses anybody but a signed-in administrator the act named.

@@ -107,10 +107,7 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 		if got := read(t, "triager"); got.Waiting != 0 {
 			t.Errorf("the proposer is told %d claims wait on them", got.Waiting)
 		}
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
-			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		after := read(t, "reviewer")
 		if after.Waiting != 0 {
 			t.Errorf("after agreeing, %d still waits", after.Waiting)

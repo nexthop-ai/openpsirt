@@ -38,10 +38,10 @@ type coverageOutput struct {
 
 // CoverageBody is one declared build and when a scan last arrived for it.
 type CoverageBody struct {
-	Product    string `json:"product"`
-	Stream     string `json:"stream"`
-	StreamKind string `json:"stream_kind" enum:"branch,tag" doc:"Whether this line moves"`
-	Variant    string `json:"variant"`
+	Product    string   `json:"product"`
+	Stream     string   `json:"stream"`
+	StreamKind lineKind `json:"stream_kind" doc:"Whether this line moves"`
+	Variant    string   `json:"variant"`
 	// LastReceivedAt is absent where nothing has ever been filed against this
 	// build, which is a different situation from a scan that failed.
 	LastReceivedAt string `json:"last_received_at,omitempty" doc:"The moment a scan last arrived. Absent where none ever has"`
@@ -139,7 +139,7 @@ func registerCoverage(api huma.API, in Ingest) {
 			body := CoverageBody{
 				Product:        row.Product,
 				Stream:         row.Stream,
-				StreamKind:     row.StreamKind,
+				StreamKind:     lineKind(row.StreamKind),
 				Variant:        row.Variant,
 				QuietDays:      int(row.Since.Hours() / 24),
 				Quiet:          row.Quiet,

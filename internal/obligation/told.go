@@ -235,7 +235,7 @@ func (s *Store) WindowsNamed(ctx context.Context, subject access.Subject,
 		Where("ow.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which windows were answered: %w", err)
 	}
-	windows, err := s.withLimits(ctx, windows)
+	windows, err := withLimits(ctx, s.db, windows)
 	if err != nil {
 		return nil, err
 	}

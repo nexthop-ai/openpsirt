@@ -38,6 +38,9 @@ const (
 // Valid reports whether k is a kind we recognize.
 func (k Kind) Valid() bool { return k == Branch || k == Tag }
 
+// Kinds is every kind a release line can be.
+func Kinds() []Kind { return []Kind{Branch, Tag} }
+
 // ErrNotFound is returned when something named has not been declared.
 var ErrNotFound = errors.New("not declared")
 

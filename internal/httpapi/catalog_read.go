@@ -168,7 +168,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		for _, row := range rows {
 			body := StreamBody{
 				Name: row.Name, DisplayName: spelled(row.Name, row.DisplayName),
-				Kind: string(row.Kind),
+				Kind: lineKind(row.Kind),
 				Open: counted(in.Counts, open, row.ID), LastScanAt: seen[row.Name],
 				Retired: row.Retired(),
 			}
