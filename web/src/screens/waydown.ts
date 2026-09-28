@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Sitting } from "../ui/Covering";
-import { keyOf } from "./treeshape";
+import { STEP, keyOf } from "./treeshape";
 
 // The way down to one place, as the rows a reader sees.
 //
@@ -18,7 +18,7 @@ import { keyOf } from "./treeshape";
 // the answer, and loses the component's own name, which is read off the end of
 // the chain.
 
-export type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
+type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
 
 type WayDown = {
   steps: Step[];
@@ -73,7 +73,7 @@ export function intoTheTree(places: Sitting[]): string {
   // Each step as the tree's own identity for a row, not as a bare name: the
   // tree opens the set it is handed, and a name the build ships twice names
   // two rows there.
-  query.set("path", steps.map((step) => keyOf(step)).join("\u001f"));
+  query.set("path", steps.map((step) => keyOf(step)).join(STEP));
   if (last?.version) query.set("version", last.version);
   // The rest of what the tree keys a row on, so the row the link exists to
   // show is the one marked.

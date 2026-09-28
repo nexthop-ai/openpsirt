@@ -35,7 +35,7 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-rail-scrim);
-  background: rgb(8 12 20 / 35%);
+  background: var(--scrim);
 }
 
 /* A screen, not a page: a portrait sheet of paper is narrower than this, and

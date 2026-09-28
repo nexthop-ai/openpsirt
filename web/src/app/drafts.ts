@@ -31,6 +31,7 @@
 // The place somebody was in each list, cleared with everything else the session
 // holds.
 import { forgetPlaces } from "./place";
+import { DAY_MS } from "../ui/when";
 
 // The namespace every draft lives under. Named the way the other things this
 // application keeps in the browser are — the chosen theme and the scope
@@ -45,7 +46,7 @@ const PREFIX = "openpsirt.draft.";
 // finishing it after. Past it the text is much more likely to be forgotten
 // than resumed, and forgotten text in storage that outlives every session is
 // what this bound is for.
-const KEEP_FOR = 24 * 60 * 60 * 1000;
+const KEEP_FOR = DAY_MS;
 
 // The owner of the drafts on this page. Set once the session is known and
 // cleared when it is not, so a draft written before anybody was recognized is
@@ -174,7 +175,7 @@ export function restore(about: string | undefined): string {
 //
 // Every field the form holds, because the ones it does not keep are the ones
 // that come back empty beside a filled form and read as answered.
-export type Answered = {
+type Answered = {
   outcome?: string;
   justification?: string;
   until?: string;
