@@ -242,6 +242,7 @@ million edges between them.
 | The component bound is charged where a component is read, not where one is recorded | Charged at the recording, the header pass — which records nothing — counted none of them, so a document putting its components inside the root component's own nested array was walked in full during a read that happens inside the upload request, with only the size bound saying how many there could be. The same document read whole was refused. A bound that holds on one of two paths through the same parser is a bound somebody routes around |
 | The header pass holds nothing it walked past | Charging the walk is what stops a document nobody could have meant; holding nothing is what keeps the pass cheap for the documents that are fine, and this pass runs inside the upload request, so what it holds is held per concurrent upload. It was charging and holding: the count was the fix and the retention was not |
 | A suppression document's product identifiers are charged against the component bound | The claim bound counts claims, and one claim names any number of products — so a document holding a single statement that lists millions of identifiers was inside every bound in force, and the map holding them was charged against nothing |
+| A CycloneDX document's license entries are charged against ten times the component bound, with a refusal of their own | Each is kept, so one component could otherwise hold as many as the byte bound allows. A real component states one to three, and the real switch images average under one. The claim bound would refuse a large image that makes no claim, naming the wrong setting |
 | The claim bound is spent across a scan's documents rather than per document | Every other bound is per document, and a scan carries as many as a build attaches. Passed whole to each, a producer sending fifty each inside the limit made this hold fifty times what the limit allows |
 | How many documents arrive with one scan is bounded too | It is what makes every per-document bound mean something: without it they are multiplied by a number nothing decides |
 
@@ -284,8 +285,9 @@ and one reader is what the seam was for.
 | **An element announces what it is in a field that may arrive after the fields it governs** | An element is read into one neutral shape and interpreted when it closes. That is what a component read from either other format already does, and it holds one element rather than a document, so the walk stays bounded |
 | **The header is inside the contents** | A document's creation record is one entry of the same array its packages are in. The header read therefore walks the whole graph and builds nothing from it, which is as cheap as this format allows rather than as cheap as the others are |
 | **A document carries several creation records** | Anything it imported brought its own. The one the document points at is the document's; where it points at nothing, none stands in and the upload is dated when it arrives. An imported document's time does not move between builds, so standing it in would have every later scan of that target refused as not newer |
+| **A creation record may be written in place** | The format lets an element carry its creation record as an object where it would otherwise point at one. Written on the document, its time is the document's; written on any other element, it dates nothing unless it carries an identifier, and then it is the record every reference to that identifier names. Its version is checked as a referred-to record's is |
 | **One relationship states a list of ends** | The edge bound is charged per end rather than per relationship, as each is read |
-| **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead. So the walk is bounded throughout and the two are still sized the way they differ |
+| **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead, and a relationship hands it back for the edge bound its ends were charged against. A relationship stating no end is charged nothing there and keeps its component charge. So the walk is bounded throughout and the bounds are still sized the way they differ |
 | **Identifiers are absolute** | Nothing here depends on their shape. Every one but the document's own resolves the document to itself and is discarded, which is what the other formats' in-file identifiers are for too |
 
 A path and a package may not share an identifier, and this format states
@@ -568,12 +570,20 @@ its own name or in a header saying what it fixes.
 
 | Matching rule | Reason |
 |---|---|
-| Qualifiers and subpaths are discarded before comparing | A claim is written as the package and the version; the same package in an inventory carries the architecture it was built for |
+| A package identifier is compared as identity reduces it: qualifiers and subpath dropped, escapes decoded, scheme and type lowercased | A claim is written as the package and the version, and the same package in an inventory carries the architecture it was built for. One real image carries the same version as `2.3.2-2%2Bb1` and `2.3.2-2+b1` |
 | A claim naming no version covers every version | The format says so, and it is how a build states something about whatever it ships |
+| A claim naming a version reaches a component stating that version beside an identifier that names none | An inventory may state the version outside the identifier |
+| An OpenVEX product with subcomponents is a claim about the subcomponents | The product is what shipped and the subcomponents are what the statement is about. This deployment's own export states every claim that way. A product with none is the thing the statement is about |
+| A subcomponent is read only as a package identifier | Anything else names a component and no version, which would cover every version of that name and every fork of it. A product whose subcomponents are all of that kind is a claim about nothing |
 | A claim against a source tree matches a component of that name, or a fork of one | The build knows which packages came out of a tree and this deployment does not |
 | A source tree is named either way it can be named | As a bare name where the document carried no package identifier, and as a package identifier of the generic type where it carried one. The two are the same claim and are matched the same |
 | A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
 | A claim is matched at every place its component sits | The fan-out is ours either way |
+
+A claim attached to a scan is stored with the package identifier and the name
+it states, and no version stated outside the identifier. A claim that names no
+package and states its version only as a branch therefore covers every version
+of that name once stored.
 
 A claim that matched nothing is reported, not dropped. A build's judgment that
 went nowhere means a finding it already answered comes back as noise. The
@@ -811,6 +821,8 @@ which file they wrote it in.
 | A CSAF *advisory* is refused here and read by the supplier-advisory path | Each is read under what the document around the claims means, and what a later upload of it replaces differs |
 | The reader is the one the build's own suppressions go through | One parser rather than one per distribution's format keeps the hostile-input surface to a size somebody can reason about |
 | Uploading again from the same publisher sets aside what they said before rather than deleting it | What an approval was granted on the strength of has to stay readable. The document's digest is kept with every statement, so a revision can be noticed |
+| The same document uploaded again writes nothing where it reads as what stands, and replaces what stands where it reads differently | The digest is of the bytes. A reader that derives a different name or target from the same bytes has changed what the statements say, and uploading again is how rows stored under the earlier reading are brought up to date |
+| A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is a statement about `frr` |
 
 What is done with the statements is not an ingest question: they are evidence and
 a prefill, never applied (REQ-31).
@@ -830,6 +842,8 @@ product ships.
 | An advisory that names no publisher or carries no tracking identifier is refused | Whose judgment it is decides what it supersedes and whose name stands beside it, and the tracking identifier is the key a revision replaces. Both are mandatory in the format |
 | Every product-status list the format defines is read, at the versions it names | Two of the eight are the only status a real advisory carries. What is not read is the range a list implies — that everything after a first fixed version is fixed — because the document enumerates the versions it is about and nothing else |
 | Words are attached to the products they name, by identifier or by group | The format lets either say which products a flag, a remediation or a threat is about, and they mean the same thing. Read only the first and a remediation scoped by a group falls through to the words written about the status at large, so an upgrade instruction lands on a claim the document never made |
+| A group is expanded once the document is closed | The tree defining it may come after the words naming it. Words scoped by a group are about what the group holds, and a group holding nothing scopes them to no product |
+| A CVE is the issue's name wherever the document states it, and every other identifier is an alias | The producer chooses the key order. Where no CVE is stated, the first other identifier is the name |
 | The claims come back in the order the document stated them | A map has no first. Which of several sentences stands for a claim, which order its products are carried in and which order the claims are written would otherwise be whatever the runtime chose, so the same bytes uploaded twice would store different reasoning under a digest saying nothing moved |
 | A version stated as a branch is the version the claim is about | A publisher that states no package identifier states the version as the branch its product sits in. Dropped, a claim about one release of an appliance answers for every release of it, and the screen has no version to show beside the status |
 | A claim naming a version offers a prefill only at that version | An advisory exists to name the version that carries the fix, which is not the version shipped here. Offered against another, the control comes prefilled with a claim the publisher never made, with their name on it |
@@ -844,14 +858,24 @@ case for an equipment vendor, whose advisories carry no package identifier
 anywhere, and it resolves the way a claim against a source tree does — a
 component of that name is the one meant.
 
-The bound is what the reader holds, so an identifier is charged once however
-often the document names it. Measured on a real distribution advisory about a
-kernel: 794 distinct product identifiers, mentioned 220,088 times — 341 issues
-over 279 composed products, each listed under a status and again in the
-remediation about it. Charged per mention that document is refused at a
-ceiling of 100,000 while holding under eight hundred entries; charged per
-identifier it is nowhere near. The same file is 27 MB against a size default of
-256 MB.
+A CSAF document is held to two bounds.
+
+| Bound | What it charges |
+|---|---|
+| The component bound | Each distinct identifier the document states, once however often it is named |
+| Ten times the component bound | Each entry the reader keeps: a product defined, a group, a group member, a product listed under a status by each claim, a product or group a sentence names, an alias, and every member a group reference stands for when it is expanded |
+
+A justification naming no product is not an entry. A claim keeps the last one
+it gives, so a document repeating it holds one.
+
+Measured on a real distribution advisory about a kernel: 794 distinct product
+identifiers, mentioned 220,088 times — 341 issues over 279 composed products,
+each listed under a status and again in the remediation about it. The first
+bound is nowhere near, and the second is a fifth spent. The same file is 27 MB
+against a size default of 256 MB. An entry held costs about 170 bytes, so the
+second bound at its default is about 170 MB. A group reference is charged what
+it expands into: without that, one group of fifty thousand products referenced
+four thousand times is two hundred million entries from under a megabyte.
 
 One distribution VEX document about a single issue composes 1,669 of its 1,669
 product identifiers through relationships, so a reader that resolves only

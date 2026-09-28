@@ -74,6 +74,12 @@ func TestAPackageIdentifierKeepsWhatIdentityThrowsAway(t *testing.T) {
 		want graph.Parts
 	}{
 		{
+			// An "@" straight after a slash begins a scoped name, and no
+			// version follows it.
+			purl: "pkg:npm/@babel/core",
+			want: graph.Parts{Type: "npm", Namespace: "@babel", Name: "core"},
+		},
+		{
 			purl: "pkg:apk/alpine/busybox@1.37.0-r31?arch=x86_64&distro=alpine-3.24.1",
 			want: graph.Parts{Type: "apk", Namespace: "alpine", Name: "busybox", Version: "1.37.0-r31", Distro: "alpine-3.24.1", DistroStated: true},
 		},

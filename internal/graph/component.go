@@ -192,6 +192,29 @@ func canonicalPurl(purl string) string {
 	return strings.ToLower(scheme) + ":" + strings.ToLower(kind) + "/" + decoded(path)
 }
 
+// PackageOf splits a package identifier into the package it names and the
+// version it names, each reduced the way identity reduces them: qualifiers and
+// subpath dropped, escapes decoded, the scheme and type lowercased.
+//
+// A claim and an inventory spell one package differently — `2.3.2-2+b1`
+// against `2.3.2-2%2Bb1`, `@babel` against `%40babel` — and a comparison of
+// what each wrote says two packages where identity says one.
+//
+// The version follows the last "@" that has something before it other than a
+// slash. A scoped name in some ecosystems begins with one
+// ("pkg:npm/@babel/core"), and splitting there names a version of
+// "babel/core".
+func PackageOf(purl string) (base, version string) {
+	base = strings.TrimSpace(purl)
+	if cut := strings.IndexAny(base, "?#"); cut >= 0 {
+		base = base[:cut]
+	}
+	if at := strings.LastIndex(base, "@"); at > 0 && base[at-1] != '/' {
+		base, version = base[:at], decoded(base[at+1:])
+	}
+	return canonicalPurl(base), version
+}
+
 // UpstreamFromPurl reads what a package identifier says it was built from.
 //
 // Producers state this two ways and mean the same thing. The format has a
@@ -509,9 +532,10 @@ func PartsOfPurl(purl string) Parts {
 		return Parts{}
 	}
 	// Cut the version from the right: a name contains no "@" and a version
-	// can.
+	// can. An "@" straight after a slash begins a scoped name
+	// ("pkg:npm/@babel/core") and is not a version.
 	path := rest
-	if at := strings.LastIndex(rest, "@"); at > 0 {
+	if at := strings.LastIndex(rest, "@"); at > 0 && rest[at-1] != '/' {
 		path, parts.Version = rest[:at], decoded(rest[at+1:])
 	}
 

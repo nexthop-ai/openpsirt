@@ -494,7 +494,7 @@ producer's own word. Recorded, and read by nothing that decides anything.
 | Where it is stated | Words |
 |---|---|
 | A CycloneDX component | `required`, `optional`, `excluded` — stated on the component and carried to the edges arriving at it, because the graph is where a scope can be asked about |
-| An SPDX 3 relationship | `build`, `design`, `development`, `other`, `runtime` — stated on the relationship, which is the ordinary dependency |
+| An SPDX 3 relationship | `build`, `design`, `development`, `other`, `runtime` — stated on the relationship, which is the ordinary dependency. A `hasOptionalDependency` relationship stating no scope is recorded as `optional`, the word its SPDX 2 counterpart is recorded in |
 | An SPDX 2 relationship type | `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF`, recorded as `build`, `development`, `runtime` and `optional`. One fact under two spellings, and a filter cannot be made to ask for the same thing twice — so every relationship that names a phase is here, not a subset of them |
 
 "Not in the runtime path", "build-time only", "test-only" is the largest
@@ -971,6 +971,9 @@ Where two claims cover one finding, the one attached to the component wins over
 one that named something to be matched: the first knows exactly what it is about,
 while the second may name a whole source tree. Where neither is attached, the
 claims are read in a stable order.
+
+`DESIGN-ingest.md` § Build-declared suppressions holds how a claim that names
+something is matched against a component.
 
 ## Fan-out cost
 

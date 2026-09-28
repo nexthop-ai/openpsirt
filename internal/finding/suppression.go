@@ -48,6 +48,9 @@ type Claim struct {
 }
 
 // covers reports whether this claim is about the component described.
+//
+// A stored claim carries no version stated outside its identifier, so a claim
+// that names no package identifier covers every version of the name it states.
 func (c Claim) covers(d graph.Described) bool {
 	return sbom.Target{Purl: c.SubjectPurl, Name: c.SubjectName}.Covers(d)
 }

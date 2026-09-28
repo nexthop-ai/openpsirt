@@ -112,3 +112,50 @@ func TestTheScannerIsToldADistributionStatedAsANameAndAVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestTheDistributionIsAddedBeforeTheSubpath(t *testing.T) {
+	// A subpath follows the qualifiers, so a qualifier appended after it
+	// would be read as part of the subpath.
+	held := []graph.Described{{Name: "x", Version: "1",
+		Purl: "pkg:deb/debian/x@1?os_name=debian&os_version=12#sub/dir"}}
+	var out bytes.Buffer
+	if err := sbom.WriteInventory(&out, held); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var written struct {
+		Components []struct {
+			Purl string `json:"purl"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &written); err != nil {
+		t.Fatal(err)
+	}
+	want := "pkg:deb/debian/x@1?os_name=debian&os_version=12&distro=debian-12#sub/dir"
+	if len(written.Components) != 1 || written.Components[0].Purl != want {
+		t.Errorf("wrote %+v, want %s", written.Components, want)
+	}
+}
+
+func TestComponentsOfOneNameAreWrittenInVersionOrder(t *testing.T) {
+	// The document is written the same way every time, so the same inventory
+	// is the same bytes.
+	held := []graph.Described{
+		{Name: "libc", Version: "2.41", Purl: "pkg:deb/debian/libc@2.41"},
+		{Name: "libc", Version: "2.36", Purl: "pkg:deb/debian/libc@2.36"},
+	}
+	var out bytes.Buffer
+	if err := sbom.WriteInventory(&out, held); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var written struct {
+		Components []struct {
+			Version string `json:"version"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &written); err != nil {
+		t.Fatal(err)
+	}
+	if len(written.Components) != 2 || written.Components[0].Version != "2.36" {
+		t.Errorf("wrote %+v, want 2.36 before 2.41", written.Components)
+	}
+}

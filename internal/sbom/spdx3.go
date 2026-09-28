@@ -61,6 +61,9 @@ var spdx3Edges = map[string]bool{
 	"hasProvidedDependency": true,
 }
 
+// spdx3Optional is the relationship type that states an optional dependency.
+const spdx3Optional = "hasOptionalDependency"
+
 // spdx3Ancestors are the relationship types that say one component was derived
 // from another. `ancestorOf` points from the ancestor; `descendantOf` points at
 // it.
@@ -113,6 +116,9 @@ type spdx3Element struct {
 	// creation information it was made under.
 	rootElements []string
 	creationInfo string
+	// createdInline is the creation time where the creation information is
+	// written in place rather than referred to.
+	createdInline string
 
 	// A relationship's own fields.
 	from  string
@@ -184,7 +190,29 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 		case "specVersion":
 			return c.into(&e.specVersion)
 		case "creationInfo":
-			return c.into(&e.creationInfo)
+			// A reference to a creation-information element, or the element
+			// written in place: a linked format may write a reference out as
+			// the thing it refers to. Written in place with an identifier of
+			// its own, it is the record every other reference to that
+			// identifier means, wherever it was written.
+			var inline spdx3Element
+			ref, err := c.b.stringOrObject(func(key string) error {
+				switch key {
+				case "@id", "spdxId":
+					return c.into(&inline.id)
+				case "created":
+					return c.into(&inline.created)
+				case "specVersion":
+					return c.into(&inline.specVersion)
+				default:
+					return c.b.skip()
+				}
+			})
+			if err != nil {
+				return err
+			}
+			e.creationInfo, e.createdInline = ref, inline.created
+			return c.spdx3Created(inline)
 		case "rootElement":
 			// Charged per element, as its twin in the other version is. One
 			// graph entry costs one component on the way in, and without this
@@ -263,6 +291,7 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 	case spdx3Document:
 		c.doc.Serial = e.id
 		c.spdx3DocumentCreation = e.creationInfo
+		c.spdx3DocumentCreated = e.createdInline
 		c.spdx3DocumentRefs[e.id] = true
 		if c.headerOnly {
 			return nil
@@ -314,8 +343,11 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 		// would have a document's relationships spend the ceiling meant for
 		// its packages, and this format states file membership as a
 		// relationship, so that is the ordinary shape rather than a hostile
-		// one.
-		c.stated--
+		// one. A relationship with no end was charged nothing there and is
+		// still recorded, so it keeps its component charge.
+		if len(e.to) > 0 {
+			c.stated--
+		}
 		return c.spdx3Relate(e)
 	}
 	return nil
@@ -410,13 +442,19 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 		if e.scope == spdx3TestScope {
 			return nil
 		}
+		// An optional dependency is stated by its type rather than a scope,
+		// and recorded in the word the second version's type for it is, so
+		// a filter answers the same about it whichever version stated it.
+		kind := scopeWord(e.scope)
+		if kind == "" && e.kinds == spdx3Optional {
+			kind = "optional"
+		}
 		for _, to := range e.to {
 			// Already charged where the ends were read, so the edge is
 			// recorded rather than charged twice. The scope rides along as
 			// what the producer said, and nothing reads it to decide
 			// anything.
-			c.edges = append(c.edges,
-				refEdge{parent: e.from, child: to, kind: scopeWord(e.scope)})
+			c.edges = append(c.edges, refEdge{parent: e.from, child: to, kind: kind})
 		}
 		return nil
 	case e.kinds == spdx3Declared || e.kinds == spdx3Concluded:
@@ -559,12 +597,16 @@ func (c *reader) spdx3Roots() {
 // undated, and an undated upload is dated when it arrives, which moves with
 // each build where an imported time would not.
 func (c *reader) spdx3Settle() {
-	if len(c.spdx3Creations) == 0 || !c.doc.BuiltAt.IsZero() {
+	if !c.doc.BuiltAt.IsZero() {
 		return
 	}
-	raw, ours := c.spdx3Creations[c.spdx3DocumentCreation]
-	if !ours {
-		return
+	raw := c.spdx3DocumentCreated
+	if raw == "" {
+		referred, ours := c.spdx3Creations[c.spdx3DocumentCreation]
+		if !ours {
+			return
+		}
+		raw = referred
 	}
 	built, err := time.Parse(time.RFC3339, raw)
 	if err != nil {
