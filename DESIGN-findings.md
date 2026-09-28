@@ -363,7 +363,7 @@ as each finishes, and sleeps once none has a commit due.
 | A repository whose copy is on this disk and that has commits never looked up | Bringing a held copy up to date is a small fetch, and every lookup after it costs a fraction of a second |
 | Then the one holding the most urgent commit never looked up | Urgency is the worst rating among the issues linking to the commit, then the score behind it |
 | Then the most urgent commit due again | A commit is due again a week after it was looked up |
-| Never a host an administrator excluded, and not for a day after a failed visit | A host having a bad hour and a repository that is gone look the same from here |
+| Never a host an administrator excluded, and not for a day after a failed visit | A host having a bad hour and a repository that is gone look the same from here. The host is read from the stored address, which is kept whole, rather than from the host column, which is cut to the width of a name and can lose the suffix an exclusion names |
 
 A visit fetches the repository's branches, writes git's commit-graph index,
 and looks up every due commit in it, most urgent first.
@@ -434,6 +434,7 @@ never chooses a path on this disk (REQ-66).
 | A copy that alone outgrows the quota is stopped and removed, and the visit fails | Retried a day later, which is the moment a raised quota takes effect. A host that sent a small first copy and then an endless fetch is stopped the same way |
 | A copy removed to make room stops counting towards the size the report shows | The report reads the size recorded at the end of each visit, and that record is cleared when the copy goes |
 | An update of a copy asks the remote the copy was made from, not the address | The copy records how it was made beside that remote. Asked by address, a host sends whole trees on top of commits the copy holds without them, and the fetch fails for want of them |
+| The copies directory is made absolute when the pass starts | Git runs inside it, so a path relative to the process would name a second directory under the first, outside the quota's measure |
 | A copy left half made by a process that died is removed before the next one starts | It is named apart from finished copies, so nothing mistakes it for one |
 
 ### Display

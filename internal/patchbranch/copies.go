@@ -112,7 +112,10 @@ func (c copies) ensure(ctx context.Context, g git, repository string) (string, e
 	}
 	making := dir + partial
 	err := c.watched(ctx, making, true, func(ctx context.Context) error {
-		return g.clone(ctx, repository, c.root, making)
+		// Named relative to the directory git runs in, which is the root, so
+		// the copy lands where it is measured and renamed from whether the
+		// root was given relative or not.
+		return g.clone(ctx, repository, c.root, filepath.Base(making))
 	})
 	if err != nil {
 		_ = os.RemoveAll(making)

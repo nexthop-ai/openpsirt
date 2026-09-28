@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // NewLocalPass is a pass that fetches from directories rather than hosts, with
@@ -29,6 +30,19 @@ func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded
 	// is recorded as no longer held.
 	pass.copies.gone = pass.forget
 	return pass
+}
+
+// Environment is what git is run with, for a copy kept under home.
+func Environment(home string) []string { return git{transport: "https"}.environment(home) }
+
+// Settings is the configuration every git invocation carries.
+func Settings(proxy string) []string { return git{transport: "https"}.settings(proxy) }
+
+// Leased is the pass holding leases as replica, asking for the lease again
+// every renew while a visit runs.
+func (p *Pass) Leased(db *bun.DB, replica string, renew time.Duration) *Pass {
+	p.leases, p.replica, p.renew = queue.NewLeases(db), replica, renew
+	return p
 }
 
 // TurnOff is the pass with the lookups off, as a deployment that never turned

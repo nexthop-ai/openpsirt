@@ -260,7 +260,7 @@ func severityOf(how urgency) string {
 // stateOf reads where a repository stands from what its row records.
 func stateOf(one RepositoryProgress, excluded outward.Excluded) State {
 	switch {
-	case excluded.Host(one.Host):
+	case excluded.Host(Commit{Repository: one.URL}.Host()):
 		return Refused
 	case one.Reason != "":
 		return Failed

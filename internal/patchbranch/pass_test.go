@@ -110,6 +110,116 @@ func empty(t *testing.T, db *database.DB) {
 	dbtest.Reset(t, db)
 }
 
+// A copies directory given relative to where the process runs holds the copy
+// where it is measured and renamed from.
+func TestARelativeCopiesDirectoryHoldsItsCopies(t *testing.T) {
+	up := project(t)
+	t.Chdir(t.TempDir())
+	pass := patchbranch.NewLocalPass(nil, "copies", patchbranch.DefaultQuota, outward.Excluded{},
+		func(string) string { return up.dir })
+	if err := pass.Fetch(t.Context(), repositoryOf("relative")); err != nil {
+		t.Fatalf("a relative copies directory could not hold a copy: %v", err)
+	}
+	if !pass.Held(repositoryOf("relative")) {
+		t.Error("the copy is not where the pass looks for it")
+	}
+}
+
+// A visit asks for the lease again as it runs, and stops when another
+// replica has it.
+func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		ctx := t.Context()
+		made := project(t)
+		issue(t, db, "CVE-2025-0019", "critical", link("project", made.fix))
+		leases := queue.NewLeases(db.DB)
+		heldUntil := func() time.Time {
+			t.Helper()
+			var row queue.Lease
+			if err := db.DB.NewSelect().Model(&row).Where("name = ?", patchbranch.Lease).
+				Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if row.HeldUntil == nil {
+				return time.Time{}
+			}
+			return *row.HeldUntil
+		}
+
+		// Held through a slow fetch: the lease moves on while it runs.
+		if mine, err := leases.Take(ctx, patchbranch.Lease, "one", 30*time.Minute); err != nil || !mine {
+			t.Fatalf("taking the lease: %v %v", mine, err)
+		}
+		var during time.Time
+		slow := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			outward.Excluded{}, func(string) string {
+				during = heldUntil()
+				time.Sleep(200 * time.Millisecond)
+				return made.dir
+			}).Leased(db.DB, "one", 20*time.Millisecond)
+		if _, err := slow.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if after := heldUntil(); !after.After(during) {
+			t.Errorf("the lease stood at %v during the fetch and %v after, so it was not renewed",
+				during, after)
+		}
+
+		// Lost part way: another replica takes it, and the visit stops rather
+		// than writing what the other replica is also writing.
+		if _, err := db.DB.NewUpdate().Table("patch_repository").
+			Set("fetched_at = NULL").Set("reached_at = NULL").Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Table("patch_commit").
+			Set("looked_at = NULL").Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		lost := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			outward.Excluded{}, func(string) string {
+				if _, err := db.DB.NewUpdate().Model((*queue.Lease)(nil)).
+					Set("held_until = ?", time.Now().UTC().Add(-time.Hour)).
+					Where("name = ?", patchbranch.Lease).Exec(ctx); err != nil {
+					t.Error(err)
+				}
+				if mine, err := leases.Take(ctx, patchbranch.Lease, "two", time.Hour); err != nil || !mine {
+					t.Errorf("the other replica could not take the lease: %v %v", mine, err)
+				}
+				time.Sleep(200 * time.Millisecond)
+				return made.dir
+			}).Leased(db.DB, "one", 20*time.Millisecond)
+		if _, err := lost.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if lost.Held(repositoryOf("project")) {
+			t.Error("a visit that lost its lease went on to keep a copy")
+		}
+	})
+}
+
+// A replica shutting down part way through a visit hands the lease back, so
+// the next one carries on at once rather than waiting for it to lapse.
+func TestAPassStoppedMidVisitHandsTheLeaseBack(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		made := project(t)
+		issue(t, db, "CVE-2025-0020", "critical", link("project", made.fix))
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			outward.Excluded{}, func(string) string {
+				stop()
+				return made.dir
+			}).Leased(db.DB, "one", time.Minute)
+		pass.Cycle(ctx)
+		mine, err := queue.NewLeases(db.DB).Take(t.Context(), patchbranch.Lease, "two", time.Hour)
+		if err != nil || !mine {
+			t.Errorf("the next replica could not take the work at once: %v %v", mine, err)
+		}
+	})
+}
+
 // passOver is a pass that fetches each named project from its directory.
 func passOver(t *testing.T, db *database.DB, quota int64, excluded outward.Excluded, projects map[string]upstream) *patchbranch.Pass {
 	t.Helper()
@@ -342,6 +452,73 @@ func TestARepositoryOnAnExcludedHostIsNeverVisited(t *testing.T) {
 			t.Errorf("the report says %+v, want the one repository excluded", repositories)
 		}
 	})
+}
+
+// A host longer than the stored column is judged on the address, which is
+// stored whole, so the suffix an exclusion names is not cut off first.
+func TestARepositoryOnALongExcludedHostIsNeverVisited(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		ctx := t.Context()
+		made := project(t)
+		long := strings.Repeat("a", 60) + "." + strings.Repeat("b", 60) + "." +
+			strings.Repeat("c", 60) + ".excluded.example"
+		issue(t, db, "CVE-2025-0018", "critical", "https://"+long+"/example/project/commit/"+made.fix)
+		excluded, err := outward.ParseExcluded("excluded.example")
+		if err != nil {
+			t.Fatal(err)
+		}
+		pass := passOver(t, db, patchbranch.DefaultQuota, excluded, map[string]upstream{})
+		if visited, err := pass.Once(ctx); err != nil || visited != "" {
+			t.Errorf("a repository on a long excluded host was visited: %q %v", visited, err)
+		}
+		repositories, _, err := patchbranch.Progress(ctx, db.DB, excluded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(repositories) != 1 || repositories[0].State != patchbranch.Refused {
+			t.Errorf("the report says %+v, want the one repository excluded", repositories)
+		}
+	})
+}
+
+// Git is given none of the configuration, credentials or proxy of the process
+// it runs under, and every invocation refuses what could send a request or a
+// credential somewhere a report chose.
+func TestGitIsGivenNoConfigurationOrCredentialsOfTheProcess(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "http://proxy.example.test")
+	t.Setenv("GIT_CONFIG_GLOBAL", "/somewhere/else")
+	want := map[string]bool{
+		"HOME=/copies": true, "GIT_CONFIG_NOSYSTEM=1": true, "GIT_CONFIG_GLOBAL=" + os.DevNull: true,
+		"GIT_TERMINAL_PROMPT=0": true, "GIT_ASKPASS=": true, "SSH_ASKPASS=": true,
+		"GIT_NO_LAZY_FETCH=1": true, "LC_ALL=C": true,
+	}
+	for _, each := range patchbranch.Environment("/copies") {
+		if strings.HasPrefix(each, "PATH=") {
+			continue
+		}
+		if !want[each] {
+			t.Errorf("git is given %q", each)
+		}
+		delete(want, each)
+	}
+	for each := range want {
+		t.Errorf("git is not given %q", each)
+	}
+
+	said := map[string]bool{}
+	settings := patchbranch.Settings("")
+	for i := 0; i+1 < len(settings); i += 2 {
+		if settings[i] == "-c" {
+			said[settings[i+1]] = true
+		}
+	}
+	for _, each := range []string{"protocol.allow=never", "credential.helper=", "core.askPass=",
+		"http.followRedirects=false", "core.hooksPath=" + os.DevNull} {
+		if !said[each] {
+			t.Errorf("git runs without %q", each)
+		}
+	}
 }
 
 func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
