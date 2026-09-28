@@ -18,9 +18,9 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -54,26 +54,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // setUp builds the fixture in one database.
 func setUp(t *testing.T, db *database.DB) *fixture {
 	t.Helper()
-	ctx := t.Context()
-	dbtest.Reset(t, db)
-
-	cat := catalog.NewStore(db.DB)
-	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	w := world.New(t, db)
 
 	root := t.TempDir()
 	files, err := attach.NewFiles(root)
@@ -82,7 +63,7 @@ func setUp(t *testing.T, db *database.DB) *fixture {
 	}
 	f := &fixture{
 		db: db, store: attach.NewStore(db.DB, files), files: files, root: root,
-		product: product.ID, target: target.ID,
+		product: w.Product.ID, target: w.Target.ID,
 	}
 	f.issue = f.anIssue(t, identity, access.Public)
 	return f

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/uptrace/bun"
 )
 
@@ -86,7 +87,7 @@ func TestAnUnseenProductIsRefusedBeforeTheIssueIsLookedUp(t *testing.T) {
 			"a pipeline credential":          pipeline,
 		} {
 			asked.reset()
-			_, _, err := f.store.Issue(ctx, subject, "sonic", identity)
+			_, _, err := f.store.Issue(ctx, subject, world.ProductName, identity)
 			if !errors.Is(err, attach.ErrNoSuchIssue) {
 				t.Errorf("%s got %v, want the answer an undeclared product gets", name, err)
 			}
