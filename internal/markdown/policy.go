@@ -214,9 +214,9 @@ func attachmentFault(line int, destination string, target destinationTarget) (Fa
 	}
 	return Fault{
 		Line: line, Offending: destination,
-		Reason: "an attachment is referred to by the identifier this deployment " +
-			"minted for it — 32 hexadecimal characters — and nothing else " +
-			"resolves to a file. Attach the file and use the reference it gives you",
+		Reason: fmt.Sprintf("an attachment is referred to by the identifier this deployment "+
+			"minted for it — %d hexadecimal characters — and nothing else "+
+			"resolves to a file. Attach the file and use the reference it gives you", 2*TokenBytes),
 	}, true
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -376,8 +377,8 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		// Grouped on the names and shown in the spelling somebody declared:
 		// the list is text a person reads, and one build is one entry
 		// however it was spelled.
-		ColumnExpr(`MIN(st.display_name) AS "stream"`).
-		ColumnExpr(`MIN(va.display_name) AS "variant"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("st")+`) AS "stream"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("va")+`) AS "variant"`).
 		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").

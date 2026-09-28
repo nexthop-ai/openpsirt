@@ -824,17 +824,9 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 	for _, claim := range claims {
 		ids = append(ids, claim.VulnerabilityID)
 	}
-	named := map[int64]string{}
-	if len(ids) > 0 {
-		var issues []Vulnerability
-		if err := s.db.NewSelect().Model(&issues).
-			Column("id", "identifier").
-			Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
-			return nil, nil, 0, fmt.Errorf("read what these issues are called: %w", err)
-		}
-		for _, issue := range issues {
-			named[issue.ID] = issue.Identifier
-		}
+	named, err := NewVulnerabilities(s.db).NamesByID(ctx, ids)
+	if err != nil {
+		return nil, nil, 0, err
 	}
 	return claims, named, total, nil
 }
