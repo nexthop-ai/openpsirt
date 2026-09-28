@@ -18,7 +18,13 @@
 import { compile } from "tailwindcss";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { emits, positionedModifiers, rulesIn, styleless as unstyled } from "./class-rules.mjs";
+import {
+  cssRules,
+  emits,
+  positionedModifiers,
+  rulesIn,
+  styleless as unstyled,
+} from "./class-rules.mjs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -39,21 +45,8 @@ async function stylesheets(dir) {
 // only shape a single-class utility can collide with.
 const defined = new Map();
 for (const file of await stylesheets(src)) {
-  const css = await readFile(file, "utf8");
-  // Comments and declaration blocks stripped, so that only selectors are read.
-  //
-  // At-rule preludes go too. Blanking the innermost blocks and splitting on
-  // braces leaves every `@import`, `@media` and `@supports` prelude in the
-  // stream, and `@import "@fontsource/instrument-sans/400.css"` then registers
-  // `css` as a class this stylesheet defines — a name the reverse check below
-  // would vouch for and no element could ever carry. The rules inside a media
-  // query arrive as their own fragments after the split, so they are
-  // unaffected.
-  const selectors = css.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{[^{}]*\}/g, "{}");
-  for (const raw of selectors.split(/[{}]/)) {
-    for (const [, name] of raw
-      .replace(/@[\w-]+[^;{}]*;?/g, " ")
-      .matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
+  for (const { selector } of cssRules(await readFile(file, "utf8"))) {
+    for (const [, name] of selector.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
       if (!defined.has(name)) defined.set(name, path.relative(src, file));
     }
   }

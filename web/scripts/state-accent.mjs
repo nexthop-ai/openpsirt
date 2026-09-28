@@ -8,6 +8,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { cssRules } from "./class-rules.mjs";
 
 // A selector that describes a state rather than an interaction.
 const STATE =
@@ -17,14 +18,11 @@ const STATE =
 const INTERACTION = /:hover|:focus/;
 
 // Every rule whose selector names a state and whose body uses the accent, as
-// "file: selector". Comments are dropped first so a word in one is not a rule.
+// "file: selector".
 export function stateInAccent(file, css) {
   const out = [];
   let examined = 0;
-  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  const rule = /([^{}]+)\{([^{}]*)\}/g;
-  for (let match = rule.exec(source); match; match = rule.exec(source)) {
-    const selector = (match[1] ?? "").trim();
+  for (const { selector, body } of cssRules(css)) {
     if (selector.startsWith("@")) continue;
     examined++;
     const states = selector
@@ -32,7 +30,7 @@ export function stateInAccent(file, css) {
       .map((each) => each.trim())
       .filter((each) => STATE.test(each) && !INTERACTION.test(each));
     if (states.length === 0) continue;
-    if (/var\(--accent(-soft|-line|-ink)?\)/.test(match[2] ?? "")) {
+    if (/var\(--accent(-soft|-line|-ink)?\)/.test(body)) {
       out.push(`${file}: ${states.join(", ")}`);
     }
   }

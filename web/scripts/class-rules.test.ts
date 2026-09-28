@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { emits, positionedModifiers, rulesIn, styleless } from "./class-rules.mjs";
+import { cssRules, emits, positionedModifiers, rulesIn, styleless } from "./class-rules.mjs";
 
 // A class used as a modifier beside another, which also has a rule of its own
 // that takes an element out of normal flow, positions anything carrying both
@@ -34,6 +34,17 @@ describe("how a stylesheet is read", () => {
     // read as the selector and the rule was never seen.
     const { declared } = rulesIn(`/* a note about .overpane */\n.overpane { position: fixed; }`);
     expect(declared.get("overpane")).toContain("position: fixed");
+  });
+
+  it("reads a rule that follows an at-rule statement", () => {
+    const css = `@import "@fontsource/instrument-sans/400.css";\n.overpane { position: fixed; }`;
+    expect(rulesIn(css).declared.get("overpane")).toContain("position: fixed");
+    expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".overpane"]);
+  });
+
+  it("reads a rule inside an at-rule block without the block's prelude", () => {
+    const css = `@media (max-width: 780px) {\n  .chip { padding: 0; }\n}`;
+    expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".chip"]);
   });
 
   it("leaves a selector that is not only class names", () => {
