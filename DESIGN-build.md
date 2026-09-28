@@ -650,10 +650,15 @@ whoever builds rather than whoever installs.
 | `@fontsource/*` under OFL-1.1 | The license fonts are published under. What it withholds is selling the fonts on their own, which is not something a shipped application does |
 | `argparse` under PSF-2.0 | A port of Python's argparse carrying the original's license. Permissive, and compatible |
 
+An exception names a package whole, wherever it is installed: `argparse`
+admits neither `argparse-lite` nor `@someone/argparse`. A name ending in `/`
+names a scope and admits every package in it.
+
 An SPDX expression is evaluated rather than matched: `MIT AND ISC` needs both
 allowed and `(MPL-2.0 OR Apache-2.0)` needs either. Treating the string as a
 name refuses both, and adding the strings to the allowlist accepts every other
-expression spelled that way.
+expression spelled that way. An expression read to anything short of its end,
+a group that never closes included, is refused.
 
 ### Copied files
 

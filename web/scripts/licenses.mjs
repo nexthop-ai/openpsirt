@@ -3,17 +3,13 @@
 
 // The license of everything the interface ships, against the allowlist.
 //
-// The Go side of this has been checked since the build was written: nothing
-// ships unless its license is permissive, because a self-hosted tool is
-// redistributed by whoever installs it and a copyleft dependency makes that
-// their problem. The interface was not checked at all. It ships too — the
-// bundle is built into the binary — so half the shipped tree was going out
-// against a policy the other half was held to.
+// Nothing ships unless its license is permissive, because a self-hosted tool
+// is redistributed by whoever installs it and a copyleft dependency makes that
+// their problem. The Go side is held to the same policy; the interface ships
+// too, because the bundle is built into the binary.
 //
-// The platform product that would have covered it, dependency review, is a
-// paid add-on on a private repository and is not enabled. This is not a
-// stand-in for it: it runs locally with one command, which the action never
-// could, and that is what REQ-75 actually asks for.
+// It runs locally with one command, which the platform's dependency review
+// cannot, and that is what REQ-75 asks for.
 //
 // Development dependencies are unrestricted, as they are on the Go side.
 // Vite, ESLint and the type checker are not in the bundle, and a build tool's
@@ -37,16 +33,13 @@ const allowed = new Set(
 
 // Licenses accepted for one package despite not being on the list.
 //
-// Passed in, like the allowlist above and for the same reason this file states
-// there: the exceptions were hardcoded here, twenty-seven lines under the
-// comment forbidding exactly that, so one license policy had two exception
-// lists in two files and neither mentioned the other. Granting a fourth
-// exception had no single place to be written.
+// Passed in, like the allowlist above and for the same reason: one license
+// policy with its exceptions in two files has no single place a new one is
+// written.
 //
-// Each entry is `prefix=license`, so the license still has to match: an
+// Each entry is `name=license`, so the license still has to match: an
 // exception admits one package's actual license rather than waving the package
-// through. The prefix is anchored to a path boundary, because a prefix match
-// on "argparse" would also admit a package named "argparse-lite".
+// through.
 const exceptions = (process.env.LICENSE_EXCEPTIONS ?? "")
   .split(",")
   .map((each) => each.trim())
@@ -54,15 +47,34 @@ const exceptions = (process.env.LICENSE_EXCEPTIONS ?? "")
   .map((each) => {
     const [prefix, license] = each.split("=");
     if (!prefix || !license) {
-      console.error(`LICENSE_EXCEPTIONS entry ${each} is not prefix=license.`);
+      console.error(`LICENSE_EXCEPTIONS entry ${each} is not name=license.`);
       process.exit(2);
     }
-    const quoted = prefix.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&");
-    return {
-      match: new RegExp(`(^|/)${quoted}${prefix.endsWith("/") ? "" : "($|/)"}`),
-      license,
-    };
+    return { prefix, license };
   });
+
+// The package installed at a lockfile location, with its nested
+// `node_modules/` segments collapsed to "/": the last package name in the
+// path, where a name beginning "@" is a scope and takes the segment after it.
+export function packageAt(location) {
+  const segments = location.split("/").filter(Boolean);
+  let last = "";
+  for (let i = 0; i < segments.length; i++) {
+    last =
+      segments[i].startsWith("@") && i + 1 < segments.length
+        ? `${segments[i]}/${segments[++i]}`
+        : segments[i];
+  }
+  return last;
+}
+
+// Whether an exception names the package at a location. A name is matched
+// whole, so "argparse" admits neither "argparse-lite" nor "@someone/argparse";
+// a name ending in "/" is a scope, and admits every package in it.
+export function excepts(prefix, location) {
+  const name = packageAt(location);
+  return prefix.endsWith("/") ? name.startsWith(prefix) : name === prefix;
+}
 
 // An SPDX expression is not a license name. "MIT AND ISC" is satisfied only if
 // both are allowed; "(MPL-2.0 OR Apache-2.0)" by either. Treating the whole
@@ -80,13 +92,19 @@ export function satisfies(expression, against = allowed) {
     if (tokens[position] === "(") {
       position++;
       const inner = or();
-      position++; // the closing parenthesis
+      // The group has to close here. Taking whatever token stands here as
+      // the bracket swallows a license name, and "(MIT GPL-3.0" reads as MIT.
+      if (tokens[position] !== ")") {
+        position = Number.POSITIVE_INFINITY;
+        return false;
+      }
+      position++;
       return inner;
     }
     const name = tokens[position++];
     // Nothing left to read. A package whose license field is empty or missing
-    // reaches here, and throwing was a worse answer than refusing: the gate
-    // exited with a stack trace rather than naming the package.
+    // reaches here, and is refused rather than thrown on, so the gate names
+    // the package.
     if (name === undefined) return false;
     // A trailing "+" means this version of the license or later.
     return against.has(name.replace(/\+$/, ""));
@@ -145,7 +163,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     }
     if (satisfies(license)) continue;
 
-    const exception = exceptions.find((e) => e.match.test(name) && e.license === license);
+    const exception = exceptions.find((e) => excepts(e.prefix, name) && e.license === license);
     if (exception) {
       excepted.push(`${name} (${license})`);
       continue;
