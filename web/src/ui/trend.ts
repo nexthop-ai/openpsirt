@@ -8,7 +8,7 @@
 // blank line: the blank invites a question, and the sentence answers one.
 
 // One step of the trend, as much of it as the readings use.
-export type Step = {
+type Step = {
   open?: number;
   opened?: number;
   resolved?: number;

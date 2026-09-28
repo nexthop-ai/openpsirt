@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Which exports of the web source nothing else names.
+// Which exports of the web source nothing else imports.
 //
 // An export with no importer is a defect rather than spare capacity: a reader
 // takes it for an interface something depends on. A module's own use needs no
@@ -9,9 +9,11 @@
 // only way a module's pure part is reached from one; so a symbol only its own
 // tests reach passes, as it does in the server's check.
 //
-// It reads names rather than a module graph: an export is used where another
-// file names it as a word. That can pass a name that is also an ordinary word
-// in a comment elsewhere, and cannot fail one that is imported.
+// It reads the names other files import — an import or re-export clause, a
+// destructured dynamic import, and a lazily loaded screen's `m.Name` — rather
+// than every word, so a local of the same name, a heading or a comment is not
+// taken for an importer. It does not resolve paths: a name imported from any
+// module counts for every module exporting it.
 
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -33,21 +35,44 @@ function files(dir) {
   return out;
 }
 
+// The names one file imports from others.
+const clause = /\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s/g;
+const dynamic = /\{([^}]*)\}\s*=\s*await\s+import\(/g;
+const lazily = /\bm\.([A-Za-z_$][\w$]*)/g;
+
+export function importedBy(text) {
+  const names = new Set();
+  for (const pattern of [clause, dynamic]) {
+    for (const [, list] of text.matchAll(pattern)) {
+      for (const part of list.split(",")) {
+        const name = part
+          .trim()
+          .replace(/^type\s+/, "")
+          .split(/\s+as\s+/)[0]
+          .trim();
+        if (name) names.add(name);
+      }
+    }
+  }
+  if (/\blazy\(/.test(text)) for (const [, name] of text.matchAll(lazily)) names.add(name);
+  return names;
+}
+
 // unnamed takes the source as { file: text } and returns every export no
-// other file names, as "file: name".
+// other file imports, as "file: name".
 export function unnamed(sources) {
-  const names = Object.entries(sources).map(([file, text]) => ({
+  const files = Object.entries(sources).map(([file, text]) => ({
     file,
     text,
-    words: new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []),
+    imports: importedBy(text),
   }));
   const found = [];
   let examined = 0;
-  for (const { file, text } of names) {
+  for (const { file, text } of files) {
     if (/\.test\.(ts|tsx)$/.test(file)) continue;
     for (const [, name] of text.matchAll(declared)) {
       examined += 1;
-      const named = names.some((other) => other.file !== file && other.words.has(name));
+      const named = files.some((other) => other.file !== file && other.imports.has(name));
       if (!named) found.push(`${file}: ${name}`);
     }
   }

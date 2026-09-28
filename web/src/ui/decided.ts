@@ -12,7 +12,7 @@ import { drawn } from "./states";
 // name for: a claim sent back to its author, which is what the proposer is
 // looking for in a list, and the empty state — some places answered and the
 // rest not, which is neither decided nor undecided and has to say so.
-export type Decided = { word: string; cls: string };
+type Decided = { word: string; cls: string };
 
 export function decidedAs(state?: string, sentBack?: boolean): Decided {
   if (sentBack) return { word: "Rejected", cls: "lapsed" };

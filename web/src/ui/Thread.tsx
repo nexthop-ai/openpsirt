@@ -23,7 +23,7 @@ import { at } from "./when";
 // query, the two mutations and the history read arrive as props rather than
 // being built here from a word.
 
-export type Said = {
+type Said = {
   id?: number;
   body?: string;
   written_by?: string;
@@ -180,7 +180,7 @@ export function Thread({
   );
 }
 
-export type Version = { version?: number; body?: string; replaced_at?: string };
+type Version = { version?: number; body?: string; replaced_at?: string };
 
 // A piece's earlier wording, before it was changed.
 //

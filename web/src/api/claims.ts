@@ -9,7 +9,7 @@ import { unwrap } from "./queries";
 // many decisions it wrote. The row carries the claim, what it wrote, how far
 // it reaches, and — for a claim over many issues — its outliers.
 type QueueRow = Body<"WaitingBody">;
-export type Outliers = Body<"OutliersBody">;
+type Outliers = Body<"OutliersBody">;
 type FindingRef = Body<"FindingRefBody">;
 // The case against agreeing.
 type Counter = Body<"CounterBody">;

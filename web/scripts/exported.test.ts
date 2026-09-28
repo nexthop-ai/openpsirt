@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { unnamed, webSources } from "./exported.mjs";
+import { importedBy, unnamed, webSources } from "./exported.mjs";
 
 describe("an export in the web source", () => {
   it("is named by some other file", () => {
@@ -26,5 +26,20 @@ describe("an export in the web source", () => {
       "a.test.ts": 'import { kept } from "./a";\n',
     }) as { found: string[] };
     expect(found).toEqual([]);
+  });
+
+  it("is reported where the only other mention is a local of the same name", () => {
+    const { found } = unnamed({
+      "a.ts": "export type Step = { name: string };\n",
+      "b.ts": "type Step = { at: number };\n// Step by step.\n",
+    }) as { found: string[] };
+    expect(found).toEqual(["a.ts: Step"]);
+  });
+
+  it("counts a lazily loaded screen as imported", () => {
+    const names = importedBy(
+      'const Home = lazy(() => import("./Home").then((m) => ({ default: m.Home })));',
+    ) as Set<string>;
+    expect(names.has("Home")).toBe(true);
   });
 });

@@ -54,7 +54,7 @@ export function agreeing(people: number): string {
 }
 
 // What has to happen before an advisory can go out.
-export type Missing = "" | "flaws" | "agreement";
+type Missing = "" | "flaws" | "agreement";
 
 // Nothing named comes first: an advisory covering no flaw generates no
 // document at all, so an agreement is not the next thing to go looking for.

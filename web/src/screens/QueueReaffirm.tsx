@@ -19,7 +19,7 @@ type Row = Body<"ToReaffirmBody">;
 
 // What one act re-made: how many claims, and how many of those wait for a
 // second person.
-export type Reaffirmed = { claims: number; waiting: number };
+type Reaffirmed = { claims: number; waiting: number };
 
 // What to say about it once the rows it came from have left the list.
 export function reaffirmedNotice(made: Reaffirmed): string {
