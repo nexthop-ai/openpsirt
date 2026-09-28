@@ -935,7 +935,7 @@ question widened by a case the subject was brought into.
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
-| Findings, places, runs, promised upgrades, carried patches, publisher statements, readiness, standing | Refused |
+| Findings, places, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the tags in use | Refused |
 | What each run opened and closed | Refused, for an empty list of runs as well |
 | The receipts list | The receipts, with no counts of what each run changed. The receipts are the pipeline's own; the counts are a report on findings |
 

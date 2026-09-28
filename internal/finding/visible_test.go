@@ -146,8 +146,9 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 		if got := open(f.holding(t, access.PublicRead)); got != 1 {
 			t.Errorf("a reader of disclosed findings only was told %d, expected 1", got)
 		}
-		if got := open(access.NewPerson(2, "stranger", false, nil, 0)); got != 0 {
-			t.Errorf("somebody with no rights was told %d", got)
+		if _, err := f.store.Releases(t.Context(), access.NewPerson(2, "stranger", false, nil, 0),
+			f.productID); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody with no rights got %v, want a refusal", err)
 		}
 	})
 }
@@ -260,6 +261,19 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 				}},
 				{"how the builds stand", func(s access.Subject) error {
 					_, _, err := f.store.HowItStands(ctx, s, f.productID)
+					return err
+				}},
+				{"what the releases hold", func(s access.Subject) error {
+					_, err := f.store.Releases(ctx, s, f.productID)
+					return err
+				}},
+				{"the tags in use", func(s access.Subject) error {
+					_, err := f.store.TagsInUse(ctx, s, f.productID)
+					return err
+				}},
+				{"how a release is trending", func(s access.Subject) error {
+					_, err := f.store.ReleaseTrend(ctx, s,
+						finding.Scope{ProductID: &f.productID}, 10)
 					return err
 				}},
 			} {

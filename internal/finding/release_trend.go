@@ -61,9 +61,16 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
-	// nothing is the first, and is answered below.
+	// nothing anywhere is the first, and is answered below.
 	if subject.Kind != access.Person {
 		return nil, access.Denied("read how a release is trending")
+	}
+	// A named product this subject reads nothing in is refused rather than
+	// drawn as a chart with nothing on it.
+	if scope.ProductID != nil {
+		if _, err := access.Readable(subject, *scope.ProductID); err != nil {
+			return nil, err
+		}
 	}
 	products, all := subject.Products()
 	if !all && len(products) == 0 {

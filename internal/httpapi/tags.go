@@ -5,10 +5,12 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -116,7 +118,10 @@ func registerTags(api huma.API, in Ingest) {
 			return nil, err
 		}
 		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, noSuchProduct()
+		case err != nil:
 			return nil, wentWrong(in.logger(), "the tags could not be read", err)
 		}
 		out := &listOutput[string]{}

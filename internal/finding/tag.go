@@ -154,9 +154,9 @@ func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 func (s *Store) TagsInUse(ctx context.Context, subject access.Subject,
 	productID int64) ([]string, error) {
 
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return nil, nil
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return nil, err
 	}
 	var rows []struct {
 		Typed string `bun:"typed"`

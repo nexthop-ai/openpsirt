@@ -168,7 +168,12 @@ func registerReports(api huma.API, in Ingest) {
 			return nil, err
 		}
 		releases, err := finding.NewStore(in.DB.DB).Releases(ctx, subject, named.ID)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			// A product somebody sees and reads nothing in answers as one
+			// they cannot see, for the reason the lookup above does.
+			return nil, noSuchProduct()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "what is open per build could not be read", err)
 		}
 		out := &listOutput[ReleaseBody]{}
