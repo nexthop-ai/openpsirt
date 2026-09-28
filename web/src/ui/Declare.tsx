@@ -76,6 +76,34 @@ export function Declare({
   );
 }
 
+// Whether what a place builds reaches customers, as a yes or no. One control,
+// because its wording and what it feeds have to read the same wherever a place
+// is declared or edited.
+export function FacingField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>Ships to customers</label>
+      <select
+        id={id}
+        value={value ? "yes" : "no"}
+        onChange={(event) => onChange(event.target.value === "yes")}
+      >
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+      <span className="hint">Feeds how urgent a finding here is</span>
+    </div>
+  );
+}
+
 // One labeled input, so the forms look like one thing.
 export function Field({
   label,

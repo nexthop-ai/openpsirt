@@ -346,9 +346,8 @@ export function Streams() {
         ok={kind === "tag" ? "Add tag" : "Add branch"}
         hint="Naming the branch a tag was cut from carries its decisions into the tag."
       >
-        {/* The label wraps the input, as every other field here does. Beside
-            it with no htmlFor and no id, a screen reader announced a text
-            field with no name at all. */}
+        {/* The label wraps the input, as every other field here does, so a
+            screen reader names the field. */}
         <label className="field">
           <span>Product</span>
           <input {...notACredential} type="text" value={product} disabled />
