@@ -72,7 +72,7 @@ func registerRouting(api huma.API, in Ingest) {
 			return nil, err
 		}
 		// The store asks for triage on the product, which is what the
-		// declaration says and what its three siblings enforce.
+		// declaration says and what its sibling routes enforce.
 		rules, err := finding.NewStore(in.DB.DB).Rules(ctx, subject, product.ID)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, noSuchProduct()

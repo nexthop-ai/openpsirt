@@ -122,7 +122,8 @@ type Arriving struct {
 	Serial string
 	// ParserVersion is the version of the code that will read it.
 	ParserVersion string
-	// Credential identifies what sent it. Blank until sign-in exists.
+	// Credential identifies what sent it: the identity of the key or the person
+	// the upload was authenticated as.
 	Credential string
 }
 
