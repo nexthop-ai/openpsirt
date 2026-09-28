@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -348,6 +349,119 @@ func TestARuleThatOutgrewItsBoundDoesNotStopTheRestOfTheSweep(t *testing.T) {
 		// The rule ordered after it still ran, which is the whole point.
 		if placed == 0 {
 			t.Error("nothing was placed, so the rule behind the outgrown one never ran")
+		}
+	})
+}
+
+// flat is a build of the named libraries, each directly under the root, with
+// one issue reported against each.
+func (f *fixture) flat(t *testing.T, names ...string) {
+	t.Helper()
+	snap := graph.Snapshot{Root: root}
+	var reported []finding.Reported
+	for i, name := range names {
+		library := at(name, "1.0")
+		snap.Components = append(snap.Components, library)
+		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: library})
+		reported = append(reported, found(fmt.Sprintf("CVE-2026-%d", i+1), library))
+	}
+	f.shipped(t, snap)
+	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The preview's total is how many components a rule matches, not how many it
+// names: the names are a sample.
+func TestAPreviewCountsEveryComponentItMatchesBeyondTheSample(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.flat(t, "libone", "libtwo", "libthree")
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		caught, err := f.store.WouldMatch(t.Context(), who, f.productID, "lib*", "", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caught.Total != 3 || len(caught.Components) != 1 {
+			t.Errorf("the preview says %d components and names %v, want 3 and a sample of 1",
+				caught.Total, caught.Components)
+		}
+	})
+}
+
+// A rule's `*` is its only wildcard. The characters LIKE treats as wildcards
+// appear in real package names and match themselves, on every engine.
+func TestARulePatternMatchesUnderscoreAndPercentLiterally(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.flat(t, "lib_a", "libxa", "lib%b", "libyb")
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		for pattern, want := range map[string]string{"lib_*": "lib_a", "lib%*": "lib%b"} {
+			caught, err := f.store.WouldMatch(t.Context(), who, f.productID, pattern, "", 20)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if caught.Total != 1 || len(caught.Components) != 1 || caught.Components[0] != want {
+				t.Errorf("%q matched %v, want only %s", pattern, caught.Components, want)
+			}
+		}
+	})
+}
+
+// A batch is bounded across rules: a rule that fills it leaves nothing for the
+// rules after it, and the sweep says it filled.
+func TestARuleThatFillsTheBatchLeavesTheRulesAfterItForTheNextOne(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.flat(t, "libone", "libtwo")
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+		for _, name := range []string{"libone", "libtwo"} {
+			if _, err := f.store.AddRule(ctx, who, f.productID, where, name, name, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+		placed, filled, _, err := f.store.ApplyRules(ctx, f.productID, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if placed != 1 || !filled {
+			t.Errorf("a batch of one placed %d and says filled %v, want 1 and true", placed, filled)
+		}
+		held := map[int64]bool{}
+		for _, row := range f.open(t) {
+			if row.AssignedTo != nil {
+				held[row.ComponentID] = true
+			}
+		}
+		if len(held) != 1 {
+			t.Errorf("%d components are held after a batch of one, want the first rule's", len(held))
+		}
+	})
+}
+
+// A rule pointing at a retired team places nothing.
+func TestARuleForARetiredTeamPlacesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.flat(t, "libone")
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "libone", "libone", ""); err != nil {
+			t.Fatal(err)
+		}
+		if err := access.NewStore(f.db.DB).RetireTeam(ctx, where); err != nil {
+			t.Fatal(err)
+		}
+		placed, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if placed != 0 {
+			t.Errorf("a rule for a retired team placed %d rows", placed)
+		}
+		for _, row := range f.open(t) {
+			if row.AssignedTo != nil {
+				t.Errorf("a row is held after the only rule's team retired: %+v", row)
+			}
 		}
 	})
 }

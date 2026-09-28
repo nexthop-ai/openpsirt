@@ -420,6 +420,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | Rule | Reason |
 |---|---|
 | The preview asks exactly what the sweep asks, sharing the predicate | A preview that disagreed with the rule would be a confident wrong answer about the one thing nobody can otherwise see. It does not account for the rules already there, so it is named for what it *matches* rather than what it will place |
+| The preview names a sample of the components and counts all of them | A rule beneath a kernel matches hundreds of modules; the names are a sample to read and the total is its own count over the same narrowing |
 | How many one pass places is a setting | A bulk write is bounded and the bound belongs where an operator can move it: a pass too large holds a connection through the whole of it, and one too small leaves a fifty-thousand-finding product re-queuing twenty-five times. It was a constant in the sweeper and a second constant in the writer — two numbers for one bound — under a comment declining the decision without citing it |
 | The preview is narrowed like every other count (REQ-42, REQ-43) | Read unnarrowed, the gap between the preview and the same person's findings list is exactly the amount of undisclosed work. Somebody who may see nothing is told nothing rather than zero |
 | A rule places only work nobody holds | A human assignment always wins. A rule able to override one would perform the assigner's act continuously on behalf of whoever wrote it, with nobody holding the right at the moment it happened |
