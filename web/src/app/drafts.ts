@@ -56,13 +56,42 @@ let writer = "";
 // belongTo records whose drafts this page is reading and writing, and takes
 // away what is not theirs.
 //
-// A session that lapsed left its drafts behind, and the identity in the key
-// only stopped them being read back into the same form — it did not stop them
-// being in the storage. Whoever is here now is the only person whose text
-// belongs on this browser.
+// Whoever is here now is the only person whose text belongs on this browser,
+// and the only person whose session state belongs in this tab. A lapsed
+// session is resumed by signing in again in the same tab, so the session
+// store is still there when somebody else does it: it records whose it is,
+// and a different person arriving clears it.
+//
+// Only once somebody is recognized. An empty identity is the page still
+// finding out who is here, and clearing then would clear on every load.
 export function belongTo(identity: string | undefined) {
   writer = identity ?? "";
-  if (writer) sweep();
+  if (!writer) return;
+  const owner = encodeURIComponent(writer);
+  try {
+    const held = window.sessionStorage.getItem(SESSION_OWNER);
+    if (held !== null && held !== owner) forgetSession();
+    window.sessionStorage.setItem(SESSION_OWNER, owner);
+  } catch {
+    // A browser that refuses storage holds no session state to clear.
+  }
+  sweep();
+}
+
+// ownsSession reports whether the session state in this tab is the current
+// person's to read.
+//
+// Asked by each reader of it, because a screen can render before the session
+// is known and before belongTo has cleared somebody else's. State recorded for
+// a person is read back only once that same person is recognized; state
+// nobody has claimed discloses nobody's.
+export function ownsSession(): boolean {
+  try {
+    const held = window.sessionStorage.getItem(SESSION_OWNER);
+    return held === null || (writer !== "" && held === encodeURIComponent(writer));
+  } catch {
+    return false;
+  }
 }
 
 // sweep drops every draft that is somebody else's or older than the window.
@@ -240,31 +269,27 @@ export function forget(about: string | undefined) {
   }
 }
 
-// forgetAll clears every draft this browser holds, whoever wrote them.
-//
-// Called on sign-out, which is the control the local draft rests on: drafts
-// hold triage text, private findings included, and text surviving a sign-out
-// would be exposed in a way the application itself is not. Every writer's, not
-// only the one signing out — a draft left by an earlier session is exactly the
-// one nobody would think to clear.
-// Session-scoped state kept outside the drafts, which sign-out also takes
-// away. Named here rather than in the two modules that write it, and imported
-// by them, so the clear and its writers cannot drift apart — and so that this
-// module, which is loaded with the frame, pulls nothing else in behind it.
+// Session-scoped state kept outside the drafts, which sign-out and a change of
+// person also take away. Named here rather than in the two modules that write
+// it, and imported by them, so the clear and its writers cannot drift apart —
+// and so that this module, which is loaded with the frame, pulls nothing else
+// in behind it.
 //
 // The look and the rail are not here: those are preferences, and a preference
 // surviving a sign-out is what a preference is.
 export const SCOPE_KEPT = "openpsirt.scope";
 export const DECIDE_KEPT = "openpsirt.decide.last";
-const SESSION_KEPT = [SCOPE_KEPT, DECIDE_KEPT];
+// Whose the session state in this tab is.
+const SESSION_OWNER = "openpsirt.session.owner";
+const SESSION_KEPT = [SCOPE_KEPT, DECIDE_KEPT, SESSION_OWNER];
 
 // forgetSession clears what belongs to the session rather than to the browser.
 //
-// Sign-out is a same-tab navigation, so the session store survives it by
-// construction: the next person to sign in was handed the previous person's
-// product, branch and variant in the scope bar and their last outcome and
-// reasoning in the decision form — including a product name they may hold no
-// grant on.
+// Sign-out is a same-tab navigation, and a lapsed session is resumed in the
+// same tab, so the session store survives both by construction. Left in
+// place, the next person to sign in is handed the previous person's product,
+// branch and variant in the scope bar and their last outcome and reasoning in
+// the decision form — including a product name they may hold no grant on.
 export function forgetSession() {
   try {
     for (const key of SESSION_KEPT) window.sessionStorage.removeItem(key);
@@ -278,6 +303,13 @@ export function forgetSession() {
   forgetPlaces();
 }
 
+// forgetAll clears every draft this browser holds, whoever wrote them.
+//
+// Called on sign-out, which is the control the local draft rests on: drafts
+// hold triage text, private findings included, and text surviving a sign-out
+// would be exposed in a way the application itself is not. Every writer's, not
+// only the one signing out — a draft left by an earlier session is exactly the
+// one nobody would think to clear.
 export function forgetAll() {
   try {
     const going: string[] = [];
