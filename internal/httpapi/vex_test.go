@@ -824,3 +824,103 @@ func TestAVEXDocumentSaysNothingFixedWhileAPlaceIsOpen(t *testing.T) {
 		}
 	})
 }
+
+// vexStatements reads the build's document as issue, status and the
+// subcomponent each statement names, in the order the document holds them.
+func (r *reach) vexStatements(t *testing.T) [][3]string {
+	t.Helper()
+	var doc struct {
+		Statements []struct {
+			Vulnerability struct {
+				Name string `json:"name"`
+			} `json:"vulnerability"`
+			Status   string `json:"status"`
+			Products []struct {
+				Subcomponents []struct {
+					ID string `json:"@id"`
+				} `json:"subcomponents"`
+			} `json:"products"`
+		} `json:"statements"`
+	}
+	read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+	var out [][3]string
+	for _, one := range doc.Statements {
+		inside := ""
+		if len(one.Products) == 1 && len(one.Products[0].Subcomponents) == 1 {
+			inside = one.Products[0].Subcomponents[0].ID
+		}
+		out = append(out, [3]string{one.Vulnerability.Name, one.Status, inside})
+	}
+	return out
+}
+
+func TestAVEXDocumentIsOrderedByIssueWhateverOrderItWasDecidedIn(t *testing.T) {
+	// Two documents for one build are diffed by whoever receives them, so the
+	// statements come out in one order on every engine: by issue, then by
+	// component. The later-named issue is decided first here.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		first, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+		second, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
+		for _, id := range []int64{first, second} {
+			if got := asPerson(t, r, "reviewer", http.MethodPost,
+				fmt.Sprintf("/v1/claims/%d/approval", id), `{}`); got.Code != http.StatusOK {
+				t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+			}
+		}
+		got := r.vexStatements(t)
+		if len(got) != 2 || got[0][0] != "CVE-2026-1000" || got[1][0] != "CVE-2026-9999" {
+			t.Errorf("the document holds %v, want CVE-2026-1000 before CVE-2026-9999", got)
+		}
+	})
+}
+
+func TestAnAlreadyFixedClaimPublishesAsFixed(t *testing.T) {
+	// The version shipping here carries the fix, which the format calls
+	// fixed. Published as not affected, it would say the flaw never reached
+	// the build.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
+			`{"outcome":"already-fixed","fixed_version":"5.10.0-27",`+
+				`"reasoning":"The vendor backported the fix into this kernel."}`)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		got := r.vexStatements(t)
+		if len(got) != 1 || got[0][1] != "fixed" {
+			t.Errorf("an already-fixed claim published as %v, want one fixed statement", got)
+		}
+	})
+}
+
+func TestAComponentWithNoPackageIdentifierIsNamedByItsName(t *testing.T) {
+	// A statement with no subcomponent reads as no claim at all, so a
+	// component the build names without a package identifier is named by
+	// the name the build gives it.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		r.patchedRows(t, `UPDATE "component" SET "purl" = NULL WHERE "name" = 'linux-image'`)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		got := r.vexStatements(t)
+		if len(got) != 1 || got[0][2] != "linux-image" {
+			t.Errorf("an agreed claim on a component with no identifier names %v, want linux-image", got)
+		}
+	})
+}
+
+func TestAPatchOnAComponentWithNoPackageIdentifierIsNamedByItsName(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.patchedKernel(t)
+		r.patchedRows(t, `UPDATE "component" SET "purl" = NULL WHERE "name" = 'linux-image'`)
+		fixed := r.fixedIn(t)
+		if len(fixed["CVE-2026-9999"]) != 1 || fixed["CVE-2026-9999"][0] != "linux-image" {
+			t.Errorf("a patch on a component with no identifier names %v, want linux-image", fixed)
+		}
+	})
+}

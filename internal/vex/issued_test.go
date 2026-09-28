@@ -4,8 +4,13 @@
 package vex_test
 
 import (
+	"context"
 	"encoding/json"
+	"strings"
+	"sync"
 	"testing"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -67,6 +72,86 @@ func TestADocumentRecordedAfterSomebodyElsesStatesTheLaterVersion(t *testing.T) 
 		if !doc.Timestamp.Equal(recorded.IssuedAt) {
 			t.Errorf("the document is dated %v and was recorded at %v",
 				doc.Timestamp, recorded.IssuedAt)
+		}
+	})
+}
+
+// insertsIssuance runs rival before the first statement writing an issuance,
+// on another connection, and counts the writes it sees.
+type insertsIssuance struct {
+	once   sync.Once
+	rival  func()
+	writes int
+}
+
+func (h *insertsIssuance) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if strings.HasPrefix(e.Query, "INSERT ") && strings.Contains(e.Query, "vex_issuance") {
+		h.writes++
+		h.once.Do(h.rival)
+	}
+	return ctx
+}
+
+func (h *insertsIssuance) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
+	// Both read the same highest number inside their transactions, and the
+	// unique constraint refuses the second write. That refusal is a lost race:
+	// the whole attempt is taken again, reads the number the first wrote, and
+	// records the next one. SQLite has one connection, so nothing lands
+	// between the read and the write there.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		if db.Stats().MaxOpenConnections == 1 {
+			t.Skip("one connection: nothing lands between a read and a write")
+		}
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.Resolve(ctx, "sonic", "master", "broadcom"); err != nil {
+			t.Fatal(err)
+		}
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
+			access.Stated(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subject := access.NewPerson(who.ID, who.Email, false,
+			map[int64][]access.Role{product.ID: {access.PublicTriage}}, 0)
+		named := publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
+
+		hook := &insertsIssuance{rival: func() {
+			if _, err := vex.NewStore(db.DB).Issued(context.Background(), subject, named,
+				"sonic", "master", "broadcom"); err != nil {
+				t.Errorf("the rival issuance: %v", err)
+			}
+		}}
+		hooked := bun.NewDB(db.DB.DB, db.Dialect())
+		hooked.AddQueryHook(hook)
+
+		recorded, err := vex.NewStore(hooked).Issued(ctx, subject, named, "sonic", "master", "broadcom")
+		if err != nil {
+			t.Fatalf("an issuance that lost the race for its number answered %v", err)
+		}
+		if hook.writes != 2 {
+			t.Errorf("the issuance was written %d times, want a refused write and its retry", hook.writes)
+		}
+		var doc vex.Statements
+		if err := json.Unmarshal([]byte(recorded.Document), &doc); err != nil {
+			t.Fatal(err)
+		}
+		if recorded.Ordinal != 2 || doc.Version != 2 {
+			t.Errorf("recorded as revision %d, the document handed back says %d, want 2",
+				recorded.Ordinal, doc.Version)
 		}
 	})
 }
