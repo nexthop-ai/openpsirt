@@ -410,10 +410,8 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 
 // coveringEach counts what each of these claims covers right now.
 //
-// One statement for the page rather than three round trips per claim. The
-// visibilities are read once over the whole set rather than per claim: where a
-// set spans products the answer is the narrower one, which discloses less
-// rather than more, and that is the same rule the per-claim read followed.
+// One statement for the page rather than three round trips per claim,
+// narrowed per product at the visibility the reader holds in each.
 func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	claims []int64) (map[int64]int, error) {
 

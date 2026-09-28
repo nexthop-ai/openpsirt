@@ -117,7 +117,7 @@ func registerObligations(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who recorded these could not be read", err)
 		}
-		named, err := store.WindowsNamed(ctx, told)
+		named, err := store.WindowsNamed(ctx, subject, told)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the windows could not be read", err)
 		}
@@ -308,7 +308,7 @@ func registerObligations(api huma.API, in Ingest) {
 			return nil, refusedDecision(in.Logger, err)
 		}
 		byRecord := map[int64][]obligation.Told{told.ExploitedHereID: {*told}}
-		named, err := store.WindowsNamed(ctx, byRecord)
+		named, err := store.WindowsNamed(ctx, subject, byRecord)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the window could not be read", err)
 		}
@@ -336,7 +336,8 @@ func refusedWindow(in Ingest, err error) error {
 }
 
 // windowFor is a window as a response carries it. What the reader may read of
-// it is decided by the store, which hands over the window already narrowed.
+// it is decided before it arrives here: the list is narrowed by the store, and
+// a window just declared or changed by its handler, through the same rule.
 func windowFor(window obligation.Window) WindowBody {
 	body := WindowBody{
 		ID: window.ID, Name: window.Name, Hours: window.Hours,

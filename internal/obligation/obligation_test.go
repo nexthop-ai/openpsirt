@@ -333,7 +333,36 @@ func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
 		}
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &here.ID, "ENISA",
 			knownAt.Add(time.Hour), "Told."); err != nil {
-			t.Errorf("a notice naming a window limited to its own product answered %v", err)
+			t.Fatalf("a notice naming a window limited to its own product answered %v", err)
+		}
+
+		// Renamed and limited since to a product the triager may not know,
+		// the window is read as the list of windows reads it: not at all.
+		if _, err := f.store.ChangeWindow(ctx, f.admin, here.ID, obligation.WindowSaid{
+			Name: "Other's second window", Hours: 24, Products: []string{"other"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		told, err := f.store.ToldAbout(ctx, f.triager, []int64{record.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(told[record.ID]) != 1 {
+			t.Fatalf("the triager read %d notices, want 1", len(told[record.ID]))
+		}
+		named, err := f.store.WindowsNamed(ctx, f.triager, told)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name, ok := named[here.ID]; ok {
+			t.Errorf("a notice names %q, a window since limited to a product the reader may not know", name)
+		}
+		named, err = f.store.WindowsNamed(ctx, access.Everything("a check"), told)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if named[here.ID] != "Other's second window" {
+			t.Errorf("read as the deployment, the notice names %v", named)
 		}
 	})
 }
@@ -487,7 +516,7 @@ func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		named, err := f.store.WindowsNamed(ctx, told)
+		named, err := f.store.WindowsNamed(ctx, f.triager, told)
 		if err != nil {
 			t.Fatal(err)
 		}

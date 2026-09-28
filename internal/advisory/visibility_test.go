@@ -226,6 +226,14 @@ func TestWhatWentOutIsReadAtEveryFlawTheAdvisoryEverCovered(t *testing.T) {
 				if got.sent[name] {
 					t.Errorf("%s was among the documents sent to %s", name, who)
 				}
+				if got.issuances[name] {
+					t.Errorf("what %s went out as was read by %s", name, who)
+				}
+			}
+			// The document carries every revision's summary in its history.
+			if _, err := f.store.ForAdvisory(ctx, subject, issuer, repointed); !errors.Is(
+				err, advisory.ErrNoSuchAdvisory) {
+				t.Errorf("%s generated %s, which carries what went out before: %v", who, repointed, err)
 			}
 		}
 
@@ -241,6 +249,9 @@ func TestWhatWentOutIsReadAtEveryFlawTheAdvisoryEverCovered(t *testing.T) {
 			if !got.published[name] {
 				t.Errorf("%s was not reported as published to a private reader of sonic", name)
 			}
+		}
+		if !got.issuances[repointed] {
+			t.Errorf("what %s went out as was not read by a private reader of sonic", repointed)
 		}
 	})
 }

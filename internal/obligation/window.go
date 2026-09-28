@@ -234,6 +234,15 @@ func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
+	return s.withLimits(ctx, windows)
+}
+
+// withLimits fills in the products each window is limited to, which the
+// window row itself does not carry.
+func (s *Store) withLimits(ctx context.Context, windows []Window) ([]Window, error) {
+	if len(windows) == 0 {
+		return windows, nil
+	}
 	ids := make([]int64, 0, len(windows))
 	for _, window := range windows {
 		ids = append(ids, window.ID)
@@ -243,7 +252,7 @@ func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 		ProductID int64  `bun:"product_id"`
 		Product   string `bun:"product"`
 	}
-	err = s.db.NewSelect().
+	err := s.db.NewSelect().
 		TableExpr(`"obligation_window_product" AS "owp"`).
 		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
 		ColumnExpr(`owp.window_id AS "window_id"`).

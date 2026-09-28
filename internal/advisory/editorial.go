@@ -371,7 +371,7 @@ func (s *Store) Where(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	gone, err := s.issuances(ctx, row)
+	gone, err := s.issuances(ctx, subject, row)
 	if err != nil {
 		return nil, err
 	}

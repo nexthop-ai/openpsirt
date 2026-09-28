@@ -369,3 +369,90 @@ func TestDecisionsAcrossProductsAreDescribedAtTheVisibilityReadInEach(t *testing
 		}
 	})
 }
+
+func TestGrowthSinceAgreementIsCountedAtTheVisibilityReadInEachProduct(t *testing.T) {
+	// The growth report spans products, and each visibility is a grant held
+	// per product. An undisclosed finding a claim reached since it was agreed
+	// to is growth to somebody reading undisclosed work in its product,
+	// whatever else the page holds.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other := f.secondProduct(t)
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		f.finds(t, f.build(t, f.product, "2026.03"), libfoo, "place-here", access.Private)
+		f.finds(t, f.build(t, other, "2026.03"), libfoo, "place-there", access.Public)
+
+		triaging := []access.Role{access.PublicTriage, access.PrivateTriage}
+		both := f.holding(t, "triager-of-both", map[int64][]access.Role{
+			f.product: triaging, other: triaging,
+		})
+		approving := append([]access.Role{access.Approver}, triaging...)
+		approver := f.holding(t, "approver-of-both", map[int64][]access.Role{
+			f.product: approving, other: approving,
+		})
+		here := f.proposes(t, both, f.placeIn(f.product, "place-here", access.Private))
+		there := f.proposes(t, both, f.placeIn(other, "place-there", access.Public))
+		for _, claim := range []int64{here.ClaimID, there.ClaimID} {
+			if _, err := f.store.ApproveClaim(ctx, approver, claim, "", nil, ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// A build arriving afterwards, which the claim reaches by matching.
+		f.finds(t, f.build(t, f.product, "2026.06"), libfoo, "place-here", access.Private)
+
+		mixed := f.holding(t, "mixed-reader", map[int64][]access.Role{
+			f.product: {access.PublicRead, access.PrivateRead},
+			other:     {access.PublicRead},
+		})
+		read, err := f.store.Scrutinize(ctx, mixed, nil, time.Time{}, time.Time{}, 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		grown := false
+		for _, row := range read.Grew {
+			if row.ClaimID == here.ClaimID && row.Covered == 1 && row.CoversNow == 2 {
+				grown = true
+			}
+		}
+		if !grown {
+			t.Errorf("an undisclosed claim in a product read privately was not reported grown: %+v", read.Grew)
+		}
+	})
+}
+
+func TestWhatAnApprovalCoveredIsCountedAtTheVisibilityHeldInEachProduct(t *testing.T) {
+	// One claim over two products, agreed to by somebody reading undisclosed
+	// work in one and disclosed work in the other. What they agreed to is
+	// both findings, each at the visibility they hold in its product.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other := f.secondProduct(t)
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		f.finds(t, f.build(t, f.product, "2026.03"), libfoo, "place-here", access.Private)
+		f.finds(t, f.build(t, other, "2026.03"), libfoo, "place-there", access.Public)
+
+		triaging := []access.Role{access.PublicTriage, access.PrivateTriage}
+		both := f.holding(t, "triager-of-both", map[int64][]access.Role{
+			f.product: triaging, other: triaging,
+		})
+		claim := f.proposes(t, both,
+			f.placeIn(f.product, "place-here", access.Private),
+			f.placeIn(other, "place-there", access.Public))
+
+		mixed := f.holding(t, "mixed-approver", map[int64][]access.Role{
+			f.product: {access.Approver, access.PublicTriage, access.PrivateTriage},
+			other:     {access.Approver, access.PublicTriage},
+		})
+		if _, err := f.store.ApproveClaim(ctx, mixed, claim.ClaimID, "", nil, ""); err != nil {
+			t.Fatal(err)
+		}
+		var covered int
+		if err := f.db.NewRaw(`SELECT "covered" FROM "claim_approval" WHERE "claim_id" = ?`,
+			claim.ClaimID).Scan(ctx, &covered); err != nil {
+			t.Fatal(err)
+		}
+		if covered != 2 {
+			t.Errorf("the approval records it covered %d findings, want 2", covered)
+		}
+	})
+}
