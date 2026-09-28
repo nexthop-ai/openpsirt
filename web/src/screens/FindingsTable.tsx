@@ -9,7 +9,7 @@ import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
 import { on } from "../ui/when";
 import { Peek, Sits } from "./FindingsViews";
-import { SORTS, pathTo, type Row } from "./list";
+import { SORTS, identityOf, pathTo, type Row } from "./list";
 import { bandOf } from "../ui/severities";
 
 // The findings list as a table, and as cards on a narrow screen.
@@ -176,7 +176,7 @@ export function FindingsTable({
           </thead>
           <tbody id="findingRows">
             {rows.map((row, i) => {
-              const key = `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
+              const key = identityOf(row);
               const at = pathTo(buildOf(row), row, carrying, prepared?.name);
               // Its decision state comes from the server, defined the
               // way the state filter defines it; a row does not guess from
@@ -516,7 +516,7 @@ export function FindingsTable({
             // a click and nothing else is a list nobody can get into
             // from a keyboard.
             <article
-              key={`${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`}
+              key={identityOf(row)}
               // The word the badge draws with, so the card's stripe and the
               // badge on it agree. An absent rating gave the card no class at
               // all while the badge beside it said "Unrated".

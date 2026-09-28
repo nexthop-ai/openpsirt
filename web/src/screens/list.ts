@@ -481,9 +481,12 @@ export function withinVariant(query: ReturnType<typeof listQuery>, named: boolea
   return rest;
 }
 
-// A row's own identity, for finding it again in a list read afresh.
+// A row's own identity, for finding it again in a list read afresh, and the
+// key a selection, a preview and the list's own elements are held by. It
+// carries everything that picks a component: one name at one version is two
+// components where two namespaces publish it.
 export function identityOf(row: Row): string {
-  return `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
+  return `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""} ${row.namespace ?? ""}`;
 }
 
 // The address a row opens. The version is part of it: a component name is

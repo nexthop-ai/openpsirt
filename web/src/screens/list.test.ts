@@ -9,12 +9,14 @@ import {
   SORTS,
   asAsked,
   fromAt,
+  identityOf,
   listQuery,
   pageSize,
   pathTo,
   where,
   widened,
   windowFor,
+  type Row,
 } from "./list";
 
 // The list's address is the list. What is tested here is the part a second
@@ -279,6 +281,23 @@ describe("where a row opens", () => {
       "",
     );
     expect(new URLSearchParams(at.split("?")[1]).has("rule")).toBe(false);
+  });
+});
+
+describe("a row's identity", () => {
+  // One name at one version in one ecosystem is two components where two
+  // namespaces publish it, and each is a finding of its own. The identity is
+  // what a selection, a preview and a key are held by.
+  it("tells apart two components that differ only by namespace", () => {
+    const row = {
+      vulnerability: "CVE-2024-1",
+      component: "utils",
+      version: "1.0.0",
+      ecosystem: "maven",
+    } as Row;
+    expect(identityOf({ ...row, namespace: "org.one" })).not.toBe(
+      identityOf({ ...row, namespace: "org.two" }),
+    );
   });
 });
 

@@ -954,9 +954,7 @@ export function Findings() {
   const tooMany = spanning ? overCap : !everyMatching && picked.size > NAMED_AT_ONCE;
 
   // The rows on this page, in the same key the selection uses.
-  const shownKeys = rows.map(
-    (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
-  );
+  const shownKeys = rows.map(identityOf);
 
   // Handing a selection to somebody, which is the one thing a selection can do
   // until the bulk workflows that start from one are built. What a refusal
