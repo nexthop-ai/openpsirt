@@ -17,8 +17,7 @@
 
 /* ============================================================
    The app. A look is a token set. Every component below reads only
-   these tokens, so switching a look is a token swap and a few
-   structural overrides marked [look].
+   these tokens, so switching a look is a token swap.
    ============================================================ */
 
 :root {
@@ -76,16 +75,20 @@
   /* The shade on the clipped edge of a table that scrolls sideways. */
   --shade: rgb(16 24 40 / 14%);
   --shadow-lg: 0 12px 32px rgb(16 24 40 / 18%);
+  /* The focus ring a field draws around itself, beside an accent border. */
+  --ring: 0 0 0 3px var(--accent-soft);
+  /* What dims the page behind something laid over it: lighter behind a drawer
+     or the rail, which the page is still read beside, and heavier behind a
+     sheet, which is read instead of it. */
+  --scrim: rgb(8 12 20 / 35%);
+  --backdrop: rgb(8 12 20 / 55%);
   --radius: 6px;
   --radius-lg: 8px;
   --pill: 999px;
 
-  /* The stacking ladder, in the order things actually stack.
-     Six values were hand-picked across four stylesheets with nothing to read
-     to decide a seventh, and two unrelated overlays claimed 45 — the drawer
-     and the rail's scrim, which resolve in the same context, so the drawer won
-     on document order and the rail's click-to-dismiss stopped working wherever
-     the two overlapped.
+  /* The stacking ladder, in the order things actually stack. Every layer has a
+     step of its own: two overlays that resolve in one context on one step
+     stack by document order, and the one underneath stops taking clicks.
      The floating action sits below the dropdowns on purpose: a suggestion list
      opening over it is right, and it over a dropdown is not. */
   --z-fab: 20;
@@ -97,10 +100,9 @@
   --z-rail: 50;
   --z-modal: 60;
 
-  /* How far a disabled control is faded. One ratio rather than two: a disabled
-     chip at 0.45 and a disabled button at 0.55 meant one strength for one
-     meaning, and the weaker one composited to about 2.2:1 against white —
-     below the floor for text. No dark-look override, because it is a ratio. */
+  /* How far a disabled control is faded, one ratio for every control. At 0.45
+     text composites to about 2.2:1 against white, below the floor for text.
+     No dark-look override, because it is a ratio. */
   --dim: 0.55;
 
   --step--1: 12.5px;
@@ -109,20 +111,9 @@
   --step-2: 19px;
   --step-3: 25px;
 
-  /* The spacing scale.
-     
-     There was none. Nine hundred spacing values were written by hand across
-     the stylesheet, running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18 —
-     continuous rather than a scale, which is what "no scale" looks like from
-     the outside: every value is defensible on its own and no two screens agree
-     about what "a small gap" is.
-     
-     These are the six that carry the weight, named at exactly the numbers
-     already in use, so naming them moved nothing. That is the point: a scale
-     invented here would be an aesthetic judgment made without looking at a
-     screen, and this is the other half of the job — making the vocabulary
-     visible, so the next value somebody adds is either one of these or
-     obviously not. */
+  /* The spacing scale: the six values that carry the weight, at the numbers
+     the screens use. A new spacing value is one of these or deliberately
+     not. */
   --gap-hair: 4px;
   --gap-tight: 6px;
   --gap: 8px;

@@ -43,14 +43,13 @@ button {
 
 /* ---------- rail (sidebar) ---------- */
 
-/* The rail stays put and does not scroll. It asks for about 935 pixels of
-   entries, which is taller than the window on most laptops, and the two ways
-   of absorbing that are both worse than folding: a scroll region of its own
-   puts a second scrollbar down the middle of the screen, and scrolling with
-   the page leaves the menu a thousand pixels above somebody reading the foot
-   of a list. So the groups fold, and "Manage" starts folded, which brings it
-   under seven hundred. The max-height is a floor under a very short window
-   rather than the arrangement — with the groups folded it never bites. */
+/* The rail stays put and does not scroll. Unfolded, its entries are taller
+   than the window on most laptops, and the two ways of absorbing that are both
+   worse than folding: a scroll region of its own puts a second scrollbar down
+   the middle of the screen, and scrolling with the page leaves the menu a
+   thousand pixels above somebody reading the foot of a list. So the groups
+   fold, and "Manage" starts folded. The max-height is a floor under a very
+   short window rather than the arrangement. */
 .rail {
   grid-column: 1;
   grid-row: 1 / 3;
@@ -67,10 +66,9 @@ button {
   overflow-y: auto;
   scrollbar-width: thin;
 }
-/* The bug itself, and all it ever was. A column flex container shrinks its
-   children before it overflows, so a rail taller than the window squashed its
-   entries down to a third of their height rather than extending past the
-   fold. Nothing in a rail should ever be shorter than it asked to be. */
+/* A column flex container shrinks its children before it overflows, so a
+   rail taller than the window squashes its entries rather than extending past
+   the fold. Nothing in a rail is shorter than it asked to be. */
 .rail > * {
   flex: none;
 }
@@ -166,7 +164,7 @@ button {
   font-size: 11px;
   font-weight: 600;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--pill);
   background: var(--side-count);
   color: var(--side-ink);
   font-variant-numeric: tabular-nums;
@@ -213,7 +211,7 @@ button {
 .topsearch:focus-within {
   border-color: var(--accent-line);
   background: var(--surface);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--ring);
 }
 .topsearch svg {
   width: 15px;
@@ -271,7 +269,7 @@ button {
   min-width: 15px;
   height: 15px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--pill);
   background: var(--sev-critical);
   /* The token that flips with the look, not white. Every severity token in the
      dark look is a light tint — the critical one is a pale salmon — so white on
@@ -383,7 +381,7 @@ button {
   padding: 6px 8px;
   border: 0;
   background: none;
-  border-radius: 6px;
+  border-radius: var(--radius);
   cursor: pointer;
   text-align: left;
   font-size: var(--step--1);

@@ -7,12 +7,11 @@
    which shares no selector and no token group with the DOM components beside
    it. A file of its own for that reason rather than for its length.
 
-   Imported after the components and before the screens, which is where it sat
-   when they were one file.
+   Imported after the components and before the screens.
 
-   The rules here came from the per-screen sheet: they style components in
-   `ui/` that many screens draw, and a chart drawn by the front page, four
-   report sheets and a component page belongs to no one screen. */
+   They style components in `ui/` that many screens draw, and a chart drawn by
+   the front page, the report sheets and a component page belongs to no one
+   screen. */
 
 .chart {
   width: 100%;
