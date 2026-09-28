@@ -67,7 +67,7 @@ func TestEveryDecisionIsCorrelatedToItsFindingThroughOneSpelling(t *testing.T) {
 		examined++
 		spelled := correlationsSpelledOut(path, string(source))
 		// The one spelling itself, and nothing else in its file.
-		if strings.HasSuffix(filepath.ToSlash(path), "finding/narrow.go") && len(spelled) > 0 {
+		if strings.HasSuffix(filepath.ToSlash(path), "finding/narrow_state.go") && len(spelled) > 0 {
 			spelled = spelled[1:]
 		}
 		found = append(found, spelled...)

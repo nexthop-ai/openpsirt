@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -262,4 +263,269 @@ func (s *Store) oldClaim(ctx context.Context, decisionID int64) (*Claim, error) 
 		return nil, fmt.Errorf("read the judgment being carried: %w", err)
 	}
 	return row.Claim, nil
+}
+
+// Carried is what a new line would inherit from an existing one.
+//
+// Six buckets, because they need different things from a person. What
+// already applies needs nothing. What moved needs a fresh answer, and gets the
+// old reasoning to start from. A postponement is a scheduling judgment about a
+// release rather than a claim about code, so it is offered separately. A
+// judgment whose date has gone by sits at a place the new line still has and
+// cannot be carried. A promised upgrade is planned from its component. And
+// what covers nothing there is left behind.
+type Carried struct {
+	// Applying reach the new line by matching. Nothing to choose.
+	Applying int
+	// Moved held a claim at a version the new line does not have. Each comes
+	// across as a proposal carrying the old words — never as a decision,
+	// because the version moved and the old conclusion is not a conclusion
+	// about the new code.
+	Moved []Inherited
+	// Postponed were deferrals. "Not this sprint" was about that sprint, and
+	// carrying it silently gives a new line expiry dates nobody chose.
+	Postponed []Inherited
+	// Expired is how many sit at a place the new line still holds, as a
+	// deferral or a promise whose date has gone by. Carried keeps the date,
+	// so none of them can be carried, and each leaves a finding there with
+	// no answer.
+	Expired int
+	// Upgrades is how many promised upgrades moved. An upgrade covers a
+	// component in the releases it names and records what each of them is
+	// waiting on, which a claim carried onto one place cannot write, so each
+	// is planned again from the component.
+	Upgrades int
+	// Absent is how many cover nothing in the new line at all.
+	Absent int
+}
+
+// Inherited is one claim a new line could take on.
+type Inherited struct {
+	DecisionID    int64
+	Vulnerability string
+	Component     string
+	Outcome       Outcome
+	Was           string
+	Now           string
+	Reasoning     string
+	// DeferredDays is how long this has already been put off, across every
+	// line it has been carried through. The number that decides whether
+	// carrying it again is reasonable.
+	DeferredDays int
+}
+
+// WouldCarry reports what a new line would inherit from an existing one,
+// without changing anything.
+//
+// Asked before a line is created, because the answer is what somebody is
+// agreeing to — and a carry that happened silently is the one nobody reviews.
+func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
+	fromTarget, toTarget int64) (*Carried, error) {
+
+	if subject.Kind != access.Person {
+		return nil, ErrNotTheirs
+	}
+
+	// productID is which product this is about, read from the build rather
+	// than taken from the caller. Decisions are selected by product as well as
+	// by live key and place: a place is a hash of component names carrying no
+	// product, so a shared distribution package matches across products, and
+	// the reasoning of undisclosed claims elsewhere would come back.
+	var productID int64
+	if err := s.db.NewSelect().
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr("st.product_id").
+		Where("tg.id = ?", toTarget).
+		Scan(ctx, &productID); err != nil {
+		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
+	}
+	var readable []access.Visibility
+	for _, v := range []access.Visibility{access.Public, access.Private} {
+		if mayDecide(subject, productID, v) {
+			readable = append(readable, v)
+		}
+	}
+	if len(readable) == 0 {
+		return nil, ErrNotTheirs
+	}
+
+	var rows []struct {
+		DecisionID    int64  `bun:"decision_id"`
+		Vulnerability string `bun:"vulnerability"`
+		Component     string `bun:"component"`
+		Outcome       string `bun:"outcome"`
+		Was           string `bun:"was"`
+		Now           string `bun:"now_at"`
+		ConsumerWas   string `bun:"consumer_was"`
+		ConsumerNow   string `bun:"consumer_now"`
+		Reasoning     string `bun:"reasoning"`
+		StillThere    bool   `bun:"still_there"`
+		RanOut        bool   `bun:"ran_out"`
+		// Carried so a postponement can be told how long it has already run.
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		PlaceIdentity   string `bun:"place_identity"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		// The issue each decision is read as, which is the one the new line holds.
+		Join(finding.DecisionIssue).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
+		// The argument, which is where the outcome lives.
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
+		ColumnExpr(`de.id AS "decision_id"`).
+		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
+		ColumnExpr(`de.place_identity AS "place_identity"`).
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "was"`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`COALESCE(dr.body, '') AS "reasoning"`).
+		// The new line's contents at that place, if anything.
+		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
+			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
+			AS "component"`, toTarget).
+		// Both versions, because a decision is keyed on both: a build whose
+		// consumer alone has moved is one the claim does not reach, and the
+		// finding surfaces unanswered.
+		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
+		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer_was"`).
+		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
+			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
+			AS "still_there"`, toTarget).
+		// A date it carries that has already gone by, either of them.
+		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
+			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS "ran_out"`, s.now()).
+		Where("de.live_key IS NOT NULL").
+		Where("de.product_id = ?", productID).
+		Where("de.visibility IN (?)", bun.List(readable)).
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
+			WHERE g.target_id = ? AND g.vulnerability_id = dv.issue_id
+			  AND g.place_identity = de.place_identity)`, fromTarget).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read what a new line would inherit: %w", err)
+	}
+
+	carried := &Carried{}
+	var postponed []at
+	for _, row := range rows {
+		if !row.StillThere {
+			carried.Absent++
+			continue
+		}
+		if row.Was == row.Now && row.ConsumerWas == row.ConsumerNow {
+			// The versions match, so it reaches the new line by matching.
+			// Offering it would ask somebody to agree to something that has
+			// already happened.
+			carried.Applying++
+			continue
+		}
+		one := Inherited{
+			DecisionID: row.DecisionID, Vulnerability: row.Vulnerability,
+			Component: row.Component, Outcome: Outcome(row.Outcome),
+			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
+		}
+		// Anything the write would refuse is not offered. A carried judgment
+		// keeps its date rather than having it quietly moved forward, so a
+		// deferral that has already run out and a promise whose date has
+		// gone by cannot be carried at all — and offering one is offering
+		// something the act behind the button turns down.
+		if row.RanOut {
+			carried.Expired++
+			continue
+		}
+		if Outcome(row.Outcome) == UpgradeNeeded {
+			carried.Upgrades++
+			continue
+		}
+		if Outcome(row.Outcome) == Deferred {
+			postponed = append(postponed, at{row.VulnerabilityID, row.PlaceIdentity})
+			carried.Postponed = append(carried.Postponed, one)
+			continue
+		}
+		carried.Moved = append(carried.Moved, one)
+	}
+
+	// The length each postponement has already run. Somebody agreeing to carry
+	// a deferral into a new line is agreeing to however long it has been put
+	// off in total, not to the months the new one asks for — and four
+	// consecutive carries of "not this release" are a decision nobody made.
+	already, err := s.deferredSoFarAt(ctx, productID, postponed)
+	if err != nil {
+		return nil, err
+	}
+	for i := range carried.Postponed {
+		carried.Postponed[i].DeferredDays = int(already[postponed[i]].Hours() / 24)
+	}
+	return carried, nil
+}
+
+// at is one place a decision was made about.
+type at struct {
+	vulnerability int64
+	place         string
+}
+
+// deferredSoFarAt totals how long each of these places has been put off, in
+// one statement rather than one per row.
+//
+// The arithmetic happens here rather than in SQL: subtracting one timestamp
+// from another and summing the result has no portable spelling, and the rows
+// are already being read.
+func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []at) (map[at]time.Duration, error) {
+	total := map[at]time.Duration{}
+	if len(places) == 0 {
+		return total, nil
+	}
+	issues := make([]int64, 0, len(places))
+	identities := make([]string, 0, len(places))
+	wanted := make(map[at]bool, len(places))
+	for _, place := range places {
+		if wanted[place] {
+			continue
+		}
+		wanted[place] = true
+		issues = append(issues, place.vulnerability)
+		identities = append(identities, place.place)
+	}
+
+	var deferrals []Decision
+	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
+		Column("vulnerability_id", "place_identity", "proposed_at", "state", "ended_at").
+		Where("de.product_id = ?", productID).
+		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(issues)).
+		Where("de.place_identity IN (?)", bun.List(identities)).
+		Where("claim.outcome = ?", Deferred).
+		// Withdrawn ones for the span they were in force, as the threshold
+		// counts them.
+		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read how long these have been put off: %w", err)
+	}
+	// Keyed by the issue each deferral is read as, which is how the places
+	// were asked for.
+	filed := make([]int64, 0, len(deferrals))
+	for _, deferral := range deferrals {
+		filed = append(filed, deferral.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
+	for _, deferral := range deferrals {
+		deferral.VulnerabilityID = issueOf[deferral.VulnerabilityID]
+		key := at{deferral.VulnerabilityID, deferral.PlaceIdentity}
+		// The pair of lists matches more combinations than were asked for, so
+		// what was not asked for is dropped here.
+		if !wanted[key] || deferral.Claim == nil || deferral.Claim.DeferredUntil == nil {
+			continue
+		}
+		if span := heldFor(deferral); span > 0 {
+			total[key] += span
+		}
+	}
+	return total, nil
 }
