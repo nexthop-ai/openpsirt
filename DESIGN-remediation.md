@@ -431,6 +431,7 @@ Three states, derived on every read and set by nobody.
 |---|---|
 | The date is on the commitment, and the claim that argued for it is a citation | What somebody decided and what a release is waiting on are one fact. Changing it goes through the claim, so the two cannot come to disagree |
 | There is no "replanned" | Re-promising writes a new date and the standing promise is the one read. A state nothing can distinguish from another is a word rather than a fact |
+| Where several promises stand over one component in one build, one of them is reported whole | The latest date, ties to the later claim, and a promise naming a version before one naming none. Its date and its version are read together: the latest date beside the lowest version string pairs two promises nobody made |
 | A lapsed promise returns the upgrade, not its findings | One item, to whoever is carrying it — reported as a party only where one party holds all of what is still open under it. Answering the findings again one at a time is what the bulk promise was made instead of |
 | A finding returns on its own only when the package moved and it did not close | A decision is keyed on the upstream version it was made against, so the existing key distinguishes "the plan was wrong about specifics" from "the plan did not happen" |
 

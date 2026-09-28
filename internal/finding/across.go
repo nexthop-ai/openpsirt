@@ -560,14 +560,15 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 	var rows []struct {
 		TargetID    int64      `bun:"target_id"`
 		FoldKey     string     `bun:"fold_key"`
+		ClaimID     int64      `bun:"claim_id"`
 		CommittedTo *time.Time `bun:"committed_to"`
 		UpgradeTo   string     `bun:"upgrade_to"`
 	}
 	// Through the finding, because a decision is keyed on a place and a build
-	// is what a place sits in. The latest promise wins where there are
-	// several: a replanned date is the one that stands. A product is reached
-	// through the build rather than carried on the finding, which is where the
-	// correlation everywhere else starts from.
+	// is what a place sits in. A product is reached through the build rather
+	// than carried on the finding, which is where the correlation everywhere
+	// else starts from. One row per promise, so the date and the version
+	// reported come from the same one.
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
@@ -581,22 +582,52 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(`MAX(cl.committed_to) AS "committed_to"`).
-		ColumnExpr(`MIN(COALESCE(cl.upgrade_to, '')) AS "upgrade_to"`).
+		ColumnExpr(`cl.id AS "claim_id"`).
+		ColumnExpr(`cl.committed_to AS "committed_to"`).
+		ColumnExpr(`COALESCE(cl.upgrade_to, '') AS "upgrade_to"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("c.fold_key IN (?)", folds).
 		Where("cl.outcome = ?", "upgrade-needed").
 		Where("de.live_key IS NOT NULL").
-		GroupExpr("f.target_id, c.fold_key").
+		GroupExpr("f.target_id, c.fold_key, cl.id, cl.committed_to, cl.upgrade_to").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
 	}
-	out := make(map[foldIn]promise, len(rows))
+	// The latest promise stands where there are several: a replanned date is
+	// the one that stands, and ties go to the later claim. A promise naming a
+	// version stands over one naming none, which says nothing about where to.
+	type standing struct {
+		promise
+		claim int64
+	}
+	best := make(map[foldIn]standing, len(rows))
+	later := func(a, b standing) bool {
+		if (a.to != "") != (b.to != "") {
+			return a.to != ""
+		}
+		switch {
+		case a.at == nil && b.at != nil:
+			return false
+		case a.at != nil && b.at == nil:
+			return true
+		case a.at != nil && !a.at.Equal(*b.at):
+			return a.at.After(*b.at)
+		}
+		return a.claim > b.claim
+	}
 	for _, row := range rows {
-		out[foldIn{row.TargetID, row.FoldKey}] = promise{at: row.CommittedTo, to: row.UpgradeTo}
+		key := foldIn{row.TargetID, row.FoldKey}
+		one := standing{promise{at: row.CommittedTo, to: row.UpgradeTo}, row.ClaimID}
+		if held, ok := best[key]; !ok || later(one, held) {
+			best[key] = one
+		}
+	}
+	out := make(map[foldIn]promise, len(best))
+	for key, one := range best {
+		out[key] = one.promise
 	}
 	return out, nil
 }
