@@ -404,6 +404,28 @@ The first statement of anything stands, and anything it did not state is taken
 from the next description that does. Nothing is overwritten: two producers
 disagreeing is not something a reader can settle.
 
+The same rule holds across reports. A stored component is filled in by a later
+report describing it, because the scanner is given the stored row rather than
+the document that arrived.
+
+| Filled in where the stored row lacks it | Reason |
+|---|---|
+| A package-identifier qualifier, key by key | Identity drops qualifiers, so one component arrives with and without them. `distro` selects a distribution's advisories and `upstream` its source package's: a kernel first stored as `pkg:deb/sonic/linux-image…?arch=amd64` matched nothing, and the same package stated with `distro=debian-13&upstream=linux` matches the Debian kernel's advisories |
+| The platform enumeration | The second identifier a scanner matches on |
+| The source package and the version it was built at | What a finding is explained by and what expiry compares |
+| The supplier and the license | `DESIGN-findings.md` § Component suppliers |
+
+A qualifier already stored stays as written whatever a later report says about
+it, so a later report adds to what is stored and never changes it. The fold
+key is worked out again from the filled row, because it reads the distribution
+and the source package. Identity reads neither, and does not move.
+
+| When the fold key moves | Reason |
+|---|---|
+| Each build holding the component has its upgrade commitment carried to the new key | A commitment is keyed on the fold. Left on the old key it covers nothing open, which reads as landed |
+| A build already committed on the new key keeps that commitment | One commitment per fold per build, and it is the one somebody made for that fold |
+| The commitment on the old key is withdrawn only where nothing the build holds still folds to it | A fold splits when some of its binaries state a distribution and some do not, and each side is still work |
+
 The platform enumeration is kept and excluded from identity. A scanner given one
 matches things a package identifier alone misses — vendor firmware, operating
 systems, appliances, anything never published to a package ecosystem. Deriving
@@ -577,6 +599,8 @@ root, against 0.018 s.
 | Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a claim is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
 | Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |
+| A fold that splits is committed on both sides | A later report stating a distribution for some of a source package's binaries and not the rest splits its fold, and the commitment is carried to the new key and kept on the old. Revising the claim behind it through one component revises that side alone |
+| Carrying a commitment is not recorded as an act | Nobody made it. The carried commitment keeps who declared it and when |
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |

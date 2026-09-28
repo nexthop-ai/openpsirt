@@ -718,3 +718,55 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 		}
 	}
 }
+
+func TestACommitmentFollowsAFoldALaterInventoryMoves(t *testing.T) {
+	// A later inventory stating a distribution the stored component lacked
+	// moves its fold key. A commitment left on the old key covers nothing open,
+	// which reads as landed: the plan would say the bump shipped when nothing
+	// changed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.someoneElse(t, access.PublicTriage)
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
+			f.componentID(t, libnl.Name), "3.9.0", nil, nil,
+			[]int64{f.target}, map[int64]bool{}); err != nil {
+			t.Fatal(err)
+		}
+
+		stated := libnl
+		stated.Purl += "?distro=debian-13"
+		restated := twoConsumers()
+		for i, c := range restated.Components {
+			if c.Name == libnl.Name {
+				restated.Components[i] = stated
+			}
+		}
+		for i, d := range restated.Dependencies {
+			if d.Child.Name == libnl.Name {
+				restated.Dependencies[i].Child = stated
+			}
+		}
+		f.shipped(t, restated)
+
+		planned, err := f.store.PendingUpgrades(ctx, who, f.target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(planned) != 1 {
+			t.Fatalf("%d commitments, want the one made", len(planned))
+		}
+		if planned[0].Fold != stated.FoldKey() {
+			t.Error("the commitment stayed on the fold the component left")
+		}
+		if planned[0].State != finding.UpgradePlanned || planned[0].Issues != 1 {
+			t.Errorf("the commitment reads %s with %d open, want planned with the one",
+				planned[0].State, planned[0].Issues)
+		}
+	})
+}
