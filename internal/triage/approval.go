@@ -171,7 +171,10 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			// unique index is the only thing that can say so, for the reason
 			// proposing relies on it.
 			if database.IsDuplicate(err) {
-				return Revised{}, &placeTaken{places: places}
+				// The place this row refused on, not every place of the
+				// claim: its rows still standing are live at theirs, and
+				// named first they would be offered as the claim to revise.
+				return Revised{}, &placeTaken{places: []Place{places[i]}}
 			}
 			return Revised{}, fmt.Errorf("record a revision: %w", err)
 		}

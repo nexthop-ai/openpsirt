@@ -89,6 +89,56 @@ func TestRevivingAClaimWhosePlaceIsTakenNamesTheClaimStandingThere(t *testing.T)
 	})
 }
 
+func TestRevivingAPartlyEndedClaimNamesTheClaimAtTheTakenPlace(t *testing.T) {
+	// One place of two lapsed and another claim took it. The refusal names
+	// that claim's row, never the reviving claim's own row still standing at
+	// the other place.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		f.ends(t, made[1].ID, time.Now().UTC().Truncate(time.Microsecond))
+		standing := f.claims(t, f.places("under-b")[0])
+
+		_, err := f.store.Revise(ctx, f.triager, made[0].ClaimID, "On reflection it holds.")
+		if !errors.Is(err, triage.ErrAlreadyDecided) {
+			t.Fatalf("reviving onto a taken place answered %v, want it already decided", err)
+		}
+		if !strings.Contains(err.Error(), fmt.Sprintf("decision %d ", standing.ID)) {
+			t.Errorf("the refusal %q does not name decision %d", err, standing.ID)
+		}
+	})
+}
+
+func TestMovingAWithdrawnPromiseOntoATakenPlaceNamesTheClaimThere(t *testing.T) {
+	// Changing a promise revives it, so it meets the same refusal a revision
+	// does, and names the claim standing at the place the same way.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		by := time.Now().UTC().AddDate(0, 0, 30).Truncate(time.Second)
+		promised, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.UpgradeNeeded, UpgradeTo: "2.0", CommittedTo: &by,
+			Reasoning: "Moving to the release that drops the parser.", By: f.proposer,
+			NeedsApproval: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Withdraw(ctx, f.triager, promised.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+		standing := f.claims(t, f.at())
+
+		_, _, err = f.store.Repromise(ctx, f.triager, promised.ClaimID, "2.1", by,
+			"The release moved.")
+		if !errors.Is(err, triage.ErrAlreadyDecided) {
+			t.Fatalf("moving a promise onto a taken place answered %v, want it already decided", err)
+		}
+		if !strings.Contains(err.Error(), fmt.Sprintf("decision %d ", standing.ID)) {
+			t.Errorf("the refusal %q does not name decision %d", err, standing.ID)
+		}
+	})
+}
+
 func TestAProposerWhoseRowsSpanSeveralReadsIsToldOnce(t *testing.T) {
 	// A sweep lapsing more rows than one read names reads who to tell in
 	// pieces. One person is one notice however the rows fall.
