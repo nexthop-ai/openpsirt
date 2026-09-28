@@ -17,7 +17,6 @@ func TestAWakeVisitsEveryRepositoryDueBeforeItSleeps(t *testing.T) {
 	// pass asleep: one repository per wake puts the kernel hours behind copies
 	// that take a second each.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		first, second, third := project(t), project(t), project(t)
 		issue(t, db, "CVE-2025-0101", "high", link("first", first.fix))
@@ -36,7 +35,6 @@ func TestAWakeVisitsEveryRepositoryDueBeforeItSleeps(t *testing.T) {
 
 func TestProgressListsTheVisitUnderWayFirstWithHowFarItHasGot(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		busy, later := project(t), project(t)
 		issue(t, db, "CVE-2025-0111", "low", link("busy", busy.fix), link("busy", busy.backport))

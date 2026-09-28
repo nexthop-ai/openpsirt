@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
@@ -53,7 +53,6 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
@@ -146,7 +145,6 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
 			access.Stated(true), nil)
@@ -213,21 +211,17 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 // product, the stream, the variant and the component to every server the
 // request crosses.
 func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
 			[]finding.Named{{Identifier: "SONIC-2026-7002", Severity: "critical"}})
 		if err != nil {
@@ -304,7 +298,6 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
@@ -358,7 +351,6 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
@@ -415,7 +407,6 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
@@ -474,7 +465,6 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 	// refuse.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
@@ -535,7 +525,6 @@ func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
@@ -595,7 +584,6 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		saw := &took{}
@@ -668,7 +656,6 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		saw := &took{}
@@ -733,7 +720,6 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		saw := &took{}
@@ -804,10 +790,10 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 // A destination's reason is why the last delivery failed, and nothing once one
 // has gone since.
 func TestADestinationSaysWhyItLastFailed(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		// Answers by what it is sent, so each delivery fails its own way.
 		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -874,7 +860,6 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		saw := &took{}
@@ -943,7 +928,6 @@ func TestTwoUploadsAreTwoThingsToCarry(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		saw := &took{}

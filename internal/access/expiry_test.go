@@ -22,8 +22,6 @@ import (
 // way to ask for one that has already run out.
 func atClock(t *testing.T, db *database.DB, at *time.Time) (*Store, int64) {
 	t.Helper()
-	dbtest.Reset(t, db)
-
 	// An administrator, so that no product has to be declared here: what these
 	// tests move is the clock, and a role grant would only add a table this
 	// package cannot reach without importing something that imports it back.
@@ -121,7 +119,6 @@ func TestAProviderMayRefreshWhatAProviderGaveAndNotWhatSomebodySet(t *testing.T)
 	// owner signed in.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		store := NewStore(db.DB)
 		person, err := store.Ensure(ctx, "ana", "Ana", nil, nil)
 		if err != nil {
@@ -207,7 +204,6 @@ func TestAskingForWhatNobodyOwnsWithoutAskingForADigestIsRefused(t *testing.T) {
 	// believe they have asked for something.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		store := NewStore(db.DB)
 		person, err := store.Ensure(ctx, "ana", "Ana", nil, nil)
 		if err != nil {
@@ -252,7 +248,6 @@ func TestAskingForWhatNobodyOwnsWithoutAskingForADigestIsRefused(t *testing.T) {
 // here is a real one from whichever engine is running.
 func TestARefusedInsertIsForgivenOnlyAsADuplicate(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 		store := NewStore(db.DB)
 
@@ -312,7 +307,6 @@ func TestARefusedInsertIsForgivenOnlyAsADuplicate(t *testing.T) {
 // inside one, and is documented as succeeding and changing nothing.
 func TestADuplicateInsideATransactionLeavesItUsable(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 		person, err := NewStore(db.DB).Ensure(ctx, "ana", "", nil, nil)
 		if err != nil {

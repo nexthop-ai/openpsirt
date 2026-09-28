@@ -67,25 +67,8 @@ func (f *runFixture) ranJustNow(t *testing.T) {
 // target. Nothing is filed against it.
 func (f *runFixture) anotherBuild(t *testing.T, stream string) int64 {
 	t.Helper()
-	ctx := t.Context()
-	cat := catalog.NewStore(f.db.DB)
-	product, err := cat.ProductByName(ctx, "sonic")
-	if err != nil {
-		t.Fatal(err)
-	}
-	declared, err := cat.DeclareStream(ctx, product.ID, stream, catalog.Tag, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	variant, err := cat.VariantByName(ctx, product.ID, "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := cat.TargetFor(ctx, declared.ID, variant.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return target.ID
+	declared := f.world.DeclareStream(f.world.Product, stream, catalog.Tag, nil)
+	return f.world.TargetFor(declared, f.world.Customer).ID
 }
 
 // withInventory files an inventory against a build, which is what makes it a

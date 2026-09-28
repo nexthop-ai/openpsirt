@@ -107,7 +107,6 @@ func catalogOn(t *testing.T, on engines, fn func(t *testing.T, d *declaring)) {
 	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		administrator, err := rights.Ensure(t.Context(), "admin", "Administrator", access.Stated(true), nil)

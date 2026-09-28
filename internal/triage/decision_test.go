@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -86,10 +86,11 @@ type cast struct {
 // castSeed is the world every test here starts from, seeded once per binary
 // on SQLite and per test on a server.
 var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, error) {
-	product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
+	world, err := fixtures.Declare(ctx, db)
 	if err != nil {
 		return cast{}, err
 	}
+	product := world.Product
 	interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 		{Identifier: "CVE-2026-1", Severity: "high"},
 	})

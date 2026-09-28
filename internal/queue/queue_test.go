@@ -30,7 +30,6 @@ func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)
 func each(t *testing.T, opts queue.Options, fn func(t *testing.T, db *database.DB, q *queue.Queue)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		fn(t, db, queue.New(db, opts))
 	})
 }

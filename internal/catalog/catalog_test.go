@@ -17,13 +17,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// each runs fn against every available engine, with the schema applied and the
-// catalog emptied first so a persistent server behaves like a fresh one.
+// each runs fn against every available engine, on a migrated and empty
+// database.
 func each(t *testing.T, fn func(t *testing.T, db *database.DB, s *catalog.Store)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
-
 		fn(t, db, catalog.NewStore(db.DB))
 	})
 }

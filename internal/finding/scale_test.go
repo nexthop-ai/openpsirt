@@ -26,9 +26,9 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -71,25 +71,8 @@ const (
 func TestMeasureAYearOfNightlyScans(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		w := world.New(t, db)
+		cat, product, branch, variant, target := w.Catalog, w.Product, w.Branch, w.Customer, w.Target
 
 		store := finding.NewStore(db.DB)
 		graphs := graph.NewStore(db.DB)
@@ -514,25 +497,8 @@ const bigIssues = 6_000
 func TestMeasureAFixBundlePage(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		w := world.New(t, db)
+		product, branch, variant, target := w.Product, w.Branch, w.Customer, w.Target
 
 		store := finding.NewStore(db.DB)
 		scans := ingest.NewStore(db.DB)
@@ -627,25 +593,8 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		w := world.New(t, db)
+		target := w.Target
 
 		store := finding.NewStore(db.DB)
 		graphs := graph.NewStore(db.DB)

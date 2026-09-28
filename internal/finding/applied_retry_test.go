@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -21,23 +21,8 @@ import (
 func TestAScanAppliedAgainAfterALostCommitCountsOnce(t *testing.T) {
 	db, race := dbtest.Racing(t, nil)
 	ctx := t.Context()
-	cat := catalog.NewStore(db.DB)
-	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	w := world.New(t, db)
+	product, target := w.Product, w.Target
 	f := &fixture{
 		db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
 		target: target.ID, productID: product.ID, scans: ingest.NewStore(db.DB),

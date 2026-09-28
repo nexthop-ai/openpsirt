@@ -21,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -34,6 +35,9 @@ type fixture struct {
 	graph     *graph.Store
 	target    int64
 	productID int64
+	// tag is the release the default world cut from the branch, and variant
+	// the way the branch is built.
+	tag, variant int64
 	// scope is the fixture's own build as a selection, which is what the
 	// lists take: one build is a selection with all three levels named.
 	scope    finding.Scope
@@ -87,6 +91,17 @@ func (f *fixture) shipped(t *testing.T, snap graph.Snapshot) {
 func (f *fixture) anotherBuild(t *testing.T, stream string) int64 {
 	t.Helper()
 	return f.buildOfKind(t, stream, catalog.Tag)
+}
+
+// release is the default world's tag built as the fixture's variant: the
+// release cut from the fixture's branch.
+func (f *fixture) release(t *testing.T) int64 {
+	t.Helper()
+	target, err := catalog.NewStore(f.db.DB).TargetFor(t.Context(), f.tag, f.variant)
+	if err != nil {
+		t.Fatalf("build %s: %v", world.TagName, err)
+	}
+	return target.ID
 }
 
 // anotherBranch is the same for a release that moves, which is what a test
@@ -233,33 +248,24 @@ func (f *fixture) open(t *testing.T) []finding.Finding {
 	return rows
 }
 
-// seededCatalog is what the seeded catalog hands a test: one product, built
-// once, as identifiers.
+// seededCatalog is what the seeded catalog hands a test: the default world's
+// product, its branch built as the customer variant, and the tag cut from the
+// branch, as identifiers.
 type seededCatalog struct {
-	product, stream, variant, target int64
+	product, stream, variant, target, tag int64
 }
 
 // catalogSeed is the catalog every test here starts from, seeded once per
 // binary on SQLite and per test on a server.
 var catalogSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (seededCatalog, error) {
-	cat := catalog.NewStore(db.DB)
-	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	w, err := world.Declare(ctx, db)
 	if err != nil {
 		return seededCatalog{}, err
 	}
-	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-	if err != nil {
-		return seededCatalog{}, err
-	}
-	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-	if err != nil {
-		return seededCatalog{}, err
-	}
-	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-	if err != nil {
-		return seededCatalog{}, err
-	}
-	return seededCatalog{product: product.ID, stream: stream.ID, variant: variant.ID, target: target.ID}, nil
+	return seededCatalog{
+		product: w.Product.ID, stream: w.Branch.ID, variant: w.Customer.ID, target: w.Target.ID,
+		tag: w.Tag.ID,
+	}, nil
 })
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
@@ -267,7 +273,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		fn(t, &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-			target: c.target, productID: c.product, scans: ingest.NewStore(db.DB),
+			target: c.target, productID: c.product, tag: c.tag, variant: c.variant, scans: ingest.NewStore(db.DB),
 			scope: finding.Scope{
 				ProductID: &c.product, StreamID: &c.stream, VariantID: &c.variant,
 			},
@@ -283,7 +289,7 @@ func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	catalogSeed.Servers(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		fn(t, &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-			target: c.target, productID: c.product, scans: ingest.NewStore(db.DB),
+			target: c.target, productID: c.product, tag: c.tag, variant: c.variant, scans: ingest.NewStore(db.DB),
 			scope: finding.Scope{
 				ProductID: &c.product, StreamID: &c.stream, VariantID: &c.variant,
 			},
@@ -299,10 +305,10 @@ func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // plan nobody can be asked about.
 func (f *fixture) planner(t *testing.T, roles ...access.Role) access.Subject {
 	t.Helper()
-	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "them@example.com", "Them", nil, nil)
+	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "somebody@example.com", "Them", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return access.NewPerson(person.ID, "them@example.com", false,
+	return access.NewPerson(person.ID, "somebody@example.com", false,
 		map[int64][]access.Role{f.productID: roles}, 0)
 }

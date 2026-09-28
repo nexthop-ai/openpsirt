@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -50,7 +51,7 @@ func TestABranchIsComparedAgainstWhatWasLastShippedFromIt(t *testing.T) {
 	// having at all: is what we are about to ship better or worse than
 	// what we last shipped. Both halves come from scans already collected.
 	each(t, func(t *testing.T, f *fixture) {
-		release := f.cutFrom(t, "v2.4.1")
+		release := f.release(t)
 		f.shippedTo(t, release, twoConsumers())
 		shippedRun := f.runOn(t, release)
 		if _, err := f.store.Apply(t.Context(), release, shippedRun,
@@ -91,7 +92,7 @@ func TestABranchIsComparedAgainstWhatWasLastShippedFromIt(t *testing.T) {
 			t.Fatalf("nothing to compare against, though a release was cut and scanned: %q",
 				ready.Why)
 		}
-		if ready.Shipped.Stream != "v2.4.1" {
+		if ready.Shipped.Stream != world.TagName {
 			t.Errorf("compared against %q, want the release cut from this branch",
 				ready.Shipped.Stream)
 		}

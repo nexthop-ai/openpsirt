@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -110,12 +110,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
-
-		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "mine", "Mine")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := fixture.New(t, db).Product
 		rights := access.NewStore(db.DB)
 		granted, err := rights.Ensure(ctx, "granted", "", nil, nil)
 		if err != nil {

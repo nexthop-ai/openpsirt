@@ -101,14 +101,6 @@ func issue(t *testing.T, db *database.DB, identifier, severity string, links ...
 	}
 }
 
-// empty clears every table. What is due and what the report counts are
-// questions about the whole table, and on a server engine the tests of a
-// package share one database.
-func empty(t *testing.T, db *database.DB) {
-	t.Helper()
-	dbtest.Reset(t, db)
-}
-
 // A copies directory given relative to where the process runs holds the copy
 // where it is measured and renamed from.
 func TestARelativeCopiesDirectoryHoldsItsCopies(t *testing.T) {
@@ -128,7 +120,6 @@ func TestARelativeCopiesDirectoryHoldsItsCopies(t *testing.T) {
 // replica has it.
 func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		issue(t, db, "CVE-2025-0019", "critical", link("project", made.fix))
@@ -201,7 +192,6 @@ func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 // the next one carries on at once rather than waiting for it to lapse.
 func TestAPassStoppedMidVisitHandsTheLeaseBack(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0020", "critical", link("project", made.fix))
 		ctx, stop := context.WithCancel(t.Context())
@@ -235,7 +225,6 @@ func passOver(t *testing.T, db *database.DB, quota int64, excluded outward.Exclu
 
 func TestEachPatchLinkIsLabeledWithTheBranchesHoldingItsCommit(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		missing := strings.Repeat("ab", 20)
@@ -286,7 +275,6 @@ func TestEachPatchLinkIsLabeledWithTheBranchesHoldingItsCommit(t *testing.T) {
 
 func TestACopyMadeWithoutFilesTakesTheCommitsThatLandAfter(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		// Served through the protocol a host speaks, with the filter a host
@@ -337,7 +325,6 @@ func TestACopyMadeWithoutFilesTakesTheCommitsThatLandAfter(t *testing.T) {
 
 func TestABranchNameNoEngineCanStoreIsCountedAndNotKept(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		// git allows any byte in a branch name; two of the four engines refuse
@@ -362,7 +349,6 @@ func TestABranchNameNoEngineCanStoreIsCountedAndNotKept(t *testing.T) {
 
 func TestNothingIsFetchedWhileTheLookupsAreOff(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0002", "critical", link("project", made.fix))
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
@@ -379,7 +365,6 @@ func TestNothingIsFetchedWhileTheLookupsAreOff(t *testing.T) {
 
 func TestTheRepositoryBehindTheWorstIssueIsVisitedFirst(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		mild, severe := project(t), project(t)
 		issue(t, db, "CVE-2025-0003", "low", link("mild", mild.fix))
 		issue(t, db, "CVE-2025-0004", "critical", link("severe", severe.fix))
@@ -397,7 +382,6 @@ func TestTheRepositoryBehindTheWorstIssueIsVisitedFirst(t *testing.T) {
 
 func TestARepositoryAlreadyCopiedIsVisitedFirstForNewCommits(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		mild, severe := project(t), project(t)
 		issue(t, db, "CVE-2025-0005", "low", link("mild", mild.fix))
@@ -426,7 +410,6 @@ func TestARepositoryAlreadyCopiedIsVisitedFirstForNewCommits(t *testing.T) {
 
 func TestARepositoryOnAnExcludedHostIsNeverVisited(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		issue(t, db, "CVE-2025-0008", "critical", link("project", made.fix))
@@ -457,7 +440,6 @@ func TestARepositoryOnAnExcludedHostIsNeverVisited(t *testing.T) {
 // stored whole, so the suffix an exclusion names is not cut off first.
 func TestARepositoryOnALongExcludedHostIsNeverVisited(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		long := strings.Repeat("a", 60) + "." + strings.Repeat("b", 60) + "." +
@@ -520,9 +502,73 @@ func TestGitIsGivenNoConfigurationOrCredentialsOfTheProcess(t *testing.T) {
 	}
 }
 
+// Every git a visit starts is run with that environment and those settings,
+// whatever the process running the pass carries. Git is reached through a
+// program that records what it was handed and then runs git.
+//
+// Verified by deleting the line that sets the command's environment in run,
+// and separately by dropping the settings from its arguments: each fails here.
+func TestEveryGitAVisitStartsIsGivenNothingOfTheProcess(t *testing.T) {
+	dbtest.Alone(t, func(t *testing.T, db *database.DB) {
+		made := project(t)
+		issue(t, db, "CVE-2025-0021", "critical", link("project", made.fix))
+
+		hostile := filepath.Join(t.TempDir(), "gitconfig")
+		if err := os.WriteFile(hostile, []byte("[credential]\n\thelper = store\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("GIT_CONFIG_GLOBAL", hostile)
+		t.Setenv("HTTPS_PROXY", "http://proxy.example.test")
+
+		dir := t.TempDir()
+		record := filepath.Join(dir, "invocations")
+		real, err := exec.LookPath("git")
+		if err != nil {
+			t.Fatal(err)
+		}
+		wrapper := filepath.Join(dir, "git")
+		script := "#!/bin/sh\n" +
+			"{ echo '--- invocation'; for each in \"$@\"; do echo \"ARG $each\"; done; " +
+			"env | sed 's/^/ENV /'; } >> '" + record + "'\n" +
+			"exec '" + real + "' \"$@\"\n"
+		if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the wrapper has to be executable
+			t.Fatal(err)
+		}
+
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
+			map[string]upstream{"project": made}).Running(wrapper)
+		if _, err := pass.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		recorded, err := os.ReadFile(record) //nolint:gosec // G304: a file in the test's own temporary directory
+		if err != nil {
+			t.Fatalf("git was never run: %v", err)
+		}
+		invocations := strings.Split(string(recorded), "--- invocation\n")[1:]
+		if len(invocations) == 0 {
+			t.Fatal("git was never run, so this checked nothing")
+		}
+		for i, each := range invocations {
+			lines := strings.Split(each, "\n")
+			if slices.Contains(lines, "ENV HTTPS_PROXY=http://proxy.example.test") {
+				t.Errorf("git run %d was given the process's proxy", i)
+			}
+			if !slices.Contains(lines, "ENV GIT_CONFIG_GLOBAL="+os.DevNull) {
+				t.Errorf("git run %d read the process's personal configuration", i)
+			}
+			for _, setting := range []string{"credential.helper=", "protocol.allow=never",
+				"core.hooksPath=" + os.DevNull, "http.followRedirects=false"} {
+				if !slices.Contains(lines, "ARG "+setting) {
+					t.Errorf("git run %d ran without %q", i, setting)
+				}
+			}
+		}
+	})
+}
+
 func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		issue(t, db, "CVE-2025-0009", "critical", link("project", made.fix))
@@ -553,7 +599,6 @@ func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 
 func TestAVisitStoppedPartwayIsNeitherFinishedNorFailed(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0014", "critical", link("project", made.fix))
 		// Shutdown arrives as the fetch begins.
@@ -583,7 +628,6 @@ func TestAVisitStoppedPartwayIsNeitherFinishedNorFailed(t *testing.T) {
 
 func TestAVisitKeepsTheLeaseAsItGoes(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		pass := patchbranch.NewLeasedPass(db.DB, "this-replica")
 		if err := pass.StillMine(ctx); err != nil {
@@ -602,7 +646,6 @@ func TestAVisitKeepsTheLeaseAsItGoes(t *testing.T) {
 
 func TestAVisitStoppedPartwayLeavesAnEarlierFailureStanding(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0018", "critical", link("project", made.fix))
 		// A visit that fails: the copy cannot fit.
@@ -671,7 +714,6 @@ func TestAFailureOfOursIsNotRecordedAsTheRepositorys(t *testing.T) {
 
 func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		made := project(t)
 		issue(t, db, "CVE-2025-0010", "high",
@@ -707,7 +749,6 @@ func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 
 func TestTheLeastRecentlyUsedCopyIsRemovedFirst(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		empty(t, db)
 		ctx := t.Context()
 		first, second, third := project(t), project(t), project(t)
 		cache := t.TempDir()

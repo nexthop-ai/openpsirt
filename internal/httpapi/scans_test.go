@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -169,19 +169,7 @@ func ingestOn(t *testing.T, on engines, opts queue.Options, fn func(t *testing.T
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
+		product := fixture.New(t, db).Product
 
 		// A key scoped to the product, which is the common case: a key cannot
 		// imply which release an upload is for, so the upload states it.
@@ -201,7 +189,8 @@ func ingestOn(t *testing.T, on engines, opts queue.Options, fn func(t *testing.T
 		})
 		fn(t, &ingestFixture{
 			handler: handler, db: db, queue: q, key: secret,
-			path: "/v1/products/sonic/streams/master/variants/broadcom/scans",
+			path: "/v1/products/" + fixture.ProductName + "/streams/" + fixture.BranchName +
+				"/variants/" + fixture.CustomerVariant + "/scans",
 		})
 	})
 }

@@ -289,7 +289,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7))); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -766,7 +766,7 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 	// carried a deadline.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		tag := f.anotherBuild(t, "v2.4.1")
+		tag := f.release(t)
 		branch := f.anotherBranch(t, "release-2.5")
 
 		for _, target := range []int64{tag, branch} {

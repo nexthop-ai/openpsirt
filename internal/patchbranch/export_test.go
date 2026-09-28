@@ -104,3 +104,9 @@ func (p *Pass) Unpolled() *Pass {
 
 // Cycle is one wake of the pass, answering how many repositories it visited.
 func (p *Pass) Cycle(ctx context.Context) int { return p.cycle(ctx) }
+
+// Running is the pass running program in place of git.
+func (p *Pass) Running(program string) *Pass {
+	p.git.path = program
+	return p
+}

@@ -29,7 +29,7 @@ func TestAnAgingBucketSaysWhatIsUndecidedAndHowItSplitsBySeverity(t *testing.T) 
 		f.aged(t, "CVE-2026-1", old)
 		f.aged(t, "CVE-2026-2", old)
 
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

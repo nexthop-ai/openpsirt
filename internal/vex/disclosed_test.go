@@ -8,9 +8,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -20,23 +18,10 @@ func TestEveryReadOfABuildsDocumentAsksForDisclosedReading(t *testing.T) {
 	// much a disclosure as the document. Reading only undisclosed work in the
 	// product reaches neither: not the document, not the record of what went
 	// out, not whether it changed, and not the bytes that were sent.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.Resolve(ctx, "sonic", "master", "broadcom"); err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		person, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
 			access.Stated(false), nil)
 		if err != nil {

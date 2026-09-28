@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -23,10 +21,10 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 	// signed in. Compared against the moment alone, an administrator adding a
 	// colleague and assigning them something raises an alert about them in the
 	// same breath — which is what happened, and an existing test caught it.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -38,7 +36,7 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assignOne(t, db, fresh.PartyID)
+		assignOne(t, w, fresh.PartyID)
 
 		if _, _, err := notify.NewWatch(db.DB, hush).Once(ctx); err != nil {
 			t.Fatal(err)
@@ -59,26 +57,11 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 // assignOne records one open finding held by somebody, which is the least that
 // makes them a person holding work. The holder is their party, which is what an
 // assignment names.
-func assignOne(t *testing.T, db *database.DB, holder int64) {
+func assignOne(t *testing.T, w *fixture.World, holder int64) {
 	t.Helper()
+	db := w.DB
 	ctx := t.Context()
-	cat := catalog.NewStore(db.DB)
-	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := w.Target
 	named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 		{Identifier: "CVE-2026-1", Severity: "high"},
 	})
@@ -110,10 +93,10 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 	// harmless if it holds nothing; work stuck behind somebody who is not
 	// here is the problem, and this is the prompt that makes an
 	// administrator realize they have gone.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -148,23 +131,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		}
 
 		// A build with two findings, one held by each of the two who hold any.
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		issues := finding.NewVulnerabilities(db.DB)
 		named, err := issues.Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-1", Severity: "high"},

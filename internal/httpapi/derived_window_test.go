@@ -27,7 +27,6 @@ import (
 func TestTheDerivedGrantWindowIsNeverNone(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		settings := setting.NewStore(db.DB)
 
 		for _, c := range []struct {

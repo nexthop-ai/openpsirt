@@ -157,7 +157,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -267,7 +267,7 @@ func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -328,7 +328,7 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -430,7 +430,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage)
 
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -985,7 +985,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1120,7 +1120,7 @@ func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

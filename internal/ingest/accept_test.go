@@ -19,45 +19,19 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// each gives every engine a migrated database, an empty catalog, and one
-// declared variant to file scans against.
+// each gives every engine the default world, whose build scans are filed
+// against.
 func each(t *testing.T, fn func(t *testing.T, s *ingest.Store, targetID int64)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		fn(t, ingest.NewStore(db.DB), aTarget(t, db))
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		fn(t, ingest.NewStore(w.DB.DB), w.Target.ID)
 	})
-}
-
-// aTarget empties the database and declares one variant to file scans
-// against.
-func aTarget(t *testing.T, db *database.DB) int64 {
-	t.Helper()
-	ctx := t.Context()
-	dbtest.Reset(t, db)
-	cat := catalog.NewStore(db.DB)
-	p, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	br, err := cat.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	v, err := cat.DeclareVariant(ctx, p.ID, "broadcom", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := cat.TargetFor(ctx, br.ID, v.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return target.ID
 }
 
 func TestTwoUploadsOfOneFileRacingToWriteAnswerThatItIsHeld(t *testing.T) {
@@ -67,7 +41,7 @@ func TestTwoUploadsOfOneFileRacingToWriteAnswerThatItIsHeld(t *testing.T) {
 	// serializes writers and never races.
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := aTarget(t, db)
+		target := fixture.New(t, db).Target.ID
 		upload := arriving(target, "raced", time.Now().UTC().Add(-time.Hour))
 
 		first, err := db.BeginTx(ctx, nil)
@@ -112,7 +86,7 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 	// build's refusal is recorded either way, so that is not a failure.
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := aTarget(t, db)
+		target := fixture.New(t, db).Target.ID
 		sender := access.NewPipeline(1, "ci", access.Scope{})
 
 		first, err := db.BeginTx(ctx, nil)

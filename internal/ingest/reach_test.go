@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
@@ -22,29 +20,11 @@ import (
 // Verified by deleting the `!subject.Sees(productID)` refusal in Of: both
 // subjects then read the scan.
 func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		other, err := cat.DeclareProduct(ctx, "onie", "Open Network Install Environment")
-		if err != nil {
-			t.Fatal(err)
-		}
-		stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		db := w.DB
+		product, target := w.Product, w.Target
+		other := w.DeclareProduct("onie", "Open Network Install Environment")
 		s := ingest.NewStore(db.DB)
 		scan, _, err := s.Record(ctx, arriving(target.ID, "held", time.Now().UTC().Add(-time.Hour)))
 		if err != nil {

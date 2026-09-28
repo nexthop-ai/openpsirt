@@ -29,9 +29,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -48,27 +46,10 @@ var promiseSizes = []int{2_000, 44_016, 243_945}
 const holders = 34
 
 func TestMeasureAnUnboundedPromise(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		db := w.DB
+		product, target := w.Product, w.Target
 		// A real person row, because a claim names who made it and the schema
 		// holds it to that.
 		rights := access.NewStore(db.DB)

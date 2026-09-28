@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
@@ -24,16 +22,13 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 	// from the issue alone it fires for none of them, because there is no
 	// issue — so the reports the feature exists for are the reports nothing
 	// reports.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		// Somebody who may triage work nobody has announced, and somebody who
 		// may only triage what has been. The second is told nothing: the
 		// claim is one they cannot open, and an alert about a letter you

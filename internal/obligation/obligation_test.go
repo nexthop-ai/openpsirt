@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
@@ -35,12 +36,12 @@ type cast struct {
 }
 
 var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, error) {
-	cat := catalog.NewStore(db.DB)
-	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	w, err := world.Declare(ctx, db)
 	if err != nil {
 		return cast{}, err
 	}
-	elsewhere, err := cat.DeclareProduct(ctx, "other", "Other")
+	product, target := w.Product, w.Target
+	elsewhere, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "other", "Other")
 	if err != nil {
 		return cast{}, err
 	}
@@ -52,18 +53,6 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	}
 	issue := interned["CVE-2026-1"]
 
-	stream, err := cat.DeclareStream(ctx, product.ID, "main", catalog.Branch, nil)
-	if err != nil {
-		return cast{}, err
-	}
-	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-	if err != nil {
-		return cast{}, err
-	}
-	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-	if err != nil {
-		return cast{}, err
-	}
 	run, err := finding.NewStore(db.DB).Begin(ctx, finding.Run{
 		TargetID: target.ID, Scanner: "grype", RanHere: true,
 	})
@@ -266,13 +255,13 @@ func TestAWindowIsReadNarrowedToTheProductsTheReaderMayKnow(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		hidden, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
-			Name: "Sonic only", Hours: 24, Products: []string{"sonic"},
+			Name: "Sonic only", Hours: 24, Products: []string{world.ProductName},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		both, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
-			Name: "Both", Hours: 48, Products: []string{"sonic", "other"},
+			Name: "Both", Hours: 48, Products: []string{world.ProductName, "other"},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -321,7 +310,7 @@ func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
 			t.Fatal(err)
 		}
 		here, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
-			Name: "Sonic's window", Hours: 24, Products: []string{"sonic"},
+			Name: "Sonic's window", Hours: 24, Products: []string{world.ProductName},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -774,7 +763,7 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 		limited, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
-			Name: "Early warning", Hours: 24, Products: []string{"sonic"},
+			Name: "Early warning", Hours: 24, Products: []string{world.ProductName},
 		})
 		if err != nil {
 			t.Fatal(err)

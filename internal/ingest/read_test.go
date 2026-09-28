@@ -12,9 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -108,38 +107,13 @@ func (f *readerFixture) store(t *testing.T, targetID int64, builtAt time.Time, i
 
 func eachReader(t *testing.T, fn func(t *testing.T, f *readerFixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// One variant, declared once for the product. Both releases are built
-		// as it, which is two targets over one variant.
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		branchTarget, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tag, err := cat.DeclareStream(ctx, product.ID, "2.4.0", catalog.Tag, &branch.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tagTarget, err := cat.TargetFor(ctx, tag.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		// Both releases are built as the one customer variant, which is two
+		// targets over one variant.
+		branchTarget := w.Target
+		tagTarget := w.TargetFor(w.Tag, w.Customer)
 
 		q := queue.New(db, queue.DefaultOptions())
 		told := &[]ingest.Stored{}

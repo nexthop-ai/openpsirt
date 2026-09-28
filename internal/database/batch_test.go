@@ -30,7 +30,6 @@ type keptRow struct {
 // cut to fit and reported as written.
 func TestKeepingAnotherWritersRowSkipsOnlyTheDuplicate(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 		now := time.Now().UTC().Truncate(time.Second)
 

@@ -12,9 +12,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -28,10 +27,10 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 	// against is something an administrator is told; when a scan arrives
 	// the alert goes without anybody dismissing it, which is the whole of a
 	// condition clearing itself and the reason these are not events.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -55,23 +54,7 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 
 		// Declared a month ago. A build declared a moment ago is not quiet —
 		// it is new — and the threshold is measured from when it was declared
@@ -133,10 +116,10 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 // Somebody who stops being an administrator stops being told what only
 // administrators are, the last of them included.
 func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		first, err := rights.Ensure(ctx, "first@example.com", "First", access.Stated(true), nil)
@@ -147,23 +130,7 @@ func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
 			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
 			Where("id = ?", target.ID).Exec(ctx); err != nil {
@@ -212,10 +179,10 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 	// The people who hear about it are the careful part. Every one of these is
 	// a finding nobody has announced, so the alert is a disclosure in its own
 	// right.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -231,11 +198,7 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		if err := rights.GrantRole(ctx, owner.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
@@ -244,18 +207,7 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		if err := rights.GrantRole(ctx, outsider.ID, product.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		// New, so it is not also quiet — this test is about one condition.
 		if _, err := db.DB.NewUpdate().Table("target").
 			Set("created_at = ?", time.Now().UTC()).
@@ -358,33 +310,17 @@ func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, comp
 // An embargo is one condition per place it sits at, so each alert links the
 // place it is about and says the same thing on every sweep.
 func TestAnEmbargoAtTwoPlacesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
 			Set("created_at = ?", time.Now().UTC()).
 			Where("id = ?", target.ID).Exec(ctx); err != nil {
@@ -435,37 +371,15 @@ func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
 	// to administrators, because this one names an issue at a build —
 	// which is finding content, and an administrator no longer reads a
 	// product by administering it.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tag, err := cat.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		released, err := cat.TargetFor(ctx, tag.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		inProgress, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
+		released := w.TargetFor(w.Tag, w.Customer)
+		inProgress := w.Target
 
 		// Somebody who triages this product, an administrator holding nothing,
 		// and somebody who only reads.
@@ -641,10 +555,10 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 	// for this kind, was never reconciled, and their alert stood indefinitely
 	// with nothing able to clear it. That alert names the issue and the
 	// product, and the link is the embargoed path.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -660,28 +574,13 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		for _, who := range []*access.Account{held, next} {
 			if err := rights.GrantRole(ctx, who.ID, product.ID, access.PrivateTriage); err != nil {
 				t.Fatal(err)
 			}
 		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
 			Set("created_at = ?", time.Now().UTC()).
 			Where("id = ?", target.ID).Exec(ctx); err != nil {
@@ -731,10 +630,10 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 	// scans keep succeeding, every screen keeps answering, and each answer is
 	// as old as the data behind it without saying so. So it has to be looked
 	// for rather than waited for.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -745,7 +644,7 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, db)
+		target := aScannedTarget(t, w)
 		watch := notify.NewWatch(db.DB, quiet)
 
 		// A month of runs, every one of them against the same data. Nothing
@@ -790,17 +689,17 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 func TestDataThatMovedRecentlyIsNotReportedAsStale(t *testing.T) {
 	// The other arm, and the one that decides whether the condition is worth
 	// having: a deployment whose data moves is told nothing at all.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
 			access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, db)
+		target := aScannedTarget(t, w)
 		for day, version := range map[int]string{3: "2026-09-15", 1: "2026-09-17"} {
 			at := time.Now().UTC().Add(-time.Duration(day) * 24 * time.Hour)
 			finished := at.Add(time.Minute)
@@ -825,28 +724,13 @@ func TestDataThatMovedRecentlyIsNotReportedAsStale(t *testing.T) {
 	})
 }
 
-// aScannedTarget declares a product with one build and files a scan against it,
-// so that the deployment is not also reported as having gone quiet.
-func aScannedTarget(t *testing.T, db *database.DB) int64 {
+// aScannedTarget files a scan against the world's build, so that the deployment
+// is not also reported as having gone quiet.
+func aScannedTarget(t *testing.T, w *fixture.World) int64 {
 	t.Helper()
+	db := w.DB
 	ctx := t.Context()
-	cat := catalog.NewStore(db.DB)
-	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	target := w.Target
 	if _, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
 		TargetID: target.ID, ContentHash: "scanned",
 		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
@@ -861,17 +745,17 @@ func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testin
 	// that fetched once and stopped again has a newer version and the same
 	// problem — and an alert still naming the version it was first raised for
 	// sends somebody to check a fetch that did happen.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
 			access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, db)
+		target := aScannedTarget(t, w)
 		ranAt := func(daysAgo int, version string) {
 			t.Helper()
 			at := time.Now().UTC().Add(-time.Duration(daysAgo) * 24 * time.Hour)
@@ -942,10 +826,10 @@ func TestTheWatchTellsAdministratorsWhenSomethingIsHiddenWithNobodyAgreeing(t *t
 	// stopped — so it gets read after something has gone wrong rather than
 	// before. This is the other way round: silence unless it has something to
 	// say, and the saying reaches somebody who did not go looking.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
@@ -956,11 +840,8 @@ func TestTheWatchTellsAdministratorsWhenSomethingIsHiddenWithNobodyAgreeing(t *t
 		if err != nil {
 			t.Fatal(err)
 		}
-		aScannedTarget(t, db)
-		product, err := catalog.NewStore(db.DB).ProductByName(ctx, "sonic")
-		if err != nil {
-			t.Fatal(err)
-		}
+		aScannedTarget(t, w)
+		product := w.Product
 		watch := notify.NewWatch(db.DB, quiet)
 		hearing := func(who *access.Account) string {
 			t.Helper()
@@ -1057,17 +938,17 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 // bundle would be told the data had not moved in seven months, about data that
 // moved two days earlier.
 func TestAVersionComingBackIsNotTheDataStandingStill(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
 			access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, db)
+		target := aScannedTarget(t, w)
 		ran := ranOn(t, db, target)
 
 		// Last quarter's bundle, then a fetch two days ago, then the old
@@ -1095,17 +976,17 @@ func TestAVersionComingBackIsNotTheDataStandingStill(t *testing.T) {
 // most recently — and a condition that holds on one sweep and not the next is
 // a fresh unread alert every sweep, for ever, which is what REQ-49 is about.
 func TestTwoReplicasADataFetchApartDoNotAlternate(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
 			access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, db)
+		target := aScannedTarget(t, w)
 		ran := ranOn(t, db, target)
 
 		// One replica has been on the same data for two months; the other
@@ -1142,17 +1023,17 @@ func TestTwoReplicasADataFetchApartDoNotAlternate(t *testing.T) {
 // threshold measured in hours, and a deployment fetching nightly has a reason
 // to set one.
 func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
 			access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, db)
+		target := aScannedTarget(t, w)
 		finished := time.Now().UTC().Add(-18*time.Hour + time.Minute)
 		if _, err := db.DB.NewInsert().Model(&finding.Run{
 			TargetID: target, Scanner: "grype", DatabaseVersion: "2026-09-18",
@@ -1194,28 +1075,13 @@ func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
 // A quiet build whose uploads are being turned away says so, and why, rather
 // than that nothing has arrived.
 func TestAQuietBuildBeingRefusedSaysWhyItIsRefused(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		rights := access.NewStore(db.DB)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		admin := recordPerson(t, rights, "admin@example.com", true, product.ID, "")
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
 			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
 			Where("id = ?", target.ID).Exec(ctx); err != nil {
@@ -1237,31 +1103,12 @@ func TestAQuietBuildBeingRefusedSaysWhyItIsRefused(t *testing.T) {
 // An issue being exploited on a release is told to whoever may act on it,
 // whatever its rating.
 func TestAnExploitedIssueOnAReleaseIsToldWhateverItsRating(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		rights := access.NewStore(db.DB)
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tag, err := cat.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		released, err := cat.TargetFor(ctx, tag.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
+		released := w.TargetFor(w.Tag, w.Customer)
 		triager := recordPerson(t, rights, "triager@example.com", false, product.ID, access.PublicTriage)
 
 		critical(t, db, released.ID, "CVE-2026-EXPLOITED", "high")
@@ -1281,9 +1128,9 @@ func TestAnExploitedIssueOnAReleaseIsToldWhateverItsRating(t *testing.T) {
 // The data in force is the newest run's version, dated from when a version
 // was last seen for the first time, beside how long counts as stopped.
 func TestTheDataInForceIsTheNewestVersionDatedFromWhenItFirstArrived(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		watch := notify.NewWatch(db.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 		none, err := watch.DataInForce(ctx)
@@ -1294,7 +1141,7 @@ func TestTheDataInForceIsTheNewestVersionDatedFromWhenItFirstArrived(t *testing.
 			t.Fatalf("with nothing run the data reads %+v", none)
 		}
 
-		ran := ranOn(t, db, aScannedTarget(t, db))
+		ran := ranOn(t, db, aScannedTarget(t, w))
 		ran(9, "v5:2026-01-01")
 		ran(5, "v5:2026-01-05")
 		ran(2, "v5:2026-01-05")

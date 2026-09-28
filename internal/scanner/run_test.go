@@ -16,9 +16,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -72,31 +71,17 @@ var (
 
 type runFixture struct {
 	db     *database.DB
+	world  *fixture.World
 	queue  *queue.Queue
 	target int64
 }
 
 func eachRun(t *testing.T, fn func(t *testing.T, f *runFixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.Resolve(ctx, "sonic", "master", "broadcom")
-		if err != nil {
-			t.Fatal(err)
-		}
+		db := w.DB
+		target := w.Target
 
 		// The inventory the build shipped, already read and stored.
 		scan, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
@@ -116,7 +101,7 @@ func eachRun(t *testing.T, fn func(t *testing.T, f *runFixture)) {
 			t.Fatal(err)
 		}
 
-		fn(t, &runFixture{db: db, queue: queue.New(db, queue.DefaultOptions()), target: target.ID})
+		fn(t, &runFixture{db: db, world: w, queue: queue.New(db, queue.DefaultOptions()), target: target.ID})
 	})
 }
 
@@ -291,10 +276,7 @@ func (f *runFixture) decided(t *testing.T) int64 {
 	ctx := t.Context()
 
 	rights := access.NewStore(f.db.DB)
-	product, err := catalog.NewStore(f.db.DB).ProductByName(ctx, "sonic")
-	if err != nil {
-		t.Fatal(err)
-	}
+	product := f.world.Product
 	var people []access.Subject
 	for _, who := range []string{"proposer", "approver"} {
 		person, err := rights.Ensure(ctx, who, "", nil, nil)

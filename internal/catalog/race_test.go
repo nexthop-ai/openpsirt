@@ -29,7 +29,6 @@ import (
 // refusal can arrive at COMMIT rather than at the insert.
 func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 		store := catalog.NewStore(db.DB)
 
@@ -115,7 +114,6 @@ func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 // making the race succeed must not make a contradiction succeed.
 func TestDeclaringSomethingElseUnderAKnownNameIsStillRefused(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 		store := catalog.NewStore(db.DB)
 

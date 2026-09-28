@@ -170,7 +170,7 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		everywhere := access.NewPerson(owner.ID, "them@example.com", false,
+		everywhere := access.NewPerson(owner.ID, "somebody@example.com", false,
 			map[int64][]access.Role{
 				f.productID: {access.PrivateTriage}, elsewhere.ID: {access.PrivateTriage},
 			}, 0)
@@ -283,7 +283,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 		}
 		theirs := f.anotherBranchOf(t, elsewhere.ID, "master")
 		f.shippedTo(t, theirs, twoConsumers())
-		holder := access.NewPerson(owner.ID, "them@example.com", false,
+		holder := access.NewPerson(owner.ID, "somebody@example.com", false,
 			map[int64][]access.Role{elsewhere.ID: {access.PrivateTriage}}, 0)
 		_, name, err := f.store.Enter(t.Context(), holder, finding.Entering{
 			TargetIDs: []int64{theirs}, Component: swss.Name, Severity: "high",
@@ -474,7 +474,7 @@ func TestAReferenceFitsAProductNamedAtTheFullWidth(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		who := access.NewPerson(f.planner(t).ID, "them@example.com", false,
+		who := access.NewPerson(f.planner(t).ID, "somebody@example.com", false,
 			map[int64][]access.Role{product.ID: {access.PrivateTriage}}, 0)
 		row, err := f.store.Record(t.Context(), who, product.ID,
 			finding.Claimed{Summary: "Reported against a product with a very long name."})

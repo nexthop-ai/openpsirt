@@ -28,7 +28,7 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 		}
 		// The same issue in a tag, and in a branch that has gone out of
 		// support. Three builds, one of each kind of answer.
-		tag := f.anotherBuild(t, "v2.4.1")
+		tag := f.release(t)
 		f.shippedTo(t, tag, through(libnl))
 		if _, err := f.store.Apply(ctx, tag, f.runOn(t, tag), []finding.Reported{
 			found("CVE-2026-1", libnl),

@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
@@ -29,14 +28,11 @@ type configured struct {
 
 func each(t *testing.T, fn func(t *testing.T, f *configured)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
-		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := w.Product
 		rights := access.NewStore(db.DB)
 		boss, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {

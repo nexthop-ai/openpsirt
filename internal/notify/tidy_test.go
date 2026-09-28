@@ -22,7 +22,6 @@ func TestTheSweepClearsSessionsThatHaveRunOut(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		person, err := rights.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
