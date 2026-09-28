@@ -1453,13 +1453,12 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <p>A sign-in method is not in this list because one is required: the process
 refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
-<p>A database built by v0.1.0, v0.2.0, v0.3.0 or v0.4.0 is upgraded in place, at
-startup or by <code>openpsirt migrate up</code>. One built by an earlier release passes
-through each later release's upgrade on the way. v0.4.0 changed no schema, so a
-v0.3.0 database takes the same upgrade a v0.4.0 one does. A database built by
+<p>A database built by any release is upgraded in place, at startup or by
+<code>openpsirt migrate up</code>. One built by an earlier release passes through each
+later release's upgrade on the way. A database built by a release candidate or
 any build between releases is recreated.</p>
-<p>Read the sections for the release you are coming from, and every section after
-it: from v0.1.0, read all five.</p>
+<p>Read <a href="#every-upgrade">Every upgrade</a>, the section for the release you are coming
+from, and every section after it.</p>
 <h3 id="every-upgrade">Every upgrade<a class="headerlink" href="#every-upgrade" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -1475,7 +1474,7 @@ it: from v0.1.0, read all five.</p>
 </tr>
 <tr>
 <td>Stop every process of the earlier release</td>
-<td>The Helm chart does this by default: its <code>strategy</code> is <code>Recreate</code>, so every earlier pod stops before a new one starts. With <code>strategy.type: RollingUpdate</code>, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them</td>
+<td>The Helm chart does this by default: its <code>strategy</code> is <code>Recreate</code>, so every earlier pod stops before a new one starts. With <code>strategy.type: RollingUpdate</code>, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them</td>
 </tr>
 <tr>
 <td>Deploy this release</td>
@@ -1485,11 +1484,7 @@ it: from v0.1.0, read all five.</p>
 </table>
 <p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back that
 carries a migration, run with this build before the earlier one is deployed.
-v0.4.0 carries none, so going back to v0.4.0 or v0.3.0 is one, and to v0.2.0
-is two. v0.1.0 started against an
-upgraded schema reports it current and cannot read it. Patch branch lookups
-come back off in v0.2.0, which reads its own setting for them: turn them on
-again under its Settings.</p>
+The section for the release gone back to says what else it needs.</p>
 <h3 id="from-v010">From v0.1.0<a class="headerlink" href="#from-v010" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -1527,8 +1522,9 @@ again under its Settings.</p>
 </tr>
 </tbody>
 </table>
+<p>v0.1.0 started against a schema that was not taken back down reports it
+current and cannot read it.</p>
 <h3 id="from-v020">From v0.2.0<a class="headerlink" href="#from-v020" title="Permanent link">&para;</a></h3>
-<p>Also read after an upgrade from v0.1.0.</p>
 <table>
 <thead>
 <tr>
@@ -1585,8 +1581,12 @@ again under its Settings.</p>
 </tr>
 </tbody>
 </table>
+<p>Going back to v0.2.0 leaves patch branch lookups off, because v0.2.0 reads its
+own setting for them: turn them on again under its Settings.</p>
 <h3 id="from-v030">From v0.3.0<a class="headerlink" href="#from-v030" title="Permanent link">&para;</a></h3>
-<p>Also read after an upgrade from v0.1.0 or v0.2.0.</p>
+<p>v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
+one does, and going back to v0.3.0 takes the same <code>openpsirt migrate down</code> as
+going back to v0.4.0.</p>
 <table>
 <thead>
 <tr>
@@ -1602,7 +1602,6 @@ again under its Settings.</p>
 </tbody>
 </table>
 <h3 id="from-v040">From v0.4.0<a class="headerlink" href="#from-v040" title="Permanent link">&para;</a></h3>
-<p>Also read after an upgrade from any earlier release.</p>
 <table>
 <thead>
 <tr>
