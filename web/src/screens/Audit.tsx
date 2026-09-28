@@ -16,7 +16,7 @@ import { Because, labeled } from "../ui/Outcome";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
-import { coveringPeriod, stated } from "./reports/Window";
+import { calendarDay, coveringPeriod, endExclusive, stated } from "./reports/Window";
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
 
@@ -84,6 +84,7 @@ export function Audit() {
   const states = params.getAll("state").filter(Boolean);
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
+  const sent = periodSent(params);
   const alone = params.get("alone") === "true";
   // What applies now, rather than what was once agreed to. Not the same
   // question the state filter asks: a judgment is approved and lapses when the
@@ -131,7 +132,7 @@ export function Audit() {
     queryFn: async () => unwrap(await api.GET("/v1/products", {})),
   });
   const record = useQuery({
-    queryKey: ["audit", products, outcomes, states, from, to, alone, inForce, offset],
+    queryKey: ["audit", products, outcomes, states, sent.from, sent.to, alone, inForce, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/audit", {
@@ -159,8 +160,8 @@ export function Audit() {
               ...(states.length > 0
                 ? { state: states as ("proposed" | "approved" | "withdrawn" | "lapsed")[] }
                 : {}),
-              ...(from ? { from } : {}),
-              ...(to ? { to } : {}),
+              ...(sent.from ? { from: sent.from } : {}),
+              ...(sent.to ? { to: sent.to } : {}),
             },
           },
         }),
@@ -366,8 +367,9 @@ function Ruled() {
   const products = params.getAll("product").filter(Boolean);
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
+  const sent = periodSent(params);
   const [offset, setOffset] = useState(0);
-  const ruled = useRulingsAcross({ products, from, to, offset });
+  const ruled = useRulingsAcross({ products, from: sent.from, to: sent.to, offset });
   useBackOff(ruled.data?.items?.length, offset, setOffset);
   if (ruled.isError) {
     return (
@@ -424,6 +426,7 @@ function Administered() {
   // to it.
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
+  const sent = periodSent(params);
   // The rows shown, rather than an offset: the newest first is the
   // order, and asking for the next page of a list that only grows at the top
   // is how a row is seen twice or not at all.
@@ -432,15 +435,15 @@ function Administered() {
   // read; asking for more would be refused and take the section with it.
   const longest = CHANGES_MOST;
   const changes = useQuery({
-    queryKey: ["administered", from, to, showing],
+    queryKey: ["administered", sent.from, sent.to, showing],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/administration/changes", {
           params: {
             query: {
               limit: showing,
-              ...(from ? { from } : {}),
-              ...(to ? { to } : {}),
+              ...(sent.from ? { from: sent.from } : {}),
+              ...(sent.to ? { to: sent.to } : {}),
             },
           },
         }),
@@ -539,6 +542,17 @@ function Administered() {
   );
 }
 
+// The period the address asks for, as the server takes it. "To" here is the
+// last day in the period, the way every report sheet reads it, and the
+// server's end is the day after. A day that is not on the calendar is left
+// out rather than rolled into the next month.
+export function periodSent(params: URLSearchParams): { from: string; to: string } {
+  return {
+    from: calendarDay(params.get("from") ?? ""),
+    to: endExclusive(calendarDay(params.get("to") ?? "")),
+  };
+}
+
 // The most change-history rows one request is answered with. The route
 // refuses a larger page.
 export const CHANGES_MOST = 200;
@@ -548,10 +562,9 @@ export const CHANGES_MOST = 200;
 // file and the section it was taken from cannot disagree about the stretch.
 function changesAt(params: URLSearchParams, format: string): string {
   const asked = new URLSearchParams();
-  for (const name of ["from", "to"]) {
-    const value = params.get(name);
-    if (value) asked.set(name, value);
-  }
+  const sent = periodSent(params);
+  if (sent.from) asked.set("from", sent.from);
+  if (sent.to) asked.set("to", sent.to);
   const query = asked.toString();
   return `/v1/administration/changes.${format}${query ? `?${query}` : ""}`;
 }
@@ -710,6 +723,11 @@ function Judgment({ row }: { row: Judged }) {
 function recordAt(params: URLSearchParams, format: string): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
+  const sent = periodSent(params);
+  for (const name of ["from", "to"] as const) {
+    if (sent[name]) asked.set(name, sent[name]);
+    else asked.delete(name);
+  }
   const query = asked.toString();
   return `/v1/audit.${format}${query ? `?${query}` : ""}`;
 }

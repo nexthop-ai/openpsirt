@@ -85,6 +85,14 @@ describe("the period a sheet was asked for", () => {
     expect(periodAsked(asked("from=2026-01"))).toEqual({ from: "", to: "" });
   });
 
+  it("refuses a day past the end of its month", () => {
+    // A parser rolls it into March, and the day after that is what the
+    // server would be sent under a heading naming February.
+    expect(periodAsked(asked("to=2026-02-30"))).toEqual({ from: "", to: "" });
+    expect(periodAsked(asked("from=2026-04-31"))).toEqual({ from: "", to: "" });
+    expect(periodAsked(asked("to=2028-02-29"))).toEqual({ from: "", to: "2028-02-29" });
+  });
+
   it("refuses a period that ends before it starts", () => {
     // It holds nothing, and the server refuses it — so the sheet asks a
     // question that can be answered rather than drawing an error.

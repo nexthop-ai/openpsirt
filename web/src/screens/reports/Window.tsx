@@ -80,13 +80,20 @@ export function endExclusive(day: string): string {
   return next.toISOString().slice(0, 10);
 }
 
+// calendarDay is a day as the address names it, or nothing where it names no
+// day on the calendar. A parser rolls a day past the end of its month into the
+// next month rather than refusing it, and the day after that is what reaches
+// the server.
+export function calendarDay(value: string): string {
+  if (!DAY.test(value)) return "";
+  const named = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(named.getTime()) || named.toISOString().slice(0, 10) !== value) return "";
+  return value;
+}
+
 // periodAsked is the period the address asks for, or neither date.
 export function periodAsked(params: URLSearchParams): Asked {
-  const kept = (name: string) => {
-    const value = params.get(name) ?? "";
-    if (!DAY.test(value) || Number.isNaN(new Date(value).getTime())) return "";
-    return value;
-  };
+  const kept = (name: string) => calendarDay(params.get(name) ?? "");
   const from = kept("from");
   const to = kept("to");
   // A period that ends before it starts holds nothing, and the server refuses
