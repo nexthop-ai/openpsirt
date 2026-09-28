@@ -437,6 +437,22 @@ components:
         - person
         - agreed_at
       type: object
+    AliasRemovedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AliasRemovedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        filed_under:
+          description: The name the issue is filed under now, which is the name to read it by
+          type: string
+      required:
+        - filed_under
+      type: object
     AlsoBuild:
       additionalProperties: false
       properties:
@@ -20054,7 +20070,9 @@ paths:
 
         From here on a scan reporting that name no longer resolves here. Findings that did resolve here through it split back out on the next scan that reports it, under an issue of their own.
 
-        Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported, and the name the issue is filed under, answer 422. A name the issue does not answer to answers 404.
+        Where the issue is filed under the name removed, it is refiled under the next best name it has: a CVE where one is left, and otherwise the reference it was minted under. The answer says which, and the issue is read by that name afterwards.
+
+        Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported answers 422, including the name the issue is filed under when a scan reported it. A name the issue does not answer to answers 404.
 
         Requires: public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
       operationId: remove-alias
@@ -20078,8 +20096,12 @@ paths:
             maxLength: 191
             type: string
       responses:
-        "204":
-          description: No Content
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AliasRemovedBody"
+          description: OK
         default:
           content:
             application/problem+json:

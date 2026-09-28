@@ -205,27 +205,35 @@ func registerWhoTold(api huma.API, in Ingest) {
 			"From here on a scan reporting that name no longer resolves here. Findings " +
 			"that did resolve here through it split back out on the next scan that " +
 			"reports it, under an issue of their own.\n\n" +
+			"Where the issue is filed under the name removed, it is refiled under the " +
+			"next best name it has: a CVE where one is left, and otherwise the reference " +
+			"it was minted under. The answer says which, and the issue is read by that " +
+			"name afterwards.\n\n" +
 			"Asks for the same right recording it does: triage in every product the " +
-			"issue is open in. A name a scan reported, and the name the issue is filed " +
-			"under, answer 422. A name the issue does not answer to answers 404.",
-		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
+			"issue is open in. A name a scan reported answers 422, including the name " +
+			"the issue is filed under when a scan reported it. A name the issue does not " +
+			"answer to answers 404.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusOK,
 	}, perProduct, "Also asks for triage in every other product the issue is open in.",
 		triageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The name to remove, as it is written"`
-	}) (*struct{}, error) {
+	}) (*struct{ Body AliasRemovedBody }, error) {
 		subject, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
+		out := &struct{ Body AliasRemovedBody }{}
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
 			named, err := finding.NewVulnerabilities(tx).NamesByID(ctx, []int64{issue})
 			if err != nil {
 				return wentWrong(in.Logger, "that issue could not be looked up", err)
 			}
-			switch err := finding.NewVulnerabilities(tx).
-				NoLongerKnownAs(ctx, subject, issue, input.Alias); {
+			filedUnder, err := finding.NewVulnerabilities(tx).
+				NoLongerKnownAs(ctx, subject, issue, input.Alias)
+			out.Body.FiledUnder = filedUnder
+			switch {
 			case errors.Is(err, finding.ErrNoSuchName):
 				return huma.Error404NotFound(finding.ErrNoSuchName.Error())
 			case err != nil:
@@ -241,8 +249,13 @@ func registerWhoTold(api huma.API, in Ingest) {
 		}); err != nil {
 			return nil, err
 		}
-		return &struct{}{}, nil
+		return out, nil
 	})
+}
+
+// AliasRemovedBody is an issue after one of its names was removed.
+type AliasRemovedBody struct {
+	FiledUnder string `json:"filed_under" doc:"The name the issue is filed under now, which is the name to read it by"`
 }
 
 // reportBody names the people and the issue one report refers to.

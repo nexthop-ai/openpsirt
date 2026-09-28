@@ -4,6 +4,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -66,7 +67,7 @@ func TestANameRecordedByHandIsRemovedAndTheFiledUnderNameIsNot(t *testing.T) {
 		if code := r.alias(t, http.MethodDelete, minted, "GHSA-3c4j-5f6m-7q8r"); code != http.StatusNotFound {
 			t.Errorf("removing a name it does not go by answered %d, want 404", code)
 		}
-		if code := r.alias(t, http.MethodDelete, minted, typed); code != http.StatusNoContent {
+		if code := r.alias(t, http.MethodDelete, minted, typed); code != http.StatusOK {
 			t.Fatalf("removing a name recorded by hand answered %d", code)
 		}
 		detail.Aliases, detail.AliasesByHand = nil, nil
@@ -108,10 +109,52 @@ func TestANameAScanReportedIsNotRemovedByHand(t *testing.T) {
 		if code := r.alias(t, http.MethodDelete, "CVE-2027-0001", reported); code != http.StatusUnprocessableEntity {
 			t.Errorf("removing a name a scan reported answered %d, want 422", code)
 		}
-		// The CVE was typed by hand and the issue is now filed under it,
-		// which is the one name never removed.
-		if code := r.alias(t, http.MethodDelete, "CVE-2027-0001", "CVE-2027-0001"); code != http.StatusUnprocessableEntity {
-			t.Errorf("removing the filed-under name, recorded by hand, answered %d, want 422", code)
+	})
+}
+
+func TestAMistypedCVEIsRemovedAndTheFlawRefiledUnderItsOwnReference(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		minted := r.embargoed(t)
+		const typo = "CVE-2027-9001"
+		if code := r.alias(t, http.MethodPut, minted, typo); code != http.StatusNoContent {
+			t.Fatalf("recording a CVE answered %d", code)
+		}
+		var detail struct {
+			Vulnerability string `json:"vulnerability"`
+		}
+		read(t, r, "private-triage", findingAt(minted), &detail)
+		if detail.Vulnerability != typo {
+			t.Fatalf("the flaw is filed under %q, want the CVE typed", detail.Vulnerability)
+		}
+
+		var before changed
+		read(t, r, "admin", "/v1/administration/changes?limit=1", &before)
+		got := asPerson(t, r, "private-triage", http.MethodDelete,
+			fmt.Sprintf("/v1/products/mine/issues/%s/aliases/%s", typo, typo), "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("removing the filed-under CVE typed by hand answered %d: %s", got.Code, got.Body.String())
+		}
+		var removed struct {
+			FiledUnder string `json:"filed_under"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &removed); err != nil {
+			t.Fatal(err)
+		}
+		if removed.FiledUnder != minted {
+			t.Errorf("the answer says it is filed under %q, want %q", removed.FiledUnder, minted)
+		}
+		detail.Vulnerability = ""
+		read(t, r, "private-triage", findingAt(minted), &detail)
+		if detail.Vulnerability != minted {
+			t.Errorf("after the removal the flaw is filed under %q, want its own reference %q",
+				detail.Vulnerability, minted)
+		}
+		var after changed
+		read(t, r, "admin", "/v1/administration/changes?limit=1", &after)
+		if after.Total != before.Total+1 || len(after.Items) == 0 || after.Items[0].Kind != "alias" ||
+			after.Items[0].Was != typo {
+			t.Errorf("the removal left %d rows, newest %+v", after.Total-before.Total, after.Items)
 		}
 	})
 }

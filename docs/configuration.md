@@ -119,14 +119,11 @@ going back to v0.4.0.
 
 | After the upgrade from v0.4.0 | |
 |---|---|
-| A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
-
-| After the upgrade from v0.4.0 | |
-|---|---|
 | A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
 | Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
 | An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
 | Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
+| A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
 
 ## Serving
 

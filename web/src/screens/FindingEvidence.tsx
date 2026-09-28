@@ -10,7 +10,7 @@
 import { Fragment, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
@@ -324,6 +324,8 @@ export function Reporter({
   byHand?: string[];
 }) {
   const queries = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [alias, setAlias] = useState("");
   // Reading who reported it asks for reading undisclosed work; answering them
   // is working the report, which asks for triage of it.
@@ -368,7 +370,17 @@ export function Reporter({
           params: { path: { product, vulnerability, alias: name } },
         }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["finding"] }),
+    onSuccess: (removed) => {
+      // Removing the name it was filed under refiles it, and the address
+      // this screen was reached by names it no more.
+      const now = removed?.filed_under;
+      if (now && now !== vulnerability) {
+        const from = `/${encodeURIComponent(vulnerability)}`;
+        const to = `/${encodeURIComponent(now)}`;
+        navigate(location.pathname.replace(from, to) + location.search, { replace: true });
+      }
+      void queries.invalidateQueries({ queryKey: ["finding"] });
+    },
   });
 
   const report = told.data;

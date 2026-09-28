@@ -2682,7 +2682,9 @@ export interface paths {
          *
          *     From here on a scan reporting that name no longer resolves here. Findings that did resolve here through it split back out on the next scan that reports it, under an issue of their own.
          *
-         *     Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported, and the name the issue is filed under, answer 422. A name the issue does not answer to answers 404.
+         *     Where the issue is filed under the name removed, it is refiled under the next best name it has: a CVE where one is left, and otherwise the reference it was minted under. The answer says which, and the issue is read by that name afterwards.
+         *
+         *     Asks for the same right recording it does: triage in every product the issue is open in. A name a scan reported answers 422, including the name the issue is filed under when a scan reported it. A name the issue does not answer to answers 404.
          *
          *     Requires: public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
          */
@@ -6033,6 +6035,16 @@ export interface components {
             agreed_at: string;
             /** @description Who agrees, by sign-in identity */
             person: string;
+        };
+        AliasRemovedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AliasRemovedBody.json
+             */
+            readonly $schema?: string;
+            /** @description The name the issue is filed under now, which is the name to read it by */
+            filed_under: string;
         };
         AlsoBuild: {
             stream: string;
@@ -16609,12 +16621,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No Content */
-            204: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AliasRemovedBody"];
+                };
             };
             /** @description Error */
             default: {
