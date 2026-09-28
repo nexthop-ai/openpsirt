@@ -108,9 +108,15 @@ describe("an act on a claim, once it lands", () => {
     expect(invalidated).toEqual(EVERY_CLAIM_KEY);
   });
 
-  // Verified by changing `onSuccess: done` to `onSettled: done` on approval.
-  it("a refused approval moves nothing", async () => {
-    const { invalidated } = await acted(useApproveClaim, { id: 7 }, 409);
+  // Verified by changing `onSuccess: done` to `onSettled: done` on each hook
+  // in turn: its refused case then invalidates every claim read.
+  it.each([
+    ["approval", useApproveClaim, { id: 7 }],
+    ["send-back", useRejectClaim, { id: 7, because: "x" }],
+    ["split", useSplitClaim, { id: 7, rows: [1], because: "x" }],
+  ] as const)("a refused %s moves nothing", async (_, hook, vars) => {
+    const { sent, invalidated } = await acted(hook as never, vars, 409);
+    expect(sent).toHaveLength(1);
     expect(invalidated).toEqual([]);
   });
 });

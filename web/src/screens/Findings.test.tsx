@@ -42,21 +42,25 @@ describe("the filters narrowing the findings list", () => {
   });
 
   // Verified by writing the flag with `set` alone: `only=exploited` is left in
-  // the address, still narrows the list, and the test fails on it.
-  it("unticks known exploited however the address spelled it", async () => {
-    await draw("/findings?only=exploited");
-    act(() => chip("More filters")?.click());
-    await settle();
-    const box = Array.from(mount.host().querySelectorAll("label.check")).find(
-      (each) => each.textContent === "Known exploited",
-    );
-    const input = box?.querySelector<HTMLInputElement>("input");
-    expect(input?.checked, "the flag does not read only=exploited as on").toBe(true);
-    act(() => input?.click());
-    await settle();
-    expect(query().get("only")).toBeNull();
-    expect(query().get("exploited")).toBeNull();
-  });
+  // the address, still narrows the list, and the test fails on it. And by
+  // clearing `only` alone: `exploited=1` is left and the second case fails.
+  it.each(["/findings?only=exploited", "/findings?exploited=1"])(
+    "unticks known exploited however the address spelled it (%s)",
+    async (address) => {
+      await draw(address);
+      act(() => chip("More filters")?.click());
+      await settle();
+      const box = Array.from(mount.host().querySelectorAll("label.check")).find(
+        (each) => each.textContent === "Known exploited",
+      );
+      const input = box?.querySelector<HTMLInputElement>("input");
+      expect(input?.checked, "the flag does not read the address as on").toBe(true);
+      act(() => input?.click());
+      await settle();
+      expect(query().get("only")).toBeNull();
+      expect(query().get("exploited")).toBeNull();
+    },
+  );
 
   // Verified by dropping the offset delete from the list's filter change: the
   // address keeps offset=50 and the test fails on it.
