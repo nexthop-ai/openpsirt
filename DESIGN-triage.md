@@ -1385,7 +1385,9 @@ What a new line would inherit is shown before anything happens, and what moved i
 chosen rather than taken (REQ-25). Four groups, because they need four different
 things: what already applies has nothing to agree to, what covers nothing here
 has nothing to apply to, what moved is a question, and what was postponed is a
-question that carries its own history.
+question that carries its own history. What has run out at a place the new line
+holds is counted apart, since it cannot be carried and leaves a finding there
+unanswered.
 
 Reasoning travels and conclusions do not. Everything carried arrives as a claim
 waiting for a second person, however confident whoever carried it was: the

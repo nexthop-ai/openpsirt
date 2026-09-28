@@ -94,8 +94,8 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
         <>
           <p className="hint">
             <b>{preview.data.applying ?? 0}</b> reach this line already · <b>{moved.length}</b>{" "}
-            moved · <b>{postponed.length}</b> postponed · <b>{preview.data.absent ?? 0}</b> cover
-            nothing here.
+            moved · <b>{postponed.length}</b> postponed · <b>{preview.data.expired ?? 0}</b> past
+            their date · <b>{preview.data.absent ?? 0}</b> cover nothing here.
           </p>
 
           {moved.length === 0 && postponed.length === 0 ? (

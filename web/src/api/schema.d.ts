@@ -3765,13 +3765,15 @@ export interface paths {
          * Show what triage a new line would inherit
          * @description Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
          *
-         *     Four groups, because they need four different things:
+         *     Five groups, because they need different things:
          *
          *     `applying` reach this line by matching, and there is nothing to choose.
          *
          *     `moved` held a claim at a version this line does not have. Each would come across as a proposal carrying the old reasoning, never as a decision.
          *
          *     `postponed` were deferrals. Each says how long it has already been put off across every line it has come through, which is the total that carrying it again agrees to.
+         *
+         *     `expired` are deferrals and promises at a place this line still holds whose date has passed. A carried judgment keeps its date, so these cannot be carried.
          *
          *     `absent` cover nothing here and are left behind.
          *
@@ -6529,6 +6531,11 @@ export interface components {
              * @description Reach it by matching. Nothing to choose
              */
             applying: number;
+            /**
+             * Format: int64
+             * @description Deferrals and promises at a place this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer
+             */
+            expired: number;
             /** @description The version differs, so each needs a fresh answer */
             moved: components["schemas"]["InheritedBody"][] | null;
             /** @description Deferrals, offered separately and never carried by default */

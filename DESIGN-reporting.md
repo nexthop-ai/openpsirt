@@ -282,6 +282,7 @@ to and a carry that happens silently is one nobody reviews.
 | Reaches the new line by matching | Counted, never offered. A decision is a claim about a combination of code, so these have already happened |
 | Held a claim at a version this line does not have | Offered as a *proposal carrying the old reasoning*, never as a decision, because the version moved and the old conclusion is not a conclusion about the new code |
 | Deferrals | Offered separately, never carried by default. "Not this sprint" was about that sprint |
+| Past its date at a place the line holds | Counted apart from what covers nothing, because the finding there is left with no answer. A carried judgment keeps its date, so a deferral or promise whose date has gone by cannot be carried |
 | Covers nothing here | Counted and left behind |
 
 | Rule | Reason |

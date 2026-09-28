@@ -467,6 +467,7 @@ type CarriedBody struct {
 	Applying  int             `json:"applying" doc:"Reach it by matching. Nothing to choose"`
 	Moved     []InheritedBody `json:"moved" doc:"The version differs, so each needs a fresh answer"`
 	Postponed []InheritedBody `json:"postponed" doc:"Deferrals, offered separately and never carried by default"`
+	Expired   int             `json:"expired" doc:"Deferrals and promises at a place this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer"`
 	Absent    int             `json:"absent" doc:"Cover nothing in the new line"`
 }
 
@@ -478,13 +479,15 @@ func registerCarry(api huma.API, in Ingest) {
 		Description: "Returns what an existing line's decisions would mean for this one, " +
 			"without changing anything. Ask before creating a line: the answer is what " +
 			"somebody is agreeing to.\n\n" +
-			"Four groups, because they need four different things:\n\n" +
+			"Five groups, because they need different things:\n\n" +
 			"`applying` reach this line by matching, and there is nothing to choose.\n\n" +
 			"`moved` held a claim at a version this line does not have. Each would come " +
 			"across as a proposal carrying the old reasoning, never as a decision.\n\n" +
 			"`postponed` were deferrals. Each says how long it has already been put off " +
 			"across every line it has come through, which is the total that carrying it " +
 			"again agrees to.\n\n" +
+			"`expired` are deferrals and promises at a place this line still holds whose " +
+			"date has passed. A carried judgment keeps its date, so these cannot be carried.\n\n" +
 			"`absent` cover nothing here and are left behind.",
 		Tags: []string{"Triage"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -512,7 +515,7 @@ func registerCarry(api huma.API, in Ingest) {
 			return nil, refusedDecision(in.Logger, err)
 		}
 		body := CarriedBody{
-			Applying: carried.Applying, Absent: carried.Absent,
+			Applying: carried.Applying, Expired: carried.Expired, Absent: carried.Absent,
 			Moved:     inherited(carried.Moved),
 			Postponed: inherited(carried.Postponed),
 		}

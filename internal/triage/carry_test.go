@@ -315,7 +315,8 @@ func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
 	})
 }
 
-// And a judgment whose date has already gone by is not offered at all.
+// And a judgment whose date has already gone by is not offered at all, and is
+// counted as past its date.
 //
 // A carried judgment keeps its date rather than having it quietly moved
 // forward, so carrying one that has run out writes a claim that is finished
@@ -348,6 +349,12 @@ func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 		}
 		if len(offered.Postponed) != 0 {
 			t.Errorf("a deferral that has run out was offered: %+v", offered.Postponed)
+		}
+		// Counted as past its date, not as covering nothing: its place is
+		// on the new line, and the finding there is left with no answer.
+		if offered.Expired != 1 || offered.Absent != 0 {
+			t.Errorf("a deferral past its date at a place the line holds counts as %d expired, "+
+				"%d absent; want 1 and 0", offered.Expired, offered.Absent)
 		}
 	})
 }
