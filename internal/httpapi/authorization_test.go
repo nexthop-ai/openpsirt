@@ -259,6 +259,16 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
+	// The other product builds the same variant name as this one, so a path
+	// naming theirs/master/broadcom addresses a build that exists: a refusal
+	// there is the scope or visibility check answering, and not the build
+	// being absent. With the visibility test in catalog.LocateVisible removed,
+	// the pipeline tests reaching theirs/master/broadcom fail; with this
+	// variant undeclared they passed either way.
+	theirBroadcom, err := cat.DeclareVariant(ctx, theirs.ID, "Broadcom", true)
+	if err != nil {
+		return cast{}, err
+	}
 
 	// A build under each product, so that anything answering "what exists
 	// here" has something to answer with. Without these the catalog has
@@ -276,8 +286,10 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if _, err := cat.TargetFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.TargetFor(ctx, theirBranch.ID, theirVariant.ID); err != nil {
-		return cast{}, err
+	for _, variant := range []*catalog.Variant{theirVariant, theirBroadcom} {
+		if _, err := cat.TargetFor(ctx, theirBranch.ID, variant.ID); err != nil {
+			return cast{}, err
+		}
 	}
 
 	// Everybody here is seeded with a display name that is not their
