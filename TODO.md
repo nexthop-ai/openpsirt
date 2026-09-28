@@ -98,7 +98,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Keep 30 days as the longest a sign-in lasts? | It bounds how long a role a group withdrew can still be held. 90 days is defensible |
 | Start a disclosure date for an outside report ruled a duplicate? | The flaw was found here and has no date, and the outside reporter may be counting down to publication |
 
 ## Measured and left alone
