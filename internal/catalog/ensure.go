@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -54,6 +55,9 @@ func raced(err error) bool {
 }
 
 func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*Product, bool, error) {
+	// Trimmed as DeclareProduct stores it, so a repeat declaration compares
+	// what is kept rather than what was typed around it.
+	displayName = strings.TrimSpace(displayName)
 	existing, err := s.ProductByName(ctx, name)
 	switch {
 	case err == nil:

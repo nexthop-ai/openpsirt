@@ -203,6 +203,7 @@ than the exotic one.
 | A declaration that loses to another writer reads what won and confirms it | The read and the write are two statements, so both callers find nothing and both insert. The unique index refuses one of them, and the refusal is not the loser's to report |
 | Once more and no further | A row that keeps disappearing is not a race, and a retry with no bound is a loop |
 | Declaring something *else* under a known name is still refused | Idempotence is about the same declaration arriving twice. A tag redeclared as a branch, or a product redeclared with another display name, is a name quietly changing meaning |
+| A display name is compared as it is stored, trimmed | Space around it is not part of it, so the same declaration typed with a trailing space is the same declaration |
 
 The same holds for the build a scan is filed against: two pipelines filing the
 first scan for one release and variant at once must not produce two rows, which
@@ -211,7 +212,8 @@ would be two histories for one thing somebody ships.
 ## Names
 
 Bounded: no leading or trailing spaces, nothing empty, and a length keeping a
-unique index inside every engine's key-length limit. Uniqueness is within the
+unique index inside every engine's key-length limit. The length is counted in
+characters, which is what the column holds. Uniqueness is within the
 parent — a product name globally, a stream and a variant within their product.
 
 Capitals do not distinguish two names. These are typed by hand into build
