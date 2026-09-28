@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -491,6 +492,9 @@ func reachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T
 			// Restated here it is a second boundary that agrees until one
 			// moves.
 			Ours: currency.Ourselves(as.Namespace, nil),
+			// A chat platform, so a chat channel and a person's own chat
+			// settings answer rather than saying the deployment offers none.
+			Chats: []string{notify.Slack},
 		})
 		fn(t, &reach{handler: handler, key: made.key, revoked: made.revoked,
 			rights: rights, db: db, api: api})

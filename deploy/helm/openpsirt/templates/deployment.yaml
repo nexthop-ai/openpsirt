@@ -56,6 +56,10 @@
 {{- if or (and .Values.mail.server (not .Values.mail.from)) (and .Values.mail.from (not .Values.mail.server)) }}
 {{- fail "set mail.server and mail.from together, or neither: a server with nobody to send as sends nothing, and nothing is what an operator who configured half of it would never find out" }}
 {{- end }}
+{{- $zulip := .Values.chat.zulip }}
+{{- if and (or $zulip.site $zulip.email $zulip.key $zulip.existingSecret) (not (and $zulip.site $zulip.email (or $zulip.key $zulip.existingSecret))) }}
+{{- fail "set chat.zulip.site, chat.zulip.email and chat.zulip.key (or existingSecret) together, or none: a bot is its server, its address and its key" }}
+{{- end }}
 {{- if and (or .Values.mail.password .Values.mail.existingSecret) (not .Values.mail.username) }}
 {{- fail "set mail.username: a password with no username is never sent, so the server would refuse every message and the mail would look configured" }}
 {{- end }}
@@ -76,11 +80,12 @@ spec:
       labels: {{- include "openpsirt.selectorLabels" . | nindent 8 }}
       annotations:
         # Rolls the pods when a credential the chart holds changes: the
-        # database's, a sign-in client secret, or the mail password. Without
+        # database's, a sign-in client secret, the mail password, or a chat
+        # bot's credential. Without
         # this a rotation updates the Secret, leaves the pod template
         # byte-identical, and every running pod keeps using the old credential
         # while the upgrade reports success.
-        {{- if or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) (and .Values.mail.server .Values.mail.password (not .Values.mail.existingSecret)) }}
+        {{- if or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) (and .Values.mail.server .Values.mail.password (not .Values.mail.existingSecret)) (and .Values.chat.slack.token (not .Values.chat.slack.existingSecret)) (and .Values.chat.zulip.site .Values.chat.zulip.key (not .Values.chat.zulip.existingSecret)) }}
         checksum/secrets: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
         {{- with .Values.podAnnotations }}
@@ -211,6 +216,24 @@ spec:
                   name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.mail "suffix" "mail") }}
                   key: {{ include "openpsirt.secretKey" (dict "source" .Values.mail "key" "mail-password") }}
             {{- end }}
+            {{- end }}
+            {{- if or .Values.chat.slack.token .Values.chat.slack.existingSecret }}
+            - name: OPENPSIRT_SLACK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.chat.slack "suffix" "slack") }}
+                  key: {{ include "openpsirt.secretKey" (dict "source" .Values.chat.slack "key" "slack-token") }}
+            {{- end }}
+            {{- if .Values.chat.zulip.site }}
+            - name: OPENPSIRT_ZULIP_SITE
+              value: {{ .Values.chat.zulip.site | quote }}
+            - name: OPENPSIRT_ZULIP_EMAIL
+              value: {{ .Values.chat.zulip.email | quote }}
+            - name: OPENPSIRT_ZULIP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.chat.zulip "suffix" "zulip") }}
+                  key: {{ include "openpsirt.secretKey" (dict "source" .Values.chat.zulip "key" "zulip-key") }}
             {{- end }}
             - name: OPENPSIRT_AUTO_MIGRATE
               value: {{ .Values.autoMigrate | quote }}

@@ -28,5 +28,9 @@ func StatementsV050(engine database.Engine) map[string][]string {
 		"vulnerability_merge": merge[:2],
 		"decision_superseded": merge[2:],
 		"assessment":          assessmentV050(t),
+		"notification":        notificationV050(t),
+		"outbound":            outboundV050(t),
+		"chat_preference":     {chatV050(t)[0]},
+		"chat_delivery":       {chatV050(t)[1]},
 	}
 }

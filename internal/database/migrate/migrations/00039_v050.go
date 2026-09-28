@@ -82,6 +82,12 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //   - A rating claim states why it was withdrawn where no person withdrew it.
 //     Every claim v0.4.0 withdrew, a person withdrew, so the column starts
 //     empty.
+//   - A notification names the team whose queue it is about, and a
+//     destination may be a chat channel belonging to the deployment, a
+//     product or a team. Every destination v0.4.0 held is a signed request
+//     belonging to the deployment.
+//   - What somebody chose about chat, and what has been carried to them there,
+//     are tables of their own. Nothing v0.4.0 held goes in either.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -130,8 +136,25 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := u.create(mergeV050(t), "vulnerability_merge", "decision_superseded"); err != nil {
 		return err
 	}
-	return u.change(assessmentV050(t), change{table: "assessment",
-		add: []added{{column: "withdrawn_because"}}})
+	if err := u.change(assessmentV050(t), change{table: "assessment",
+		add: []added{{column: "withdrawn_because"}}}); err != nil {
+		return err
+	}
+	if err := u.change(notificationV050(t), change{table: "notification",
+		add:         []added{{column: "team_id"}},
+		constraints: []string{"notification_team_fk"}}); err != nil {
+		return err
+	}
+	if err := u.change(outboundV050(t), change{table: "outbound",
+		add: []added{
+			{column: "platform", fill: "'webhook'"},
+			{column: "channel"}, {column: "topic"},
+			{column: "product_id"}, {column: "team_id"},
+		},
+		constraints: []string{"outbound_product_fk", "outbound_team_fk"}}); err != nil {
+		return err
+	}
+	return u.create(chatV050(t), "chat_preference", "chat_delivery")
 }
 
 // eachIssueItself reads every issue as itself, which is what an issue nothing
@@ -167,6 +190,20 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := sendersNamed(ctx, tx); err != nil {
 		return err
 	}
+	// A chat channel is a destination v0.4.0 cannot reach, so it goes with
+	// what it delivered.
+	for _, stmt := range []string{
+		`DELETE FROM "outbound_delivery" WHERE "outbound_id" IN ` +
+			`(SELECT "id" FROM "outbound" WHERE "platform" <> 'webhook')`,
+		`DELETE FROM "outbound" WHERE "platform" <> 'webhook'`,
+	} {
+		if _, err := tx.NewRaw(stmt).Exec(ctx); err != nil {
+			return fmt.Errorf("remove the chat channels v0.4.0 cannot reach: %w", err)
+		}
+	}
+	if err := dropTables(ctx, tx.Tx, "chat_delivery", "chat_preference"); err != nil {
+		return err
+	}
 	if err := dropTables(ctx, tx.Tx, "decision_superseded", "vulnerability_merge"); err != nil {
 		return err
 	}
@@ -191,6 +228,15 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+	if err := u.narrow(narrowing{table: "notification",
+		keys: []string{"notification_team_fk"}, columns: []string{"team_id"}}); err != nil {
+		return err
+	}
+	if err := u.narrow(narrowing{table: "outbound",
+		keys:    []string{"outbound_product_fk", "outbound_team_fk"},
+		columns: []string{"platform", "channel", "topic", "product_id", "team_id"}}); err != nil {
+		return err
+	}
 	// Which names a person typed goes with its column. The names stay.
 	if err := u.run([]string{`ALTER TABLE "vulnerability_alias" DROP COLUMN "by_hand"`}); err != nil {
 		return err

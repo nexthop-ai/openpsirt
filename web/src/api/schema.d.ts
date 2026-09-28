@@ -1661,7 +1661,7 @@ export interface paths {
         };
         /**
          * List where this deployment sends things
-         * @description The destinations configured, which kinds go to each, and whether they are working.
+         * @description The destinations configured, which kinds go to each, and whether they are working. A destination is a webhook or a chat channel.
          *
          *     The signing secret is never returned, and of the address only the host is. A destination is told apart by its name and kind.
          *
@@ -1671,19 +1671,21 @@ export interface paths {
         put?: never;
         /**
          * Send a kind of notification somewhere
-         * @description Records a destination: a URL, a shared secret to sign with, and which kinds go there — one kind by name, or `*` for all of them.
+         * @description Records a destination: which kinds go there — one kind by name, or `*` for all of them — and either a webhook or a chat channel.
          *
-         *     One signed request, not an adapter each. Slack, Teams, a tracker driven by automation and paging all take an HTTP request with a JSON body, so one shape reaches all of them.
+         *     A webhook takes a URL and a shared secret to sign with. A chat channel takes a `platform` this deployment is configured for, the `channel` to post to, and on Zulip a `topic`. It may name a `product` or a `team`, and then carries only what is about that product or that team.
          *
-         *     What it carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
+         *     A chat channel carries notifications about a product, a team or the deployment, never one addressed to a single person, and a kind addressed to one person is refused. What one channel carries is not also posted to a broader one: a team's channel takes what is about its team, a product's what is about its product, and a deployment's the rest. A channel belonging to a product or a team carries nothing about a finding nobody has announced; a deployment's carries that there is something, and a link.
+         *
+         *     What a webhook carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
          *
          *     `subject` and `text` are escaped as markdown, a backslash before each character that would open markup, and carry `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;`, which Slack and Teams read as those characters. Any other receiver decodes the three and drops the backslashes. The line of `text` holding the address is not escaped as markdown, and `link` is sent as it is.
          *
-         *     Every request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
+         *     Every webhook request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
          *
-         *     The response carries the host of the address and never the rest of it, the same as the listing.
+         *     The response carries the host of a webhook's address and never the rest of it, the same as the listing.
          *
-         *     https only, and a redirect is refused rather than followed. The body is signed and not encrypted, and a redirect asks us to send a signed request somewhere else, which is what the restriction exists to prevent.
+         *     A webhook is https only, and a redirect is refused rather than followed.
          *
          *     Requires: administrator
          */
@@ -5286,6 +5288,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/session/me/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose what is sent to you in chat
+         * @description Turns direct messages on or off, and says whether what a chat channel carries is sent to you directly as well.
+         *
+         *     Direct messages are on until turned off. They carry what is your own — work assigned to you, a note naming you, a claim sent back — and what is about a product or a team where no channel carries it. `shared` sends you what the channels carry as well, for somebody who does not sit in them; it is off until asked for, and asking for it without `direct` is refused.
+         *
+         *     You are found on a chat platform by the address recorded against you, which `GET /v1/session/me` reports as `reachable`. Refused where this deployment offers no chat platform, which `GET /v1/session/me` reports as `chat`.
+         *
+         *     Requires: your own credential
+         */
+        put: operations["set-chat"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/session/me/digest": {
         parameters: {
             query?: never;
@@ -5902,13 +5930,26 @@ export interface components {
              * @example https://example.com/schemas/Add-outboundRequest.json
              */
             readonly $schema?: string;
+            /** @description The chat channel to post to */
+            channel?: string;
             /** @description One notification kind, or * for all of them */
             kind: string;
             name: string;
-            /** @description The signing secret. Never returned by any endpoint */
-            secret: string;
-            /** @description The address to send to. https only */
-            url: string;
+            /**
+             * @description How it is reached. A webhook where absent
+             * @enum {string}
+             */
+            platform?: "webhook" | "slack" | "zulip";
+            /** @description The product a chat channel belongs to */
+            product?: string;
+            /** @description A webhook's signing secret, at least 16 characters. Never returned by any endpoint */
+            secret?: string;
+            /** @description The team a chat channel belongs to */
+            team?: string;
+            /** @description The topic within a Zulip channel */
+            topic?: string;
+            /** @description A webhook's address. https only */
+            url?: string;
         };
         "Add-routing-ruleRequest": {
             /**
@@ -6745,6 +6786,14 @@ export interface components {
              */
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
             vulnerability: string;
+        };
+        ChatBody: {
+            /** @description They are sent direct messages: what is their own, and what no channel carries */
+            direct: boolean;
+            /** @description The chat platforms this deployment offers */
+            platforms: string[] | null;
+            /** @description What a channel carries is sent to them directly as well */
+            shared: boolean;
         };
         ClaimApprovalBody: {
             /**
@@ -9567,22 +9616,35 @@ export interface components {
             readonly $schema?: string;
             /** @description The reason the last one failed, where one did */
             because?: string;
+            /** @description The chat channel it posts to */
+            channel?: string;
             /**
              * Format: int64
              * @description The number being retried or given up on
              */
             failing: number;
-            /** @description The host it sends to. The rest of the address is never returned */
-            host: string;
+            /** @description The host a webhook sends to. The rest of the address is never returned */
+            host?: string;
             /** @description The notifications that go here, or * for all of them */
             kind: string;
             /** @description The name, so a log line and a screen can use it */
             name: string;
             /**
+             * @description How it is reached: a signed request, or a chat platform
+             * @enum {string}
+             */
+            platform: "webhook" | "slack" | "zulip";
+            /** @description The product a chat channel belongs to */
+            product?: string;
+            /**
              * Format: int64
              * @description The number of things delivered there
              */
             sent: number;
+            /** @description The team a chat channel belongs to */
+            team?: string;
+            /** @description The topic within a Zulip channel */
+            topic?: string;
         };
         OutlierBody: {
             /**
@@ -11196,6 +11258,18 @@ export interface components {
             /** @description The reason any build is being taken out. Required whenever one is */
             reason?: string;
         };
+        "Set-chatRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Set-chatRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Send direct messages */
+            direct: boolean;
+            /** @description Send what a channel carries directly as well */
+            shared?: boolean;
+        };
         "Set-digestRequest": {
             /**
              * Format: uri
@@ -12138,6 +12212,8 @@ export interface components {
              * @description The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
              */
             bulk_cap?: number;
+            /** @description The chat platforms this deployment offers and what they chose, where it offers any */
+            chat?: components["schemas"]["ChatBody"];
             /**
              * Format: int64
              * @description The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
@@ -20687,6 +20763,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WhoBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Set-chatRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

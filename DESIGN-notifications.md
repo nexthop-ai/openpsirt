@@ -2,7 +2,7 @@
 
 What a person is told, through which channel, and when.
 
-Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77.
+Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-79, REQ-80.
 
 ## Contents
 
@@ -23,6 +23,12 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77.
 - [Delivery](#delivery)
 - [Mail](#mail)
 - [Outbound HTTP](#outbound-http)
+- [Chat](#chat)
+- [Chat recipients](#chat-recipients)
+- [Channel scope](#channel-scope)
+- [Grouped chat messages](#grouped-chat-messages)
+- [Chat delivery](#chat-delivery)
+- [Chat markup](#chat-markup)
 - [Embargo notices](#embargo-notices)
 - [Obligation notices](#obligation-notices)
 - [Ownership of a notification](#ownership-of-a-notification)
@@ -529,6 +535,142 @@ request-forgery primitive unless governed:
 | A destination's kind is normalized where it is written | Stored as typed and compared loosely, a destination added under one spelling is retired by another only by accident, and one believed retired goes on receiving everything it takes, undisclosed findings included |
 | Reading and changing where things go is refused in the data layer | It is this table's own rule and the rest of them live there (REQ-42 and REQ-43). What an operator's question needs is named field by field rather than embedding the row, so the signing secret cannot reach a caller that forgets to drop it |
 
+## Chat
+
+Slack and Zulip, each through a bot whose credential is deployment
+configuration. A bot posts to the channels an administrator names and sends
+people direct messages. Chat carries every notification as it happens (REQ-79),
+which is where it differs from mail: mail stays quiet and leaves the rest to the
+digest (REQ-47).
+
+| Platform | Reaches a channel | Reaches a person | Finds a person |
+|---|---|---|---|
+| Slack | The bot posts to a channel it has been added to, by the channel's ID or name | The bot posts to the person, which Slack shows in the app's own conversation with them | By the address their workspace holds, with the scope that reads addresses |
+| Zulip | The bot posts to a channel under a topic, `OpenPSIRT` where the destination names none | A direct message to the person's account | By the address, which the organization has to let the bot see |
+
+| Rule | Reason |
+|---|---|
+| The credential is configuration and never enters the database | A bot is one per deployment, as the mail server is. The operator's secret store holds it, and no screen or response can return it |
+| Which channel receives what is a destination, set by an administrator | Routing changes without a redeploy, and is kept where the webhooks are |
+| A channel on a platform this deployment does not offer is refused | It is listed as configured and nothing could ever post to it |
+| A person is found by the address recorded against them | Linking accounts by hand reaches nobody until everybody has done it |
+| Somebody the platform has no account for is sent nothing in chat, and the notifications are settled | They keep the notification area and mail. Settling keeps the next cycle from asking about the same notifications again |
+| Chat is composed by the code that composes a mail | What may leave this deployment about an undisclosed finding is decided once (REQ-48) |
+
+Teams and Google Chat are not built. Teams' incoming webhooks were retired in
+2026; its replacement takes a card rather than text, and a direct message needs
+either a workflow built in the tenant or a registered bot. Google Chat takes text
+from a webhook for a channel, and a direct message needs a Chat app installed
+for the people it reaches.
+
+## Chat recipients
+
+Each kind is either somebody's own or shared. A table over every kind holds
+which, and a test holds the table against the list of kinds.
+
+| Kind of notification | Examples | Where it goes |
+|---|---|---|
+| Somebody's own | Assigned, named in a note, a claim sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
+| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, the vulnerability data stale, a supplier silent | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
+| Shared, undisclosed | An embargo approaching or due, an obligation window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
+
+| Person's setting | Default | Effect |
+|---|---|---|
+| Direct messages | On | Off sends them nothing directly on any platform |
+| What the channels carry | Off | On sends them shared notifications directly as well, for somebody who does not sit in the channels. Refused with direct messages off, because it would change nothing |
+
+Both are the person's own, like the digest's switches. An administrator sets
+neither. What somebody reads in the application before a cycle reaches it is
+not sent to them in chat, and nothing opened more than a day ago is carried to
+chat at all.
+
+## Channel scope
+
+A chat channel belongs to the deployment, to one product, or to one team. A
+webhook belongs to the deployment, because whatever receives it is automation
+that filters for itself.
+
+| Channel | Carries |
+|---|---|
+| A team's | Shared, disclosed notifications naming that team: work sitting in its queue |
+| A product's | Shared, disclosed notifications about that product that no team's channel covers |
+| The deployment's | Shared notifications no narrower channel covers, and that there is something undisclosed, with the way in |
+
+A notification reaches the most specific channel covering it, and no broader
+one. A notification covered by a channel is not also sent directly to the
+people it names, unless they asked for what the channels carry.
+
+A channel narrower than the deployment says nothing about undisclosed work
+(REQ-80). Nothing here can see who sits in a chat channel, and a team is built
+to hold people of mixed clearance, so even "something undisclosed arrived" tells
+the uncleared members an embargo exists. Undisclosed work reaches the people
+cleared for it directly. The deployment's channel is the one an administrator
+set up to hear everything, and it carries the fact and a link, as a webhook
+does.
+
+A queue holding one undisclosed place among many is undisclosed as a whole, so
+a team channel says nothing about it until the last undisclosed place leaves.
+
+| Destination rule | Reason |
+|---|---|
+| A channel is refused a kind that is somebody's own | It would be listed as configured and receive nothing |
+| A channel belongs to a product or a team, never both | The two scopes rank against each other, and one channel in both would rank against itself |
+| A channel names the channel it posts to, and a topic only on Zulip | Slack has no topics |
+| A channel takes no address and no secret | The platform's credential reaches it |
+| The product and the team are named in the request and resolved after the caller is established as an administrator | A name resolved first makes the refusal say whether it exists |
+
+## Grouped chat messages
+
+A cycle runs each minute. What one person or one channel has to be told in a
+cycle arrives as one message (REQ-79).
+
+| Content | How it is said |
+|---|---|
+| One thing | Its subject as the heading, its sentence, and its link |
+| Several things | A count as the heading, then a line per kind and product: one thing is its subject and first sentence; several are the subject, the product and how many |
+| Anything undisclosed among several | One line with how many, and the way in. Nothing names what they are |
+| More lines than a message lists | Twelve lines, and how many more were left out. The rest is in the application |
+
+Notifications do not record which scan, feed refresh, rule or person produced
+them, and most of the bursts arrive through a sweep deriving conditions after
+the act rather than from the act itself. Kind and product are what the
+notifications carry, and a night of scans is many notifications of one kind in
+one product, so that is what a message groups by.
+
+A person's message is composed from at most a thousand notifications. A
+backlog larger than that is carried a thousand at a time, one message a
+cycle.
+
+## Chat delivery
+
+| Rule | Reason |
+|---|---|
+| One sweep per deployment, held by a lease | The arrangement mail and the webhooks use. Without it every replica sends the same message |
+| A channel's delivery is tracked as a webhook's is: per destination and per thing said | A condition held by six people is one thing to a channel. Two copies of it in one cycle are one line |
+| A person's delivery is tracked per notification and per platform | Mail and each chat platform carry a notification independently, and one of them failing is not another one's retry |
+| The claim is staked before the request | A second replica or the next cycle cannot send the same thing while the first is in flight |
+| Tried five times, then left alone | The rule mail and the webhooks follow. The notification stays in the application |
+| A cycle sends to at most fifty people on each platform | Finding a person and sending to them are two requests, and the lease is sized from a cycle's requests |
+| A platform asking to be sent less is a failed attempt | The next cycle tries again, and five refusals leave the notification in the application |
+| A refusal is recorded without the request's address | Finding a person puts their address in the request, and the reason is stored |
+| Slack is asked not to unfurl | Unfurling has Slack's servers fetch every address in the message from this deployment |
+| Slack is reached at the host the application names and Zulip at the one configured, over https, following no redirect | The same client a webhook uses. Both hosts are named rather than chosen by a document, which is what REQ-69 lets a request reach |
+
+## Chat markup
+
+Every string in a message is plain text until the platform's rule escapes it.
+Component names, publisher names and a supplier's failure text are none of them
+chosen here.
+
+| Platform | Escaped | Kept as markup |
+|---|---|---|
+| Slack | `&`, `<` and `>`, which open a link, a mention and a ping for the whole channel. A link's label is one line | The heading's bold and the links this deployment composed, with their `&` escaped |
+| Zulip | Markdown, by the rule the release note uses, which escapes the characters mentions and channel links open with | The heading's bold, and the links this deployment composed, with parentheses and spaces in the address percent-encoded so the link ends where it should |
+
+Slack's emphasis has no escape and opens nothing, so it is left alone rather
+than shown with a backslash before it. A webhook's text is escaped for Slack and
+Teams at once and carries the backslash, which the limits below record.
+
 ## Embargo notices
 
 An embargo running out is announced before its date (REQ-38), at a lead time
@@ -595,7 +737,8 @@ finding it names may since have been decided, closed or reopened.
 
 | Not built | Detail |
 |---|---|
-| A chat adapter | Behind the same interface mail uses. A chat adapter translates rather than forwarding markdown, and mostly sends a summary and a link |
+| Teams and Google Chat | Slack and Zulip are built. § Chat says what each of the other two needs |
+| A message when a rule routes work to a team | Routed work arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
 | The HTML part of a mail | The only remaining reader for the server-side renderer, and the reason it is kept rather than deleted |
 
 ## Limits
@@ -604,4 +747,7 @@ finding it names may since have been decided, closed or reopened.
 |---|---|
 | Events are not collapsed | Being assigned the same finding twice is two things that happened, and the second is the one they have not seen |
 | The badge count is counted through the same conditions as the list | A badge that disagrees with the list under it is the same class of mistake as a total that ignores a filter |
-| Slack shows a backslash before each character escaped as markdown | Slack's markup has no backslash escape and Teams renders markdown, and one text goes to both. A stray backslash costs less than a link labelled anything |
+| Slack shows a backslash before each character escaped as markdown in a webhook's text | Slack's markup has no backslash escape and Teams renders markdown, and one text goes to both. A stray backslash costs less than a link labelled anything |
+| A chat account registered to somebody's address is taken to be theirs | The platform's administrator controls which addresses its accounts hold, and a deployment that does not trust them should not configure the bot |
+| Chat carries nothing opened more than a day ago | A backlog from before a platform was configured, or from a day it refused, is in the application, and delivered at once it buries what is new |
+| A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team and routing by rule make none |

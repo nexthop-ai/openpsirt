@@ -903,6 +903,10 @@ var tables = []string{
 	// also points at. The delivery row cascades with the notification, so the
 	// order is belt as well as braces.
 	"outbound_delivery",
+	// Before notification, which it points at.
+	"chat_delivery",
+	// Before person, which it points at.
+	"chat_preference",
 	// Before person, which it points at.
 	"notification",
 	// Before person and target, both of which it points at.
@@ -1073,6 +1077,40 @@ func Reset(t *testing.T, db *database.DB) {
 // clear is Reset without a test to fail: the harness empties a server
 // database with it before every test.
 func clear(ctx context.Context, db *database.DB) error {
+	err := clearOf(ctx, db, tables)
+	if err == nil {
+		return nil
+	}
+	// A database a test rolled back to an earlier release lacks the tables a
+	// later one added, and asking after one that is not there fails the whole
+	// statement. The version is asked only then, because the ordinary reset
+	// runs between every pair of tests and a round trip there is paid by all
+	// of them.
+	at, verr := schema.Version(ctx, db)
+	if verr != nil {
+		return err
+	}
+	var held []string
+	for _, table := range tables {
+		if since, later := addedAt[table]; !later || since <= at {
+			held = append(held, table)
+		}
+	}
+	if len(held) == len(tables) {
+		return err
+	}
+	return clearOf(ctx, db, held)
+}
+
+// addedAt is the migration each table a release after v0.2.0 added arrived
+// in. Every table not named here exists in every schema a test resets.
+var addedAt = map[string]int64{
+	"chat_delivery":   39,
+	"chat_preference": 39,
+}
+
+// clearOf empties the named tables, which are in the order tables holds them.
+func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 	// One transaction, not a statement per table. SQLite in its default mode
 	// syncs the file at every commit, and a commit per table between every pair
 	// of tests is a large part of what a test on SQLite costs.
@@ -1084,7 +1122,7 @@ func clear(ctx context.Context, db *database.DB) error {
 	// emptying tables that are already empty. Which ones hold anything is one
 	// more statement, asked before the deletes and inside the same transaction.
 	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
-		occupied, err := occupied(ctx, tx)
+		occupied, err := occupied(ctx, tx, tables)
 		if err != nil {
 			return err
 		}
@@ -1122,7 +1160,7 @@ func clear(ctx context.Context, db *database.DB) error {
 // answering 1 where the table has anything and NULL where it has not. LIMIT 1
 // rather than COUNT, because the question is whether a delete has anything to
 // do and a table under test can hold a quarter of a million rows.
-func occupied(ctx context.Context, tx bun.Tx) (map[string]bool, error) {
+func occupied(ctx context.Context, tx bun.Tx, tables []string) (map[string]bool, error) {
 	columns := make([]string, len(tables))
 	for i, table := range tables {
 		columns[i] = fmt.Sprintf(`(SELECT 1 FROM "%s" LIMIT 1) AS "held_%d"`, table, i)

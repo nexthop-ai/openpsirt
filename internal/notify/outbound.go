@@ -68,6 +68,17 @@ type Outbound struct {
 	CreatedBy int64      `bun:"created_by,notnull"`
 	CreatedAt time.Time  `bun:"created_at,notnull"`
 	RetiredAt *time.Time `bun:"retired_at"`
+	// Platform is how it is reached: Webhook, or a chat platform this
+	// deployment holds a credential for.
+	Platform string `bun:"platform,notnull"`
+	// Channel is where on a chat platform it posts, and Topic the topic
+	// within it on a platform that has them. Nil for a webhook.
+	Channel *string `bun:"channel"`
+	Topic   *string `bun:"topic"`
+	// ProductID and TeamID are what a chat channel belongs to. Both nil is
+	// the whole deployment.
+	ProductID *int64 `bun:"product_id"`
+	TeamID    *int64 `bun:"team_id"`
 }
 
 // Everything is the kind that matches every notification.
@@ -151,9 +162,10 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 		}
 	}
 
+	// A chat channel is carried by the chat sweep, which groups what it says.
 	var destinations []Outbound
 	if err := s.db.NewSelect().Model(&destinations).
-		Where("retired_at IS NULL").Scan(ctx); err != nil {
+		Where("retired_at IS NULL").Where("platform = ?", Webhook).Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read where things go: %w", err)
 	}
 	if len(destinations) == 0 {
@@ -195,7 +207,20 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 // stays in the window for ever and the window stops advancing.
 func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error) {
 	var rows []Notification
-	q := s.db.NewSelect().Model(&rows).
+	q := unsettled(s.db.NewSelect().Model(&rows), to).
+		OrderExpr("nt.created_at ASC, nt.id ASC").
+		Limit(sweepBatch)
+	if err := q.Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what there is to say: %w", err)
+	}
+	return rows, nil
+}
+
+// unsettled narrows a read of notifications to what one destination has
+// still to be told: its kind, still true or still unread, and not already
+// carried there or given up on.
+func unsettled(q *bun.SelectQuery, to Outbound) *bun.SelectQuery {
+	q = q.
 		// Only what is still true or still unread is worth saying. A
 		// cleared condition is not news, and an event nobody has yet been
 		// told about outside is.
@@ -221,9 +246,7 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 			`             AND "prior"."cleared_at" IS NULL)) `+
 			`     OR ("nt"."together" <> ? AND "settled"."about" = "nt"."together")) `+
 			`AND ("settled"."sent_at" IS NOT NULL OR "settled"."attempts" >= ?))`,
-			to.ID, "", "", tries).
-		OrderExpr("nt.created_at ASC, nt.id ASC").
-		Limit(sweepBatch)
+			to.ID, "", "", tries)
 	// The kind is an equality test, which is what normalizing it on the way in
 	// is for. Filtered after the limit instead, a destination configured for
 	// one kind wedged behind two hundred rows of another exactly as a
@@ -231,10 +254,7 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 	if to.Kind != Everything {
 		q = q.Where("nt.kind = ?", to.Kind)
 	}
-	if err := q.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what there is to say: %w", err)
-	}
-	return rows, nil
+	return q
 }
 
 // reopened takes a condition's delivery again for a new opening, where the
@@ -330,61 +350,10 @@ const (
 )
 
 // deliver sends one notification to one destination, once.
-//
-// The claim is staked before the request is made: a row inserted with no
-// sent_at is what stops a second replica — or a second pass a minute later —
-// sending the same thing twice while the first is still in flight.
 func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (outcome, error) {
-	key := about(row)
-	now := s.now().UTC().Truncate(time.Microsecond)
-
-	claim := &Delivery{
-		OutboundID: to.ID, About: key, NotificationID: row.ID,
-		Attempts: 1, FirstSeen: now,
-	}
-	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
-		// Only the unique index means somebody has this one. A lost
-		// connection or a lock timeout is a failure and is reported as one;
-		// read as "already claimed", a sweep during an outage reports nothing
-		// sent and nothing failed, which is what a quiet queue looks like
-		// too.
-		if !database.IsDuplicate(err) {
-			return already, fmt.Errorf("claim a delivery: %w", err)
-		}
-		// Somebody has this one. Either it has gone, or it is being tried
-		// again — and trying again is a decision this pass makes by updating
-		// the row rather than by racing for it.
-		var held Delivery
-		if err := s.db.NewSelect().Model(&held).
-			Where("outbound_id = ?", to.ID).Where("about = ?", key).
-			Scan(ctx); err != nil {
-			// The row the index just refused, and it cannot be read. That is
-			// a fault rather than an answer: reported as one, not as a
-			// delivery somebody else is handling.
-			return already, fmt.Errorf("read who has this delivery: %w", err)
-		}
-		// A condition that cleared and came back is news again. The
-		// delivery covers the opening it was claimed for, which has ended
-		// once the row that claimed it has cleared.
-		if row.About != "" && held.NotificationID != row.ID {
-			taken, err := s.reopened(ctx, held, row.ID, now)
-			if err != nil {
-				return already, err
-			}
-			if taken {
-				held.SentAt, held.Attempts = nil, 0
-			}
-		}
-		if held.SentAt != nil || held.Attempts >= tries {
-			return already, nil
-		}
-		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-			Set("attempts = attempts + 1").
-			Where("id = ?", held.ID).Where("sent_at IS NULL").
-			Exec(ctx); err != nil {
-			return already, fmt.Errorf("take another attempt at a delivery: %w", err)
-		}
-		claim.ID = held.ID
+	claimed, err := s.claim(ctx, to, row)
+	if err != nil || claimed == 0 {
+		return already, err
 	}
 
 	message := Compose(row, s.baseURL)
@@ -408,25 +377,98 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 	if err != nil {
 		return refused, nil
 	}
+	sendErr := s.send(ctx, to, body, s.now().UTC().Truncate(time.Microsecond))
+	if err := s.settle(ctx, to, []int64{claimed}, sendErr); err != nil {
+		return delivered, err
+	}
+	if sendErr != nil {
+		return refused, nil
+	}
+	return delivered, nil
+}
 
-	if err := s.send(ctx, to, body, now); err != nil {
+// claim stakes this destination's delivery of one notification, and answers
+// the delivery it staked, or zero where there is nothing to carry: it has
+// gone, it has been given up on, or somebody else holds it.
+//
+// The claim is staked before the request is made: a row inserted with no
+// sent_at is what stops a second replica — or a second pass a minute later —
+// sending the same thing twice while the first is still in flight.
+func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int64, error) {
+	key := about(row)
+	now := s.now().UTC().Truncate(time.Microsecond)
+
+	claim := &Delivery{
+		OutboundID: to.ID, About: key, NotificationID: row.ID,
+		Attempts: 1, FirstSeen: now,
+	}
+	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
+		// Only the unique index means somebody has this one. A lost
+		// connection or a lock timeout is a failure and is reported as one;
+		// read as "already claimed", a sweep during an outage reports nothing
+		// sent and nothing failed, which is what a quiet queue looks like
+		// too.
+		if !database.IsDuplicate(err) {
+			return 0, fmt.Errorf("claim a delivery: %w", err)
+		}
+		// Somebody has this one. Either it has gone, or it is being tried
+		// again — and trying again is a decision this pass makes by updating
+		// the row rather than by racing for it.
+		var held Delivery
+		if err := s.db.NewSelect().Model(&held).
+			Where("outbound_id = ?", to.ID).Where("about = ?", key).
+			Scan(ctx); err != nil {
+			// The row the index just refused, and it cannot be read. That is
+			// a fault rather than an answer: reported as one, not as a
+			// delivery somebody else is handling.
+			return 0, fmt.Errorf("read who has this delivery: %w", err)
+		}
+		// A condition that cleared and came back is news again. The
+		// delivery covers the opening it was claimed for, which has ended
+		// once the row that claimed it has cleared.
+		if row.About != "" && held.NotificationID != row.ID {
+			taken, err := s.reopened(ctx, held, row.ID, now)
+			if err != nil {
+				return 0, err
+			}
+			if taken {
+				held.SentAt, held.Attempts = nil, 0
+			}
+		}
+		if held.SentAt != nil || held.Attempts >= tries {
+			return 0, nil
+		}
+		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
+			Set("attempts = attempts + 1").
+			Where("id = ?", held.ID).Where("sent_at IS NULL").
+			Exec(ctx); err != nil {
+			return 0, fmt.Errorf("take another attempt at a delivery: %w", err)
+		}
+		claim.ID = held.ID
+	}
+	return claim.ID, nil
+}
+
+// settle records how the claimed deliveries went: sent, or why not.
+func (s *Signal) settle(ctx context.Context, to Outbound, claimed []int64, sendErr error) error {
+	if sendErr != nil {
 		// Recorded rather than logged and forgotten: a destination that is
 		// refusing is a thing an operator has to be able to see, and the last
 		// reason is the only part of it that says anything.
 		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-			Set("failed = ?", trimTo(withoutTheAddress(err, to.URL), 400)).
-			Where("id = ?", claim.ID).Exec(ctx); err != nil && s.logger != nil {
+			Set("failed = ?", trimTo(withoutTheAddress(sendErr, to.URL), 400)).
+			Where("id IN (?)", bun.List(claimed)).Exec(ctx); err != nil && s.logger != nil {
 			s.logger.Error("could not record why a destination refused", "error", err)
 		}
-		return refused, nil
+		return nil
 	}
 	if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
 		Set("sent_at = ?", s.now().UTC().Truncate(time.Microsecond)).
 		Set("failed = ?", "").
-		Where("id = ?", claim.ID).Exec(ctx); err != nil {
-		return delivered, fmt.Errorf("record that it went: %w", err)
+		Where("id IN (?)", bun.List(claimed)).Exec(ctx); err != nil {
+		return fmt.Errorf("record that it went: %w", err)
 	}
-	return delivered, nil
+	return nil
 }
 
 // send makes the request.
@@ -601,9 +643,13 @@ func administering(subject access.Subject, what string) error {
 // boundary, where a caller that marshals it puts a shared secret in a
 // response.
 type Configured struct {
-	Name string
-	Kind string
-	URL  string
+	Name     string
+	Kind     string
+	Platform string
+	URL      string
+	// Channel and Topic are where on a chat platform it posts. Product and
+	// Team name what it belongs to, where it belongs to either.
+	Channel, Topic, Product, Team string
 	// Sent is how many things have gone there, and Failing how many are being
 	// retried or have been given up on. An operator's question about a
 	// destination is whether it works, and nothing else answers it.
@@ -619,14 +665,27 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 	if err := administering(subject, "read where things go"); err != nil {
 		return nil, err
 	}
-	var rows []Outbound
+	var rows []struct {
+		Outbound `bun:",extend"`
+		Product  string `bun:"product"`
+		Team     string `bun:"team"`
+	}
 	if err := s.db.NewSelect().Model(&rows).
-		Where("retired_at IS NULL").Order("name", "kind").Scan(ctx); err != nil {
+		ColumnExpr("ob.*").
+		ColumnExpr(`COALESCE("p"."name", '') AS "product"`).
+		ColumnExpr(`COALESCE("tm"."name", '') AS "team"`).
+		Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "ob"."product_id"`).
+		Join(`LEFT JOIN "team" AS "tm" ON "tm"."id" = "ob"."team_id"`).
+		Where("ob.retired_at IS NULL").OrderExpr("ob.name, ob.kind").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read where things go: %w", err)
 	}
 	out := make([]Configured, 0, len(rows))
 	for _, row := range rows {
-		one := Configured{Name: row.Name, Kind: row.Kind, URL: row.URL}
+		one := Configured{
+			Name: row.Name, Kind: row.Kind, Platform: row.Platform, URL: row.URL,
+			Channel: deref(row.Channel), Topic: deref(row.Topic),
+			Product: row.Product, Team: row.Team,
+		}
 		var counts []struct {
 			Sent    int `bun:"sent"`
 			Failing int `bun:"failing"`
@@ -662,6 +721,20 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 	return out, nil
 }
 
+// Destination is where somebody asks a kind of notification to go.
+type Destination struct {
+	Name string
+	Kind string
+	// Platform is Webhook where empty.
+	Platform string
+	// URL and Secret are a webhook's, and refused for a chat channel.
+	URL, Secret string
+	// Channel is a chat channel's, and Topic a Zulip channel's topic.
+	Channel, Topic string
+	// ProductID and TeamID narrow a chat channel to one product or one team.
+	ProductID, TeamID *int64
+}
+
 // AddDestination records where a kind of notification goes.
 //
 // A name and kind that was retired is taken up again rather than refused. The
@@ -669,27 +742,30 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 // and the name is unique across retired rows too — so inserting a second under
 // the same pair fails on a row nothing lists, with a message about a
 // destination nobody can see.
+//
+// offered is the chat platforms this deployment holds a credential for. A
+// channel on any other is one nothing could ever post to.
 func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
-	name, kind, url, secret string) (*Outbound, error) {
+	d Destination, offered []string) (*Outbound, error) {
 
 	if err := administering(subject, "configure where things go"); err != nil {
-		return nil, err
-	}
-	// Judged here as well as at the request, so a second caller cannot store
-	// a destination the sweep will refuse only when it comes to send.
-	if err := reachable(url); err != nil {
 		return nil, err
 	}
 	row := &Outbound{
 		// The kind is normalized on the way in rather than compared loosely
 		// on the way out, so the write that adds a destination and the read
 		// that retires it agree on what it is called.
-		Name: strings.TrimSpace(name), Kind: foldedKind(kind),
-		URL: strings.TrimSpace(url), Secret: secret,
+		Name: strings.TrimSpace(d.Name), Kind: foldedKind(d.Kind),
+		Platform: strings.ToLower(strings.TrimSpace(d.Platform)),
+		URL:      strings.TrimSpace(d.URL), Secret: d.Secret,
+		ProductID: d.ProductID, TeamID: d.TeamID,
 		CreatedBy: subject.ID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
 	}
-	if row.Name == "" || row.Kind == "" || row.URL == "" {
-		return nil, fmt.Errorf("a destination needs a name, a kind and an address")
+	if row.Platform == "" {
+		row.Platform = Webhook
+	}
+	if row.Name == "" || row.Kind == "" {
+		return nil, fmt.Errorf("a destination needs a name and a kind")
 	}
 	// A kind nothing is ever of is a destination that never receives
 	// anything, listed as configured and working.
@@ -701,10 +777,23 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		return nil, fmt.Errorf("no notification is of the kind %q: the kind is %q for every "+
 			"notification, or one of %s", row.Kind, Everything, strings.Join(named, ", "))
 	}
+	if row.Platform == Webhook {
+		if err := webhookOnly(d, row); err != nil {
+			return nil, err
+		}
+	} else if err := chatOnly(d, row, offered); err != nil {
+		return nil, err
+	}
+
 	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
 		Set("retired_at = ?", nil).
 		Set("url = ?", row.URL).
 		Set("secret = ?", row.Secret).
+		Set("platform = ?", row.Platform).
+		Set("channel = ?", row.Channel).
+		Set("topic = ?", row.Topic).
+		Set("product_id = ?", row.ProductID).
+		Set("team_id = ?", row.TeamID).
 		Set("created_by = ?", row.CreatedBy).
 		Set("created_at = ?", row.CreatedAt).
 		Where("name = ?", row.Name).
@@ -730,6 +819,75 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		return nil, fmt.Errorf("record that destination: %w", err)
 	}
 	return row, nil
+}
+
+// webhookOnly refuses what a signed request does not take.
+//
+// It belongs to the deployment. Whatever receives it is automation, which
+// filters for itself, and a scope on it would be a second filter to keep in
+// step with the first.
+func webhookOnly(d Destination, row *Outbound) error {
+	// Judged here as well as at the request, so a second caller cannot store
+	// a destination the sweep will refuse only when it comes to send.
+	if err := reachable(row.URL); err != nil {
+		return err
+	}
+	if row.Secret == "" {
+		return fmt.Errorf("a webhook needs a secret to sign with")
+	}
+	if strings.TrimSpace(d.Channel) != "" || strings.TrimSpace(d.Topic) != "" {
+		return fmt.Errorf("a webhook has an address rather than a channel")
+	}
+	if d.ProductID != nil || d.TeamID != nil {
+		return fmt.Errorf("a webhook belongs to the deployment: whatever receives it " +
+			"filters for itself")
+	}
+	return nil
+}
+
+// chatOnly refuses what a chat channel does not take.
+func chatOnly(d Destination, row *Outbound, offered []string) error {
+	if !slices.Contains(offered, row.Platform) {
+		if len(offered) == 0 {
+			return fmt.Errorf("no chat platform is configured, so a %s channel is one "+
+				"nothing could post to", row.Platform)
+		}
+		return fmt.Errorf("%q is not a chat platform this deployment is configured for: "+
+			"it offers %s", row.Platform, strings.Join(offered, " and "))
+	}
+	if row.URL != "" || row.Secret != "" {
+		return fmt.Errorf("a chat channel is reached through the platform's credential, " +
+			"so it takes no address or secret of its own")
+	}
+	channel := strings.TrimSpace(d.Channel)
+	if channel == "" {
+		return fmt.Errorf("a chat destination names the channel it posts to")
+	}
+	row.Channel = &channel
+	if topic := strings.TrimSpace(d.Topic); topic != "" {
+		if row.Platform != Zulip {
+			return fmt.Errorf("only a Zulip channel has topics")
+		}
+		row.Topic = &topic
+	}
+	if d.ProductID != nil && d.TeamID != nil {
+		return fmt.Errorf("a channel belongs to a product or to a team, not both")
+	}
+	// A channel is never sent what is somebody's own, so a destination for
+	// one of those kinds is listed as configured and receives nothing.
+	if row.Kind != Everything && !isShared(Kind(row.Kind)) {
+		return fmt.Errorf("%q is addressed to one person, and a channel is sent only "+
+			"what is about a product, a team or the deployment", row.Kind)
+	}
+	return nil
+}
+
+// deref is an optional string, or nothing.
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // RetireDestination takes one out of use, keeping what went there.

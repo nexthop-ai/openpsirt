@@ -147,6 +147,10 @@ components:
           format: uri
           readOnly: true
           type: string
+        channel:
+          description: The chat channel to post to
+          maxLength: 191
+          type: string
         kind:
           description: One notification kind, or * for all of them
           maxLength: 191
@@ -156,21 +160,36 @@ components:
           maxLength: 191
           minLength: 1
           type: string
+        platform:
+          description: How it is reached. A webhook where absent
+          enum:
+            - webhook
+            - slack
+            - zulip
+          type: string
+        product:
+          description: The product a chat channel belongs to
+          maxLength: 191
+          type: string
         secret:
-          description: The signing secret. Never returned by any endpoint
+          description: A webhook's signing secret, at least 16 characters. Never returned by any endpoint
           maxLength: 400
-          minLength: 16
+          type: string
+        team:
+          description: The team a chat channel belongs to
+          maxLength: 191
+          type: string
+        topic:
+          description: The topic within a Zulip channel
+          maxLength: 60
           type: string
         url:
-          description: The address to send to. https only
+          description: A webhook's address. https only
           maxLength: 1000
-          minLength: 1
           type: string
       required:
         - name
         - kind
-        - url
-        - secret
       type: object
     Add-routing-ruleRequest:
       additionalProperties: false
@@ -1566,6 +1585,27 @@ components:
       required:
         - vulnerability
         - component
+      type: object
+    ChatBody:
+      additionalProperties: false
+      properties:
+        direct:
+          description: "They are sent direct messages: what is their own, and what no channel carries"
+          type: boolean
+        platforms:
+          description: The chat platforms this deployment offers
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        shared:
+          description: What a channel carries is sent to them directly as well
+          type: boolean
+      required:
+        - platforms
+        - direct
+        - shared
       type: object
     ClaimApprovalBody:
       additionalProperties: false
@@ -6673,12 +6713,15 @@ components:
         because:
           description: The reason the last one failed, where one did
           type: string
+        channel:
+          description: The chat channel it posts to
+          type: string
         failing:
           description: The number being retried or given up on
           format: int64
           type: integer
         host:
-          description: The host it sends to. The rest of the address is never returned
+          description: The host a webhook sends to. The rest of the address is never returned
           type: string
         kind:
           description: The notifications that go here, or * for all of them
@@ -6686,14 +6729,30 @@ components:
         name:
           description: The name, so a log line and a screen can use it
           type: string
+        platform:
+          description: "How it is reached: a signed request, or a chat platform"
+          enum:
+            - webhook
+            - slack
+            - zulip
+          type: string
+        product:
+          description: The product a chat channel belongs to
+          type: string
         sent:
           description: The number of things delivered there
           format: int64
           type: integer
+        team:
+          description: The team a chat channel belongs to
+          type: string
+        topic:
+          description: The topic within a Zulip channel
+          type: string
       required:
         - name
         - kind
-        - host
+        - platform
         - sent
         - failing
       type: object
@@ -9343,6 +9402,25 @@ components:
       required:
         - builds
       type: object
+    Set-chatRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Set-chatRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        direct:
+          description: Send direct messages
+          type: boolean
+        shared:
+          description: Send what a channel carries directly as well
+          type: boolean
+      required:
+        - direct
+      type: object
     Set-digestRequest:
       additionalProperties: false
       properties:
@@ -10998,6 +11076,9 @@ components:
           description: The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
           format: int64
           type: integer
+        chat:
+          $ref: "#/components/schemas/ChatBody"
+          description: The chat platforms this deployment offers and what they chose, where it offers any
         deferral_days:
           description: The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
           format: int64
@@ -15545,7 +15626,7 @@ paths:
   /v1/outbound:
     get:
       description: |-
-        The destinations configured, which kinds go to each, and whether they are working.
+        The destinations configured, which kinds go to each, and whether they are working. A destination is a webhook or a chat channel.
 
         The signing secret is never returned, and of the address only the host is. A destination is told apart by its name and kind.
 
@@ -15571,19 +15652,21 @@ paths:
         scope: deployment
     post:
       description: |-
-        Records a destination: a URL, a shared secret to sign with, and which kinds go there — one kind by name, or `*` for all of them.
+        Records a destination: which kinds go there — one kind by name, or `*` for all of them — and either a webhook or a chat channel.
 
-        One signed request, not an adapter each. Slack, Teams, a tracker driven by automation and paging all take an HTTP request with a JSON body, so one shape reaches all of them.
+        A webhook takes a URL and a shared secret to sign with. A chat channel takes a `platform` this deployment is configured for, the `channel` to post to, and on Zulip a `topic`. It may name a `product` or a `team`, and then carries only what is about that product or that team.
 
-        What it carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
+        A chat channel carries notifications about a product, a team or the deployment, never one addressed to a single person, and a kind addressed to one person is refused. What one channel carries is not also posted to a broader one: a team's channel takes what is about its team, a product's what is about its product, and a deployment's the rest. A channel belonging to a product or a team carries nothing about a finding nobody has announced; a deployment's carries that there is something, and a link.
+
+        What a webhook carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
 
         `subject` and `text` are escaped as markdown, a backslash before each character that would open markup, and carry `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;`, which Slack and Teams read as those characters. Any other receiver decodes the three and drops the backslashes. The line of `text` holding the address is not escaped as markdown, and `link` is sent as it is.
 
-        Every request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
+        Every webhook request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
 
-        The response carries the host of the address and never the rest of it, the same as the listing.
+        The response carries the host of a webhook's address and never the rest of it, the same as the listing.
 
-        https only, and a redirect is refused rather than followed. The body is signed and not encrypted, and a redirect asks us to send a signed request somewhere else, which is what the restriction exists to prevent.
+        A webhook is https only, and a redirect is refused rather than followed.
 
         Requires: administrator
       operationId: add-outbound
@@ -26428,6 +26511,37 @@ paths:
       summary: Describe the current subject
       tags:
         - Access
+      x-openpsirt-requires:
+        scope: self
+  /v1/session/me/chat:
+    put:
+      description: |-
+        Turns direct messages on or off, and says whether what a chat channel carries is sent to you directly as well.
+
+        Direct messages are on until turned off. They carry what is your own — work assigned to you, a note naming you, a claim sent back — and what is about a product or a team where no channel carries it. `shared` sends you what the channels carry as well, for somebody who does not sit in them; it is off until asked for, and asking for it without `direct` is refused.
+
+        You are found on a chat platform by the address recorded against you, which `GET /v1/session/me` reports as `reachable`. Refused where this deployment offers no chat platform, which `GET /v1/session/me` reports as `chat`.
+
+        Requires: your own credential
+      operationId: set-chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Set-chatRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Choose what is sent to you in chat
+      tags:
+        - Notifications
       x-openpsirt-requires:
         scope: self
   /v1/session/me/digest:

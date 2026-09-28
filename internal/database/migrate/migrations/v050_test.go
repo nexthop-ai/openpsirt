@@ -5,6 +5,7 @@ package migrations_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -145,4 +146,57 @@ func byHand(t *testing.T, ctx context.Context, db *database.DB, name string) boo
 		t.Fatalf("read %s: %v", name, err)
 	}
 	return held
+}
+
+// Upgraded, every destination v0.4.0 held is a webhook belonging to the
+// deployment. Rolled back, a chat channel goes, because v0.4.0 cannot reach
+// one, and the webhook stays as it was.
+func TestAnUpgradeLeavesEveryDestinationAWebhook(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		rollBack(t, ctx, db)
+		dbtest.MigrateTo(t, db, v030)
+
+		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "outbound" ("name", "kind", "url", "secret", `+
+			`"created_by", "created_at") VALUES (?, ?, ?, ?, ?, ?)`,
+			"paging", "*", "https://paging.example/hook", "a-shared-secret-long-enough",
+			admin.ID, time.Now().UTC().Truncate(time.Microsecond)).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		dbtest.MigrateTo(t, db, v050)
+		var platform string
+		var product, team sql.NullInt64
+		if err := db.DB.NewRaw(`SELECT "platform", "product_id", "team_id" FROM "outbound" `+
+			`WHERE "name" = ?`, "paging").Scan(ctx, &platform, &product, &team); err != nil {
+			t.Fatal(err)
+		}
+		if platform != "webhook" || product.Valid || team.Valid {
+			t.Errorf("upgraded, a v0.4.0 destination is %q for product %v and team %v, "+
+				"want a webhook for the deployment", platform, product, team)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "outbound" ("name", "kind", "url", "secret", `+
+			`"created_by", "created_at", "platform", "channel") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"psirt", "*", "", "", admin.ID, time.Now().UTC().Truncate(time.Microsecond),
+			"slack", "C0123").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := schema.Down(ctx, db, quiet()); err != nil {
+			t.Fatalf("roll the upgrade back: %v", err)
+		}
+		var names []string
+		if err := db.DB.NewRaw(`SELECT "name" FROM "outbound" ORDER BY "name"`).
+			Scan(ctx, &names); err != nil {
+			t.Fatal(err)
+		}
+		if len(names) != 1 || names[0] != "paging" {
+			t.Errorf("rolled back, the destinations are %v, want the webhook alone", names)
+		}
+		leaveAtLatest(t, ctx, db)
+	})
 }

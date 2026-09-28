@@ -122,6 +122,15 @@ type Config struct {
 	MailServer   string
 	MailUsername string
 	MailPassword string
+	// SlackToken is a Slack app's bot token, and the Zulip three are a Zulip
+	// bot's server, address and key. Each is a chat platform this deployment
+	// may post to and send people direct messages on, and absent is ordinary.
+	// Which channels receive what is an administrator's to set, where
+	// destinations are.
+	SlackToken string
+	ZulipSite  string
+	ZulipEmail string
+	ZulipKey   string
 	// AttachmentBucket is where files hanging off an issue are kept, and
 	// absent is ordinary: with none of this set, attachments are off and
 	// everything else works . An operator who wants none should not have
@@ -327,6 +336,10 @@ func Load() (Config, error) {
 		MailServer:          env("MAIL_SERVER", ""),
 		MailUsername:        env("MAIL_USERNAME", ""),
 		MailPassword:        env("MAIL_PASSWORD", ""),
+		SlackToken:          env("SLACK_TOKEN", ""),
+		ZulipSite:           env("ZULIP_SITE", ""),
+		ZulipEmail:          env("ZULIP_EMAIL", ""),
+		ZulipKey:            env("ZULIP_KEY", ""),
 		IngestMaxBytes:      r.number("INGEST_MAX_BYTES", 0),
 		IngestMaxComponents: r.number("INGEST_MAX_COMPONENTS", 0),
 		IngestMaxEdges:      r.number("INGEST_MAX_EDGES", 0),
@@ -459,6 +472,27 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf(
 			"OPENPSIRT_MAIL_SERVER and OPENPSIRT_MAIL_FROM: set both or neither — " +
 				"a server with nobody to send as sends nothing, and says nothing about it")
+	}
+
+	// The same rule again. A Zulip bot is a server, the address it signs in
+	// as and its key, and any two of those reach nothing.
+	zulip := 0
+	for _, part := range []string{c.ZulipSite, c.ZulipEmail, c.ZulipKey} {
+		if strings.TrimSpace(part) != "" {
+			zulip++
+		}
+	}
+	if zulip != 0 && zulip != 3 {
+		return Config{}, fmt.Errorf(
+			"OPENPSIRT_ZULIP_SITE, OPENPSIRT_ZULIP_EMAIL and OPENPSIRT_ZULIP_KEY: set all " +
+				"three or none — a bot is its server, its address and its key together")
+	}
+	if site := strings.TrimSpace(c.ZulipSite); site != "" {
+		parsed, err := url.Parse(site)
+		if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+			return Config{}, fmt.Errorf("OPENPSIRT_ZULIP_SITE: want the server's https " +
+				"address, such as https://chat.example.com: the bot's key is sent with every request")
+		}
 	}
 
 	if err := c.LogLevel.UnmarshalText([]byte(env("LOG_LEVEL", "info"))); err != nil {
