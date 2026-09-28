@@ -24,12 +24,16 @@ const LIST = "/products/:product/findings";
 // The same list with no product picked.
 const EVERY = "/findings";
 
+// The exact shapes first, then anything else under a product: every address
+// below `/products/:product` names that product, and a shape added to the
+// router without being listed here still yields it.
 const SHAPES = [
   `${BUILD}/*`,
   BUILD,
   "/products/:product/streams/:stream",
   "/products/:product/streams",
   "/products/:product",
+  "/products/:product/*",
 ];
 
 export type Scoped = { product?: string; stream?: string; variant?: string };
@@ -77,26 +81,39 @@ export function onFindings(pathname: string): boolean {
 // was counted with.
 export const UNNARROWED = "on=branch&on=tag&support=in-support&support=past-eol&planned=either";
 
-export function findingsPath(at: Scoped, unnarrowed = false): string {
+//
+// A filter a caller adds goes in as `extra`, never after the returned string:
+// the address for a partial scope already carries a query, and a second `?`
+// joined to it becomes part of the branch's name.
+export function findingsPath(
+  at: Scoped,
+  unnarrowed = false,
+  extra?: URLSearchParams | Record<string, string>,
+): string {
+  const query = new URLSearchParams();
   // Without a product it is the list across every product somebody can read,
   // which is the same screen. Sent to the catalog instead — the cross-product
   // list being a screen of its own, reached from its own rail entry — one list
   // would have two doors, and the one in the scope group would be dead
   // whenever no product is picked.
-  const also = unnarrowed ? UNNARROWED : "";
-  if (!at.product) return also ? `/findings?${also}` : "/findings";
-  const product = `/products/${encodeURIComponent(at.product)}`;
-  if (at.stream && at.variant) {
-    const build =
-      `${product}/streams/${encodeURIComponent(at.stream)}` +
-      `/variants/${encodeURIComponent(at.variant)}/findings`;
-    return also ? `${build}?${also}` : build;
+  let path = "/findings";
+  if (at.product) {
+    const product = `/products/${encodeURIComponent(at.product)}`;
+    if (at.stream && at.variant) {
+      path =
+        `${product}/streams/${encodeURIComponent(at.stream)}` +
+        `/variants/${encodeURIComponent(at.variant)}/findings`;
+    } else {
+      path = `${product}/findings`;
+      if (at.stream) query.set("stream", at.stream);
+      if (at.variant) query.set("variant", at.variant);
+    }
   }
-  const query = new URLSearchParams();
-  if (at.stream) query.set("stream", at.stream);
-  if (at.variant) query.set("variant", at.variant);
-  const rest = [query.toString(), also].filter(Boolean).join("&");
-  return `${product}/findings${rest ? `?${rest}` : ""}`;
+  if (unnarrowed)
+    for (const [name, value] of new URLSearchParams(UNNARROWED)) query.append(name, value);
+  for (const [name, value] of new URLSearchParams(extra)) query.append(name, value);
+  const rest = query.toString();
+  return rest ? `${path}?${rest}` : path;
 }
 
 // The place the tab remembers a selection. Named beside the
@@ -157,30 +174,35 @@ export function scopeQuery(at: Scoped): Record<string, string> {
 
 export function useScope(): Scoped {
   const { pathname, search } = useLocation();
+  const named = scopeAt(pathname, search);
+  if (!named) return remembered();
+  if (named.product) remember(named);
+  return named;
+}
+
+// The scope an address names, or null where it names none and the tab's
+// remembered one stands.
+export function scopeAt(pathname: string, search: string): Scoped | null {
   // The wider findings list is the one address whose scope is not all in the
   // path: the product is, and the two levels below it are in the query, which
   // is what lets either of them be "all" independently.
   const list = matchPath(LIST, pathname);
   if (list) {
     const asked = new URLSearchParams(search);
-    const scope = {
+    return {
       product: list.params.product,
       stream: asked.get("stream") || undefined,
       variant: asked.get("variant") || undefined,
     };
-    if (scope.product) remember(scope);
-    return scope;
   }
   for (const shape of SHAPES) {
     const hit = matchPath(shape, pathname);
     if (hit) {
       const { product, stream, variant } = hit.params;
-      const scope = { product, stream, variant };
-      if (product) remember(scope);
-      return scope;
+      return { product, stream, variant };
     }
   }
-  return remembered();
+  return null;
 }
 
 // The parts that survive a product change, per address that names a product.
@@ -195,6 +217,9 @@ const UNDER_PRODUCT: { shape: string; carries: "nothing" | "stream" | "tail" }[]
   { shape: "/products/:product/streams", carries: "tail" },
   { shape: "/products/:product/variants", carries: "tail" },
   { shape: "/products/:product/comparison", carries: "tail" },
+  { shape: "/products/:product/comparison/inventory", carries: "tail" },
+  { shape: "/products/:product/inbox", carries: "tail" },
+  { shape: "/products/:product/inbox/:reference", carries: "nothing" },
   { shape: "/products/:product/components/:component", carries: "nothing" },
   { shape: "/products/:product", carries: "tail" },
 ];

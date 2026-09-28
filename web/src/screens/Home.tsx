@@ -35,14 +35,24 @@ const BACK_LIMIT = 200;
 // quarter ahead is a plan rather than a week's work.
 const SOON_DAYS = 14;
 
-// The findings list narrowed to one of the tiles. Joined rather than assumed
-// to be the first parameter: the list for anything wider than a build carries
-// the branch and the variant in its address already.
 // The findings list, narrowed to what a deadline tile counts: undecided, and
 // running out inside the window. Built here so the figure and the screen it
 // opens ask the same question.
 function runningOut(at: Parameters<typeof findingsPath>[0], within: string): string {
-  return `${findingsPath(at, true)}&running=${within}&state=undecided`;
+  return findingsPath(at, true, { running: within, state: "undecided" });
+}
+
+// The findings list, narrowed to what the readiness panel counts as blocking:
+// everything nobody has agreed to, above the product's line as the list is by
+// default. The count takes none of the list's other defaults, so neither does
+// the link.
+export function blockingPath(at: Parameters<typeof findingsPath>[0]): string {
+  const asked = new URLSearchParams([
+    ["state", "undecided"],
+    ["state", "waiting"],
+    ["state", "lapsed"],
+  ]);
+  return findingsPath(at, true, asked);
 }
 
 function withOnly(path: string, only: string): string {
@@ -305,7 +315,7 @@ function Readiness({ at }: { at: Scoped }) {
       {at.product && (
         <footer>
           <Link
-            to={`${findingsPath({ product: at.product, stream: at.stream, variant: at.variant })}?state=undecided&state=waiting&state=lapsed`}
+            to={blockingPath({ product: at.product, stream: at.stream, variant: at.variant })}
             className="linkish"
           >
             Work what is blocking →

@@ -20,6 +20,7 @@ import {
   asked,
   coveringPeriod,
   daysAsked,
+  endExclusive,
   periodAsked,
   stated,
   windowStart,
@@ -55,16 +56,43 @@ function bandOrder(band: string): number {
   return at < 0 ? BANDS.length : at;
 }
 
-// The findings list, narrowed to what one aging bucket counts. Built here
-// rather than typed into each row so the link and the figure cannot come to
-// ask different questions.
-function openFor(at: Parameters<typeof findingsPath>[0], days: number): string {
-  const asked = new URLSearchParams();
+// The findings list, narrowed to what one aging bucket counts: open at least
+// its start and under its end, where it has one. Built here rather than typed
+// into each row so the link and the figure cannot come to ask different
+// questions.
+export function openFor(
+  at: Parameters<typeof findingsPath>[0],
+  days: number,
+  until = 0,
+  extra: Record<string, string> = {},
+): string {
+  const asked = new URLSearchParams(extra);
   if (days > 0) asked.set("open_for", String(days));
+  if (until > 0) asked.set("open_under", String(until));
   // The bucket counts everything open, including what the product's line keeps
   // out — so the list it opens has to as well, or the two numbers disagree.
   asked.set("below", "yes");
-  return `${findingsPath(at)}?${asked.toString()}`;
+  return findingsPath(at, false, asked);
+}
+
+// The findings list, narrowed to what appeared in a stretch. Nothing is added
+// for a side the stretch leaves open.
+export function appeared(
+  at: Parameters<typeof findingsPath>[0],
+  began: string,
+  ended: string,
+): string {
+  return findingsPath(at, false, {
+    ...(began ? { opened_after: began } : {}),
+    ...(ended ? { opened_before: ended } : {}),
+  });
+}
+
+// What the sections that are counted by product alone say they cover. Their
+// reads take a product and no branch or variant, so the scope the sheet's
+// heading states is not theirs.
+export function byProduct(product: string | undefined): string {
+  return product ? `${product}, every branch and variant` : "Every product";
 }
 
 // The state of the work, rather than the work itself: how fast things are
@@ -124,7 +152,7 @@ export function Overview() {
               // by when the judgment was argued, which is what the record
               // dates by.
               ...(began ? { from: began } : {}),
-              ...(period.to ? { to: period.to } : {}),
+              ...(period.to ? { to: endExclusive(period.to) } : {}),
               limit: NEWEST,
               ...(at.product ? { product: [at.product] } : {}),
             },
@@ -170,24 +198,17 @@ export function Overview() {
         ) : (
           <>
             <div className="kpis" style={{ marginTop: 8 }}>
-              {/* Both open the list they count. "Fixed" opens what closed in
-                  the window, which is a different population from this list's
-                  own — asking for it changes what the list is about rather
-                  than narrowing it, and the list says so when it is asked. */}
-              <Link
-                className="kpi"
-                to={`${findingsPath(at)}${began ? `?closed_after=${began}` : ""}`}
-              >
+              {/* "Appeared" opens the list it counts. "Fixed" opens nothing:
+                  what it counts is closed, and the findings list holds only
+                  what is open. */}
+              <div className="kpi">
                 <span className="l">Fixed</span>
                 <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
                 <span className="d">
                   distinct issues that went away · a version carrying the issue forward is not a fix
                 </span>
-              </Link>
-              <Link
-                className="kpi"
-                to={`${findingsPath(at)}${began ? `?opened_after=${began}` : ""}`}
-              >
+              </div>
+              <Link className="kpi" to={appeared(at, began, endExclusive(period.to))}>
                 <span className="l">Appeared</span>
                 <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
                 <span className="d">distinct issues, same window and unit as fixed</span>
@@ -237,10 +258,12 @@ export function Overview() {
                           somebody to build the same question by hand, and the
                           question they build is not always the same one. */}
                       <td>
-                        <Link to={openFor(at, bucket.days ?? 0)}>{bucket.label}</Link>
+                        <Link to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0)}>
+                          {bucket.label}
+                        </Link>
                       </td>
                       <td className="num">
-                        <Link to={openFor(at, bucket.days ?? 0)}>
+                        <Link to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0)}>
                           {(bucket.open ?? 0).toLocaleString()}
                         </Link>
                       </td>
@@ -264,7 +287,9 @@ export function Overview() {
                       <td className="num">
                         {(bucket.undecided ?? 0) > 0 ? (
                           <Link
-                            to={`${openFor(at, bucket.days ?? 0)}&state=undecided`}
+                            to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0, {
+                              state: "undecided",
+                            })}
                             className="state open"
                           >
                             {(bucket.undecided ?? 0).toLocaleString()}
@@ -293,10 +318,9 @@ export function Overview() {
         <h3>Triage times</h3>
         {/* Said inside the printing area rather than behind noprint: the
             printed header states the sheet's scope over every section, and
-            this one does not take it. A sheet that states a scope three of its
-            four sections do not honour is one nobody can check. */}
+            this one is counted by product alone. */}
         <p className="hint" style={{ marginTop: 0 }}>
-          Every product in this deployment, whatever is picked above.
+          {byProduct(at.product)}.
         </p>
         {measures.isPending ? (
           <Loading />
@@ -411,7 +435,7 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Repeated deferrals</h3>
         <p className="hint">
-          This product, all time.{" "}
+          {byProduct(at.product)}, all time.{" "}
           {/* The one list on this sheet rather than a figure, so it is the one
               thing here that exports. A review argues over the rows. */}
           <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
@@ -476,7 +500,7 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Approved in this window, newest first. This product, one row per place, as in{" "}
+          Approved in this window, newest first. {byProduct(at.product)}, one row per place, as in{" "}
           <Link to="/audit">the record</Link>.
         </p>
         {argued.isPending ? (

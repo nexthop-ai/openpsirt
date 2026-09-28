@@ -39,10 +39,12 @@ type Remediation struct {
 
 // Bucket is how many issues have been open for a stretch of time.
 type Bucket struct {
-	// Label names the stretch, and Days is where it starts, so a caller can
-	// order them without parsing the label.
+	// Label names the stretch, Days is where it starts and Until where it
+	// ends, so a caller can order them and ask for the same stretch without
+	// parsing the label. Until is zero for the last, which has no end.
 	Label string
 	Days  int
+	Until int
 	Open  int
 	// BySeverity is the same count cut by how the issues were rated. One
 	// number for a bucket says a hundred things are over three months old and
@@ -210,7 +212,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		if err != nil {
 			return nil, fmt.Errorf("count what is aging: %w", err)
 		}
-		one := Bucket{Label: bucket.label, Days: bucket.from, Open: n}
+		one := Bucket{Label: bucket.label, Days: bucket.from, Until: bucket.to, Open: n}
 
 		// The same bucket cut by severity. Counted as distinct issues like the
 		// bucket itself, so the parts sum to the whole rather than to the

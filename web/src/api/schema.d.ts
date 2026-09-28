@@ -6366,6 +6366,11 @@ export interface components {
             open: number;
             /**
              * Format: int64
+             * @description The end of the stretch, which is not itself in it. Absent for the last, which has no end
+             */
+            to_days?: number;
+            /**
+             * Format: int64
              * @description The number nobody has said anything about. A claim waiting for a second person is not an answer
              */
             undecided: number;
@@ -6975,7 +6980,7 @@ export interface components {
             items: components["schemas"]["CoverageBody"][] | null;
             /**
              * Format: int64
-             * @description The number in support never scanned, across every build and not only this page
+             * @description The number in support and in use never scanned, across every build and not only this page. Those gone quiet are among the quiet as well
              */
             never: number;
             /**
@@ -6988,6 +6993,16 @@ export interface components {
              * @description The span this deployment allows, in days
              */
             quiet_after_days: number;
+            /**
+             * Format: int64
+             * @description The number in support and taken out of use, across every build and not only this page. Nothing may be filed against these, so they are never counted as quiet
+             */
+            retired: number;
+            /**
+             * Format: int64
+             * @description The number in support and in use that a scan has reached and that have not gone quiet, across every build and not only this page
+             */
+            scanned: number;
             /**
              * Format: int64
              * @description The number of builds to report on
@@ -13862,6 +13877,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -13876,6 +13893,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
@@ -13968,6 +13987,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -13982,6 +14003,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
@@ -15712,6 +15735,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -15726,6 +15751,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
@@ -15869,6 +15896,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -15883,6 +15912,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
@@ -15988,6 +16019,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -16002,6 +16035,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
@@ -16112,6 +16147,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -16126,6 +16163,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
@@ -16234,6 +16273,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -16248,6 +16289,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */

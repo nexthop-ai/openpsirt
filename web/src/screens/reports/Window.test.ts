@@ -7,6 +7,7 @@ import {
   coveringPeriod,
   coveringWords,
   daysAsked,
+  endExclusive,
   periodAsked,
   wordsFor,
 } from "./Window";
@@ -90,12 +91,31 @@ describe("the period a sheet was asked for", () => {
     expect(periodAsked(asked("from=2026-06-01&to=2026-01-01"))).toEqual({ from: "", to: "" });
   });
 
+  it("takes a period of one day", () => {
+    expect(periodAsked(asked("from=2026-03-31&to=2026-03-31"))).toEqual({
+      from: "2026-03-31",
+      to: "2026-03-31",
+    });
+  });
+
+  it("counts the last day picked, by sending the day after it", () => {
+    // The server's end is not itself in the period, and a person picking
+    // March 31 means March 31 is in it.
+    expect(asked2({ from: "2026-01-01", to: "2026-03-31" }, 30)).toEqual({
+      from: "2026-01-01",
+      to: "2026-04-01",
+    });
+    expect(endExclusive("2026-12-31")).toBe("2027-01-01");
+    expect(endExclusive("2028-02-28")).toBe("2028-02-29");
+    expect(endExclusive("")).toBe("");
+  });
+
   it("sends a period or a window and never both", () => {
     // The two are ways of saying the same thing, and sending both is refused
     // by the server: a caller who sent both meant one of them.
     expect(asked2({ from: "2026-01-01", to: "2026-04-01" }, 30)).toEqual({
       from: "2026-01-01",
-      to: "2026-04-01",
+      to: "2026-04-02",
     });
     expect(asked2({ from: "", to: "" }, 30)).toEqual({ days: 30 });
     expect(asked2({ from: "2026-01-01", to: "" }, 30)).toEqual({ from: "2026-01-01" });
@@ -116,11 +136,7 @@ describe("what a sheet sends", () => {
     // Zero is not a window the server can answer for — the parameter carries
     // a minimum of one — so a sheet whose default is the whole of it must
     // leave it out. Sent, it comes back 422 and the sheet draws its own
-    // failure on load, which is what the deadline-compliance sheet did.
+    // failure on load.
     expect(asked2({ from: "", to: "" }, 0)).toEqual({});
-  });
-
-  it("still sends a window the sheet does have", () => {
-    expect(asked2({ from: "", to: "" }, 90)).toEqual({ days: 90 });
   });
 });

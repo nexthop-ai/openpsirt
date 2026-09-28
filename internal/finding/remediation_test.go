@@ -157,6 +157,33 @@ func TestWhatIsAgingIsCountedInTheBucketsPeopleAskIn(t *testing.T) {
 	})
 }
 
+func TestEachAgingBucketNamesBothEndsOfItsStretch(t *testing.T) {
+	// A link from a bucket asks the list for the same stretch, which it can
+	// only do knowing where the stretch ends as well as where it starts.
+	each(t, func(t *testing.T, f *fixture) {
+		got, err := f.store.Remediation(t.Context(), f.holding(t, access.PublicRead),
+			f.wholeProduct(), time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got.Aging) < 2 {
+			t.Fatalf("%d buckets, so nothing here is checked", len(got.Aging))
+		}
+		for at, bucket := range got.Aging {
+			if at == len(got.Aging)-1 {
+				if bucket.Until != 0 {
+					t.Errorf("the last bucket ends at %d days, want no end", bucket.Until)
+				}
+				continue
+			}
+			if next := got.Aging[at+1]; bucket.Until != next.Days {
+				t.Errorf("%q ends at %d days and %q starts at %d",
+					bucket.Label, bucket.Until, next.Label, next.Days)
+			}
+		}
+	})
+}
+
 func TestSomebodyWhoReadsNothingMeasuresNothing(t *testing.T) {
 	// The same rule as every other aggregate: a figure is over what the
 	// asker may see, and it is the data layer that decides.

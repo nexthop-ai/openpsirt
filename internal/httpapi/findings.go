@@ -302,11 +302,13 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		VexStatus:         plainly(n.Said),
 		OpenedByRun:       n.OpenedByRun,
 	}
+	var openedBefore *time.Time
 	for _, each := range []struct {
 		text string
 		at   **time.Time
 	}{
 		{n.OpenedAfter, &narrowed.OpenedAfter},
+		{n.OpenedBefore, &openedBefore},
 		{n.ClosedAfter, &narrowed.ClosedAfter},
 		{n.DecidedAfter, &narrowed.ProposedAfter},
 	} {
@@ -318,7 +320,27 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		}
 		*each.at = when
 	}
+	// An age and a date bound the same moment from the same side, so both
+	// asked keep the tighter of the two.
+	narrowed.OpenedAfter = later(narrowed.OpenedAfter, daysBack(n.OpenUnder))
+	narrowed.OpenedBefore = earlier(narrowed.OpenedBefore, openedBefore)
 	return narrowed, nil
+}
+
+// later is the later of two moments, either of which may be absent.
+func later(a, b *time.Time) *time.Time {
+	if a == nil || (b != nil && b.After(*a)) {
+		return b
+	}
+	return a
+}
+
+// earlier is the earlier of two moments, either of which may be absent.
+func earlier(a, b *time.Time) *time.Time {
+	if a == nil || (b != nil && b.Before(*a)) {
+		return b
+	}
+	return a
 }
 
 // Narrowing is the filters both findings lists take: the per-product one and
@@ -359,6 +381,7 @@ type Narrowing struct {
 	Assigned     []string    `query:"assigned,explode" enum:"me,somebody,nobody" doc:"Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"`
 	Likelihood   float64     `query:"epss_at_least" minimum:"0" maximum:"1" doc:"Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1"`
 	OpenFor      int         `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
+	OpenUnder    int         `query:"open_under" minimum:"1" doc:"Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two"`
 	DueWithin    int         `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
 	Overdue      bool        `query:"overdue" doc:"Keep only what is already past its deadline"`
 	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in"`
@@ -366,6 +389,7 @@ type Narrowing struct {
 	SentBack     bool        `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
 	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
 	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
+	OpenedBefore string      `query:"opened_before" doc:"Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included"`
 	OpenedByRun  int64       `query:"opened_by_run" minimum:"1" doc:"Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it"`
 	ClosedAfter  string      `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
 	DecidedAfter string      `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`

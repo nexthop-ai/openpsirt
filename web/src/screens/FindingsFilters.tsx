@@ -335,7 +335,9 @@ export function activeFilters(params: URLSearchParams): Active[] {
   each("hide", "Excluding", []);
   pick("running", "Deadline", DEADLINES);
   add("open_for", "Open for", at("open_for") && `${at("open_for")} days or more`);
+  add("open_under", "Open for", at("open_under") && `under ${at("open_under")} days`);
   add("opened_after", "First seen after", at("opened_after"));
+  add("opened_before", "First seen before", at("opened_before"));
   // A chip rather than a control in the panel: nobody types a run identifier,
   // and what puts it in the address is a link from the run that reports it.
   // It removes itself like every other chip, which is how somebody arriving

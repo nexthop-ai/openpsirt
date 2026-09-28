@@ -18,6 +18,7 @@ import {
   asked as askedFor,
   coveringPeriod,
   daysAsked,
+  endExclusive,
   periodAsked,
   stated,
   windowStart,
@@ -82,7 +83,7 @@ export function Scrutiny() {
     // reading a period opens a list the number was never about.
     const began = stated(period) ? period.from : windowStart(days);
     if (began) asked.set("from", began);
-    if (period.to) asked.set("to", period.to);
+    if (period.to) asked.set("to", endExclusive(period.to));
     if (product) asked.set("product", product);
     return `/audit?${asked.toString()}`;
   };

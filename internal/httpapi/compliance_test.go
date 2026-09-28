@@ -145,6 +145,25 @@ func TestTheListFiltersOnWhenThingsHappened(t *testing.T) {
 		if got := count(t, "opened_after="+tomorrow); got != 0 {
 			t.Errorf("opened after tomorrow is %d rows", got)
 		}
+		// The other end of the same stretch, so a period's list can close
+		// where the period does.
+		if got := count(t, "opened_before="+tomorrow); got != 1 {
+			t.Errorf("opened before tomorrow is %d rows, want the one seeded now", got)
+		}
+		if got := count(t, "opened_before="+yesterday); got != 0 {
+			t.Errorf("opened before yesterday is %d rows", got)
+		}
+		// And as an age: seeded this second, it is younger than a day, so a
+		// bucket of the youngest holds it and nothing older does.
+		if got := count(t, "open_under=1"); got != 1 {
+			t.Errorf("open for under a day is %d rows, want the one seeded now", got)
+		}
+		if got := count(t, "open_under=1&opened_after="+tomorrow); got != 0 {
+			t.Errorf("an age and a date together kept %d rows, want the tighter of the two", got)
+		}
+		if got := count(t, "opened_before="+tomorrow+"&open_for=1"); got != 0 {
+			t.Errorf("a date and an age together kept %d rows, want the tighter of the two", got)
+		}
 		// Nothing has been claimed about, so nothing was proposed after
 		// anything.
 		if got := count(t, "proposed_after="+yesterday); got != 0 {

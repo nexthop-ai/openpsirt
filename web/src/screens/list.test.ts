@@ -171,6 +171,21 @@ describe("the filters as the server takes them", () => {
     expect(listQuery(new URLSearchParams("running=7"))).toMatchObject({ due_within: 7 });
   });
 
+  it("sends both ends of a stretch a report links with", () => {
+    expect(
+      listQuery(
+        new URLSearchParams(
+          "open_for=7&open_under=28&opened_after=2026-01-01&opened_before=2026-04-01",
+        ),
+      ),
+    ).toMatchObject({
+      open_for: 7,
+      open_under: 28,
+      opened_after: "2026-01-01",
+      opened_before: "2026-04-01",
+    });
+  });
+
   it("refuses a page size nobody offered", () => {
     // It reaches the server as a limit, and the server has its own bound; the
     // point here is that the screen and the query agree on one number.

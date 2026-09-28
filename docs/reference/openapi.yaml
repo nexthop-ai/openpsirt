@@ -1001,6 +1001,10 @@ components:
         open:
           format: int64
           type: integer
+        to_days:
+          description: The end of the stretch, which is not itself in it. Absent for the last, which has no end
+          format: int64
+          type: integer
         undecided:
           description: The number nobody has said anything about. A claim waiting for a second person is not an answer
           format: int64
@@ -2064,7 +2068,7 @@ components:
             - array
             - "null"
         never:
-          description: The number in support never scanned, across every build and not only this page
+          description: The number in support and in use never scanned, across every build and not only this page. Those gone quiet are among the quiet as well
           format: int64
           type: integer
         quiet:
@@ -2073,6 +2077,14 @@ components:
           type: integer
         quiet_after_days:
           description: The span this deployment allows, in days
+          format: int64
+          type: integer
+        retired:
+          description: The number in support and taken out of use, across every build and not only this page. Nothing may be filed against these, so they are never counted as quiet
+          format: int64
+          type: integer
+        scanned:
+          description: The number in support and in use that a scan has reached and that have not gone quiet, across every build and not only this page
           format: int64
           type: integer
         total:
@@ -2088,6 +2100,8 @@ components:
         - quiet
         - never
         - unsupported
+        - retired
+        - scanned
         - total
         - quiet_after_days
       type: object
@@ -13902,6 +13916,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -13974,6 +13997,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false
@@ -14359,6 +14389,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -14431,6 +14470,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false
@@ -17001,6 +17047,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -17073,6 +17128,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false
@@ -17572,6 +17634,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -17644,6 +17715,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false
@@ -18063,6 +18141,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -18135,6 +18222,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false
@@ -18565,6 +18659,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -18637,6 +18740,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false
@@ -19080,6 +19190,15 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+          explode: false
+          in: query
+          name: open_under
+          schema:
+            description: Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead
           explode: false
           in: query
@@ -19152,6 +19271,13 @@ paths:
           name: opened_after
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
+            type: string
+        - description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
+          explode: false
+          in: query
+          name: opened_before
+          schema:
+            description: Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included
             type: string
         - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
           explode: false

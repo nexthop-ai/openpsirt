@@ -98,7 +98,7 @@ export function Compliance() {
               </div>
               <Link
                 className="kpi"
-                to={`${findingsPath(at)}?overdue=true`}
+                to={findingsPath(at, false, { overdue: "true" })}
                 aria-label="Open what is overdue"
               >
                 <span className="l">Plainly late</span>

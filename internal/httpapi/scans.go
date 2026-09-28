@@ -1008,11 +1008,13 @@ type coverageOutput struct {
 		// Quiet is how many of the rows are, so a caller can say so without
 		// counting them again.
 		Quiet int `json:"quiet" doc:"The number gone quiet, across every build and not only this page"`
-		// Never and Unsupported are counted here for the same reason, and
-		// because a caller recomputing either from the page it was handed
-		// states a figure about the page under a heading about the estate.
-		Never          int `json:"never" doc:"The number in support never scanned, across every build and not only this page"`
+		// The rest are counted here for the same reason, and because a caller
+		// recomputing any of them from the page it was handed states a figure
+		// about the page under a heading about the estate.
+		Never          int `json:"never" doc:"The number in support and in use never scanned, across every build and not only this page. Those gone quiet are among the quiet as well"`
 		Unsupported    int `json:"unsupported" doc:"The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet"`
+		Retired        int `json:"retired" doc:"The number in support and taken out of use, across every build and not only this page. Nothing may be filed against these, so they are never counted as quiet"`
+		Scanned        int `json:"scanned" doc:"The number in support and in use that a scan has reached and that have not gone quiet, across every build and not only this page"`
 		Total          int `json:"total" doc:"The number of builds to report on"`
 		QuietAfterDays int `json:"quiet_after_days" doc:"The span this deployment allows, in days"`
 	}
@@ -1043,6 +1045,37 @@ type CoverageBody struct {
 	// RetiredFromUse is the other reason silence is expected, and a different
 	// one: nothing may be filed against this build at all.
 	RetiredFromUse bool `json:"retired,omitempty" doc:"Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet"`
+}
+
+// coverageCounts is the estate a coverage answer counts, by the one state each
+// build is in. Quiet is the exception: a build in use and never scanned can be
+// quiet too, and is counted in both.
+type coverageCounts struct {
+	quiet, never, unsupported, retired, scanned int
+}
+
+// countCoverage sorts every build into the state it is in. Out of support
+// comes first and taken out of use second, because silence is expected of
+// both; of what is left, a build a scan has never reached is never scanned,
+// and one reached and not quiet is scanned.
+func countCoverage(rows []ingest.Coverage) coverageCounts {
+	var out coverageCounts
+	for _, row := range rows {
+		if row.Quiet {
+			out.quiet++
+		}
+		switch {
+		case row.OutOfSupport:
+			out.unsupported++
+		case row.RetiredFromUse:
+			out.retired++
+		case row.LastReceivedAt == nil:
+			out.never++
+		case !row.Quiet:
+			out.scanned++
+		}
+	}
+	return out
 }
 
 func registerCoverage(api huma.API, in Ingest) {
@@ -1089,22 +1122,14 @@ func registerCoverage(api huma.API, in Ingest) {
 		out := &coverageOutput{}
 		out.Body.QuietAfterDays = int(quietAfter.Hours() / 24)
 		out.Body.Total = len(rows)
-		// Counted before the page is cut, and the quiet ones counted across
-		// the whole answer rather than the page: a badge saying "3" because
-		// three quiet builds fall on the first page answers a different
-		// question from the one it appears to.
-		for _, row := range rows {
-			if row.Quiet {
-				out.Body.Quiet++
-			}
-			if row.OutOfSupport {
-				out.Body.Unsupported++
-				continue
-			}
-			if row.LastReceivedAt == nil {
-				out.Body.Never++
-			}
-		}
+		// Counted before the page is cut, and across the whole answer rather
+		// than the page: a badge saying "3" because three quiet builds fall
+		// on the first page answers a different question from the one it
+		// appears to.
+		counted := countCoverage(rows)
+		out.Body.Quiet, out.Body.Never = counted.quiet, counted.never
+		out.Body.Unsupported, out.Body.Retired = counted.unsupported, counted.retired
+		out.Body.Scanned = counted.scanned
 		if input.Offset < len(rows) {
 			rows = rows[input.Offset:]
 		} else {

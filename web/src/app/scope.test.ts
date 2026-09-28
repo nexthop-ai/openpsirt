@@ -2,7 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { findingsPath, needsBuild, onFindings, remember, rescoped, scopeQuery } from "./scope";
+import { ROUTES } from "./App";
+import {
+  findingsPath,
+  needsBuild,
+  onFindings,
+  remember,
+  rescoped,
+  scopeAt,
+  scopeQuery,
+} from "./scope";
 
 const BUILD = "/products/sonic/streams/master/variants/broadcom";
 
@@ -19,8 +28,8 @@ describe("which screens need a whole build", () => {
   });
 
   it("lets the findings list take whatever is selected", () => {
-    // It was refused a partial scope on the same justification as the five
-    // above, and the justification never held for it.
+    // A build's list when given a build, and every build's under the product
+    // when not, so it has an answer for a partial scope.
     expect(needsBuild(`${BUILD}/findings`)).toBe(false);
     expect(needsBuild("/products/sonic/findings")).toBe(false);
     expect(onFindings(`${BUILD}/findings`)).toBe(true);
@@ -56,6 +65,53 @@ describe("where a selection's findings live", () => {
 
   it("spans every product when none is picked", () => {
     expect(findingsPath({})).toBe("/findings");
+  });
+
+  it("keeps a filter apart from the levels the address already carries", () => {
+    const overdue = { overdue: "true" };
+    expect(findingsPath({ product: "sonic", stream: "master" }, false, overdue)).toBe(
+      "/products/sonic/findings?stream=master&overdue=true",
+    );
+    expect(findingsPath({ product: "sonic" }, false, overdue)).toBe(
+      "/products/sonic/findings?overdue=true",
+    );
+    expect(
+      findingsPath({ product: "sonic", stream: "master", variant: "broadcom" }, false, overdue),
+    ).toBe(`${BUILD}/findings?overdue=true`);
+    expect(findingsPath({}, false, overdue)).toBe("/findings?overdue=true");
+  });
+
+  it("reads a filter back as its own parameter on a partial scope", () => {
+    const path = findingsPath({ product: "sonic", variant: "broadcom" }, true, { open_for: "7" });
+    const asked = new URLSearchParams(path.slice(path.indexOf("?")));
+    expect(asked.get("variant")).toBe("broadcom");
+    expect(asked.get("open_for")).toBe("7");
+    expect(asked.get("planned")).toBe("either");
+  });
+});
+
+// Every address the router answers under one product, with that product in it.
+const UNDER = Object.values(ROUTES)
+  .filter((pattern) => pattern.startsWith("/products/:product"))
+  .map((pattern) =>
+    pattern.replace(/:([a-z]+)/g, (_, name) => (name === "product" ? "sonic" : name)),
+  );
+
+describe("an address that names a product", () => {
+  it("is the authority for the product in the scope bar", () => {
+    expect(UNDER.length, "no address under a product was found").toBeGreaterThan(0);
+    for (const path of UNDER) {
+      expect(scopeAt(path, "")?.product, path).toBe("sonic");
+    }
+  });
+
+  it("moves to the product picked in its place", () => {
+    for (const path of UNDER) {
+      const to = { product: "gnmi", stream: "master", variant: "broadcom" };
+      const next = rescoped(path, to);
+      expect(next, path).not.toBeNull();
+      expect(next?.startsWith("/products/gnmi"), `${path} went to ${next}`).toBe(true);
+    }
   });
 });
 
