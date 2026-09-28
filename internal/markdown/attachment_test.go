@@ -13,10 +13,9 @@ import (
 const token = "0f9a1b2c3d4e5f60718293a4b5c6d7e8"
 
 func TestAnImageMayComeFromAnAttachmentAndNowhereElse(t *testing.T) {
-	// DESIGN-text.md's rule is unchanged and this is the whole of the change
-	// to it: an image loaded from a third party reports who read a finding and
-	// when, which on an undisclosed one is a disclosure channel. A file held
-	// here is fetched through a path that asks who is looking.
+	// An image loaded from a third party reports who read a finding and when,
+	// which on an undisclosed one is a disclosure channel. A file held here is
+	// fetched through a path that asks who is looking.
 	for _, c := range []struct {
 		what    string
 		source  string
@@ -102,18 +101,16 @@ func TestMentionsAreReadFromProseAndNotFromCode(t *testing.T) {
 		{"inside a code span", "Write it as `@ana` to call somebody", nil},
 		{"inside a fenced block", "```\nfrom @ana to @ben\n```\n", nil},
 		{"inside a fenced block with a language", "```log\nfrom @ana\n```\n", nil},
-		// The shape a pasted stack trace actually takes, and the one nothing
-		// covered. What keeps these out is that goldmark holds a block's
-		// content in Lines() with no child text node, so the walk never
-		// reaches it — these rows are what would catch an upgrade that
-		// changes that, now that the guards that looked like the reason are
-		// gone.
+		// The shape a pasted stack trace actually takes. What keeps these out
+		// is that goldmark holds a block's content in Lines() with no child
+		// text node, so the walk never reaches it — these rows are what would
+		// catch an upgrade that changes that.
 		{"inside an indented block", "A log:\n\n    from @ana to @ben\n", nil},
 		{"an email address", "Mail ops@example.com about it", nil},
 		{"trailing punctuation is not part of the name", "Thanks @ana.", []string{"ana"}},
 		// A sign-in through a trusted header mints identities like this, and
-		// the editor writes whatever the identity is. Reading it as a mention
-		// of "proxy" meant the person named was never told.
+		// the editor writes whatever the identity is. Read as a mention of
+		// "proxy", the person named is never told.
 		{"an identity with a colon in it", "Asking @proxy:dev to look.", []string{"proxy:dev"}},
 		{"a colon that ends the sentence", "@ana: could you?", []string{"ana"}},
 	} {
@@ -132,12 +129,9 @@ func TestMentionsAreReadFromProseAndNotFromCode(t *testing.T) {
 }
 
 func TestAReferenceIsRefusedUnlessItNamesAFileThisDeploymentMinted(t *testing.T) {
-	// The scheme was checked and what followed it was not, while References —
-	// the half that decides which files a piece of text actually pulls in —
-	// recognizes only a minted identifier. So these were accepted when they
-	// were written and referred to nothing when they were read: a dead link
-	// nothing reported, and the same two-halves-of-one-rule disagreement the
-	// sanitizer had over relative links.
+	// References — the half that decides which files a piece of text actually
+	// pulls in — recognizes only a minted identifier. Accepting any of these
+	// would store a dead link nothing reports.
 	for _, c := range []struct {
 		what   string
 		source string
@@ -163,6 +157,62 @@ func TestAReferenceIsRefusedUnlessItNamesAFileThisDeploymentMinted(t *testing.T)
 			// never saw it either.
 			if got := markdown.References(c.source); len(got) != 0 {
 				t.Errorf("%s resolves to %v, so the two halves still disagree", c.what, got)
+			}
+		})
+	}
+}
+
+func TestAReferenceSchemeInCapitalsIsRefusedForItsSpelling(t *testing.T) {
+	// A renderer resolves `attachment:` and `issue:` as written in lower
+	// case, so a reference in any other case is a dead link. The refusal
+	// names the spelling, which is what is wrong, and never the identifier,
+	// which is well formed.
+	for _, c := range []struct {
+		what   string
+		source string
+		wrong  string
+	}{
+		{"an attachment", "[the log](Attachment:" + token + ")", "32 hexadecimal characters"},
+		{"an attachment image", "![shot](ATTACHMENT:" + token + ")", "32 hexadecimal characters"},
+		{"an issue", "[the flaw](Issue:CVE-2026-1234)", "is not one"},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			err := markdown.Check(c.source)
+			if err == nil {
+				t.Fatalf("%s with its scheme in capitals was accepted", c.what)
+			}
+			if !strings.Contains(err.Error(), "lower case") {
+				t.Errorf("the refusal does not name the spelling: %v", err)
+			}
+			if strings.Contains(err.Error(), c.wrong) {
+				t.Errorf("the refusal blames a well-formed identifier: %v", err)
+			}
+			if got := markdown.References(c.source); len(got) != 0 {
+				t.Errorf("a refused reference resolves to %v", got)
+			}
+		})
+	}
+}
+
+func TestEveryAttachmentReferenceCheckAcceptsIsOneReferencesCounts(t *testing.T) {
+	// Check decides what may be stored and References decides which files the
+	// stored text keeps. A reference one accepts and the other does not count
+	// is a file the sweep deletes while the text still links to it.
+	for _, c := range []struct {
+		what   string
+		source string
+	}{
+		{"a link", "[the log](attachment:" + token + ")"},
+		{"an image", "![a screenshot](attachment:" + token + ")"},
+		{"an autolink", "See <attachment:" + token + "> for the log"},
+		{"a reference definition", "See [the log].\n\n[the log]: attachment:" + token + "\n"},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			if err := markdown.Check(c.source); err != nil {
+				t.Fatalf("%s was refused: %v", c.what, err)
+			}
+			if got := markdown.References(c.source); len(got) != 1 || got[0] != token {
+				t.Errorf("%s was accepted and resolves to %v, so the file it names is swept", c.what, got)
 			}
 		})
 	}

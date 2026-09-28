@@ -40,7 +40,7 @@ type Note struct {
 	Omitted int
 }
 
-// Notes renders a comparison as prose somebody pastes into a release note .
+// Notes renders a comparison as prose somebody pastes into a release note.
 //
 // Markdown, and generated here rather than in a browser, so that what an
 // API caller gets and what the screen shows are the same words. A second
@@ -58,16 +58,20 @@ type Note struct {
 //
 // The comparison keeps all three sets. This is the one that goes to somebody.
 //
-// A release that fixed nothing says so. It answered nothing at all, and a
-// caller cannot tell that from a truncated response, from the wrong pair of
-// builds, or from a request that went astray — every one of which is also
-// zero bytes. The reasoning that produced the empty answer still holds: a
-// heading over nothing is a question in a reader's mind, which is why what is
-// returned here is a sentence and not a heading.
+// A release that fixed nothing says so. An empty answer cannot be told from a
+// truncated response, from the wrong pair of builds, or from a request that
+// went astray — every one of which is also zero bytes. A heading over nothing
+// is a question in a reader's mind, so what is returned is a sentence and not
+// a heading.
+//
+// Every value a third party chose is escaped where it is written, so a
+// component or a version cannot become a link, an image or markup in a
+// document that leaves the deployment.
 func Notes(about Note, c *Comparison) string {
 	if c == nil {
 		return ""
 	}
+	about = written(about)
 	fixed := onlyFixes(c.Fixed)
 	if len(fixed) == 0 && about.Omitted == 0 {
 		return nothingFixed(about)
@@ -82,6 +86,20 @@ func Notes(about Note, c *Comparison) string {
 	lead(&out, about)
 	section(&out, fixed)
 	return out.String()
+}
+
+// written is what a note says about itself, escaped for the document.
+//
+// Every one of these is somebody else's text: the release names were given at
+// upload and the scanner and database versions are what the scanner reported.
+// Each is escaped once here, so the heading, the lead and the sentence a
+// release that fixed nothing is carry them as text.
+func written(about Note) Note {
+	about.From = markdown.Literal(strings.TrimSpace(about.From))
+	about.To = markdown.Literal(strings.TrimSpace(about.To))
+	about.Scanner = markdown.Literal(about.Scanner)
+	about.Database = markdown.Literal(about.Database)
+	return about
 }
 
 // nothingFixed is the whole document where a release fixed nothing.
@@ -209,8 +227,8 @@ func onlyFixes(rows []Changed) []Changed {
 // rather than named exclusions, and the same list the remediation rate counts:
 // a closure added later is not a fix on any surface until somebody says it is,
 // rather than progress on one and churn on the other. Returning the other half
-// as well is what stops a screen deciding it again — that is how a column
-// headed "Fixed" came to carry two scanner faults.
+// as well is what stops a screen deciding it again, and a column headed
+// "Fixed" carrying a scanner fault.
 func partition(rows []Changed) (fixed, closed []Changed) {
 	for _, row := range rows {
 		if row.Because.Resolves() {
@@ -236,9 +254,10 @@ func section(out *strings.Builder, rows []Changed) {
 	}
 	out.WriteString("\n")
 	for _, g := range grouped(rows) {
-		fmt.Fprintf(out, "- %s%s\n", g.component, how(g.rows[0]))
+		fmt.Fprintf(out, "- %s%s\n", markdown.Literal(g.component), how(g.rows[0]))
 		for _, row := range g.rows {
-			fmt.Fprintf(out, "  - %s%s%s\n", row.Vulnerability, said(row), writtenUp(row))
+			fmt.Fprintf(out, "  - %s%s%s\n",
+				markdown.Literal(row.Vulnerability), said(row), writtenUp(row))
 		}
 	}
 }
@@ -253,7 +272,7 @@ func section(out *strings.Builder, rows []Changed) {
 func said(row Changed) string {
 	var parts []string
 	if row.Severity != "" {
-		parts = append(parts, row.Severity)
+		parts = append(parts, markdown.Literal(row.Severity))
 	}
 	if row.ScoreCenti > 0 {
 		parts = append(parts, fmt.Sprintf("%.1f", float64(row.ScoreCenti)/100))
@@ -360,9 +379,10 @@ func how(row Changed) string {
 	}
 	if row.MovedTo != "" {
 		if row.FromVersion != "" {
-			return fmt.Sprintf(" — %s, %s → %s", said, row.FromVersion, row.MovedTo)
+			return fmt.Sprintf(" — %s, %s → %s", said,
+				markdown.Literal(row.FromVersion), markdown.Literal(row.MovedTo))
 		}
-		return fmt.Sprintf(" — %s to %s", said, row.MovedTo)
+		return fmt.Sprintf(" — %s to %s", said, markdown.Literal(row.MovedTo))
 	}
 	return " — " + said
 }

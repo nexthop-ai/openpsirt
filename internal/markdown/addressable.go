@@ -20,11 +20,9 @@ import "strings"
 // in this system, and an address stored beside a claim is no different for
 // being stored rather than written in a sentence.
 //
-// The same judgment, not a second one shaped like it. This stopped at the
-// scheme, so `attachment:../../etc/passwd` and a bare `issue:` were stored on
-// their own and refused inside a link — the two halves of one rule disagreeing,
-// which is the divergence attachmentFault was written to close and this
-// reintroduced on the field an approver reads.
+// The same judgment a link inside text gets, through the same function, so
+// `attachment:../../etc/passwd` and a bare `issue:` are refused on their own
+// as they are inside a link.
 func Addressable(address string) error {
 	if address == "" {
 		return nil
@@ -49,6 +47,10 @@ func Addressable(address string) error {
 // carrying a newline writes attacker-chosen markdown into something somebody
 // publishes.
 //
+// Inside angle brackets only an absolute address is a link. Anything else is
+// read as markup, so `style` written there opens a raw HTML tag. The scheme is
+// one of the three a document leaving the deployment links to.
+//
 // Addressable answers the other half, which is what a reader's machine would
 // do if they followed it.
 func Autolinkable(address string) error {
@@ -58,6 +60,14 @@ func Autolinkable(address string) error {
 			Reason: "an address written into a document carries no spaces or angle " +
 				"brackets: inside <> it would end at the first of them and the rest " +
 				"of the line would become content",
+		}
+	}
+	switch target, _ := schemeOf(address); target.scheme {
+	case "http", "https", "mailto":
+	default:
+		return Fault{
+			Offending: address,
+			Reason:    "an address written into a document names http, https or mailto",
 		}
 	}
 	return Addressable(address)

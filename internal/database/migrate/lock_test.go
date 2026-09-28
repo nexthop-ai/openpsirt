@@ -22,8 +22,8 @@ import (
 // The engines a run may touch are *not* copied here. That rule lives
 // in dbtest/engines, which imports neither this package nor dbtest, precisely
 // so the copy in this file does not have to exist — it is the rule the quick
-// loop and the race run set, and this test used to ignore it and open three
-// servers regardless.
+// loop and the race run set, and this test follows it rather than opening
+// three servers regardless.
 const (
 	postgresURLEnv = "OPENPSIRT_TEST_POSTGRES_URL"
 	mysqlURLEnv    = "OPENPSIRT_TEST_MYSQL_URL"
@@ -34,7 +34,7 @@ func open(t *testing.T, url string) *database.DB {
 	t.Helper()
 	target, err := database.ParseURL(url)
 	if err != nil {
-		t.Fatalf("parse %q: %v", url, err)
+		t.Fatalf("parse the database URL: %v", err)
 	}
 	db, err := database.Open(context.Background(), target)
 	if err != nil {

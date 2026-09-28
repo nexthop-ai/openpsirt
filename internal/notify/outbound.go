@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -161,13 +162,10 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 	for _, destination := range destinations {
 		// Read per destination and only what this one has not settled.
 		//
-		// Read once for all of them, with no predicate but "not cleared", the
-		// window was the oldest two hundred uncleared rows — and an event row
-		// is never cleared, because only a condition is. So once two hundred
-		// events existed the same two hundred were re-read on every cycle and
-		// nothing created afterwards was ever signalled: no error, no log, no
-		// counter. The mail sweep beside this one has carried a per-row
-		// delivery predicate all along, which is what makes it advance.
+		// An event row is never cleared, because only a condition is, so a
+		// window asking only for uncleared rows fills with the oldest events
+		// and stops advancing without an error. The per-row delivery
+		// predicate is what makes it advance, as it does for the mail sweep.
 		rows, err := s.window(ctx, destination)
 		if err != nil {
 			return sent, failed, err
@@ -203,9 +201,9 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 		// unique on the destination and what was said, and what was said is a
 		// condition's own identity where it has one — so a condition opened
 		// for six people is six rows and one delivery, which is deliberate
-		// because a channel wants it once. Asked by the row's own number
-		// instead, five of the six could never be settled: they answered this
-		// for ever and, being the oldest, sat at the front of the window.
+		// because a channel wants it once. Asked by the row's own number, five
+		// of the six are never settled and, being the oldest, hold the front
+		// of the window.
 		//
 		// An event says the same thing to many people when it names what it
 		// is one of, and then it settles the same way. Without that arm a
@@ -256,12 +254,11 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		Attempts: 1, FirstSeen: now,
 	}
 	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
-		// The unique index, and nothing else. Every other insert in this
-		// tree asks which failure this was; here any error at all read as
-		// "somebody has this one", so a lost connection or a lock timeout
-		// answered "already claimed" and a sweep during a brief outage
-		// reported nothing sent and nothing failed — which is what a quiet
-		// queue looks like too.
+		// Only the unique index means somebody has this one. A lost
+		// connection or a lock timeout is a failure and is reported as one;
+		// read as "already claimed", a sweep during an outage reports nothing
+		// sent and nothing failed, which is what a quiet queue looks like
+		// too.
 		if !database.IsDuplicate(err) {
 			return already, fmt.Errorf("claim a delivery: %w", err)
 		}
@@ -303,7 +300,7 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		// one here from the row instead would announce the identifier and the
 		// component to every server the request crosses, which is the whole of
 		// what the composed body was careful about.
-		Kind: string(row.Kind), Subject: message.Subject, Text: message.Text,
+		Kind: string(row.Kind), Subject: chatText(message.Subject, ""), Text: chatText(message.Text, message.Link),
 		Link: message.Link, Private: row.Private,
 		At: row.CreatedAt.UTC().Format(time.RFC3339),
 	})
@@ -395,6 +392,30 @@ func foldedKind(kind string) string {
 	return strings.ToLower(strings.TrimSpace(kind))
 }
 
+// chatMarkup escapes the three characters a chat channel reads as its own
+// markup.
+var chatMarkup = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+
+// chatText is text as a chat channel has to receive it to show it as written.
+//
+// A body carries a publisher's name, a supplier's failure text and component
+// names, none of them chosen here. Each line is escaped as markdown with the
+// helper the release note uses, because Teams renders `[label](address)` as a
+// link labelled anything. Then `&`, `<` and `>` are escaped as Slack and Teams
+// require, because both read `<!channel>` as a ping for everybody in the
+// channel and `<address|label>` as a link. The text this application writes
+// carries no markdown of its own. The line holding the link is composed from
+// the configured address, so it is left a link.
+func chatText(text, link string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if link == "" || line != link {
+			lines[i] = markdown.Literal(line)
+		}
+	}
+	return chatMarkup.Replace(strings.Join(lines, "\n"))
+}
+
 // trimTo bounds what is stored of a failure.
 func trimTo(text string, most int) string { return bound.Head(text, most) }
 
@@ -463,9 +484,8 @@ func (g *outboundGuard) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // administering refuses anybody but an administrator signed in as a person.
 //
-// The rule these three writes and the read beside them carried nowhere: they
-// took no subject at all, and the only thing keeping the signing secret off
-// the wire was one handler that copied the fields it wanted by name.
+// The three writes and the read beside them take a subject and ask it here,
+// so the signing secret stays off the wire whatever handler calls them.
 func administering(subject access.Subject, what string) error {
 	if !subject.Admin || subject.Kind != access.Person {
 		return access.Denied(what)
@@ -476,10 +496,9 @@ func administering(subject access.Subject, what string) error {
 // Configured is one destination and whether it is working.
 //
 // The fields an operator's question needs, spelled out rather than embedding
-// the row. Embedded, the signing secret crossed the store boundary and the
-// only thing keeping it off the wire was one handler copying six fields by
-// name — a second caller that ranged over these and marshalled them would put
-// a shared secret in a response, and nothing would have said so.
+// the row. An embedded row carries the signing secret across the store
+// boundary, where a caller that marshals it puts a shared secret in a
+// response.
 type Configured struct {
 	Name string
 	Kind string
@@ -548,10 +567,8 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 	}
 	row := &Outbound{
 		// The kind is normalized on the way in rather than compared loosely
-		// on the way out. A destination added as "Assigned" received
-		// notifications because the dispatch folded case, and was retired by
-		// "assigned" only by accident — the write and the read disagreed
-		// about what the same destination was called.
+		// on the way out, so the write that adds a destination and the read
+		// that retires it agree on what it is called.
 		Name: strings.TrimSpace(name), Kind: foldedKind(kind),
 		URL: strings.TrimSpace(url), Secret: secret,
 		CreatedBy: subject.ID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond),

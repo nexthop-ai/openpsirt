@@ -8,6 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/text"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -163,9 +168,9 @@ func TestTheSameComparisonRendersTheSameDocumentTwice(t *testing.T) {
 }
 
 func TestAReleaseThatFixedNothingSaysSo(t *testing.T) {
-	// It answered nothing at all, and a caller cannot tell that from a
-	// truncated response, from the wrong pair of builds or from a request
-	// that went astray — every one of which is also zero bytes.
+	// An empty answer cannot be told from a truncated response, from the
+	// wrong pair of builds or from a request that went astray — every one of
+	// which is also zero bytes.
 	//
 	// A heading over nothing is still a question in a reader's mind about
 	// whether something is missing, which is why what comes back is a
@@ -194,12 +199,9 @@ func TestAReleaseThatFixedNothingSaysSo(t *testing.T) {
 }
 
 func TestEveryClosureThatCountsAsAFixHasWordsForIt(t *testing.T) {
-	// One list rather than three projections of it. "What counts as a fix" was
-	// a positive list of four words spliced into SQL, a negative list of three
-	// in Go, and a third list of the same four as a switch returning prose —
-	// none of them checked by the compiler. An eighth closure was kept by the
-	// release note, rendered with nothing after it, and not counted by the
-	// remediation rate: one constant, two screens quietly disagreeing.
+	// One list rather than three projections of it. A closure the release
+	// note keeps and the remediation rate does not count renders with nothing
+	// after it, and two screens disagree about the same constant.
 	if len(finding.Resolving()) == 0 {
 		t.Fatal("nothing counts as a fix, so this checked nothing")
 	}
@@ -326,5 +328,53 @@ func TestABulletCarriesWhatDecidesWhenTheUpgradeIsTaken(t *testing.T) {
 	// printed: what follows it is whole markdown lines a feed chose.
 	if strings.Contains(notes, "Fixed upstream") {
 		t.Errorf("a feed wrote lines into a published note:\n%s", notes)
+	}
+}
+
+func TestNothingAThirdPartyNamedBecomesMarkupInANote(t *testing.T) {
+	// A component name, a version and an identifier are chosen upstream, and
+	// the note goes to a customer's markdown viewer. Each is text there: no
+	// link, image, markup, heading or list the name opened.
+	link := "[Download the fix](https://evil.example/p)"
+	image := "<img src=https://evil.example/t.gif>"
+	notes := finding.Notes(finding.Note{
+		From: "# v1 " + link, To: "main " + image,
+		Scanner: "grype ![x](https://evil.example/s)", Database: "https://evil.example/d",
+	}, &finding.Comparison{
+		Fixed: []finding.Changed{{
+			Vulnerability: "CVE-2026-1 " + link, Component: "- " + image + "\n\n## Fixed",
+			Severity: "high <b>x</b>", Because: finding.Upgraded,
+			FromVersion: "1.0 ![x](https://evil.example/f)", MovedTo: "www.evil.example",
+			Advisory: "https://nvd.nist.gov/vuln/detail/CVE-2026-1",
+		}},
+	})
+
+	source := []byte(notes)
+	document := goldmark.New(goldmark.WithExtensions(extension.GFM)).Parser().
+		Parse(text.NewReader(source))
+	headings, walked := 0, 0
+	_ = ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		walked++
+		switch typed := node.(type) {
+		case *ast.Heading:
+			headings++
+		case *ast.AutoLink:
+			// The write-up the note links on purpose, and nothing else.
+			if got := string(typed.URL(source)); got != "https://nvd.nist.gov/vuln/detail/CVE-2026-1" {
+				t.Errorf("%q became a link:\n%s", got, notes)
+			}
+		case *ast.Link, *ast.Image, *ast.RawHTML, *ast.HTMLBlock:
+			t.Errorf("a third party's text became %s:\n%s", node.Kind(), notes)
+		}
+		return ast.WalkContinue, nil
+	})
+	if walked == 0 {
+		t.Fatal("the note parsed to nothing, so this checked nothing")
+	}
+	if headings != 1 {
+		t.Errorf("the note has %d headings, want its own one:\n%s", headings, notes)
 	}
 }

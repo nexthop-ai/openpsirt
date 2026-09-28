@@ -465,7 +465,7 @@ of this table's rules are.
 ## Mail
 
 A channel behind one interface, so what may be said is decided once for every
-channel there will be. Mail carries the markdown as its text part.
+channel there will be. Mail carries the text as its plain-text part.
 
 | Rule | Reason |
 |---|---|
@@ -498,6 +498,7 @@ request-forgery primitive unless governed:
 | Every request is signed over the timestamp and the body | A receiver can distinguish one of ours from one anybody could make, and cannot be handed yesterday's again. The timestamp is inside the signature |
 | The signing secret is stored recoverably | Every other credential is hashed because it authenticates somebody to this deployment; this one authenticates this deployment to somebody else. No endpoint returns it |
 | No endpoint returns a destination's address, only its host | For Slack and Teams the path is the credential. A destination is told apart by its name and kind, which is also what retires it |
+| The subject and the text are escaped as markdown, line by line, by the rule the release note uses, and then carry `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;` | Teams renders markdown in the text, so `[label](address)` is a link labelled anything, and Slack and Teams read `<!channel>` as a ping for the whole channel and `<address\|label>` as a link. A body carries publisher names, supplier failure text and component names nobody here chose, and the text this application writes carries no markdown of its own. The line holding the address this deployment composed stays an address, and the link field is sent as it is. A mail is plain text and carries the text unescaped |
 | What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
 | Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event is tracked by its own identity, unless it names what it is one of |
 | An event that says the same sentence to many people names what it is one of | One upload changing much of a build is one thing to carry however many people read that product. Without it a product with twenty-five readers posts twenty-five identical messages a night, and a night of builds crowds every other kind out of a sweep. What is personal — a decision of yours, you were named — carries none, because those are as many things as there are people |
@@ -576,3 +577,4 @@ finding it names may since have been decided, closed or reopened.
 |---|---|
 | Events are not collapsed | Being assigned the same finding twice is two things that happened, and the second is the one they have not seen |
 | The badge count is counted through the same conditions as the list | A badge that disagrees with the list under it is the same class of mistake as a total that ignores a filter |
+| Slack shows a backslash before each character escaped as markdown | Slack's markup has no backslash escape and Teams renders markdown, and one text goes to both. A stray backslash costs less than a link labelled anything |

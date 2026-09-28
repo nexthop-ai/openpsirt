@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -76,6 +77,9 @@ type Target struct {
 	// connection rather than of the URL, because the engines spell the
 	// transport differently and a server may ignore what was asked for.
 	RequireEncryption bool
+	// secrets is every spelling of a credential the URL carries, so an error
+	// leaving this package can be scrubbed of it.
+	secrets []string
 }
 
 // ParseURL turns a database URL into something a driver can open.
@@ -102,10 +106,19 @@ func ParseURL(raw string) (Target, error) {
 	if !ok {
 		return Target{}, fmt.Errorf("unsupported database %q: want one of postgres, mysql, mariadb, sqlite", u.Scheme)
 	}
-	// Normalize the scheme into the URL the driver receives. Accepting
-	// "POSTGRES://" and passing it through unchanged had pgx reject it and
-	// silently fall back to environment defaults, producing an error that
-	// named the supplied URL while describing a connection somewhere else.
+	// A password holding an unescaped "/", "?" or "#" still parses: the
+	// authority ends at that character, part of the credential becomes the
+	// host, and the rest lands in the path, the query or the fragment — none
+	// of which redaction treats as a credential. That shape is judged by where
+	// the stray "@" lands.
+	if engine != SQLite && strayCredential(u) {
+		return Target{}, fmt.Errorf("database URL is not a URL: %s: percent-encode "+
+			"/ ? # @ in the user name and password", parseFailure(raw, nil))
+	}
+	// Normalize the scheme into the URL the driver receives. Passed through
+	// unchanged, "POSTGRES://" is rejected by pgx, which falls back to
+	// environment defaults and describes a connection somewhere else under
+	// the supplied URL.
 	u.Scheme = strings.ToLower(u.Scheme)
 	raw = u.String()
 
@@ -113,7 +126,7 @@ func ParseURL(raw string) (Target, error) {
 	if err != nil {
 		return Target{}, err
 	}
-	return Target{Engine: engine, DSN: dsn, Redacted: redact(u)}, nil
+	return Target{Engine: engine, DSN: dsn, Redacted: redact(u), secrets: secretsOf(u)}, nil
 }
 
 func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
@@ -159,9 +172,9 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		//
 		// Appended, not assigned. Setting the mode outright replaces it,
 		// and what it replaces includes whatever else an operator has set.
-		// Assigning it cost a nine-character string stored in a
-		// four-character column its last five characters, with no error, on
-		// both of these engines and on neither of the other two — which is
+		// Assigned, a mode without strictness stores a nine-character string
+		// in a four-character column as its first four characters, with no
+		// error, on both of these engines and on neither of the other two —
 		// the shape of portability trap that only shows up in production.
 		//
 		// Strictness is named rather than inherited. Appending alone
@@ -314,6 +327,25 @@ func transport(u *url.URL) string {
 	return "&tls=preferred"
 }
 
+// strayCredential reports whether a server URL has user information that
+// spilled past its authority.
+//
+// An "@" in the path, or in a query key, is the rest of a user name and
+// password cut short by an unescaped "/" or "?": a split password lands in a
+// key. A query value may hold an "@", because drivers read a user name from
+// the query, and `?user=app@corp` is a user name rather than a spill. A
+// fragment has no meaning to any driver and is where a password cut at "#"
+// lands. An opaque URL, a scheme followed by a colon and no slashes, puts
+// the whole of the user information outside anything redaction reads.
+func strayCredential(u *url.URL) bool {
+	stray := u.Opaque != "" || u.Fragment != "" || strings.Contains(u.EscapedPath(), "@")
+	for _, pair := range strings.Split(u.RawQuery, "&") {
+		key, _, _ := strings.Cut(pair, "=")
+		stray = stray || strings.Contains(key, "@")
+	}
+	return stray
+}
+
 // parseFailure describes a URL the parser refused without repeating it.
 //
 // The parser names what it objected to, which for a malformed escape is the
@@ -326,21 +358,7 @@ func parseFailure(raw string, err error) string {
 	if rest == "" {
 		scheme = ""
 	}
-	// The host is what follows the last "@", up to the path. The "@" is found
-	// before the path is cut away, because a password may contain a slash:
-	// cutting at the first slash first leaves the "@" beyond the cut, so the
-	// userinfo is mistaken for the host and the credential is printed. A
-	// base64-shaped generated password contains one routinely.
-	//
-	// The cost of the order is a URL carrying no credential whose path
-	// contains an "@": its last path segment is named as the host. That is a
-	// wrong diagnostic rather than a disclosure, which is the direction to
-	// err in.
-	authority := rest
-	if at := strings.LastIndex(rest, "@"); at >= 0 {
-		authority = rest[at+1:]
-	}
-	host, _, _ := strings.Cut(authority, "/")
+	host := hostOf(rest)
 	var urlErr *url.Error
 	kind := "could not be parsed"
 	if errors.As(err, &urlErr) {
@@ -354,10 +372,53 @@ func parseFailure(raw string, err error) string {
 		}
 	}
 	where := "the URL"
-	if scheme != "" || host != "" {
+	switch {
+	case host != "":
 		where = fmt.Sprintf("the %s URL for %q", scheme, host)
+	case scheme != "":
+		where = fmt.Sprintf("the %s URL", scheme)
 	}
 	return where + " " + kind
+}
+
+// hostOf is the host of a URL the parser refused, or nothing when the text
+// does not say which part is the host without guessing.
+//
+// The host follows the one "@" that ends the user information, and the "@"
+// is found before the path is cut away, because a password may contain a
+// slash. With more than one "@", or with an "=" or "&" before it, the "@" may
+// sit in a query value — a password parameter — and what follows it is the
+// credential rather than a host. Then no host is named, which is a less
+// useful message rather than a disclosure. A host is also only named when it
+// is shaped like one: letters, digits, dots, hyphens, colons and brackets.
+func hostOf(rest string) string {
+	authority := rest
+	switch strings.Count(rest, "@") {
+	case 0:
+	case 1:
+		at := strings.Index(rest, "@")
+		if strings.ContainsAny(rest[:at], "=&") {
+			return ""
+		}
+		authority = rest[at+1:]
+	default:
+		return ""
+	}
+	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+		authority = authority[:end]
+	}
+	for _, r := range authority {
+		if !hostRune(r) {
+			return ""
+		}
+	}
+	return authority
+}
+
+// hostRune reports whether a character may appear in a host and port.
+func hostRune(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' ||
+		strings.ContainsRune(".-:[]", r)
 }
 
 // secretParams are query parameters that carry a credential. Drivers accept
@@ -365,6 +426,11 @@ func parseFailure(raw string, err error) string {
 // handles userinfo puts the password in the first log line of every start.
 var secretParams = []string{"password", "sslpassword", "sslkey"}
 
+// redact is the URL with every credential replaced, safe to log.
+//
+// The query is read pair by pair rather than through the parser. The parser
+// drops a pair it cannot decode, so a password parameter with a malformed
+// escape is neither found nor replaced, and is printed as it was written.
 func redact(u *url.URL) string {
 	clone := *u
 	if u.User != nil {
@@ -372,17 +438,91 @@ func redact(u *url.URL) string {
 			clone.User = url.UserPassword(u.User.Username(), "xxxxx")
 		}
 	}
-	if q := clone.Query(); len(q) > 0 {
-		changed := false
-		for _, name := range secretParams {
-			if q.Has(name) {
-				q.Set(name, "xxxxx")
-				changed = true
-			}
-		}
-		if changed {
-			clone.RawQuery = q.Encode()
+	pairs := strings.Split(clone.RawQuery, "&")
+	for i, pair := range pairs {
+		if key, _, _ := strings.Cut(pair, "="); secretParam(key) {
+			pairs[i] = key + "=xxxxx"
 		}
 	}
+	clone.RawQuery = strings.Join(pairs, "&")
+	clone.Fragment, clone.RawFragment = "", ""
 	return clone.String()
+}
+
+// secretParam reports whether a query key, as written, names a credential.
+func secretParam(key string) bool {
+	if decoded, err := url.QueryUnescape(key); err == nil {
+		key = decoded
+	}
+	for _, name := range secretParams {
+		if strings.EqualFold(key, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// secretsOf is every spelling of every credential in a URL: as written and as
+// decoded, because a driver quoting it may use either.
+func secretsOf(u *url.URL) []string {
+	var found []string
+	add := func(spellings ...string) {
+		for _, one := range spellings {
+			if one != "" {
+				found = append(found, one)
+			}
+		}
+	}
+	if u.User != nil {
+		if password, set := u.User.Password(); set {
+			_, written, _ := strings.Cut(u.User.String(), ":")
+			add(password, written, url.QueryEscape(password))
+		}
+	}
+	for _, pair := range strings.Split(u.RawQuery, "&") {
+		key, value, _ := strings.Cut(pair, "=")
+		if !secretParam(key) {
+			continue
+		}
+		add(value)
+		if decoded, err := url.QueryUnescape(value); err == nil {
+			add(decoded)
+		}
+	}
+	return found
+}
+
+// scrubbed is an error whose text has had a URL's credentials taken out.
+type scrubbed struct {
+	text string
+	err  error
+}
+
+func (s scrubbed) Error() string { return s.text }
+func (s scrubbed) Unwrap() error { return s.err }
+
+// scrub takes every spelling of a credential out of an error's text.
+//
+// A driver's error describes what it was given, and what it was given is the
+// connection string with the password in it. Its own redaction covers the
+// userinfo and not a password passed as a query parameter, so every error
+// that leaves this package with a driver's error inside it goes through here.
+// Longer spellings are replaced first, so a shorter one inside a longer one
+// leaves no fragment behind.
+//
+// There is no floor on length. A short or common password is replaced
+// wherever it appears, so a password of `postgres` turns `user=postgres` into
+// `user=xxxxx`, and a one-letter password mangles every word holding that
+// letter. A garbled message is the cost of never printing the password.
+func scrub(err error, target Target) error {
+	if err == nil || len(target.secrets) == 0 {
+		return err
+	}
+	secrets := append([]string(nil), target.secrets...)
+	sort.Slice(secrets, func(i, j int) bool { return len(secrets[i]) > len(secrets[j]) })
+	text := err.Error()
+	for _, secret := range secrets {
+		text = strings.ReplaceAll(text, secret, "xxxxx")
+	}
+	return scrubbed{text: text, err: err}
 }

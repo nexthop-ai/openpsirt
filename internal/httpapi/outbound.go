@@ -85,6 +85,11 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 			"about a finding nobody has announced carries the fact that there is something " +
 			"and a link, and nothing else — the same body a mail would carry, composed by the " +
 			"same code.\n\n" +
+			"`subject` and `text` are escaped as markdown, a backslash before each character " +
+			"that would open markup, and carry `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;`, " +
+			"which Slack and Teams read as those characters. Any other receiver decodes the " +
+			"three and drops the backslashes. The line of `text` holding the address is not " +
+			"escaped as markdown, and `link` is sent as it is.\n\n" +
 			"Every request is signed. `X-OpenPSIRT-Timestamp` and " +
 			"`X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the " +
 			"body — so a receiver can tell one of ours from one anybody could make, and " +

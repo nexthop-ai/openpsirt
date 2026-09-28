@@ -71,6 +71,16 @@ other scheme is dropped.
 
 Outbound links carry no referrer and no live opener.
 
+A destination is judged as a browser reads it, in every form a link takes:
+inline, a reference definition, and an autolink in angle brackets.
+
+| Step | Reason |
+|---|---|
+| Character references are decoded | `&#106;avascript:` is `javascript:` to a browser |
+| Leading and trailing control characters and spaces are removed, and every tab and newline wherever it sits | A browser's address parser does the same, so `/`, a tab, `/evil.example` is two separators |
+| The scheme runs to the first colon, with any control character inside it ignored | `java&#9;script:` is `javascript:` to a browser |
+| `attachment:` and `issue:` are refused unless written exactly so, in lower case | A renderer resolves them as written, so `Attachment:` is a link to nothing. The refusal names the spelling, because the identifier after it may be well formed |
+
 A link to somewhere in this deployment survives. The browser's sanitizer decides
 by **resolving** the destination against the page rather than matching it
 against a pattern: `//somewhere.else/x` carries no scheme and is not relative, so
@@ -122,6 +132,7 @@ by scheme, not by address.
 |---|---|
 | The only permitted image scheme is `attachment:` | A submission pointing anywhere else is told to attach the file |
 | What follows the scheme must be a 32-hexadecimal-character identifier this deployment minted | Otherwise `attachment:../../secret` is accepted when written and resolves to nothing when read |
+| Every link form the check accepts a reference in is a form that keeps the file: a link, an image, a reference definition and an autolink | The list of what a text refers to marks a file attached, and an unmarked file is deleted by the sweep while the text still points at it |
 | The sanitizer permits the scheme | It cannot become a page or a script: no browser resolves it, and the interface turns it into a path against a file this deployment holds |
 
 A remote image fires from the browser of everybody who reads the text, from
@@ -157,14 +168,48 @@ Both live in the same column, so the origin decides. Rendering the column would
 hand whoever wrote the scan file a formatting language aimed at the browsers of
 the people holding the most access in this deployment.
 
-Escaping, like sanitizing, happens where the text is put into a document —
-which is the interface, not here. What the server guarantees is that the two
-origins stay distinguishable, so a renderer can tell which it is holding.
+Escaping, like sanitizing, happens where the text is put into a document. The
+interface escapes what it shows, and the two origins stay distinguishable so a
+renderer can tell which it is holding.
+
+The server puts third-party text into two documents of its own: the release
+note and the issue document, both served as markdown (`DESIGN-reporting.md`).
+Each value there that did not pass the submission policy is escaped as it is
+written, so a renderer shows it as the text it is. A webhook's subject and
+text are escaped by the same rule, line by line (`DESIGN-notifications.md`).
+
+| Escaped | Where | Opens |
+|---|---|---|
+| A control character, a newline among them | Anywhere, as a space | A line and a block the string chose |
+| `\` `` ` `` `*` `[` `]` `<` `~` `\|` | Anywhere | An escape, code, emphasis, a link or image, markup or an autolink, strikethrough, a table cell |
+| `_` | Unless a letter or digit is on both sides | Emphasis |
+| `&` | Before a letter or `#` | A character reference |
+| `:` | Before `//` | A bare address, which a renderer that links addresses links |
+| `.` | After `www` at the start of a word | The same, for an address with no scheme |
+| `@` | Before a letter or digit | A mail link, and a mention in a renderer with accounts |
+| Spaces | First in the string, dropped | A code block, which four of them open where the string opens a line |
+| A run of up to six `#`, or a `-` or `+`, before a space or the end of the string; a `-` before another `-`; a `>` | First in the string | A heading, a list item, a rule or a quotation where the string opens a line, a list item's content included |
+| `.` or `)` before a space or the end of the string | After up to nine leading digits | An ordered list item |
+| The first `#` of a run after a space | Last in the string, trailing spaces aside | A closing sequence, which a heading drops |
+
+A character is escaped where it can open syntax where it sits, and in the few
+places it only might: `--rc1` is written `\--rc1`, because a line of three is a
+rule. Both documents are also read as source, where `1\.2\.3` for every
+version is noise.
 
 ## Refusals
 
 A refusal carries the line, the offending text, and the reason. Every fault in
 the submission is reported at once rather than one at a time.
+
+The line is where the refused link is written, found from the link's own
+text onward. A destination written twice is named on both lines, and one
+shown in a fenced block above or earlier in the same paragraph is not the one
+named. A destination supplied by a reference definition is named on the
+definition's line, and one that does not appear literally — spelled with a
+character reference — on the first line of its block. A link with no text and
+an autolink are searched from the start of their block, so for those an
+earlier copy in the same paragraph is the one named.
 
 ## Code block language tags
 

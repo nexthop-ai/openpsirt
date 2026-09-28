@@ -77,7 +77,7 @@ const Issue = "issue"
 // be rendered, because it is the same parse.
 func inspect(source string) []Fault {
 	document := parser.Parser().Parse(text.NewReader([]byte(source)))
-	lines := lineIndexFor(source)
+	lines := newLineIndex(source)
 
 	var faults []Fault
 	_ = ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -87,34 +87,32 @@ func inspect(source string) []Fault {
 		switch typed := node.(type) {
 		case *ast.Image:
 			// An image may come from a file held here and from nowhere else.
-			// The rule that nothing is fetched from a third party is
-			// unchanged, and it is the whole rule: an image loaded from
-			// somewhere else fires from the browser of everybody who reads
-			// the text, from inside the network, telling whoever wrote it who
-			// is looking and when. On an undisclosed finding that is a
-			// disclosure channel rather than a picture.
+			// An image loaded from somewhere else fires from the browser of
+			// everybody who reads the text, from inside the network, telling
+			// whoever wrote it who is looking and when. On an undisclosed
+			// finding that is a disclosure channel rather than a picture.
 			destination := string(typed.Destination)
-			if scheme, _ := schemeOf(destination); scheme != Attachment {
+			line := lines.of(destination, node)
+			if target, _ := schemeOf(destination); target.scheme != Attachment {
 				faults = append(faults, Fault{
-					Line:      lines.of(destination, lines.at(node)),
+					Line:      line,
 					Offending: destination,
 					Reason: "an image has to be a file attached here, because one loaded from " +
 						"anywhere else is fetched by the browser of everybody who reads this — " +
 						"from inside the network, telling whoever wrote it who is looking and " +
 						"when. Attach the file and refer to it",
 				})
-			} else if fault, bad := attachmentFault(
-				lines.of(destination, lines.at(node)), destination); bad {
+			} else if fault, bad := attachmentFault(line, destination, target); bad {
 				faults = append(faults, fault)
 			}
 		case *ast.Link:
 			destination := string(typed.Destination)
-			if fault, bad := destinationFault(lines.of(destination, lines.at(node)), destination); bad {
+			if fault, bad := destinationFault(lines.of(destination, node), destination); bad {
 				faults = append(faults, fault)
 			}
 		case *ast.AutoLink:
 			destination := string(typed.URL([]byte(source)))
-			if fault, bad := destinationFault(lines.of(destination, lines.at(node)), destination); bad {
+			if fault, bad := destinationFault(lines.of(destination, node), destination); bad {
 				faults = append(faults, fault)
 			}
 		case *ast.RawHTML, *ast.HTMLBlock:
@@ -131,13 +129,12 @@ func inspect(source string) []Fault {
 
 // destinationFault judges where a link goes.
 func destinationFault(line int, destination string) (Fault, bool) {
-	scheme, ok := schemeOf(destination)
+	target, ok := schemeOf(destination)
 	if !ok {
-		// An address on another host has no scheme to name — schemeOf returns
-		// nothing for it, deliberately, because what is wrong is the two
-		// separators rather than a word — so a message built around the scheme
-		// read "and this uses \"\"". The two cases are told apart here.
-		if scheme == "" {
+		// An address on another host has no scheme to name: what is wrong is
+		// the two separators rather than a word, so it has a sentence of its
+		// own.
+		if target.scheme == "" {
 			return Fault{
 				Line: line, Offending: destination,
 				Reason: "a link starting with two separators goes to another host, whatever " +
@@ -149,32 +146,50 @@ func destinationFault(line int, destination string) (Fault, bool) {
 			Line: line, Offending: destination,
 			Reason: fmt.Sprintf(
 				"a link may use http, https, mailto, attachment or issue, and this uses %q",
-				scheme),
+				target.scheme),
 		}, true
 	}
-	if scheme == Attachment {
-		return attachmentFault(line, destination)
-	}
-	if scheme == Issue {
-		return issueFault(line, destination)
+	switch target.scheme {
+	case Attachment:
+		return attachmentFault(line, destination, target)
+	case Issue:
+		return issueFault(line, destination, target)
 	}
 	return Fault{}, false
+}
+
+// spellingFault refuses a reference scheme spelled any way but its own.
+//
+// A renderer resolves `attachment:` and `issue:` as written, so a reference in
+// capitals, or with a control character in its scheme, is a link to nothing.
+// Refused on its own, ahead of the identifier, because the identifier may be
+// well formed.
+func spellingFault(line int, destination string, target destinationTarget) (Fault, bool) {
+	if target.written == target.scheme {
+		return Fault{}, false
+	}
+	return Fault{
+		Line: line, Offending: destination,
+		Reason: fmt.Sprintf("a reference is written %s: exactly, in lower case, "+
+			"because that is the spelling a reader's page resolves. This is written %q",
+			target.scheme, target.written+":"),
+	}, true
 }
 
 // issueFault judges what an issue reference names.
 //
 // Judged at submission for the reason an attachment reference is: a
 // destination the scheme accepts and no identifier can address is a dead link
-// from the moment it is typed, and the writer is here to be told. Left to
-// whoever renders the text later, it is a link that goes nowhere and nothing
-// reports it.
+// from the moment it is typed, and the writer is here to be told.
 //
 // It does not ask whether we have that issue. Somebody writing about a flaw we
 // have not seen yet is writing something true, and refusing it would make the
 // text argue with the scan schedule.
-func issueFault(line int, destination string) (Fault, bool) {
-	value := strings.TrimPrefix(destination, Issue+":")
-	if namedIssue(value) {
+func issueFault(line int, destination string, target destinationTarget) (Fault, bool) {
+	if fault, bad := spellingFault(line, destination, target); bad {
+		return fault, true
+	}
+	if namedIssue(target.rest) {
 		return Fault{}, false
 	}
 	return Fault{
@@ -186,15 +201,15 @@ func issueFault(line int, destination string) (Fault, bool) {
 
 // attachmentFault judges what an attachment reference names.
 //
-// The scheme was accepted and what followed it was not looked at, while
-// References — the half that decides which files a piece of text actually
-// pulls in — recognizes only a minted identifier. So `attachment:../../secret`
-// was accepted when it was written and referred to nothing when it was read: a
-// dead link nothing reported, and the same two-halves-of-one-rule disagreement
-// the sanitizer had over relative links. Judged here instead, at the moment
-// somebody can still fix it.
-func attachmentFault(line int, destination string) (Fault, bool) {
-	if mintedToken(strings.TrimPrefix(destination, Attachment+":")) {
+// References, the half that decides which files a piece of text keeps,
+// recognizes only a minted identifier. A reference this accepts is one
+// References counts, so a destination like `attachment:../../secret` is
+// refused here, at the moment somebody can still fix it.
+func attachmentFault(line int, destination string, target destinationTarget) (Fault, bool) {
+	if fault, bad := spellingFault(line, destination, target); bad {
+		return fault, true
+	}
+	if mintedToken(target.rest) {
 		return Fault{}, false
 	}
 	return Fault{
@@ -205,60 +220,58 @@ func attachmentFault(line int, destination string) (Fault, bool) {
 	}, true
 }
 
+// destinationTarget is a destination read the way a browser reads it.
+type destinationTarget struct {
+	// scheme is in lower case, and empty for a relative destination or one
+	// on another host.
+	scheme string
+	// written is the scheme as the destination spells it.
+	written string
+	// rest is what follows the scheme's colon.
+	rest string
+}
+
 // schemeOf reads where a destination goes, and whether it is somewhere a link
 // may go.
 //
-// The destination arrives already decoded by the parser, which is the point:
-// what is judged is where the link will actually point rather than how it was
-// spelled.
+// What is judged is where the link will actually point rather than how it was
+// spelled, so the destination is decoded and then normalized the way a
+// browser's address parser normalizes it before anything is read from it.
 //
 // A destination with no scheme is relative. Those stay inside this deployment
 // and are allowed — a link from one finding to another is ordinary.
-func schemeOf(destination string) (string, bool) {
-	// Decoded first, and this is the whole point. A destination is kept as it
-	// was written and resolved when it is rendered, so `&#106;avascript:`
-	// reads as harmless here and as `javascript:` in a browser. Judging the
-	// spelling rather than the meaning is how a check gets walked past.
-	destination = strings.TrimSpace(stdhtml.UnescapeString(destination))
+func schemeOf(destination string) (destinationTarget, bool) {
+	// A destination is kept as it was written and resolved when it is
+	// rendered, so `&#106;avascript:` reads as harmless before decoding and
+	// as `javascript:` in a browser.
+	literal := strings.TrimSpace(stdhtml.UnescapeString(destination))
+	destination = browserNormalized(literal)
 	if destination == "" {
-		return "", true
+		return destinationTarget{}, true
 	}
-	// A destination beginning with two separators is not relative, whatever
-	// the absence of a colon suggests. `//evil.example/x` is an address on
-	// another host that inherits whatever scheme the page was served over, and
-	// `/\evil.example/x` is the same thing to a browser — so read as relative,
-	// both were accepted at submission and rendered as an anchor with neither
-	// the referrer rule nor the new-tab rule applied, because neither applies
-	// to something with no scheme. A reader clicking it navigated in the same
-	// tab to a third party, handing over this deployment's own address — which
-	// names the product, the build and the finding — as the referrer. A
-	// relative link inside this deployment never starts with two separators.
-	//
-	// Asked as "two separators" rather than as a list of the two spellings
-	// somebody thought of: a browser reads all four the same way, and the list
-	// held `//` and `/\` while `\\` and `\/` went past it as relative.
+	// A destination beginning with two separators is an address on another
+	// host that inherits whatever scheme the page was served over. A browser
+	// reads `/` and `\` alike here, so all four spellings are one rule. A
+	// relative link inside this deployment never starts with two separators,
+	// and the referrer and new-tab rules a renderer applies to an absolute
+	// link do not apply to a relative one.
 	if len(destination) > 1 &&
 		strings.ContainsAny(destination[:1], `/\`) &&
 		strings.ContainsAny(destination[1:2], `/\`) {
-		return "", false
+		return destinationTarget{}, false
 	}
-	// Anything before a path separator, a query or a fragment is not a scheme.
+	// Anything after a path separator, a query or a fragment is not a scheme,
+	// and a browser takes the scheme up to the first colon.
 	head := destination
 	if cut := strings.IndexAny(head, "/?#"); cut >= 0 {
 		head = head[:cut]
 	}
-	scheme, found := strings.CutSuffix(head, ":")
-	if !found {
-		// No colon before the first separator, so nothing is claiming to be a
-		// scheme: this is relative.
-		if !strings.Contains(head, ":") {
-			return "", true
-		}
-		scheme, _, _ = strings.Cut(head, ":")
+	if !strings.Contains(head, ":") {
+		return destinationTarget{}, true
 	}
-	// Whitespace and control characters inside a scheme are how one gets past
-	// a check that trusts the text: browsers strip them and act on what is
-	// left.
+	scheme, _, _ := strings.Cut(destination, ":")
+	// A control character inside a scheme is how one gets past a check that
+	// trusts the text, so none is read as part of it.
 	scheme = strings.Map(func(r rune) rune {
 		if r <= ' ' {
 			return -1
@@ -266,17 +279,38 @@ func schemeOf(destination string) (string, bool) {
 		return r
 	}, scheme)
 	if scheme == "" {
-		return "", true
+		return destinationTarget{}, true
 	}
+	scheme = strings.ToLower(scheme)
 
-	lowered := strings.ToLower(scheme)
-	return lowered, allowedScheme(lowered)
+	// The spelling and the remainder are read from the destination before
+	// normalizing. A renderer matches a reference as written, so a tab or a
+	// capital the browser would forgive is still a reference to nothing.
+	written, rest, _ := strings.Cut(literal, ":")
+	return destinationTarget{scheme: scheme, written: written, rest: rest}, allowedScheme(scheme)
+}
+
+// browserNormalized is an address as a browser's parser reads it: leading and
+// trailing control characters and spaces removed, and every tab and newline
+// removed wherever it sits.
+func browserNormalized(address string) string {
+	address = strings.TrimFunc(address, func(r rune) bool { return r <= ' ' })
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\t', '\n', '\r':
+			return -1
+		}
+		return r
+	}, address)
 }
 
 // lineIndex maps a position in the source to the line it is on.
 type lineIndex struct {
 	source []byte
 	starts []int
+	// next is where the next search for each offending text begins, so a
+	// destination written twice is found twice.
+	next map[string]int
 }
 
 func newLineIndex(source string) lineIndex {
@@ -286,54 +320,91 @@ func newLineIndex(source string) lineIndex {
 			starts = append(starts, offset+1)
 		}
 	}
-	return lineIndex{source: []byte(source), starts: starts}
+	return lineIndex{source: []byte(source), starts: starts, next: map[string]int{}}
 }
 
-// of returns the 1-indexed line the given text appears on.
+// of returns the 1-indexed line the given text appears on, for a node.
 //
 // Used in preference to the enclosing block's position, because a paragraph
 // may run for twenty lines and pointing at its first one sends somebody to the
-// wrong place. What a person will do is search for the offending text, so this
-// does the same.
-func (l lineIndex) of(offending string, fallback int) int {
+// wrong place. The search starts at the link's own text, or past the last
+// place the same text was found, so a copy shown earlier in a fenced block or
+// earlier in the same paragraph is not the one named. A link with no text
+// starts at its block. A destination a reference definition supplies is
+// written wherever the definition is, which may be above the block, so the
+// whole source is searched after that.
+func (l lineIndex) of(offending string, node ast.Node) int {
+	fallback := l.at(node)
 	if offending == "" {
 		return fallback
 	}
-	at := bytes.Index(l.source, []byte(offending))
+	start := textStart(node)
+	if start < 0 {
+		start = l.offset(node)
+	}
+	from := max(start, l.next[offending], 0)
+	at := -1
+	if from <= len(l.source) {
+		if found := bytes.Index(l.source[from:], []byte(offending)); found >= 0 {
+			at = from + found
+		}
+	}
+	if at < 0 {
+		at = bytes.Index(l.source, []byte(offending))
+	}
 	if at < 0 {
 		// The destination was decoded by the parser and does not appear
 		// literally — an entity-encoded scheme, say. The block is then the
 		// most precise honest answer.
 		return fallback
 	}
-	for number := len(l.starts) - 1; number >= 0; number-- {
-		if at >= l.starts[number] {
-			return number + 1
+	l.next[offending] = at + len(offending)
+	return l.line(at)
+}
+
+// textStart returns where the first text inside a node begins in the source,
+// or -1 where it holds none.
+func textStart(node ast.Node) int {
+	start := -1
+	_ = ast.Walk(node, func(child ast.Node, entering bool) (ast.WalkStatus, error) {
+		if typed, ok := child.(*ast.Text); ok && entering {
+			start = typed.Segment.Start
+			return ast.WalkStop, nil
 		}
-	}
-	return fallback
+		return ast.WalkContinue, nil
+	})
+	return start
 }
 
 // at returns the 1-indexed line a node begins on, or 0 where it cannot be
 // placed. A fault that cannot say where it is still reports what is wrong.
 func (l lineIndex) at(node ast.Node) int {
-	// Only a block knows where it is. Asking an inline node is not merely
-	// unanswerable — it panics — so the walk goes up to the block containing
-	// it, which is the paragraph or list item a person would look at anyway.
+	offset := l.offset(node)
+	if offset < 0 {
+		return 0
+	}
+	return l.line(offset)
+}
+
+// offset returns where the block holding a node begins in the source, or -1.
+func (l lineIndex) offset(node ast.Node) int {
+	// Only a block knows where it is. Asking an inline node panics, so the
+	// walk goes up to the block containing it, which is the paragraph or list
+	// item a person would look at anyway.
 	for node != nil && node.Type() != ast.TypeBlock && node.Type() != ast.TypeDocument {
 		node = node.Parent()
 	}
 	if node == nil {
-		return 0
+		return -1
 	}
-
-	offset := -1
 	if lines := node.Lines(); lines != nil && lines.Len() > 0 {
-		offset = lines.At(0).Start
+		return lines.At(0).Start
 	}
-	if offset < 0 {
-		return 0
-	}
+	return -1
+}
+
+// line returns the 1-indexed line an offset is on.
+func (l lineIndex) line(offset int) int {
 	for number := len(l.starts) - 1; number >= 0; number-- {
 		if offset >= l.starts[number] {
 			return number + 1
@@ -342,9 +413,6 @@ func (l lineIndex) at(node ast.Node) int {
 	return 0
 }
 
-// lineIndexFor builds the map inspect uses.
-func lineIndexFor(source string) lineIndex { return newLineIndex(source) }
-
 // References lists the attachments a piece of text refers to, in the order it
 // refers to them and without repeats.
 //
@@ -352,6 +420,10 @@ func lineIndexFor(source string) lineIndex { return newLineIndex(source) }
 // reference inside a fenced block or an inline code span — where it is being
 // shown rather than made — is not counted. Somebody explaining how to write
 // one of these should not thereby attach a file to their justification.
+//
+// Every node inspect judges a destination on is a node this reads one from.
+// A reference Check accepts and this does not count is a file the sweep
+// deletes while stored text still links to it.
 func References(source string) []string {
 	return referenced(source, Attachment, mintedToken)
 }
@@ -375,21 +447,23 @@ func referenced(source, scheme string, shaped func(string) bool) []string {
 			destination = string(typed.Destination)
 		case *ast.Link:
 			destination = string(typed.Destination)
+		case *ast.AutoLink:
+			destination = string(typed.URL([]byte(source)))
 		default:
 			return ast.WalkContinue, nil
 		}
-		if had, _ := schemeOf(destination); had != scheme {
+		target, _ := schemeOf(destination)
+		if target.written != scheme {
 			return ast.WalkContinue, nil
 		}
-		value := strings.TrimPrefix(destination, scheme+":")
 		// Only what a reference of this kind looks like. Anything else is a
 		// broken link in a document rather than something to go looking for,
 		// and matching loosely would let text name rows by pattern.
-		if !shaped(value) || seen[value] {
+		if !shaped(target.rest) || seen[target.rest] {
 			return ast.WalkContinue, nil
 		}
-		seen[value] = true
-		found = append(found, value)
+		seen[target.rest] = true
+		found = append(found, target.rest)
 		return ast.WalkContinue, nil
 	})
 	return found
@@ -444,11 +518,10 @@ func mintedToken(token string) bool {
 // mention is a name written after an @, as the editor writes one.
 //
 // A colon is part of a name here. A sign-in through a trusted header mints
-// identities like `proxy:dev`, and the editor writes whatever the identity is —
-// so a class that stopped at the colon read `@proxy:dev` as a mention of
-// "proxy", which is nobody, and the person named was never told. That is the
-// ordinary shape of an identity in a self-hosted deployment rather than an
-// unusual one.
+// identities like `proxy:dev`, and the editor writes whatever the identity is.
+// A class stopping at the colon reads `@proxy:dev` as a mention of "proxy",
+// which is nobody, and the person named is never told. That is the ordinary
+// shape of an identity in a self-hosted deployment rather than an unusual one.
 //
 // Otherwise narrow: it must follow something that is not a word character, so
 // an email address in the middle of a sentence is not read as a mention of
@@ -480,12 +553,10 @@ func Mentions(source string) []string {
 		// skipped to get that.
 		//
 		// A fenced or indented block keeps its content in Lines() with no
-		// child text node, so the walk never descends into one and the two
-		// guards that stood here decided nothing — a control that does not
-		// control, and one somebody reading this would take for the reason a
-		// pasted log line names nobody. That reason is goldmark's node
-		// layout, and the rows in the test are what would catch an upgrade
-		// that changes it. A code span is the case that differs:
+		// child text node, so the walk never descends into one. That is why a
+		// pasted log line names nobody: it is goldmark's node layout, and the
+		// rows in the test are what would catch an upgrade that changes it.
+		// A code span is the case that differs:
 		// parseCodeSpan appends text segments as children, so without this
 		// the `@ana` in `look at @ana` would be read as a mention.
 		if _, code := node.(*ast.CodeSpan); code {

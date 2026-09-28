@@ -124,11 +124,12 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 
 	sqldb, err := sql.Open(driver, target.DSN)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", target.Engine, err)
+		return nil, fmt.Errorf("open %s: %w", target.Engine, scrub(err, target))
 	}
 	if err := sqldb.PingContext(ctx); err != nil {
 		_ = sqldb.Close()
-		return nil, fmt.Errorf("connect to %s at %s: %w", target.Engine, target.Redacted, err)
+		return nil, fmt.Errorf("connect to %s at %s: %w", target.Engine, target.Redacted,
+			scrub(err, target))
 	}
 
 	server, err := identify(ctx, sqldb, target.Engine)

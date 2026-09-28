@@ -634,7 +634,8 @@ demo-reset: demo-down
 #
 #   make upgrade-rehearsal FROM=v0.2.0 ENGINE=postgres
 #
-# The engine's URL is the one make engines-up wrote, and the rehearsal makes a
+# The engine's URL is the one make engines-up wrote, read by the tool from the
+# environment rather than its command line, and the rehearsal makes a
 # database of its own beside it. Local only: it builds the release's image and
 # this tree's, and scans every inventory the release's demo seeds, so it takes
 # minutes per run rather than seconds. The scanner's database is copied from
@@ -647,8 +648,7 @@ upgrade-rehearsal:
 	@[ -d $(REHEARSAL_DIR)/grype ] || [ ! -d $(DEMO_DIR)/grype ] || cp -a $(DEMO_DIR)/grype $(REHEARSAL_DIR)/grype
 	@$(MAKE) --no-print-directory demo-image DEMO_IMAGE=openpsirt-rehearsal:current
 	@$(GO) run ./internal/tools/rehearsal -from $(FROM) -engine $(ENGINE) -dir $(REHEARSAL_DIR) \
-	  -image openpsirt-rehearsal:current \
-	  -url "$(OPENPSIRT_TEST_$(shell echo '$(ENGINE)' | tr a-z A-Z)_URL)"
+	  -image openpsirt-rehearsal:current
 
 # The developer loop: this machine's binary and the interface's dev server, for
 # editing the interface and seeing it reload. Needs Go, node and a scanner

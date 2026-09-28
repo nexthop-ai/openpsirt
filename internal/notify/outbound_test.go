@@ -48,10 +48,8 @@ func (t *took) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
-	// Nothing left this deployment but mail, so a fix target was a wish
-	// and an approver discovered a claim by opening the queue. One signed
-	// request gives a chat channel, a tracker and paging without an
-	// adapter for any of them.
+	// One signed request gives a chat channel, a tracker and paging without
+	// an adapter for any of them.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -139,15 +137,79 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 	})
 }
 
+func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
+	// A publisher's name, a supplier's failure text and a component name
+	// reach a notification body, and a chat channel reads angle brackets as
+	// its own markup: a ping for the whole channel, or a link labelled
+	// anything. The three characters that open it are escaped.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
+			access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat", notify.Everything,
+			server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Tell(ctx, notify.Telling{
+			PersonID: who.ID, Kind: notify.StatementRevised,
+			Body: "<!channel> <https://evil.example|security update> & Sons changed a statement " +
+				"on [Download the fix](https://evil.example/p)",
+			Link: "/issues/CVE-2026-1?from=a&to=b",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if sent, _, err := signal.Once(ctx); err != nil || sent != 1 {
+			t.Fatalf("sent %d (%v), want one", sent, err)
+		}
+
+		var body struct {
+			Subject string `json:"subject"`
+			Text    string `json:"text"`
+			Link    string `json:"link"`
+		}
+		if err := json.Unmarshal([]byte(saw.bodies[0]), &body); err != nil {
+			t.Fatal(err)
+		}
+		if strings.ContainsAny(body.Text, "<>") || strings.ContainsAny(body.Subject, "<>") {
+			t.Errorf("chat markup reached a channel: %q", body.Text)
+		}
+		for _, want := range []string{
+			`\&lt;!channel&gt; \&lt;https\://evil.example\|security update&gt; &amp; Sons`,
+			`\[Download the fix\](https\://evil.example/p)`,
+			// The address this deployment composed is still one to follow.
+			"\nhttps://openpsirt.example/issues/CVE-2026-1?from=a&amp;to=b\n",
+		} {
+			if !strings.Contains(body.Text, want) {
+				t.Errorf("the text reads %q, want it to carry %q", body.Text, want)
+			}
+		}
+		// The address is ours and travels in its own field, as it is.
+		if body.Link != "https://openpsirt.example/issues/CVE-2026-1?from=a&to=b" {
+			t.Errorf("the link reads %q", body.Link)
+		}
+	})
+}
+
 // A webhook body is composed by the same code that composes a mail, so the
 // no-detail rule reaches it — including the address, which travels in a field
 // of its own where a receiver reads it without opening the text.
 //
-// The address was the half that did not hold: the body was composed with the
-// rule applied and the link was then rebuilt from the row beside it, so a
-// deployment with one destination configured announced the identifier, the
+// A link rebuilt from the row beside the body announces the identifier, the
 // product, the stream, the variant and the component to every server the
-// request crossed.
+// request crosses.
 func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -327,12 +389,11 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 }
 
 func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
-	// The window was the oldest two hundred uncleared notifications, and an
-	// event row is never cleared — only a condition is. So once two hundred
-	// events existed the same two hundred were re-read on every cycle and
-	// nothing created afterwards was ever signalled, with no error, no log
-	// and no counter. A deployment reaches that in the first two hundred
-	// events of its life.
+	// An event row is never cleared — only a condition is. A window of the
+	// oldest two hundred uncleared notifications re-reads the same two
+	// hundred on every cycle once that many events exist, and signals nothing
+	// created afterwards, with no error, no log and no counter. A deployment
+	// reaches that in the first two hundred events of its life.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -389,11 +450,9 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 }
 
 func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T) {
-	// These three carried no subject at all, in a package that enforces its
-	// own authorization for this table in the same file with the reasoning
-	// written out. The signing secret stays off the wire only because one
-	// handler copies the fields it wants by name — a second caller marshalling
-	// what comes back publishes a shared secret, with nothing saying so.
+	// The store asks the subject itself, so a caller marshalling what comes
+	// back cannot publish a shared secret, and no handler has to remember to
+	// refuse.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
@@ -447,13 +506,11 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 }
 
 func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
-	// The kind decided the loop rather than the window: the oldest two
-	// hundred were selected whatever kind they were, and a row this
-	// destination does not take never gets a delivery row — so it stayed in
-	// the window for ever. A paging destination behind two hundred ordinary
-	// events was wedged exactly as a destination taking everything was, and
-	// the backlog test above never reached it because its destination takes
-	// every kind.
+	// A row this destination does not take never gets a delivery row, so a
+	// window chosen whatever the kind keeps it for ever. The kind decides the
+	// window, and a paging destination behind two hundred ordinary events
+	// still advances. The backlog test above does not reach this, because its
+	// destination takes every kind.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -509,11 +566,11 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 	// A delivery is keyed on what was said, so a condition opened for six
 	// people is six notification rows and one delivery — which is deliberate,
 	// because a channel wants it once. Asked "settled here?" by the row's own
-	// number, five of those six could never be settled: the duplicate arm
-	// returns without writing anything for them, so they answered the
-	// predicate for ever and, being the oldest, sat at the front of the
-	// window. A few dozen people across the condition kinds is enough to stop
-	// the sweep advancing again.
+	// number, five of those six are never settled: the duplicate arm returns
+	// without writing anything for them, so they answer the predicate for
+	// ever and, being the oldest, hold the front of the window. A few dozen
+	// people across the condition kinds is enough to stop the sweep
+	// advancing.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
