@@ -39,8 +39,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"SESSION_LIFETIME", "12"},
 		{"DB_MAX_OPEN", "many"},
 		{"DB_MAX_OPEN", "0"},
-		// The trusted-header pair, which this table covered neither half of.
-		// A half-configuration is the dangerous state: a header named with
+		// The trusted-header pair. A half-configuration is the dangerous state: a header named with
 		// nothing to trust it from is either a mistake or the first half of
 		// one, and sources configured with no header named reads nothing from
 		// them.
@@ -54,7 +53,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"MAIL_SERVER", "smtp.example.test:587"},
 		{"MAIL_FROM", "psirt@example.test"},
 		// The standard permits exactly six words here and the value reaches
-		// the document verbatim, so a typo produced advisories that fail
+		// the document verbatim, so a typo produces advisories that fail
 		// validation wherever anybody takes them — the one use a generated
 		// advisory has.
 		{"ADVISORY_PREFIX", "nexthop"},
@@ -73,6 +72,16 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"DIRECTORY_URL", "/csaf"},
 		{"DIRECTORY_URL", "psirt.example.test/csaf"},
 		{"DIRECTORY_URL", "https://"},
+		// A name is joined to the end of the address, so anything after its
+		// path lands in the middle of every document's own address, and a
+		// password in it is published in every one of them.
+		{"DIRECTORY_URL", "https://u:p@psirt.example.test/csaf"},
+		{"DIRECTORY_URL", "https://psirt.example.test/csaf?x=1"},
+		{"DIRECTORY_URL", "https://psirt.example.test/csaf#f"},
+		// Swallowed, a list that cannot be read empties the exclusions, and
+		// every internal host becomes somewhere a report can send a fetch.
+		{"OUTBOUND_EXCLUDED", "10.0.0.0/33"},
+		{"OUTBOUND_EXCLUDED", "not a host"},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
@@ -118,9 +127,9 @@ func TestATrustedHeaderHonoredFromAnywhereIsRefused(t *testing.T) {
 	// on the empty case while accepting this one is a guard that catches only
 	// the honest mistake.
 	//
-	// Nothing in the tree executed this. It is the only production caller of
-	// the check at all, three lines, and with them gone the trusted identity
-	// header is honored from any address that can reach the process.
+	// This is the only production caller of the check, and without it the
+	// trusted identity header is honored from any address that can reach the
+	// process.
 	for _, sources := range []string{"0.0.0.0/0", "::/0", "10.0.0.0/8,0.0.0.0/0"} {
 		t.Run(sources, func(t *testing.T) {
 			t.Setenv(envPrefix+"TRUSTED_HEADER", "X-User")
@@ -264,21 +273,13 @@ func TestLoadReadsEnvironment(t *testing.T) {
 	}
 }
 
-func TestAutoMigrateIsOnUnlessTurnedOff(t *testing.T) {
+func TestAutoMigrateIsOnByDefault(t *testing.T) {
 	c, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	if !c.AutoMigrate {
 		t.Error("auto-migration should be on by default")
-	}
-	t.Setenv(envPrefix+"AUTO_MIGRATE", "false")
-	c, err = Load()
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if c.AutoMigrate {
-		t.Error("auto-migration should be off when set to false")
 	}
 }
 
@@ -329,6 +330,12 @@ func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
 		{"a scheme and no host", "https://", true},
 		{"a path below the address", "https://psirt.example.com/psirt", true},
 		{"something that is not an address", "https://%zz", true},
+		// Every sign-in callback and notification link appends a path to the
+		// address, so anything after it lands in the middle of each one.
+		{"a query", "https://psirt.example.com/?x", true},
+		{"an empty query", "https://psirt.example.com/?", true},
+		{"a fragment", "https://psirt.example.com/#top", true},
+		{"credentials", "https://user:pw@psirt.example.com", true},
 	} {
 		t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://test.db")
 		t.Setenv("OPENPSIRT_BASE_URL", c.base)
@@ -340,5 +347,66 @@ func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
 		if err != nil && !strings.Contains(err.Error(), "OPENPSIRT_BASE_URL") {
 			t.Errorf("%s (%q): the refusal does not name the variable: %v", c.what, c.base, err)
 		}
+	}
+}
+
+// The refusal names the address with the password masked, since a refusal is
+// logged.
+func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
+	for _, key := range []string{"BASE_URL", "DIRECTORY_URL"} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv(envPrefix+key, "https://user:hunter2@psirt.example.test/")
+			_, err := Load()
+			if err == nil {
+				t.Fatal("an address carrying credentials was accepted")
+			}
+			if strings.Contains(err.Error(), "hunter2") {
+				t.Errorf("the refusal repeats the password: %v", err)
+			}
+		})
+	}
+}
+
+// A value that is only whitespace, which is what a template renders for a
+// blank field, is no address at all rather than one made of spaces.
+func TestABlankDirectoryAddressIsNoAddress(t *testing.T) {
+	t.Setenv(envPrefix+"DIRECTORY_URL", "   ")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DirectoryURL != "" {
+		t.Errorf("read as %q, want no address", c.DirectoryURL)
+	}
+}
+
+// A directory store with no address it is served from writes files whose every
+// address is a name with nothing in front of it.
+func TestADirectoryStoreWithNoAddressIsRefused(t *testing.T) {
+	for _, key := range []string{"DIRECTORY_DIR", "DIRECTORY_BUCKET"} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv(envPrefix+key, "/tmp/csaf")
+			t.Setenv(envPrefix+"DIRECTORY_URL", "  ")
+			_, err := Load()
+			if err == nil {
+				t.Fatalf("%s with no address was accepted", key)
+			}
+			if !strings.Contains(err.Error(), envPrefix+"DIRECTORY_URL") {
+				t.Errorf("the refusal does not name the address it wants: %v", err)
+			}
+		})
+	}
+}
+
+// The names that are never sent to a public index. Read, and read without the
+// empty entries a template leaves: an empty name matches everything.
+func TestTheInternalNamesAreReadAsAList(t *testing.T) {
+	t.Setenv(envPrefix+"UPSTREAM_INTERNAL", " a, ,b,")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(c.UpstreamInternal, "|") != "a|b" {
+		t.Errorf("read as %q, want [a b]", c.UpstreamInternal)
 	}
 }

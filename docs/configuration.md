@@ -119,7 +119,7 @@ Also read after an upgrade from any earlier release.
 | Variable | Meaning | Default |
 |---|---|---|
 | `OPENPSIRT_ADDR` | The `host:port` the HTTP server listens on | `:8080` |
-| `OPENPSIRT_BASE_URL` | The address people arrive on, **written in full and with no path below it**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
+| `OPENPSIRT_BASE_URL` | The address people arrive on, **written in full, with no path below it and no query, fragment or credentials**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
 | `OPENPSIRT_PLAIN_HTTP` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
 | `OPENPSIRT_SHUTDOWN_GRACE` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |
 | `OPENPSIRT_STARTUP_TIMEOUT` | How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on | `60s` |
@@ -276,7 +276,7 @@ web server serves them, at the address you give below.
 
 | Variable | What it does | Default |
 |---|---|---|
-| `OPENPSIRT_DIRECTORY_URL` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address | unset |
+| `OPENPSIRT_DIRECTORY_URL` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address, or carries a query, a fragment or credentials. A value that is only whitespace is unset | unset |
 | `OPENPSIRT_DIRECTORY_BUCKET` | The bucket the files are written to. Empty means no object store | unset |
 | `OPENPSIRT_DIRECTORY_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_DIRECTORY_REGION` | The region, where the store wants one | unset |

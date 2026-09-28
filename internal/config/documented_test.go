@@ -4,8 +4,11 @@
 package config
 
 import (
+	"io/fs"
 	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -19,37 +22,70 @@ import (
 // line somebody follows, sets, restarts for, and gets no change from — and
 // there is nothing in the running system to tell them so.
 //
-// Both were true when this was written, by care alone. This is what keeps them
-// true, and it is the same shape as the checks that hold the design tokens and
-// the API reference to the code.
+// It is the same shape as the checks that hold the design tokens and the API
+// reference to the code.
 //
 // The source is read rather than the package being asked, because the names
 // are literals at their call sites: that is what makes them greppable, and a
 // list built beside them to satisfy a test is a second list to keep right.
 
-// sources is where a setting is read from the environment, and refusals is
-// where one is named in a message telling an operator to set it.
-//
-// Literals rather than a walk, which is what keeps a file-reading test from
-// being a file-reading primitive: a walk that stopped matching would read
-// fewer files and report the same clean answer.
-var (
-	sources  = []string{"config.go", "ingest.go"}
-	refusals = []string{
-		"config.go", "ingest.go",
-		"../../cmd/openpsirt/main.go",
-		"../attach/s3.go",
-		"../advisory/advisory.go",
+// goSources is every Go file below root that is not a test, skipping the
+// directories named. A walk rather than a list, because a list is what a new
+// file is left out of; each caller requires the files it knows must be there,
+// so a walk that stopped matching fails rather than reading less.
+func goSources(t *testing.T, root string, skip ...string) []string {
+	t.Helper()
+	var found []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if slices.Contains(skip, filepath.ToSlash(path)) || d.Name() == "testdata" ||
+				(strings.HasPrefix(d.Name(), ".") && d.Name() != "." && d.Name() != "..") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			found = append(found, filepath.ToSlash(path))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-)
+	return found
+}
+
+// requireAmong fails when a file known to be there was not found, which is
+// how a walk that silently narrowed shows itself.
+func requireAmong(t *testing.T, found []string, want ...string) {
+	t.Helper()
+	for _, w := range want {
+		if !slices.Contains(found, w) {
+			t.Fatalf("%s was not among the files read, so this checked less than it says", w)
+		}
+	}
+}
 
 func TestEverySettingIsWrittenDown(t *testing.T) {
+	// Where a setting is read from the environment: every file in this
+	// package.
+	sources := goSources(t, ".")
+	requireAmong(t, sources, "config.go")
+	// Where one is named in a message, an API description or a field telling
+	// an operator to set it: every file of the program. The harness and the
+	// gates are left out, because the names they carry configure a test run
+	// rather than a deployment.
+	refusals := goSources(t, "../..", "../../internal/tools", "../../internal/dbtest",
+		"../../web", "../../node_modules")
+	requireAmong(t, refusals, "../../internal/config/config.go", "../../cmd/openpsirt/main.go")
+
 	read := regexp.MustCompile(`(?:env|r\.duration|r\.number|r\.boolean)\("([A-Z0-9_]+)"`)
 	reads := map[string]bool{}
-	// Named one by one rather than walked: every path here is a literal, which
-	// is what keeps a file-reading test from being a file-reading primitive.
 	for _, path := range sources {
-		source, err := os.ReadFile(path) //nolint:gosec // G304: every path in `sources` is a literal in this file
+		source, err := os.ReadFile(path) //nolint:gosec // G304: a Go file of this repository, found by the walk above
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,17 +97,13 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 		t.Fatal("no settings were found in the source, so this checked nothing")
 	}
 
-	// A variable named in a refusal is one an operator is being told to set,
-	// so it is held to the documented set exactly as one that is read here is.
-	//
-	// Three packages name them: this one, and the two below it that carry the
-	// prefix of their own because importing back would cycle. Named one by one
-	// like the sources above, and counted, because a path that stops resolving
-	// is a file this stops reading and nothing else says so.
+	// A variable named anywhere in the program is one an operator is being
+	// told to set, so it is held to the documented set exactly as one that is
+	// read here is.
 	named := regexp.MustCompile(`OPENPSIRT_([A-Z0-9_]+)`)
 	told := 0
 	for _, path := range refusals {
-		source, err := os.ReadFile(path) //nolint:gosec // G304: every path in `refusals` is a literal in this file
+		source, err := os.ReadFile(path) //nolint:gosec // G304: a Go file of this repository, found by the walk above
 		if err != nil {
 			t.Fatal(err)
 		}

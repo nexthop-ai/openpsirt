@@ -451,7 +451,7 @@ func Load() (Config, error) {
 	// not a configuration, it is half of one — and half of one answered as
 	// "no mail configured", which is a choice an operator is entitled to make
 	// and is indistinguishable from the mistake. Embargo mail is what a
-	// coordinated disclosure runs on, and it was silently off.
+	// coordinated disclosure runs on.
 	if (strings.TrimSpace(c.MailServer) == "") != (strings.TrimSpace(c.MailFrom) == "") {
 		return Config{}, fmt.Errorf(
 			"OPENPSIRT_MAIL_SERVER and OPENPSIRT_MAIL_FROM: set both or neither — " +
@@ -467,7 +467,7 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("OPENPSIRT_LOG_FORMAT: want \"text\" or \"json\", got %q", c.LogFormat)
 	}
 	// The standard permits exactly six words here and the value reaches the
-	// document verbatim, so a typo produced advisories that fail validation
+	// document verbatim, so a typo produces advisories that fail validation
 	// wherever anybody takes them — which is the one use a generated advisory
 	// has. Refused at startup, beside the setting above that is checked the
 	// same way for the same reason.
@@ -496,7 +496,12 @@ func Load() (Config, error) {
 	// Checked whether or not a store is configured to write into. The
 	// documents state it too, so an address that answers nothing is in every
 	// document generated while it is set.
-	if where := strings.TrimSpace(c.DirectoryURL); where != "" {
+	//
+	// Trimmed before anything reads it, so a value that is only whitespace —
+	// what a template renders for a blank field — is no address rather than
+	// one made of spaces.
+	c.DirectoryURL = strings.TrimSpace(c.DirectoryURL)
+	if where := c.DirectoryURL; where != "" {
 		at, err := url.Parse(where)
 		if err != nil {
 			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: %w", err)
@@ -509,7 +514,7 @@ func Load() (Config, error) {
 		if at.Scheme != "https" || at.Host == "" || at.User != nil ||
 			at.RawQuery != "" || at.Fragment != "" {
 			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: want an https address "+
-				"with no query, fragment or credentials, got %q", where)
+				"with no query, fragment or credentials, got %q", at.Redacted())
 		}
 		// One trailing slash, so that a name joined to it is a file inside the
 		// directory rather than a sibling of it. Every trailing slash, because
@@ -523,7 +528,7 @@ func Load() (Config, error) {
 	// nothing in front of it, and nothing says so. The other way round writes
 	// nothing anywhere.
 	if (strings.TrimSpace(c.DirectoryBucket) != "" || strings.TrimSpace(c.DirectoryDir) != "") &&
-		strings.TrimSpace(c.DirectoryURL) == "" {
+		c.DirectoryURL == "" {
 		return Config{}, fmt.Errorf(
 			"OPENPSIRT_DIRECTORY_URL: set it alongside OPENPSIRT_DIRECTORY_BUCKET or " +
 				"OPENPSIRT_DIRECTORY_DIR — a directory written with no address it is " +
@@ -532,11 +537,10 @@ func Load() (Config, error) {
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}
-	// Refused at startup rather than at the first sign-in. The API write path
-	// bounds this setting and the environment path did not, so a deployment
-	// following the documented configuration started cleanly and then failed
-	// every browser sign-in — and the way back needed an administrator's key,
-	// because nobody could sign in.
+	// Refused at startup rather than at the first sign-in, on the bound the API
+	// write path applies. Unbounded here, a deployment starts cleanly and then
+	// fails every browser sign-in, and the way back needs an administrator's
+	// key because nobody can sign in.
 	if c.SessionLifetime > access.MaxSessionLifetime {
 		return Config{}, fmt.Errorf("OPENPSIRT_SESSION_LIFETIME: want at most %s, got %q",
 			access.MaxSessionLifetime, c.SessionLifetime)
@@ -549,19 +553,17 @@ func Load() (Config, error) {
 
 // absoluteBase refuses a deployment address that is not one.
 //
-// Checked here so that every consumer may assume it is absolute, which
-// four of them already did. It was the one string setting with a required
-// shape that nothing parsed, and the failure was silent where it mattered
-// most: `OPENPSIRT_BASE_URL=psirt.example.com` — the form the value takes in a
-// DNS record or an Ingress host field — parses, puts the whole string in Path
-// and leaves Host empty, so the same-origin check fell through to origins
-// derived from the request's own Host header. The guard became an echo of what
-// the request said, with nothing logged, while the operator believed they had
-// pinned the origin.
+// Checked here so that every consumer may assume it is absolute. A string with
+// a required shape that nothing parses fails silently where it matters most:
+// `OPENPSIRT_BASE_URL=psirt.example.com` — the form the value takes in a DNS
+// record or an Ingress host field — parses, puts the whole string in Path and
+// leaves Host empty, and the same-origin check would fall through to origins
+// derived from the request's own Host header.
 //
-// The other consequences were loud and self-correcting, which is what hid it:
-// the OIDC redirect address is not absolute either, so every sign-in fails at
-// the provider — naming the provider rather than this deployment.
+// A sign-in callback and every link a notification carries are built by
+// appending a path to this value, so a query, a fragment or credentials in it
+// land in the middle of every one of them, and credentials are sent to
+// everybody a link reaches.
 func absoluteBase(base string) error {
 	if base == "" {
 		return nil
@@ -576,6 +578,10 @@ func absoluteBase(base string) error {
 				"https://psirt.example.com, got %q", base)
 	case parsed.Host == "":
 		return fmt.Errorf("OPENPSIRT_BASE_URL: names no host: %q", base)
+	case parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.ForceQuery:
+		// Shown with any password masked: a refusal is logged.
+		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address alone, with no query, "+
+			"fragment or credentials: %q", parsed.Redacted())
 	case strings.Trim(parsed.Path, "/") != "":
 		// A path below the address would make every link this deployment
 		// writes point somewhere it does not answer.
