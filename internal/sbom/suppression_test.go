@@ -244,15 +244,12 @@ func TestAClaimAboutComponentsInsideAProductTargetsTheComponents(t *testing.T) {
 	// what the statement is about.
 	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
 	 "products": [{"@id": "pkg:oci/image@sha256%3Aabc",
-	   "subcomponents": [{"@id": "pkg:deb/debian/openssl@3.0.14"}, {"@id": "thrift"}]}]}`))
-	if len(got[0].Targets) != 2 {
+	   "subcomponents": [{"@id": "pkg:deb/debian/openssl@3.0.14"}]}]}`))
+	if len(got[0].Targets) != 1 {
 		t.Fatalf("the claim points at %+v", got[0].Targets)
 	}
 	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
 		t.Error("a claim about a component inside a product missed the component")
-	}
-	if !got[0].Covers(graph.Described{Name: "thrift", Version: "0.14.1"}) {
-		t.Error("a subcomponent named without a package identifier missed the component of that name")
 	}
 	if got[0].Covers(graph.Described{Purl: "pkg:oci/image@sha256%3Aabc"}) {
 		t.Error("a claim about a component inside a product was read as a claim about the product")
@@ -266,6 +263,23 @@ func TestAClaimAboutComponentsInsideAProductTargetsTheComponents(t *testing.T) {
 	 "products": [{"@id": "pkg:deb/debian/openssl@3.0.14"}]}`))
 	if !alone[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14"}) {
 		t.Error("a claim about a product alone missed it")
+	}
+}
+
+func TestASubcomponentNamedWithoutAPackageIdentifierCoversNothing(t *testing.T) {
+	// A bare name states no version, so read as a target it would cover
+	// every version of that name and every fork of it.
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:oci/image@sha256%3Aabc",
+	   "subcomponents": [{"@id": "thrift"}]}]}`))
+	for _, shipped := range []graph.Described{
+		{Name: "thrift", Version: "0.20.0"},
+		{Name: "thrift-fork", UpstreamName: "thrift", Version: "0.20.0"},
+		{Purl: "pkg:oci/image@sha256%3Aabc"},
+	} {
+		if got[0].Covers(shipped) {
+			t.Errorf("a subcomponent named thrift covered %+v", shipped)
+		}
 	}
 }
 

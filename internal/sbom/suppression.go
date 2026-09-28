@@ -160,10 +160,10 @@ func (t Target) Covers(d graph.Described) bool {
 		// claims name source trees rather than packages, so this is the
 		// ordinary case rather than the exception.
 		//
-		// The version the document stated outside the identifier is still a
-		// version it stated: a publisher naming no package names one in the
-		// branch its product sits in, and a claim about one release of an
-		// appliance does not answer for every release of it.
+		// The version the document stated outside the identifier is compared
+		// where the target carries it: a publisher naming no package names
+		// one in the branch its product sits in. A target with no version
+		// covers every version of the name.
 		return coversNamed(t.Name, version, d)
 	}
 	if strings.HasPrefix(base, "pkg:generic/") {

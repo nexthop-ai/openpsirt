@@ -214,26 +214,39 @@ func (v *suppressions) vulnerability(claim *Suppression) error {
 // is about. So the subcomponents are the targets where there are any, and the
 // product only where there are none. This deployment's own export states
 // every claim that way, with the build as the product.
+//
+// A subcomponent is read only as a package identifier. Anything else names a
+// component and no version, and a bare name matches every version of it and
+// every fork of it, which is a claim nobody made. A product whose
+// subcomponents are all of that kind targets nothing, because the statement
+// was about them and never about the product.
 func (v *suppressions) products(claim *Suppression) error {
 	return v.b.array(func() error {
-		var inside []Target
+		var (
+			inside []Target
+			stated bool
+		)
 		product, err := v.product(func() error {
 			return v.b.array(func() error {
 				one, err := v.product(nil)
 				if err != nil || one.Purl == "" {
 					return err
 				}
+				stated = true
+				if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(one.Purl)), "pkg:") {
+					return nil
+				}
 				if err := v.name(); err != nil {
 					return err
 				}
-				inside = append(inside, subcomponent(one.Purl))
+				inside = append(inside, Target{Purl: one.Purl, Name: nameOf(one.Purl)})
 				return nil
 			})
 		})
 		if err != nil {
 			return err
 		}
-		if len(inside) > 0 {
+		if stated {
 			claim.Targets = append(claim.Targets, inside...)
 			return nil
 		}
@@ -281,16 +294,6 @@ func (v *suppressions) product(subcomponents func() error) (Target, error) {
 		target.Purl = id
 	}
 	return target, err
-}
-
-// subcomponent is the target a subcomponent names. A package identifier is
-// matched as one; anything else is the name of a component with no package
-// identifier, which is how this deployment's export names one.
-func subcomponent(id string) Target {
-	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(id)), "pkg:") {
-		return Target{Name: strings.TrimSpace(id)}
-	}
-	return Target{Purl: id, Name: nameOf(id)}
 }
 
 // into reads one string into a status.

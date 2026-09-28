@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -248,27 +249,40 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
 
-		// The same bytes arriving again change nothing, so nothing is
+		for i := range said {
+			said[i].Vulnerability = folded(said[i].Vulnerability)
+			said[i].Component = folded(said[i].Component)
+		}
+
+		// The same bytes read the same way change nothing, so nothing is
 		// written. Set aside and rewritten, every standing claim gets a new
 		// identity and a superseded moment — and a superseded claim is what
 		// tells everyone holding an approved decision that cited it that the
 		// publisher has changed what they published. Re-syncing a publisher's
 		// directory is the ordinary operation once advisories arrive one per
 		// issue, so that notice would fire on every pass and say nothing.
-		standing, err := tx.NewSelect().Model((*Statement)(nil)).
+		//
+		// The digest is of the bytes, and what the claims say is also how
+		// they were read. Where the reading of the same bytes differs from
+		// what stands, the reading is recorded, so uploading a document again
+		// is how rows stored under an earlier reading are brought up to date.
+		var standing []Statement
+		err := tx.NewSelect().Model(&standing).
+			Column("vulnerability", "purl", "component", "about", "status",
+				"justification", "statement").
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
 			Where("document_id = ?", identifier).
 			Where("digest = ?", from.Digest).
 			Where("superseded_at IS NULL").
-			Count(ctx)
+			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("ask what is already held: %w", err)
 		}
-		if standing > 0 {
+		if len(standing) > 0 && sameReading(standing, said) {
 			// What the document says is what the record already holds.
-			recorded = standing
+			recorded = len(standing)
 			return nil
 		}
 
@@ -301,8 +315,6 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			said[i].ID = 0
 			said[i].ProductID = productID
 			said[i].Publisher = publisher
-			said[i].Vulnerability = folded(said[i].Vulnerability)
-			said[i].Component = folded(said[i].Component)
 			said[i].Source, said[i].Identifier = from.Source, identifier
 			said[i].Document, said[i].Digest = from.Document, from.Digest
 			said[i].UploadedBy, said[i].UploadedAt = by.ID, now
@@ -444,6 +456,24 @@ const (
 // runs decided whether a publisher's judgment reached a finding. Normalizing
 // on write is the same answer matching a typed name without capitals gives for
 // every other name people type.
+// sameReading reports whether two sets of statements say the same things,
+// in any order. Only what a reader derives from the document is compared.
+func sameReading(held, said []Statement) bool {
+	if len(held) != len(said) {
+		return false
+	}
+	reading := func(rows []Statement) []string {
+		out := make([]string, len(rows))
+		for i, one := range rows {
+			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
+				one.About, one.Status, one.Justification, one.Statement}, "\x00")
+		}
+		slices.Sort(out)
+		return out
+	}
+	return slices.Equal(reading(held), reading(said))
+}
+
 func folded(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }

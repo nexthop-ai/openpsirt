@@ -971,16 +971,8 @@ one that named something to be matched: the first knows exactly what it is about
 while the second may name a whole source tree. Where neither is attached, the
 claims are read in a stable order.
 
-A claim that names something is matched against a component this way.
-
-| Rule | Reason |
-|---|---|
-| A package identifier is compared as identity reduces it: qualifiers and subpath dropped, escapes decoded, scheme and type lowercased | One real image carries the same version as `2.3.2-2%2Bb1` and `2.3.2-2+b1`. Compared as written, a claim in one spelling has no effect on a component in the other, and nothing reports it |
-| A claim naming no version covers every version of the package | The format says so |
-| A claim naming a version reaches a component stating that version beside an identifier that names none | An inventory may state the version outside the identifier |
-| An OpenVEX product with subcomponents is a claim about the subcomponents | The product is what shipped and the subcomponents are what the statement is about. This deployment's own export states every claim that way, so its output reads back as claims about its components. A product with none is the thing the statement is about |
-| A subcomponent written as something other than a package identifier is the name of a component | That is how the export names a component with no package identifier |
-| The component a statement is stored against is the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is a statement about `frr` |
+`DESIGN-ingest.md` § Build-declared suppressions holds how a claim that names
+something is matched against a component.
 
 ## Fan-out cost
 

@@ -428,3 +428,58 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 		}
 	})
 }
+
+func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
+	// The digest is of the bytes. The same bytes read the same way write
+	// nothing, and read another way they are recorded as now read, so
+	// uploading a document again brings rows stored under an earlier reading
+	// up to date.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		from := finding.Supplied{Source: finding.FromVex, Publisher: "Example",
+			Document: "example.json", Digest: "sha256:one"}
+		read := func(component string) []finding.Statement {
+			return []finding.Statement{{
+				Vulnerability: "CVE-2026-1", Component: component,
+				Purl: "pkg:deb/debian/libstdc%2B%2B6@12", Status: "not_affected",
+			}}
+		}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			read("libstdc%2b%2b6")); err != nil {
+			t.Fatal(err)
+		}
+
+		recorded, setAside, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			read("libstdc%2b%2b6"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if recorded != 1 || setAside != 0 {
+			t.Errorf("the same reading again reports %d recorded and %d set aside, want "+
+				"the one standing and nothing set aside", recorded, setAside)
+		}
+
+		_, setAside, err = f.store.RecordStatements(ctx, who, f.productID, from,
+			read("libstdc++6"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if setAside != 1 {
+			t.Errorf("the same bytes read another way set aside %d statements, want 1", setAside)
+		}
+		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+			[]string{"CVE-2026-1"}, "libstdc++6", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != 1 {
+			t.Errorf("the statement under the name it is read as now: %d found", len(said))
+		}
+	})
+}

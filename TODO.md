@@ -81,6 +81,7 @@ Missing or wrong, with no decision needed to fix it.
 | No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
 | The recorded scanner output is from grype 0.112.0 | The image ships 0.119.0. Re-recording changes what several tests assert |
 | The scanner's memory use is not measured | The pod's limits are a judgment. A measurement of peak memory on the full-size fixture, cold and warm, would settle them |
+| A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
 | The interface is designed from mockups | Some of it will be wrong in ways that show only in use. The first release is evidence |
 
 ## Weak tests
