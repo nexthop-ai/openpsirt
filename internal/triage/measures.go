@@ -435,17 +435,8 @@ func nearestRank(sorted []time.Duration, part float64) time.Duration {
 }
 
 // bandRank orders the severity words worst first, the way every other list here
-// orders them.
+// orders them, from the one list the finding package keeps. A word it does not
+// know sorts after all of them.
 func bandRank(band string) int {
-	switch band {
-	case "critical":
-		return 0
-	case "high":
-		return 1
-	case "medium":
-		return 2
-	case "low":
-		return 3
-	}
-	return 4
+	return len(finding.Bands()) - finding.Ranks(band)
 }
