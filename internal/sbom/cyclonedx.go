@@ -325,10 +325,9 @@ func (c *reader) cdxLicenses(declared, concluded *[]string) error {
 		}); err != nil {
 			return err
 		}
-		// Charged against the claim bound as each entry is kept. A real
-		// component states one to three, and without a charge one component
-		// can hold as many as the byte bound allows.
-		if err := c.claim(); err != nil {
+		// Charged as each entry is kept. Without a charge one component can
+		// hold as many as the byte bound allows.
+		if err := c.license(); err != nil {
 			return err
 		}
 		if strings.EqualFold(strings.TrimSpace(acknowledged), "concluded") {

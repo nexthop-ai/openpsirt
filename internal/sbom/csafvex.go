@@ -77,9 +77,12 @@ type claimed struct {
 	// would store different reasoning under a digest saying nothing moved.
 	byProduct map[string]Status
 	listed    []string
-	// flags are the justifications in the order the document gave them, each
-	// with the products it names. A later flag naming a product wins over an
-	// earlier one.
+	// whole is the justification the document gave the whole claim, in a flag
+	// naming no product. A later one wins, so only the last is kept.
+	whole string
+	// flags are the justifications naming products, in the order the document
+	// gave them, each with the products it names. A later flag naming a
+	// product wins over an earlier one.
 	flags []scoped
 	// said is the prose, per status, for the words that named no product. An
 	// impact statement belongs to the products called not affected and an
@@ -152,7 +155,7 @@ type csafReader struct {
 	// things the document describes.
 	charged map[string]struct{}
 	// held is every entry the reader keeps, one per mention: a product the
-	// tree defines, a member of a group, a product a claim lists, a product or
+	// tree defines, a group, a member of a group, a product a claim lists, a product or
 	// group a sentence names, an identifier an issue also goes by, and each
 	// member a group stands for once a reference to it is expanded. The set
 	// above charges a re-mention nothing, and a re-mention is still an entry
@@ -412,6 +415,11 @@ func (r *csafReader) productGroup() error {
 		return err
 	}
 	if id != "" {
+		// The group's own entry, which a group holding no product would
+		// otherwise keep for nothing.
+		if err := r.hold(1); err != nil {
+			return err
+		}
 		r.groups[id] = has
 	}
 	return nil
@@ -776,7 +784,13 @@ func (r *csafReader) flags(one *claimed) error {
 		}); err != nil {
 			return err
 		}
-		if flag.words != "" {
+		switch {
+		case flag.words == "":
+		case !flag.names():
+			// Overwritten rather than kept, so a document repeating an
+			// unscoped flag holds one of them.
+			one.whole = flag.words
+		default:
 			one.flags = append(one.flags, flag)
 		}
 		return nil
@@ -851,11 +865,10 @@ func (r *csafReader) expand(words scoped, visit func(id string)) error {
 // them in.
 func (r *csafReader) scopedWords(one *claimed) (flagged, told map[string]string, err error) {
 	flagged, told = map[string]string{}, map[string]string{}
+	if one.whole != "" {
+		flagged[""] = one.whole
+	}
 	for _, flag := range one.flags {
-		if !flag.names() {
-			flagged[""] = flag.words
-			continue
-		}
 		if err := r.expand(flag, func(id string) { flagged[id] = flag.words }); err != nil {
 			return nil, nil, err
 		}

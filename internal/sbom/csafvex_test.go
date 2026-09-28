@@ -413,3 +413,117 @@ func TestWordsScopedByGroupStayScopedWhenTheTreeComesLast(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryEntryTheCSAFReaderKeepsIsCharged(t *testing.T) {
+	// Each place the reader keeps an entry, repeated a thousand and one times
+	// about one product. The distinct-identifier bound charges a repeat
+	// nothing, so only the charge per entry held stops each of these: a
+	// hundred products allow a thousand entries.
+	lim := sbom.Limits{MaxComponents: 100}
+	const product = `{"product_id": "P0", "name": "p0",
+	  "product_identification_helper": {"purl": "pkg:deb/debian/p0@1.0"}}`
+	repeat := func(count int, each func(i int) string) string {
+		out := make([]string, count)
+		for i := range out {
+			out[i] = each(i)
+		}
+		return strings.Join(out, ",")
+	}
+	claim := func(extra string) string {
+		return `[{"cve": "CVE-2026-1", "product_status": {"known_not_affected": ["P0"]}` +
+			extra + `}]`
+	}
+	onlyProduct := func(int) string { return `{"full_product_names": [` + product + `]}` }
+	noExtra := func(int) string { return claim("") }
+	cases := []struct {
+		name            string
+		tree            func(n int) string
+		vulnerabilities func(n int) string
+	}{
+		{
+			name: "a product defined again",
+			tree: func(n int) string {
+				return `{"full_product_names": [` + repeat(n, func(int) string { return product }) + `]}`
+			},
+			vulnerabilities: noExtra,
+		},
+		{
+			name: "a group holding no product",
+			tree: func(n int) string {
+				return `{"full_product_names": [` + product + `], "product_groups": [` +
+					repeat(n, func(i int) string { return fmt.Sprintf(`{"group_id": "G%d"}`, i) }) + `]}`
+			},
+			vulnerabilities: noExtra,
+		},
+		{
+			name: "a group member",
+			tree: func(n int) string {
+				return `{"full_product_names": [` + product + `], "product_groups": [
+				  {"group_id": "G", "product_ids": [` + repeat(n, func(int) string { return `"P0"` }) + `]}]}`
+			},
+			vulnerabilities: noExtra,
+		},
+		{
+			name: "an alias",
+			tree: onlyProduct,
+			vulnerabilities: func(n int) string {
+				return claim(`, "ids": [` + repeat(n, func(int) string {
+					return `{"system_name": "Example", "text": "EX-1"}`
+				}) + `]`)
+			},
+		},
+		{
+			name: "a product a sentence names",
+			tree: onlyProduct,
+			vulnerabilities: func(n int) string {
+				return claim(`, "flags": [{"label": "vulnerable_code_not_present",
+				  "product_ids": [` + repeat(n, func(int) string { return `"P0"` }) + `]}]`)
+			},
+		},
+		{
+			name: "a group a sentence names",
+			tree: func(int) string {
+				return `{"full_product_names": [` + product + `], "product_groups": [{"group_id": "G"}]}`
+			},
+			vulnerabilities: func(n int) string {
+				return claim(`, "flags": [{"label": "vulnerable_code_not_present",
+				  "group_ids": [` + repeat(n, func(int) string { return `"G"` }) + `]}]`)
+			},
+		},
+	}
+	for _, c := range cases {
+		for reader, err := range bothCSAFReaders(c.tree(1), c.vulnerabilities(1), lim) {
+			if err != nil {
+				t.Errorf("%s once: the %s reader refused it: %v", c.name, reader, err)
+			}
+		}
+		for reader, err := range bothCSAFReaders(c.tree(1001), c.vulnerabilities(1001), lim) {
+			if err == nil {
+				t.Errorf("%s a thousand and one times: the %s reader held every one under a "+
+					"bound of a hundred products", c.name, reader)
+				continue
+			}
+			if !strings.Contains(err.Error(), "product limit") {
+				t.Errorf("%s: the %s refusal does not name the limit it hit: %v", c.name, reader, err)
+			}
+		}
+	}
+}
+
+func TestTheLastJustificationForTheWholeClaimStands(t *testing.T) {
+	// A flag naming no product is about the whole claim, and a later one wins.
+	tree, _ := csafProducts(1, "")
+	got, err := sbom.ReadSuppressions(strings.NewReader(csafDocument("csaf_vex", tree,
+		`[{"cve": "CVE-2026-1", "product_status": {"known_not_affected": ["P0"]},
+		  "flags": [{"label": "component_not_present"},
+		            {"label": "vulnerable_code_not_present"}]}]`)), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("%d claims", len(got))
+	}
+	if got[0].Justification != "vulnerable_code_not_present" {
+		t.Errorf("the claim is justified by %q", got[0].Justification)
+	}
+}

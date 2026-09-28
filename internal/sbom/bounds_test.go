@@ -144,15 +144,19 @@ func TestEveryLicenseEntryAComponentStatesIsCharged(t *testing.T) {
 		return strings.Replace(minimal, `"purl": "pkg:deb/debian/libc6@2.41"`,
 			`"purl": "pkg:deb/debian/libc6@2.41", "licenses": [`+b.String()+`]`, 1)
 	}
-	if _, err := sbom.Read(strings.NewReader(licensed(5)), sbom.Limits{MaxStatements: 5}); err != nil {
-		t.Fatalf("five licenses at a bound of five: %v", err)
+	// The document is two components, and a bound of two allows twenty
+	// license entries. The claim bound is left at one, because a license
+	// entry is not a claim.
+	lim := sbom.Limits{MaxComponents: 2, MaxStatements: 1}
+	if _, err := sbom.Read(strings.NewReader(licensed(20)), lim); err != nil {
+		t.Fatalf("twenty licenses at a bound of two components: %v", err)
 	}
-	_, err := sbom.Read(strings.NewReader(licensed(6)), sbom.Limits{MaxStatements: 5})
+	_, err := sbom.Read(strings.NewReader(licensed(21)), lim)
 	if err == nil {
-		t.Fatal("six licenses were held under a bound of five")
+		t.Fatal("twenty-one licenses were held under a bound of two components")
 	}
-	if !strings.Contains(err.Error(), "limit") {
-		t.Errorf("the refusal does not name a limit: %v", err)
+	if !strings.Contains(err.Error(), "license entries") {
+		t.Errorf("the refusal does not name the limit it hit: %v", err)
 	}
 }
 

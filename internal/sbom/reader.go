@@ -111,8 +111,11 @@ type reader struct {
 	// a document of one component can carry millions of them, and this is read
 	// in full inside the upload request.
 	claimed int
-	seen    map[string]int
-	edges   []refEdge
+	// licensed counts the license entries a document states, against a bound
+	// sized from the component bound.
+	licensed int
+	seen     map[string]int
+	edges    []refEdge
 	// contained is the structure a producer declared by nesting one component
 	// inside another. It resolves without the document's identifiers, since a
 	// nested component often carries none.
@@ -301,6 +304,21 @@ func (c *reader) claim() error {
 	c.claimed++
 	if c.claimed > c.lim.MaxStatements {
 		return fmt.Errorf("scan file carries more than the %d claim limit", c.lim.MaxStatements)
+	}
+	return nil
+}
+
+// licensesPerComponent is how many license entries a document may state for
+// each component the component bound allows. A real component states one to
+// three, and a real switch image averages under one.
+const licensesPerComponent = 10
+
+// license counts one more license entry against the limit.
+func (c *reader) license() error {
+	c.licensed++
+	if ceiling := c.lim.MaxComponents * licensesPerComponent; c.licensed > ceiling {
+		return fmt.Errorf("scan file states more than %d license entries, %d for each of "+
+			"the %d components the limit allows", ceiling, licensesPerComponent, c.lim.MaxComponents)
 	}
 	return nil
 }
