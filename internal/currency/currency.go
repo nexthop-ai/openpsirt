@@ -42,6 +42,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -186,12 +187,10 @@ var askers = map[string]func(*Client) Asker{
 // Askable is every ecosystem this has an index for.
 //
 // The one list, so that the pass selecting candidates can be built from it
-// rather than from its complement. Maintained as a complement — one entry
-// excluding distribution packages — every other unaskable ecosystem passed the
-// filter, reached the asker, found none and was recorded empty, spending one
-// of the two hundred slots a pass has. On an image with ten thousand Alpine
-// packages that is fifty passes writing nothing before the Go and Rust
-// components it can answer are reached.
+// rather than from its complement. An ecosystem with no index that passed the
+// filter would reach the asker, find none and be recorded empty, spending one
+// of the two hundred slots a pass has: on an image with ten thousand Alpine
+// packages, fifty passes writing nothing.
 //
 // Sorted, so the condition a pass builds from this is the same statement every
 // time rather than whatever order a map walk gave it.
@@ -255,6 +254,12 @@ func (c *Client) fetch(ctx context.Context, at, accept string) ([]byte, http.Hea
 	req.Header.Set("Accept", accept)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		// Turned away by the client itself: a redirect, or a host it will
+		// not reach. It does so every time it is asked, so it is a fact
+		// about this name rather than a bad day, and it is recorded.
+		if errors.Is(err, outward.ErrRefused) {
+			return nil, nil, fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
+		}
 		return nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -395,7 +400,7 @@ func (n npmRegistry) Latest(ctx context.Context, name string) (Latest, error) {
 	return Latest{
 		Version: version, Released: parseTime(answer.Time[version]),
 		Summary: answer.Description,
-		Project: firstOf(answer.Homepage, answer.Repository.URL),
+		Project: firstAddress(answer.Homepage, answer.Repository.URL),
 	}, nil
 }
 
@@ -429,7 +434,7 @@ func (p pyPI) Latest(ctx context.Context, name string) (Latest, error) {
 			Uploaded string `json:"upload_time_iso_8601"`
 		} `json:"urls"`
 	}
-	at := p.c.PyPI + "/pypi/" + url.PathEscape(name) + "/json"
+	at := p.c.PyPI + "/pypi/" + url.PathEscape(pypiNormalized(name)) + "/json"
 	if err := p.c.get(ctx, at, &answer); err != nil {
 		return Latest{}, err
 	}
@@ -442,7 +447,7 @@ func (p pyPI) Latest(ctx context.Context, name string) (Latest, error) {
 		Version: answer.Info.Version, Summary: answer.Info.Summary,
 		// Whichever the project stated, in the order somebody reading about it
 		// would want: its own pages before its repository.
-		Project: firstOf(answer.Info.HomePage, answer.Info.URLs["Homepage"],
+		Project: firstAddress(answer.Info.HomePage, answer.Info.URLs["Homepage"],
 			answer.Info.URLs["Source"], answer.Info.URLs["Repository"]),
 	}
 	for _, file := range answer.URLs {
@@ -455,6 +460,16 @@ func (p pyPI) Latest(ctx context.Context, name string) (Latest, error) {
 		}
 	}
 	return latest, nil
+}
+
+// pypiSeparators is every run of the characters PyPI treats as one.
+var pypiSeparators = regexp.MustCompile(`[-_.]+`)
+
+// pypiNormalized is a project name as PyPI serves it: lower case, with every
+// run of hyphens, underscores and dots one hyphen. Asked any other way, the
+// index answers with a redirect to this name, which the client refuses.
+func pypiNormalized(name string) string {
+	return pypiSeparators.ReplaceAllString(strings.ToLower(name), "-")
 }
 
 type cratesIO struct{ c *Client }
@@ -489,7 +504,7 @@ func (r cratesIO) Latest(ctx context.Context, name string) (Latest, error) {
 	}
 	latest := Latest{
 		Version: version, Summary: answer.Crate.Description,
-		Project: firstOf(answer.Crate.Homepage, answer.Crate.Repository),
+		Project: firstAddress(answer.Crate.Homepage, answer.Crate.Repository),
 	}
 	for _, each := range answer.Versions {
 		if each.Num == version {

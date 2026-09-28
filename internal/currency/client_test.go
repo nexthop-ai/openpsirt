@@ -5,6 +5,7 @@ package currency_test
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/currency"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
 // answering is a stand-in for one public index.
@@ -176,6 +178,124 @@ func TestAPythonReleaseIsDatedByItsEarliestFile(t *testing.T) {
 	}
 	if want := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC); !latest.Released.Equal(want) {
 		t.Errorf("released %v, expected the earliest file's date %v", latest.Released, want)
+	}
+}
+
+// What an index answers decides whether the component is asked again on the
+// next pass or recorded as asked. A bad day is asked again; a refusal the
+// index repeats every time is recorded, because unrecorded it holds the head
+// of every window after it.
+func TestAnIndexAnswerIsClassifiedAsABadDayOrAFact(t *testing.T) {
+	for _, each := range []struct {
+		code int
+		want error
+	}{
+		{http.StatusTooManyRequests, currency.ErrNotAnswering},
+		{http.StatusInternalServerError, currency.ErrNotAnswering},
+		{http.StatusServiceUnavailable, currency.ErrNotAnswering},
+		{http.StatusForbidden, currency.ErrUnaskable},
+		{http.StatusUnavailableForLegalReasons, currency.ErrUnaskable},
+		{http.StatusBadRequest, currency.ErrUnaskable},
+		{http.StatusNotFound, currency.ErrUnknown},
+		{http.StatusGone, currency.ErrUnknown},
+	} {
+		a := serving(t, `{}`)
+		a.code = each.code
+		_, err := client(a).For("pypi").Latest(t.Context(), "requests")
+		if !errors.Is(err, each.want) {
+			t.Errorf("%d answered %v, want %v", each.code, err, each.want)
+		}
+	}
+
+	// A document past what is read is refused as too large rather than cut
+	// off and read as something else.
+	a := serving(t, `{"info":{"version":"1"}}`+strings.Repeat(" ", currency.MostBody))
+	if _, err := client(a).For("pypi").Latest(t.Context(), "requests"); !errors.Is(err, currency.ErrUnaskable) {
+		t.Errorf("a document past the ceiling answered %v", err)
+	}
+}
+
+// A redirect is refused by the guarded client every time it is asked, so it
+// is recorded as asked rather than read as a bad day.
+func TestARedirectFromAnIndexIsRecordedAsAsked(t *testing.T) {
+	a := serving(t, `{}`)
+	a.code = http.StatusMovedPermanently
+	c := client(a)
+	c.HTTP = &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return fmt.Errorf("%w a redirect to %s", outward.ErrRefused, req.URL.Host)
+		},
+	}
+	a.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.asked = append(a.asked, r.URL.RequestURI())
+		http.Redirect(w, r, "/elsewhere", http.StatusMovedPermanently)
+	})
+	_, err := c.For("pypi").Latest(t.Context(), "requests")
+	if !errors.Is(err, currency.ErrUnaskable) {
+		t.Errorf("a redirect answered %v, want it recorded as asked", err)
+	}
+}
+
+// A Python project is asked for under the name PyPI serves it at, which it
+// otherwise answers with a redirect.
+func TestAPythonProjectIsAskedForByItsNormalizedName(t *testing.T) {
+	a := serving(t, `{"info":{"version":"6.0"}}`)
+	if _, err := client(a).For("pypi").Latest(t.Context(), "Zope.Interface"); err != nil {
+		t.Fatal(err)
+	}
+	if len(a.asked) != 1 || a.asked[0] != "/pypi/zope-interface/json" {
+		t.Errorf("requested %v, want the normalized name", a.asked)
+	}
+}
+
+// npm's full document failing leaves the abbreviated one, which says the
+// version and no date.
+func TestNpmFallsBackToTheVersionAloneOnABadDay(t *testing.T) {
+	a := serving(t, `{}`)
+	a.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.asked = append(a.asked, r.Header.Get("Accept"))
+		if r.Header.Get("Accept") == "application/json" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"dist-tags":{"latest":"1.2.3"}}`))
+	})
+	latest, err := client(a).For("npm").Latest(t.Context(), "left-pad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest.Version != "1.2.3" || !latest.Released.IsZero() {
+		t.Errorf("the fallback answered %+v, want the version and no date", latest)
+	}
+	if len(a.asked) != 2 {
+		t.Errorf("asked %d times, want the full document and then the abbreviated one", len(a.asked))
+	}
+}
+
+// Of the addresses an index states for a project, the first that may be stored
+// is taken: an absolute web address, and nothing relative or on another scheme.
+func TestTheProjectAddressIsTheFirstWebAddressStated(t *testing.T) {
+	for _, each := range []struct {
+		said string
+		want string
+	}{
+		{`{"info":{"version":"1","home_page":"UNKNOWN","project_urls":{"Source":"https://github.com/x/y"}}}`,
+			"https://github.com/x/y"},
+		{`{"info":{"version":"1","home_page":"mailto:a@example.com","project_urls":{"Homepage":"https://x.example"}}}`,
+			"https://x.example"},
+		{`{"info":{"version":"1","home_page":"attachment:12"}}`, ""},
+		{`{"info":{"version":"1","home_page":"issue:CVE-2024-1"}}`, ""},
+		{`{"info":{"version":"1","home_page":"//elsewhere.example/x"}}`, ""},
+	} {
+		a := serving(t, each.said)
+		latest, err := client(a).For("pypi").Latest(t.Context(), "x")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if latest.Project != each.want {
+			t.Errorf("%s gave the address %q, want %q", each.said, latest.Project, each.want)
+		}
 	}
 }
 

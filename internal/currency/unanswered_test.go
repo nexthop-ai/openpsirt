@@ -36,6 +36,10 @@ func TestWhatHasNoUpstreamAnswerSaysWhy(t *testing.T) {
 			"pkg:cargo/serde@1.0.0",
 			"pkg:golang/golang.org/x/net@v0.17.0",
 			"pkg:deb/debian/openssl@3.5.6-1",
+			// Names the asker refuses before sending anything: a Maven
+			// artifact with no group, and a NuGet name that moves the path.
+			"pkg:maven/commons-lang@2.6",
+			"pkg:nuget/..@1.0",
 		} {
 			put(t, w, purl, &asked, none)
 		}
@@ -53,6 +57,8 @@ func TestWhatHasNoUpstreamAnswerSaysWhy(t *testing.T) {
 			"pkg:cargo/serde@1.0.0",
 			"pkg:golang/golang.org/x/net@v0.17.0",
 			"pkg:deb/debian/openssl@3.5.6-1",
+			"pkg:maven/commons-lang@2.6",
+			"pkg:nuget/..@1.0",
 			"pkg:pypi/requests@2.31.0")
 
 		ours := currency.Ourselves("https://example-corp.test", nil)
@@ -69,6 +75,8 @@ func TestWhatHasNoUpstreamAnswerSaysWhy(t *testing.T) {
 			"pkg:npm/private-fork@0.1.0":                             currency.WhyUnknown,
 			"pkg:npm/%zz/broken@1.0.0":                               currency.WhyUnreadable,
 			"pkg:golang/golang.org/x/net@v0.17.0":                    currency.WhyUnknown,
+			"pkg:maven/commons-lang@2.6":                             currency.WhyUnreadable,
+			"pkg:nuget/..@1.0":                                       currency.WhyUnreadable,
 		}
 		if total != len(want) {
 			t.Errorf("reported %d in all, expected %d: %v", total, len(want), rows)

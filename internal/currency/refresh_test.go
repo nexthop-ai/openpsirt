@@ -480,6 +480,80 @@ func TestAnIndexSayingNoDoesNotDestroyWhatWeAlreadyKnew(t *testing.T) {
 	})
 }
 
+// A version answered with no date keeps the date held for it while the version
+// has not moved, and loses it when the version moves.
+func TestAVersionAnsweredWithNoDateKeepsTheDateItHad(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB) {
+		long := time.Now().UTC().Add(-2 * currency.StaleAfter)
+		same, older := "4.17.21", "1.0.0"
+		r, _ := seed(t, db, []component{
+			{purl: "pkg:npm/lodash@4.17.20", checked: &long, version: &same},
+			{purl: "pkg:npm/left-pad@1.0.0", checked: &long, version: &older},
+		}, map[string]currency.Latest{
+			"lodash":   {Version: same},
+			"left-pad": {Version: "1.3.0"},
+		}, nil)
+		shipped := time.Date(2021, 2, 20, 0, 0, 0, 0, time.UTC)
+		if _, err := db.DB.NewUpdate().Table("component").
+			Set("latest_released_at = ?", shipped).Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got := read(t, db)
+		if kept := got["pkg:npm/lodash@4.17.20"]; kept.Released == nil || !kept.Released.UTC().Equal(shipped) {
+			t.Errorf("the date of a version that did not move reads %v, want %v", kept.Released, shipped)
+		}
+		moved := got["pkg:npm/left-pad@1.0.0"]
+		if moved.Version == nil || *moved.Version != "1.3.0" || moved.Released != nil {
+			t.Errorf("a version that moved reads %v released %v, want 1.3.0 and no date",
+				moved.Version, moved.Released)
+		}
+	})
+}
+
+// A name in an ecosystem with an index that cannot be read at all is recorded
+// as asked, so it does not stay due for ever.
+func TestAnUnreadableNameInAnAskableEcosystemIsRecorded(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB) {
+		r, asked := seed(t, db, []component{{purl: "pkg:npm/%zz/x@1"}}, nil, nil)
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if read(t, db)["pkg:npm/%zz/x@1"].Checked == nil {
+			t.Error("a name nothing can read was left due for ever")
+		}
+		if len(*asked) != 0 {
+			t.Errorf("an unreadable name was sent: %v", *asked)
+		}
+	})
+}
+
+// Every version of one package in a pass takes one answer, so the index is
+// asked about the package once.
+func TestAPackageIsAskedAboutOnceHoweverManyVersionsAreHeld(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB) {
+		r, asked := seed(t, db, []component{
+			{purl: "pkg:npm/lodash@4.17.19"},
+			{purl: "pkg:npm/lodash@4.17.20"},
+			{purl: "pkg:npm/lodash@4.17.21"},
+		}, map[string]currency.Latest{"lodash": {Version: "4.17.21"}}, nil)
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if len(*asked) != 1 {
+			t.Errorf("the index was asked %d times about one package: %v", len(*asked), *asked)
+		}
+		for purl, row := range read(t, db) {
+			if row.Version == nil || *row.Version != "4.17.21" {
+				t.Errorf("%s holds %v", purl, row.Version)
+			}
+		}
+	})
+}
+
 // counted records what an index was asked, safely enough for two replicas to
 // share one — which is the case the test is about, and which has to be safe
 // even when the control being tested is broken.

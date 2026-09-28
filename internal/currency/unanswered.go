@@ -138,10 +138,10 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		found = found[:mostExamined]
 	}
 	for _, row := range found {
-		ecosystem, _, readable := Asked(row.Purl)
+		ecosystem, name, readable := Asked(row.Purl)
 		why := WhyUnknown
 		switch {
-		case !readable:
+		case !readable || !nameAskable(ecosystem, name):
 			why = WhyUnreadable
 		case ours.HeldBack(row.Purl):
 			why = WhyOurs
@@ -168,4 +168,19 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		rows = rows[:limit]
 	}
 	return rows, total, whole, nil
+}
+
+// nameAskable is whether an index's asker can turn a name into a request at
+// all. The Maven and NuGet askers refuse some names before sending anything,
+// with the same checks this makes, and a name refused that way was never
+// sent to anybody.
+func nameAskable(ecosystem, name string) bool {
+	switch ecosystem {
+	case "maven":
+		_, _, ok := mavenCoordinates(name)
+		return ok
+	case "nuget":
+		return walkable(name)
+	}
+	return true
 }

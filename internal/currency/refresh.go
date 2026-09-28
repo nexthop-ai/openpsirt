@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -248,6 +250,10 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("read who publishes what was scanned: %w", err)
 	}
 	ours := r.Ours.With(roots...)
+	// What an index said, by the name asked. A component row is one version,
+	// and the question is about the package, so every version in the window
+	// takes the one answer rather than asking the same name again.
+	answered := map[string]Latest{}
 	asked, at := 0, 0
 	renewed := r.Now()
 	for len(due) > 0 {
@@ -326,6 +332,12 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			continue
 		}
 
+		if latest, known := answered[ecosystem+"/"+name]; known {
+			if err := r.record(ctx, component.ID, latest); err != nil {
+				return asked, err
+			}
+			continue
+		}
 		latest, err := r.Index(ecosystem).Latest(ctx, name)
 		switch {
 		case err == nil:
@@ -352,11 +364,10 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			// to. One index failing is not the pass failing: nothing is
 			// written, so it stays due and the next pass tries again.
 			//
-			// Everything else reaches the arm above rather than this one.
-			// Read as a bad day, a refusal the index repeats every time left
-			// the component unrecorded — and the window takes the never-asked
-			// first, so it held the head of every pass afterwards for ever,
-			// with the components behind it never reached.
+			// Everything else reaches the arm above rather than this one. A
+			// refusal the index repeats every time, left unrecorded, would
+			// hold the head of every pass afterwards, because the window takes
+			// the never-asked first.
 			//
 			// The rest of that ecosystem waits for the next pass, and the
 			// window is read again without it, bounded by what is left of
@@ -376,6 +387,7 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			continue
 		}
 
+		answered[ecosystem+"/"+name] = latest
 		if err := r.record(ctx, component.ID, latest); err != nil {
 			return asked, err
 		}
@@ -442,18 +454,13 @@ func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, 
 // One spelling, because the pass that asks and the report that says what went
 // unanswered have to describe the same set of candidates.
 //
-// Built from the list of those ecosystems rather than from its complement. A
-// distribution package is the case a complement was written for and is still
-// excluded by being absent from the list: for one of those the distribution is
-// the maintainer, and the date it released says nothing about the age of the
-// software inside it. Every other unaskable ecosystem is excluded too, which a
-// complement did not do — each of them reached the asker, found none and was
-// recorded empty, spending one of the two hundred slots a pass has.
+// Built from the list of those ecosystems rather than from its complement, so
+// every ecosystem with no index is left out, a distribution package among them:
+// for one of those the distribution is the maintainer, and the date it released
+// says nothing about the age of the software inside it.
 //
 // Lowercased, because Asked lowercases the ecosystem and the two have to
-// agree. SQLite's LIKE is case-insensitive and PostgreSQL's is not, so
-// "pkg:DEB/..." was excluded by one engine and kept by another, and the row
-// that got through had no index and stuck.
+// agree, and SQLite's LIKE folds case where PostgreSQL's does not.
 func askableOnly(q *bun.SelectQuery) *bun.SelectQuery {
 	return askableExcept(q, nil)
 }
@@ -467,7 +474,8 @@ func askableExcept(q *bun.SelectQuery, except map[string]bool) *bun.SelectQuery 
 		if except[each] {
 			continue
 		}
-		q = q.WhereOr("LOWER(c.purl) LIKE ?", "pkg:"+each+"/%")
+		q = q.WhereOr("LOWER(c.purl) LIKE ?"+database.LikeClause,
+			"pkg:"+database.LikeEscaped(each)+"/%")
 		some = true
 	}
 	if !some {
@@ -501,7 +509,6 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		}
 		return nil
 	}
-	q = q.Set("latest_version = ?", latest.Version)
 	// The index's description of the package, and where it is developed. Both
 	// are somebody else's text arriving over the network and rendered to staff
 	// who hold the most access, so both are bounded and the address is judged
@@ -517,10 +524,18 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		q = q.Set("project_url = ?", project)
 	}
 	if latest.Released.IsZero() {
-		q = q.Set("latest_released_at = NULL")
+		// A version with no date keeps the date it had while the version has
+		// not moved: npm's fallback and a Maven project document that did not
+		// come back both answer the version alone, and the date already held
+		// is still the release date of that version. Placed before the version
+		// is assigned, because two engines apply assignments in order and
+		// would otherwise compare against the new version.
+		q = q.Set("latest_released_at = CASE WHEN latest_version = ? "+
+			"THEN latest_released_at ELSE NULL END", latest.Version)
 	} else {
 		q = q.Set("latest_released_at = ?", latest.Released.UTC())
 	}
+	q = q.Set("latest_version = ?", latest.Version)
 	if _, err := q.Exec(ctx); err != nil {
 		return fmt.Errorf("record what upstream has released: %w", err)
 	}
@@ -586,22 +601,35 @@ const MostAddress = 2048
 // addressable is an address from an index, bounded and judged before it is
 // stored.
 //
-// The same two schemes anything else typed into this deployment may link to. An
+// An absolute address on one of the two web schemes, and nothing else typed
+// into this deployment may link to: no relative reference, no mail address,
+// and none of the schemes that name something inside this deployment. An
 // index is a third party, and what it hands over goes into an `href`: a scheme
 // a browser acts on is not encoded output. Judged here as well as where it is
 // drawn, because a value that never should have been stored is one somebody
 // later reads out of the database by another route.
-//
-// The bound is the half that was missing. The comment beside the two values
-// said both were bounded and only the summary was, so the column took whatever
-// arrived — bounded by nothing but the ceiling on the whole document.
-func addressable(url string) string {
-	at := strings.TrimSpace(url)
+func addressable(address string) string {
+	at := strings.TrimSpace(address)
 	if at == "" || len(at) > MostAddress {
+		return ""
+	}
+	parsed, err := url.Parse(at)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
 		return ""
 	}
 	if err := markdown.Addressable(at); err != nil {
 		return ""
 	}
 	return at
+}
+
+// firstAddress is the first of the addresses an index states that may be
+// stored, so a refused home page falls through to the repository.
+func firstAddress(said ...string) string {
+	for _, each := range said {
+		if at := addressable(each); at != "" {
+			return at
+		}
+	}
+	return ""
 }

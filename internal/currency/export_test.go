@@ -23,6 +23,10 @@ func Asking(r *Refresher, interval time.Duration) { r.interval = interval }
 // pass while the pass used a different one.
 const RenewEvery = renewEvery
 
+// MostBody is how much of one document is read, for the test that sends one
+// byte more.
+const MostBody = mostBody
+
 // Examining lowers the ceiling on how many components one read of the report
 // classifies, and puts it back when the test ends.
 //
