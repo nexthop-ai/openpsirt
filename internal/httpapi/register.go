@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -71,23 +72,30 @@ func (closure) Schema(huma.Registry) *huma.Schema {
 // measuredWith reads the chain the register stands on: the upload, the
 // inventory in it, and the run that produced the findings.
 //
-// Nothing here fails the register. A provenance block that could refuse would
-// make the report a build has not finished scanning unreadable, which is the
-// build somebody is most likely asking about — so what cannot be read is
-// absent and says so by being absent.
+// A build nothing has been uploaded to has no block, and a build with no
+// finished run has a block without the run: the register of a build that has
+// not finished scanning is the one somebody is most likely asking about. A
+// read that failed fails the register, because an absent block is the answer
+// for an unscanned build and a fault is not that.
 func measuredWith(ctx context.Context, in Ingest, subject access.Subject,
-	targetID int64, product, stream, variant string) *MeasuredBody {
+	targetID int64, product, stream, variant string) (*MeasuredBody, error) {
 
 	scan, err := ingest.NewStore(in.DB.DB).Newest(ctx, targetID)
-	if err != nil || scan == nil {
-		return nil
+	if err != nil {
+		return nil, wentWrong(in.Logger, "what the register was measured with could not be read", err)
+	}
+	if scan == nil {
+		return nil, nil
 	}
 	measured := &MeasuredBody{
 		Scan: scan.ID, ScanHash: scan.ContentHash,
 		BuiltAt: scan.BuiltAt.UTC().Format(time.RFC3339),
 	}
-	if last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, targetID); err == nil &&
-		last != nil {
+	last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, targetID)
+	if err != nil && !errors.Is(err, access.ErrDenied) {
+		return nil, wentWrong(in.Logger, "what the register was measured with could not be read", err)
+	}
+	if err == nil && last != nil {
 		measured.Run, measured.Scanner = last.ID, last.Scanner
 		measured.ScannerVersion, measured.DatabaseVersion =
 			last.ScannerVersion, last.DatabaseVersion
@@ -100,7 +108,7 @@ func measuredWith(ctx context.Context, in Ingest, subject access.Subject,
 	// whose contents were let go still names the inventory it was read from.
 	sent, err := ingest.NewDocuments(in.DB.DB).Sent(ctx, []int64{scan.ID})
 	if err != nil {
-		return measured
+		return nil, wentWrong(in.Logger, "what the register was measured with could not be read", err)
 	}
 	for _, document := range sent[scan.ID] {
 		if document.Kind != ingest.InventoryKind {
@@ -117,7 +125,7 @@ func measuredWith(ctx context.Context, in Ingest, subject access.Subject,
 		}
 		break
 	}
-	return measured
+	return measured, nil
 }
 
 // stating is the same facts as a file's header.
@@ -225,8 +233,11 @@ func registerRegister(api huma.API, in Ingest) {
 			}
 		}{}
 		out.Body.Total = total
-		out.Body.Measured = measuredWith(ctx, in, subject, target,
+		out.Body.Measured, err = measuredWith(ctx, in, subject, target,
 			input.Product, input.Stream, input.Variant)
+		if err != nil {
+			return nil, err
+		}
 		out.Body.Items = make([]DisposedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, disposedBody(row))
@@ -270,6 +281,11 @@ func registerRegister(api huma.API, in Ingest) {
 		if err := store.MayReadRegister(ctx, subject, target); err != nil {
 			return nil, refusedFinding(in, err)
 		}
+		measured, err := measuredWith(ctx, in, subject, target,
+			input.Product, input.Stream, input.Variant)
+		if err != nil {
+			return nil, err
+		}
 		out := Exporting{
 			What: "disposition register",
 			// The build it is about, and nothing about a triage line: the
@@ -277,8 +293,7 @@ func registerRegister(api huma.API, in Ingest) {
 			// would be worse than silence.
 			About: append([]Stated{
 				{"build", input.Product + " " + input.Stream + " (" + input.Variant + ")"},
-			}, measuredWith(ctx, in, subject, target,
-				input.Product, input.Stream, input.Variant).stating()...),
+			}, measured.stating()...),
 			Header: []string{
 				"issue", "severity", "component", "version", "place", "consumer", "state",
 				"outcome", "justification", "proposed by", "proposed at",

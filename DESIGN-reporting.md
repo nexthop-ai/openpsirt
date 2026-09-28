@@ -416,7 +416,7 @@ deadline, and whether the deadline was met.
 | It narrows by what stands, by outcome, by component, by issue, and to one side of the history | An auditor asks "what has nobody decided" and "show me the dismissals", which are ways of reading the same complete answer rather than different questions. The count is of the narrowed list, because counted over the build a narrowed page says how many rows the build holds and every later offset is a page of a different list |
 | It still applies no triage line, whatever else is asked of it | That is what it is for, and a filter that could hide part of the build would make it the findings list at a second address |
 | A state word it does not recognize keeps nothing | A filter that silently widens is how a register reads as complete about rows it left out. The route's own vocabulary refuses one at the door; this is the guard behind it |
-| Provenance never fails the report | A build nothing has finished scanning is the one somebody is most likely asking about, so what cannot be read is absent rather than an error |
+| Provenance missing never fails the report, and provenance unreadable does | A build nothing has finished scanning is the one somebody is most likely asking about, so no upload means no block and no finished run means a block without one. A read that failed is a fault: an absent block would say nothing was uploaded |
 
 Current state, with no `as_of`. Reconstructing the view as of a past date is
 refused on two grounds. Each row carries the timestamps that evidence the thing
