@@ -13788,6 +13788,7 @@ export interface operations {
                 /** @description Limit to judgments this team's members proposed, by team name */
                 team?: string;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

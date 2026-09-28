@@ -13634,6 +13634,13 @@ paths:
             maximum: 200
             minimum: 1
             type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            format: int64
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:

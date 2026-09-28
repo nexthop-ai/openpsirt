@@ -116,3 +116,41 @@ func TestEffortCountsActsRatherThanRows(t *testing.T) {
 		}
 	})
 }
+
+// The effort report's total is how many rows the question has, not how many
+// fit on the page, and the rows past the page can be read.
+func TestTheEffortTotalCountsPastThePage(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedTwoIssues(t)
+		r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+		r.claimed(t, "private-triage", "CVE-2026-1000", "linux-image", dismissal)
+		// A judgment whose place no longer holds anything, which is a row of
+		// its own: the time went somewhere, whatever is there now.
+		if _, err := r.db.DB.NewUpdate().Table("decision").
+			Set("place_identity = ?", "gone").
+			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+				"CVE-2026-1000").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, c := range []struct {
+			query string
+			items int
+		}{
+			{"?limit=1", 1}, {"?limit=1&offset=1", 1}, {"?limit=1&offset=5", 0},
+		} {
+			var out struct {
+				Items []struct {
+					Component string `json:"component"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			read(t, r, "private-triage", "/v1/effort"+c.query, &out)
+			if len(out.Items) != c.items || out.Total != 2 {
+				t.Errorf("%s answered %d rows of %d, want %d of 2",
+					c.query, len(out.Items), out.Total, c.items)
+			}
+		}
+	})
+}

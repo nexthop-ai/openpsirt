@@ -339,6 +339,7 @@ a manager has to answer without any of the others.
 | What a judgment was about is reached through the findings at its place | A decision names a place rather than a component. A judgment about something since removed still names what it was about, which is what a report about where the time went has to keep |
 | Dated by when a judgment was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
 | It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's. The team is picked on the sheet, from the teams that exist |
+| It pages, and its total counts every row before the limit | A total taken off the page reads a list cut at the limit as complete, and with no offset the rows past the largest page could not be read at all |
 
 ## Triage latency
 

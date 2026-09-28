@@ -45,6 +45,9 @@ type Spent struct {
 	Promised  int `bun:"promised"`
 	Dismissed int `bun:"dismissed"`
 	Deferred  int `bun:"deferred"`
+	// Total is how many rows the question has before the limit, carried on
+	// every row by the statement that reads the page.
+	Total int `bun:"total"`
 }
 
 // Effort is what the work went into over a period, worst first.
@@ -54,12 +57,12 @@ type Spent struct {
 // rows measures how far a component fans out through an image rather than
 // anybody's afternoon.
 func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuring,
-	since, until time.Time, limit int) ([]Spent, error) {
+	since, until time.Time, limit, offset int) ([]Spent, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are different
 	// statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, access.Denied("read where the work went")
+		return nil, 0, access.Denied("read where the work went")
 	}
 	if until.IsZero() {
 		until = s.now().UTC()
@@ -69,31 +72,40 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	// asked for, under a response saying the period ran from the beginning.
 	limit = database.AList.Of(limit)
 
-	var rows []Spent
-	q := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
-		// The argument, which is where an outcome lives.
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		// The judgment's subject, reached through the findings at the
-		// place — the same correlation the record's own component filter
-		// makes. A judgment about something since removed matches nothing and
-		// keeps its row, which is what a report about where the time went has
-		// to keep.
-		//
-		// Joined rather than asked as a subquery in the select list. The
-		// same expression in the list and in the grouping is refused outright
-		// by MySQL and MariaDB under ONLY_FULL_GROUP_BY, because it reads
-		// columns the grouping does not carry — so the report answered on two
-		// engines and was a 500 on the other two.
-		//
-		// A place sits in as many builds as hold it, so this multiplies the
-		// rows. Every figure below counts distinct identifiers for that
-		// reason: what is being counted is acts, and an act is one row of the
-		// decision table however many builds share the place it names.
-		Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = de.vulnerability_id
+	// The joins, the narrowing and the grouping on their own, so the page and
+	// the count ask the same question.
+	grouped := func() *bun.SelectQuery {
+		q := s.db.NewSelect().
+			TableExpr(`"decision" AS "de"`).
+			Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
+			// The argument, which is where an outcome lives.
+			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+			// The judgment's subject, reached through the findings at the
+			// place — the same correlation the record's own component filter
+			// makes. A judgment about something since removed matches nothing and
+			// keeps its row, which is what a report about where the time went has
+			// to keep.
+			//
+			// Joined rather than asked as a subquery in the select list. The
+			// same expression in the list and in the grouping is refused outright
+			// by MySQL and MariaDB under ONLY_FULL_GROUP_BY, because it reads
+			// columns the grouping does not carry — so the report answered on two
+			// engines and was a 500 on the other two.
+			//
+			// A place sits in as many builds as hold it, so this multiplies the
+			// rows. Every figure below counts distinct identifiers for that
+			// reason: what is being counted is acts, and an act is one row of the
+			// decision table however many builds share the place it names.
+			Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = de.vulnerability_id
 			AND pf.place_identity = de.place_identity`).
-		Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
+			Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
+			Where("de.proposed_at < ?", until).
+			GroupExpr(`de.product_id, COALESCE(pc.name, '')`)
+		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
+	}
+
+	var rows []Spent
+	q := grouped().
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
 		ColumnExpr(`COALESCE(pc.name, '') AS "component"`).
@@ -109,13 +121,27 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			` AS "dismissed"`, bun.List(OutcomesDismissing())).
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome = ? THEN de.claim_id END)`+
 			` AS "deferred"`, Deferred).
-		Where("de.proposed_at < ?", until).
-		GroupExpr(`de.product_id, COALESCE(pc.name, '')`).
+		// How many rows the question has, counted over the grouped result
+		// and before the limit. A total taken off the page reads a list cut
+		// at the limit as complete.
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		OrderExpr("claims DESC, decisions DESC, component").
-		Limit(limit)
-	q = only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
+		Limit(limit).Offset(offset)
 	if err := q.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read where the work went: %w", err)
+		return nil, 0, fmt.Errorf("read where the work went: %w", err)
 	}
-	return rows, nil
+	if len(rows) > 0 {
+		return rows, rows[0].Total, nil
+	}
+	if offset == 0 {
+		return rows, 0, nil
+	}
+	// A page past the end carries no row to read the count off.
+	total, err := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, grouped().ColumnExpr("de.product_id")).
+		Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count where the work went: %w", err)
+	}
+	return rows, total, nil
 }
