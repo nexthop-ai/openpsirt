@@ -225,7 +225,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			product, err := catalog.NewStore(in.DB.DB).
 				VisibleProduct(ctx, subject, input.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 			}
 			filter.ProductIDs = []int64{product.ID}
 		}

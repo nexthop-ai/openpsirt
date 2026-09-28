@@ -381,17 +381,25 @@ func registerNotes(api huma.API, in Ingest) {
 		// produced it — a vulnerability database ships bad data and is
 		// corrected, and "which data said so" is then the question. A run that
 		// has not finished is not an answer.
-		if last, err := findings.LatestRun(ctx, subject, to); err == nil && last != nil {
+		last, err := findings.LatestRun(ctx, subject, to)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "what the later build was measured with could not be read", err)
+		}
+		if last != nil {
 			about.Scanner = strings.TrimSpace(last.Scanner + " " + last.ScannerVersion)
 			about.Database = last.DatabaseVersion
 			if last.FinishedAt != nil {
 				about.At = *last.FinishedAt
 			}
 		}
+		// A note that cannot say how much was left out is not one to hand a
+		// customer: without the count it reads as leaving nothing out.
 		if !input.IncludePrivate {
-			if left, err := findings.OmittedFixes(ctx, subject, from, to); err == nil {
-				about.Omitted = left
+			left, err := findings.OmittedFixes(ctx, subject, from, to)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "what was left out could not be counted", err)
 			}
+			about.Omitted = left
 		}
 		notes := finding.Notes(about, comparison)
 		return &huma.StreamResponse{Body: func(hc huma.Context) {

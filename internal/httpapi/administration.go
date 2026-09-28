@@ -617,7 +617,7 @@ func registerAdministration(api huma.API, a Administering) {
 				return err
 			}
 			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			product, err := names.ProductByName(ctx, in.Product)
 			if err != nil {
@@ -701,7 +701,7 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			person, err := store.ByIdentity(ctx, in.Identity)
 			if err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			switch err := store.UnbindIdentifier(ctx, person.ID); {
 			case errors.Is(err, access.ErrNothingMatched):
@@ -754,7 +754,7 @@ func registerAdministration(api huma.API, a Administering) {
 				return err
 			}
 			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			role := access.Role(in.Role)
 			if !role.Valid() {

@@ -527,8 +527,11 @@ func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
 // whole of what this is for.
 func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool) (Subject, error) {
 	person, err := s.ByIdentity(ctx, identity)
-	if err != nil {
+	if errors.Is(err, ErrNoSuchPerson) {
 		return Subject{}, ErrDenied
+	}
+	if err != nil {
+		return Subject{}, err
 	}
 	// Somebody who has left holds whatever they held, and reaches none of
 	// it. Checked here because every way a person gets in comes through
@@ -800,7 +803,7 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 	key := new(Key)
 	err := s.db.NewSelect().Model(key).Where("secret_hash = ?", hashSecret(secret)).Scan(ctx)
 	if err != nil {
-		return Subject{}, ErrDenied
+		return Subject{}, database.FromRead(err, ErrDenied, "look up a key")
 	}
 	if key.RevokedAt != nil {
 		return Subject{}, ErrDenied

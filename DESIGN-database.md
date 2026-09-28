@@ -755,6 +755,9 @@ and a store that wraps both alike makes every caller above it wrong at once.
 | Absence is a sentinel each package words for itself | A caller matches on the sentinel through the wrapping. Matching on a message is the same mistake as reading an engine's error text |
 | A failed read names the act, and the act reaches the log | "Look up product 12" is what an operator needs. What the driver said is not a thing to publish |
 | One helper, not a rule people remember | Made by hand at every call site, it is made differently at most of them |
+| A handler's error arm asks which error it holds before it answers 404 | An arm answering 404 for any error turns an outage into "that does not exist", and inside a transaction it drops the cause the retry helper reads. A gate reports an arm whose first statement answers 404 whatever the error was |
+| A read that fills in part of an answer fails the answer | Left out, a field reads as its absence: a limit as no limit, a narrowed token as one reaching everything, a release note as leaving nothing out |
+| A credential that cannot be looked up is a fault | Answered 503 with a time to ask again, and logged. Answered as not authorized, an outage sends every caller to sign in again |
 
 Two readers of one two-column select telling the two apart differently is the
 ordinary shape: `TargetFor` and `ExistingTarget` are that select, and a caller

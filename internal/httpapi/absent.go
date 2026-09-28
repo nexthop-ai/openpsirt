@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -296,6 +297,8 @@ func absent(logger *slog.Logger, err error, reading string, missing func() error
 		errors.Is(err, access.ErrNoSuchTeam),
 		errors.Is(err, access.ErrNoSuchToken),
 		errors.Is(err, finding.ErrNoSuchRun),
+		errors.Is(err, finding.ErrNoOpenFinding),
+		errors.Is(err, attach.ErrNoSuchIssue),
 		errors.Is(err, access.ErrNoSuchPerson):
 		return missing()
 	default:

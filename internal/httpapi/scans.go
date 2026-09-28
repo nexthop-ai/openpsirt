@@ -838,9 +838,12 @@ func registerReceipts(api huma.API, in Ingest) {
 		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
 		out := &ReceiptsOutput{}
 		out.Body.Items = []ReceiptBody{}
-		if err != nil {
+		switch {
+		case errors.Is(err, catalog.ErrNotFound):
 			// Declared, and nothing has ever been filed against it.
 			return out, nil
+		case err != nil:
+			return nil, wentWrong(in.Logger, "that build could not be looked up", err)
 		}
 
 		// A key sees the receipts for what it sent and nothing more. Reading

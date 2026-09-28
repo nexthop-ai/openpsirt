@@ -196,6 +196,14 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			} else {
 				subject, session, err = in.Access.Resolve(r.Context(), r)
 			}
+			if err != nil && !errors.Is(err, access.ErrDenied) {
+				// A credential that could not be looked up is a fault, not
+				// a stranger. Logged, and answered in words that say
+				// nothing about the caller or the database.
+				in.logger().Error("who is asking could not be resolved", "error", err)
+				unavailable(w)
+				return
+			}
 			if err != nil {
 				// Refused here rather than in a handler, so that nothing
 				// about the request is examined first. Otherwise an
@@ -565,12 +573,11 @@ func asked(logger *slog.Logger, err error) error {
 
 // noDatabase is the answer when this process has no database behind it.
 //
-// One sentence rather than twenty-one. Every handler guards against it,
-// because a nil pointer inside one is worse than a refusal, and a guard per
-// handler invents its own wording — "cannot read findings", "cannot record
-// decisions", "cannot list teams" — which reads as twenty-one conditions and
-// is one. Unlogged, the only trace of a deployment wired up wrong is a 500
-// with a sentence in it.
+// One sentence for every handler. Each guards against it, because a nil
+// pointer inside one is worse than a refusal, and a guard that words it for
+// itself reads as many conditions where there is one. Logged, because
+// otherwise the only trace of a deployment wired up wrong is a 500 with a
+// sentence in it.
 //
 // It says nothing about what the caller asked for, because the caller did not
 // cause it and cannot fix it: this is a process that came up without the thing
@@ -616,6 +623,15 @@ const openPrefix = "/v1/sign-in/"
 // outsider whether a name or a key is real.
 func refuse(w http.ResponseWriter) {
 	Problem(w, http.StatusUnauthorized, "not authorized")
+}
+
+// unavailable answers a request whose caller could not be looked up.
+//
+// Not a refusal: telling somebody they are not authorized because the
+// database did not answer sends them to sign in again, which cannot help.
+func unavailable(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "30")
+	Problem(w, http.StatusServiceUnavailable, "this could not be answered just now; try again shortly")
 }
 
 // Problem writes a refusal in the shape every other refusal here takes.

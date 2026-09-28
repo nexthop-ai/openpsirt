@@ -5,6 +5,7 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,6 +32,11 @@ const (
 	ComponentUpstreamExpr = "COALESCE(NULLIF(c.upstream_version, ''), c.version, '')"
 	ConsumerUpstreamExpr  = "COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')"
 )
+
+// ErrNoOpenFinding is a place, or a component in a build, where nothing is
+// open against the issue asked about. A sentinel, so a caller can tell it from
+// a read that could not be made.
+var ErrNoOpenFinding = errors.New("no open finding is recorded there")
 
 // Deciding carries everything a decision needs about where it is being
 // made, read from the findings rather than from whoever is making it.
@@ -124,7 +130,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		return nil, fmt.Errorf("read what is open at that place: %w", err)
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no open finding is recorded there")
+		return nil, ErrNoOpenFinding
 	}
 
 	// A place is a pair of names, so one place can hold the same package at

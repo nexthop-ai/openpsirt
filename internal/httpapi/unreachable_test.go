@@ -66,6 +66,15 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"the catalog's own reader", "/v1/products/mine/streams"},
 			{"the build lookup a document is generated from",
 				"/v1/products/mine/streams/master/variants/broadcom/vex"},
+			// Lookups that answered any failure as a name that reaches
+			// nothing, or left a field out as though it held nothing.
+			{"a build's readiness",
+				"/v1/products/mine/streams/master/variants/broadcom/readiness"},
+			{"an issue's attachments", "/v1/products/mine/issues/CVE-2026-9999/attachments"},
+			{"the limits the interface draws with", "/v1/session/me"},
+			{"a product the record narrows to", "/v1/decisions?product=mine"},
+			{"the chains your own work sits on",
+				"/v1/products/mine/streams/master/variants/broadcom/components/mine"},
 		} {
 			req := httptest.NewRequest(http.MethodGet, c.path, nil)
 			req.Header.Set(testHeader, "reader")
@@ -186,3 +195,52 @@ func (c *counting) Handle(context.Context, slog.Record) error {
 }
 func (c *counting) WithAttrs([]slog.Attr) slog.Handler { return c }
 func (c *counting) WithGroup(string) slog.Handler      { return c }
+
+// A credential that cannot be looked up is a fault, not a stranger.
+//
+// The resolver answered every failed read as "not authorized", so an outage
+// sent every caller to sign in again, which cannot help, and nothing was
+// logged. Here the resolver itself reads the database nobody can reach.
+func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		path := filepath.Join(t.TempDir(), "gone.db")
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		target, err := database.ParseURL("sqlite://" + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gone, err := database.Open(context.Background(), target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := gone.Close(); err != nil {
+			t.Fatal(err)
+		}
+		sources, err := access.ParseSources("192.0.2.1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		logged := &counting{}
+		handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Ingest{
+			DB: gone, Queue: queue.New(gone, queue.DefaultOptions()),
+			Access: access.NewResolver(access.NewStore(gone.DB),
+				access.Trust{Header: testHeader, From: sources}),
+		})
+		req := httptest.NewRequest(http.MethodGet, "/v1/session/me", nil)
+		req.Header.Set(testHeader, "reader")
+		fromOurOwnPage(req)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Errorf("a caller who could not be looked up answered %d: %s", rec.Code, rec.Body.String())
+		}
+		if strings.Contains(strings.ToLower(rec.Body.String()), "database is closed") {
+			t.Errorf("the driver's message reached the body: %s", rec.Body.String())
+		}
+		if logged.lines == 0 {
+			t.Error("a caller who could not be looked up was not logged")
+		}
+	})
+}

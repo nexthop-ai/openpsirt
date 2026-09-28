@@ -458,7 +458,7 @@ func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
 
 	at, err := finding.NewStore(in.DB.DB).PlaceFor(ctx, subject, target.ID, issue, place)
 	if err != nil {
-		return nil, 0, noSuchFinding()
+		return nil, 0, absent(in.Logger, err, "that place could not be looked up", noSuchFinding)
 	}
 	return at, target.ID, nil
 }

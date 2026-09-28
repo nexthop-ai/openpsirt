@@ -1,7 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Command negatives reports a 404 built from an error's own text.
+// Command negatives reports a 404 built from an error's own text, and an error
+// arm that answers 404 without asking which error it is.
 //
 // A 404 asserts that a name reaches nothing. Building its body from an
 // error publishes whatever that error carried, and where the reader under it
@@ -16,11 +17,13 @@
 // status it would flag every one of those deliberate lines and teach people to
 // ignore it.
 //
-// It does not cover an error arm that answers the fixed 404 without
-// asking which error it is. That has the same wrong status with nothing
-// disclosed, and "did this arm test the sentinel" is a question about control
-// flow that reading the text cannot answer. A gate that pretended to answer it
-// would be worse than one that says where it stops.
+// The second shape is `if err != nil {` whose first statement answers a fixed
+// 404. It has the wrong status with nothing disclosed: a read that could not
+// be made answers "that does not exist", and inside a transaction the cause the
+// retry helper reads is gone. The helper that splits the two, absent, is what
+// such an arm calls instead. The gate reads the arm's first statement only, so
+// an arm that tests the sentinel first and then answers 404 passes, and one
+// that answers 404 after some other statement is not seen.
 package main
 
 import (
@@ -29,6 +32,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -183,6 +187,36 @@ func builtIn(path string, src []byte) ([]int, error) {
 	return lines, nil
 }
 
+// collapsing matches an error arm that tests nothing but the error's presence.
+var collapsing = regexp.MustCompile(`\berr != nil(\s*\|\|[^{]*)?\s*\{\s*$`)
+
+// absence matches a return answering a fixed 404, behind any number of other
+// return values.
+var absence = regexp.MustCompile(
+	`^\s*return\s+(?:[^,()]+,\s*)*(?:noSuch\w*\(|huma\.Error404NotFound\()`)
+
+// collapses reports the lines of body that open an error arm answering a fixed
+// 404 whatever the error was, as one-based line numbers.
+func collapses(body string) []int {
+	lines := strings.Split(body, "\n")
+	var found []int
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "//") || !collapsing.MatchString(line) ||
+			strings.Contains(line, "errors.Is") {
+			continue
+		}
+		next := i + 1
+		for next < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[next]), "//") {
+			next++
+		}
+		if next < len(lines) && absence.MatchString(lines[next]) {
+			found = append(found, i+1)
+		}
+	}
+	return found
+}
+
 // allowed is the one place a 404 may publish an error's text, and why.
 //
 // The catalog's own not-declared error is composed from the names the caller
@@ -203,6 +237,14 @@ func main() {
 		}
 		if _, ok := allowed[path]; ok {
 			return nil
+		}
+		for _, at := range collapses(string(body)) {
+			bad = append(bad, fmt.Sprintf(
+				"%s:%d: an error arm answers 404 whatever the error was. A read that "+
+					"could not be made is then \"that does not exist\", and inside a "+
+					"transaction the cause the retry helper reads is gone. Answer "+
+					"through absent, which gives the 404 for the sentinel and a "+
+					"logged fault for everything else", path, at))
 		}
 		lines, err := builtIn(path, body)
 		if err != nil {
@@ -225,14 +267,15 @@ func main() {
 	}
 	if len(bad) == 0 {
 		fmt.Printf("no 404 is built from an error's own text, beside the %d named "+
-			"exception(s) (%d files)\n", len(allowed), read)
+			"exception(s), and no error arm answers 404 whatever the error was "+
+			"(%d files)\n", len(allowed), read)
 		return
 	}
 	for _, one := range bad {
 		fmt.Fprintln(os.Stderr, one)
 	}
 	fmt.Fprintf(os.Stderr,
-		"\n%d refusal(s) tell a caller a name reaches nothing, in words an error chose.\n",
+		"\n%d refusal(s) tell a caller a name reaches nothing without knowing it does.\n",
 		len(bad))
 	os.Exit(1)
 }

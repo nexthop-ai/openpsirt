@@ -123,7 +123,13 @@ func registerTeams(api huma.API, a Administering) {
 			// Read inside, because the record at the foot of it states
 			// whether this declared the team, and so does the status.
 			_, missing := store.TeamByName(ctx, in.Body.Name)
-			declared = missing != nil
+			switch {
+			case missing == nil:
+			case errors.Is(missing, access.ErrNoSuchTeam):
+				declared = true
+			default:
+				return wentWrong(a.Logger, "that team could not be looked up", missing)
+			}
 
 			if team, err = store.DeclareTeam(ctx, in.Body.Name, in.Body.DisplayName); err != nil {
 				return asked(a.Logger, err)
@@ -137,7 +143,7 @@ func registerTeams(api huma.API, a Administering) {
 			for _, identity := range in.Body.Members {
 				person, err := store.ByIdentity(ctx, identity)
 				if err != nil {
-					return noSuchPerson()
+					return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 				}
 				if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
 					return wentWrong(a.Logger, "cannot put somebody on a team", err)
@@ -178,7 +184,7 @@ func registerTeams(api huma.API, a Administering) {
 			}
 			team, err := store.TeamByName(ctx, in.Team)
 			if err != nil {
-				return noSuchTeamNamed(in.Team)
+				return absent(a.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(in.Team) })
 			}
 			if err := store.RetireTeam(ctx, team.ID); err != nil {
 				if errors.Is(err, access.ErrNoSuchTeam) {
@@ -220,11 +226,11 @@ func registerTeams(api huma.API, a Administering) {
 			}
 			team, err := store.TeamByName(ctx, in.Team)
 			if err != nil {
-				return noSuchTeamNamed(in.Team)
+				return absent(a.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(in.Team) })
 			}
 			person, err := store.ByIdentity(ctx, in.Identity)
 			if err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
 				return wentWrong(a.Logger, "cannot put somebody on a team", err)
@@ -258,11 +264,11 @@ func registerTeams(api huma.API, a Administering) {
 			}
 			team, err := store.TeamByName(ctx, in.Team)
 			if err != nil {
-				return noSuchTeamNamed(in.Team)
+				return absent(a.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(in.Team) })
 			}
 			person, err := store.ByIdentity(ctx, in.Identity)
 			if err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			// Mapped before the trail row, as every other withdrawal is: a
 			// removal that matched nothing is not a removal, and recording it

@@ -116,7 +116,7 @@ func (s *Store) ResolveSession(ctx context.Context, token string) (Subject, *Ses
 	session := new(Session)
 	if err := s.db.NewSelect().Model(session).
 		Where("token_hash = ?", hashSecret(token)).Scan(ctx); err != nil {
-		return Subject{}, nil, ErrDenied
+		return Subject{}, nil, database.FromRead(err, ErrDenied, "look up a session")
 	}
 	if !s.now().Before(session.ExpiresAt) {
 		return Subject{}, nil, ErrDenied
@@ -124,7 +124,7 @@ func (s *Store) ResolveSession(ctx context.Context, token string) (Subject, *Ses
 
 	person := new(Account)
 	if err := s.db.NewSelect().Model(person).Where("id = ?", session.PersonID).Scan(ctx); err != nil {
-		return Subject{}, nil, ErrDenied
+		return Subject{}, nil, database.FromRead(err, ErrDenied, "look up whose session this is")
 	}
 
 	// Resolved by identity, the same path every other sign-in takes, so that

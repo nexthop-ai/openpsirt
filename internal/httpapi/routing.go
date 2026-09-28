@@ -191,7 +191,7 @@ func registerRouting(api huma.API, in Ingest) {
 		if err := changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
 			var err error
 			if team, err = access.NewStore(tx).TeamByName(ctx, input.Body.Team); err != nil {
-				return noSuchTeamNamed(input.Body.Team)
+				return absent(in.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(input.Body.Team) })
 			}
 			if rule, err = finding.NewStore(tx).AddRule(ctx, subject, product, team.ID,
 				input.Body.Name, input.Body.Upstream, input.Body.Beneath); err != nil {

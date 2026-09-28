@@ -150,7 +150,7 @@ func registerAssigning(api huma.API, in Ingest) {
 		case input.Body.Person != "":
 			person, err := rights.ByIdentity(ctx, input.Body.Person)
 			if err != nil {
-				return nil, noSuchPerson()
+				return nil, absent(in.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			// An assignment carries visibility of what was assigned, so the
 			// check is against the level rather than against their present
@@ -179,7 +179,8 @@ func registerAssigning(api huma.API, in Ingest) {
 		case input.Body.Team != "":
 			team, err := rights.TeamByName(ctx, input.Body.Team)
 			if err != nil {
-				return nil, noSuchTeamNamed(input.Body.Team)
+				return nil, absent(in.Logger, err, "that team could not be looked up",
+					func() error { return noSuchTeamNamed(input.Body.Team) })
 			}
 			// At least one member has to be able to read what is
 			// being routed there, asked at the strictest
@@ -302,7 +303,7 @@ func registerAssigning(api huma.API, in Ingest) {
 		rights := access.NewStore(in.DB.DB)
 		from, err := rights.ByIdentity(ctx, input.Identity)
 		if err != nil {
-			return nil, noSuchPerson()
+			return nil, absent(in.Logger, err, "that person could not be looked up", noSuchPerson)
 		}
 
 		findings := finding.NewStore(in.DB.DB)
@@ -312,7 +313,7 @@ func registerAssigning(api huma.API, in Ingest) {
 		} else {
 			var to *access.Account
 			if to, err = rights.ByIdentity(ctx, input.Body.To); err != nil {
-				return nil, noSuchPerson()
+				return nil, absent(in.Logger, err, "that person could not be looked up", noSuchPerson)
 			} else {
 				moved, err = findings.HandOver(ctx, subject, from.PartyID, to.PartyID)
 			}

@@ -439,7 +439,7 @@ func registerRevocation(api huma.API, a Administering) {
 		for _, person := range people {
 			owners[person.ID] = person.Identity
 		}
-		return tokenList(ctx, names, tokens, owners)
+		return tokenList(ctx, a.Logger, names, tokens, owners)
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -506,7 +506,7 @@ func registerRevocation(api huma.API, a Administering) {
 			}
 			person, err := rights.ByIdentity(ctx, in.Identity)
 			if err != nil {
-				return noSuchPerson()
+				return absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 			}
 			if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
 				return wentWrong(a.Logger, "cannot end the sessions", err)

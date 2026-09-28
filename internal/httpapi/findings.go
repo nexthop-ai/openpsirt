@@ -947,7 +947,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 
 		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, target.ID, issue, component)
 		if err != nil {
-			return nil, noSuchFinding()
+			return nil, absent(in.Logger, err, "that finding could not be read", noSuchFinding)
 		}
 		body := evidenceBody(*evidence)
 		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {

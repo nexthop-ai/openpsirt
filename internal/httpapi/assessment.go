@@ -104,7 +104,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		}
 		issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, input.Vulnerability)
 		if err != nil {
-			return nil, noSuchIssue()
+			return nil, absent(in.Logger, err, "that issue could not be looked up", noSuchIssue)
 		}
 		claim, err := finding.NewStore(in.DB.DB).Assess(ctx, subject, product.ID, issue,
 			input.Body.Severity, input.Body.Reasoning)

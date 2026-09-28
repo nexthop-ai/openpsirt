@@ -141,7 +141,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		}
 		productID, vulnerabilityID, err := files.Issue(ctx, subject, input.Product, input.Vulnerability)
 		if err != nil {
-			return nil, huma.Error404NotFound(attach.ErrNoSuchIssue.Error())
+			return nil, absent(in.Logger, err, "that issue could not be looked up",
+				func() error { return huma.Error404NotFound(attach.ErrNoSuchIssue.Error()) })
 		}
 
 		maxSize, quota, share, err := attachmentLimits(ctx, in)
@@ -200,7 +201,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		}
 		productID, vulnerabilityID, err := files.Issue(ctx, subject, input.Product, input.Vulnerability)
 		if err != nil {
-			return nil, huma.Error404NotFound(attach.ErrNoSuchIssue.Error())
+			return nil, absent(in.Logger, err, "that issue could not be looked up",
+				func() error { return huma.Error404NotFound(attach.ErrNoSuchIssue.Error()) })
 		}
 		rows, err := files.ForIssue(ctx, subject, productID, vulnerabilityID)
 		if err != nil {

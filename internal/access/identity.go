@@ -313,7 +313,7 @@ func (s *Store) claimedBy(ctx context.Context, username string) (*Identity, erro
 	claimed := new(Identity)
 	if err := s.db.NewSelect().Model(claimed).
 		Where("username = ?", username).Scan(ctx); err != nil {
-		return nil, ErrDenied
+		return nil, database.FromRead(err, ErrDenied, "look up who may sign in by that name")
 	}
 	return claimed, nil
 }
@@ -401,7 +401,7 @@ func (s *Store) Identities(ctx context.Context, personID int64) ([]Identity, err
 func (s *Store) byID(ctx context.Context, id int64) (*Account, error) {
 	person := new(Account)
 	if err := s.db.NewSelect().Model(person).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, ErrDenied
+		return nil, database.FromRead(err, ErrDenied, "look up a person")
 	}
 	return person, nil
 }

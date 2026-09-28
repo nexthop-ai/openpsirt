@@ -190,7 +190,7 @@ func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, er
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
 		Where("secret_hash = ?", hashSecret(presented)).Scan(ctx); err != nil {
-		return Subject{}, ErrDenied
+		return Subject{}, database.FromRead(err, ErrDenied, "look up a token")
 	}
 	if token.RevokedAt != nil {
 		return Subject{}, ErrDenied
