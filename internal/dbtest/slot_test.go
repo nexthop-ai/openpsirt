@@ -110,7 +110,7 @@ func TestTwoLesseesOfOnePackageNeverShareASlot(t *testing.T) {
 func TestAReleasedSlotIsReusedWithItsDatabase(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
-		admin := openAdmin(t, base)
+		admin := Open(t, base)
 		path := slotPath(t, engine)
 		fingerprint, err := migrations.Fingerprint()
 		if err != nil {
@@ -169,7 +169,7 @@ func TestASlotIsFreedWhenItsConnectionCloses(t *testing.T) {
 		_ = held.conn.Close()
 		_ = held.db.Close()
 
-		admin := openAdmin(t, base)
+		admin := Open(t, base)
 		conn, err := admin.DB.DB.Conn(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -205,7 +205,7 @@ func TestASlotIsFreedWhenItsConnectionCloses(t *testing.T) {
 func TestTheCleanLeavesAHeldSlotAndDropsAnUnheldOne(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
-		admin := openAdmin(t, base)
+		admin := Open(t, base)
 		path := slotPath(t, engine)
 		held := leaseFor(t, engine, base, path)
 		freed := leaseFor(t, engine, base, path)
