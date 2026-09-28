@@ -5918,6 +5918,49 @@ components:
         - variant
         - places
       type: object
+    MatchCoverageBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/MatchCoverageBody.json
+          format: uri
+          readOnly: true
+          type: string
+        components:
+          description: The number of components the build holds
+          format: int64
+          type: integer
+        items:
+          description: The unmatched components, narrowed by reason where one was asked for, ordered by reason and then by name
+          items:
+            $ref: "#/components/schemas/UnmatchedBody"
+          type:
+            - array
+            - "null"
+        reasons:
+          description: Every reason with how many components it covers, zero included, in the order a component is tested against them. A component is counted under the first reason it meets
+          items:
+            $ref: "#/components/schemas/ReasonCountBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The number of items across every page
+          format: int64
+          type: integer
+        unmatched:
+          description: The number of those the scanner has no way to match
+          format: int64
+          type: integer
+      required:
+        - components
+        - unmatched
+        - reasons
+        - items
+        - total
+      type: object
     MeasuredBody:
       additionalProperties: false
       properties:
@@ -7870,6 +7913,26 @@ components:
         - places
         - waiting
       type: object
+    ReasonCountBody:
+      additionalProperties: false
+      properties:
+        count:
+          description: The number of the build's components it covers
+          format: int64
+          type: integer
+        reason:
+          description: Why the scanner cannot match them
+          enum:
+            - no-identifier
+            - unpublished-kind
+            - no-version
+            - no-distribution
+            - generic-without-cpe
+          type: string
+      required:
+        - reason
+        - count
+      type: object
     ReceiptBody:
       additionalProperties: false
       properties:
@@ -8675,15 +8738,15 @@ components:
         term:
           description: The search this answers, where one was asked
           type: string
-        unidentified:
-          description: The number of those components carrying neither a package identifier nor a platform enumeration
+        unmatched:
+          description: The number of those components the scanner has no way to match. The match coverage report lists them, with the reason
           format: int64
           type: integer
       required:
         - items
         - components
         - edges
-        - unidentified
+        - unmatched
       type: object
     RowsStandingBody:
       additionalProperties: false
@@ -10418,6 +10481,39 @@ components:
           type: integer
       required:
         - undone
+      type: object
+    UnmatchedBody:
+      additionalProperties: false
+      properties:
+        cpe:
+          description: The platform enumeration the scanner is given, where there is one
+          type: string
+        ecosystem:
+          description: The kind of package this is, as its identifier spells it
+          type: string
+        name:
+          type: string
+        namespace:
+          description: The namespace its package identifier names, where it names one
+          type: string
+        purl:
+          description: The package identifier the scanner is given, where there is one
+          type: string
+        reason:
+          description: "Why the scanner cannot match it. no-identifier: no package identifier, and a CPE alone matches nothing. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE"
+          enum:
+            - no-identifier
+            - unpublished-kind
+            - no-version
+            - no-distribution
+            - generic-without-cpe
+          type: string
+        version:
+          type: string
+      required:
+        - name
+        - version
+        - reason
       type: object
     UpgradeBody:
       additionalProperties: false
@@ -23636,6 +23732,142 @@ paths:
         any_of:
           - public-triage
           - private-triage
+  /v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage:
+    get:
+      description: |-
+        Returns the components the build holds now that the vulnerability scanner has no way to match, with the reason for each and a count per reason. Such a component reports no findings whatever it contains.
+
+        Read from the component as the scanner is given it, when this is asked. A component meeting several reasons is listed under the first in the order `reasons` gives.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-match-coverage
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: One reason alone
+          explode: false
+          in: query
+          name: reason
+          schema:
+            description: One reason alone
+            enum:
+              - no-identifier
+              - unpublished-kind
+              - no-version
+              - no-distribution
+              - generic-without-cpe
+            type: string
+        - description: The number returned
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 200
+            description: The number returned
+            format: int64
+            maximum: 500
+            minimum: 1
+            type: integer
+        - description: The number skipped
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: The number skipped
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchCoverageBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the components a scanner cannot match
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}:
+    get:
+      description: |-
+        Every component the match coverage list names, as a file, in the same order, with the reason for each.
+
+        Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-match-coverage
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: One reason alone
+          explode: false
+          in: query
+          name: reason
+          schema:
+            description: One reason alone
+            enum:
+              - no-identifier
+              - unpublished-kind
+              - no-version
+              - no-distribution
+              - generic-without-cpe
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the components a scanner cannot match
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades:
     get:
       description: |-
