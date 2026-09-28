@@ -5,8 +5,14 @@ package attach
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // An endpoint reached in the clear is refused unless it reaches no further than
@@ -33,10 +39,8 @@ func TestPlaintextEndpointNeedsSayingSo(t *testing.T) {
 			endpoint: "http://10.4.1.9:9000", refused: true},
 		{name: "loopback needs no allowance", endpoint: "http://127.0.0.1:9000", clear: false},
 		{name: "loopback by name needs none either", endpoint: "http://localhost:9000"},
-		// Loopback is the whole of 127.0.0.0/8 and the IPv6 forms, not three
-		// spellings of it. Giving a local store its own address is ordinary,
-		// and it was refused with a message naming exactly what the operator
-		// had supplied.
+		// Loopback is the whole of 127.0.0.0/8 and the IPv6 forms. Giving a
+		// local store its own loopback address is ordinary.
 		{name: "a local store on its own loopback address", endpoint: "http://127.0.0.2:9000"},
 		{name: "loopback written as IPv6", endpoint: "http://[::1]:9000"},
 		{name: "loopback written as an IPv4-mapped IPv6 literal",
@@ -91,5 +95,80 @@ func TestNoBucketIsNoStore(t *testing.T) {
 	}
 	if bucket != nil {
 		t.Fatal("a store was built for no bucket")
+	}
+}
+
+// A plaintext store takes a body it cannot rewind.
+//
+// An upload is streamed through two digests on its way in, so what reaches the
+// client is a reader with no Seek. Over https the request carries a trailing
+// checksum, which a stream satisfies; over http the client hashes the body
+// before sending it unless told the payload is unsigned. The server here is on
+// a loopback address, which is the development store.
+func TestAPlaintextStoreTakesAStreamedBody(t *testing.T) {
+	held := map[string][]byte{}
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.Method {
+		case http.MethodPut:
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			held[r.URL.Path] = body
+		case http.MethodGet:
+			body, ok := held[r.URL.Path]
+			if !ok {
+				w.Header().Set("Content-Type", "application/xml")
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(w, `<Error><Code>NoSuchKey</Code></Error>`)
+				return
+			}
+			_, _ = w.Write(body)
+		case http.MethodDelete:
+			delete(held, r.URL.Path)
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	bucket, err := NewBucket(ctx, BucketConfig{
+		Endpoint: server.URL, Bucket: "attachments", Region: "us-east-1",
+		Key: "key", Secret: "secret", PathStyle: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const key, content = "attachments/ab/cd/abcd", "the bytes of a file"
+	// No Seek: the shape the upload path hands over.
+	streamed := io.MultiReader(strings.NewReader(content))
+	if err := bucket.Put(ctx, key, streamed, int64(len(content)), "text/plain"); err != nil {
+		t.Fatalf("a streamed body was refused: %v", err)
+	}
+	read, err := bucket.Open(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(read)
+	_ = read.Close()
+	if err != nil || string(got) != content {
+		t.Fatalf("read back %q, %v", got, err)
+	}
+	link, err := bucket.URLFor(ctx, key, time.Minute, `attachment; filename="a"`, "text/plain")
+	if err != nil || !strings.HasPrefix(link, server.URL+"/attachments/"+key+"?") {
+		t.Fatalf("signed %q, %v", link, err)
+	}
+	if err := bucket.Delete(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bucket.Open(ctx, key); !errors.Is(err, ErrNoSuchObject) {
+		t.Fatalf("a removed object read back as %v", err)
+	}
+	if err := bucket.Reachable(ctx); err != nil {
+		t.Fatal(err)
 	}
 }

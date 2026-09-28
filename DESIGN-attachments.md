@@ -135,6 +135,7 @@ An endpoint that is not `https` is refused, and two things lift that (REQ-70).
 | A deployment that lifted it is told at every start | An attachment is delivered as a redirect, so the signed address is a bearer token: anybody on the path may spend it for the file it names. That is invisible from the setting that allows it, and the person who set it is rarely the person reading the logs a year later |
 | Neither the refusal nor the notice repeats a password | An endpoint may carry credentials, and a notice at every start would otherwise write them to the log at every start |
 | An endpoint carrying credentials is split before anything is given the address | The name and password are handed over as credentials, which is what makes the signing well-defined, and the address the client is given carries nothing to leak by any route. What a person is shown and what the client uses stop being two strings that can drift |
+| An upload to a plaintext store sends its payload unsigned, with a checksum only where the operation requires one | An upload is streamed through its digests and cannot be rewound, and over plain HTTP the client would otherwise hash or checksum the body before sending it, which a stream refuses. Over https a trailing checksum covers a stream and nothing changes |
 | Distinct from serving this application without TLS | That one is cookies on the way in, this one a file on the way out, and a deployment can want either without the other |
 
 ## Delivery

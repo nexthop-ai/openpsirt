@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -34,6 +35,10 @@ type Bucket struct {
 	// for it, cross the network in the clear. Worked out where the endpoint
 	// is checked, so that nothing has to decide it a second time.
 	clear bool
+	// The store is reached over plain HTTP, whether across a network or on
+	// this machine. An upload is a stream with no Seek, and over plain HTTP
+	// the client cannot hash or checksum one ahead of sending it.
+	plain bool
 }
 
 // BucketConfig is where an object store is and how to reach it.
@@ -59,7 +64,7 @@ type BucketConfig struct {
 	AllowHTTP bool
 }
 
-// NewBucket returns a store, or nil where the deployment configured none .
+// NewBucket returns a store, or nil where the deployment configured none.
 //
 // Credentials are taken from the environment when none are configured,
 // which is the whole reason for the official client: a deployment on
@@ -81,7 +86,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		options = append(options, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(settings.Key, settings.Secret, settings.Token)))
 	}
-	inTheClear := false
+	inTheClear, plain := false, false
 	endpoint := strings.TrimSpace(settings.Endpoint)
 	shown := endpoint
 	if endpoint != "" {
@@ -91,11 +96,10 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		}
 		// A name and password in the address are taken out of it and handed
 		// over as credentials, which is also what makes the signing
-		// well-defined. Left in, the raw string reached the client and every
-		// failure it reported carried the password — a startup reachability
-		// failure is printed to standard error, where a container runtime
-		// captures it into the log store the redaction exists to keep it out
-		// of.
+		// well-defined. The client is given the address without them, because
+		// every failure it reports carries the address it was given, and a
+		// startup reachability failure is printed to standard error, where a
+		// container runtime captures it into a log store.
 		//
 		// A configured key still wins, for the reason above.
 		if parsed.User != nil {
@@ -117,7 +121,8 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// than two that can drift: the password has already been taken out
 		// of the one the client gets.
 		shown = endpoint
-		inTheClear = parsed.Scheme != "https" && !loopback(parsed.Hostname())
+		plain = parsed.Scheme != "https"
+		inTheClear = plain && !loopback(parsed.Hostname())
 		if inTheClear && !settings.AllowHTTP {
 			// Naming the way through. The operator meeting this is the one a
 			// plaintext store was allowed for, and a refusal that states only
@@ -160,6 +165,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		bucket:   bucket,
 		endpoint: shown,
 		clear:    inTheClear,
+		plain:    plain,
 	}, nil
 }
 
@@ -176,12 +182,9 @@ func (b *Bucket) Endpoint() string { return b.endpoint }
 
 // loopback says whether a host reaches no further than this machine.
 //
-// Asked of the address rather than compared against a table of three. The
-// table left the whole of 127.0.0.0/8 and the IPv4-mapped IPv6 forms outside
-// it, so a local store given its own loopback address was refused with a
-// message naming exactly what the operator had supplied — and the only way
-// past it said, in the deployment log, that a plaintext store had been
-// accepted across a network when it had not.
+// Loopback is the whole of 127.0.0.0/8 and ::1 in every spelling, including
+// the IPv4-mapped IPv6 forms, so it is asked of the parsed address rather than
+// matched against a list of spellings.
 //
 // The literal name stays, because it is a name rather than an address and the
 // deployment may have it in its own hosts file.
@@ -203,13 +206,27 @@ func (b *Bucket) Put(ctx context.Context, key string, body io.Reader, size int64
 	// Streamed rather than held. The signature covers the envelope and TLS
 	// covers the bytes, which is what lets a reader be passed through instead
 	// of a slice the size of the file.
+	//
+	// Over https the client sends a trailing checksum, which a stream
+	// satisfies. Over plain HTTP it would hash the body before sending it,
+	// which a stream with no Seek refuses, so the payload goes unsigned and
+	// the checksum is sent only where the operation requires one. The body's
+	// integrity is the upload path's own digest, taken as the bytes pass.
+	var perCall []func(*s3.Options)
+	if b.plain {
+		perCall = append(perCall,
+			s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware),
+			func(o *s3.Options) {
+				o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+			})
+	}
 	_, err := b.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(b.bucket),
 		Key:           aws.String(key),
 		Body:          body,
 		ContentLength: aws.Int64(size),
 		ContentType:   aws.String(contentType),
-	})
+	}, perCall...)
 	if err != nil {
 		return fmt.Errorf("store object: %w", err)
 	}
