@@ -535,7 +535,8 @@ not done, so the manifest holds one architecture and the chart runs on
 Compatibility begins at 1.0 (REQ-76). Below it the API and the schema are both
 alpha: a release exercises the whole publication path and undertakes nothing
 about upgrading from one to the next, and the schema is not collapsed into one
-initial migration until then (REQ-72). What says so is the major version rather
+initial migration until then. The collapse keeps an upgrade from the last 0.x
+release (`DESIGN-database.md` § Migrations). What says so is the major version rather
 than a suffix on the tag, which is why `0.1.0` is published as a release and
 moves the aliases — `latest` has to name something, and while every version is
 alpha the newest one is still what somebody asking for the current version

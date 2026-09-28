@@ -21,7 +21,7 @@ Required for 1.0, and wrong to do earlier.
 
 | Work | Why it waits |
 |---|---|
-| Collapse the migrations into one | 1 to 36 stay because v0.1.0 applied them, 37 and 38 because v0.2.0 and v0.3.0 tagged them, and 39 is the untagged release's own. v0.4.0 changed no schema (REQ-72) |
+| Collapse the migrations into one | 1 to 36 stay because v0.1.0 applied them, 37 and 38 because v0.2.0 and v0.3.0 tagged them, and 39 is the untagged release's own. v0.4.0 changed no schema. The collapse keeps one upgrade, from the last 0.x release, so a database that release built is upgraded rather than recreated |
 | Start keeping schema and API compatibility | Below 1.0 an upgrade may change the API, and only a database from a tagged release is upgraded in place (REQ-76) |
 
 ## Deferred by the owner
