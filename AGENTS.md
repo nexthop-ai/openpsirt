@@ -573,13 +573,14 @@ returns at the length test without it. The other shapes were the same behavior
 at two layers, and the same predicate over different input classes. Nothing was
 deleted.
 
-The same test the other way round. "Leaves a level of one alone" and "says
-nothing where nothing has a version" also both return the empty string, and
-they *are* the same path: a level of one and a level of none both leave the
+The same test the other way round. A level of one and a level of none also
+both return the empty string, and they *are* the same path: both leave the
 length test with nothing, and neither reaches the comparison. Two assertions
 that read differently and execute identically is what this rule says to look
 for. The tests are named here rather than cited by line, because a line number
-stops saying what it said the first time either file is edited.
+stops saying what it said the first time either file is edited. A level of none
+has no test of its own, because it runs the path "leaves a level of one alone"
+already pins.
 
 ## Commits and pull requests
 
