@@ -34,7 +34,6 @@ import { BANDS } from "../../ui/severities";
 // server answers for.
 const WEEKS = [4, 13, 26, 52, 104] as const;
 
-
 export function Backlog() {
   const at = useScope();
   const scope = scopeQuery(at);

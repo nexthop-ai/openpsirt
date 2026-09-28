@@ -1,12 +1,89 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { Empty } from "./Empty";
+import { Paged } from "./Paged";
 import { Wide } from "./Wide";
 import { componentAt } from "../app/routes";
 
 // One kind of change, or every kind where it is empty.
 export type Kind = "" | "removed" | "added" | "changed";
+
+// The most one page asks for. Long enough that an ordinary night fits on one
+// page, short enough that a build which replaced everything does not arrive as
+// one screen of two thousand rows.
+export const PAGE = 200;
+
+// MovedPage is one page of names that moved, under the chips that narrow it
+// to one kind.
+//
+// Two different emptinesses. Narrowed to one kind, what is empty is the
+// narrowing, and the way back is offered because the chips that produced it
+// are above a screen somebody may have scrolled. Unnarrowed, it is the
+// inventories themselves, which `nothing` says.
+//
+// `waiting` stands in for the page while it is read or where it failed.
+export function MovedPage({
+  product,
+  only,
+  onPick,
+  rows,
+  total,
+  offset,
+  onGo,
+  removedIsGone,
+  otherwise,
+  nothing,
+  waiting,
+}: {
+  product: string;
+  only: Kind;
+  onPick: (kind: Kind) => void;
+  rows: NameMoved[];
+  total: number;
+  offset: number;
+  onGo: (offset: number) => void;
+  removedIsGone?: boolean;
+  // What else changed, where one kind is asked for and none of it moved.
+  otherwise: string;
+  nothing: { title: string; detail: string };
+  waiting?: ReactNode;
+}) {
+  return (
+    <>
+      <KindChips only={only} onPick={onPick} />
+      {waiting ??
+        (rows.length === 0 ? (
+          only ? (
+            <Empty
+              title={`Nothing was ${only === "changed" ? "moved to a new version" : only}.`}
+              detail={otherwise}
+            >
+              <button type="button" className="btn" onClick={() => onPick("")}>
+                Show everything
+              </button>
+            </Empty>
+          ) : (
+            <Empty title={nothing.title} detail={nothing.detail} />
+          )
+        ) : (
+          <>
+            <NamesMoved product={product} rows={rows} removedIsGone={removedIsGone} />
+            <Paged
+              shown={rows.length}
+              total={total}
+              offset={offset}
+              limit={PAGE}
+              onGo={onGo}
+              what="listed"
+            />
+          </>
+        ))}
+    </>
+  );
+}
 
 // One name two inventories hold differently: an upload against the one before
 // it, or one build against another.
@@ -20,7 +97,7 @@ type NameMoved = {
 // The kinds of change as a row of chips. One kind at a time is asked of the
 // server, so that the count in the footer is of that kind rather than of the
 // page.
-export function KindChips({ only, onPick }: { only: Kind; onPick: (kind: Kind) => void }) {
+function KindChips({ only, onPick }: { only: Kind; onPick: (kind: Kind) => void }) {
   return (
     <div className="variants" style={{ marginBottom: 10 }}>
       {(
@@ -50,7 +127,7 @@ export function KindChips({ only, onPick }: { only: Kind; onPick: (kind: Kind) =
 // removedIsGone says a removed name is shipped by nothing on the before side
 // either, which is true of one upload against its predecessor and false of two
 // builds, where the earlier build still ships it.
-export function NamesMoved({
+function NamesMoved({
   product,
   rows,
   removedIsGone = true,

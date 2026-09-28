@@ -2,20 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
-import { KindChips, NamesMoved, type Kind } from "../ui/NamesMoved";
-import { Paged } from "../ui/Paged";
-import { PickBuild } from "../ui/PickBuild";
+import { MovedPage, PAGE, type Kind } from "../ui/NamesMoved";
+import { PickPair, useBuildPair } from "../ui/PickBuild";
 import { comparisonAt } from "../app/routes";
-
-// The most one page asks for, as on one upload's listing.
-const PAGE = 200;
 
 // Which names any two builds of a product differ on.
 //
@@ -24,27 +20,11 @@ const PAGE = 200;
 // answers what each contains.
 export function InventoryCompare() {
   const { product = "" } = useParams();
-  const [params, setParams] = useSearchParams();
-  const from = params.get("from") ?? "";
-  const fromVariant = params.get("from_variant") ?? "";
-  const to = params.get("to") ?? "";
-  const toVariant = params.get("to_variant") ?? "";
-  const only = (params.get("change") ?? "") as Kind;
+  const builds = useBuildPair(product);
+  const { ready, pair } = builds;
+  const only = (builds.params.get("change") ?? "") as Kind;
   const [offset, setOffset] = useState(0);
 
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const variants = useQuery({
-    queryKey: ["variants", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
-
-  const ready = from !== "" && fromVariant !== "" && to !== "" && toVariant !== "";
-  const pair = { from, from_variant: fromVariant, to, to_variant: toVariant };
   const differences = useQuery({
     queryKey: ["inventory-comparison", product, pair, only, offset],
     enabled: ready,
@@ -62,17 +42,12 @@ export function InventoryCompare() {
   // Each choice resets the page, because a page of one comparison is not a
   // page of another.
   function set(key: string, value: string) {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next);
+    builds.set(key, value);
     setOffset(0);
   }
 
   // The file is the comparison on the screen, narrowing included.
   const asked = new URLSearchParams({ ...pair, ...(only ? { change: only } : {}) }).toString();
-  const streamNames = (streams.data?.items ?? []).map((each) => each.name ?? "");
-  const variantNames = (variants.data?.items ?? []).map((each) => each.name ?? "");
   const items = differences.data?.items ?? [];
   const total = differences.data?.total ?? 0;
 
@@ -100,31 +75,7 @@ export function InventoryCompare() {
           }}
         >
           <h3 style={{ margin: 0 }}>Compare</h3>
-          {(streams.isError || variants.isError) && (
-            <Failed
-              error={streams.isError ? streams.error : variants.error}
-              what="The builds to compare could not be read."
-            />
-          )}
-          <PickBuild
-            label="Earlier build"
-            stream={from}
-            variant={fromVariant}
-            streams={streamNames}
-            variants={variantNames}
-            onStream={(value) => set("from", value)}
-            onVariant={(value) => set("from_variant", value)}
-          />
-          <span style={{ color: "var(--faint)" }}>to</span>
-          <PickBuild
-            label="Later build"
-            stream={to}
-            variant={toVariant}
-            streams={streamNames}
-            variants={variantNames}
-            onStream={(value) => set("to", value)}
-            onVariant={(value) => set("to_variant", value)}
-          />
+          <PickPair builds={builds} set={set} />
           {ready && (
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               <a
@@ -149,39 +100,25 @@ export function InventoryCompare() {
             detail="Any two: across releases, across platforms, or a tag against its branch."
           />
         ) : (
-          <>
-            <KindChips only={only} onPick={(kind) => set("change", kind)} />
-            {differences.isPending ? (
-              <Loading />
-            ) : differences.isError ? (
-              <Failed error={differences.error} what="Those two could not be compared." />
-            ) : items.length === 0 ? (
-              only ? (
-                <Empty
-                  title={`Nothing was ${only === "changed" ? "moved to a new version" : only}.`}
-                  detail="These two differ in other ways."
-                >
-                  <button type="button" className="btn" onClick={() => set("change", "")}>
-                    Show everything
-                  </button>
-                </Empty>
-              ) : (
-                <Empty title="No differences." detail="Both builds hold the same components." />
-              )
-            ) : (
-              <>
-                <NamesMoved product={product} rows={items} removedIsGone={false} />
-                <Paged
-                  shown={items.length}
-                  total={total}
-                  offset={offset}
-                  limit={PAGE}
-                  onGo={setOffset}
-                  what="listed"
-                />
-              </>
-            )}
-          </>
+          <MovedPage
+            product={product}
+            only={only}
+            onPick={(kind) => set("change", kind)}
+            rows={items}
+            total={total}
+            offset={offset}
+            onGo={setOffset}
+            removedIsGone={false}
+            otherwise="These two differ in other ways."
+            nothing={{ title: "No differences.", detail: "Both builds hold the same components." }}
+            waiting={
+              differences.isPending ? (
+                <Loading />
+              ) : differences.isError ? (
+                <Failed error={differences.error} what="Those two could not be compared." />
+              ) : undefined
+            }
+          />
         )}
       </div>
     </div>
