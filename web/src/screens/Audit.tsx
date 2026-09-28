@@ -85,11 +85,9 @@ export function Audit() {
   // of history. It is what the standing-corrections view is built on, where
   // the whole point is that nothing expires them.
   const inForce = params.get("in_force") === "true";
-  // A page of the record rather than a cap on it. It asked for five hundred
-  // and said "narrow the dates to print the rest", which is a search dressed
-  // as an answer: an auditor reading a year cannot narrow to something they
-  // have not read yet, and the rows past the cap were unreachable from this
-  // screen entirely.
+  // A page of the record rather than a cap on it: an auditor reading a year
+  // cannot narrow to something they have not read yet, so every row is
+  // reachable a page at a time.
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -136,9 +134,10 @@ export function Audit() {
               ...(products.length > 0 ? { product: products } : {}),
               ...(outcomes.length > 0
                 ? {
-                    outcome: outcomes.filter((each): each is Outcome =>
-                      Object.hasOwn(OUTCOME_SAID, each),
-                    ),
+                    // Sent as asked: a word the server does not record is
+                    // refused, rather than dropped here while the sheet's
+                    // header still prints it.
+                    outcome: outcomes as Outcome[],
                   }
                 : {}),
               ...(alone ? { alone: true } : {}),
@@ -460,8 +459,7 @@ function Administered() {
       <div className="screen-head">
         <h3>Change history</h3>
         <span style={{ marginLeft: "auto" }} className="noprint">
-          {/* The record an access review is written from, as a file. It was
-              capped at fifty rows on a screen and could not leave it. */}
+          {/* The record an access review is written from, as a file. */}
           <a className="btn quiet" href={changesAt(params, "csv")}>
             CSV
           </a>{" "}
@@ -660,9 +658,8 @@ function Judgment({ row }: { row: Judged }) {
           </>
         )}
 
-        {/* The one field that checks an already-fixed claim, and it was
-            returned and never drawn: what the packager's own record has to
-            agree with. */}
+        {/* The one field that checks an already-fixed claim: what the
+            packager's own record has to agree with. */}
         {row.fixed_version && (
           <>
             <dt>Fixed in</dt>

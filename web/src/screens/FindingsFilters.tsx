@@ -36,7 +36,7 @@ import { Words } from "../ui/Words";
 // The label says what picking it means rather than naming the word again: the
 // least of them is every finding there is, and the worst of them is only that
 // one.
-export const SEVERITIES = FLOORS.map((word, i) => [
+const SEVERITIES = FLOORS.map((word, i) => [
   word,
   i === 0 ? "Any" : i === FLOORS.length - 1 ? "Critical only" : titled(word) + " and above",
 ]) as unknown as readonly (readonly [string, string])[];
@@ -73,22 +73,21 @@ export const STATES = [
 
 // The outcomes this filter offers, labeled from the one map rather than
 // beside the tokens here: a second spelling of a word somebody picks and then
-// reads back is how the two stop agreeing. Typed against the server's own
-// outcomes, so a word it does not record is a compile error.
-export const OUTCOMES: readonly (readonly [string, string])[] = [
+// reads back is how the two stop agreeing. Keyed by every outcome the server
+// records, so one it adds or drops is a compile error here.
+const OFFERED: Record<Outcome, true> = {
+  affected: true,
+  "not-applicable": true,
+  mismatched: true,
+  "wont-fix": true,
+  deferred: true,
+  "already-fixed": true,
+  "upgrade-needed": true,
+  "patch-needed": true,
+};
+const OUTCOMES: readonly (readonly [string, string])[] = [
   ["", "Any"],
-  ...(
-    [
-      "affected",
-      "not-applicable",
-      "mismatched",
-      "wont-fix",
-      "deferred",
-      "already-fixed",
-      "upgrade-needed",
-      "patch-needed",
-    ] as const satisfies readonly Outcome[]
-  ).map((each) => [each, labeled(each)] as const),
+  ...(Object.keys(OFFERED) as Outcome[]).map((each) => [each, labeled(each)] as const),
 ];
 
 export const ASSIGNED = [
@@ -207,7 +206,7 @@ function said(pairs: Pairs, value: string): string {
 // removing one leaves the rest — which is the whole point of asking for two.
 // The pairs say what to remove: a key with an empty word is the whole filter,
 // a key with a word is that one value of it.
-export type Active = {
+type Active = {
   key: string;
   label: string;
   value: string;

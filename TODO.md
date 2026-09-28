@@ -82,6 +82,7 @@ Missing or wrong, with no decision needed to fix it.
 | The recorded scanner output is from grype 0.112.0 | The image ships 0.119.0. Re-recording changes what several tests assert |
 | The scanner's memory use is not measured | The pod's limits are a judgment. A measurement of peak memory on the full-size fixture, cold and warm, would settle them |
 | A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
+| The interface copies which outcomes dismiss and which state a reason | The server does not publish either class, so an outcome it reclassifies is not a compile error in the interface. Publishing them needs a field the interface reads |
 | The interface is designed from mockups | Some of it will be wrong in ways that show only in use. The first release is evidence |
 
 ## Weak tests

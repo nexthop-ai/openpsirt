@@ -1693,14 +1693,14 @@ than calling the row a finding. The rail has room for a number and not for a
 noun, so a badge carries its unit on the title and on what a screen reader is
 given.
 
-Dates take one absolute form and one relative form. Four were in use at once,
-two of them machine-shaped — a stored moment interpolated whole, with its time
-and its offset, is the tool showing its storage rather than answering the
-question.
+Dates take an absolute form, to the day or to the minute, and one relative
+form. A stored moment interpolated whole, with its time and its offset, is the
+tool showing its storage rather than answering the question.
 
 | Form | |
 |---|---|
 | **Absolute** | The calendar day as stored, deliberately not localized. These are dates people quote to each other across time zones, and one that reads differently for two people looking at the same row is worse than one that reads unfamiliarly for both |
+| **To the minute** | The day and the minute in UTC, and saying so, for a moment somebody correlates with another: a comment, a grant, a scan arriving. Written without the zone it reads as the reader's local time |
 | **Relative** | For the reader asking whether something is stale. It reads the same scale in both directions, because a deadline and a last scan are the same question about opposite sides of now, and it carries the absolute form on the title |
 
 A value that is not a stored moment is drawn as nothing in both forms: the shape
@@ -1809,7 +1809,7 @@ scroll sideways. That is why the tables here are written rather than installed.
 | **What sits over the page is positioned against the viewport** | The nearest positioned ancestor is the frame, which grows with the content — so on a tall page the drawer's height became the whole document: Close at the top of it, submit at the bottom, and neither on screen. A floating action that is not fixed does not float |
 | **Stacking is a named scale, not hand-picked numbers** | They were spread across the stylesheets with nothing to read to decide the next one, and two unrelated overlays claimed the same step: the drawer and the rail's scrim resolve in one context, so the drawer won on document order and the rail's click-to-dismiss stopped working wherever they overlapped |
 | **A closed vocabulary the server owns is rendered from the generated client** | They were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell wherever it was the whole of it, register states printed as wire tokens, and a narrowing over the claim kinds could not fail because its comparisons exhausted every value but one |
-| **An outcome's class is derived once, by the server's rule** | Which outcomes dismiss and which state a reason come from one table keyed by every outcome the server records, holding what each claims: that it hides risk, that it carries a date, that it states a reason. A dismissal hides risk and carries no date. A report asking for dismissals and a form asking for a reason read that table, so an outcome the server gains is a compile error rather than one left uncounted |
+| **An outcome's class is one table in the interface, copying the server's rule** | Which outcomes dismiss and which state a reason come from one table keyed by every outcome the server records, holding what each claims: that it hides risk, that it carries a date, that it states a reason. A dismissal hides risk and carries no date. The reports asking for dismissals and the bulk and saved-filter forms asking for a reason read it, so an outcome the server gains is a compile error. Half built: the server does not publish the classes, so an outcome it moves to another class is not caught here, and the one-finding decision form still states the reason rule on its own |
 | **A count is never shown before it is known** | While its read is in flight a count is a faint placeholder, never a digit; a failed read is a dash with the reason on hover; only an answered read shows the figure. A zero drawn while loading is a confident answer to a question not yet asked. An empty state such as "Nothing is pending" is drawn only once every read it depends on has answered. One shared renderer does all three, and a web test holds it to them |
 | **A word the table does not know is shown as it arrived** | A server that grows a vocabulary before the interface does should leave somebody reading something unfamiliar rather than a blank |
 | **A choice with a consequence is a card per option** | Where it came from, filing or recording, a recorded flaw's disclosure, and a ruling's disposition each decide something that follows. The card carries what picking it does, so it is read before the choice. An option somebody may not pick is left out and said in a line below, not drawn as a card that refuses. A radio group to the keyboard: one tab stop, arrows move and pick |
