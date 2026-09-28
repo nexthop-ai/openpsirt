@@ -14,6 +14,7 @@ import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
 import { DECIDE_KEPT, keepAnswer, ownsSession, restoreAnswer } from "../app/drafts";
+import { DAY_MS } from "./when";
 
 // One judgment about this finding. Outcome, the justification where it does
 // not apply, a date where it is deferred, the reasoning, which places it
@@ -197,7 +198,7 @@ function rememberUsed(said: Same) {
 function deferredDays(until: string): number {
   const then = Date.parse(until + "T00:00:00Z");
   if (Number.isNaN(then)) return 0;
-  return Math.max(0, (then - Date.now()) / 86_400_000);
+  return Math.max(0, (then - Date.now()) / DAY_MS);
 }
 
 // Whether a claim stands on its own or waits for a second person, said before
@@ -449,8 +450,6 @@ export function Decide({
           variant: m.variant ?? "",
           version: m.version ?? "",
           places: (had?.places ?? 0) + (m.places ?? 0),
-          note: "The same issue at another version. Check the reasoning still holds there.",
-          tone: "warn",
         });
       }
     }

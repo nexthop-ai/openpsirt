@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSearchParams } from "react-router-dom";
+import { DAY_MS } from "../../ui/when";
 
 // The window a report sheet covers, and the words for it.
 //
@@ -37,7 +38,7 @@ export function daysAsked(params: URLSearchParams, fallback: number): number {
 // take. Beside the reader of the number rather than in each sheet, so a figure
 // and the list it opens ask the same question.
 export function windowStart(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return new Date(Date.now() - days * DAY_MS).toISOString().slice(0, 10);
 }
 
 // wordsFor is what one window is called, wherever it is named.

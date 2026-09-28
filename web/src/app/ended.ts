@@ -21,6 +21,9 @@
 //
 // A module rather than React state because the thing that notices is the query
 // client, which is created outside the tree and has no way to reach into it.
+//
+// Nothing clears it. Every way back in through a provider is a redirect, and a
+// redirect loads the page again.
 
 let ended = false;
 const watching = new Set<() => void>();
@@ -29,16 +32,6 @@ const watching = new Set<() => void>();
 export function sessionEnded() {
   if (ended) return;
   ended = true;
-  for (const tell of watching) tell();
-}
-
-// Resumed clears it, for the case somebody signs in again without the page
-// reloading. Nothing does that today — every way back through a provider is a
-// redirect — and it exists so that the flag is not a one-way door if one ever
-// does.
-export function sessionResumed() {
-  if (!ended) return;
-  ended = false;
   for (const tell of watching) tell();
 }
 

@@ -40,8 +40,6 @@ export type Other = {
   variant: string;
   version: string;
   places: number;
-  note: string;
-  tone: "ok" | "warn" | "off";
 };
 
 export type Plan = {
