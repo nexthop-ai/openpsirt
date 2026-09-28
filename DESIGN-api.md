@@ -145,7 +145,10 @@ error types, asked in one place, rather than by the message text. Answered
 alike as a 422 with the message in it, a broken database reaches the caller as
 a bad request carrying the statement text and, for a connection failure, the
 address and user it tried. A connection that could not be made or was cut
-short is read from the network's and each driver's own error for it. Every
+short is read from the network's and each driver's own error for it. The
+document parser states a file ending inside a value in its own words, because
+the error it would otherwise return is the one a driver returns for a
+connection cut short, and a truncated upload is the sender's to fix. Every
 mapper from a store's error to an answer asks this before publishing a
 message, and a failed upload's receipt carries a fixed sentence in place of
 one. Where the type cannot decide, the error is treated as a refusal.

@@ -57,6 +57,21 @@ func newBounded(r io.Reader, maxDepth int) *bounded {
 	return &bounded{dec: json.NewDecoder(r), maxDepth: maxDepth}
 }
 
+// token reads the next token, stating a document that ends inside a value in
+// words.
+//
+// The decoder reports that as the same end-of-file error a database driver
+// returns for a connection cut short, and a caller that tells the two apart by
+// the error's identity answers the sender's malformed file as a fault of its
+// own.
+func (b *bounded) token() (json.Token, error) {
+	tok, err := b.dec.Token()
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, errors.New("the document ends partway through a value")
+	}
+	return tok, err
+}
+
 func (b *bounded) enter() error {
 	b.depth++
 	if b.depth > b.maxDepth {
@@ -75,7 +90,7 @@ func (b *bounded) object(fn func(key string) error) error {
 	}
 	defer b.leave()
 	for b.dec.More() {
-		tok, err := b.dec.Token()
+		tok, err := b.token()
 		if err != nil {
 			return err
 		}
@@ -106,7 +121,7 @@ func (b *bounded) array(fn func() error) error {
 
 // open consumes an opening delimiter and descends a level.
 func (b *bounded) open(want json.Delim) error {
-	tok, err := b.dec.Token()
+	tok, err := b.token()
 	if err != nil {
 		return err
 	}
@@ -118,14 +133,14 @@ func (b *bounded) open(want json.Delim) error {
 
 // close consumes a closing delimiter.
 func (b *bounded) close() error {
-	_, err := b.dec.Token()
+	_, err := b.token()
 	return err
 }
 
 // str reads one string. A null reads as empty, which is how a producer that
 // emits a field it has no value for is treated the same as one that omits it.
 func (b *bounded) str() (string, error) {
-	tok, err := b.dec.Token()
+	tok, err := b.token()
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +161,7 @@ func (b *bounded) str() (string, error) {
 // a name in the next is common enough that reading only one of the two would
 // refuse documents that are perfectly well formed.
 func (b *bounded) stringOrObject(fn func(key string) error) (string, error) {
-	tok, err := b.dec.Token()
+	tok, err := b.token()
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +182,7 @@ func (b *bounded) stringOrObject(fn func(key string) error) (string, error) {
 	}
 	defer b.leave()
 	for b.dec.More() {
-		key, err := b.dec.Token()
+		key, err := b.token()
 		if err != nil {
 			return "", err
 		}
@@ -185,7 +200,7 @@ func (b *bounded) stringOrObject(fn func(key string) error) (string, error) {
 // skip consumes one value of any shape, descending through it so that nesting
 // inside a part of the document we do not read is still bounded.
 func (b *bounded) skip() error {
-	tok, err := b.dec.Token()
+	tok, err := b.token()
 	if err != nil {
 		return err
 	}
@@ -199,7 +214,7 @@ func (b *bounded) skip() error {
 	defer b.leave()
 	for b.dec.More() {
 		if delim == '{' {
-			if _, err := b.dec.Token(); err != nil { // the key
+			if _, err := b.token(); err != nil { // the key
 				return err
 			}
 		}
@@ -223,7 +238,7 @@ func (b *bounded) skip() error {
 // refers to, and a document doing that in a field whose text is all this reads
 // has nothing here to offer rather than being broken.
 func (b *bounded) each(fn func(string) error) error {
-	tok, err := b.dec.Token()
+	tok, err := b.token()
 	if err != nil {
 		return err
 	}
@@ -239,7 +254,7 @@ func (b *bounded) each(fn func(string) error) error {
 			}
 			defer b.leave()
 			for b.dec.More() {
-				if _, err := b.dec.Token(); err != nil { // the key
+				if _, err := b.token(); err != nil { // the key
 					return err
 				}
 				if err := b.skip(); err != nil {
