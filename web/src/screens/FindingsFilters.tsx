@@ -157,7 +157,7 @@ export const DEADLINES = [
 // server matches it, and the chip above the list labels it with the word
 // itself. What it has no way to do is offer it, and the durable answer to that
 // is the kinds actually present travelling with the read rather than a longer
-// list here — which is a question the server does not answer.
+// list here — which is a question the server does not answer yet.
 const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
