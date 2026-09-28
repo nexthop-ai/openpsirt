@@ -191,35 +191,42 @@ func debianOrder(a, b string) (int, bool) {
 // "TBD", a sentence — fails both.
 func splitDebian(v string) (epoch, upstream, revision string, ok bool) {
 	epoch = "0"
+	epochStated := false
 	if at := strings.Index(v, ":"); at >= 0 {
 		if !digits(v[:at]) {
 			return "", "", "", false
 		}
-		epoch, v = v[:at], v[at+1:]
+		epoch, v, epochStated = v[:at], v[at+1:], true
 	}
+	revised := false
 	if at := strings.LastIndex(v, "-"); at >= 0 {
-		upstream, revision = v[:at], v[at+1:]
+		upstream, revision, revised = v[:at], v[at+1:], true
 	} else {
 		upstream = v
 	}
 	if upstream == "" || !isDigit(upstream[0]) {
 		return "", "", "", false
 	}
-	if !debianCharacters(upstream) || !debianCharacters(revision) {
+	// The upstream version may hold a hyphen where a revision follows it, and
+	// a colon where an epoch precedes it, which is Debian policy's own rule.
+	// The revision holds neither.
+	if !debianCharacters(upstream, revised, epochStated) ||
+		!debianCharacters(revision, false, false) {
 		return "", "", "", false
 	}
 	return epoch, upstream, revision, true
 }
 
-// debianCharacters says whether every character is one a Debian version may
-// hold. The hyphen is not among them: it separates the revision, and the
-// caller has already cut at the last one.
-func debianCharacters(s string) bool {
+// debianCharacters says whether every character is one a Debian version part
+// may hold, with the hyphen and the colon admitted only where the caller says
+// the part may hold them.
+func debianCharacters(s string, hyphen, colon bool) bool {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		switch {
 		case c >= '0' && c <= '9', c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z':
 		case c == '.', c == '+', c == '~':
+		case c == '-' && hyphen, c == ':' && colon:
 		default:
 			return false
 		}
@@ -375,6 +382,9 @@ func splitSemantic(v string) (release []string, pre string, ok bool) {
 	}
 	if at := strings.Index(v, "-"); at >= 0 {
 		v, pre = v[:at], v[at+1:]
+		if !semanticPreRelease(pre) {
+			return nil, "", false
+		}
 	}
 	// An empty version needs no guard of its own: Split gives one empty part,
 	// which is not digits, and the loop below answers with the same nil, "",
@@ -389,6 +399,24 @@ func splitSemantic(v string) (release []string, pre string, ok bool) {
 		}
 	}
 	return release, pre, true
+}
+
+// semanticPreRelease says whether a pre-release is one the specification
+// allows: dot-separated identifiers, none of them empty, each drawn from
+// letters, digits and the hyphen. Anything else is text a producer wrote after
+// a hyphen, and ordering it is a guess.
+func semanticPreRelease(pre string) bool {
+	for _, identifier := range strings.Split(pre, ".") {
+		if identifier == "" {
+			return false
+		}
+		for i := 0; i < len(identifier); i++ {
+			if c := identifier[i]; !isDigit(c) && !isLetter(c) && c != '-' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // compareNumeric compares two runs of digits as numbers without converting

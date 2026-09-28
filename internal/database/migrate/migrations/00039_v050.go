@@ -60,6 +60,20 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     v0.4.0 kept the act in the administrative trail and nothing beside the
 //     name. A column added with its default, which all four engines add where
 //     the table stands.
+//   - A graph node gains columns for the identifiers its build stated for the
+//     component. Every open node takes the component row's, which is what
+//     v0.4.0 gave a scanner, and the next scan of each build writes its own.
+//     A closed node is left without: nothing reads a closed node's
+//     identifiers.
+//   - A component's identity is worked out again. v0.4.0 hashed a package
+//     identifier and a name with a version into one space, and v0.5.0 hashes
+//     them apart. Each row's identity comes from the row's own identifier, or
+//     its name and version where it has none, so no two rows meet: two rows
+//     v0.4.0 held apart differ in what is hashed.
+//   - A scan and a refused upload record who sent them as a key or a person
+//     and its identifier, where v0.4.0 recorded a name. A name a key holds is
+//     read as that key, and otherwise a name a person holds as that person. A
+//     name held by neither stays as it is, and narrows nothing.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -82,10 +96,25 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		Exec(ctx); err != nil {
 		return fmt.Errorf("separate administration named in configuration: %w", err)
 	}
-	return nil
+
+	if err := u.change(graphNodeV050(t), change{table: "graph_node",
+		add: []added{{column: "purl"}, {column: "cpe"}}}); err != nil {
+		return err
+	}
+	if err := statedFromComponents(ctx, tx); err != nil {
+		return err
+	}
+	if err := reidentified(ctx, tx, identityV050); err != nil {
+		return err
+	}
+	return sendersQualified(ctx, tx)
 }
 
 // downgradeV050 puts back what v0.4.0 reads.
+//
+// Each component takes v0.4.0's identity again and a sender is recorded by
+// name before any table changes, so a refusal leaves the database as v0.5.0
+// left it on every engine. The node columns go.
 //
 // The name is written back into the administration column, which is where
 // v0.4.0 reads it. A trail row configuration wrote has no person, which
@@ -93,6 +122,12 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 // Whether a person typed each name an issue answers to goes with its column,
 // and the names stay.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
+	if err := reidentified(ctx, tx, identityV040); err != nil {
+		return err
+	}
+	if err := sendersNamed(ctx, tx); err != nil {
+		return err
+	}
 	if _, err := tx.NewRaw(`UPDATE "person" SET "is_admin" = ? WHERE "is_bootstrap" = ?`,
 		true, true).Exec(ctx); err != nil {
 		return fmt.Errorf("fold administration named in configuration back in: %w", err)
@@ -107,6 +142,18 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := u.run([]string{`ALTER TABLE "vulnerability_alias" DROP COLUMN "by_hand"`}); err != nil {
 		return err
 	}
+	if err := u.trailNarrowed(t); err != nil {
+		return err
+	}
+	return apply(ctx, tx.Tx, []string{
+		`ALTER TABLE "graph_node" DROP COLUMN "cpe"`,
+		`ALTER TABLE "graph_node" DROP COLUMN "purl"`,
+	})
+}
+
+// trailNarrowed puts back the administrative trail v0.4.0 built: no actor,
+// and a person on every row.
+func (u *upgrader) trailNarrowed(t *columnTypes) error {
 	trail := narrowing{table: "admin_change",
 		forget:  `DELETE FROM "admin_change" WHERE "actor" = 'configuration'`,
 		columns: []string{"actor"}}

@@ -38,7 +38,7 @@ type NeighborBody struct {
 
 // RootsBody is the build's own component and what it pulls in directly.
 type RootsBody struct {
-	Root  *NeighborBody  `json:"root,omitempty" doc:"The build itself, which everything below descends from. Absent where the inventory named no root of its own"`
+	Root  *NeighborBody  `json:"root,omitempty" doc:"The build itself, which everything below descends from. Absent where nothing has been applied to the build"`
 	Items []NeighborBody `json:"items"`
 	// Components and Edges say how much there is, which is what a reader needs
 	// before deciding whether to browse or to search. Two numbers rather than
@@ -73,8 +73,8 @@ func registerGraph(api huma.API, in Ingest) {
 			"first. The root is named separately from the list because it is what the list " +
 			"hangs from rather than a member of it.\n\n" +
 			"The list also holds every component nothing else in the build depends on, and the " +
-			"root's counts cover them. Where the inventory named no root, those components are " +
-			"the list.\n\n" +
+			"root's counts cover them. An inventory naming no root of its own is filed with the " +
+			"build standing in for it.\n\n" +
 			"The starting point for walking the graph. A full render is not offered and would " +
 			"not be useful: a real image holds thousands of components and tens of thousands of " +
 			"edges, which neither draws nor reads. Ask for one step at a time.\n\n" +

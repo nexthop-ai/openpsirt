@@ -17,6 +17,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,10 +136,21 @@ type Described struct {
 // The identifier is reduced to the parts that say what a package *is* before
 // it is hashed. A real inventory spells one package several ways, and taking
 // the identifier verbatim makes each spelling a component of its own.
+//
+// The two bases are hashed apart, each marked with which it is, and a name is
+// prefixed with its length. A producer's JSON can spell any byte, a null
+// included, so no separator is one a name never holds. Hashed alike, a
+// component named "pkg:npm/lodash" at "4.17.22" with no identifier is the same
+// component as the real one, and whichever arrives first decides for every
+// product whether it carries an identifier a scanner can match; and "a@b" at
+// "c" is "a" at "b@c".
 func (d Described) Identity() string {
 	basis := canonicalPurl(d.Purl)
 	if basis == "" {
-		basis = strings.TrimSpace(d.Name) + "@" + strings.TrimSpace(d.Version)
+		name := strings.TrimSpace(d.Name)
+		basis = "name\x00" + strconv.Itoa(len(name)) + "\x00" + name + strings.TrimSpace(d.Version)
+	} else {
+		basis = "purl\x00" + basis
 	}
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:])
@@ -381,11 +393,10 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		// rule about reading outside one — but it says nothing about another
 		// transaction, against another target, finding the same component
 		// absent at the same moment. A unique violation is not a retryable
-		// failure, so the loser did not retry: the whole scan apply failed
-		// and the producer was told its upload could not be read, for a
-		// component that is now present. Two replicas reading two scans at
-		// once is the shipped arrangement, and a portfolio first meeting a
-		// shared dependency is when it happens.
+		// failure, so a loser failing on it fails the whole scan apply, for a
+		// component that is present. Two replicas reading two scans at once is
+		// the shipped arrangement, and a portfolio first meeting a shared
+		// dependency is when it happens, so the insert keeps what is there.
 		//
 		// A component row is content-addressed, so leaving somebody else's
 		// alone loses nothing its identity depends on. What this description
@@ -787,10 +798,10 @@ func (c *Components) fillBlank(ctx context.Context, column, what string,
 // matching them and the stored row does not: package-identifier qualifiers, a
 // CPE, and the source package a component was built from.
 //
-// The scanner is given the stored row rather than the document that arrived,
-// so a component first interned without `distro` or `upstream` is otherwise
-// never matched against its distribution's advisories, however many later
-// reports state them. The merge is FillFrom's: nothing stated is overwritten,
+// The scanner takes what a build did not state from the stored row, so a
+// component first interned without `distro` or `upstream` is otherwise never
+// matched against its distribution's advisories, however many later reports
+// state them. The merge is FillFrom's: nothing stated is overwritten,
 // so what is stored does not depend on which report came last.
 //
 // The fold key is worked out again from the filled row, because it is derived

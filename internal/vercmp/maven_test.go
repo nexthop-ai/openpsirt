@@ -189,9 +189,9 @@ var mavenAscendingPairs = [][2]string{
 	{"2.0.1", "2.0.1-xyz"},
 	{"2.0.1", "2.0.1-123"},
 	{"2.0.1-xyz", "2.0.1-123"},
-	// A qualifier in the middle of a version, which made the comparison
-	// disagree with itself: a was above b and b above c while c was above a,
-	// and sorting a list of them threw.
+	// A qualifier in the middle of a version. The three are ordered pairwise
+	// so that a cycle among them, which makes sorting a list of them throw,
+	// fails here.
 	{"6.1.0rc3", "6.1.0"},
 	{"6.1.0rc3", "6.1H.5-beta"},
 	{"6.1.0", "6.1H.5-beta"},
@@ -202,11 +202,19 @@ var mavenAscendingPairs = [][2]string{
 	{"123456789012345.1H.5-beta", "12345678901234567890.1H.5-beta"},
 	{"1234567890.12345", "12345678901234567890.1H.5-beta"},
 	{"20190126.230843", "12345678901234567890.1H.5-beta"},
-	// A qualifier written after a zero, which used to read as the release
-	// itself and made two different pre-releases both equal to it.
+	// A qualifier written after a zero is a pre-release of the version, not
+	// the version itself.
 	{"1-0.alpha", "1"},
 	{"1-0.beta", "1"},
 	{"1-0.alpha", "1-0.beta"},
+	// A word against the level a hyphen opens: the word is below it, which is
+	// Maven's own answer.
+	{"1-a.b.c", "1-a-c"},
+}
+
+func TestAMavenSeparatorWithNothingBeforeItStandsForZero(t *testing.T) {
+	bothWays(t, vercmp.Maven, "1-.1", "1-0.1", 0)
+	bothWays(t, vercmp.Maven, "1..2", "1.0.2", 0)
 }
 
 // mavenAfterADot is every word the suite checks the dot rule against: one

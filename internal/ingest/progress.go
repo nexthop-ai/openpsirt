@@ -60,28 +60,28 @@ type Receipt struct {
 	// and left off the rest: what a run opened and closed is one fact, and
 	// repeating it down three rows reads as three separate changes.
 	RunID *int64
-	// Measured is what the run that answers *this* upload was made with .
+	// Measured is what the run that answers *this* upload was made with.
 	// On every receipt, unlike the counts above: the versions are a
 	// property of the run rather than a change it made, and a page of
 	// receipts spanning a scanner upgrade or a database that stopped
 	// moving is exactly what somebody is reading this screen to notice.
 	//
-	// It is also what makes a corrected feed answerable. "Which
-	// vulnerability database produced the finding you dismissed on 3
-	// March" was unanswerable while only the newest finished run's
-	// versions came back.
+	// It is also what makes a corrected feed answerable: which
+	// vulnerability database produced the finding somebody dismissed on a
+	// given day.
 	Measured *finding.Run
 }
 
 // Of is one scan of one build, narrowed the way the receipts are.
 //
 // Answered here rather than in a handler for the same reason the list is: a
-// check beside the query cannot be skipped by adding another endpoint. A scan
-// that belongs to another build, or that this credential did not send, answers
-// as one that does not exist — the two are the same sentence deliberately,
-// because telling them apart is telling somebody what exists elsewhere.
+// check beside the query cannot be skipped by adding another endpoint, and
+// that covers which sender a key is narrowed to as well as which product it
+// sees. A scan that belongs to another build, or that a key did not send,
+// answers as one that does not exist — the two are the same sentence
+// deliberately, because telling them apart is telling somebody what exists
+// elsewhere.
 func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID int64) (*Scan, error) {
-
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	q := s.db.NewSelect().Model(held).
 		Where("id = ?", scanID).
 		Where("target_id = ?", targetID)
-	if credential := sentBy(subject); credential != "" {
+	if credential := narrowedTo(subject); credential != "" {
 		q = q.Where("credential = ?", credential)
 	}
 	if err := q.Scan(ctx); err != nil {
@@ -103,24 +103,16 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	return held, nil
 }
 
-// sentBy is the credential a subject's reads of uploads are narrowed to: a
-// key reads back what it sent and nothing more, and a person reads every
-// upload to a build they may see.
-func sentBy(subject access.Subject) string {
-	if subject.Kind == access.Pipeline {
-		return subject.Identity
-	}
-	return ""
-}
-
 // Receipts reports what became of the scans filed against a target, newest
 // first, with how many there are in total.
 //
-// A key is narrowed to what it sent. The narrowing belongs here rather than in
-// the caller: filtering a page after it has been read returns short pages and
-// a total counting rows the reader was not shown, which is both wrong and a
-// count of somebody else's uploads.
-func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64, limit, offset int) ([]Receipt, int, error) {
+// A key is narrowed to what it sent, decided here from the subject. Filtering
+// a page after it has been read returns short pages and a total counting rows
+// the reader was not shown, and a narrowing a caller chooses is one the next
+// caller forgets.
+func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64,
+	limit, offset int) ([]Receipt, int, error) {
+
 	// Asked here rather than only in the handler. A check beside the query
 	// cannot be skipped by adding another endpoint, which is the whole reason
 	// visibility is decided in this layer — and receipts carry a producer's
@@ -131,19 +123,16 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	}
 	if !subject.Sees(productID) {
 		// A typed refusal, so the handler answers it the way a build nobody
-		// declared is answered rather than as a fault. A plain error became a
-		// 500 — and a 500 where a stranger gets a 404 says the build is
-		// there, one name at a time.
+		// declared is answered rather than as a fault: a 500 where a stranger
+		// gets a 404 says the build is there, one name at a time.
 		return nil, 0, access.Denied(fmt.Sprintf("read what was filed against product %d", productID))
 	}
 
-	// Clamped here rather than trusted from the caller. The handler above
-	// bounds what it takes, and this is the only paged read in the tree that
-	// relied on it — one more endpoint over the same store and a limit of zero
-	// asks for the whole table.
+	// Clamped here rather than trusted from the caller: one more endpoint over
+	// the same store, and a limit of zero asks for the whole table.
 	limit = database.AList.Of(limit)
 
-	credential := sentBy(subject)
+	credential := narrowedTo(subject)
 	sent := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("target_id = ?", targetID)
 		if credential != "" {
@@ -210,12 +199,10 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// The upload each run is attributed to, worked out over *every* scan
 	// rather than over this page.
 	//
-	// A page is a window on the same history, so deciding "the newest upload
-	// this run covered" from the rows in front of us gave a different answer
-	// on page two: a run claimed on page one was claimed again by the first
-	// older upload it also covered, and the same opened and closed counts
-	// rendered twice. The claim has to be a property of the scan, not of the
-	// page it appears on.
+	// A page is a window on the same history. Decided from the rows in front
+	// of us, a run claimed on page one is claimed again on page two by the
+	// first older upload it also covered, and its counts render twice. The
+	// claim is a property of the scan, not of the page it appears on.
 	claimed, err := s.claims(ctx, targetID, credential, runs)
 	if err != nil {
 		return nil, 0, err
@@ -308,12 +295,7 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 
 // productOf is which product a build belongs to.
 //
-// Through the catalog rather than by a query written here. The copy that stood
-// in this file was the same statement with different aliases and one real
-// difference: it discarded the driver's error and returned a fixed sentence
-// about no build being declared, so a database that could not answer and a
-// build that does not exist were indistinguishable — including to whatever was
-// deciding what to do next.
+// Through the catalog, which tells a failed read from a build nobody declared.
 func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
 	return catalog.NewStore(db).ProductOf(ctx, targetID)
 }

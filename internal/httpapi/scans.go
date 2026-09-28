@@ -456,9 +456,9 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		Serial:        header.Serial,
 		BuiltAt:       header.BuiltAt,
 		ParserVersion: version.Get().Version,
-		// The credential that sent this, recorded alongside the parser
-		// version, so the provenance of the data has an answer.
-		Credential: subject.Identity,
+		// Who sent this, recorded alongside the parser version, so the
+		// provenance of the data has an answer.
+		Credential: ingest.Sender(subject),
 	}
 
 	var (
@@ -846,9 +846,8 @@ func registerReceipts(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "that build could not be looked up", err)
 		}
 
-		// A key sees the receipts for what it sent and nothing more, which the
-		// store decides. Reading back one's own upload is the other half of the
-		// acceptance, not a report about the product.
+		// A key sees the receipts for what it sent and nothing more, which
+		// the store decides from the subject.
 		scans := ingest.NewStore(in.DB.DB)
 		receipts, total, err := scans.Receipts(ctx, subject, target.ID, input.Limit, input.Offset)
 		switch {
@@ -963,12 +962,10 @@ func registerReceipts(api huma.API, in Ingest) {
 		// The tools those numbers were arrived at with. Read separately
 		// because it describes the build rather than any upload, and absent
 		// rather than invented where nothing has finished running yet. Not for
-		// a credential that is only allowed to see its own uploads. This
-		// endpoint deliberately narrows receipts to what a key sent — "a key
-		// sees the receipts for what it sent and nothing more" — and a key
-		// that has uploaded nothing would otherwise still learn when the build
-		// was last scanned and with what, which is a report about the product
-		// rather than an acknowledgement of its own upload.
+		// a key, which sees its own uploads and nothing more: a key that has
+		// uploaded nothing would otherwise still learn when the build was last
+		// scanned and with what, which is a report about the product rather
+		// than an acknowledgement of its own upload.
 		if subject.Kind == access.Pipeline {
 			return out, nil
 		}

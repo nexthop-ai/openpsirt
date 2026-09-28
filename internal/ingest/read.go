@@ -44,6 +44,9 @@ type Reader struct {
 	// package that notifies reads what has been ingested, so reaching it from
 	// here would close a cycle between the two.
 	told func(context.Context, Stored)
+	// beforeApply runs between the parse and the transaction that applies
+	// it, which is where a newer scan can overtake this one. Set by tests.
+	beforeApply func()
 }
 
 // Stored is an inventory that has been applied, as the fact that something
@@ -132,6 +135,12 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 	// it must not run on a cancellation, where nothing is wrong with the
 	// document, nor where the job went to another worker, which is reading
 	// the same document and will record what became of it.
+	//
+	// The scan it overtook is brought back only once this job will not run
+	// again. A job with attempts left is retried, and a retry that succeeds
+	// applies this scan. An older scan read in between is applied first and
+	// reopens what this one closes.
+	last := job.Attempts >= job.MaxAttempts
 	ending := r.queue.Settle(ctx, job, r.name, "scan", r.logger, err, taken,
 		func(settled context.Context) error {
 			// Logged here rather than handed back, because the two failures
@@ -140,6 +149,8 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 			if marked := r.markFailed(settled, job.Reference, err); marked != nil {
 				r.logger.Error("could not record why a scan failed",
 					"scan", job.Reference, "error", marked)
+			} else if !last {
+				return nil
 			} else if back := r.reinstate(settled, job.Reference); back != nil {
 				r.logger.Error("could not bring back the scan this one had overtaken",
 					"scan", job.Reference, "error", back)
@@ -328,9 +339,31 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// with the scan marked failed and the graph it described current.
 	var applied graph.Applied
 	var claimed finding.ClaimsApplied
+	var overtaken bool
+	if r.beforeApply != nil {
+		r.beforeApply()
+	}
 	if err := database.InTransaction(ctx, r.db.DB,
 		func(ctx context.Context, tx bun.Tx) error {
-			var err error
+			overtaken = false
+			// Asked again with the build held. The answer above was read
+			// before a parse that can take minutes, and a newer scan applied
+			// meanwhile is replaced by this one if nothing asks. The build's
+			// row is taken first, as the graph's apply takes it, so a newer
+			// scan being applied has committed before this reads.
+			if _, err := tx.NewUpdate().Table("target").
+				Set("last_scan_id = last_scan_id").
+				Where("id = ?", scan.TargetID).Exec(ctx); err != nil {
+				return fmt.Errorf("take the build: %w", err)
+			}
+			newest, err := NewStore(tx).Newest(ctx, scan.TargetID)
+			if err != nil {
+				return err
+			}
+			if newest != nil && newest.ID != scanID && !scan.BuiltAt.After(newest.BuiltAt) {
+				overtaken = true
+				return nil
+			}
 			if applied, err = graph.ApplyWithin(ctx, tx, scan.TargetID, scanID, snapshot); err != nil {
 				return err
 			}
@@ -341,6 +374,9 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			return NewStore(tx).Made(ctx, scanID, components, placed, rootIdentifier)
 		}); err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
+	}
+	if overtaken {
+		return &Result{ScanID: scanID, Superseded: true}, nil
 	}
 
 	// What the upload did to the build's inventory, for whoever decides

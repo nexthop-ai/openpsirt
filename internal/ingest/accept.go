@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -57,9 +58,7 @@ const (
 // String names the outcome for logs and errors.
 //
 // Read by the refusals below and by the line the API writes when an upload is
-// turned away. It was declared and reached by nothing, while those refusals
-// spelled the same words inline — so the producer's words and this method's
-// could drift, and the deployment logged nothing at all.
+// turned away, so the producer's words and the log's are one spelling.
 func (o Outcome) String() string {
 	switch o {
 	case Accept:
@@ -122,9 +121,35 @@ type Arriving struct {
 	Serial string
 	// ParserVersion is the version of the code that will read it.
 	ParserVersion string
-	// Credential identifies what sent it: the identity of the key or the person
-	// the upload was authenticated as.
+	// Credential is who sent it, as Sender spells it.
 	Credential string
+}
+
+// Sender is how a scan records who sent it: the kind of subject and its
+// identifier, so a key and a person are never the same sender.
+//
+// Not the name. A key's name is unique among keys and a person's identity
+// among people, so one name can be both, and a key named like a person would
+// read that person's uploads back as its own. The identifier also outlives a
+// rename.
+func Sender(subject access.Subject) string {
+	switch subject.Kind {
+	case access.Pipeline:
+		return "key:" + strconv.FormatInt(subject.ID, 10)
+	case access.Person:
+		return "person:" + strconv.FormatInt(subject.ID, 10)
+	}
+	return ""
+}
+
+// narrowedTo is the sender whose scans alone a subject may read back, and
+// empty for a subject that reads every scan of a product it sees. A key reads
+// back what it sent and nothing more (REQ-44).
+func narrowedTo(subject access.Subject) string {
+	if subject.Kind == access.Pipeline {
+		return Sender(subject)
+	}
+	return ""
 }
 
 // Scan is a scan we took.
@@ -243,6 +268,9 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 //
 // The returned scan is the one now current for that variant: for a file we
 // already hold, that is the row we took the first time.
+//
+// Run inside the transaction helper, which is what answers a lost race: two
+// uploads of one file racing to write end with the loser told to go again.
 func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) {
 	// A document stating no build time is ordered by when it arrived. Dated
 	// here rather than at the door, because this is where the bytes already
@@ -317,11 +345,15 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 	}
 	if _, err := s.db.NewInsert().Model(scan).Exec(ctx); err != nil {
 		// Two uploads of one file can both pass the check and race to write.
-		// The loser sees the unique constraint, which means the other landed
-		// — the same situation as sending it twice, and answered the same way
-		// rather than as a failure the producer would retry into a red build.
-		if existing, found := s.byContent(ctx, a.TargetID, a.ContentHash); found == nil && existing != nil {
-			return existing, AlreadyHave, nil
+		// The loser sees the unique constraint, which means the other landed:
+		// the same situation as sending it twice, answered the same way once
+		// the whole act runs again. It cannot be read here. PostgreSQL has
+		// aborted the transaction, and MySQL and MariaDB read from the
+		// snapshot that did not hold the other row. So the caller's
+		// transaction helper runs it again, and deciding afresh answers that
+		// the file is already held.
+		if database.IsDuplicate(err) {
+			return nil, Accept, fmt.Errorf("record scan: %w", database.ErrGoAgain)
 		}
 		return nil, Accept, fmt.Errorf("record scan: %w", err)
 	}
@@ -439,6 +471,10 @@ func truncate(s string, most int) string { return bound.Head(s, most) }
 // Written after it has been read rather than when it arrives, because until
 // then nobody knows: an upload is bytes, and how many components it describes
 // and how many of them anything places are answers the parser produces.
+//
+// It also makes the scan accepted again. A read that failed on an earlier
+// attempt marked it failed, and this attempt applied it, in the transaction
+// this writes in: the build shows it, so it is the newest that stands.
 func (s *Store) Made(ctx context.Context, scanID int64, components, placed int,
 	rootIdentifier string) error {
 
@@ -446,6 +482,8 @@ func (s *Store) Made(ctx context.Context, scanID int64, components, placed int,
 		Set("components = ?", components).
 		Set("placed = ?", placed).
 		Set("root_identifier = ?", rootIdentifier).
+		Set("status = ?", Accepted).
+		Set("failure = ?", "").
 		Where("id = ?", scanID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record what the inventory was made of: %w", err)
@@ -487,9 +525,8 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	// caller. The caller already has the name in two shapes and would be
 	// choosing between them here, which is one place for the record to
 	// disagree with what the request was actually resolved as.
-	if r.Credential == nil && subject.Identity != "" {
-		identity := subject.Identity
-		r.Credential = &identity
+	if sender := Sender(subject); r.Credential == nil && sender != "" {
+		r.Credential = &sender
 	}
 	r.Reason = truncate(r.Reason, 2000)
 
@@ -520,6 +557,9 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	// constraint: one inserts and the loser is the one this arm refuses, which
 	// is a refusal recorded by the other request rather than one lost.
 	if _, err := s.db.NewInsert().Model(&r).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			return nil
+		}
 		return fmt.Errorf("record that an upload was refused: %w", err)
 	}
 	return nil

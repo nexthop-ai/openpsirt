@@ -573,6 +573,57 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 	})
 }
 
+func TestASearchHitCarriesWhatIsBeneathItAsTheTreeDoes(t *testing.T) {
+	// A container found by name holds no findings of its own, and what is
+	// beneath it is what says whether it is worth opening: the same number,
+	// by the same bands, that browsing to it shows.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
+			t.Fatal(err)
+		}
+		f.opens(t, f.anIssue(t, "CVE-2026-UNDER"), f.componentNamed(t, openssl.Name), "under-curl")
+
+		found, err := f.store.Search(ctx, everyone(f), f.targetID, "curl", 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(found) != 1 {
+			t.Fatalf("searching found %+v, want curl alone", found)
+		}
+		hit := found[0]
+		if hit.Findings != 0 || hit.Beneath != 1 {
+			t.Errorf("curl found by name says %d on it and %d beneath, want 0 and 1",
+				hit.Findings, hit.Beneath)
+		}
+		banded := 0
+		for _, n := range hit.BeneathBy {
+			banded += n
+		}
+		if banded != hit.Beneath {
+			t.Errorf("the bands %v sum to %d, and %d is beneath", hit.BeneathBy, banded, hit.Beneath)
+		}
+	})
+}
+
+func TestASearchDoesNotFindTheBuildItself(t *testing.T) {
+	// The root is the build rather than one of its components, which is what
+	// every other read of a build's contents says.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
+			t.Fatal(err)
+		}
+		found, err := f.store.Search(ctx, everyone(f), f.targetID, root.Name, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(found) != 0 {
+			t.Errorf("searching for the build's own name found %+v", found)
+		}
+	})
+}
+
 // anIssue records a vulnerability to open findings against.
 func (f *fixture) anIssue(t *testing.T, identifier string) int64 {
 	t.Helper()

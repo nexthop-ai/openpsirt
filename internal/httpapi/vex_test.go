@@ -900,10 +900,13 @@ func TestAnAlreadyFixedClaimPublishesAsFixed(t *testing.T) {
 func TestAComponentWithNoPackageIdentifierIsNamedByItsName(t *testing.T) {
 	// A statement with no subcomponent reads as no claim at all, so a
 	// component the build names without a package identifier is named by
-	// the name the build gives it.
+	// the name the build gives it. Neither the shared row nor the build's
+	// node holds one.
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		r.patchedRows(t, `UPDATE "component" SET "purl" = NULL WHERE "name" = 'linux-image'`)
+		r.patchedRows(t, `UPDATE "graph_node" SET "purl" = NULL
+			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
 		if got := asPerson(t, r, "reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
@@ -920,9 +923,57 @@ func TestAPatchOnAComponentWithNoPackageIdentifierIsNamedByItsName(t *testing.T)
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.patchedKernel(t)
 		r.patchedRows(t, `UPDATE "component" SET "purl" = NULL WHERE "name" = 'linux-image'`)
+		r.patchedRows(t, `UPDATE "graph_node" SET "purl" = NULL
+			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
 		fixed := r.fixedIn(t)
 		if len(fixed["CVE-2026-9999"]) != 1 || fixed["CVE-2026-9999"][0] != "linux-image" {
 			t.Errorf("a patch on a component with no identifier names %v, want linux-image", fixed)
+		}
+	})
+}
+
+func TestAVEXStatementNamesTheComponentAsThisBuildStatedIt(t *testing.T) {
+	// The component row is shared by every product shipping the package and
+	// holds the identifier the first of them stated. A customer's scanner
+	// matches this build's, qualifiers included, so that is the one a
+	// statement names, for a dismissal and for a patch alike.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.patchedKernel(t)
+		const stated = "pkg:deb/debian/linux-image@5.10?distro=debian-13"
+		r.patchedRows(t, `UPDATE "graph_node" SET "purl" = '`+stated+`'
+			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var doc struct {
+			Statements []struct {
+				Vulnerability struct {
+					Name string `json:"name"`
+				} `json:"vulnerability"`
+				Products []struct {
+					Subcomponents []struct {
+						ID string `json:"@id"`
+					} `json:"subcomponents"`
+				} `json:"products"`
+			} `json:"statements"`
+		}
+		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+		named := map[string][]string{}
+		for _, one := range doc.Statements {
+			for _, product := range one.Products {
+				for _, inside := range product.Subcomponents {
+					named[one.Vulnerability.Name] = append(named[one.Vulnerability.Name], inside.ID)
+				}
+			}
+		}
+		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
+			if len(named[issue]) != 1 || named[issue][0] != stated {
+				t.Errorf("the statement about %s names %v, want %q as this build stated it",
+					issue, named[issue], stated)
+			}
 		}
 	})
 }

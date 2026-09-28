@@ -4,6 +4,7 @@
 package ingest_test
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,11 +16,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
-// The fate of an upload, and the run whose numbers belong to it.
-//
-// None of this had a test. The runs query went from "the newest finished one"
-// to every finished one, a receipt gained the run that answered it, and both
-// design documents assert behavior that would regress with nothing saying so.
+// The fate of an upload, and the run whose numbers belong to it: every
+// finished run is considered, and a receipt carries the run that answered it.
 func TestAFailedRunDoesNotPoisonTheUploadsBeforeIt(t *testing.T) {
 	// One bad night is otherwise permanent. Taking the earliest run to finish
 	// after an upload as the one that answered it, whatever became of that
@@ -191,10 +189,9 @@ func finishRunWith(t *testing.T, s *ingest.Store, target int64, at time.Time,
 
 // Every receipt carries what the run answering it was measured with.
 //
-// Only the newest finished run's versions were reported, beside the page — so
-// a page spanning a scanner upgrade or a vulnerability database that stopped
-// moving said one thing about all of it, and "which database produced the
-// finding you dismissed on 3 March" had no answer.
+// A page spanning a scanner upgrade or a vulnerability database that stopped
+// moving says so row by row, and which database produced a finding somebody
+// dismissed on a given day has an answer.
 func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
@@ -354,5 +351,119 @@ func TestEveryRunKeepsItsOwnUploadAcrossALongHistory(t *testing.T) {
 		if answered != nights {
 			t.Errorf("%d of %d nights carry their own run", answered, nights)
 		}
+	})
+}
+
+func TestAKeyReadsBackWhatItSentAndNotWhatAPersonOfItsNameSent(t *testing.T) {
+	// The narrowing is the store's, from the subject, and a sender is a key or
+	// a person rather than a name: a key named like a person does not read
+	// that person's uploads back as its own.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+		target := quietTarget(t, s, ours)
+		now := time.Now().UTC()
+		key := access.NewPipeline(7, "ci-nightly", access.Scope{ProductID: ours})
+		person := access.NewPerson(7, "ci-nightly", false,
+			map[int64][]access.Role{ours: {access.PublicRead}}, 0)
+
+		sent := map[string]int64{}
+		for i, by := range []access.Subject{person, key} {
+			scan, _, err := s.Record(ctx, ingest.Arriving{
+				TargetID: target, ContentHash: string(by.Kind), BuiltAt: now.Add(time.Duration(i-3) * time.Hour),
+				ParserVersion: "test", Credential: ingest.Sender(by),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			sent[string(by.Kind)] = scan.ID
+		}
+
+		receipts, total, err := s.Receipts(ctx, key, target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(receipts) != 1 || receipts[0].Scan.ID != sent[string(access.Pipeline)] {
+			t.Errorf("the key reads back %d of %d receipts: %+v, want its own alone",
+				len(receipts), total, receipts)
+		}
+		if _, err := s.Of(ctx, key, target, sent[string(access.Person)]); !errors.Is(err, ingest.ErrNoScan) {
+			t.Errorf("the key reads the person's scan: %v", err)
+		}
+		if _, err := s.Of(ctx, key, target, sent[string(access.Pipeline)]); err != nil {
+			t.Errorf("the key cannot read its own scan: %v", err)
+		}
+		// Somebody who reads the product reads both.
+		all, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read := map[int64]bool{}
+		for _, receipt := range all {
+			read[receipt.Scan.ID] = true
+		}
+		if !read[sent[string(access.Person)]] || !read[sent[string(access.Pipeline)]] {
+			t.Errorf("a reader of the product reads %+v, want both uploads", all)
+		}
+	})
+}
+
+func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T) {
+	// A read that died after its attempts ran out without marking the scan,
+	// because marking it failed as well, is a failure on the receipt rather
+	// than a read still in progress.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+		target := quietTarget(t, s, ours)
+		now := time.Now().UTC()
+
+		for i, each := range []struct{ hash, lastError string }{
+			{"with-cause", "the document ended early"},
+			{"without-cause", ""},
+		} {
+			file(t, s, target, each.hash, now.Add(time.Duration(i-2)*time.Hour))
+			var lastError any
+			if each.lastError != "" {
+				lastError = each.lastError
+			}
+			var scanID int64
+			if err := s.DB().NewSelect().Model((*ingest.Scan)(nil)).Column("id").
+				Where("content_hash = ?", each.hash).Scan(ctx, &scanID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.DB().NewUpdate().Model((*queue.Job)(nil)).
+				Set("state = ?", queue.Dead).
+				Set("last_error = ?", lastError).
+				Where("reference = ?", strconv.FormatInt(scanID, 10)).
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen := 0
+		for _, receipt := range receipts {
+			want, ours := map[string]string{
+				"with-cause":    "the document ended early",
+				"without-cause": "the upload could not be read",
+			}[receipt.Scan.ContentHash]
+			if !ours {
+				continue
+			}
+			seen++
+			if receipt.Scan.Status != ingest.Accepted {
+				t.Fatalf("the scan was marked %q, and the case is one nothing marked", receipt.Scan.Status)
+			}
+			if receipt.State != ingest.Refused || receipt.Failure != want {
+				t.Errorf("%s reads %q with %q, want failed with %q",
+					receipt.Scan.ContentHash, receipt.State, receipt.Failure, want)
+			}
+		}
+		if seen != 2 {
+			t.Errorf("%d of the two uploads came back", seen)
+		}
+
 	})
 }

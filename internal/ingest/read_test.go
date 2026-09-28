@@ -31,6 +31,16 @@ const anInventory = `{
   "dependencies": [{"ref": "root", "dependsOn": ["a", "b"]}, {"ref": "a", "dependsOn": ["b"]}]
 }`
 
+// aSmallerInventory is the same build described with one component fewer.
+const aSmallerInventory = `{
+  "bomFormat": "CycloneDX", "specVersion": "1.6",
+  "metadata": {"timestamp": "2026-08-01T00:00:00Z",
+    "component": {"bom-ref": "root", "name": "sonic-broadcom.bin", "version": "1.0"}},
+  "components": [
+    {"bom-ref": "a", "name": "libc6", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}],
+  "dependencies": [{"ref": "root", "dependsOn": ["a"]}]
+}`
+
 const aSuppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:x", "version": 1,
  "statements": [{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
  "products": [{"@id": "pkg:deb/debian/libc6"}]}]}`
@@ -113,8 +123,7 @@ func eachReader(t *testing.T, fn func(t *testing.T, f *readerFixture)) {
 			t.Fatal(err)
 		}
 		// One variant, declared once for the product. Both releases are built
-		// as it, which is two targets over one variant — the shape that used
-		// to need the name typed twice.
+		// as it, which is two targets over one variant.
 		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
 		if err != nil {
 			t.Fatal(err)
@@ -332,7 +341,7 @@ func TestAScanOvertakenByANewerOneIsNotApplied(t *testing.T) {
 	// arrival check prevents at the door, arriving from behind.
 	eachReader(t, func(t *testing.T, f *readerFixture) {
 		now := time.Now().UTC()
-		older := f.store(t, f.branch, now.Add(-2*time.Hour), anInventory)
+		older := f.store(t, f.branch, now.Add(-2*time.Hour), aSmallerInventory)
 		newer := f.store(t, f.branch, now.Add(-time.Hour), anInventory)
 
 		// The newer one is read first, which is what a queue handing two jobs
@@ -365,7 +374,8 @@ func TestAScanOvertakenByANewerOneIsNotApplied(t *testing.T) {
 			t.Errorf("%d scans were skipped as overtaken, want 1", skipped)
 		}
 
-		// And what is present is the newer picture, not the older one.
+		// And what is present is the newer picture, not the older one: the
+		// older inventory holds one component fewer.
 		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
 		if err != nil {
 			t.Fatal(err)
@@ -376,12 +386,132 @@ func TestAScanOvertakenByANewerOneIsNotApplied(t *testing.T) {
 	})
 }
 
+func TestAScanOvertakenWhileItIsParsedIsNotApplied(t *testing.T) {
+	// Whether a newer scan stands is asked again in the transaction that
+	// applies, because a parse takes long enough for one to arrive.
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		now := time.Now().UTC()
+		older := f.accept(t, f.branch, now.Add(-2*time.Hour), aSmallerInventory)
+		var newer int64
+		reader := f.reading(sbom.Limits{}).BeforeApplying(func() {
+			newer = f.store(t, f.branch, now.Add(-time.Hour), anInventory)
+		})
+
+		result, err := reader.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !result.Superseded || result.ScanID != older {
+			t.Fatalf("read %+v, want the older scan set aside once the newer %d arrived", result, newer)
+		}
+		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(t.Context(), f.branch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nodes) != 0 {
+			t.Errorf("%d nodes present from a scan a newer one overtook", len(nodes))
+		}
+	})
+}
+
+func TestAScanReadOnALaterAttemptStandsAndBringsNothingOlderBack(t *testing.T) {
+	// A read that fails and then succeeds on a retry leaves the scan accepted,
+	// with no failure on it, and the newest scan the build holds. The scan it
+	// overtook is not read again while the retry is still to come.
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC()
+		retrying := queue.DefaultOptions()
+		retrying.Backoff = 0
+		q := queue.New(f.db, retrying)
+		reader := ingest.NewReader(f.db, q, sbom.Limits{},
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+
+		older := f.store(t, f.branch, now.Add(-2*time.Hour), aSmallerInventory)
+		// The newer one's inventory is not there yet, so its first attempt
+		// fails for a reason the second does not meet.
+		scans := ingest.NewStore(f.db.DB)
+		newer, outcome, err := scans.Record(ctx, ingest.Arriving{
+			TargetID: f.branch, ContentHash: "newer", BuiltAt: now.Add(-time.Hour),
+			ParserVersion: "test",
+		})
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("record: %v %v", outcome, err)
+		}
+		for _, id := range []int64{older, newer.ID} {
+			if _, err := q.Add(ctx, queue.Parse, strconv.FormatInt(id, 10)); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		result, err := reader.Once(ctx)
+		if err != nil || result == nil || !result.Superseded || result.ScanID != older {
+			t.Fatalf("the older scan was not set aside as overtaken: %+v %v", result, err)
+		}
+		if _, err := reader.Once(ctx); err == nil {
+			t.Fatal("a scan with no inventory was read")
+		}
+		if _, err := ingest.NewDocuments(f.db.DB).Write(ctx, newer.ID, ingest.InventoryKind, 0,
+			strings.NewReader(anInventory)); err != nil {
+			t.Fatal(err)
+		}
+		for range 4 {
+			result, err := reader.Once(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result == nil {
+				break
+			}
+		}
+
+		read, err := scans.ByID(ctx, newer.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if read.Status != ingest.Accepted || read.Failure != "" {
+			t.Errorf("the scan read on its second attempt is %q with %q", read.Status, read.Failure)
+		}
+		newest, err := scans.Newest(ctx, f.branch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if newest == nil || newest.ID != newer.ID {
+			t.Errorf("the newest scan the build holds is %+v, want %d", newest, newer.ID)
+		}
+		if n := f.jobsFor(t, older); n != 1 {
+			t.Errorf("the overtaken scan was queued %d times, want once", n)
+		}
+		nodes, err := graph.NewStore(f.db.DB).CurrentNodes(ctx, f.branch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nodes) != 3 {
+			t.Errorf("%d nodes present, want the graph the newer scan described", len(nodes))
+		}
+	})
+}
+
+// jobsFor is how many times a scan has been queued to be read.
+func (f *readerFixture) jobsFor(t *testing.T, scanID int64) int {
+	t.Helper()
+	n, err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
+		Where("kind = ?", queue.Parse).
+		Where("reference = ?", strconv.FormatInt(scanID, 10)).
+		Count(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
 func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
 	// An older scan is set aside on the strength of the newer one's row alone
 	// — the newer one may not have been read yet. If it then cannot be read,
 	// the build would be left showing whatever came before both: the older
 	// scan's job is done and nothing reads it again, and its receipt waits
-	// for a scan run that never comes.
+	// for a scan run that never comes. Brought back once the newer one's job
+	// has no attempts left.
 	eachReader(t, func(t *testing.T, f *readerFixture) {
 		now := time.Now().UTC()
 		older := f.store(t, f.branch, now.Add(-2*time.Hour), anInventory)
@@ -389,9 +519,12 @@ func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
 			`{"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [{"version": "1"}]}`)
 
 		// The older one is read first and set aside; then the newer one
-		// fails.
+		// fails, on its only attempt.
+		once := queue.DefaultOptions()
+		once.MaxAttempts = 1
 		for _, id := range []int64{older, newer} {
-			if _, err := f.queue.Add(t.Context(), queue.Parse, strconv.FormatInt(id, 10)); err != nil {
+			if _, err := queue.New(f.db, once).Add(t.Context(), queue.Parse,
+				strconv.FormatInt(id, 10)); err != nil {
 				t.Fatal(err)
 			}
 		}

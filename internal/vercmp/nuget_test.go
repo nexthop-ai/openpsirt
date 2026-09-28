@@ -270,6 +270,8 @@ func TestNuGetOrdersWhatItsOwnSuiteNeverPairs(t *testing.T) {
 		// A label that is a hyphen and digits is a negative number to the
 		// reference, which orders it below zero.
 		{"1.0.0--1", "1.0.0-0", -1},
+		// A hyphen with no digits after it is a word, above every number.
+		{"1.0.0--", "1.0.0-0", 1},
 		// Words compare without regard to case, character by character.
 		{"1.0.0-ALPHA", "1.0.0-beta", -1},
 		// The fourth number decides after the first three agree.

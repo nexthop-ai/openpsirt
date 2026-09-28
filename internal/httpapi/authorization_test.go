@@ -163,9 +163,13 @@ func (r *reach) sentByTheKey(t *testing.T) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
+	key, err := r.rights.ResolveKey(ctx, r.key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	made, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
 		TargetID: target.ID, ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
-		ParserVersion: "test", Credential: "nightly",
+		ParserVersion: "test", Credential: ingest.Sender(key),
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)

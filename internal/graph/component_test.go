@@ -374,9 +374,10 @@ func TestAQualifierOneDescriptionLacksIsTakenFromAnother(t *testing.T) {
 }
 
 func TestALaterReportFillsInWhatAScannerMatchesOn(t *testing.T) {
-	// The scanner is given the stored row. A component first interned without
-	// the qualifiers that select its distribution's advisories was otherwise
-	// never matched, however many later reports stated them.
+	// The scanner takes what a build did not state from the stored row. A
+	// component first interned without the qualifiers that select its
+	// distribution's advisories is otherwise never matched, however many
+	// later reports state them.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		components := graph.NewComponents(f.db.DB)

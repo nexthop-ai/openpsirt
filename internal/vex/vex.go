@@ -259,6 +259,15 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 	return named, target, nil
 }
 
+// nodeJoin is the build's open node for a finding's component, which holds the
+// package identifier this build stated for it. A statement names the
+// component by that one: the component row is shared by every product
+// shipping the package and holds the qualifiers the first of them stated, and a
+// customer's scanner matches the build's own. A build holds one open node per
+// component, so the join adds no row.
+const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON gn.target_id = f.target_id
+			AND gn.component_id = f.component_id AND gn.closed_scan_id IS NULL`
+
 // document assembles what stands about one build, at the visibilities asked
 // for.
 func (s *Store) document(ctx context.Context, who publisher.Named, named *catalog.Named,
@@ -284,6 +293,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(nodeJoin).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`LEFT JOIN "decision" AS "de" ON `+finding.DecisionAt("?")+`
@@ -310,7 +320,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
 		// Safe as an aggregate, because the grouping below refuses a component
 		// whose places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
@@ -344,7 +354,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		// grouping on those emitted the same claim twice — or, where the
 		// outcomes differed, two statements contradicting each other about one
 		// component.
-		GroupExpr("v.id, v.identifier, c.name, c.purl").
+		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
 		// Every open place agreed, and agreed the same way. The join is left,
 		// so a place nobody has dismissed contributes a row with no decision:
 		// counting them is how "all of them" is asked. Without it, one
@@ -528,12 +538,13 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(nodeJoin).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`JOIN "suppression" AS "sup" ON sup.id = f.suppressed_by`).
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
 		// The row the date is read from. A time read through an aggregate
 		// comes back as text on one engine and a time on another.
 		ColumnExpr(`MIN(f.id) AS "first"`).
@@ -553,7 +564,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
 				AND o.closed_at IS NULL AND oc.name = c.name
 				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
-		GroupExpr("v.id, v.identifier, c.name, c.purl").
+		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
 		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {
