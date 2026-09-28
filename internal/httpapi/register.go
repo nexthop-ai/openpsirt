@@ -31,12 +31,12 @@ type DisposedBody struct {
 	Namespace     string        `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 	Place         string        `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
 	Consumer      string        `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
-	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state. undecided is the row every other report leaves out and the one an auditor is looking for"`
+	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state. undecided is a row nobody has decided anything about"`
 	Outcome       outcome       `json:"outcome,omitempty"`
 	Justification justification `json:"justification,omitempty"`
 	ProposedBy    string        `json:"proposed_by,omitempty"`
 	ProposedAt    string        `json:"proposed_at,omitempty"`
-	ApprovedBy    string        `json:"approved_by,omitempty" doc:"The people who agreed. Two different people is the whole of the control, so both names are carried rather than a count"`
+	ApprovedBy    string        `json:"approved_by,omitempty" doc:"The people who agreed, by name"`
 	ApprovedAt    string        `json:"approved_at,omitempty"`
 	// AgreementCarried says the agreement was given for an earlier claim and
 	// carried onto this one, which is what a re-affirmation stands on. The
@@ -189,14 +189,10 @@ func registerRegister(api huma.API, in Ingest) {
 		Description: "One row per issue and place in this build, with its state, what was " +
 			"claimed, who claimed it, who agreed, when each of those happened, its deadline " +
 			"and whether that was met.\n\n" +
-			"The complement of the audit list, not a variant of it. The audit list says " +
-			"what was decided; an auditor's first question is what was *known*, decided or " +
-			"not — so `undecided` rows are in here, and closed ones too. A register of only " +
-			"what is still open answers a different question.\n\n" +
-			"Current state, and no `as_of`. Reconstructing the view as of a past date was " +
-			"asked for and refused: each row already carries the dates that evidence what is " +
-			"being checked, and a reconstruction would be a second answer about the past that " +
-			"has to be kept honest against the first.",
+			"Every issue known in the build, decided or not: `undecided` rows are in here, " +
+			"and closed ones too. The audit list is what was decided.\n\n" +
+			"Current state only; there is no `as_of`. Each row carries the dates of what " +
+			"happened to it.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

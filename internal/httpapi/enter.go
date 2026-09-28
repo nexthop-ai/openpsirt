@@ -311,20 +311,12 @@ func registerDisclosure(api huma.API, in Ingest) {
 		Summary: "List what is approaching disclosure",
 		Description: "Returns findings nobody has announced whose embargo is running out, " +
 			"soonest first, and the ones whose date has already arrived.\n\n" +
-			"Before the date, not on it. The date arriving is the last moment to act on " +
-			"something rather than the first useful warning, and a list that only ever showed " +
-			"what was already past would be a list of decisions somebody has already failed to " +
-			"make.\n\n" +
 			"Nothing here discloses anything. Reaching the date escalates: the row appears " +
-			"and the people who can act on it are told. Publishing embargoed detail because a " +
-			"timer expired is the wrong default — if the fix is not ready, disclosing anyway is " +
-			"a decision a person makes.\n\n" +
-			"Every row is undisclosed by definition, so this list is a disclosure in its own " +
-			"right: a product you may not read undisclosed work in contributes nothing to it, " +
-			"not even a count.\n\n" +
+			"and the people who can act on it are told.\n\n" +
+			"A product you may not read undisclosed work in contributes nothing to it, not " +
+			"even a count.\n\n" +
 			"`within` is how many days ahead to look. Left off, it is this deployment's own " +
-			"embargo length — the screen opened on thirty days against a ninety-day policy " +
-			"and drew nothing while five embargoes were running.",
+			"embargo length.",
 		Tags: []string{"Findings"},
 	}, perProduct, "A product you may not read undisclosed work in contributes "+
 		"nothing, not even a count.", privateRights()...), func(ctx context.Context, input *struct {
@@ -601,14 +593,7 @@ func registerMovements(api huma.API, in Ingest) {
 		Description: "Every request to move a disclosure date that nobody has agreed to yet, " +
 			"across the products you may read undisclosed work in, newest first. Every act " +
 			"is here, and `act` says which each one is.\n\n" +
-			"Without this there is nowhere to be that second person. A request could be " +
-			"read on the finding it belongs to and nowhere else, so the only way to find one " +
-			"was to already know it existed — which is the failure the review queue exists to " +
-			"prevent, in the one place where what is being agreed to is how long something " +
-			"stays hidden.\n\n" +
-			"Your own requests are here too, marked as yours. You cannot agree to one — " +
-			"the endpoint refuses it — but a proposer looking for what is holding a case up " +
-			"should not have their own request hidden from them.\n\n" +
+			"Your own requests are here too, marked as yours. You cannot agree to one.\n\n" +
 			"Agree with `POST /v1/disclosure-movements/{id}/approval`.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Only where you may read undisclosed work."), func(ctx context.Context, input *struct {

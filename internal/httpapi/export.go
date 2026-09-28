@@ -511,12 +511,8 @@ func registerExport(api huma.API, in Ingest) {
 		Description: "The findings list as a file: every row the same filters would show, not " +
 			"one page of them.\n\n" +
 			"Read with your own visibility, as it streams. It is the same query the screen " +
-			"reads, paged and written out as it goes — there is no point at which a whole " +
-			"unnarrowed list exists to be filtered afterwards, which is the failure an export " +
-			"is the easiest place in a codebase to make.\n\n" +
-			"The line this deployment triages at is stated in the file, because a spreadsheet " +
-			"opened six months later has nothing else to say that everything below it was " +
-			"never in there.\n\n" +
+			"reads, paged and written out as it goes.\n\n" +
+			"The line this deployment triages at is stated in the file.\n\n" +
 			"Takes every filter the findings list takes.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {

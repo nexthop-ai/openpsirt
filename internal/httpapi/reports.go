@@ -77,13 +77,7 @@ func registerReports(api huma.API, in Ingest) {
 			"`beneath` keeps a component and everything under it, which needs a branch and a " +
 			"variant naming exactly one build. A team that owns one area asks for its own " +
 			"three lines this way.\n\n" +
-			"Three series rather than one, because separately they are three numbers and " +
-			"together they say whether the team is keeping pace: new consistently outrunning " +
-			"resolved is a growing backlog.\n\n" +
-			"Split by severity because a total that barely moves while its critical share rises " +
-			"is getting worse, and a single line hides exactly that.\n\n" +
-			"Worked out when it is asked for. Nothing is precomputed or refreshed on a schedule " +
-			"until a measurement says it has to be.",
+			"Worked out when it is asked for.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
@@ -279,17 +273,9 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		Summary: "Show what each release shipped with",
 		Description: "One point per tagged release of one product, oldest first, with what is " +
 			"open against it now.\n\n" +
-			"The axis follows what is being viewed. A branch is scanned nightly and has " +
-			"continuous data, so a calendar reads correctly on it. A tag never moves again, and " +
-			"releases months apart make a calendar count read as slow drift rather than the " +
-			"step change it was — the gaps are the chart's whole shape and they are gaps in " +
-			"nothing.\n\n" +
-			"Answered against today's vulnerability data, not as of the day each was cut. " +
-			"That is what re-scanning a shipped release is for.\n\n" +
-			"No rates here. How many appeared and were resolved between two releases is an " +
-			"artifact of how far apart somebody cut them; rates always plot on calendar. And a " +
-			"product must be named: two products' tags interleave by date and mean nothing side " +
-			"by side.",
+			"The axis is the sequence of releases, not the calendar.\n\n" +
+			"Answered against today's vulnerability data, not as of the day each was cut.\n\n" +
+			"No rates here; the calendar trend has them. A product must be named.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
