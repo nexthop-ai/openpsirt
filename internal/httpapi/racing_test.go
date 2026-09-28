@@ -91,3 +91,13 @@ func TestAFaultKeepsItsCauseForTheRetryHelper(t *testing.T) {
 		t.Errorf("what the store wrote is what the caller is told: %q", status.Error())
 	}
 }
+
+// A lost race handed to the refusal a store's sentence gets reaches the retry
+// helper too. Recording a person maps its store errors through it, inside the
+// transaction that would take the act again.
+func TestALostRaceIsNotAnsweredAsTheCallersMistake(t *testing.T) {
+	lost := fmt.Errorf("record %q: %w", "ana", database.ErrGoAgain)
+	if got := asked(nil, lost); !database.WorthRetrying(got) {
+		t.Errorf("a lost race came back as %v, which the retry helper does not take again", got)
+	}
+}

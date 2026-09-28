@@ -521,7 +521,7 @@ func registerAdministration(api huma.API, a Administering) {
 							"a role is held against one product or across every product, not both")
 					}
 					if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
-						return huma.Error400BadRequest(err.Error())
+						return asked(a.Logger, err)
 					}
 					if err := noted(ctx, db, trail.Role, in.Body.Identity+" on every product",
 						nil, trail.Said(hold.Role, true)); err != nil {
@@ -538,7 +538,7 @@ func registerAdministration(api huma.API, a Administering) {
 					return undeclared(a.Logger, err, "that product could not be looked up")
 				}
 				if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
-					return huma.Error400BadRequest(err.Error())
+					return asked(a.Logger, err)
 				}
 				if err := noted(ctx, db, trail.Role, in.Body.Identity+" on "+hold.Product,
 					nil, trail.Said(hold.Role, true)); err != nil {

@@ -544,6 +544,12 @@ func asked(logger *slog.Logger, err error) error {
 	if errors.Is(err, access.ErrDenied) {
 		return huma.Error403Forbidden("not authorized")
 	}
+	// A lost race, which the transaction around the act takes again. Answered
+	// as a refusal it is a 422 telling the caller to go again, and the retry
+	// helper never sees it.
+	if errors.Is(err, database.ErrGoAgain) {
+		return err
+	}
 	if database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
 	}
