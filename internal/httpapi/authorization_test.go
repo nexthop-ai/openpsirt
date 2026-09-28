@@ -495,7 +495,10 @@ func TestWhoMayReachWhat(t *testing.T) {
 			// one answer read twice.
 			mineMoved  = mineScans + "/1/changes"
 			theirMoved = "/v1/products/theirs/streams/master/variants/broadcom/scans/1/changes"
-			theirFound = "/v1/products/theirs/findings?stream=master&variant=broadcom"
+			// What the scanner cannot match in one build, and its file.
+			mineUnmatched   = "/v1/products/mine/streams/master/variants/broadcom/match-coverage"
+			theirsUnmatched = "/v1/products/theirs/streams/master/variants/broadcom/match-coverage"
+			theirFound      = "/v1/products/theirs/findings?stream=master&variant=broadcom"
 			// The same list with the branch and the variant left
 			// at "all". Widening the selection is exactly the
 			// shape that leaves a check behind on the narrow path.
@@ -652,6 +655,15 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"approver", http.MethodGet, mineMoved, http.StatusNotFound},
 			{"reader", http.MethodGet, theirMoved, http.StatusNotFound},
 			{"", http.MethodGet, mineMoved, http.StatusUnauthorized},
+			{"reader", http.MethodGet, mineUnmatched, http.StatusOK},
+			{"private", http.MethodGet, mineUnmatched, http.StatusOK},
+			{"admin", http.MethodGet, mineUnmatched, http.StatusNotFound},
+			{"reader", http.MethodGet, mineUnmatched + ".csv", http.StatusOK},
+			{"approver", http.MethodGet, mineUnmatched, http.StatusNotFound},
+			{"approver", http.MethodGet, mineUnmatched + ".json", http.StatusNotFound},
+			{"reader", http.MethodGet, theirsUnmatched, http.StatusNotFound},
+			{"reader", http.MethodGet, theirsUnmatched + ".csv", http.StatusNotFound},
+			{"", http.MethodGet, mineUnmatched, http.StatusUnauthorized},
 
 			// Administration is administration. Holding every product role
 			// there is does not amount to any of it.

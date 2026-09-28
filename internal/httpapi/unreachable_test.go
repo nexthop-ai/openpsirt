@@ -49,6 +49,7 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 		}{
 			{"productNamedVisibly", "/v1/products/mine/findings"},
 			{"locatedVisibly", "/v1/products/mine/streams/master/variants/broadcom/components"},
+			{"locatedVisibly", "/v1/products/mine/streams/master/variants/broadcom/match-coverage"},
 			{"targetRow", "/v1/products/mine/streams/master/variants/broadcom/scans"},
 			{"issueHere", "/v1/products/mine/streams/master/variants/broadcom/findings/" +
 				"CVE-2026-9999/components/libnl-3-200"},

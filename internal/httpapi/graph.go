@@ -46,8 +46,9 @@ type RootsBody struct {
 	// and how much of it was placed.
 	Components int `json:"components" doc:"The number of components this build holds"`
 	Edges      int `json:"edges" doc:"The number of edges placing them"`
-	// Unidentified is what the scanner has no identifier to match on.
-	Unidentified int `json:"unidentified" doc:"The number of those components carrying neither a package identifier nor a platform enumeration"`
+	// Unmatched is what the scanner has no way to match; the match coverage
+	// report lists them.
+	Unmatched int `json:"unmatched" doc:"The number of those components the scanner has no way to match. The match coverage report lists them, with the reason"`
 	// Searching is the term somebody typed when Items would be thousands
 	// long, and it comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`
@@ -114,7 +115,7 @@ func registerGraph(api huma.API, in Ingest) {
 		out := &rootsOutput{}
 		out.Body.Components = tally.Components
 		out.Body.Edges = tally.Edges
-		out.Body.Unidentified = tally.Unidentified
+		out.Body.Unmatched = tally.Unmatched
 
 		// A search answers with matches and no root. The request is for a set
 		// of components rather than a position, and naming a root

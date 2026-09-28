@@ -462,6 +462,8 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 		for _, path := range []string{
 			build + "/scans",
 			build + "/components",
+			build + "/match-coverage",
+			build + "/match-coverage.csv",
 			build + "/register",
 			build + "/register.csv",
 		} {

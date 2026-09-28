@@ -1016,32 +1016,23 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 	if err != nil {
 		return Tally{}, fmt.Errorf("count what this build's edges are: %w", err)
 	}
-	// The components carrying neither a package identifier nor a platform
-	// enumeration, which is everything a scanner matches on. They ship and are
-	// tracked, and no scan can say anything about them, so a build of nothing
-	// else reports no findings and reads as clean.
-	unidentified, err := s.db.NewSelect().
-		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", false).
-		Where("(c.purl IS NULL OR c.purl = '')").
-		Where("(c.cpe IS NULL OR c.cpe = '')").
-		Count(ctx)
+	// What the scanner has no way to match. It ships and is tracked, and no
+	// scan can say anything about it, so a build of nothing else reports no
+	// findings and reads as clean.
+	unmatched, err := s.unmatchedCount(ctx, targetID)
 	if err != nil {
-		return Tally{}, fmt.Errorf("count what this build holds that nothing can match: %w", err)
+		return Tally{}, err
 	}
-	return Tally{Components: components, Edges: edges, Unidentified: unidentified}, nil
+	return Tally{Components: components, Edges: edges, Unmatched: unmatched}, nil
 }
 
 // Tally is how much a build's graph holds.
 type Tally struct {
 	Components int
 	Edges      int
-	// Unidentified is how many of the components carry nothing a scanner can
-	// match them on.
-	Unidentified int
+	// Unmatched is how many of the components the scanner has no way to match,
+	// for any of the reasons Unmatchable gives.
+	Unmatched int
 }
 
 // Search finds components of a build by name.

@@ -54,6 +54,9 @@ const AutoAssignment = retrying(() =>
 const Disclosing = retrying(() => import("../screens/Disclosing").then((m) => m.Disclosing));
 const Obligations = retrying(() => import("../screens/Obligations").then((m) => m.Obligations));
 const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
+const MatchCoverage = retrying(() =>
+  import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
+);
 const Inventories = retrying(() => import("../screens/Inventories").then((m) => m.Inventories));
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
 const System = retrying(() => import("../screens/System").then((m) => m.System));
@@ -99,6 +102,7 @@ export const ROUTES = {
   inventoryChanges: `${build}/scans/:scan/changes`,
   run: `${build}/runs/:run`,
   upgrades: `${build}/pending-upgrades`,
+  matchCoverage: `${build}/match-coverage`,
   vex: `${build}/vex`,
   comparison: "/products/:product/comparison",
   inventoryComparison: "/products/:product/comparison/inventory",
@@ -226,6 +230,7 @@ export function App() {
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.upgrades} element={<Upgrades />} />
+              <Route path={ROUTES.matchCoverage} element={<MatchCoverage />} />
               <Route path={ROUTES.vex} element={<VEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
               <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
