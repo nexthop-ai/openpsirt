@@ -249,6 +249,7 @@ while the work runs on.
 
 | Rule | Reason |
 |---|---|
+| A code block is not highlighted | Grammar coverage costs bundle size, which is weighed against a real screen |
 | A bare `scheme://` is an address; a bare `word:` is not | The second matches `parser.go:112` in a stack trace and `TODO: check this` in a sentence. Schemes that act rather than navigate are matched separately, since they carry no `//` |
 | A tag in the text is reported rather than silently dropped | Raw markup is refused at submission either way, so this changes nothing about safety. It tells the author why their tag will not appear |
 | Raw markup is refused outright rather than allowlisted | Such a list is a thing that can be wrong, and the gap between what it permits and what a browser does is where the attacks live |
