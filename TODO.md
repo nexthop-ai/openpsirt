@@ -12,7 +12,6 @@ Nothing else may reference this file. Anything durable belongs in
 - [Decided, not built](#decided-not-built)
 - [Known gaps](#known-gaps)
 - [Weak tests](#weak-tests)
-- [Owner decisions outstanding](#owner-decisions-outstanding)
 - [Measured and left alone](#measured-and-left-alone)
 
 ## Before 1.0
@@ -80,6 +79,7 @@ Missing or wrong, with no decision needed to fix it.
 | Saved filters keep a scope | Each belongs to the product it was saved in, and the list across every product offers none. `DESIGN-interface.md` § Saved filters states the rule: one list per person, applied within whatever scope is on screen. Filters kept under one name in two products need the product added to one of the names when the product comes off |
 | The package-kind filter is a fixed list | A kind outside it is reached only by editing the address, and a kind the scope does not hold is offered and leads to an empty list. The server reports no kinds present |
 | An upload refused for a full queue raises no alert | It is logged and the System screen marks the queue at its limit, so a build whose pipeline does not retry loses its inventory with nobody told |
+| An outside report ruled a duplicate starts no disclosure date | A flaw found here carries none, so the reporter's publication arrives with no escalation before it |
 
 ## Weak tests
 
@@ -91,14 +91,6 @@ Missing or wrong, with no decision needed to fix it.
 | The upstream-currency retry | Runs one pass, so nothing is asked again |
 | The empty-document reader | Its comment says an empty part is refused, and it asserts that the part is stored |
 | Scanned builds in the API tests | Several tests build a scanned build by hand. The shared fixture has helpers for the catalog and people only |
-
-## Owner decisions outstanding
-
-Each needs the owner to choose before anything is built.
-
-| Question | Background |
-|---|---|
-| Start a disclosure date for an outside report ruled a duplicate? | The flaw was found here and has no date, and the outside reporter may be counting down to publication |
 
 ## Measured and left alone
 
