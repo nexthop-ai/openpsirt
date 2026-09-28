@@ -377,15 +377,40 @@ func (s *Store) registerJoins(productID int64,
 // are the findings list's own test, so the register and the list agree about
 // every place. The claim's outcome is read by a scalar rather than through the
 // join, because the claim joined is the one this condition selects.
-var onTheRecordHere = `((de.live_key IS NOT NULL AND ` +
-	keyMatchesOn("de", `(SELECT clr.outcome FROM "claim" AS "clr" WHERE clr.id = de.claim_id)`) + `)
+//
+// Two live decisions can cover one finding: a claim keyed on its versions and
+// a correction, which covers the place at any version. The one reported is
+// the one the finding's own screen names: the correction in force, and
+// otherwise the oldest.
+var onTheRecordHere = `((de.live_key IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
+	AND NOT EXISTS (SELECT 1 FROM "decision" AS "d3"
+		WHERE d3.product_id = de.product_id
+		  AND d3.vulnerability_id = de.vulnerability_id
+		  AND d3.place_identity = de.place_identity
+		  AND d3.live_key IS NOT NULL
+		  AND ` + keyMatchesOn("d3", outcomeOf("d3")) + `
+		  AND (` + rankOf("d3") + ` < ` + rankOf("de") + `
+		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND d3.id < de.id))))
 	OR (de.state = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
 		WHERE d2.product_id = de.product_id
 		  AND d2.vulnerability_id = de.vulnerability_id
 		  AND d2.place_identity = de.place_identity
-		  AND ((d2.live_key IS NOT NULL AND ` +
-	keyMatchesOn("d2", `(SELECT cl2.outcome FROM "claim" AS "cl2" WHERE cl2.id = d2.claim_id)`) + `)
+		  AND ((d2.live_key IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
 		    OR (d2.state = 'lapsed' AND d2.id > de.id)))))`
+
+// outcomeOf is the outcome of a decision's claim, as a scalar.
+func outcomeOf(decision string) string {
+	return `(SELECT clr.outcome FROM "claim" AS "clr" WHERE clr.id = ` + decision + `.claim_id)`
+}
+
+// rankOf orders the live decisions at one place the way the finding's screen
+// does: a correction in force before anything else.
+func rankOf(decision string) string {
+	return `(CASE WHEN ` + outcomeOf(decision) + ` = '` + Mismatched + `'
+		AND (` + decision + `.state = 'approved'
+		  OR (` + decision + `.needs_approval = FALSE AND ` + decision + `.sent_back_at IS NULL))
+		THEN 0 ELSE 1 END)`
+}
 
 // registerQuery is the register, unbounded. What a caller adds is how much of
 // it they want.

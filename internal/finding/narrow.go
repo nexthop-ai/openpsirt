@@ -1161,10 +1161,12 @@ const KeyMatches = "(cl.outcome = '" + Mismatched + "' OR (" +
 // keyMatchesOn is KeyMatches over a decision under another alias, with the
 // claim's outcome given as an expression, for a statement that asks it before
 // the claim is joined or of a second decision beside the first.
+//
+// Derived from KeyMatches by renaming its two references rather than written
+// out again, so the rule has one spelling. KeyMatches stays a constant because
+// other constants are built from it.
 func keyMatchesOn(decision, outcome string) string {
-	return "(" + outcome + " = '" + Mismatched + "' OR (" +
-		"COALESCE(" + decision + ".component_upstream_version, '') = " + ComponentUpstreamExpr +
-		" AND COALESCE(" + decision + ".consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
+	return strings.NewReplacer("cl.outcome", outcome, "de.", decision+".").Replace(KeyMatches)
 }
 
 // Mismatched is the outcome whose claim is about identity, named here so the

@@ -342,7 +342,7 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss), found("CVE-2026-2", teamd),
+			found("CVE-2026-1", swss), found("CVE-2026-2", teamd), found("CVE-2026-3", libnl),
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -362,6 +362,11 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
 		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
 		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "approved", teamd.Version, "anew")
+		// Lapsed, claimed again and lapsed again, with nothing live: the
+		// latest lapse is the record.
+		twice := finding.PlaceIdentity(libnl.Name, swss.Name)
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
 
 		rows, total, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
 		if err != nil {
@@ -380,6 +385,9 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 		}
 		if got := states[lapsed]; len(got) != 1 || got[0] != "agreed" {
 			t.Errorf("a place lapsed and agreed again reads %v, want one row agreed", got)
+		}
+		if got := states[twice]; len(got) != 1 || got[0] != "lapsed" {
+			t.Errorf("a place lapsed twice with nothing live reads %v, want one row lapsed", got)
 		}
 		undecided, total, err := f.store.Register(ctx, who, f.target,
 			finding.Registering{States: []string{"undecided"}}, 50, 0)
@@ -444,5 +452,67 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 		}
 		reads(f.target, "agreed")
 		reads(other, "undecided")
+	})
+}
+
+// A finding two live decisions cover reads once: a claim keyed on its versions
+// and a correction, which covers the place at any version. The register names
+// the one the finding's screen names — the correction once it is in force, and
+// the older claim before that.
+func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue, place := f.issueID(t, "CVE-2026-1"), finding.PlaceIdentity(swss.Name, "")
+		f.decided(t, somebody.ID, issue, place, "approved", swss.Version, "keyed")
+		correction := map[string]any{
+			"claim_id":   claimSaying(t, f.db, somebody.ID, "mismatched"),
+			"product_id": f.productID, "vulnerability_id": issue,
+			"place_identity": place, "visibility": "public", "state": "proposed",
+			"needs_approval": true, "proposed_by": somebody.ID,
+			"proposed_at":                time.Now().UTC(),
+			"component_upstream_version": "0.9.0", "live_key": "anywhere",
+		}
+		if _, err := f.db.DB.NewInsert().Model(&correction).
+			TableExpr("\"decision\"").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		reads := func(because, outcome string) {
+			t.Helper()
+			rows, total, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var here []finding.Disposed
+			for _, row := range rows {
+				if row.Place == place {
+					here = append(here, row)
+				}
+			}
+			if len(here) != 1 || total != len(rows) {
+				t.Fatalf("%s: the place reads %d times, total %d of %d rows", because,
+					len(here), total, len(rows))
+			}
+			if here[0].Outcome != outcome {
+				t.Errorf("%s: the place reads %q, want %q", because, here[0].Outcome, outcome)
+			}
+		}
+		reads("a correction waiting beside an agreed claim", "not-applicable")
+		if _, err := f.db.DB.NewUpdate().Table("decision").Set("state = ?", "approved").
+			Where("live_key = ?", "anywhere").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		reads("a correction in force beside an agreed claim", "mismatched")
 	})
 }
