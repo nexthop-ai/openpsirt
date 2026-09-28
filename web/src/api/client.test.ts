@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it } from "vitest";
-import { csrfCookie } from "./client";
+import { csrf, csrfCookie } from "./client";
 
 // The `__Host-` prefix is the only thing stopping a sibling host under the
-// same registrable domain writing a cookie this deployment then reads. Reading
-// whichever name came first gave that away: two cookies of equal path length
-// are ordered by when they were created, so one planted first was the one
-// sent, every write was refused against the value bound to the session, and
-// nothing in the page said why.
+// same registrable domain writing a cookie this deployment then reads. Two
+// cookies of equal path length are ordered by when they were created, so a
+// reader taking whichever name comes first sends a planted one.
 // jsdom's own cookie jar orders by its own rules, so the two names are put in
 // the order under test directly. What is being pinned is which of two the
 // reader prefers, not how a browser stores them.
@@ -41,8 +39,8 @@ describe("which CSRF cookie is echoed", () => {
     set("__Host-openpsirt_csrf=a%20b");
     expect(csrfCookie()).toBe("a b");
     // A malformed escape throws out of `decodeURIComponent`, and this runs in
-    // the middleware every write goes through — so one bad cookie set by
-    // anything on this host failed every write in the application.
+    // the middleware every write goes through, so a throw here fails every
+    // write in the application.
     set("__Host-openpsirt_csrf=%E0%A4%A");
     expect(() => csrfCookie()).not.toThrow();
     expect(csrfCookie()).toBe("%E0%A4%A");
@@ -51,5 +49,30 @@ describe("which CSRF cookie is echoed", () => {
   it("answers with nothing where neither is set", () => {
     set("");
     expect(csrfCookie()).toBe("");
+  });
+});
+
+// The middleware every request passes through. Called directly, because what
+// is pinned is which requests carry the token, and that needs no server.
+async function sent(method: string): Promise<Request> {
+  const request = new Request("http://psirt.example/v1/anything", { method });
+  const out = await csrf.onRequest!({ request } as never);
+  return (out as Request | undefined) ?? request;
+}
+
+describe("which requests carry the CSRF token", () => {
+  it.each(["POST", "PUT", "PATCH", "DELETE"])("%s carries the cookie's value", async (method) => {
+    set("__Host-openpsirt_csrf=ours");
+    expect((await sent(method)).headers.get("X-CSRF-Token")).toBe("ours");
+  });
+
+  it.each(["GET", "HEAD"])("%s carries none", async (method) => {
+    set("__Host-openpsirt_csrf=ours");
+    expect((await sent(method)).headers.has("X-CSRF-Token")).toBe(false);
+  });
+
+  it("sends no empty header where there is no cookie", async () => {
+    set("");
+    expect((await sent("POST")).headers.has("X-CSRF-Token")).toBe(false);
   });
 });
