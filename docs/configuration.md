@@ -112,6 +112,8 @@ going back to v0.4.0.
 | With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
 | Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
 | Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
+| Recording that an advisory went out takes a triage role on every product it covers. In v0.4.0 a triage role on any product was enough | Grant the publisher triage on each product their advisories cover |
+| A filter taking words from a set refuses a word named twice with a 422, and a filter of product names takes at most 200. A saved filter repeating a word opens as a 422 | Save the filter again without the repeat |
 
 | After the upgrade from v0.4.0 | |
 |---|---|

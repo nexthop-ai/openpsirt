@@ -178,8 +178,8 @@ describe("drafts", () => {
     // The store the scope actually lives in, asserted against it.
     // forgetAll walks the local store alone; what the tab holds is taken away
     // by forgetSession, and sign-out calls both.
-    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
     belongTo("oidc:ana");
+    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
 
     forgetAll();
 
@@ -246,6 +246,17 @@ describe("what somebody else signing in takes away", () => {
 
     expect(window.sessionStorage.getItem("openpsirt.scope")).toBe('{"product":"sonic"}');
     expect(window.sessionStorage.getItem("openpsirt.decide.last")).toBe('{"outcome":"wont-fix"}');
+    expect(ownsSession()).toBe(true);
+  });
+
+  it("clears state nobody claimed when somebody is first recognized", () => {
+    // A tab holding state written before the owner was recorded has no
+    // owner key, and it may be anybody's.
+    seeded();
+    belongTo("oidc:ben");
+
+    expect(window.sessionStorage.getItem("openpsirt.scope")).toBeNull();
+    expect(window.sessionStorage.getItem("openpsirt.decide.last")).toBeNull();
     expect(ownsSession()).toBe(true);
   });
 

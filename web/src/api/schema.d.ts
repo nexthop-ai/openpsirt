@@ -263,7 +263,7 @@ export interface paths {
          *
          *     Answers 409 where nobody has agreed to what the advisory says.
          *
-         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         post: operations["record-advisory-issued"];
         delete?: never;

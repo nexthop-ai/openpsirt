@@ -116,7 +116,7 @@ func registerRulings(api huma.API, in Ingest) {
 			"to those proposed in a period, `to` exclusive, as the record's own period is.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product    []string `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
+		Product    []string `query:"product,explode" maxItems:"200" maxLength:"191" doc:"Limit to these products, by name. Repeatable; any of them matches"`
 		Waiting    bool     `query:"waiting" doc:"Only rulings waiting for a second person"`
 		Approvable bool     `query:"approvable" doc:"Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling"`
 		From       string   `query:"from" doc:"Only rulings proposed on or after this date, as YYYY-MM-DD"`

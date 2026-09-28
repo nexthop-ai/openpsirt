@@ -70,7 +70,10 @@ export function belongTo(identity: string | undefined) {
   const owner = encodeURIComponent(writer);
   try {
     const held = window.sessionStorage.getItem(SESSION_OWNER);
-    if (held !== null && held !== owner) forgetSession();
+    // State with no owner recorded beside it may be anybody's, so the first
+    // person recognized in the tab does not inherit it.
+    const unclaimed = held === null && window.sessionStorage.length > 0;
+    if (unclaimed || (held !== null && held !== owner)) forgetSession();
     window.sessionStorage.setItem(SESSION_OWNER, owner);
   } catch {
     // A browser that refuses storage holds no session state to clear.

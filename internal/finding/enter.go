@@ -774,11 +774,11 @@ func (s *Store) ComponentName(ctx context.Context, componentID int64) (string, e
 // cleaned is the weaknesses as they will be stored: trimmed, upper-cased and
 // without repeats or empties.
 //
-// Kept as whatever classification somebody typed rather than checked against a
-// catalog of them. A list that refused an identifier it had not heard of
-// would refuse next year's, and what this is for is making a set of findings
-// comparable to things outside — which is served by recording what was meant
-// and not by having an opinion about it.
+// Checked for shape by the caller and never against a catalog of weaknesses.
+// A list that refused an identifier it had not heard of would refuse next
+// year's, and what this is for is making a set of findings comparable to
+// things outside — which is served by recording what was meant and not by
+// having an opinion about it.
 func cleaned(in []string) []string {
 	out := make([]string, 0, len(in))
 	seen := map[string]bool{}

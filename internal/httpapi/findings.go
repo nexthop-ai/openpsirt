@@ -825,12 +825,9 @@ type EvidenceBody struct {
 	// somebody decides on needs both.
 	Due      string `json:"due,omitempty" doc:"The date it runs out. The earliest among its places, which is the one that makes the whole finding late"`
 	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue"`
-	// The same two words the list body declares. Spelled `past-end-of-life`
-	// here, which nothing produces, and omitting `out-of-support`, which the
-	// store emits on every finding whose release is past end of life, a
-	// consumer validating against the published document rejects the body and
-	// a TypeScript one cannot narrow on the value it receives. Two bodies for
-	// one value, disagreeing.
+	// The same words the list body declares, and the words the store emits.
+	// A consumer validating against the published document rejects a body
+	// carrying a word the enum omits, and a TypeScript one cannot narrow on it.
 	NoDeadline string        `json:"no_deadline,omitempty" enum:"not-rated,below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	FoundBy    *MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 

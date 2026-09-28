@@ -74,9 +74,9 @@ type Auditing struct {
 	// Repeatable, because "dismissed or deferred" and "waiting or sent back"
 	// are the questions somebody reading the record has, and one value cannot
 	// ask either. Repeat the parameter; any of what is named matches.
-	Product   []string  `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
-	Outcome   []outcome `query:"outcome,explode" doc:"Limit to these kinds of judgment. Repeatable; any of them matches"`
-	State     []string  `query:"state,explode" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to these states. Repeatable; any of them matches"`
+	Product   []string  `query:"product,explode" maxItems:"200" maxLength:"191" doc:"Limit to these products, by name. Repeatable; any of them matches"`
+	Outcome   []outcome `query:"outcome,explode" uniqueItems:"true" doc:"Limit to these kinds of judgment. Repeatable; any of them matches"`
+	State     []string  `query:"state,explode" enum:"proposed,approved,withdrawn,lapsed" uniqueItems:"true" doc:"Limit to these states. Repeatable; any of them matches"`
 	From      string    `query:"from" doc:"Only judgments proposed on or after this date, as YYYY-MM-DD"`
 	To        string    `query:"to" doc:"Only judgments proposed before this date, as YYYY-MM-DD"`
 	Alone     bool      `query:"alone" doc:"Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`

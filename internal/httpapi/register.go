@@ -163,8 +163,8 @@ func stringOrNone(id int64) string {
 // component — each a way of reading the same complete answer rather than a
 // different question.
 type Registering struct {
-	State     []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
-	Outcome   []outcome `query:"outcome,explode" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
+	State     []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" uniqueItems:"true" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
+	Outcome   []outcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
 	Component string    `query:"component" doc:"Keep one component, by name"`
 	Issue     string    `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
 	Standing  string    `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`

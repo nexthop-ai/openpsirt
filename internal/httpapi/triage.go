@@ -274,7 +274,7 @@ type QueueNarrowing struct {
 	ProposedBy string    `query:"proposed_by" maxLength:"191" doc:"Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
 	OlderThan  int       `query:"older_than" minimum:"1" doc:"Keep only claims at least this many days old"`
 	Severity   string    `query:"severity" enum:"low,medium,high,critical" doc:"Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
-	Outcome    []outcome `query:"outcome,explode" doc:"Keep only claims of these outcomes. Any of them, not all"`
+	Outcome    []outcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep only claims of these outcomes. Any of them, not all"`
 	Release    string    `query:"release" maxLength:"191" doc:"Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
 }
 

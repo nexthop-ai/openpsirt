@@ -8056,6 +8056,7 @@ components:
         weaknesses:
           description: "The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"
           items:
+            pattern: ^(\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\s*$
             type: string
           maxItems: 16
           type:
@@ -11637,7 +11638,7 @@ paths:
 
         Answers 409 where nobody has agreed to what the advisory says.
 
-        Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: record-advisory-issued
       parameters:
         - in: path
@@ -11672,7 +11673,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
-        note: A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+        note: A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
   /v1/advisories/{advisory}/issues:
     post:
       description: |-
@@ -12148,7 +12149,9 @@ paths:
           schema:
             description: Limit to these products, by name. Repeatable; any of them matches
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12172,6 +12175,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Limit to these states. Repeatable; any of them matches
           explode: true
           in: query
@@ -12188,6 +12192,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Only judgments proposed on or after this date, as YYYY-MM-DD
           explode: false
           in: query
@@ -12316,7 +12321,9 @@ paths:
           schema:
             description: Limit to these products, by name. Repeatable; any of them matches
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12340,6 +12347,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Limit to these states. Repeatable; any of them matches
           explode: true
           in: query
@@ -12356,6 +12364,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Only judgments proposed on or after this date, as YYYY-MM-DD
           explode: false
           in: query
@@ -23872,6 +23881,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep rows whose standing judgment is one of these. Repeatable
           explode: true
           in: query
@@ -23892,6 +23902,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep one component, by name
           explode: false
           in: query
@@ -23998,6 +24009,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep rows whose standing judgment is one of these. Repeatable
           explode: true
           in: query
@@ -24018,6 +24030,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep one component, by name
           explode: false
           in: query
@@ -25237,7 +25250,9 @@ paths:
           schema:
             description: Limit to these products, by name. Repeatable; any of them matches
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -25384,6 +25399,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
           explode: false
           in: query
@@ -25510,6 +25526,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
           explode: false
           in: query
