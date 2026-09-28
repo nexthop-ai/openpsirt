@@ -21,7 +21,6 @@ func TestDebianVersionsOrderTheWayDpkgOrdersThem(t *testing.T) {
 		want int
 	}{
 		{"6.12.41-1", "6.12.107-1", -1},
-		{"6.12.107-1", "6.12.41-1", 1},
 		{"6.12.41-1", "6.12.41-1", 0},
 		// 100 is larger than 94 even though "1" sorts before "9".
 		{"6.12.94-1", "6.12.100-1", -1},
@@ -36,17 +35,14 @@ func TestDebianVersionsOrderTheWayDpkgOrdersThem(t *testing.T) {
 		{"1.007", "1.7", 0},
 		// An epoch outranks the version after it.
 		{"1:1.0", "2.0", 1},
-		{"2.0", "1:1.0", -1},
 		{"1:1.0", "1:1.0", 0},
+		// The upstream version holds a hyphen where a revision follows it,
+		// and a colon where an epoch precedes it.
+		{"1.0-beta-1", "1.0-beta-2", -1},
+		{"1.0-beta-1", "1.0-1", 1},
+		{"1:2:3-1", "1:2:4-1", -1},
 	} {
-		got, ok := vercmp.Order(vercmp.Debian, each.a, each.b)
-		if !ok {
-			t.Errorf("%q against %q could not be ordered", each.a, each.b)
-			continue
-		}
-		if got != each.want {
-			t.Errorf("%q against %q is %d, want %d", each.a, each.b, got, each.want)
-		}
+		bothWays(t, vercmp.Debian, each.a, each.b, each.want)
 	}
 }
 
@@ -75,86 +71,12 @@ func TestSemanticVersionsOrderAndAPreReleaseComesFirst(t *testing.T) {
 		{"1.0.0-alpha.1", "1.0.0-alpha.beta", -1},
 		// Build metadata says nothing about order.
 		{"v28.5.2+incompatible", "v28.5.2", 0},
-		// The same comparisons the other way round, because three arms fire
-		// only when a sorts *after* b: a release outranking its own
-		// pre-release, an alphanumeric identifier outranking a numeric one,
-		// and two differing alphabetic identifiers. Without the mirrors,
-		// "alpha before beta" is asserted nowhere and flipping the numeric
-		// rule breaks antisymmetry rather than merely an answer.
-		{"1.27.0", "1.27.0-rc.2", 1},
-		{"1.0.0-alpha", "1.0.0-1", 1},
 		{"1.0.0-alpha", "1.0.0-beta", -1},
-		{"1.0.0-beta", "1.0.0-alpha", 1},
-		{"1.0.0-rc.1", "1.0.0-rc", 1},
+		// A hyphen inside an identifier is part of it, which is how a Go
+		// pseudo-version is spelled.
+		{"v0.0.0-20230101120000-abcdef123456", "v0.0.0", -1},
 	} {
-		got, ok := vercmp.Order(vercmp.Semantic, each.a, each.b)
-		if !ok {
-			t.Errorf("%q against %q could not be ordered", each.a, each.b)
-			continue
-		}
-		if got != each.want {
-			t.Errorf("%q against %q is %d, want %d", each.a, each.b, got, each.want)
-		}
-	}
-}
-
-func TestOrderingIsAntisymmetric(t *testing.T) {
-	// A comparator read as a comparator rather than as a table of answers.
-	// Every arm that decides an order has a mirror, and a rule that returns
-	// the same sign both ways is not a wrong answer but a broken ordering: a
-	// list sorted with it depends on the order it was already in.
-	for _, each := range []struct {
-		scheme vercmp.Scheme
-		a, b   string
-	}{
-		{vercmp.Debian, "6.12.41-1", "6.12.107-1"},
-		{vercmp.Debian, "1.0~rc1", "1.0"},
-		{vercmp.Debian, "1.007", "1.7"},
-		{vercmp.Debian, "1:1.0", "2.0"},
-		{vercmp.Semantic, "1.27.0-rc.2", "1.27.0"},
-		{vercmp.Semantic, "1.0.0-1", "1.0.0-alpha"},
-		{vercmp.Semantic, "1.0.0-alpha", "1.0.0-beta"},
-		{vercmp.Semantic, "1.0.0-rc", "1.0.0-rc.1"},
-		{vercmp.Semantic, "1.2", "1.2.0"},
-		{vercmp.RPM, "1.0", "1.0~rc1"},
-		{vercmp.RPM, "1.0", "1.0^20240101"},
-		{vercmp.RPM, "1.a", "1.2"},
-		{vercmp.RPM, "1:1.0-1", "2.0-1"},
-		{vercmp.RPM, "1.0-1", "1.0-2"},
-		{vercmp.APK, "1.2.0_rc1", "1.2.0"},
-		{vercmp.APK, "1.2.0", "1.2.0_p1"},
-		{vercmp.APK, "1.2.0-r1", "1.2.0-r2"},
-		{vercmp.APK, "8.2.0015", "8.2.002"},
-		{vercmp.APK, "1.2.0_alpha", "1.2.0_beta"},
-		{vercmp.PyPI, "1.0.dev1", "1.0a1"},
-		{vercmp.PyPI, "1.0", "1.0.post1"},
-		{vercmp.PyPI, "1.0", "1.0+local"},
-		{vercmp.PyPI, "1.0+abc", "1.0+1"},
-		{vercmp.PyPI, "1!0.1", "2.0"},
-		{vercmp.Maven, "1-alpha-1", "1"},
-		{vercmp.Maven, "1", "1-sp"},
-		{vercmp.Maven, "1.0.0.rc1", "1.0.0-rc2"},
-		{vercmp.Maven, "1-snapshot", "1"},
-		{vercmp.Maven, "1", "1-abc"},
-		{vercmp.NuGet, "1.0.0-beta", "1.0.0"},
-		{vercmp.NuGet, "1.0.0", "1.0.0.1"},
-		{vercmp.NuGet, "1.0.0-1", "1.0.0-a"},
-		{vercmp.NuGet, "1.0.0-rc.2", "1.0.0-rc.10"},
-	} {
-		forward, ok := vercmp.Order(each.scheme, each.a, each.b)
-		if !ok {
-			t.Errorf("%q against %q could not be ordered", each.a, each.b)
-			continue
-		}
-		back, ok := vercmp.Order(each.scheme, each.b, each.a)
-		if !ok {
-			t.Errorf("%q against %q could not be ordered", each.b, each.a)
-			continue
-		}
-		if forward != -back {
-			t.Errorf("%q against %q is %d and the reverse is %d, want the opposite sign",
-				each.a, each.b, forward, back)
-		}
+		bothWays(t, vercmp.Semantic, each.a, each.b, each.want)
 	}
 }
 
@@ -221,8 +143,24 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 		// An upstream version begins with a digit, which is Debian policy's
 		// own rule and what separates a version from a word.
 		{vercmp.Debian, "v1.0-1", "1.0-1"},
-		// An epoch is digits or it is not an epoch.
+		// An epoch is digits or it is not an epoch, and an empty one is not
+		// digits.
 		{vercmp.Debian, "next:1.0-1", "1.0-1"},
+		{vercmp.Debian, ":1.0-1", "1.0-1"},
+		{vercmp.RPM, ":1.0", "1.0"},
+		{vercmp.RPM, "x:1.0", "1.0"},
+		// The revision holds no colon, where the upstream version before it
+		// may.
+		{vercmp.Debian, "1:2:3-4:5", "1.0-1"},
+		// An empty release part is not a zero.
+		{vercmp.Semantic, "v", "1.0"},
+		{vercmp.Semantic, "1..2", "1.0"},
+		{vercmp.Semantic, "1.", "1.0"},
+		// A pre-release is identifiers, none of them empty, drawn from
+		// letters, digits and the hyphen.
+		{vercmp.Semantic, "1.0.0-", "1.0.0"},
+		{vercmp.Semantic, "1.0.0-rc..1", "1.0.0"},
+		{vercmp.Semantic, "1.0.0-not fixed", "1.0.0"},
 	} {
 		if _, ok := vercmp.Order(each.scheme, each.a, each.b); ok {
 			t.Errorf("%q against %q was ordered, want a refusal", each.a, each.b)
@@ -305,52 +243,6 @@ func TestADistributionUpgradeReachesWhatItLeavesBehind(t *testing.T) {
 	}
 }
 
-func TestAlpineOrdersTheTokensItsOwnSuiteNeverPairs(t *testing.T) {
-	// A commit hash is the one token the published suite never orders against
-	// another kind: three of its lines carry one and all three have a hash on
-	// both sides, so every one is decided inside the token. Where the hash
-	// sits among the tokens decides real answers — the tail rule compares
-	// which token each version stopped on — and moving it would leave that
-	// suite green.
-	//
-	// The same shape the two older schemes have beside their vendored cases,
-	// and for the same reason: what a published suite does not pair is written
-	// down here rather than left to whichever order the constants happen to be
-	// declared in.
-	for _, each := range []struct {
-		a, b string
-		want int
-	}{
-		// A hash follows the version it was taken of.
-		{"1.0", "1.0~abcd", -1},
-		// And outranks a bare revision. Where two versions agree as far as
-		// one of them goes, the one that stopped on the earlier token is the
-		// greater — a hash is part of what the version is, and a revision is
-		// the packaging around it.
-		{"1.0~abcd", "1.0-r1", 1},
-		// And follows a suffix, which is part of what the version calls
-		// itself rather than a note about where it came from.
-		{"1.0_p1", "1.0~abcd", 1},
-		{"1.0~abcd", "1.0_alpha1", 1},
-		// Two hashes of one version compare as text, which is all anybody can
-		// do with them.
-		{"1.0~abcd", "1.0~bbcd", -1},
-	} {
-		got, ok := vercmp.Order(vercmp.APK, each.a, each.b)
-		if !ok {
-			t.Errorf("%q against %q could not be ordered", each.a, each.b)
-			continue
-		}
-		if got != each.want {
-			t.Errorf("%q against %q is %d, want %d", each.a, each.b, got, each.want)
-		}
-		back, ok := vercmp.Order(vercmp.APK, each.b, each.a)
-		if !ok || back != -each.want {
-			t.Errorf("%q against %q is %d, and back again is %d", each.a, each.b, got, back)
-		}
-	}
-}
-
 // The two distribution schemes are checked against cases written here rather
 // than against the suites their projects publish.
 //
@@ -408,6 +300,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		// anything that follows it.
 		{"a caret follows the release it came after", "1.0^", "1.0", 1},
 		{"a caret follows with content too", "1.0^git1", "1.0", 1},
+		{"two carets compare after them", "1.0^2", "1.0^1", 1},
 		{"and precedes the next version", "1.0^20160101", "1.0.1", -1},
 		// That is not the same as preceding a longer number in the same
 		// segment: 0 against 01 is a number against a number.
@@ -460,7 +353,11 @@ func TestAlpineVersionsOrderTheWayApkOrdersThem(t *testing.T) {
 		{"and never outranks the version", "1.0-r9", "1.1-r0", -1},
 
 		// A commit hash is part of what the version is, so it outranks a bare
-		// revision and is outranked by a suffix.
+		// revision and is outranked by a suffix. It is the one token the
+		// published suite never orders against another kind: every line of it
+		// carrying one has a hash on both sides. Where the hash sits among
+		// the tokens decides real answers, because the tail rule compares
+		// which token each version stopped on.
 		{"a hash follows the version it was taken of", "1.0~abcd", "1.0", 1},
 		{"a hash outranks a bare revision", "1.0~abcd", "1.0-r1", 1},
 		{"a suffix outranks a hash", "1.0_p1", "1.0~abcd", 1},
@@ -509,6 +406,11 @@ func TestAlpineReadsAVersionOrRefusesTheWholeString(t *testing.T) {
 		{"a revision of nothing", "0.1-r", false},
 		{"two revisions", "0.1-r2-r3", false},
 		{"something after the revision", "0.1-r2_pre1", false},
+		{"a hyphen without r", "1.0-12", false},
+		{"a hash after a revision", "1.0-r1~abcd", false},
+		{"two hashes", "1.0~ab~cd", false},
+		{"a byte outside the grammar", "1.0+1", false},
+		{"a capital letter", "1.0A", false},
 		// And it has to start with a number.
 		{"a bare word", "a", false},
 		{"a leading dot", ".1", false},
@@ -530,7 +432,7 @@ func TestADistributionVersionThatIsNotOneIsRefused(t *testing.T) {
 	// a scheme that never fails. What an advisory wrote where a version
 	// belongs then outranked every real release, because a letter sorts above
 	// a digit.
-	for _, scheme := range []vercmp.Scheme{vercmp.RPM, vercmp.Debian} {
+	for _, scheme := range []vercmp.Scheme{vercmp.RPM, vercmp.Debian, vercmp.APK} {
 		for _, not := range []string{
 			"unfixed", "TBD", "none", "not fixed", "", "  ",
 			// No leading digit, which is the rule each scheme states for
@@ -614,12 +516,15 @@ func TestAVersionLeadingToAReleaseIsToldApartFromOne(t *testing.T) {
 		{vercmp.Maven, "unfixed"},
 		{vercmp.NuGet, "1.0-"},
 		{vercmp.NuGet, ""},
-		{vercmp.NuGet, "1" + strings.Repeat(".1", 4096)},
+		// Longer than any version, and refused by nothing but the bound: each
+		// is a string the scheme's grammar accepts.
+		{vercmp.Maven, "1" + strings.Repeat("-1", 4096)},
+		{vercmp.NuGet, "1.0.0-" + strings.Repeat("a", 4096)},
 		// A scheme no index is asked under.
 		{vercmp.Semantic, "1.0.0-rc.1"},
 	} {
 		if _, ok := vercmp.Leads(each.scheme, each.v); ok {
-			t.Errorf("%v: %q was read, want a refusal", each.scheme, each.v)
+			t.Errorf("%v: %.40q was read, want a refusal", each.scheme, each.v)
 		}
 	}
 }
