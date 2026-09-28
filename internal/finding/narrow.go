@@ -478,6 +478,52 @@ func AtLeast(word string) []string {
 	return nil
 }
 
+// asksOfGroups says whether the filter holds a condition over the list's
+// group — one issue at one fold — rather than over a row.
+func (f Filter) asksOfGroups() bool {
+	return f.Exploited || f.HasFix || f.Unconfirmed ||
+		len(trimmed(f.States)) > 0 || len(trimmed(f.Outcomes)) > 0 || f.Planned != PlannedEither ||
+		len(trimmed(f.Assigned)) > 0 || len(f.fixStates()) > 0 ||
+		f.OpenedAfter != nil || f.OpenedBefore != nil || f.ClosedAfter != nil ||
+		f.Overdue || f.DueBefore != nil || f.DiffersBetweenBuilds
+}
+
+// ofRows is the filter with every condition over a group taken out, leaving
+// what it asks of each row.
+func (f Filter) ofRows() Filter {
+	f.Exploited, f.HasFix, f.Unconfirmed = false, false, false
+	f.States, f.Outcomes, f.Planned = nil, nil, PlannedEither
+	f.Assigned, f.FixStates = nil, nil
+	f.OpenedAfter, f.OpenedBefore, f.ClosedAfter = nil, nil, nil
+	f.Overdue, f.DueBefore, f.DiffersBetweenBuilds = false, nil, false
+	return f
+}
+
+// asListed narrows a query over the open findings of these builds to the rows
+// the findings list holds under the filter, for a query grouped at another
+// grain than the list's.
+//
+// The list's conditions over a group are written for one issue at one fold.
+// Asked of a component, "exploited" holds for the whole component when one of
+// its issues is, and "has a fix" fails it when one of its issues has none — so
+// its counts stop being the list's. The groups the list keeps are chosen at
+// the list's own grain and joined in, and only the conditions on a row are
+// applied here. A filter with no condition over a group is applied as it is.
+func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
+	visible []access.Visibility) *bun.SelectQuery {
+
+	if !f.asksOfGroups() {
+		return f.narrow(q)
+	}
+	kept := f.narrow(openGroups(db, targets, visible).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn + ` AS "fold"`))
+	return f.ofRows().narrow(q.
+		Join(`JOIN "component" AS "ck" ON ck.id = f.component_id`).
+		Join(`JOIN (?) AS "kept" ON kept.vulnerability_id = f.vulnerability_id`+
+			` AND kept.fold = ck.fold_key`, kept))
+}
+
 // narrow applies the filter to a grouped query over finding AS f.
 //
 // Nothing here needs vulnerability or component joined. Every condition on

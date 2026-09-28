@@ -484,6 +484,7 @@ is what has not been answered yet.
 | Filtering by outcome asks what stands, not what was proposed | "What have we dismissed" is a question about this deployment's answer, and a claim still waiting for a second person is not an answer. Counting a proposal would let one person put their own unreviewed claim into the number the question was asked about |
 | "Assigned to me" means mine or a team I am on | Here as everywhere the phrase appears. A group whose places are held by different parties is neither mine nor anybody's |
 | The by-component view asks the same question as the by-issue view | It was building its own query out of a hand-copied subset of nine filters, so switching views quietly widened the list back out by everything the subset left out — a deadline, an assignee, an outcome — while the chips above went on saying they were on |
+| A filter over a group is asked at the list's grain, one issue at one fold, in the by-component view and the fix bundles alike | Asked of a whole component, "exploited" kept every issue of a component holding one exploited issue, and "has a fix" dropped a component for one issue without a fix. The list's groups are chosen first and joined in, and only the conditions on a row are asked of the component's rows. A filter with no condition over a group reads the covering index as before |
 
 ## Sorting, paging and selection
 

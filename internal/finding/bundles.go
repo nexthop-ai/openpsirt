@@ -120,7 +120,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
 
 	bundled := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return filter.narrow(q.
+		return filter.asListed(s.db, q.
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
@@ -131,7 +131,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 			// A bundle is a version to move to.
 			Where("f.fixed_in IS NOT NULL").
 			Where("f.fixed_in <> ?", "").
-			GroupExpr(FoldedOn + ", f.fixed_in"))
+			GroupExpr(FoldedOn+", f.fixed_in"), targets, visible)
 	}
 
 	page := bundled(s.db.NewSelect()).
@@ -230,7 +230,7 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		Stream  string `bun:"stream"`
 		Variant string `bun:"variant"`
 	}
-	q := filter.narrow(s.db.NewSelect().
+	q := filter.asListed(s.db, s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
@@ -242,7 +242,7 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
-		GroupExpr(FoldedOn + ", f.fixed_in, c.name, st.name, va.name")).
+		GroupExpr(FoldedOn+", f.fixed_in, c.name, st.name, va.name"), targets, visible).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`f.fixed_in AS "fixed_in"`).
 		ColumnExpr(`c.name AS "name"`).
@@ -334,7 +334,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		// thousand rows to find out.
 		OrderExpr(componentOrder(filter)).
 		Limit(limit).Offset(offset)
-	if err = filter.narrow(page).Scan(ctx, &rows); err != nil {
+	if err = filter.asListed(s.db, page, targets, visible).Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what is open by component: %w", err)
 	}
 
@@ -350,7 +350,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 			Where("f.visibility IN (?)", bun.List(visible)).
 			GroupExpr("f.component_id")
 		if total, err = s.db.NewSelect().
-			TableExpr(`(?) AS "grouped"`, filter.narrow(counted)).
+			TableExpr(`(?) AS "grouped"`, filter.asListed(s.db, counted, targets, visible)).
 			Count(ctx); err != nil {
 			return nil, 0, fmt.Errorf("count what is open by component: %w", err)
 		}
@@ -538,7 +538,7 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("f.component_id, " + rating.EffectiveExpr)
-	if err := filter.narrow(query).Scan(ctx, &rows); err != nil {
+	if err := filter.asListed(s.db, query, targets, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
 	}
 	out := make(map[int64]map[string]int, len(ids))
@@ -599,7 +599,7 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 		// — and grouped rather than plain because the narrowing asks questions
 		// of the places under an issue, which are aggregates.
 		GroupExpr("f.component_id, f.vulnerability_id, f.fixed_in, c.purl")
-	if err := filter.narrow(query).Scan(ctx, &rows); err != nil {
+	if err := filter.asListed(s.db, query, targets, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where each component could go: %w", err)
 	}
 	per := map[int64][]namedFix{}
