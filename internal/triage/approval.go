@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,17 +19,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
-// Approve records a second person agreeing to what a decision currently says.
-//
-// Against one revision, not against the decision. The whole value of a second
-// pair of eyes is that they read particular words; an approval that floats
-// free of the words would still be standing after somebody rewrote them, and
-// nothing would report that.
-//
-// The proposer may never be the approver, with no override. A one-person
-// deployment therefore cannot approve anything, which is the control working
-// rather than a gap in it — and it is better said plainly than quietly
-// relaxed.
 // Revise states the reasoning again, and takes back any approval standing on
 // what it said before.
 //
@@ -48,8 +38,21 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int6
 		written, err = within.revise(ctx, subject, claimID, reasoning)
 		return err
 	})
+	var taken *placeTaken
+	if errors.As(err, &taken) {
+		return written, s.alreadyDecided(ctx, ErrAlreadyDecided, taken.places)
+	}
 	return written, err
 }
+
+// placeTaken is a revision refused because another claim now stands at one of
+// the places the revised claim would retake, with the places to name it from.
+// The standing claim is read once the transaction has unwound, as every
+// refusal naming one is.
+type placeTaken struct{ places []Place }
+
+func (e *placeTaken) Error() string { return ErrAlreadyDecided.Error() }
+func (e *placeTaken) Unwrap() error { return ErrAlreadyDecided }
 
 // Revised is a revision, and the people whose agreement it took back.
 type Revised struct {
@@ -139,20 +142,22 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	}
 	claim.RevisionID = &revision.ID
 
+	places := make([]Place, 0, len(rows))
 	for _, row := range rows {
-		// Retaken, because revising a withdrawn or lapsed claim brings it back
-		// to life and the key is what the uniqueness rule is enforced through.
-		// Without this the row is live and holds nothing, the unique index
-		// cannot see it, and a second contradictory claim about the same code
-		// is accepted — both can then be approved, with one silently
-		// governing. That is the exact failure the rule exists to prevent,
-		// walked around rather than raced.
-		key := liveKeyFor(Place{
+		places = append(places, Place{
 			ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
 			PlaceIdentity:     row.PlaceIdentity,
 			ComponentUpstream: orEmpty(row.ComponentUpstreamVersion),
 			ConsumerUpstream:  orEmpty(row.ConsumerUpstreamVersion),
-		}, claim.Outcome.StandsAtAnyVersion())
+		})
+	}
+	for i, row := range rows {
+		// Retaken, because revising a withdrawn or lapsed claim brings it back
+		// to life and the key is what the uniqueness rule is enforced through.
+		// Without it the row is live and holds nothing, the unique index
+		// cannot see it, and a second contradictory claim about the same code
+		// is accepted, both approvable, with one silently governing.
+		key := liveKeyFor(places[i], claim.Outcome.StandsAtAnyVersion())
 		if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
 			Set("state = ?", Proposed).
 			Set("live_key = ?", key).
@@ -162,6 +167,15 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			// unusable.
 			Set("sent_back_at = ?", nil).
 			Where("id = ?", row.ID).Exec(ctx); err != nil {
+			// Another claim has taken the place since this one ended. The
+			// unique index is the only thing that can say so, for the reason
+			// proposing relies on it.
+			if database.IsDuplicate(err) {
+				// The place this row refused on, not every place of the
+				// claim: its rows still standing are live at theirs, and
+				// named first they would be offered as the claim to revise.
+				return Revised{}, &placeTaken{places: []Place{places[i]}}
+			}
 			return Revised{}, fmt.Errorf("record a revision: %w", err)
 		}
 	}
@@ -203,7 +217,12 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 			// Released, so the places are open to a fresh claim. A withdrawn
 			// claim is history, and history must not stop anybody deciding.
 			Set("live_key = ?", nil).
-			Where("claim_id = ?", claimID).Exec(ctx); err != nil {
+			Where("claim_id = ?", claimID).
+			// A row that has already ended keeps its state and its end
+			// date: a lapse says when and why it stopped applying, and the
+			// claim then reads as partly lapsed rather than withdrawn.
+			Where("state IN (?)", bun.List([]State{Proposed, Approved})).
+			Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a claim: %w", err)
 		}
 		return nil
@@ -317,36 +336,42 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		Where("claim_id IN (?)", bun.List(claims)).Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
-	// Back to proposed rather than withdrawn: the claims still stand, it is
-	// the agreement to them that was taken back.
-	//
-	// Only where nothing else still agrees. A decision may carry more than one
-	// agreement, and undoing a batch is undoing that batch — sending a
-	// decision back to the queue while somebody's standing agreement to it is
-	// still recorded would discard an agreement nobody took back.
-	res, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", Proposed).
-		// Cleared here as well as on a revision. A claim sent back and then
-		// approved under a batch, with the batch later undone, was left
-		// proposed, needing approval, and in no queue at all — visible to
-		// nobody but whoever knew its identifier.
-		Set("sent_back_at = ?", nil).
-		Where("de.claim_id IN (?)", bun.List(claims)).
-		Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "still" ` +
-			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
-		Exec(ctx)
-	if err != nil {
-		return Undone{}, fmt.Errorf("undo an approval: %w", err)
-	}
-	// Counted from the write rather than from the candidates. The condition
-	// above excludes any decision another agreement still stands on, so the
-	// number of candidates is not what returned to waiting — which is what
-	// Rows says it is.
-	rows, err := database.Affected(res)
+	rows, err := s.returnToWaiting(ctx, claims)
 	if err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
 	return Undone{Rows: rows, Told: told}, nil
+}
+
+// returnToWaiting puts the approved rows of these claims back in the queue,
+// once no agreement to them still stands, and says how many it moved.
+//
+// Back to proposed rather than withdrawn: the claims still stand, and it is
+// the agreement to them that was taken back. A decision may carry more than
+// one agreement, so a row another standing agreement holds stays approved.
+//
+// Approved rows only. A lapsed or withdrawn row has ended and holds no live
+// key; returned to proposed it would wait for approval with nothing enforcing
+// that one claim stands at its place.
+//
+// Counted from the write rather than from the candidates, because both
+// conditions exclude rows the caller named.
+func (s *Store) returnToWaiting(ctx context.Context, claims []int64) (int64, error) {
+	res, err := s.db.NewUpdate().Model((*Decision)(nil)).
+		Set("state = ?", Proposed).
+		// A claim sent back and then approved, with the approval later taken
+		// back, would otherwise be proposed, need approval, and sit in no
+		// queue at all.
+		Set("sent_back_at = ?", nil).
+		Where("de.claim_id IN (?)", bun.List(claims)).
+		Where("de.state = ?", Approved).
+		Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "still" ` +
+			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
+		Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return database.Affected(res)
 }
 
 // wholeClaims keeps only the claims every one of whose rows is in reached, and
@@ -431,6 +456,33 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 			ProductID: first.ProductID, VulnerabilityID: first.VulnerabilityID,
 			Rows: len(rows), Undisclosed: undisclosed,
 		})
+	}
+	return told, nil
+}
+
+// proposersOfAll is proposersOf over a set of any size: read chunk rows at a
+// time and merged, so a person is one entry however many chunks their
+// rows fall in. The representative is their earliest row.
+func (s *Store) proposersOfAll(ctx context.Context, ids []int64, chunk int) ([]ForPerson, error) {
+	sorted := slices.Clone(ids)
+	slices.Sort(sorted)
+	at := map[int64]int{}
+	var told []ForPerson
+	for start := 0; start < len(sorted); start += chunk {
+		chunk, err := s.proposersOf(ctx, sorted[start:min(start+chunk, len(sorted))])
+		if err != nil {
+			return told, err
+		}
+		for _, one := range chunk {
+			i, seen := at[one.PersonID]
+			if !seen {
+				at[one.PersonID] = len(told)
+				told = append(told, one)
+				continue
+			}
+			told[i].Rows += one.Rows
+			told[i].Undisclosed = told[i].Undisclosed || one.Undisclosed
+		}
 	}
 	return told, nil
 }

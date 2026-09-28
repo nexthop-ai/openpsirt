@@ -164,6 +164,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	if len(in.TargetIDs) == 0 {
 		return nil, "", ErrNoBuild
 	}
+	// A build named twice is one build: a finding is a component at a place,
+	// and two rows at one place are two findings for one flaw.
+	in.TargetIDs = distinctIDs(in.TargetIDs)
 	// One product, because an identifier is minted per product and a flaw
 	// recorded across two would have to be two records. Read from the builds
 	// rather than taken from the caller, and disagreement is refused rather
@@ -332,10 +335,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		}
 
 		// Bounded by what is written rather than by what was asked for. The
-		// request bounds how many builds it may name and one build was one
-		// row, so that was the whole bound; a component that two things pull
-		// in is two rows per build, and a widely vendored one across a long
-		// list of builds is a large write from a small request.
+		// request bounds how many builds it may name, but a component that
+		// two things pull in is two rows per build, and a widely vendored one
+		// across a long list of builds is a large write from a small request.
 		cap, err := setting.NewStore(tx).Count(ctx,
 			setting.WriteCeiling, setting.DefaultWriteCeiling)
 		if err != nil {

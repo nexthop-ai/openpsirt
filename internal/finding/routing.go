@@ -429,21 +429,24 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		Join(`JOIN "component" AS "cn" ON cn.id = f.component_id`).
 		ColumnExpr(`DISTINCT cn.name AS "name"`).
 		OrderExpr("cn.name").
-		Limit(sample + 1))
+		Limit(sample))
 	if err != nil {
 		return Catches{}, err
 	}
-	var shown []string
-	if err := names.Scan(ctx, &shown); err != nil {
+	if err := names.Scan(ctx, &found.Components); err != nil {
 		return Catches{}, fmt.Errorf("read what that would match: %w", err)
 	}
-	// Asked for one more than is shown, so "and more" is answerable without a
-	// second count over the same rows.
-	found.Total = len(shown)
-	if len(shown) > sample {
-		found.Components = shown[:sample]
-	} else {
-		found.Components = shown
+	// The total is its own count over the same narrowing: a rule under a
+	// kernel matches hundreds of modules, and the sample is what is named,
+	// not how many there are.
+	distinct, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "cn" ON cn.id = f.component_id`).
+		ColumnExpr(`DISTINCT cn.name AS "name"`))
+	if err != nil {
+		return Catches{}, err
+	}
+	if found.Total, err = s.db.NewSelect().TableExpr(`(?) AS "names"`, distinct).Count(ctx); err != nil {
+		return Catches{}, fmt.Errorf("count what that would match: %w", err)
 	}
 
 	counted, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).

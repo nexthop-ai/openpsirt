@@ -174,13 +174,17 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 // the claims this subject made and may re-affirm, over decision AS "de".
 //
 // A claim with any lapsed row out of the subject's reach is left off:
-// re-affirming acts on the whole claim, and would refuse it.
+// re-affirming acts on the whole claim, and would refuse it. So is a claim
+// with a withdrawn row: its author took it back, and a withdrawal leaves a
+// row that had already lapsed as it was.
 func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
 	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
 	q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Where("cl.proposed_by = ?", subject.ID).
 		Where("de.state = ?", LapsedState)).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dw" WHERE dw.claim_id = de.claim_id`+
+			` AND dw.state = ?)`, Withdrawn).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dn" WHERE dn.claim_id = de.claim_id`+
 			` AND dn.state = ? AND `+outOfReach+`)`,
 			append([]any{LapsedState}, reachArgs...)...)

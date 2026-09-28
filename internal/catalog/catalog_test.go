@@ -232,6 +232,15 @@ func TestBadNamesAreRejected(t *testing.T) {
 		if _, err := s.DeclareProduct(ctx, strings.Repeat("a", 191), ""); err != nil {
 			t.Errorf("a name of exactly the column's width was refused: %v", err)
 		}
+
+		// The width is in characters. A name of two-byte characters at the
+		// width is twice as many bytes and still fits; one more does not.
+		if _, err := s.DeclareProduct(ctx, strings.Repeat("é", 191), ""); err != nil {
+			t.Errorf("a multi-byte name of exactly the column's width was refused: %v", err)
+		}
+		if _, err := s.DeclareProduct(ctx, strings.Repeat("ü", 192), ""); err == nil {
+			t.Error("a multi-byte name one character past the column's width was accepted")
+		}
 	})
 }
 
@@ -407,6 +416,11 @@ func TestRedeclaringSomethingDifferentlyIsRefusedAndChangesNothing(t *testing.T)
 		}
 		if again.DisplayName != "Hardware Platform Images" {
 			t.Errorf("the refused call changed the display name to %q", again.DisplayName)
+		}
+		// The display name is stored trimmed, so the same one typed with
+		// space around it is the same declaration rather than a different one.
+		if _, _, err := s.EnsureProduct(ctx, "sonic", " Hardware Platform Images "); err != nil {
+			t.Errorf("redeclaring the product with space around its display name: %v", err)
 		}
 
 		// A tag that became a branch would turn everything filed against it as

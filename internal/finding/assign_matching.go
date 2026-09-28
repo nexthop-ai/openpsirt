@@ -189,7 +189,9 @@ func (s *Store) leftBehind(ctx context.Context, productID int64, visible []acces
 	held := "assigned_to IS NULL"
 	var args []any
 	if to != nil {
-		held = "assigned_to = ?"
+		// Null-safe, so its negation holds for a place nobody holds: NOT over
+		// a comparison with NULL is NULL, and the row would be left out.
+		held = "(assigned_to IS NOT NULL AND assigned_to = ?)"
 		args = append(args, *to)
 	}
 	var ids []int64

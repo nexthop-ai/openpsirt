@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -909,6 +910,91 @@ func TestADeadlineRunsFromWhenTheFixExistedRatherThanFromWhenWeSawIt(t *testing.
 		if got := f.deadline(t, "CVE-2026-LATE"); !got.Equal(want) {
 			t.Errorf("the deadline is %s, want %s — counted from when the fix arrived",
 				got.Format(time.RFC3339), want.Format(time.RFC3339))
+		}
+	})
+}
+
+// Rewriting every deadline under the windows counts from the same moment a
+// scan counts from: the latest of the opening, the learning of exploitation,
+// and the arrival of a fix. Recounted from the opening alone, a fix that
+// arrived a hundred days in makes the finding seventy days overdue the moment
+// somebody saves a window.
+func TestRewritingTheWindowsCountsFromWhenTheFixArrived(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		none := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-LATE", Severity: "high"},
+			Component: libnl, FixState: finding.FixUnknown,
+		}
+		early := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-EARLY", Severity: "high"},
+			Component: swss, FixState: finding.FixUnknown,
+		}
+		opening := f.run(t)
+		if _, err := f.store.Apply(t.Context(), f.target, opening,
+			[]finding.Reported{none, early}); err != nil {
+			t.Fatal(err)
+		}
+		f.backdate(t, opening, 100*24*time.Hour)
+		f.backdateOpenings(t, 100*24*time.Hour)
+		opened := f.startedAt(t, opening)
+
+		released := none
+		released.FixState, released.FixedIn = finding.FixedUpstream, "3.5.7"
+		// A day, as a feed dates a fix and as the column holds it.
+		arrived := opened.Add(100 * 24 * time.Hour).Truncate(24 * time.Hour)
+		released.FixedAt = &arrived
+		// A fix dated before the opening leaves the clock at the opening.
+		already := early
+		already.FixState, already.FixedIn = finding.FixedUpstream, "1.0.1"
+		before := opened.Add(-10 * 24 * time.Hour)
+		already.FixedAt = &before
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{released, already}); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := f.store.Recompute(t.Context(), finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := f.deadline(t, "CVE-2026-LATE"), arrived.Add(finding.DefaultWindows().High); !got.Equal(want) {
+			t.Errorf("rewritten, the deadline is %s, want %s — counted from when the fix arrived",
+				got.Format(time.RFC3339), want.Format(time.RFC3339))
+		}
+		if got, want := f.deadline(t, "CVE-2026-EARLY"), opened.Add(finding.DefaultWindows().High); !got.Equal(want) {
+			t.Errorf("rewritten, the deadline is %s, want %s — counted from the opening",
+				got.Format(time.RFC3339), want.Format(time.RFC3339))
+		}
+	})
+}
+
+// Being attacked here keeps a finding below the line on the clock when the
+// windows are rewritten, as it does when a scan counts it.
+func TestRewritingTheWindowsKeepsAnIssueAttackedHereOnTheClock(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), f.productID, "medium"); err != nil {
+			t.Fatal(err)
+		}
+		low := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-ATTACKED", Severity: "low"},
+			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
+		}
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{low}); err != nil {
+			t.Fatal(err)
+		}
+		if err := finding.ExploitedHereChanged(t.Context(), f.db.DB,
+			f.productID, f.issue(t, "CVE-2026-ATTACKED"), true); err != nil {
+			t.Fatal(err)
+		}
+		if f.deadlineOrZero(t, "CVE-2026-ATTACKED").IsZero() {
+			t.Fatal("an issue attacked here carries no deadline before anything is rewritten, so this checks nothing")
+		}
+		if _, err := f.store.Recompute(t.Context(), testWindows); err != nil {
+			t.Fatal(err)
+		}
+		if f.deadlineOrZero(t, "CVE-2026-ATTACKED").IsZero() {
+			t.Error("rewriting the windows took the deadline off an issue this product was attacked through")
 		}
 	})
 }

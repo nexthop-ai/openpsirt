@@ -95,6 +95,7 @@ names**: every name resolves to one row, and a decision holds across all of them
 |---|---|
 | The lookup covers every name a report supplies, not the one it led with | One scanner reports the national identifier alone; another reports its own and knows the first as an alias. Matching only the leading name makes those two issues. The test pins that ordering, because the other ordering passes either way |
 | An issue is filed under the most widely recognized of its names | What a person sees is the name they will find in an advisory. The rest are kept, and any of them finds the row |
+| The name is chosen over the filed name and a report's names together, the filed name first | A report that omits the better name leaves the issue where it is filed. Chosen from the report's names alone, the filed name flips between scans with whichever names each producer carries, and so do the published advisory and every lookup by name |
 | Identifiers are compared in one case | Every scheme treats them as case-insensitive and reports disagree about which case to write |
 | A report that would merge two held issues is refused | That is a merge of findings and decisions already made against both, and reading a scan is the wrong moment to do it quietly |
 | The filed name, folded, is what makes one issue one row | It was a hash of the unfolded name in a column of its own, which nothing read and which only one of the two paths that refile an issue under a better-known name maintained — so the key drifted away from the row it identified, and the collision when it came named a name neither issue was filed under |
@@ -589,6 +590,7 @@ in a comparison exactly as a reported one does.
 |---|---|
 | Every build is resolved before anything is written | A component name one build holds and another does not is a question about which builds are affected, so it is refused and names the build rather than recorded against some of them and silently not the rest |
 | One product | The identifier is minted per product, so a flaw in two products is two records |
+| A build named twice is one build, here and wherever a request names builds for a fix | Two rows at one place are two findings for one flaw (REQ-17), and a repeat compared by count against the product's builds reads as a build of another product |
 | What one recording writes is held to the write ceiling alone | Recording a flaw adds findings and hides none, so the review-sized limits on a judgment do not apply. The ceiling, 50,000 findings by default, guards against a runaway write, and adding builds to a flaw later is held to it the same way |
 | Every row gets the same embargo, rank and deadline | They are the same flaw. A build added later copies them, or the newest build would get a later deadline for the same flaw |
 | What carries it is a component of the build, or the build itself | Naming nothing puts it on the root, which is honest where the flaw is in how the pieces fit together. Naming something the build does not hold is refused |

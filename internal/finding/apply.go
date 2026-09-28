@@ -54,6 +54,9 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 	var applied Applied
 
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		// A retry re-runs this against a database that has moved, and what an
+		// attempt that rolled back counted is not what was applied.
+		applied = Applied{}
 		// Taken first, before anything is read, exactly as applying a graph
 		// does. Two runs against one target can be in flight at once — the
 		// queue hands different jobs to different workers by design — and

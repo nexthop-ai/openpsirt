@@ -1062,6 +1062,20 @@ func TestAVersionTooLongToKeyOnIsRefusedRatherThanShortened(t *testing.T) {
 		}); err != nil {
 			t.Errorf("a version exactly at the limit was refused: %v", err)
 		}
+
+		// The limit is characters, as the columns hold them. A version at the
+		// limit in a script taking two bytes a character is still fine.
+		wide := f.at()
+		wide.PlaceIdentity = "place-with-a-wide-version"
+		wide.ComponentUpstream = strings.Repeat("é", 191)
+		if _, err := f.store.Propose(t.Context(), f.triager, triage.Proposal{
+			Place: wide, Outcome: triage.NotApplicable,
+			Justification: triage.CodeNotInExecutePath,
+			Reasoning:     "The parser is never reached.",
+			By:            f.proposer, NeedsApproval: true,
+		}); err != nil {
+			t.Errorf("a version of 191 two-byte characters was refused: %v", err)
+		}
 	})
 }
 

@@ -332,6 +332,12 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 			Consumers          int      `json:"consumers"`
 			Findings           int      `json:"findings"`
 			Builds             []string `json:"builds"`
+			Ended              []struct {
+				State  string   `json:"state"`
+				At     string   `json:"at"`
+				Places int      `json:"places"`
+				Builds []string `json:"builds"`
+			} `json:"ended"`
 		}
 		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", claim), &whole)
 
@@ -394,6 +400,24 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 		// are re-reading something nobody has answered.
 		if whole.PreviouslyApproved {
 			t.Error("a claim that was just agreed to reads as having come back")
+		}
+		if len(whole.Ended) != 0 {
+			t.Errorf("a standing claim reports ended parts %+v", whole.Ended)
+		}
+
+		// Withdrawn, it reaches nothing now, and what it reached when it was
+		// withdrawn is reported apart.
+		if got := asPerson(t, r, "triager", http.MethodDelete,
+			fmt.Sprintf("/v1/claims/%d", claim), ""); got.Code >= 300 {
+			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", claim), &whole)
+		if whole.Findings != 0 || len(whole.Builds) != 0 {
+			t.Errorf("a withdrawn claim reaches %d findings in %v now", whole.Findings, whole.Builds)
+		}
+		if len(whole.Ended) != 1 || whole.Ended[0].State != "withdrawn" ||
+			whole.Ended[0].Places != 1 || len(whole.Ended[0].Builds) != 1 || whole.Ended[0].At == "" {
+			t.Errorf("what it reached when withdrawn reads as %+v", whole.Ended)
 		}
 	})
 }

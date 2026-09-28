@@ -190,14 +190,16 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
               cannot reconcile with anything else on the screen. */}
           <span className="l">Present reach</span>
           <span className="v" title={`${claim.places} written at, ${claim.findings} findings`}>
-            {bulk ? (
+            {claim.findings === 0 ? (
+              <b>none</b>
+            ) : bulk ? (
               <>
                 {claim.issues} issues · {claim.folds} {claim.folds === 1 ? "fold" : "folds"}
               </>
             ) : (
               <b>one judgment</b>
             )}
-            {claim.packages > 0 && (
+            {claim.findings > 0 && claim.packages > 0 && (
               <>
                 {" · "}
                 {claim.packages} {claim.packages === 1 ? "package" : "packages"} · {claim.consumers}{" "}
@@ -235,6 +237,9 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
             </span>
           )}
         </div>
+        {(claim.ended ?? []).map((part) => (
+          <Ended key={part.state} claimId={claim.claim.id} part={part} />
+        ))}
       </div>
       {claim.finding && (
         <p className="hint" style={{ margin: "10px 0 0" }}>
@@ -265,6 +270,42 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
         </p>
       )}
       <Elsewhere id={id} where={claim.claim.elsewhere ?? ""} onSet={onChanged} />
+    </div>
+  );
+}
+
+// What the rows that stopped one way reached when they stopped, beside the
+// present reach rather than in it. Counted in places, because that is what a
+// row is keyed on. The link opens what sits at those places now, across every
+// release, since the list's own defaults would hide a tag or an ended branch
+// the claim covered.
+function Ended({ claimId, part }: { claimId: number; part: Body<"EndedReachBody"> }) {
+  const builds = part.builds ?? [];
+  const query = new URLSearchParams([
+    ["claim", String(claimId)],
+    ["claim_state", part.state],
+    ["planned", "either"],
+    ["on", "branch"],
+    ["on", "tag"],
+    ["support", "in-support"],
+    ["support", "past-eol"],
+  ]);
+  return (
+    <div>
+      <span className="l">
+        {part.state === "withdrawn" ? "Reach when withdrawn" : "Reach when it lapsed"}
+      </span>
+      <span className="v">
+        {part.places} {part.places === 1 ? "place" : "places"} · {builds.length}{" "}
+        {builds.length === 1 ? "build" : "builds"}
+      </span>
+      <span className="hint">
+        {part.at && <>on {on(part.at)}</>}
+        {builds.length > 0 && <> in {builds.join(", ")}</>}
+      </span>
+      <Link className="linkish" to={`/findings?${query.toString()}`}>
+        Findings there now →
+      </Link>
     </div>
   );
 }

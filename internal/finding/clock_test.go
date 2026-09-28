@@ -88,6 +88,46 @@ func TestARowCarriesItsOwnAgeAndSaysWhyItHasNoDeadline(t *testing.T) {
 	})
 }
 
+// The finding's own screen says why it has no deadline in the same words as
+// the list's row, judged by the rating in force here. A product that re-rated a
+// published high as low, under a medium line, took it off the clock by its own
+// rating, and a reader told the release is out of support would be told
+// something false.
+func TestAFindingReRatedBelowTheLineSaysSoOnItsOwnScreen(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if err := f.setting(t, "triage.floor", "medium"); err != nil {
+			t.Fatal(err)
+		}
+		loud := found("CVE-2026-LOUD", teamd)
+		loud.Issue.Severity = "high"
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{loud}); err != nil {
+			t.Fatal(err)
+		}
+		f.rate(t, f.productID, "CVE-2026-LOUD", "low")
+		if _, err := f.store.Recompute(t.Context(), finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		listed, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
+			finding.Filter{Floor: finding.Floor{Word: "medium"}, BelowFloor: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 1 || listed[0].NoDeadline != finding.BelowTheLine {
+			t.Fatalf("the list reads %+v, want one row below the line", listed)
+		}
+		open := f.open(t)
+		evidence, err := f.store.Detail(t.Context(), who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if evidence.NoDeadline != listed[0].NoDeadline {
+			t.Errorf("the finding's screen says %q and the list says %q", evidence.NoDeadline, listed[0].NoDeadline)
+		}
+	})
+}
+
 func TestOnlyAnAllowedColumnReachesTheOrder(t *testing.T) {
 	// The interface refuses an unknown sort by its own list of words,
 	// which makes that the outer control; this is the inner one. A

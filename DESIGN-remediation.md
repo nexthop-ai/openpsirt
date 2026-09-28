@@ -142,6 +142,12 @@ and never arriving.
 | The flaw was seen before upstream released anything | **The fix.** Counting from the sighting sets a deadline against a version that did not exist, which is the common case for an inventory made of distribution packages |
 | The issue became exploited later | The learning. Counted from the opening, an issue exploited after six months lands three days before anybody knew |
 
+The same rule governs every writer. A scan counts it per finding, and an edited
+window rewrites every open deadline as three passes, one per moment, each over
+the rows for which that moment is the latest. A fix dated later than the
+moment it is weighed at has not arrived: a scan weighs it at the run's start
+and the rewrite at the time of the edit.
+
 A finding with no deadline states which reason applies:
 
 | Reason | Reported as | Precedence |
@@ -186,7 +192,7 @@ only be met by waiting.
 | A scan opening a finding, or answering one already open | The one deadline rule, with either exploitation signal |
 | A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
 | A record of this product being attacked, set or cleared | The recount, with either signal |
-| An edited window | The sweep that removes clocks passes over an exploited refusal |
+| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the line passes over either signal |
 
 A scanner that did not answer is not upstream saying no. Reading silence as
 "no fix exists" is a claim about the world made out of a gap in a report, and it
@@ -425,6 +431,7 @@ Three states, derived on every read and set by nobody.
 |---|---|
 | The date is on the commitment, and the claim that argued for it is a citation | What somebody decided and what a release is waiting on are one fact. Changing it goes through the claim, so the two cannot come to disagree |
 | There is no "replanned" | Re-promising writes a new date and the standing promise is the one read. A state nothing can distinguish from another is a word rather than a fact |
+| Where several promises stand over one component in one build, one of them is reported whole | A promise naming a version before one naming none, then the latest date, then the later claim. Its date and its version are read together: the latest date beside the lowest version string pairs two promises nobody made |
 | A lapsed promise returns the upgrade, not its findings | One item, to whoever is carrying it — reported as a party only where one party holds all of what is still open under it. Answering the findings again one at a time is what the bulk promise was made instead of |
 | A finding returns on its own only when the package moved and it did not close | A decision is keyed on the upstream version it was made against, so the existing key distinguishes "the plan was wrong about specifics" from "the plan did not happen" |
 

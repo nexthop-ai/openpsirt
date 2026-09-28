@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -47,8 +48,7 @@ var ErrExists = errors.New("already declared")
 // or a read that could not be made.
 //
 // One spelling, because the two answers differ by a status code at every
-// caller and the distinction was made by hand at each of them — where it was
-// made at all. A reader that wraps every failure alike hands a caller "that
+// caller. A reader that wraps every failure alike hands a caller "that
 // does not exist" for a database it could not reach, and a caller that trusts
 // it says so to whoever asked.
 //
@@ -162,8 +162,8 @@ func (s *Store) Within(ctx context.Context, do func(context.Context, *Store) err
 	})
 }
 
-// maxNameLength matches the column width, which is bounded so a unique index
-// on it stays inside every engine's key-length limit.
+// maxNameLength matches the column width in characters, which is bounded so a
+// unique index on it stays inside every engine's key-length limit.
 const maxNameLength = 191
 
 // validName rejects what would be confusing or unusable as an identifier.
@@ -174,8 +174,9 @@ func validName(what, name string) error {
 		return fmt.Errorf("%s name is empty", what)
 	case trimmed != name:
 		return fmt.Errorf("%s name %q has leading or trailing spaces", what, name)
-	case len(name) > maxNameLength:
-		return fmt.Errorf("%s name is %d characters; the limit is %d", what, len(name), maxNameLength)
+	case utf8.RuneCountInString(name) > maxNameLength:
+		return fmt.Errorf("%s name is %d characters; the limit is %d",
+			what, utf8.RuneCountInString(name), maxNameLength)
 	}
 	// A name travels into places that are not this database: a path, a header,
 	// the filename on an export somebody downloads. A control character or a
@@ -197,10 +198,9 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 	if err := validName("product", name); err != nil {
 		return nil, err
 	}
-	// Trimmed and checked the way the name is, which the two siblings get for
-	// free by deriving it from the name. Stored as typed it was the one
-	// catalog field nothing looked at — a display name is what a screen puts
-	// in front of somebody and what a report is titled with.
+	// Trimmed and checked the way the name is, which the two siblings get by
+	// deriving it from the name: a display name is what a screen puts in
+	// front of somebody and what a report is titled with.
 	displayName = strings.TrimSpace(displayName)
 	if displayName == "" {
 		displayName = name

@@ -94,9 +94,17 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
         <>
           <p className="hint">
             <b>{preview.data.applying ?? 0}</b> reach this line already · <b>{moved.length}</b>{" "}
-            moved · <b>{postponed.length}</b> postponed · <b>{preview.data.absent ?? 0}</b> cover
-            nothing here.
+            moved · <b>{postponed.length}</b> postponed · <b>{preview.data.expired ?? 0}</b> past
+            their date · <b>{preview.data.absent ?? 0}</b> cover nothing here.
           </p>
+          {(preview.data.upgrades ?? 0) > 0 && (
+            <p className="hint">
+              <b>{preview.data.upgrades}</b> promised{" "}
+              {preview.data.upgrades === 1 ? "upgrade" : "upgrades"} moved. Plan{" "}
+              {preview.data.upgrades === 1 ? "it" : "them"} again from the component, naming this
+              line.
+            </p>
+          )}
 
           {moved.length === 0 && postponed.length === 0 ? (
             <p className="hint">Nothing here needs a fresh answer.</p>

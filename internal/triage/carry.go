@@ -132,12 +132,15 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				until := *old.DeferredUntil
 				proposal.DeferredUntil = &until
 			}
-			// The same check every other write path makes. This one built a
-			// proposal and went straight to the writer, so nothing asked
-			// whether what it was carrying could be said at all — a dated
-			// judgment landed on a line built once, which is the case the
-			// rule exists to refuse, and a commitment arrived with the date
-			// left behind.
+			// A patch promise travels with its date, carried as it was for
+			// the same reason a deferral's date is. An upgrade is never
+			// offered, so there is no version to carry.
+			if old.CommittedTo != nil {
+				by := *old.CommittedTo
+				proposal.CommittedTo = &by
+			}
+			// The same check every other write path makes: a dated judgment
+			// is refused on a line built once, as it is when proposed there.
 			if err := proposal.valid(s.now()); err != nil {
 				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
 			}

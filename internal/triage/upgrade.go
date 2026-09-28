@@ -5,6 +5,7 @@ package triage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -356,6 +357,12 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		withdrawn = revised.Withdrawn
 		return nil
 	})
+	// Named after the transaction, as a revision's refusal is: the claim
+	// standing at the place is read once nothing here holds it.
+	var taken *placeTaken
+	if errors.As(err, &taken) {
+		return withdrawn, moved, s.alreadyDecided(ctx, ErrAlreadyDecided, taken.places)
+	}
 	return withdrawn, moved, err
 }
 

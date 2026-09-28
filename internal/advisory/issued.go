@@ -5,6 +5,7 @@ package advisory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -20,8 +21,9 @@ type Went struct {
 	Advisory string
 	Title    string
 	// Issues is how many it covered and Products how many products those sat
-	// in. The two together, because one issue in three products and three
-	// issues in one are different documents.
+	// in, as the document that went out states them. The two together,
+	// because one issue in three products and three issues in one are
+	// different documents.
 	Issues   int
 	Products int
 	// Ordinal is which issuance this was, counting from one. More than one
@@ -32,14 +34,18 @@ type Went struct {
 	IssuedBy string
 	IssuedAt time.Time
 	Digest   string
+	// Document is the bytes that went out, read for the two counts above.
+	Document string `json:"-"`
 }
 
 // Published is what has gone out, newest first, across every flaw a reader may
-// see.
+// see: what went out in a period, and what went out twice.
 //
-// Answered per flaw until now, which is the right shape for somebody
-// deciding whether to publish a revision and the wrong one for the question a
-// period asks: what went out, and what went out twice.
+// The counts are read off the document that went out, beside the title of
+// the edition it carried. The advisory's coverage today is a different
+// moment: an issue taken off since is still named in what readers hold.
+// An issuance recorded without its bytes is counted from the coverage today,
+// which is the one answer left for it.
 //
 // Narrowed the way every other read here is. An advisory is about a flaw
 // recorded by hand in this deployment, and one of those may be undisclosed —
@@ -73,6 +79,7 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 		ColumnExpr(`pe.identity AS "issued_by"`).
 		ColumnExpr(`ai.issued_at AS "issued_at"`).
 		ColumnExpr(`ai.digest AS "digest"`).
+		ColumnExpr(`ai.document AS "document"`).
 		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_issue" AS "ai2"
 			WHERE ai2.advisory_id = ad.id AND ai2.removed_at IS NULL) AS "issues"`).
 		ColumnExpr(`(SELECT COUNT(DISTINCT ai3.product_id) FROM "advisory_issue" AS "ai3"
@@ -96,7 +103,41 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	if err := narrowed(q, subject).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what has been published: %w", err)
 	}
+	for i := range rows {
+		if rows[i].Document == "" {
+			continue
+		}
+		issues, products, err := countedIn(rows[i].Document)
+		if err != nil {
+			return nil, fmt.Errorf("read what %s issuance %d covered: %w",
+				rows[i].Advisory, rows[i].Ordinal, err)
+		}
+		rows[i].Issues, rows[i].Products = issues, products
+		rows[i].Document = ""
+	}
 	return rows, nil
+}
+
+// countedIn is how many issues a document that went out states, and how
+// many products its tree names them in.
+func countedIn(document string) (issues, products int, err error) {
+	var doc struct {
+		Vulnerabilities []json.RawMessage `json:"vulnerabilities"`
+		ProductTree     struct {
+			Branches []Branch `json:"branches"`
+		} `json:"product_tree"`
+	}
+	if err := json.Unmarshal([]byte(document), &doc); err != nil {
+		return 0, 0, err
+	}
+	for _, vendor := range doc.ProductTree.Branches {
+		for _, product := range vendor.Branches {
+			if product.Category == "product_name" {
+				products++
+			}
+		}
+	}
+	return len(doc.Vulnerabilities), products, nil
 }
 
 // narrowed is what a reader of issuances may see, as the clauses a statement
@@ -108,10 +149,15 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 // would hand out a document about a product somebody holds nothing on.
 //
 // It takes the alias the advisory carries in both: "ad".
+//
+// Both the issues it covers now and the ones it covered when the issuance
+// went out: the document names the second, and an issue taken off since is
+// still in what readers hold. It also takes the issuance as "ai".
 func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	// The product half is inside it: a product this reader holds nothing on
 	// is in none of the groups the issue clause admits.
-	return wholeIssues(q, subject)
+	q = wholeIssues(q, subject)
+	return everyIssue(q, subject, "ac.added_at <= ai.issued_at AND ac.removed_at > ai.issued_at")
 }
 
 // wholeIssues narrows a statement over "advisory" as "ad" to the advisories
@@ -129,6 +175,13 @@ func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // document is: a row saying an advisory went out is as much a disclosure as
 // the document.
 func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	return everyIssue(q, subject, "ac.removed_at IS NULL")
+}
+
+// everyIssue narrows a statement over "advisory" as "ad" to the advisories
+// every issue of which this reader may see, among the coverage rows the
+// condition over "ac" keeps.
+func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun.SelectQuery {
 	products, all := subject.Products()
 	if all {
 		return q
@@ -136,7 +189,7 @@ func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	both, public, private := access.Split(products, subject.Reads)
 	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
-		WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL AND NOT EXISTS (
+		WHERE ac.advisory_id = ad.id AND (`+covered+`) AND NOT EXISTS (
 			SELECT 1 FROM "finding" AS "f"
 			JOIN "target" AS "t" ON t.id = f.target_id
 			JOIN "stream" AS "st" ON st.id = t.stream_id
@@ -219,6 +272,7 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 		Join(`JOIN "advisory_issue" AS "ac" ON ac.advisory_id = ai.advisory_id`).
 		Where("ac.product_id = ?", productID).
 		Where("ac.added_at <= ai.issued_at").
+		Where("(ac.removed_at IS NULL OR ac.removed_at > ai.issued_at)").
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether an advisory has gone out for this product: %w", err)
@@ -234,10 +288,15 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 // release was named once — and a release cannot be retired and declared again
 // as a way round it, because the second one would hold none of its history.
 //
-// An issue taken back off the advisory still counts, and one added after the
-// last issuance does not. What went out is what readers hold: a document is
-// not rewritten, so an issue removed since is still named in it and an issue
-// added since is named in no document yet.
+// An issue taken back off the advisory after an issuance still counts, and
+// one added after the last issuance, or taken off before it, does not. What
+// went out is what readers hold: a document is not rewritten, so an issue
+// removed since is still named in it and an issue added since is named in no
+// document yet.
+//
+// An issue taken off and put back keeps one row, whose interval starts again
+// when it was put back. An issuance from before it was taken off is then read
+// as not naming it.
 //
 // The issue is covered in one product, and a release belongs to one product,
 // so the two have to be the same product. Left unjoined, one upstream flaw
@@ -253,6 +312,7 @@ func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, 
 		Where("tg.stream_id = ?", streamID).
 		Where(`"st"."product_id" = "ac"."product_id"`).
 		Where("ac.added_at <= ai.issued_at").
+		Where("(ac.removed_at IS NULL OR ac.removed_at > ai.issued_at)").
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether an advisory has gone out for this release: %w", err)

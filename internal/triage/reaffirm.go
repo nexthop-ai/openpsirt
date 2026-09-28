@@ -513,22 +513,19 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 		return Lapsed{}, err
 	}
 
-	// Marked and read back as one act, a bounded batch at a time. It was
-	// three statements on the pool with nothing around them: a crash between
-	// the update and the read left rows lapsed with nobody told, which is the
-	// outcome marking a lapse exists to prevent. And the rows were identified
-	// on the way back by the timestamp the update wrote, under a comment
-	// saying two sweeps could not read each other's rows because the product
-	// is this target's — two targets of one product share a product, so two
-	// scans finishing together read each other's rows and told every proposer
-	// twice.
+	// Marked and read back as one act, a bounded batch at a time, so a crash
+	// between the update and the read cannot leave rows lapsed with nobody
+	// told. Each pass identifies its rows by identifier, which is what keeps
+	// two sweeps over targets of one product from reading each other's rows.
+	// Batched because a sweep over a real image can lapse thousands at once.
 	//
-	// Identified by identifier now, which is what makes each pass's rows its
-	// own. Batched because a sweep over a real image can lapse thousands at
-	// once and a statement naming every one of them is a statement whose size
-	// is the estate's.
+	// Who to tell is gathered once, over every row that lapsed, so a proposer
+	// whose rows span batches hears once. A batch that fails leaves the ones
+	// before it committed, and those are still reported alongside the error.
 	out := Lapsed{}
 	seen := map[int64]bool{}
+	var all []int64
+	var failed error
 	for {
 		var moved int64
 		var lapsed []int64
@@ -562,7 +559,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
 			moved = n
-			// The people to tell, read back inside the same act. The
+			// The rows this pass lapsed, read back inside the same act. The
 			// identifiers are this pass's own, so nothing another sweep marked
 			// is in it.
 			if err := tx.NewSelect().Model((*Decision)(nil)).
@@ -575,41 +572,45 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			}
 			return nil
 		}); err != nil {
-			return Lapsed{}, err
+			failed = err
+			break
 		}
 		if len(lapsed) == 0 && moved == 0 {
 			break
 		}
 		out.Rows += moved
-		fresh := make([]int64, 0, len(lapsed))
+		fresh := 0
 		for _, id := range lapsed {
 			if seen[id] {
 				continue
 			}
 			seen[id] = true
-			fresh = append(fresh, id)
+			all = append(all, id)
+			fresh++
 		}
-		if len(fresh) == 0 {
+		if fresh == 0 {
 			break
 		}
-		told, err := s.proposersOf(ctx, fresh)
-		if err != nil {
-			return Lapsed{}, err
-		}
-		out.Told = append(out.Told, told...)
 	}
+	told, err := s.proposersOfAll(ctx, all, database.InBulk.Most)
+	out.Told = told
 	if out.Rows == 0 && len(out.Told) > 0 {
 		out.Rows = int64(len(out.Told))
 	}
-	return out, nil
+	if failed != nil {
+		return out, failed
+	}
+	return out, err
 }
 
 // Carried is what a new line would inherit from an existing one.
 //
-// Four buckets, because they need four different things from a person. What
+// Six buckets, because they need different things from a person. What
 // already applies needs nothing. What moved needs a fresh answer, and gets the
 // old reasoning to start from. A postponement is a scheduling judgment about a
-// release rather than a claim about code, so it is offered separately. And
+// release rather than a claim about code, so it is offered separately. A
+// judgment whose date has gone by sits at a place the new line still has and
+// cannot be carried. A promised upgrade is planned from its component. And
 // what covers nothing there is left behind.
 type Carried struct {
 	// Applying reach the new line by matching. Nothing to choose.
@@ -622,6 +623,16 @@ type Carried struct {
 	// Postponed were deferrals. "Not this sprint" was about that sprint, and
 	// carrying it silently gives a new line expiry dates nobody chose.
 	Postponed []Inherited
+	// Expired is how many sit at a place the new line still holds, as a
+	// deferral or a promise whose date has gone by. Carried keeps the date,
+	// so none of them can be carried, and each leaves a finding there with
+	// no answer.
+	Expired int
+	// Upgrades is how many promised upgrades moved. An upgrade covers a
+	// component in the releases it names and records what each of them is
+	// waiting on, which a claim carried onto one place cannot write, so each
+	// is planned again from the component.
+	Upgrades int
 	// Absent is how many cover nothing in the new line at all.
 	Absent int
 }
@@ -773,7 +784,11 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// gone by cannot be carried at all — and offering one is offering
 		// something the act behind the button turns down.
 		if row.RanOut {
-			carried.Absent++
+			carried.Expired++
+			continue
+		}
+		if Outcome(row.Outcome) == UpgradeNeeded {
+			carried.Upgrades++
 			continue
 		}
 		if Outcome(row.Outcome) == Deferred {

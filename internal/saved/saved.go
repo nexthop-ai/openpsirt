@@ -229,8 +229,17 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 			return fmt.Errorf("you are keeping %d filters for this product, which is the "+
 				"limit: forget one before keeping another", held)
 		}
-		_, err = db.NewInsert().Model(kept).Exec(ctx)
-		return err
+		// Two saves of one new name both find nothing to update and both
+		// add a row. The unique index refuses the later one, and that is a
+		// lost race: taken again, the update above finds the row the other
+		// kept and replaces it.
+		if _, err := db.NewInsert().Model(kept).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
+			return err
+		}
+		return nil
 	}
 	if err := database.Within(ctx, s.db, write); err != nil {
 		return nil, fmt.Errorf("keep that filter: %w", err)
@@ -245,21 +254,26 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 // usually exist in no other, so offering it elsewhere offers something that
 // matches nothing and says nothing about why — and picking it replaces what is
 // on screen with a narrowing built for somewhere else.
-func (s *Store) SavedFilters(ctx context.Context, personID, productID int64, cap int) ([]Filter, error) {
+//
+// Bounded by the same number the write is, and it says how many there are in
+// all. Lowering the number leaves somebody keeping more than it shows, and the
+// write refuses them until they forget enough to be under it, so the list
+// says how many it left out.
+func (s *Store) SavedFilters(ctx context.Context, personID, productID int64,
+	cap int) ([]Filter, int, error) {
+
 	if cap <= 0 {
 		cap = setting.DefaultSavedPerPerson
 	}
 	var kept []Filter
-	// Bounded by the same number the write is. A read with no ceiling is what
-	// made the row count matter: the panel drew every row it found, on every
-	// open.
-	if err := s.db.NewSelect().Model(&kept).
+	total, err := s.db.NewSelect().Model(&kept).
 		Where("person_id = ?", personID).
 		Where("product_id = ?", productID).
-		Order("name").Limit(cap).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read what you have kept: %w", err)
+		Order("name").Limit(cap).ScanAndCount(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("read what you have kept: %w", err)
 	}
-	return kept, nil
+	return kept, total, nil
 }
 
 // ForgetFilter drops one of somebody's own.

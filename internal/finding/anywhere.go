@@ -18,13 +18,10 @@ import (
 
 // The findings list across every product somebody may see.
 //
-// The work starts from an issue as often as from a product. Findings were
-// answerable one product at a time, so "which of our products are carrying
-// this, and what is running out anywhere" was a question assembled by hand
-// once per product. At a dozen products that is the first thing anybody
-// complains about, and the issue page answers only half of it: it answers for
-// one issue, and the other half is the list — with filters, an order and
-// paging.
+// The work starts from an issue as often as from a product. "Which of our
+// products are carrying this, and what is running out anywhere" is one
+// question across products. The issue page answers it for one issue; this
+// answers it as a list, with filters, an order and paging.
 //
 // One row per product, issue and component. The same library carrying the
 // same issue in two products is two pieces of work, decided separately by
@@ -96,12 +93,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		if set && word != "" {
 			deployment = word
 		}
-		// A caller may raise the line for the whole page — that is what the
-		// severity control on the list does — but never lower it below what a
-		// product decided, because the line is the product's decision.
-		if line.Hides() && Ranks(line.Word) > Ranks(deployment) {
-			deployment = line.Word
-		}
+	}
+	// A caller may raise the line for the whole page — that is what the
+	// severity control on the list does — but never lower it below what a
+	// product decided, because the line is the product's decision. So the
+	// raise is a second condition beside each product's own line, and a row
+	// passes both: the higher of the two.
+	raised := 0
+	if !wasBelow && line.Hides() {
+		raised = Ranks(line.Word)
 	}
 
 	// pastEOL is which releases are past their date, read once for the
@@ -162,6 +162,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 					WhereOr("f.urgency >= ?", int64(exploiting)).
 					WhereOr(ratedAt+" >= "+lineAt, deployment)
 			})
+			if raised > 0 {
+				q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+					return q.
+						WhereOr("f.urgency >= ?", int64(exploiting)).
+						WhereOr(ratedAt+" >= ?", raised)
+				})
+			}
 		}
 		return filter.narrow(q)
 	}
@@ -245,10 +252,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 		// The two exploitation flags, which the packed number above cannot
-		// tell apart. Read here as well as in the per-product list: a column
-		// this query does not select is left at its zero value rather than
-		// refused, so leaving them out reported every row of the
-		// deployment-wide list as exploited by nobody.
+		// tell apart. A column this query does not select is left at its zero
+		// value, so both are selected here as on the per-product list.
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).

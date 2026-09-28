@@ -151,7 +151,7 @@ The rules below hold at all three levels, except where a row says otherwise.
 | A name another variant of the product holds is refused, retired ones included | The name stays spoken for while a variant is retired, which is what lets declaring it again bring that variant back rather than making a second |
 | A name is refused once a document naming it has been published | A published OpenVEX document is identified by the build it describes, and a published advisory names each affected release in its product tree the same way. The product, the release and the variant are all inside that identifier. Renamed afterwards, the next document names the same thing differently: a reader holding the first reads it as a second document rather than as a revision of theirs, and one matching the identifier against an advisory finds it absent, which reads as no longer affected about a customer who still is. What went out is not rewritten, so nothing there can be corrected to match: an issued document, advisory or VEX, is kept as the bytes that were sent |
 | A release is asked about the advisories that named it, rather than about its product | A release reaches an advisory's product tree by holding one of the issues that advisory covers, so that is the question. Asked of the product, a release no advisory ever named would be refused because a sibling release was named once — and a release cannot be retired and declared again to get round it, because the second one holds none of the first one's history |
-| An issue taken back off an advisory still counts | It was on the document that went out, which is the document readers hold |
+| An issue taken back off an advisory after an issuance still counts, and one taken off before it does not | It was on the document that went out, which is the document readers hold; an issue taken off first was on none |
 | A product's displayed name moves freely | It is what a screen shows, what a report is titled with, and what a published document names the product in prose. Nothing is identified by it. A release and a variant have no displayed name set apart from their name, so for those the two move together |
 | Whether a variant reaches customers stays correctable | It is in no document and is not what anything is identified by. It feeds ranking, so correcting it is worth doing and is an administrator's act |
 | What a release is does not move here | Whether it is a branch or a tag, and the branch a tag was cut from, say what a release is rather than what it is called |
@@ -203,6 +203,7 @@ than the exotic one.
 | A declaration that loses to another writer reads what won and confirms it | The read and the write are two statements, so both callers find nothing and both insert. The unique index refuses one of them, and the refusal is not the loser's to report |
 | Once more and no further | A row that keeps disappearing is not a race, and a retry with no bound is a loop |
 | Declaring something *else* under a known name is still refused | Idempotence is about the same declaration arriving twice. A tag redeclared as a branch, or a product redeclared with another display name, is a name quietly changing meaning |
+| A display name is compared as it is stored, trimmed | Space around it is not part of it, so the same declaration typed with a trailing space is the same declaration |
 
 The same holds for the build a scan is filed against: two pipelines filing the
 first scan for one release and variant at once must not produce two rows, which
@@ -211,7 +212,8 @@ would be two histories for one thing somebody ships.
 ## Names
 
 Bounded: no leading or trailing spaces, nothing empty, and a length keeping a
-unique index inside every engine's key-length limit. Uniqueness is within the
+unique index inside every engine's key-length limit. The length is counted in
+characters, which is what the column holds. Uniqueness is within the
 parent — a product name globally, a stream and a variant within their product.
 
 Capitals do not distinguish two names. These are typed by hand into build
@@ -578,4 +580,5 @@ root, against 0.018 s.
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |
+| An issue taken off an advisory and put back keeps one row, with the interval it was last on | The pair is unique, so the row is revived rather than a second written, and when it was first on is not kept. An issuance from before it was taken off is then read as not naming it, so a rename that document should refuse is allowed |
 | Where an issue sits, and the disclosure queue, link to a finding by name and version alone | The first groups one issue's places by component name, so one row can stand for two components of that name. Where a build holds that name at that version as two, the link lands on the choice between them |

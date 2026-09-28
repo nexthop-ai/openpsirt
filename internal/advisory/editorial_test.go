@@ -417,3 +417,86 @@ func TestRetitlingRunsTheSubmissionPolicyBeforeStoring(t *testing.T) {
 		}
 	})
 }
+
+// TestWhatWentOutIsCountedAsItWent pins that a record of an issuance counts
+// the issues and products the document carried, not what the advisory covers
+// since. An issue taken off afterwards is still named in what readers hold.
+func TestWhatWentOutIsCountedAsItWent(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		named := f.covering(t, [2]string{"sonic", here}, [2]string{"switchd", there})
+		f.agreed(t, named)
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, "Both"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Drop(ctx, f.who, named, "switchd", there); err != nil {
+			t.Fatal(err)
+		}
+
+		rows, err := f.store.Published(ctx, f.who, nil, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("%d rows came back for one issuance", len(rows))
+		}
+		if rows[0].Issues != 2 || rows[0].Products != 2 {
+			t.Errorf("what went out is recorded as %d issues in %d products, want 2 in 2",
+				rows[0].Issues, rows[0].Products)
+		}
+	})
+}
+
+// TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt pins the interval a
+// rename is refused on. The advisory covered a flaw in one product, dropped
+// it, and went out about a flaw in another; no document names the first
+// product, so nothing refuses its rename.
+func TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		named := f.covering(t, [2]string{"sonic", here})
+		if err := f.store.Drop(ctx, f.who, named, "sonic", here); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Add(ctx, f.who, named, "switchd", there); err != nil {
+			t.Fatal(err)
+		}
+		f.agreed(t, named)
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, "Switchd only"); err != nil {
+			t.Fatal(err)
+		}
+
+		var stream int64
+		if err := f.db.DB.NewSelect().TableExpr(`"target"`).ColumnExpr("stream_id").
+			Where("id = ?", f.master).Scan(ctx, &stream); err != nil {
+			t.Fatal(err)
+		}
+		for _, asked := range []struct {
+			what string
+			ask  func() (bool, error)
+			want bool
+		}{
+			{"the product it was taken off", func() (bool, error) {
+				return advisory.AnyIssuedForProduct(ctx, f.db.DB, f.product)
+			}, false},
+			{"the release it was taken off", func() (bool, error) {
+				return advisory.AnyIssuedForStream(ctx, f.db.DB, stream)
+			}, false},
+			{"the product it went out about", func() (bool, error) {
+				return advisory.AnyIssuedForProduct(ctx, f.db.DB, f.otherProduct)
+			}, true},
+		} {
+			got, err := asked.ask()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != asked.want {
+				t.Errorf("whether a document named %s answered %v, want %v", asked.what, got, asked.want)
+			}
+		}
+	})
+}

@@ -338,7 +338,8 @@ cycle.
 
 | Lapse message | |
 |---|---|
-| One per person per sweep, counting their rows | A version bump lapses many claims at once, and one message per claim is a channel nobody reads |
+| One per person per sweep, counting their rows | A version bump lapses many claims at once, and one message per claim is a channel nobody reads. A sweep lapses in bounded batches, and who to tell is gathered over all of them, so a person whose rows span batches is still told once |
+| A sweep that fails part way still tells | The batches before the failure are committed, and a lapse nobody hears of is the outcome the message exists to prevent |
 | Says why: the code moved, or the issue was rated worse | The two ask different things of the person re-affirming. `DESIGN-triage.md` § Lapse marking holds both |
 | Links to the review queue's To reaffirm tab | The work is re-affirming every claim that lapsed, not reading one of them. A link to one decision of three hundred leaves the rest to be found |
 | Sent by the scan's sweep and by a rating put in or out of force here | The two places a claim can lapse |

@@ -11,8 +11,7 @@ import (
 )
 
 // An ingest key belongs to no person, so it is the credential a build pipeline
-// holds. Creating one was implemented and reachable only by calling the API by
-// hand: nothing in the interface ever posted to it (REQ-44).
+// holds (REQ-44).
 func TestAnIngestKeyIsCreatedWithItsScope(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		// The product is always required; the branch and the variant are
@@ -60,9 +59,44 @@ func TestAnIngestKeyIsCreatedWithItsScope(t *testing.T) {
 	})
 }
 
-// Administration is global rather than granted against a product, and had no
-// control in the interface at all — the API took it and the screens only ever
-// displayed it (REQ-42).
+// A key pinned to one release and one variant is listed with both. Listed
+// without them it reads as a key for the whole product, which is a different
+// credential and the wrong one to withdraw.
+func TestAKeyIsListedWithTheReleaseAndVariantItIsPinnedTo(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		made := asPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+			`{"name":"pinned","product":"mine","stream":"master","variant":"broadcom"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("creating a key answered %d: %s", made.Code, made.Body.String())
+		}
+		listed := asPerson(t, r, "admin", http.MethodGet, "/v1/keys", "")
+		if listed.Code != http.StatusOK {
+			t.Fatalf("listing keys answered %d", listed.Code)
+		}
+		var out struct {
+			Items []struct {
+				Name    string `json:"name"`
+				Stream  string `json:"stream"`
+				Variant string `json:"variant"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(listed.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v (%s)", err, listed.Body.String())
+		}
+		for _, key := range out.Items {
+			if key.Name != "pinned" {
+				continue
+			}
+			if key.Stream != "master" || key.Variant != "broadcom" {
+				t.Errorf("the pinned key is listed with release %q and variant %q", key.Stream, key.Variant)
+			}
+			return
+		}
+		t.Errorf("the pinned key is not listed: %s", listed.Body.String())
+	})
+}
+
+// Administration is global rather than granted against a product (REQ-42).
 func TestAdministrationIsGrantedAndWithdrawn(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		// Somebody who exists and administers nothing. Reaching an

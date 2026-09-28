@@ -38,10 +38,10 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		row := rows[0]
-		if err != nil {
-			t.Fatalf("recording a flaw: %v", err)
+		if len(rows) == 0 {
+			t.Fatal("recording a flaw returned no rows")
 		}
+		row := rows[0]
 		if !mintedFor(identifier, "SONIC", minting().Year()) {
 			t.Errorf("filed under %q, want the product's own name, the year and a number",
 				identifier)
@@ -175,10 +175,10 @@ func TestARecordedFlawSaysWhatItIsAndWhereItIs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		row := rows[0]
-		if err != nil {
-			t.Fatal(err)
+		if len(rows) == 0 {
+			t.Fatal("recording a flaw returned no rows")
 		}
+		row := rows[0]
 		var name string
 		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS \"c\"").
 			ColumnExpr("c.name").Where("c.id = ?", row.ComponentID).
@@ -300,6 +300,35 @@ func TestOneFlawIsRecordedAgainstEveryBuildThatShipsIt(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("what was recorded is not in the product's list of %d", total)
+		}
+	})
+}
+
+// A build named twice is one build. Recording a flaw writes one finding at each
+// place it holds, and a fix declared against the build is not refused as
+// though the repeat were a build of another product.
+func TestABuildNamedTwiceIsOneBuild(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
+			finding.Entering{
+				TargetIDs: []int64{f.target, f.target},
+				Component: libnl.Name, Severity: "high",
+				Summary: "The parser accepts a message it should refuse.",
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Errorf("a build named twice holds %d findings at its one place", len(rows))
+		}
+		builds, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID, []int64{f.target, f.target})
+		if err != nil {
+			t.Fatalf("a build named twice was refused: %v", err)
+		}
+		if len(builds) != 1 || builds[0] != f.target {
+			t.Errorf("a build named twice reads as %v", builds)
 		}
 	})
 }

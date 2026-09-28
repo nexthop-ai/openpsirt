@@ -387,6 +387,12 @@ type Filter struct {
 	// SentBack keeps groups where a live claim is with its author, which is
 	// the row a proposer is looking for and cannot ask for today.
 	SentBack bool
+	// Claim keeps what sits at a place one claim wrote a row for, and
+	// ClaimStates narrows those rows to the ones in these states. Zero is no
+	// narrowing, and the states mean nothing without a claim. It is how a
+	// claim that stopped applying opens what now sits where it was.
+	Claim       int64
+	ClaimStates []string
 	// DiffersBetweenBuilds keeps groups that are open in some builds of the
 	// selection and not others — the rows a comparison is about. Meaningless
 	// where the selection is one build, and ignored there rather than
@@ -476,6 +482,52 @@ func AtLeast(word string) []string {
 		}
 	}
 	return nil
+}
+
+// asksOfGroups says whether the filter holds a condition over the list's
+// group — one issue at one fold — rather than over a row.
+func (f Filter) asksOfGroups() bool {
+	return f.Exploited || f.HasFix || f.Unconfirmed ||
+		len(trimmed(f.States)) > 0 || len(trimmed(f.Outcomes)) > 0 || f.Planned != PlannedEither ||
+		len(trimmed(f.Assigned)) > 0 || len(f.fixStates()) > 0 ||
+		f.OpenedAfter != nil || f.OpenedBefore != nil || f.ClosedAfter != nil ||
+		f.Overdue || f.DueBefore != nil || f.DiffersBetweenBuilds
+}
+
+// ofRows is the filter with every condition over a group taken out, leaving
+// what it asks of each row.
+func (f Filter) ofRows() Filter {
+	f.Exploited, f.HasFix, f.Unconfirmed = false, false, false
+	f.States, f.Outcomes, f.Planned = nil, nil, PlannedEither
+	f.Assigned, f.FixStates = nil, nil
+	f.OpenedAfter, f.OpenedBefore, f.ClosedAfter = nil, nil, nil
+	f.Overdue, f.DueBefore, f.DiffersBetweenBuilds = false, nil, false
+	return f
+}
+
+// asListed narrows a query over the open findings of these builds to the rows
+// the findings list holds under the filter, for a query grouped at another
+// grain than the list's.
+//
+// The list's conditions over a group are written for one issue at one fold.
+// Asked of a component, "exploited" holds for the whole component when one of
+// its issues is, and "has a fix" fails it when one of its issues has none — so
+// its counts stop being the list's. The groups the list keeps are chosen at
+// the list's own grain and joined in, and only the conditions on a row are
+// applied here. A filter with no condition over a group is applied as it is.
+func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
+	visible []access.Visibility) *bun.SelectQuery {
+
+	if !f.asksOfGroups() {
+		return f.narrow(q)
+	}
+	kept := f.narrow(openGroups(db, targets, visible).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn + ` AS "fold"`))
+	return f.ofRows().narrow(q.
+		Join(`JOIN "component" AS "ck" ON ck.id = f.component_id`).
+		Join(`JOIN (?) AS "kept" ON kept.vulnerability_id = f.vulnerability_id`+
+			` AND kept.fold = ck.fold_key`, kept))
 }
 
 // narrow applies the filter to a grouped query over finding AS f.
@@ -742,6 +794,22 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		where, args := f.product()
 		q = q.Where(standsAs(where, claimSentBack),
 			append(append([]any{}, args...), claimSentBack.args...)...)
+	}
+	if f.Claim > 0 {
+		// A condition on a row: a place either held one of the claim's rows
+		// or did not, so a group keeps the places that did.
+		where, args := f.product()
+		held := `EXISTS (SELECT 1 FROM "decision" AS "dc"
+			WHERE dc.claim_id = ?
+			  AND dc.product_id = ` + where + `
+			  AND dc.vulnerability_id = f.vulnerability_id
+			  AND dc.place_identity = f.place_identity`
+		asked := append([]any{f.Claim}, args...)
+		if states := trimmed(f.ClaimStates); len(states) > 0 {
+			held += " AND dc.state IN (?)"
+			asked = append(asked, bun.List(states))
+		}
+		q = q.Where(held+")", asked...)
 	}
 	// Open in some builds of the selection and not others, which is what a
 	// comparison is about. Counted over the builds the selection holds rather
@@ -1089,6 +1157,17 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 const KeyMatches = "(cl.outcome = '" + Mismatched + "' OR (" +
 	"COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr +
 	" AND COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
+
+// keyMatchesOn is KeyMatches over a decision under another alias, with the
+// claim's outcome given as an expression, for a statement that asks it before
+// the claim is joined or of a second decision beside the first.
+//
+// Derived from KeyMatches by renaming its two references rather than written
+// out again, so the rule has one spelling. KeyMatches stays a constant because
+// other constants are built from it.
+func keyMatchesOn(decision, outcome string) string {
+	return strings.NewReplacer("cl.outcome", outcome, "de.", decision+".").Replace(KeyMatches)
+}
 
 // Mismatched is the outcome whose claim is about identity, named here so the
 // expression above and the triage package cannot drift on the spelling.

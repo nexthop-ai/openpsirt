@@ -56,13 +56,14 @@ summing:
 | Deferred | *Every* open place is covered by a standing deferral. One covering some of a group leaves the rest running |
 | Overdue | Anything open is past its date and uncovered |
 
-Two closure reasons are not resolutions, and a velocity figure counting them
+Three closure reasons are not resolutions, and a velocity figure counting them
 measures churn:
 
 | Reason | Why it is not a resolution |
 |---|---|
 | `superseded` | The component's version moved and the issue came with it. Counting it as resolved draws a line saying work was completed while the same chart's new line rises by exactly as much |
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
+| `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.
@@ -281,6 +282,7 @@ to and a carry that happens silently is one nobody reviews.
 | Reaches the new line by matching | Counted, never offered. A decision is a claim about a combination of code, so these have already happened |
 | Held a claim at a version this line does not have | Offered as a *proposal carrying the old reasoning*, never as a decision, because the version moved and the old conclusion is not a conclusion about the new code |
 | Deferrals | Offered separately, never carried by default. "Not this sprint" was about that sprint |
+| Past its date at a place the line holds | Counted apart from what covers nothing, because the finding there is left with no answer. A carried judgment keeps its date, so a deferral or promise whose date has gone by cannot be carried |
 | Covers nothing here | Counted and left behind |
 
 | Rule | Reason |
@@ -349,6 +351,7 @@ had.
 | A wait is measured from the finding the claim is about | A place is a pair of names with no product in it, so the same place sits in every product shipping that component. Matching on the place alone took the figure from another product's finding, and from findings the reader may not see |
 | Bounded, and it says so | At most the most recent few thousand claims in the window, with the answer stating how many and whether the ceiling was reached |
 | Throughput is per person, counted where the work happened | A claim belongs to the window it was proposed in, and an agreement to the window it was given in |
+| Throughput counts claims | Made, agreed to and withdrawn alike. A claim writes a row per place and is one piece of work, so counting rows mixes units and disagrees with a person's own record |
 | Send-backs are counted for the deployment, not per person | The record holds that a claim came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
 | It narrows to one product, or to one team's people | Without a scope there are no per-team figures, so a manager asking how their own people are doing reads the deployment's numbers with their name on them |
 | A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A claim belongs to whoever argued it, which is the rule the record of judgments dates by — narrowed by the approver, a team's time to agree would be about claims its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
@@ -394,7 +397,8 @@ deadline, and whether the deadline was met.
 | One row per issue and place, whatever else is true of it | The agreement is read as a scalar rather than joined, because nothing makes an approval unique per decision — a second approver adds a row, and a join multiplied the finding. The page then held fewer rows than its total said, and because paging is by offset every page after that skipped one |
 | It states no triage line, because it applies none | Everything in the build is here, decided or not, which is the basis on which an auditor can rely on it. A file stating it has been taken above a line where it has not is worse than silence |
 | Everything is joined outward from the finding and joined left | A place nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
-| A judgment that lapsed is part of the record, and a superseded one is not | Asked of the decision's own columns rather than of the join. In the join it hid a lapsed judgment entirely, so the place reported as never decided and the register lost who proposed and who approved it — while the findings list called the same place lapsed |
+| A judgment that lapsed is part of the record, and a superseded one is not | Who proposed and who approved a lapsed judgment is what a compliance reader comes for, and the findings list calls the same place lapsed |
+| A row reports the one decision on the record at its place: the live one covering the finding's versions, or where none does, the latest lapsed one | Decision rows are never deleted, so a place carries every withdrawn and lapsed judgment ever made at it, and one row per place is the rule above. A live decision covers a place at the versions it was keyed on and no other, which is the findings list's own test; a build shipping the place at other versions reads undecided on both surfaces. Where two live decisions cover one finding, a claim keyed on its versions and a correction covering the place at any version, the row names the one the finding's screen names: the correction in force, otherwise the older |
 | The row names what pulls the component in, beside the place identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
 | It names what it was measured with: the upload, the inventory in it, the run, the scanner and the vulnerability data | The chain an auditor follows is shipped artifact, inventory, run, scanner and database, disposition. The register is the last link, and naming none of the first four leaves what it says standing on nothing a reader can check — while all of them are recorded |
 | The inventory is a link, not a hash | A hash nobody can fetch the bytes for is a claim rather than evidence. A tagged release keeps its documents and a branch build does not, so an inventory that was let go says so instead of reading as an omission |
@@ -572,10 +576,13 @@ disposition register have sections above.
 | The destination of the effort | The subjects of the judgments in a period, most argued first, with what came out of them. It has a section of its own above |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
-| Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible |
+| Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
 
 An issuance carries no visibility of its own, so a row of the last of those is
-narrowed by the flaw it was written about. Reading one as public because it has
+narrowed by the flaws it was written about: every issue the advisory covers now,
+and every issue it covered when that issuance went out. The document names the
+second, including an issue taken off since. The documents a directory serves are
+narrowed the same way. Reading one as public because it has
 no visibility column would announce an undisclosed flaw in the report about
 announcements, and the row names the identifier.
 
@@ -614,14 +621,16 @@ to, for the reason the record is: a judgment belongs to when it was argued, and
 dating it by its agreement moves it out of that period whenever an approval
 comes late.
 
-Every section is bounded and says when it reached the bound. Unbounded, a
-deployment that has been triaging for a while answers one row per approved
-claim in force, and the last section asks three more questions about each of
-them one at a time — thirty thousand sequential statements in one request on
-ten thousand claims, with nothing checking whether the caller is still there.
-What each claim covers now is one statement for the page. A capped section
+Every section is bounded and says when it reached the bound. A capped section
 reading as complete misleads the one reader this report is for, so it says it
 was capped.
+
+| Rule | |
+|---|---|
+| Growth is capped after it is found, most grown first | Whether a claim grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest claims fill the page and a claim that grew after them is in no answer |
+| Ties are broken by claim, then by approver | A claim with two standing agreements is two rows of equal growth, and a cap between them is decided by the record rather than by the engine |
+| What a claim covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its place again is not growth |
+| What claims cover now is counted a bounded set of claims per statement | One statement per claim is ten thousand round trips on ten thousand claims |
 
 ## Fix-bundle page cost
 

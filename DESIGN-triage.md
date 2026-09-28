@@ -69,8 +69,9 @@ made in is not part of the key.
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they
-copy are not. A version that will not fit is refused, not shortened;
-shortening would key the decision on something the finding does not hold.
+copy are not. The bound is in characters, as the columns hold them. A version
+that will not fit is refused, not shortened; shortening would key the decision
+on something the finding does not hold.
 
 Measured before settling the bound: the reference producer's real output is
 6,845 components, longest version 49 characters, none over the limit.
@@ -187,8 +188,10 @@ deployment with one person cannot approve anything.
 | **The row count is the control, so an engine that cannot report it refuses** | The rows move only while the approved revision is still what the claim rests on, and that condition is checked by counting what moved. Read as optional, the check was skipped on any driver that does not answer — after the approval row was already written |
 | The reasoning is revised, never overwritten; every revision is readable | |
 | Editing the reasoning takes back the approval | The item returns to the queue marked as previously approved rather than as a fresh proposal |
+| Revising a claim that has ended brings it back, and is refused where another claim now stands | Its rows retake their places. A place somebody has claimed since is refused naming the decision standing there, the same refusal proposing there gets |
 | Withdrawing, revising and sending back need no approval | Hiding risk needs a second person; putting it back on the table does not |
 | Undoing works at the size it was done | A bulk approval records what it covered; undoing takes the whole batch back to *proposed*. The claims still stand — it is the agreement that was taken back |
+| Undoing and withdrawing leave an ended row as it ended | Only approved rows return to *proposed*, and only rows still proposed or approved become *withdrawn*. A lapsed row holds no live key, so returned to waiting it is a proposal nothing keeps unique at its place; rewritten as withdrawn it loses when and why it stopped applying |
 | A withdrawn approval stays on the record | It says a second person did once agree, and to which words |
 | A withdrawal records who made it, which is not who gave the agreement | A proposer revising their own claim withdraws every agreement standing on the old words. Read off the withdrawal alone, restating a claim came back to its author as somebody else having undone their agreement |
 | **A carried agreement says it was carried** | A re-affirmation stands on the agreement its predecessor had and states its own reasoning, so the approver named read the earlier words. Written as an ordinary approval it said they had agreed, today, to text they have never seen — and the register, the audit list and the claim's own approvals all reported it that way |
@@ -250,7 +253,7 @@ holds the ones nobody has agreed to yet.
 | Each list carries the reasoning and the names with the row | A list where seeing why means opening every entry is a list nobody reads before acting. A row saying product 4, issue 91 is two more requests to understand, fifty times a page |
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
 | A claim it reaches only part of is left alone whole | The agreement is one row keyed on the claim, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
-| What an undo reports is what returned to waiting | A decision another agreement still stands on is left where it is, so the number of candidates is not the number that moved |
+| What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
 ## The whole claim
@@ -264,7 +267,17 @@ what became of it, what it wrote, and what it covers now.
 | **What it says** | The outcome, the reason, the mitigation, the dates, the version an upgrade moves to, and the justification as it stands — the claim's, however many rows it wrote. It names no decision and carries no row state |
 | **What became of it** | One word over every row, the same word the proposer's own list reads, with when it became that and who did it. A claim whose rows did not all end the same way is said to be mixed rather than reported as whichever came first. A claim marked as having come back is one with an approval on record that is not standing on one — asked of a claim that is currently approved, "was this ever approved" answers about the agreement being read |
 | **What it wrote** | Rows, distinct issues, distinct places |
-| **Present reach** | Folds, packages, consumers and findings, matched the way a finding asks whether a decision applies to it, and every build it reaches |
+| **Present reach** | Folds, packages, consumers and findings its live rows cover, matched the way a finding asks whether a decision applies to it, and every build they reach. A row withdrawn or lapsed covers nothing, so a claim taken back reaches nothing |
+| **Reach when it stopped** | One part for its withdrawn rows and one for its lapsed rows, each present only where such a row exists: the rows, the distinct places they sat at, the latest moment one stopped, and every build holding an open finding at one of those places at the moment that finding's row stopped. A partly lapsed claim reports the lapsed part here and what is still in force as its present reach |
+
+| Reach when it stopped | |
+|---|---|
+| Worked out on request from the rows and each finding's own opening and closing | Nothing is stored beside them, because both moments are already on the rows |
+| Each row is asked at its own moment | The rows of one part can stop on different days |
+| A finding counts where it opened at or before that moment and had not closed by it | A finding closed before a withdrawal and one opened after it were never covered by the row |
+| Matched by place, not by version | A lapse is the version moving at a place, so matched on versions a lapsed row reaches nothing at the moment it lapsed |
+| Narrowed to findings the reader may see | The same rule as the present reach |
+| The findings list narrows to one claim's places, optionally by the state of its row there | What sits at those places now is one link away, and the list stays the one place findings are listed |
 
 | Rule | |
 |---|---|
@@ -515,6 +528,7 @@ The finding carries three lists, each narrowed to what the reader may see.
 | Each entry carries how its rows here stand and the claim's state as a whole | Approved only where every live row is. A representative row's state stood in for the claim's, and one row approved beside forty-three sent back read as approved |
 | Rows sent back carry when, and the reason the approver gave | |
 | A decision records when it stopped applying | Nothing else did: an approval's withdrawal date exists only where somebody had agreed |
+| A similar claim's issue count is over every row of it the reader may see | A bulk claim writes a row per place, often thousands; a count over a sample of them is not the count |
 
 ## The review queue
 
@@ -955,7 +969,9 @@ is one act at the grain the claim was made at.
 
 The lapsed population is reached by the findings list's `lapsed` state, and by
 the review queue's To reaffirm tab, which lists the reader's own lapsed claims.
-The act sits on the claim, or on several claims from that tab
+A claim with a withdrawn row is neither listed there nor offered on its page:
+its author took it back, and a withdrawal leaves a row that had already lapsed
+as it was. The act sits on the claim, or on several claims from that tab
 (§ Re-affirmation across claims).
 
 ### Approval gate
@@ -1382,7 +1398,10 @@ What a new line would inherit is shown before anything happens, and what moved i
 chosen rather than taken (REQ-25). Four groups, because they need four different
 things: what already applies has nothing to agree to, what covers nothing here
 has nothing to apply to, what moved is a question, and what was postponed is a
-question that carries its own history.
+question that carries its own history. Two more are counted apart, since
+neither can be carried: what has run out at a place the new line holds, which
+leaves a finding there unanswered, and a promised upgrade whose version moved,
+which is planned again from its component.
 
 Reasoning travels and conclusions do not. Everything carried arrives as a claim
 waiting for a second person, however confident whoever carried it was: the
@@ -1394,9 +1413,10 @@ reasoning at all.
 |---|---|
 | Only what was offered may be carried | Naming a judgment the preview classified as already applying, or as covering nothing here, is refused rather than skipped: a caller that got the set wrong should hear so |
 | The place is read from the new line, never copied from the old claim | The versions are what a decision is keyed on and they are the thing that moved |
-| A deferral carries the date it had | Quietly moving it forward would be the tool making the judgment it is asking for. The total it has already run for is shown beside it, because that is what agreeing to it again agrees to |
+| A dated judgment carries what it said | A deferral keeps its date, and a patch promise keeps its date. Quietly moving a date forward would be the tool making the judgment it is asking for, and a promise without its date is refused on every write path. The total a deferral has already run for is shown beside it, because that is what agreeing to it again agrees to |
 | **A judgment whose date has gone by is not offered** | It carries its date rather than having it moved forward, so carrying one that has run out writes a claim finished the moment it lands. Offering it is offering something the act behind the button turns down |
-| **What is carried is checked like anything else written** | It built a claim and went straight to the writer, so nothing asked whether what it carried could be said at all — and the place it built never read whether the new line was a tag, which is the one rule this act can break that no other can |
+| **A promised upgrade is not carried** | An upgrade covers a component in the releases it names and records what each release is waiting on. A claim carried onto one place writes neither, so the new line would hold a promise its own list of pending upgrades never shows. Planned from the component, naming the new line, it writes both |
+| What is carried is checked like anything else written | The place it builds records whether the new line is a tag, so a dated judgment carried onto a release built once is refused as it is when proposed there |
 | Bounded, and written in one transaction | Carrying six judgments is one act, and half of it landing is a line nobody can tell from one somebody chose that way |
 
 ## Not built

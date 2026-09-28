@@ -50,8 +50,8 @@ type AboutPersonBody struct {
 	// Held is every grant and withdrawal against them, newest first.
 	Held      []HeldChangeBody `json:"held,omitempty"`
 	HeldTotal int              `json:"held_total" doc:"The number of role changes, of which the list above is a page"`
-	// Record is their part in the triage record.
-	Record PersonRecordBody `json:"record"`
+	// Record is their part in the triage record, for an administrator.
+	Record *PersonRecordBody `json:"record,omitempty" doc:"Their part in the triage record, counted over every product. Absent unless you administer the deployment"`
 	// Told is what was sent to them, newest first, read and cleared included:
 	// a notification is a fact about what was sent.
 	Told      []ToldBody `json:"told,omitempty"`
@@ -177,7 +177,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 			if err != nil {
 				return nil, refused(a.Logger, err, "cannot read their part in the record")
 			}
-			body.Record = PersonRecordBody{
+			body.Record = &PersonRecordBody{
 				Proposed: record.Proposed, Approved: record.Approved, Withdrawn: record.Withdrawn,
 				LastProposedAt: orAbsent(record.LastProposedAt),
 				LastApprovedAt: orAbsent(record.LastApprovedAt),

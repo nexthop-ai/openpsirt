@@ -17,10 +17,10 @@ import (
 func TestEveryFieldSomebodyTypesGoesThroughTheSubmissionPolicy(t *testing.T) {
 	// The policy runs before storage and is the security control: what is in
 	// the column is then known to have passed what was in force when it
-	// arrived. Five fields a person types skipped it entirely — the only
-	// check was that the string was not blank — so a row could hold raw
-	// markup, a scheme a browser acts on, and text past the bound a render is
-	// kept inside, forever, under an append-only rule.
+	// arrived. A field that skips it holds raw markup, a scheme a browser acts
+	// on, or text past the bound a render is kept inside, forever, under an
+	// append-only rule. Each call below was seen failing with its check
+	// removed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -59,5 +59,16 @@ func TestEveryFieldSomebodyTypesGoesThroughTheSubmissionPolicy(t *testing.T) {
 		open := f.open(t)
 		_, err = f.store.Resolve(ctx, who, f.target, open[0].VulnerabilityID, raw)
 		refused("a closure by a person", err)
+
+		_, err = f.store.Affects(ctx, who, f.productID, issue, []int64{f.target}, raw)
+		refused("a reason for correcting the affected builds", err)
+
+		_, err = f.store.Disclose(ctx, who, f.productID, issue, raw)
+		refused("a reason for disclosing", err)
+
+		_, _, err = f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Severity: "high", Summary: raw,
+		})
+		refused("a recorded flaw's summary", err)
 	})
 }

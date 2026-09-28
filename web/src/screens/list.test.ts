@@ -62,6 +62,15 @@ describe("the filters as the server takes them", () => {
     expect(listQuery(new URLSearchParams())).toEqual({ limit: 50, offset: 0 });
   });
 
+  it("sends a claim's states only with the claim", () => {
+    expect(
+      listQuery(new URLSearchParams("claim=12&claim_state=lapsed&claim_state=bogus")),
+    ).toMatchObject({ claim: 12, claim_state: ["lapsed"] });
+    const alone = listQuery(new URLSearchParams("claim_state=lapsed&claim=soon"));
+    expect(alone).not.toHaveProperty("claim");
+    expect(alone).not.toHaveProperty("claim_state");
+  });
+
   it("carries what the address says", () => {
     const asked = listQuery(
       new URLSearchParams(

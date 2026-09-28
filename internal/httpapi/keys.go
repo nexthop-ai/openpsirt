@@ -48,25 +48,33 @@ func registerKeys(api huma.API, a Administering) {
 			// ProductByName — and the Stream and Variant fields beside it
 			// already answer the address. A listing that cannot be used to
 			// remake what it lists is a listing of something else.
-			if product, err := names.ProductByID(ctx, key.ProductID); err == nil {
-				body.Product = product.Name
-				if product.DisplayName != product.Name {
-					body.ProductDisplayName = product.DisplayName
-				}
+			product, err := names.ProductByID(ctx, key.ProductID)
+			if err != nil {
+				return nil, wentWrong(a.Logger, "cannot list credentials", err)
+			}
+			body.Product = product.Name
+			if product.DisplayName != product.Name {
+				body.ProductDisplayName = product.DisplayName
 			}
 			// The whole narrowing, not only the product it names. "any
 			// branch, any variant" and "one release only" are different
 			// credentials, and a list that renders both the same way cannot be
-			// used to decide which one to withdraw.
+			// used to decide which one to withdraw. A read that fails answers
+			// the whole listing with an error for the same reason: a pinned key
+			// listed unscoped is the wrong credential to withdraw.
 			if key.StreamID != nil {
-				if stream, err := names.StreamByID(ctx, *key.StreamID); err == nil {
-					body.Stream = stream.Name
+				stream, err := names.StreamByID(ctx, *key.StreamID)
+				if err != nil {
+					return nil, wentWrong(a.Logger, "cannot list credentials", err)
 				}
+				body.Stream = stream.Name
 			}
 			if key.VariantID != nil {
-				if variant, err := names.VariantByID(ctx, *key.VariantID); err == nil {
-					body.Variant = variant.Name
+				variant, err := names.VariantByID(ctx, *key.VariantID)
+				if err != nil {
+					return nil, wentWrong(a.Logger, "cannot list credentials", err)
 				}
+				body.Variant = variant.Name
 			}
 			if key.LastUsedAt != nil {
 				body.LastUsedAt = key.LastUsedAt.UTC().Format(timeFormat)

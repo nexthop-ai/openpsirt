@@ -3,7 +3,10 @@
 
 package triage
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // NearestRank is the percentile position, for the test.
 //
@@ -17,4 +20,10 @@ func NearestRank(sorted []time.Duration, part float64) time.Duration {
 // Counted is Bounds.counted, for the test of which limit holds when.
 func (b Bounds) Counted(issues, places int, review bool) error {
 	return b.counted(issues, places, review)
+}
+
+// ProposersOfAll is proposersOfAll read a given number of rows at a time, for
+// the test that a person spread across reads is told once.
+func (s *Store) ProposersOfAll(ctx context.Context, ids []int64, chunk int) ([]ForPerson, error) {
+	return s.proposersOfAll(ctx, ids, chunk)
 }

@@ -110,7 +110,17 @@ func TestACommitmentIsStoredWithTheClaim(t *testing.T) {
 		}
 
 		// And read back the same way, since a claim is read far more often
-		// than it is written.
-		_ = made
+		// than it is written. The column holds a day.
+		var stored triage.Claim
+		if err := f.db.DB.NewSelect().Model(&stored).
+			Where("cl.id = ?", made.ClaimID).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if stored.CommittedTo == nil || stored.CommittedTo.Format(time.DateOnly) != by.Format(time.DateOnly) {
+			t.Errorf("read back, committed to %v, want %v", stored.CommittedTo, by)
+		}
+		if stored.UpgradeTo == nil || *stored.UpgradeTo != "3.5.2" {
+			t.Errorf("read back, the version it moves to is %v", stored.UpgradeTo)
+		}
 	})
 }

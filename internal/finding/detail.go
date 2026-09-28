@@ -689,7 +689,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		switch {
 		case evidence.unrated:
 			evidence.NoDeadline = NotRated
-		case !line.Admits(evidence.Exploited || evidence.ExploitedHere, evidence.Severity):
+		case !line.Admits(evidence.Exploited || evidence.ExploitedHere, issue.InForce()):
 			evidence.NoDeadline = BelowTheLine
 		case evidence.nothingToTake:
 			evidence.NoDeadline = NothingToTake

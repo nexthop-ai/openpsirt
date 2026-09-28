@@ -191,6 +191,44 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 	})
 }
 
+// A severity asked of the list raises the line over every product, including
+// one that states a lower line of its own. The product's line is a floor the
+// caller cannot go beneath, and the caller's raise is a second floor above it.
+// Being exploited passes both, because no line sets that aside.
+func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerLine(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		used := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-3", Severity: "medium", Exploited: true},
+			Component: teamd,
+		}
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "medium"}, Component: libnl},
+			{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "critical"}, Component: swss},
+			used,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), f.productID, "low"); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		rows, total, err := f.store.Anywhere(t.Context(), who, 50, 0,
+			finding.Filter{Floor: finding.Floor{Word: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		kept := map[string]bool{}
+		for _, row := range rows {
+			kept[row.Vulnerability] = true
+		}
+		if len(rows) != 2 || total != 2 || !kept["CVE-2026-2"] || !kept["CVE-2026-3"] {
+			t.Errorf("asking for high and above over a product whose line is low kept %v (total %d), "+
+				"want the critical issue and the exploited one", kept, total)
+		}
+	})
+}
+
 // lowly is one reported issue nothing would call urgent, for the line to hide.
 func lowly(id string, component graph.Described) finding.Reported {
 	return finding.Reported{
