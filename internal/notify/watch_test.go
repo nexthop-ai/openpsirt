@@ -83,14 +83,6 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		}
 
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		// Declared and never filed against, which is the same failure as
 		// having stopped — caught earlier. One alert for each administrator.
@@ -102,13 +94,13 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 			t.Fatalf("a build nothing was filed against: opened %d cleared %d, want 2 and 0",
 				opened, cleared)
 		}
-		if n := seeing(admin); n != 1 {
+		if n := waiting(t, db, admin); n != 1 {
 			t.Errorf("the administrator was told %d things, want 1", n)
 		}
-		if n := seeing(operator); n != 1 {
+		if n := waiting(t, db, operator); n != 1 {
 			t.Errorf("the administrator named in configuration was told %d things, want 1", n)
 		}
-		if n := seeing(reader); n != 0 {
+		if n := waiting(t, db, reader); n != 0 {
 			t.Errorf("somebody who administers nothing was told %d things", n)
 		}
 
@@ -132,7 +124,7 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		if opened != 0 || cleared != 2 {
 			t.Errorf("after a scan arrived: opened %d cleared %d, want 0 and 2", opened, cleared)
 		}
-		if n := seeing(admin); n != 0 {
+		if n := waiting(t, db, admin); n != 0 {
 			t.Errorf("the alert should have cleared itself, %d still waiting", n)
 		}
 	})
@@ -282,27 +274,19 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 			time.Now().UTC().Add(-24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(admin); n != 2 {
+		if n := waiting(t, db, admin); n != 2 {
 			t.Errorf("the administrator was told %d things about passed dates, want 2", n)
 		}
-		if n := seeing(owner); n != 1 {
+		if n := waiting(t, db, owner); n != 1 {
 			t.Errorf("whoever holds one was told %d things, want 1", n)
 		}
 		// Holding it is not enough. They may not read undisclosed work here,
 		// and the alert says an undisclosed finding exists.
-		if n := seeing(outsider); n != 0 {
+		if n := waiting(t, db, outsider); n != 0 {
 			t.Errorf("somebody who may not read undisclosed work was told %d things", n)
 		}
 
@@ -320,10 +304,10 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		if cleared == 0 {
 			t.Error("the date moved and the alert stayed")
 		}
-		if n := seeing(admin); n != 0 {
+		if n := waiting(t, db, admin); n != 0 {
 			t.Errorf("the administrator still sees %d after the dates moved", n)
 		}
-		if n := seeing(owner); n != 0 {
+		if n := waiting(t, db, owner); n != 0 {
 			t.Errorf("whoever holds it still sees %d after the date moved", n)
 		}
 	})
@@ -597,6 +581,16 @@ func critical(t *testing.T, db *database.DB, targetID int64, identifier, severit
 	}
 }
 
+// waiting is how many notifications somebody is being shown.
+func waiting(t *testing.T, db *database.DB, who *access.Account) int {
+	t.Helper()
+	_, total, err := notify.NewStore(db.DB).Waiting(t.Context(), asks(t, db, who), 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return total
+}
+
 // asks is the subject that person really is: the grants they hold, read back
 // from the database, and the cases they were brought into.
 //
@@ -700,22 +694,14 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 			time.Now().UTC().Add(24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(held); n != 1 {
+		if n := waiting(t, db, held); n != 1 {
 			t.Fatalf("whoever holds it was told %d things about a date coming, want 1", n)
 		}
-		if n := seeing(admin); n != 1 {
+		if n := waiting(t, db, admin); n != 1 {
 			t.Errorf("the administrator was told %d things, want 1", n)
 		}
 
@@ -730,11 +716,11 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(held); n != 0 {
+		if n := waiting(t, db, held); n != 0 {
 			t.Errorf("the previous holder still sees %d alerts about an embargo "+
 				"that is no longer theirs", n)
 		}
-		if n := seeing(next); n != 1 {
+		if n := waiting(t, db, next); n != 1 {
 			t.Errorf("whoever holds it now was told %d things, want 1", n)
 		}
 	})
@@ -761,14 +747,6 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		}
 		target := aScannedTarget(t, db)
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		// A month of runs, every one of them against the same data. Nothing
 		// here has failed and nothing has gone quiet: the scans are arriving.
@@ -790,10 +768,10 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(admin); n == 0 {
+		if n := waiting(t, db, admin); n == 0 {
 			t.Fatal("the data has not moved in a month and nobody was told")
 		}
-		if n := seeing(reader); n != 0 {
+		if n := waiting(t, db, reader); n != 0 {
 			t.Errorf("somebody who administers nothing was told %d things", n)
 		}
 
@@ -803,7 +781,7 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(admin); n != 0 {
+		if n := waiting(t, db, admin); n != 0 {
 			t.Errorf("the data moved and %d alerts are still waiting", n)
 		}
 	})

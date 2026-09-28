@@ -493,19 +493,82 @@ func TestAKeyNeverComesFromWhatSomebodyTyped(t *testing.T) {
 		if strings.Contains(stored.Filename, "/") || strings.Contains(stored.Filename, "..") {
 			t.Errorf("the filename kept a path in it: %q", stored.Filename)
 		}
-		if strings.Contains(attach.Disposition(stored), `"`+"\n") {
-			t.Errorf("the disposition can be broken out of: %q", attach.Disposition(stored))
+	})
+}
+
+// A name somebody typed cannot end the quoted parameter it is written into,
+// carry a line break into a header, or name nothing.
+func TestANameCannotBreakOutOfTheHeaderItIsWrittenInto(t *testing.T) {
+	for typed, want := range map[string]string{
+		`a"b`:    "a_b",
+		`a\b`:    "a_b",
+		"a\r\nb": "ab",
+		"\x00":   "attachment",
+		"..":     "attachment",
+	} {
+		if got := attach.SafeName(typed); got != want {
+			t.Errorf("%q is kept as %q, want %q", typed, got, want)
+		}
+	}
+	disposition := attach.Disposition(&attach.Attachment{Filename: attach.SafeName(`x"y`),
+		ContentType: "application/octet-stream"})
+	if disposition != `attachment; filename="x_y"` {
+		t.Errorf("the disposition reads %q", disposition)
+	}
+}
+
+// An object the store will not delete is named and stepped over, and the rows
+// after it are still collected.
+func TestAnUndeletableObjectDoesNotStallTheSweep(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		stuck := f.upload(t, who, "stuck.log", []byte("the store will not let this go"))
+		after := f.upload(t, who, "after.log", []byte("this goes"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var said bytes.Buffer
+		store := attach.NewStore(f.db.DB, refusing{Storage: f.files, key: stuck.ObjectKey}).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		gone, err := store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gone != 1 {
+			t.Errorf("collected %d, want the one the store let go", gone)
+		}
+		if _, err := f.files.Open(ctx, after.ObjectKey); !errors.Is(err, attach.ErrNoSuchObject) {
+			t.Errorf("the object after the undeletable one is still there: %v", err)
+		}
+		for _, want := range []string{stuck.ObjectKey, "error="} {
+			if !strings.Contains(said.String(), want) {
+				t.Errorf("the undeletable object was reported without %q: %s", want, said.String())
+			}
 		}
 	})
 }
 
+// refusing is a store that will not delete one key.
+type refusing struct {
+	attach.Storage
+	key string
+}
+
+func (r refusing) Delete(ctx context.Context, key string) error {
+	if key == r.key {
+		return errors.New("the store refused")
+	}
+	return r.Storage.Delete(ctx, key)
+}
+
 // Attaching is triage work, and a share of the store is one person's.
 //
-// It was authorized with the read test, so a role granting nothing but the
-// ability to read disclosed findings on one product could write files into
-// the deployment's store — and what filling it costs is not the uploader's,
-// it is every other upload in every product afterwards. Nothing bounded any
-// one person's part of the total either.
+// A role granting nothing but the ability to read disclosed findings on one
+// product does not write files into the deployment's store, and what filling
+// it costs is every other upload in every product afterwards.
 func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -700,11 +763,10 @@ func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
 }
 
 func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
-	// The pass counted what it could not read and threw the error away, in
-	// the one writer here that destroys somebody's data. Counted alone the
-	// row is left standing with nothing naming it: the same number comes back
-	// every pass, and nobody can tell whether it is one row stuck or a
-	// different one each time, or what is wrong with it.
+	// The one writer here that destroys somebody's data names each row it
+	// could not claim. Counted alone, the same number comes back every pass,
+	// and nobody can tell whether it is one row stuck or a different one each
+	// time, or what is wrong with it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
