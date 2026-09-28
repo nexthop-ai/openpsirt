@@ -105,16 +105,16 @@ type Comparison struct {
 func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget, toTarget int64,
 	includePrivate bool) (*Comparison, error) {
 
-	// Both builds, not one. The first version authorized the later target and
-	// applied that answer to the earlier one as well, so a caller who could
-	// reach one product could read findings out of another through the
-	// comparison — enforcement lives in the data layer precisely so the next
-	// caller of this cannot open that.
-	toProduct, visible, err := s.mayCompare(ctx, subject, toTarget)
+	// Both builds, each authorized on its own. An answer for one applied to
+	// the other would let a caller who reaches one product read findings out
+	// of another through the comparison. The product comes back with each,
+	// because the rating a row is reported at is that product's, and the two
+	// builds compared can be in two products.
+	toProduct, visible, err := readableIn(ctx, s.db, subject, toTarget)
 	if err != nil {
 		return nil, err
 	}
-	fromProduct, earlier, err := s.mayCompare(ctx, subject, fromTarget)
+	fromProduct, earlier, err := readableIn(ctx, s.db, subject, fromTarget)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	fromTarget, toTarget int64) (int, error) {
 
 	for _, targetID := range []int64{toTarget, fromTarget} {
-		_, visible, err := s.mayCompare(ctx, subject, targetID)
+		_, visible, err := readableIn(ctx, s.db, subject, targetID)
 		if err != nil {
 			return 0, err
 		}
@@ -336,23 +336,6 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 		gone[i].Because = why[pairKey(gone[i].Vulnerability, gone[i].Component)].Because
 	}
 	return len(onlyFixes(gone)), nil
-}
-
-// mayCompare reports what a subject may read of one build, refusing where they
-// may read nothing.
-func (s *Store) mayCompare(ctx context.Context, subject access.Subject, targetID int64) (int64, []access.Visibility, error) {
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
-		return 0, nil, err
-	}
-	visible := access.Visible(subject, productID)
-	if !subject.Sees(productID) || len(visible) == 0 {
-		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	// The product comes back with it, because the rating a row is reported at
-	// is that product's. The two builds compared can be in two products, and
-	// each half of the comparison is rated by its own.
-	return productID, visible, nil
 }
 
 // whyGone reads the explanations recorded when these findings closed in the

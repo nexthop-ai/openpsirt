@@ -875,7 +875,10 @@ func registerReceipts(api huma.API, in Ingest) {
 		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, target.ID, runs)
 		switch {
 		case errors.Is(err, access.ErrDenied):
-			return nil, nothingScannedThere()
+			// The receipts above were this caller's to read, so a refusal here
+			// is of the counts alone: a pipeline key reading back its own
+			// uploads reads no findings, and its receipts carry no counts.
+			changed = nil
 		case err != nil:
 			return nil, wentWrong(in.Logger, "what the scans changed could not be read", err)
 		}

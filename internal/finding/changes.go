@@ -33,26 +33,18 @@ type Change struct {
 func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID int64,
 	runIDs []int64) (map[int64]Change, error) {
 
-	if len(runIDs) == 0 {
-		return map[int64]Change{}, nil
-	}
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
-		return nil, err
-	}
-	if !subject.Sees(productID) {
-		// The answer every other read in this package gives, so the handler
-		// can tell a refusal from a fault. A plain error here reached the
-		// handler with nothing to match on and became a 500, which says a
-		// build exists and something went wrong reading it.
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
 	// Counts carry the reader's visibility like every other read does. A
 	// run that opened an undisclosed finding must not report a larger
 	// number to somebody who cannot see it — a count is a disclosure with
-	// the details removed rather than a different kind of answer.
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
+	// the details removed rather than a different kind of answer. A reader
+	// who may count nothing is refused, as every other read of a build
+	// refuses them, and before the list is looked at, so an empty list is
+	// refused alike.
+	_, visible, err := readableIn(ctx, s.db, subject, targetID)
+	if err != nil {
+		return nil, err
+	}
+	if len(runIDs) == 0 {
 		return map[int64]Change{}, nil
 	}
 

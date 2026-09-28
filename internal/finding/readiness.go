@@ -78,11 +78,8 @@ type Readiness struct {
 func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	productID, streamID, variantID int64) (*Readiness, error) {
 
-	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	if len(access.Visible(subject, productID)) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	if _, err := access.Readable(subject, productID); err != nil {
+		return nil, err
 	}
 	floor, err := FloorFor(ctx, s.db, productID)
 	if err != nil {

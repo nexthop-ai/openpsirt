@@ -247,12 +247,9 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 		return 0, nil, nil, fmt.Errorf("read findings: the selection names no product")
 	}
 	productID := *scope.ProductID
-	if !subject.Sees(productID) {
-		return 0, nil, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return 0, nil, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return 0, nil, nil, err
 	}
 	targets, err := s.buildsWorking(ctx, scope, filter.Workable)
 	if err != nil {

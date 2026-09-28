@@ -71,19 +71,11 @@ var ErrNoSuchRun = errors.New("no such run on this build")
 func (s *Store) Ran(ctx context.Context, subject access.Subject,
 	targetID, runID int64) (*RanDetail, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	// A refusal, shaped by its caller into the same 404 a run that is not
+	// there gets, so a refusal is told apart from a read that failed.
+	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return nil, err
-	}
-	if !subject.Sees(productID) {
-		// A refusal, shaped by its caller into the same 404 a run that is not
-		// there gets. Said as a sentence it could not be told from a read that
-		// failed, which is what every caller then reported it as.
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 
 	var run Run

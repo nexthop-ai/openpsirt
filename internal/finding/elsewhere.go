@@ -149,12 +149,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// grouped five-join queries and two authorization checks each, so the
 	// cost the removed sampling was there to avoid came straight back.
 	at := places[0]
-	if !access.SeesOn(subject, at.ProductID, at.VulnerabilityID) {
-		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
-	}
-	visible := access.VisibleOn(subject, at.ProductID, at.VulnerabilityID)
-	if len(visible) == 0 {
-		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
+	visible, err := access.ReadableOn(subject, at.ProductID, at.VulnerabilityID)
+	if err != nil {
+		return Reach{}, err
 	}
 	identities := make([]string, 0, len(places))
 	// The key of each place, which decides whether a build is
@@ -180,7 +177,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		ConsumerUpstream  string `bun:"consumer_upstream"`
 		Places            int    `bun:"places"`
 	}
-	err := s.db.NewSelect().
+	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).

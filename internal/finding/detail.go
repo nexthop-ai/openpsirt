@@ -527,9 +527,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 	// Asked about the issue rather than about the product, because a
 	// collaborator reads one issue here and nothing else.
-	visible := access.VisibleOn(subject, productID, vulnerabilityID)
-	if !access.SeesOn(subject, productID, vulnerabilityID) || len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.ReadableOn(subject, productID, vulnerabilityID)
+	if err != nil {
+		return nil, err
 	}
 
 	var rows []evidenceRow

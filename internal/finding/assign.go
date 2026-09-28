@@ -217,9 +217,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 			"give work to somebody else in product %d — you may take what nobody owns, "+
 				"and hand back your own", productID))
 	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return 0, false, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return 0, false, err
 	}
 
 	moved, err = s.moveWork(ctx, s.db, subject, productID, vulnerabilityID, componentID,
@@ -292,14 +292,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetID,
 	vulnerabilityID, componentID int64) (access.Visibility, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return access.Public, err
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return access.Public, access.Denied(
-			fmt.Sprintf("read findings in product %d", productID))
 	}
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
@@ -330,10 +325,9 @@ func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetI
 func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject,
 	productID int64, targets []int64, component, version string) (access.Visibility, error) {
 
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return access.Public, access.Denied(
-			fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return access.Public, err
 	}
 	if len(targets) == 0 {
 		return access.Public, nil
