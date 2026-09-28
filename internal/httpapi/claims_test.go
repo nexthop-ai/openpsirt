@@ -365,10 +365,7 @@ func TestAFindingReportsItsDecisionsAndWhatMayCarryToIt(t *testing.T) {
 
 		// A claim about the neighbor, approved.
 		neighbor, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", neighbor), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, neighbor)
 		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
 			t.Fatal(err)
 		}
@@ -518,10 +515,7 @@ func TestAFindingsRowSaysHowFarItIsDecidedAndWhetherItCameBack(t *testing.T) {
 		if state, back := row(); state != "waiting" || back {
 			t.Errorf("a revised claim reads as %q, sent back %v", state, back)
 		}
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		if state, back := row(); state != "agreed" || back {
 			t.Errorf("an approved claim reads as %q, sent back %v", state, back)
 		}
@@ -969,10 +963,7 @@ func (r *reach) agreedThenLapsed(t *testing.T) int64 {
 	if len(made.IDs) != 2 {
 		t.Fatalf("the claim covers %d places, want the two of the fold", len(made.IDs))
 	}
-	if ok := asPerson(t, r, "reviewer", http.MethodPost,
-		fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID), `{}`); ok.Code != http.StatusOK {
-		t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-	}
+	r.agreed(t, made.ClaimID)
 
 	// The code moves under them, which is what a lapse is.
 	if _, err := r.db.DB.NewUpdate().Table("component").
@@ -1165,10 +1156,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 		if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, made.ClaimID)
 
 		// And it is offered on this product's finding, as evidence.
 		here := "/v1/products/mine/streams/master/variants/broadcom" +

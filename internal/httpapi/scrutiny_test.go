@@ -157,10 +157,7 @@ func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		claim, ids := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		// Nothing has appeared since, so nothing covers more than was agreed.
 		if out := scrutiny(t, r, "private-triage", ""); len(out.Grew) != 0 {
@@ -205,10 +202,7 @@ func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		if got := asPerson(t, r, "admin", http.MethodDelete,
 			"/v1/people/reviewer/roles/mine/approver", ""); got.Code >= 300 {
 			t.Fatalf("withdrawing the right answered %d: %s", got.Code, got.Body.String())

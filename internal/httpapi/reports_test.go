@@ -306,10 +306,7 @@ func (r *reach) agreedAt(t *testing.T, place, body string) {
 	if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
 		t.Fatal(err)
 	}
-	if ok := asPerson(t, r, "reviewer", http.MethodPost,
-		fmt.Sprintf("/v1/claims/%d/approval", claim.ClaimID), `{}`); ok.Code != http.StatusOK {
-		t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-	}
+	r.agreed(t, claim.ClaimID)
 }
 
 // standsOn is what the comparison says stands about one still-present row.

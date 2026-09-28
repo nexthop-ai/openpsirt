@@ -179,10 +179,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 			`{"body":"Re-checked against 3.7.0; still true."}`); got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
 		}
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		// The decision itself, saying what it is about rather than by number.
 		var detail struct {
@@ -386,10 +383,7 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 		}
 
 		// Agreed to, and the claim says so as a whole with who did it.
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", claim), &whole)
 		if whole.Happened != "approved" || whole.By != "reviewer" {
 			t.Errorf("an agreed claim reads as %q by %q", whole.Happened, whole.By)
@@ -560,10 +554,7 @@ func TestWhatAppliesToAFindingIsReadableWithItsHistory(t *testing.T) {
 			t.Fatalf("the history reads as %+v", before.Previously)
 		}
 
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 
 		var after struct {
 			Standing *struct {

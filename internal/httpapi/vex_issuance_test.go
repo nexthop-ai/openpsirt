@@ -81,10 +81,7 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 		// A document that says something different hashes differently, which
 		// is the half that makes the comparison worth making.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		moved := recordedIssuance(t, r, "triager")
 		if moved.Digest == recorded.Digest {
 			t.Errorf("a document carrying a statement it did not carry before hashed the same")
@@ -213,10 +210,7 @@ func TestTheVEXRecordSaysWhetherTheDocumentMovedSinceItWentOut(t *testing.T) {
 		}
 
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, claim)
 		gone.Changed = nil
 		read(t, r, "reader", aBuild+"/issuance", &gone)
 		if gone.Changed == nil || !*gone.Changed {
@@ -404,10 +398,7 @@ func TestAVEXDocumentThatWentOutHoldsNothingNobodyHasAnnounced(t *testing.T) {
 		r.scannedWithEvidence(t)
 		hidden := r.embargoed(t)
 		claim, _ := r.claimed(t, "private-triage", hidden, "libnl-3-200", dismissal)
-		if got := asPerson(t, r, "private-dispatcher", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreedBy(t, "private-dispatcher", claim)
 		if got := asPerson(t, r, "private-triage", http.MethodPost, aBuild+"/issuance",
 			""); got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())

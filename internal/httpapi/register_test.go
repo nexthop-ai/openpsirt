@@ -5,7 +5,6 @@ package httpapi_test
 
 import (
 	"encoding/csv"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -207,10 +206,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		claim, ids := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
-		if ok := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
-		}
+		r.agreed(t, claim)
 		// A second agreement on the same claim, which is what the schema
 		// allows and what multiplied the row. Written directly, because a
 		// second approver going through the endpoint is a different subject

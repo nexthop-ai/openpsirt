@@ -244,10 +244,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 		if !done.Waiting {
 			t.Fatal("a promise a year out was not gated, so nobody agrees and this tests nothing")
 		}
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", done.ClaimID), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, done.ClaimID)
 
 		later := time.Now().UTC().Add(400 * 24 * time.Hour).Format(time.DateOnly)
 		if got := asPerson(t, r, "private-triage", http.MethodPut,
@@ -263,10 +260,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 
 		// The same version and date with new words withdraws the agreement
 		// too, and says the reasoning changed rather than the promise.
-		if got := asPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", done.ClaimID), `{}`); got.Code != http.StatusOK {
-			t.Fatalf("approving again answered %d: %s", got.Code, got.Body.String())
-		}
+		r.agreed(t, done.ClaimID)
 		if got := asPerson(t, r, "private-triage", http.MethodPut,
 			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The same promise, said better."}`,
