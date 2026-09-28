@@ -12,8 +12,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/uptrace/bun/dialect"
-
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -108,7 +106,8 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 
 // Register exports held open by slow readers take the slots, and the next one
 // is refused with a time to ask again rather than queued for a connection.
-// On SQLite, whose pool is one connection, one export takes the only slot.
+// The slots are a fifth of the pool and at least one, so on SQLite, whose pool
+// is one connection, one export takes the only slot.
 func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
@@ -156,9 +155,10 @@ func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
 		if refused.header.Get("Retry-After") == "" {
 			t.Error("an export past the slots was not told when to ask again")
 		}
-		if r.db.Dialect().Name() == dialect.SQLite && len(held) != 1 {
-			t.Errorf("SQLite held %d exports open at once, where its pool is one connection",
-				len(held))
+		// A fifth of the pool, and at least one: SQLite's pool is one
+		// connection, so there it is one.
+		if open := r.db.DB.DB.Stats().MaxOpenConnections; open > 0 && len(held) != max(1, open/5) {
+			t.Errorf("%d exports held open at once over a pool of %d", len(held), open)
 		}
 
 		// A slot given back is taken by the next export, which is written whole.
