@@ -168,6 +168,7 @@ administrator sets. The caller is told to retry.
 | The depth counts work held by a worker that has stopped reporting | Counting only what is waiting reads a queue in the middle of a reclaim cycle as empty: every row sits in the claimed state, held by workers that died, and the one number an operator has says there is nothing to do |
 | A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
 | Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
+| Back-pressure rather than an exact bound | Producers adding at the same moment each count what has committed, so the backlog can pass the limit by as many as are adding at once. An exact bound takes a lock per kind, which is spelled per engine |
 
 ## Configurable bounds
 

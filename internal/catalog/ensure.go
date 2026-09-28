@@ -131,11 +131,30 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 		// been released. Recording it later is the same act as recording it at
 		// the time, arriving late.
 		if parentID != nil && existing.ParentID == nil {
-			if _, err := s.db.NewUpdate().Model((*Stream)(nil)).
+			result, err := s.db.NewUpdate().Model((*Stream)(nil)).
 				Set("parent_id = ?", *parentID).
 				Where("id = ?", existing.ID).
-				Where("parent_id IS NULL").Exec(ctx); err != nil {
+				Where("parent_id IS NULL").Exec(ctx)
+			if err != nil {
 				return nil, false, fmt.Errorf("record what %q was cut from: %w", name, err)
+			}
+			n, err := database.Affected(result)
+			if err != nil {
+				return nil, false, fmt.Errorf("record what %q was cut from: %w", name, err)
+			}
+			// Nothing matched: somebody else filled it in since it was read.
+			// What they recorded is read back, and a different branch is the
+			// contradiction it would have been had it been there first.
+			if n == 0 {
+				var now Stream
+				if err := s.db.NewSelect().Model(&now).
+					Where("id = ?", existing.ID).Scan(ctx); err != nil {
+					return nil, false, fmt.Errorf("read what %q was cut from: %w", name, err)
+				}
+				if now.ParentID == nil || *now.ParentID != *parentID {
+					return nil, false, fmt.Errorf("%q: %w: it was not cut from the branch now being named",
+						name, ErrDiffers)
+				}
 			}
 			existing.ParentID = parentID
 			return existing, back, nil

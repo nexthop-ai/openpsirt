@@ -5,6 +5,7 @@ package finding
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -231,7 +232,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
 			// A claim nobody may be told about and a claim that was never
 			// recorded answer alike, so an identifier cannot be walked.
-			return ErrNoSuchAssessment
+			return database.FromRead(err, ErrNoSuchAssessment, fmt.Sprintf("read assessment %d", id))
 		}
 		// The role on the claim's own product. Refused in the words a missing
 		// claim gets rather than as a denial: "you may not agree to this"
@@ -258,10 +259,17 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 		claim.State = AssessmentLive
 		claim.DecidedBy = &subject.ID
 		claim.DecidedAt = &now
-		if _, err := tx.NewUpdate().Model(claim).
+		// Matched on the state read as well as the key. A withdrawal that
+		// committed since leaves nothing to match, and the attempt is taken
+		// again against the claim as it now stands.
+		result, err := tx.NewUpdate().Model(claim).
 			Column("state", "decided_by", "decided_at").
-			WherePK().Exec(ctx); err != nil {
+			WherePK().Where("state = ?", AssessmentProposed).Exec(ctx)
+		if err != nil {
 			return fmt.Errorf("agree to the claim: %w", err)
+		}
+		if err := movedOne(result, "agree to the claim"); err != nil {
+			return err
 		}
 		agreed = claim
 		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, claim.Severity)
@@ -288,7 +296,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		claim := new(Assessment)
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
-			return ErrNoSuchAssessment
+			return database.FromRead(err, ErrNoSuchAssessment, fmt.Sprintf("read assessment %d", id))
 		}
 		if !subject.TriagesIn(claim.ProductID) {
 			return ErrNoSuchAssessment
@@ -303,6 +311,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		if claim.State == AssessmentWithdrawn {
 			return nil
 		}
+		was := claim.State
 		now := s.now().UTC().Truncate(time.Microsecond)
 		claim.State = AssessmentWithdrawn
 		claim.DecidedBy = &subject.ID
@@ -310,10 +319,14 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		// Released, so a fresh claim may be made about the issue. A withdrawn
 		// claim is history and does not stand in the way of one.
 		claim.LiveVulnerabilityID = nil
-		if _, err := tx.NewUpdate().Model(claim).
+		result, err := tx.NewUpdate().Model(claim).
 			Column("state", "decided_by", "decided_at", "live_vulnerability_id").
-			WherePK().Exec(ctx); err != nil {
+			WherePK().Where("state = ?", was).Exec(ctx)
+		if err != nil {
 			return fmt.Errorf("withdraw the claim: %w", err)
+		}
+		if err := movedOne(result, "withdraw the claim"); err != nil {
+			return err
 		}
 		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, "")
 	})
@@ -947,4 +960,18 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		}
 	}
 	return held, nil
+}
+
+// movedOne reads an update that matched on what the transaction read. None
+// matched means the row moved since, which is a lost race for the retry
+// helper to take again.
+func movedOne(result sql.Result, doing string) error {
+	n, err := database.Affected(result)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("%s: %w", doing, database.ErrGoAgain)
+	}
+	return nil
 }

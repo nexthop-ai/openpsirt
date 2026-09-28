@@ -900,6 +900,13 @@ what the last writer wrote, and the trail says that writer replaced something
 nothing ever held. That is the settings trail, where "who raised the floor to
 critical, and from what" is the question being asked of it.
 
+| Write | What it matches on beside the key |
+|---|---|
+| Agreeing to or withdrawing a rating | The state the claim was read in |
+| Holding rows of a claim back, and setting them aside | Still waiting, and still the claim they were read from |
+| Filling in what a tag was cut from | An empty parent; a lost race reads back what won and refuses a different branch |
+| Changing a setting | The value read |
+
 A locking read — `SELECT ... FOR UPDATE` — is the other answer, and is not used
 for this: it is spelled per engine, and the condition works the same on all
 four. See [Engine-specific code](#engine-specific-code).

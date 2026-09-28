@@ -4,12 +4,17 @@
 package finding_test
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -902,3 +907,76 @@ func TestTheRatingsListIsPagedAndSaysHowManyThereAre(t *testing.T) {
 		}
 	})
 }
+
+// An agreement that races a withdrawal does not bring the withdrawn claim back.
+//
+// Both read the claim as waiting. The withdrawal commits first, and the
+// agreement's write then matched on the key alone and put the claim in force
+// over it: the rating changed, and the record said it was withdrawn. The
+// servers only, because SQLite's one connection cannot hold the two
+// transactions open at once.
+func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		if f.db.Server.Engine == database.SQLite {
+			t.Skip("two transactions at once need a server")
+		}
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		bad := found("CVE-2026-RACE", swss)
+		bad.Issue.Severity = "critical"
+		if _, err := f.store.Apply(t.Context(), f.target, run,
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		who := f.holding(t, access.PublicTriage)
+		claim, err := f.store.Assess(t.Context(), who, f.productID, f.issue(t, "CVE-2026-RACE"),
+			"low", "The affected feature is compiled out of our build.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, who.ID+1, "somebody-else")
+		other := f.holding(t, access.PublicTriage)
+		other.ID = who.ID + 1
+
+		// The withdrawal lands between the agreement's read and its write.
+		hook := &beforeAgreeing{run: func() {
+			if err := f.store.Withdraw(context.Background(), who, claim.ID); err != nil {
+				t.Errorf("withdrawing: %v", err)
+			}
+		}}
+		f.db.AddQueryHook(hook)
+		if _, err := f.store.Agree(t.Context(), other, claim.ID); err == nil {
+			t.Error("agreeing to a claim withdrawn meanwhile was reported as done")
+		}
+		if !hook.fired {
+			t.Fatal("the withdrawal never ran between the read and the write, so this tests nothing")
+		}
+		var state string
+		if err := f.db.DB.NewSelect().Table("assessment").Column("state").
+			Where("id = ?", claim.ID).Scan(t.Context(), &state); err != nil {
+			t.Fatal(err)
+		}
+		if state != string(finding.AssessmentWithdrawn) {
+			t.Errorf("the claim is %s after its withdrawal committed first", state)
+		}
+	})
+}
+
+// beforeAgreeing runs something once, just before the first write that puts
+// an assessment in force.
+type beforeAgreeing struct {
+	run   func()
+	fired bool
+}
+
+func (h *beforeAgreeing) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !h.fired && strings.HasPrefix(e.Query, "UPDATE") && strings.Contains(e.Query, "assessment") &&
+		strings.Contains(e.Query, "'live'") {
+		h.fired = true
+		h.run()
+	}
+	return ctx
+}
+
+func (h *beforeAgreeing) AfterQuery(context.Context, *bun.QueryEvent) {}

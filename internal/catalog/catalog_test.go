@@ -13,6 +13,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+
+	"github.com/uptrace/bun"
 )
 
 // each runs fn against every available engine, with the schema applied and the
@@ -463,3 +465,62 @@ func TestRedeclaringSomethingDifferentlyIsRefusedAndChangesNothing(t *testing.T)
 		}
 	})
 }
+
+// Filling in what a tag was cut from, having lost to somebody who filled in a
+// different branch, is refused rather than reported as recorded.
+//
+// The write only fills an empty parent, so losing the race wrote nothing, and
+// the declaration answered with the branch it was asked about as though it
+// had been recorded.
+func TestFillingInAParentAfterLosingARaceIsNotReportedAsRecorded(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB, store *catalog.Store) {
+		ctx := t.Context()
+		product, err := store.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := store.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, err := store.DeclareStream(ctx, product.ID, "next", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tag, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		hook := &beforeFillingIn{run: func() {
+			if _, err := db.DB.NewUpdate().Table("stream").Set("parent_id = ?", other.ID).
+				Where("id = ?", tag.ID).Exec(context.Background()); err != nil {
+				t.Errorf("filling it in first: %v", err)
+			}
+		}}
+		db.AddQueryHook(hook)
+		if _, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID); !errors.Is(err, catalog.ErrDiffers) {
+			t.Errorf("filling in a branch after another was recorded answered %v", err)
+		}
+		if !hook.fired {
+			t.Fatal("nothing filled it in first, so this tests nothing")
+		}
+	})
+}
+
+// beforeFillingIn runs something once, just before the first write that
+// fills in what a stream was cut from.
+type beforeFillingIn struct {
+	run   func()
+	fired bool
+}
+
+func (h *beforeFillingIn) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !h.fired && strings.HasPrefix(e.Query, "UPDATE") && strings.Contains(e.Query, "parent_id IS NULL") {
+		h.fired = true
+		h.run()
+	}
+	return ctx
+}
+
+func (h *beforeFillingIn) AfterQuery(context.Context, *bun.QueryEvent) {}

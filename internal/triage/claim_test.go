@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -972,3 +973,58 @@ func TestRevisingYourOwnClaimIsNotSomebodyElseUndoingIt(t *testing.T) {
 		}
 	})
 }
+
+// Holding rows back that an approval took meanwhile moves nothing it took.
+//
+// Both read the rows as waiting. The approval commits first, and the split's
+// write matched on the identifiers alone, so it moved approved rows into a new
+// claim and sent them back to their author. The servers only, because
+// SQLite's one connection cannot hold the two transactions open at once.
+func TestHoldingRowsBackThatAnApprovalTookMovesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		if f.db.Server.Engine == database.SQLite {
+			t.Skip("two transactions at once need a server")
+		}
+		ctx := t.Context()
+		recorded := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
+		hook := &beforeHoldingBack{run: func() {
+			if err := agreeTo(context.Background(), f.store, f.reviewer,
+				recorded[0].ClaimID, ""); err != nil {
+				t.Errorf("agreeing: %v", err)
+			}
+		}}
+		f.db.AddQueryHook(hook)
+		if _, err := f.store.Split(ctx, f.triager, recorded[0].ClaimID,
+			[]int64{recorded[2].ID}, "This one is reachable from the CLI."); err == nil {
+			t.Error("holding back a row approved meanwhile was reported as done")
+		}
+		if !hook.fired {
+			t.Fatal("the approval never ran between the read and the write, so this tests nothing")
+		}
+		row, _, err := f.store.Read(ctx, f.triager, recorded[2].ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.ClaimID != recorded[0].ClaimID || row.SentBackAt != nil {
+			t.Errorf("an approved row was moved to claim %d and sent back at %v",
+				row.ClaimID, row.SentBackAt)
+		}
+	})
+}
+
+// beforeHoldingBack runs something once, just before the first write that
+// sends decisions back.
+type beforeHoldingBack struct {
+	run   func()
+	fired bool
+}
+
+func (h *beforeHoldingBack) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !h.fired && strings.HasPrefix(e.Query, "UPDATE") && strings.Contains(e.Query, "sent_back_at") {
+		h.fired = true
+		h.run()
+	}
+	return ctx
+}
+
+func (h *beforeHoldingBack) AfterQuery(context.Context, *bun.QueryEvent) {}
