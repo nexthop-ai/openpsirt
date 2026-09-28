@@ -471,6 +471,8 @@ list exists to prevent.
 | Severity stays a floor | Nobody wants to see low and high without medium |
 | Drawn as checkboxes behind a control that says what is ticked | A closed control reading "Any" over three ticked boxes is how a narrowed list comes to look unnarrowed. The chips above name each separately, so removing one leaves the rest |
 | Carried in the address as the parameter repeated | A server reading only the first word narrows to less than was asked for, which looks like an answer rather than a mistake. Marked exploded on both sides, with a test at the HTTP layer that asks for two states and counts the rows |
+| A word the server does not take is left off the request | A stale or mistyped word in a saved link otherwise refuses the whole list. The words each parameter takes are checked against the generated client in both directions, and the chip above the list still names the word left off |
+| A comma ends a word in a typed filter, wherever it falls | A pasted list is several words, not one word holding commas that matches nothing |
 
 The decision state is above the list, beside the severity floor, in the place
 the exploited and fix-available chips would take. Neither earns it: the list is

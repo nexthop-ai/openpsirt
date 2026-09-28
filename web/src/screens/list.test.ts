@@ -171,6 +171,29 @@ describe("the filters as the server takes them", () => {
     expect(listQuery(new URLSearchParams("running=7"))).toMatchObject({ due_within: 7 });
   });
 
+  it("leaves out a word the server would refuse, and keeps the rest", () => {
+    // One stale word in a saved link otherwise refuses the whole request.
+    const asked = listQuery(
+      new URLSearchParams(
+        "state=open&state=undecided&floor=severe&sort=newest&outcome=bogus&outcome=patch-needed" +
+          "&origin=robot&planned=maybe&variants=some&on=trunk&assigned=them&fix_state=gone",
+      ),
+    );
+    expect(asked).toMatchObject({ state: ["undecided"], outcome: ["patch-needed"] });
+    for (const key of [
+      "severity",
+      "sort",
+      "origin",
+      "planned",
+      "across_variants",
+      "on",
+      "assigned",
+      "fix_state",
+    ]) {
+      expect(asked, key).not.toHaveProperty(key);
+    }
+  });
+
   it("sends both ends of a stretch a report links with", () => {
     expect(
       listQuery(

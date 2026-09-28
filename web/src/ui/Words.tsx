@@ -36,6 +36,14 @@ export function Words({
 }) {
   const [typed, setTyped] = useState("");
 
+  // Everything typed or pasted, split where a comma ends a word: the words it
+  // finished, and the part still being typed.
+  function typing(said: string) {
+    const { finished, left } = pasted(said, words);
+    if (finished.length > 0) onChange([...words, ...finished]);
+    setTyped(left);
+  }
+
   function add(word: string) {
     const said = word.trim();
     // Silently ignored rather than refused: adding a word that is already
@@ -74,12 +82,8 @@ export function Words({
         list={listId}
         placeholder={placeholder}
         value={typed}
-        onChange={(event) => {
-          // A comma ends a word, because somebody pasting a list types one.
-          const said = event.target.value;
-          if (said.endsWith(",")) add(said.slice(0, -1));
-          else setTyped(said);
-        }}
+        // A comma ends a word, because somebody pasting a list types one.
+        onChange={(event) => typing(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             // Kept off the form around it: this box adds a word, and the form
@@ -104,4 +108,20 @@ export function Words({
       {hint && <span className="hint">{hint}</span>}
     </label>
   );
+}
+
+// The words a comma finished in what was typed, without any already held or
+// any repeated, and what is left after the last comma.
+export function pasted(
+  said: string,
+  held: readonly string[],
+): { finished: string[]; left: string } {
+  const pieces = said.split(",");
+  const left = pieces.pop() ?? "";
+  const finished: string[] = [];
+  for (const piece of pieces) {
+    const word = piece.trim();
+    if (word && !held.includes(word) && !finished.includes(word)) finished.push(word);
+  }
+  return { finished, left };
 }
