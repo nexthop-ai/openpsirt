@@ -272,6 +272,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
 		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
 		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
+		// How many places a person recorded, which is what says an unrated
+		// group is waiting on a rating rather than off the clock.
+		ColumnExpr(`SUM(CASE WHEN f.kind = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN(COALESCE(f.matched, '')) AS "matched"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
 		ColumnExpr(`MIN(f.consumer_id) AS "consumer_id"`).
