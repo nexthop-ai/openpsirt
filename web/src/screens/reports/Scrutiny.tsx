@@ -82,6 +82,7 @@ export function Scrutiny() {
     // reading a period opens a list the number was never about.
     const began = stated(period) ? period.from : windowStart(days);
     if (began) asked.set("from", began);
+    // The record reads "to" as the last day in the period, as this sheet does.
     if (period.to) asked.set("to", period.to);
     if (product) asked.set("product", product);
     return `/audit?${asked.toString()}`;

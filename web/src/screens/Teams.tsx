@@ -12,20 +12,24 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Suggest } from "../ui/Suggest";
 import { matching, offeredAs, whoIs } from "../ui/whom";
+import { useWho } from "../app/session";
 import { Wide } from "../ui/Wide";
 
 // Teams: who work arrives for, as a queue rather than as a person.
 //
-// Teams existed in the API, on the assignments screen as a queue and on the
-// auto-assignment screen as a destination, and nowhere anybody could make one
-// — so a rule could only route to a team somebody had created with a request
-// by hand. That is the gap this closes.
+// A team is a queue on the assignments screen and a destination on the
+// auto-assignment screen, and this is where one is made and staffed.
 //
 // Belonging to a team grants nothing. It says where work arrives and never
 // what anybody may read, which is what lets one team carry mixed clearance —
 // and it is why this sits beside users and roles rather than inside it.
+//
+// Changing a team is an administrator's, and so is reading who is on one: the
+// server lists membership to nobody else. Anybody else is shown the names with
+// no controls, and no membership rather than an empty one.
 export function Teams() {
   const queries = useQueryClient();
+  const admin = !!useWho().data?.admin;
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [shown, setShown] = useState("");
@@ -79,7 +83,7 @@ export function Teams() {
       <div className="screen-head">
         <h2>Teams</h2>
         <p>Queues that work is assigned to</p>
-        <AddButton label="Add team" onClick={() => setAdding(true)} />
+        {admin && <AddButton label="Add team" onClick={() => setAdding(true)} />}
       </div>
 
       {retire.error != null && (
@@ -100,8 +104,8 @@ export function Teams() {
               <tr>
                 <th>Team</th>
                 <th>Members</th>
-                <th style={{ width: 230 }}>Add somebody</th>
-                <th />
+                {admin && <th style={{ width: 230 }}>Add somebody</th>}
+                {admin && <th />}
               </tr>
             </thead>
             <tbody>
@@ -117,7 +121,14 @@ export function Teams() {
                     )}
                   </td>
                   <td>
-                    {(team.members ?? []).length === 0 ? (
+                    {!admin ? (
+                      <span
+                        style={{ color: "var(--faint)" }}
+                        title="Membership is shown to an administrator"
+                      >
+                        —
+                      </span>
+                    ) : (team.members ?? []).length === 0 ? (
                       <span style={{ color: "var(--faint)" }}>
                         nobody — work routed here stays unassigned
                       </span>
@@ -141,28 +152,32 @@ export function Teams() {
                       </span>
                     )}
                   </td>
-                  <td>
-                    <Pick
-                      people={everybody.filter(
-                        (person) => !(team.members ?? []).includes(person.identity),
-                      )}
-                      unread={people.isError}
-                      busy={join.isPending}
-                      onPick={(identity) => join.mutate({ team: team.name ?? "", identity })}
-                    />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="linkish"
-                      style={{ color: "var(--muted)" }}
-                      title="Take it out of use. Work already routed here keeps naming it."
-                      disabled={retire.isPending}
-                      onClick={() => retire.mutate(team.name ?? "")}
-                    >
-                      Retire
-                    </button>
-                  </td>
+                  {admin && (
+                    <td>
+                      <Pick
+                        people={everybody.filter(
+                          (person) => !(team.members ?? []).includes(person.identity),
+                        )}
+                        unread={people.isError}
+                        busy={join.isPending}
+                        onPick={(identity) => join.mutate({ team: team.name ?? "", identity })}
+                      />
+                    </td>
+                  )}
+                  {admin && (
+                    <td>
+                      <button
+                        type="button"
+                        className="linkish"
+                        style={{ color: "var(--muted)" }}
+                        title="Take it out of use. Work already routed here keeps naming it."
+                        disabled={retire.isPending}
+                        onClick={() => retire.mutate(team.name ?? "")}
+                      >
+                        Retire
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

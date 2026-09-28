@@ -15,11 +15,26 @@
 // that reads unfamiliarly for both.
 
 // The shape a stored moment has: a calendar day, optionally followed by a time.
-// Checked rather than assumed, because this takes whatever a caller hands it
-// and sixteen files call it — a field that is not a moment at all would
-// otherwise be drawn as its own first ten characters, which reads like a date
-// and is not one.
+// Checked rather than assumed, because this takes whatever a caller hands it —
+// a field that is not a moment at all would otherwise be drawn as its own
+// first ten characters, which reads like a date and is not one.
 const STORED = /^\d{4}-\d{2}-\d{2}(?:[T ]|$)/;
+
+// read is a stored moment as a moment, or nothing where it is not one.
+//
+// The shape first, because a bare number parses as a year. Then the calendar
+// day it names, because a parser rolls a day past the end of its month into
+// the next month rather than refusing it, and a date drawn from that is a
+// different day from the one stored.
+function read(moment: string | null | undefined): Date | null {
+  if (!moment || !STORED.test(moment)) return null;
+  const then = new Date(moment);
+  if (Number.isNaN(then.getTime())) return null;
+  const [year, month, day] = moment.slice(0, 10).split("-").map(Number);
+  const named = new Date(Date.UTC(year ?? 0, (month ?? 0) - 1, day ?? 0));
+  if (named.toISOString().slice(0, 10) !== moment.slice(0, 10)) return null;
+  return then;
+}
 
 // on is the absolute form: the calendar day, as stored.
 //
@@ -28,11 +43,7 @@ const STORED = /^\d{4}-\d{2}-\d{2}(?:[T ]|$)/;
 // in its own words — and so is a value that is not a moment, which is the same
 // answer for the same reason.
 export function on(moment: string | null | undefined): string {
-  if (!moment || !STORED.test(moment)) {
-    return "";
-  }
-  const day = moment.slice(0, 10);
-  return Number.isNaN(new Date(day).getTime()) ? "" : day;
+  return read(moment) && moment ? moment.slice(0, 10) : "";
 }
 
 // at is the absolute form to the minute, in UTC and saying so.
@@ -42,11 +53,8 @@ export function on(moment: string | null | undefined): string {
 // end on different days. UTC for the reason the day is: people quote these to
 // each other across time zones.
 export function at(moment: string | null | undefined): string {
-  if (!moment || !STORED.test(moment)) {
-    return "";
-  }
-  const then = new Date(moment);
-  if (Number.isNaN(then.getTime())) {
+  const then = read(moment);
+  if (!then) {
     return "";
   }
   return `${then.toISOString().slice(0, 10)} ${then.toISOString().slice(11, 16)} UTC`;
@@ -60,11 +68,8 @@ export function at(moment: string | null | undefined): string {
 // them work it out. Paired with the absolute form on the title, so the exact
 // answer is one hover away and never lost.
 export function since(moment: string | null | undefined, now: Date = new Date()): string {
-  if (!moment) {
-    return "";
-  }
-  const then = new Date(moment);
-  if (Number.isNaN(then.getTime())) {
+  const then = read(moment);
+  if (!then) {
     return "";
   }
   const seconds = Math.round((now.getTime() - then.getTime()) / 1000);
@@ -89,12 +94,14 @@ export function since(moment: string | null | undefined, now: Date = new Date())
 // that took nine seconds and one that took fifty are different things and
 // "0 minutes" says neither.
 export function lasted(from: string | null | undefined, to: string | null | undefined): string {
-  if (!from || !to) {
+  const start = read(from);
+  const end = read(to);
+  if (!start || !end) {
     return "";
   }
-  const began = new Date(from).getTime();
-  const ended = new Date(to).getTime();
-  if (Number.isNaN(began) || Number.isNaN(ended) || ended < began) {
+  const began = start.getTime();
+  const ended = end.getTime();
+  if (ended < began) {
     return "";
   }
   const seconds = Math.round((ended - began) / 1000);
@@ -113,10 +120,8 @@ function ahead(seconds: number): string {
 
 // The units an interval is said in, largest that fits winning.
 //
-// One table. It was written twice, once per side of now, and a unit added to
-// one copy and not the other makes "3 days ago" and "in 3 days" answer
-// differently about the same interval — the failure the severity ladder has a
-// gate against, one table down.
+// One table for both sides of now, so "3 days ago" and "in 3 days" answer
+// alike about the same interval.
 const SCALE: [number, string][] = [
   [60, "minute"],
   [3600, "hour"],

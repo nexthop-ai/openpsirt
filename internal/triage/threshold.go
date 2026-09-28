@@ -38,6 +38,36 @@ func (s *Store) DeferredSoFar(ctx context.Context, decision Decision) (time.Dura
 	return totals[decision.ID], nil
 }
 
+// DeferredAt is the same total for several places of one issue in one
+// product, keyed by place, in one statement for all of them. A form deciding
+// about those places says whether a deferral would stand on its own, and that
+// is the total it is measured against.
+//
+// Counted over the deferrals the subject may read. A deferral sits at the
+// place it defers, so somebody deciding about a place reads every deferral
+// made there, and the total is the one the gate measures.
+func (s *Store) DeferredAt(ctx context.Context, subject access.Subject, productID,
+	vulnerabilityID int64, places []string) (map[string]time.Duration, error) {
+	decisions := make([]Decision, 0, len(places))
+	for i, place := range places {
+		decisions = append(decisions, Decision{
+			ID: int64(-1 - i), ProductID: productID, VulnerabilityID: vulnerabilityID,
+			PlaceIdentity: place,
+		})
+	}
+	totals, err := s.deferredSoFarAs(ctx, decisions, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return readableBy(q, subject, "de")
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]time.Duration, len(places))
+	for _, decision := range decisions {
+		out[decision.PlaceIdentity] = totals[decision.ID]
+	}
+	return out, nil
+}
+
 // deferredSoFar reads, in one statement for all of them, how long each of
 // these decisions' places has been put off for in total, keyed by the
 // decision asked about.
@@ -48,6 +78,12 @@ func (s *Store) DeferredSoFar(ctx context.Context, decision Decision) (time.Dura
 // products, and most decisions are not deferrals — where a lookup per row
 // was a statement per queue entry.
 func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[int64]time.Duration, error) {
+	return s.deferredSoFarAs(ctx, decisions, func(q *bun.SelectQuery) *bun.SelectQuery { return q })
+}
+
+// deferredSoFarAs is deferredSoFar over the deferrals a narrowing admits.
+func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
+	narrow func(*bun.SelectQuery) *bun.SelectQuery) (map[int64]time.Duration, error) {
 	totals := make(map[int64]time.Duration, len(decisions))
 	if len(decisions) == 0 {
 		return totals, nil
@@ -68,7 +104,7 @@ func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[in
 	}
 
 	var deferrals []Decision
-	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
+	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Claim")).
 		Where("de.product_id IN (?)", bun.List(productIDs)).
 		Where("de.vulnerability_id IN (?)", bun.List(issueIDs)).
 		Where("claim.outcome = ?", Deferred).

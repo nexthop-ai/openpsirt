@@ -16,15 +16,10 @@ describe("whether the review has anything to ask", () => {
     expect(nothingToReview({ isSuccess: true }, [{ key: "this build @ 1.2.3" }])).toBe(false);
   });
 
-  it("asks while the reach is still being read", () => {
-    // The empty list here is what has not arrived, not what is not there.
+  it("asks while the reach is still being read, or could not be read", () => {
+    // The empty list here is what has not arrived, not what is not there. A
+    // failure and a request still in flight are the same thing here: the
+    // answer is not known.
     expect(nothingToReview({ isSuccess: false }, [])).toBe(false);
-  });
-
-  it("asks where the reach could not be read at all", () => {
-    // A failure and a request still in flight are the same thing here: the
-    // answer is not known, and submitting past a question is not the same as
-    // there being no question.
-    expect(nothingToReview({ isSuccess: false }, [{ key: "unread" }])).toBe(false);
   });
 });

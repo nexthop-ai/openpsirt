@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { initials } from "../ui/initials";
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useTopOnArrival } from "./arrival";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
@@ -78,13 +79,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // The panel is about the screen somebody is leaving, so arriving on another
   // one shuts it.
   useReseed(pathname, () => setMenu(false));
-  useEffect(() => {
-    // A new screen starts at its own top. Picking an entry from the foot of
-    // the rail otherwise leaves the document where it was, so the screen that
-    // arrives is already scrolled past its heading and its controls — which
-    // reads as the wrong screen rather than as a scroll position.
-    window.scrollTo({ top: 0 });
-  }, [pathname]);
+  useTopOnArrival();
   useEffect(() => {
     if (!menu) return;
     function key(event: KeyboardEvent) {

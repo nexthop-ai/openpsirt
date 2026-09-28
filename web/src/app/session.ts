@@ -1,10 +1,11 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap, Refused } from "../api/queries";
 import { forgetAll, forgetSession } from "./drafts";
+import { sessionEnded } from "./ended";
 import { rememberForward, signedOutHere } from "../screens/SignIn";
 
 export type Can = {
@@ -65,7 +66,13 @@ export type Who = {
 // the ordinary state of a fresh browser. It resolves to null rather than
 // throwing so the shell can send somebody to sign in instead of showing them
 // an error about their own not being signed in.
+//
+// Where somebody was already signed in, a 401 is their session ending under
+// them rather than a fresh browser: the identity they had is kept, and the
+// ended session is raised, so the way back in is offered over the screen they
+// were on rather than a sign-in page replacing it.
 export function useWho() {
+  const client = useQueryClient();
   return useQuery<Who | null>({
     queryKey: ["whoami"],
     retry: false,
@@ -74,7 +81,14 @@ export function useWho() {
       try {
         return unwrap(await api.GET("/v1/session/me", {})) as Who;
       } catch (error) {
-        if (error instanceof Refused && error.status === 401) return null;
+        if (error instanceof Refused && error.status === 401) {
+          const held = client.getQueryData<Who | null>(["whoami"]);
+          if (held) {
+            sessionEnded();
+            return held;
+          }
+          return null;
+        }
         throw error;
       }
     },

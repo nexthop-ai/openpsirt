@@ -184,6 +184,7 @@ take the word.
 | Rule | |
 |---|---|
 | A problem is never drawn in the done color | Green reads as good news, which is the one reading a failure must not get. A web test fails on a chip drawn as done whose words say something is wrong |
+| A claim is drawn in the color of what it does | Warm where it hides risk, which is every outcome but affected, and green where it does not. An outcome with no color of its own draws as the neutral base, the color of a claim that hides nothing; a web test fails on an outcome the client names that the stylesheet does not color |
 
 ## The shell
 
@@ -267,6 +268,7 @@ screen answering the question just asked of it.
 | Changing scope keeps you where you are | A build-scoped screen swaps its build and stays the same screen |
 | A screen that names a build in its address is the authority for it | Everything else remembers the last one. That memory belongs to the tab rather than the browser: it is where somebody is working right now, not a preference, and a second tab looking at another product must not drag the first one with it |
 | **A screen whose address names the product has that address rewritten** | The same rule, one level up: the path is the authority, so remembering a different product and staying put lets the path put the old one back. The bar snapped to the product in the address and nothing said why. Choosing every product from one of these is the catalog |
+| **Every address under a product names that product** | The bar and the rail read the product from any address below `/products/:product`, including one no rule lists by shape, so an inbox opened from a link in a fresh tab is that product's inbox in the bar too. An address that names only the product, such as a component or an inbox, keeps the branch and variant already picked for that product, so opening a component from a branch's list leaves the rail's links on that branch. A test walks every route the router declares under a product and holds both this and the rewrite above to it |
 | **What sat below the product in the address is dropped where it belonged to it** | A branch is one product's and so is a component, so neither carries across. The address falls back to the new product's branch list, or to the product |
 | What comes back out of the tab's memory is checked, not cast | The value becomes a path segment and a query parameter. An entry an older build wrote, or one edited by hand, otherwise reaches the server as `[object Object]` |
 | What the tab remembers goes with the session | Signing out takes it away, which the drafts section states in full: the next person in that tab was shown the previous person's product |
@@ -307,9 +309,10 @@ beside it already get.
 | **In progress** | How much each person and team holds, with the reader's own row first. The panel is about the shape of the work rather than about one person, and it stays that way — but reading your own row off a list of colleagues, where it may fall below the three this shows, is why somebody who works here went elsewhere to find out |
 
 Every figure opens the list it counts, narrowed the way the figure was counted —
-the aging buckets, the fixed and appeared counts, both deadline tiles. A number
-nobody can act on from where they read it sends somebody to build the same
-question by hand, and the question they build is not always the same one.
+the aging buckets and both deadline tiles. A number nobody can act on from where
+they read it sends somebody to build the same question by hand, and the question
+they build is not always the same one. A figure counting anything closed opens
+nothing, because the findings list holds what is open (`DESIGN-reporting.md`).
 
 ## The findings list
 
@@ -470,6 +473,8 @@ list exists to prevent.
 | Severity stays a floor | Nobody wants to see low and high without medium |
 | Drawn as checkboxes behind a control that says what is ticked | A closed control reading "Any" over three ticked boxes is how a narrowed list comes to look unnarrowed. The chips above name each separately, so removing one leaves the rest |
 | Carried in the address as the parameter repeated | A server reading only the first word narrows to less than was asked for, which looks like an answer rather than a mistake. Marked exploded on both sides, with a test at the HTTP layer that asks for two states and counts the rows |
+| A word the server does not take is left off the request | A stale or mistyped word in a saved link otherwise refuses the whole list. The words each parameter takes are checked against the generated client in both directions, and the chip above the list still names the word left off |
+| A comma ends a word in a typed filter, wherever it falls | A pasted list is several words, not one word holding commas that matches nothing |
 
 The decision state is above the list, beside the severity floor, in the place
 the exploited and fix-available chips would take. Neither earns it: the list is
@@ -519,6 +524,8 @@ back in its own order rather than refusing.
 | **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them. Every change goes through the one function that holds the rule, including removing a single chip: today every chip only ever widens, so the rule held by a property of the chips rather than by construction |
 | **A figure about a selection counts what the selection holds** | The bulk-claim screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the ceiling is read against. The line under the list names whichever of the two limits the selection is past: issues, or findings written |
 | **The bulk-claim form asks before skipping what is decided** | A box, unticked, reading "Skip places already decided". Ticked, the result lists each place left out with a link to the decision standing there (`DESIGN-triage.md` § Decided places). Unticked, a decided place refuses the claim and the refusal names the decision |
+| **Approving a selection leaves ticked what was refused and what was ticked meanwhile** | The approvals run one at a time, and the selection can change while they do. What was acted on and agreed to goes; what was refused stays unless it was unticked while the loop ran; what was ticked while it ran stays |
+| **A list switched or narrowed starts at its own beginning** | A page into one list is past the end of a shorter one. Where an address still lands past the end, the pager is drawn rather than a statement that the list is empty |
 | **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
 | **Assigning a selection in one product is one request** | The picked rows travel together, and the server resolves them against the same filter the list is read with. A refusal is the whole act's, so nothing is left half assigned and the selection stays as it was. Rows a colleague holds and the caller may not take stay selected, with a count saying how many Across products each row is still its own request, under the loop below (`DESIGN-access.md` § Assignment by narrowing) |
 | **Select all takes every row the filter matches** | Offered on the batch bar in one product once something is ticked, and counted by the list's total rather than the pages seen. It names no rows: the server assigns what the filter matches when the act lands. A changed filter ends it, as it clears a selection |
@@ -793,6 +800,11 @@ owns that rule.
 | A claim's scope names its locations rather than only counting them | "One location" says how large a judgment was and not which code it was about. Three at most, then how many more, because a kernel sits at sixty and the list would become the card |
 | An approved claim at the same component and consumer is offered to a new issue (REQ-28) | With its reasoning and "apply decision #N", which fills the form and records the new claim as an extension. It still needs a second person |
 | A comment can be rewritten by whoever wrote it, in place | The control is offered only to the author so nobody is invited into a refusal the server would give them anyway. The box opens on the text as stored rather than as a draft: a copy of something already stored would come back later as an unsent draft of somebody's own comment |
+| What belongs to one finding goes when the screen walks to the next | The screen is not remounted when only its address changes, so the confirmation of what was recorded, the decision being extended, the rating form and the exploited-here forms are put back on arriving at another finding |
+| The rating form opens on a rating it offers | The four bands. A published "negligible" or "none" opens it on medium, and nothing it offers is milder than either |
+| The references are cut at twelve, and say how many more there are | Patches first, then advisories and reports; the rest are a control away rather than silently gone |
+| A description shortened to fit says it was shortened | Cut at a whole character with a mark after it. Stopped mid-sentence with nothing after it, it reads as the whole |
+| Starting an advisory mints one name and names the flaw on it once | The name is kept the moment it exists and the flaw once it is added, so a later step failing is retried from where it stopped rather than spending another number in the year's sequence |
 | A recorded flaw is closed from its own finding screen, and only a recorded one shows the control | Everything a scanner found is resolved by the next scan, and offering a button that overrules that would offer the thing the rule exists to prevent. The panel says outright that nothing else can close it and that nothing reopens it, because both are surprising and the second is irreversible |
 
 ## The decision form
@@ -811,6 +823,9 @@ collects the answer it suggested.
 | Rule | |
 |---|---|
 | The deferral threshold is a number on the form, not a sentence about a threshold | Which side of it a date falls on decides whether a second person has to agree, and reading that off the response is reading it after the choice was made |
+| A deferral is forecast against what its places were put off for already | The server adds a deferral to everything the place was put off for before, so the finding carries each place's total and the form adds the largest of those it covers. Both halves are measured to the moment, in days and parts of a day, because the server compares durations: a date thirty days out, picked after midnight, is short of a thirty-day threshold. A total reaching the threshold exactly waits for a second person, as it does on the server |
+| A promise to act by a date is forecast against the earliest deadline it covers | By that deadline it stands on its own, and later it waits for a second person. It is not called a dismissal |
+| Ctrl+Enter asks what the button asks | Nothing is sent while a submission is in flight or the review sheet is open, so a second press does not post the decision twice |
 | It names the next missing answer, beside the button | A disabled button says something is missing and never what, and Ctrl+Enter does nothing until the same answer is given. One rule decides both the sentence and the refusal |
 | Ctrl+Enter submits, and the form says so | A shortcut nobody knows about is a shortcut nobody has, and the person it is for is making a hundred of these a day |
 | The last pair is offered, never applied | Retyping the outcome and the justification is the cost the review measured, but a judgment prefilled with the last one made is a record that can say what nobody meant. So it is a button that says what it will fill in, and the fill is somebody's own click. Per session, because a default that survives a night is a default nobody chose |
@@ -850,6 +865,7 @@ written, and only then is anything sent.
 | The reach is answered whole rather than sampled | Where a judgment lands beyond this build is a question per place, and asking per place is a request each — so it asked about the first eight. That was a cost control that had become a rule about what a decision covers: what is offered is what gets written, so a build reachable only from the ninth place was never offered and nothing said so |
 | The review step is skipped where there is nothing to review | It ran even when the reach it exists to confirm is zero, and at around 150 decisions a day that is some 300 keystrokes spent confirming nothing |
 | What counts as nothing is one thing: no build holds this issue at another version | Builds already matching are named on the sheet rather than asked about, so their absence from a skipped sheet costs nothing — the confirmation that follows names them |
+| This build is counted in consumers, and what is written in places | Consumers are what the scope control beside the form narrows by, so the sheet states what it covers in them; how many records are written is a count of places. A build at another version is counted in places, because its consumers are not read |
 | An unread reach is not an empty one | A query still in flight, or one that failed, contributes no other versions, and treating that silence as "there are none" would submit past a question rather than skip one that was not there. The sheet is skipped only when every one of those reads succeeded |
 
 ## List navigation
@@ -924,6 +940,7 @@ several places is one answer with one count.
 |---|---|
 | Issues, not finding rows | A library reachable under three parents is one issue. Counted as rows it reads three times its number, and the order follows the count |
 | Counted in one pass over the build, grouped by component | Counted per matched component, SQLite reads the build's open findings once for each, and a term matching many names takes most of a minute |
+| Search hits marked in the list | The search answers with components and carries no chain to the root, so there is no position to open the tree at. The list stays while the term does, and the component's own screen is the control beside each hit |
 
 Measured on the demo's switch image, 6,867 components and 297,881 open
 findings, before and after counting in one pass:
@@ -951,7 +968,8 @@ adds:
 | | |
 |---|---|
 | **Approving and rejecting** | Work on the claim, and rejecting needs a reason. Selecting several and naming a batch approves them together, so they can be undone together |
-| **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M". An extension says which claim it rests on |
+| **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M", both counted in issues. An extension says which claim it rests on |
+| **An outlier is one issue, set aside or held back at every place it sits** | One row stands for the issue, and ticking it takes every decision the claim holds about the issue, one per place. A part of the issue left in the claim is agreed to with it. The author holding rows back and the approver setting them aside take the same set |
 | **A To reaffirm tab lists the reader's own lapsed claims** | Work handed back, which the lapse message links to. One row per claim with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many places and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every claim shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like the other two |
 | **Lapsed decisions and deferrals that ran out sit underneath** | Everybody's, where the To reaffirm tab is the reader's own. The row carries the decision and not the build it was made in, so a single place is reaffirmed on the finding, where its locations are, and a whole claim from the tab or the claim's page. One list, because a deferral that ran out on code that then moved is both — asked as two, the section merged them by hand and the count over it added the two totals |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
@@ -967,7 +985,8 @@ age of seven, thirty or ninety days, a severity, an outcome and a release
 somebody sends is the same list, and changing one clears the selection. The
 exports carry the same filters, so a file taken from a narrowed screen is the
 narrowed backlog. The filters sit on the queue proper and not on the two tabs
-about the reader's own claims.
+about the reader's own claims. The To reaffirm tab has no file of its own, so it
+offers none rather than the queue under its heading.
 
 The count beside the queue on the rail, and the home screen's figure for what is
 pending your approval, add the rulings on vulnerability reports the reader may
@@ -1114,7 +1133,7 @@ something is going.
 
 | Rule | |
 |---|---|
-| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves |
+| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves. The claims waiting on a second person open the review queue narrowed to the product |
 | Counted as issues at components | The unit the findings list counts, so the page and the list it opens agree. Counting rows would report how much the dependency graph shares |
 | The product's totals are not the sum of its builds | A library carrying one issue in two builds is one thing to decide about and two build rows. The totals are counted again over the product — a sum put 15,231 at the top of a page whose own list said 7,629 |
 | "Undecided" and "agreed" are the findings list's own words | By the same definition and from the same expression. Two screens with two definitions of "decided" is how they come to disagree in front of somebody |
@@ -1323,6 +1342,7 @@ the part of a decision that matters most.
 | **Signing out also clears what the tab remembers** | The scope somebody picked and the last judgment they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
 | **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
+| A revision opens on its draft where one was left | The editor restores only into an empty field, so a revision opening on the standing text would write that over the draft |
 | It is restored into the form it was typed in, and is not a default | The rule that the decision form opens on nothing chosen is about what somebody has *not* answered. This is their own answer to this exact finding, keyed on every part of it, and an explicit "start from this" beats it |
 
 ### Restored position
@@ -1337,6 +1357,8 @@ application never makes one.
 | Restored after the rows are drawn | Scrolling a page that is a few hundred pixels tall clamps to the bottom, so the restore lands somewhere arbitrary and reads as a fault in the list |
 | Written as somebody scrolls, not as they leave | A route change unmounts the screen, and an unmount is too late to read a position the browser has already moved |
 | A handful of pages, and anything that is not a position is the top | The store is the browser's and a person may edit it, and the value goes straight into a scroll call. An unbounded map in storage grows for as long as the tab is open |
+| The handful kept are the ones marked last | Each place carries when it was marked, and the oldest go. The order a browser lists its storage in is not the order things were written, so trimming by it can drop the list somebody just came from, every time |
+| Back and Forward do not scroll the frame to the top | Every other arrival starts at the top of the screen. On Back the list owns where it opens, and a scroll to the top before its rows arrive is recorded as where somebody was |
 | Cleared with everything else the session holds | The next person on this browser does not land in the middle of somebody else's page |
 
 ### Answer placement
@@ -1389,6 +1411,7 @@ the address.
 |---|---|
 | The inner boundary is inside the frame | A screen that throws leaves the rail, the scope bar and the way to another screen where they are. Without one, React unmounts the whole tree and what is left is a blank page with nothing to press |
 | It is keyed on the address | Walking away from a screen that threw clears it, rather than carrying one screen's failure to every other |
+| Try again loads a screen whose code failed to arrive | A screen's code is loaded when it is first drawn, and a failed load is otherwise held until the page is reloaded. Loaded again when Try again is pressed and not before, so code that cannot arrive is not asked for without end |
 | It logs as well as drawing | A boundary that only draws swallows the stack that was going to the console, which takes away what a developer needs and leaves a sentence a reader cannot act on |
 | A number from the address is checked where it is read | `Number("lastweek")` is not a wrong figure — it is a date arithmetic that throws on the render path and takes the sheet down. The window a report is asked for is a whole number of days inside the range the sheets offer, or the sheet's own default |
 | A cookie is decoded where it can be and passed on where it cannot | The decode runs in the middleware every write goes through, so one malformed cookie set by anything on this host failed every write in the application |
@@ -1404,6 +1427,7 @@ row they had open are not a draft.
 | Rule | |
 |---|---|
 | It is noticed once, where the client is built | Recognizing it at each call site is how the one that forgets shows "not authorized" against a button somebody just pressed |
+| The identity read keeps the identity it held | A refetch refused for want of a session raises the way back in over the screen and keeps who was signed in, and a refetch that fails keeps the screen. Only a first read answers "nobody is signed in" or draws the failure in place of the frame |
 | A sign-in carries the address it began at, query as well as path | A findings list *is* its filters, and coming back to the same path with none of them is coming back to a different screen |
 | Re-authenticating without leaving the page is not what this does | The requirement allows for that: where a redirect is unavoidable, the draft is saved first and the person returns to what they were writing. It is unavoidable here — a provider sign-in is a redirect to somebody else's host, which cannot be framed and increasingly cannot be done silently in a hidden frame either |
 | Where the address is checked is the server, not here | A sign-in that sends a browser wherever a parameter says makes this deployment's own domain vouch for somebody else's page; see `DESIGN-access.md` |
@@ -1434,6 +1458,7 @@ to; on an undisclosed finding the mention itself says a finding exists.
 |---|---|
 | Asking who may be mentioned on an undisclosed finding is itself a question about undisclosed findings | Somebody who cannot read them is answered as though the product were not there. Without that, the endpoint is a way to enumerate who holds private access, which is a more useful thing to steal than the list it is attached to |
 | What is being typed after an `@` is read from the text before the cursor | Rather than tracked as state, so it stays right however somebody edits |
+| What is typed is sent, and the server narrows | The server holds the whole list and matches display names as well as identities. A page of the first few people filtered here leaves out whoever is past it |
 | The pickers that say who is dealing with a finding ask the same endpoint (REQ-34) | They asked for the list of people, which is administration, so for every triager in the deployment both selects were empty. Asking who may *read* it rather than who *exists* also narrows the offer to people who can open what they are handed |
 | A box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A claim is asked at the visibility of its most careful row |
 | The one box that offers nothing is the bulk form, and it is the one that cannot ask | Deciding many findings at once carries no visibility on the wire, so the question has no answer to send. Asking as though the set were public would offer people who cannot open half of it |
@@ -1464,6 +1489,7 @@ chosen (REQ-64).
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
 | It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. Returning without navigating anywhere leaves the box looking live and swallowing what was typed |
 | A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
+| The findings list's box holds the term the list applies | Whatever takes the term out of the address — its chip, clearing the filters, a saved filter, Back — empties the box as well, or Enter there puts back a search the reader thought was gone |
 
 ## A person's own page
 
@@ -1507,7 +1533,8 @@ Leaving is recorded here, at the foot, and says what it does before it is done:
 refused at every way in, sessions ended, work handed back, nothing deleted and
 no role withdrawn. Once it is recorded the screen says so at the top rather than
 at the foot — every other number on it reads differently once somebody has gone
-— and offers bringing them back.
+— and offers bringing them back. Both acts are an administrator's; an auditor
+reading the screen sees both disabled, with the reason on hover.
 
 ## A release, gathered
 
@@ -1619,6 +1646,8 @@ the three left the credentials on a screen that did not mention them.
 | A person's name and their address are recorded here | Both are on the record and neither could be typed: the whole mail path could never reach anybody created through the interface, and what the person was told when they went looking was that an administrator has to record one |
 | An address stated empty clears it; an address left out is left alone | Coming off mail is not coming off the tool, and a screen that cannot tell the two apart makes one of them unreachable |
 | A control an auditor may not use is disabled and says why | Hidden, it teaches nobody that it exists; live, it is a button that can only reach a refusal. Only a signed-in administrator mints or withdraws a credential — a credential cannot create another |
+| A role chip carries its withdraw mark for an administrator only, and only where roles are assigned here | The row's Manage control is disabled for everybody else with the reason on hover, so the mark on every chip would be a second way to say the same refusal |
+| The teams screen offers its controls to an administrator only | Membership is listed to nobody else. A non-administrator reaching it by address sees the team names, no control, and a dash where the members would be rather than a team with nobody on it |
 | The credentials panel is drawn for an administrator only | Both of its reads are administrator-only, and its one empty state says nothing is issued — so an auditor, whom the rail admits here, was told a deployment holding keys had none. The same shape the webhooks panel is gated for |
 | The branch and the variant on a key are offered from what the product holds | A key names a build that exists: both are resolved through the catalog and refused unless declared. Offered rather than restricting, because the server is what refuses and a name declared between the two requests is not one this should decline. Choosing a product clears them, since a branch belongs to one |
 | The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |
@@ -1672,6 +1701,10 @@ question.
 |---|---|
 | **Absolute** | The calendar day as stored, deliberately not localized. These are dates people quote to each other across time zones, and one that reads differently for two people looking at the same row is worse than one that reads unfamiliarly for both |
 | **Relative** | For the reader asking whether something is stale. It reads the same scale in both directions, because a deadline and a last scan are the same question about opposite sides of now, and it carries the absolute form on the title |
+
+A value that is not a stored moment is drawn as nothing in both forms: the shape
+is checked, because a bare number parses as a year, and the calendar day is
+checked, because a parser rolls a day past the end of its month into the next.
 
 Waiting looks the same everywhere, and says so. The sentence was typed out
 thirty-nine times in four spellings, and none of them announced anything — which

@@ -213,7 +213,7 @@ Ceilings vary by list. Which list allows what is a judgment about each list.
 | Rule | |
 |---|---|
 | A capped listing carries the whole-answer count | A caller cannot tell a clipped page from a complete answer otherwise, and a reader recounting its own page states a figure about the page under a heading about the whole. Without the count a tile says 200 over a list of 462 |
-| A figure counted over the whole answer is returned beside the rows, not recomputed from them | Coverage reports how many builds there are, how many have gone quiet, how many have never been scanned and how many are out of support, each counted before the page is cut |
+| A figure counted over the whole answer is returned beside the rows, not recomputed from them | Coverage reports how many builds there are, how many have gone quiet, how many have never been scanned, how many are out of support, how many are taken out of use and how many are being scanned, each counted before the page is cut |
 | A bound declared for a listing bounds the whole listing | Applied to the people alone, it appends every team there is after them |
 | What a request asked for and could not be acted on comes back | A note naming more people than one act may tell reaches some of them, and the rest go unmentioned in the response and anywhere else |
 

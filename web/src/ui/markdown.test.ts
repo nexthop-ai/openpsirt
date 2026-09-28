@@ -116,9 +116,17 @@ describe("the renderer", () => {
     // deployment: a browser resolves it against the page's protocol and
     // fetches it from another origin. Matched by pattern it reads as a path;
     // resolved, it lands where it really goes.
+    // Asserted on where the address resolves, not on how it is spelled: a
+    // backslash is percent-encoded on the way into the markup, so no spelling
+    // of it begins with two slashes whatever happens to it.
     for (const link of ["//evil.example/x", "\\\\evil.example\\x"]) {
-      for (const tag of tagsIn(render(`[x](${link})`))) {
-        expect(tag, `${link} survived as ${tag}`).not.toContain('href="//');
+      const host = document.createElement("div");
+      host.innerHTML = render(`[x](${link})`);
+      for (const anchor of Array.from(host.querySelectorAll("a[href]"))) {
+        const href = anchor.getAttribute("href") ?? "";
+        expect(new URL(href, window.location.href).origin, `${link} became ${href}`).toBe(
+          window.location.origin,
+        );
       }
     }
   });

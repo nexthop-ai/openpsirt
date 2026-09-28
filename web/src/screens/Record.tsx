@@ -516,7 +516,7 @@ export function Record() {
                 }))}
                 chosen={streams}
                 disabled={product === ""}
-                empty={product === "" ? "Pick a product first" : "Nothing is declared here yet"}
+                empty={unpicked(product, lines)}
                 onChange={(next) => {
                   setStreams(next);
                   setComponent("");
@@ -532,7 +532,7 @@ export function Record() {
                 }))}
                 chosen={variants}
                 disabled={product === ""}
-                empty={product === "" ? "Pick a product first" : "Nothing is declared here yet"}
+                empty={unpicked(product, builtAs)}
                 onChange={(next) => {
                   setVariants(next);
                   setComponent("");
@@ -737,6 +737,16 @@ export function Record() {
       </div>
     </>
   );
+}
+
+// What a list of builds to pick from says when it has nothing to offer.
+// A read that failed or has not answered is not a product with nothing
+// declared under it.
+export function unpicked(product: string, read: { isPending: boolean; isError: boolean }): string {
+  if (product === "") return "Pick a product first";
+  if (read.isError) return "Could not be read";
+  if (read.isPending) return "Reading…";
+  return "Nothing is declared here yet";
 }
 
 // A set of things, chosen by ticking. Not a multiple-select box: those are

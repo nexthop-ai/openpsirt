@@ -103,6 +103,8 @@ one report to another carries the same two parameters.
 | A period is two dates; a rolling window is a number of days | A window ending today cannot say "last financial year", which is the number an auditor asks for, and dates alone make "how are we doing lately" a date somebody has to work out |
 | Only one of the two may be sent, and sending both is refused | A caller who sent both meant one of them, and answering about the other is a figure quoted for the wrong period — the failure a period control exists to fix |
 | The end is the day it stops, not a day inside it | The same rule the record of judgments already used, so the two cannot come to mean different things |
+| A screen's "To" is the last day in the period, and what it sends the server is the day after | A person picking March 31 for the end of a quarter means March 31 is in it. The report sheets and the record of judgments read "To" the same way, so a link between them carries the day the person picked, and each screen translates once where it reads the period from the address. Its files, its sections and its heading follow the same period |
+| A day that is not on the calendar is not a period's end | A parser rolls February 30 into March, and the day after that is a different period under a heading that names February |
 | A period that ends before it starts is refused, and so is one that holds no days | A report answering zero for either is indistinguishable from a quarter in which nothing happened. Two refusals, because the end is not itself in the period: naming one day twice asks for no days rather than for a day |
 | Every report says back the period it covered, with the end resolved | A figure read apart from its window is a number nobody can check, and a start with no end answered with nothing over figures that ran to now. An unstated *start* is the beginning and says so by being absent |
 | A default window belongs to the report, and each says which in its own words | They differ — thirty days, ninety, or the whole of it — and one shared parameter cannot carry three answers |
@@ -250,6 +252,7 @@ of a build pipeline.
 | A row carries the version, because the group does | A group is keyed on the issue and the fold, and a fold is the source package at the version it was built at. Named by component alone, one issue at three versions of one component drew as three identical rows differing in a count that is not on the row |
 | Anything agreed to is absent from that list | Agreeing is the decision to ship with it, which is the opposite of a blocker. What is left is undecided, waiting on a second person, or standing on a judgment that lapsed |
 | It is read through the findings list's own reader, with the same line | So the list it opens is the list it counts |
+| The link under the count opens the list without its own defaults | The list keeps planned work, tags and releases past end of life out unless asked, and the count takes none of those out. Opened with them it shows fewer rows than the number it sits under, and none at all on a branch past end of life |
 
 Counted as issues at components, at or above the deployment's line, with the line
 named beside the number (REQ-30).
@@ -301,6 +304,13 @@ The aging buckets are cut two ways. One number per bucket says a hundred
 things are over three months old, and neither whether any of them matters nor
 whether anybody has looked. So each bucket carries the same count by severity,
 and how many carry no standing judgment.
+
+Each bucket names where it starts and where it ends, in days, and the last has
+no end. A link from a bucket asks the findings list for the same stretch —
+open at least its start and under its end — because a start alone asks for
+every older bucket as well. It lifts the list's own defaults too: a bucket
+counts tags, releases past end of life, planned work and what sits below the
+line, and a list keeping those out shows fewer rows than the bucket names.
 
 The aging figures match on the live key rather than on both versions, unlike the deadline
 list: the aging query does not join the components those versions sit on, and for
@@ -415,9 +425,15 @@ deadlines are recomputed when the policy moves and removed below the floor and
 past end-of-life, so a deadline "as of" a date is not recoverable.
 
 Findings and decisions filter on when things happened instead: opened after,
-closed after, proposed after. Asking for what closed after a date is the one
-filter that changes what the list is *about* rather than narrowing it, and the
-caller states so by asking for it.
+opened before, closed after, proposed after, and an age in days from either
+side — open at least so long, and open under so long. An age and a date bounding
+the same side keep the tighter of the two.
+
+Closed after is accepted and reaches nothing on the findings lists: they read
+open rows only, so a group closed in the window is never in them. A figure
+counting what closed therefore opens nothing, and the filter panel does not
+offer it. An address that carries it still shows it among the filters in force,
+where it can be taken off.
 
 ## Known issues at release
 
@@ -552,8 +568,13 @@ holds the files that are reachable nowhere else.
 | A sheet that takes a period offers both ways of asking, and naming dates drops the rolling window | The two cannot travel together, so a control that let them would send a request the server refuses. What the sheet covers is written in its header either way, and every link out of it carries the same stretch |
 | A report that is a list exports as CSV and JSON; a report that is figures prints | There is no stream behind an aggregate. Inventing one publishes a file nothing here computed |
 | Every figure opens the list it counts, and that list exports | The traceable form of a number, and what somebody asking for "the numbers as a file" actually wants: a row nobody can trace back to a finding is a number in a spreadsheet |
+| A figure counting anything closed opens nothing | The findings lists hold what is open. "Fixed" counts what closed, and "Appeared" counts what opened in the window whether or not it has closed since, so a link under either opens a list of something else |
+| A link adds its filter to the list's address as a parameter of its own | The address for a partial scope already carries a query, and a second `?` joined onto it becomes part of the branch's name |
+| A section counted by product alone says so | The triage times, the repeated deferrals and the dismissals are read for a product and never for a branch or a variant, so the heading's scope is not theirs. Each names the product, every branch and variant, or every product where none is picked |
 | A link out of a report carries the period and the product the figure was computed with | The record reads its narrowing from the address rather than from the picker, so an entry that dropped the selection opened every product the reader can see from a page scoped to one — a different population under the same name, which is worse than no link |
 | No PDF is generated | Printing is the browser's, and the stylesheet is the record's. Server-side rendering is deferred |
+| A printed record is drawn in the light look | Paper is white whatever the screen was, and the dark look's text on a white page is pale gray on white. The dark look applies to the screen alone |
+| The frame does not print | The rail, the tab bar, the floating action and the menu go, and the grid that places them is flattened, so a page carries no empty column where the rail was. The narrow-screen shape applies to a screen and not to a sheet of paper narrower than it |
 | What is about to go out of support is asked for, and comes back as its own list | The day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, with nobody having decided anything. A warning and an exposure are two things: one is a date somebody can still act before. Asked for, because a second population appearing unasked changes what every figure on the report counts |
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
 | An entry may point at a screen rather than owning a page | Eight do: release readiness, upgrade plan status, carried patches, holder workload, embargo and disclosure, the exception report, release comparison, and administrative changes. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
@@ -569,7 +590,7 @@ disposition register have sections above.
 | Page | What it answers |
 |---|---|
 | Program overview | What is being fixed against what is appearing, what is aging and whether anybody has looked at it, how long a claim waits to be decided and then agreed to, what keeps being put off, and what has been argued away. Its window is seven, thirty or ninety days or a period between two dates, and the printed header names which |
-| Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. The front page names the three quietest and the inventories screen answers for one product; this answers for the estate |
+| Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support or taken out of use is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. Each build is in one of five states: out of support, out of use, never scanned, quiet, or scanned. "Being scanned" counts the last of those among the builds in support and in use, on this page and on the front page alike. Gone quiet also counts a build never scanned that has been declared longer than the quiet span, and its tile says so. The front page names the three quietest and the inventories screen answers for one product; this answers for the estate |
 | Releases out of support | The releases whose date has passed, and — asked for — the ones about to, how long ago or how long there is left, and how many issues are still open against each, ordered by what is open. Past end-of-life the deadline is removed from every open finding, so none of that pile is overdue, none is due soon, and none of it reaches a figure built on either. That is correct — no work will land there — and it is what makes asking the only way to see it. A date inherited from the product says so: a release following a date and one that stated the same date are different, and only the first moves when the product changes its mind |
 | Backlog over time | Whether the backlog is growing, and what kind of thing is making it grow: what arrived, what was answered and what stood open at the end of each step, each split by severity. Only the open count was split, and ten arriving against ten answered is a team keeping pace where both are low and a team losing ground where what arrives is critical and what leaves is not — which a line of totals draws as flat. A resolved issue is counted at the severity it held while it was open, because the step it left in no longer has one |
 | Rubber-stamp | How much a second pair of eyes actually did. Its sections are below |

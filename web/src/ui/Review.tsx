@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
+import { cut } from "./cut";
 
 // A decision's reach beyond this build, as a guided review.
 //
@@ -45,8 +46,13 @@ export type Other = {
 
 export type Plan = {
   build: string;
+  // Places, which is what is written: one record each.
   covered: number;
   total: number;
+  // The same two in consumers, which is what is said: the control narrowing a
+  // judgment works by consumer.
+  consumers: number;
+  consumersTotal: number;
   matching: string[];
   offered: Other[];
   reasoning: string;
@@ -160,9 +166,17 @@ export function Review({
               reader cannot reconcile with the control below it. */}
           <p>
             <b>
-              {plan.covered} of {plan.total} {plan.total === 1 ? "consumer" : "consumers"}
+              {plan.consumers} of {plan.consumersTotal}{" "}
+              {plan.consumersTotal === 1 ? "consumer" : "consumers"}
             </b>
-            {plan.covered < plan.total && <> — {plan.total - plan.covered} left open by you</>}.
+            {plan.covered < plan.total && (
+              <>
+                {" "}
+                — {plan.total - plan.covered} {plan.total - plan.covered === 1 ? "place" : "places"}{" "}
+                left open by you
+              </>
+            )}
+            .
           </p>
         </div>
         <div className="revcard auto">
@@ -212,7 +226,7 @@ export function Review({
                         <span className="id">{o.version || "unstated"}</span>{" "}
                         <span className="hint">
                           {o.build === "this build" ? "also in this build" : `in ${o.build}`} ·{" "}
-                          {o.places} {o.places === 1 ? "consumer" : "consumers"}
+                          {o.places} {o.places === 1 ? "place" : "places"}
                         </span>
                       </span>
                     </label>
@@ -225,8 +239,7 @@ export function Review({
               <p className="hint" style={{ margin: "6px 0 0" }}>
                 What you wrote:{" "}
                 {plan.reasoning.trim()
-                  ? plan.reasoning.trim().split("\n")[0]?.slice(0, 160) +
-                    (plan.reasoning.length > 160 ? "…" : "")
+                  ? cut(plan.reasoning.trim().split("\n")[0] ?? "", 160)
                   : "(no reasoning written yet)"}
               </p>
             </>
@@ -256,7 +269,8 @@ export function Review({
           <h5>Summary</h5>
           <ul className="revlist">
             <li>
-              <b>{plan.covered}</b> {plan.covered === 1 ? "consumer" : "consumers"} in this build
+              <b>{plan.consumers}</b> {plan.consumers === 1 ? "consumer" : "consumers"} in this
+              build
             </li>
             <li>
               <b>{chosen.length}</b> other {chosen.length === 1 ? "version" : "versions"}

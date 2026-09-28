@@ -14,9 +14,11 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // sortOrder is the query parameter for which order to page in, and it takes
@@ -304,11 +306,13 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		VexStatus:         plainly(n.Said),
 		OpenedByRun:       n.OpenedByRun,
 	}
+	var openedBefore *time.Time
 	for _, each := range []struct {
 		text string
 		at   **time.Time
 	}{
 		{n.OpenedAfter, &narrowed.OpenedAfter},
+		{n.OpenedBefore, &openedBefore},
 		{n.ClosedAfter, &narrowed.ClosedAfter},
 		{n.DecidedAfter, &narrowed.ProposedAfter},
 	} {
@@ -320,7 +324,27 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		}
 		*each.at = when
 	}
+	// An age and a date bound the same moment from the same side, so both
+	// asked keep the tighter of the two.
+	narrowed.OpenedAfter = later(narrowed.OpenedAfter, daysBack(n.OpenUnder))
+	narrowed.OpenedBefore = earlier(narrowed.OpenedBefore, openedBefore)
 	return narrowed, nil
+}
+
+// later is the later of two moments, either of which may be absent.
+func later(a, b *time.Time) *time.Time {
+	if a == nil || (b != nil && b.After(*a)) {
+		return b
+	}
+	return a
+}
+
+// earlier is the earlier of two moments, either of which may be absent.
+func earlier(a, b *time.Time) *time.Time {
+	if a == nil || (b != nil && b.Before(*a)) {
+		return b
+	}
+	return a
 }
 
 // Narrowing is the filters both findings lists take: the per-product one and
@@ -361,6 +385,7 @@ type Narrowing struct {
 	Assigned     []string    `query:"assigned,explode" enum:"me,somebody,nobody" doc:"Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"`
 	Likelihood   float64     `query:"epss_at_least" minimum:"0" maximum:"1" doc:"Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1"`
 	OpenFor      int         `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
+	OpenUnder    int         `query:"open_under" minimum:"1" doc:"Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two"`
 	DueWithin    int         `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
 	Overdue      bool        `query:"overdue" doc:"Keep only what is already past its deadline"`
 	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in"`
@@ -369,9 +394,10 @@ type Narrowing struct {
 	Claim        int64       `query:"claim" minimum:"1" doc:"Keep only what sits at a place this claim wrote a decision for, by the claim's identifier"`
 	ClaimState   []string    `query:"claim_state,explode" enum:"proposed,approved,withdrawn,lapsed" uniqueItems:"true" doc:"With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim"`
 	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
-	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
+	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here on or after this date, as 2026-03-31"`
+	OpenedBefore string      `query:"opened_before" doc:"Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included"`
 	OpenedByRun  int64       `query:"opened_by_run" minimum:"1" doc:"Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it"`
-	ClosedAfter  string      `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
+	ClosedAfter  string      `query:"closed_after" doc:"Accepted and matches nothing: this list holds open rows only"`
 	DecidedAfter string      `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
 	Said         []vexStatus `query:"vex_status,explode" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
 	Reassessed   bool        `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
@@ -680,6 +706,11 @@ type SittingBody struct {
 	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
 	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
+	// DeferredDays is what a deferral asked for here is added to before it is
+	// measured against the threshold, so the form can say which side of it a
+	// date falls on before it is sent. Fractional, because the threshold is
+	// compared with exact durations and a whole number of days moves the line.
+	DeferredDays float64 `json:"deferred_days,omitempty" doc:"The total this place has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood"`
 	// Chain is display rather than identity. A decision is keyed on the direct
 	// consumer and nothing else, which is what keeps one judgment from
 	// multiplying by every route through the graph.
@@ -926,6 +957,9 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {
 			return nil, wentWrong(in.Logger, "which branches carry the patches could not be read", err)
 		}
+		if err := putOff(ctx, in, subject, named.ProductID, issue, body.Places); err != nil {
+			return nil, wentWrong(in.Logger, "how long these places were put off could not be read", err)
+		}
 		// The record kept in this product, where one stands. Read here rather
 		// than in the detail because it is the triage record's, and what it
 		// carries — the moment something became known, the grounds, who wrote
@@ -1071,6 +1105,26 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		body.Places = append(body.Places, sitting)
 	}
 	return body
+}
+
+// putOff fills in how long each place has been put off for, in one read.
+func putOff(ctx context.Context, in Ingest, subject access.Subject, productID,
+	vulnerabilityID int64, places []SittingBody) error {
+	if len(places) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(places))
+	for _, place := range places {
+		names = append(names, place.Place)
+	}
+	totals, err := triage.NewStore(in.DB.DB).DeferredAt(ctx, subject, productID, vulnerabilityID, names)
+	if err != nil {
+		return err
+	}
+	for i := range places {
+		places[i].DeferredDays = totals[places[i].Place].Hours() / 24
+	}
+	return nil
 }
 
 // labelPatches fills in the branches each patch link's commit is on, where a

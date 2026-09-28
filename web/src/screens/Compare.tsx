@@ -66,7 +66,7 @@ export function Compare() {
   // between those two" and a failed read that answered the empty string would
   // say it about a comparison nobody was told failed.
   const [wanted, setWanted] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"" | "done" | "refused">("");
   const notes = useQuery({
     queryKey: ["release-notes", product, from, fromVariant, to, toVariant, undisclosed],
     enabled: wanted && ready,
@@ -158,6 +158,12 @@ export function Compare() {
           }}
         >
           <h3 style={{ margin: 0 }}>Compare</h3>
+          {(streams.isError || variants.isError) && (
+            <Failed
+              error={streams.isError ? streams.error : variants.error}
+              what="The builds to compare could not be read."
+            />
+          )}
           <PickBuild
             label="Earlier build"
             stream={from}
@@ -232,7 +238,7 @@ export function Compare() {
                 className="btn"
                 disabled={notes.isFetching}
                 onClick={() => {
-                  setCopied(false);
+                  setCopied("");
                   if (wanted) void notes.refetch();
                   else setWanted(true);
                 }}
@@ -255,16 +261,27 @@ export function Compare() {
               >
                 JSON
               </a>
-              {notes.data !== undefined && (
+              {/* Offered only where the browser has a clipboard to write to,
+                  which it keeps from a page served without TLS. "Copied" is
+                  said once the write is done, and a refusal says so. */}
+              {notes.data !== undefined && navigator.clipboard && (
                 <button
                   type="button"
                   className="btn quiet"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(notes.data);
-                    setCopied(true);
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(notes.data ?? "");
+                      setCopied("done");
+                    } catch {
+                      setCopied("refused");
+                    }
                   }}
                 >
-                  {copied ? "Copied" : "Copy"}
+                  {copied === "done"
+                    ? "Copied"
+                    : copied === "refused"
+                      ? "Copy refused — select the text below"
+                      : "Copy"}
                 </button>
               )}
             </div>

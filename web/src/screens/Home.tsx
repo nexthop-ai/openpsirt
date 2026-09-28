@@ -35,14 +35,24 @@ const BACK_LIMIT = 200;
 // quarter ahead is a plan rather than a week's work.
 const SOON_DAYS = 14;
 
-// The findings list narrowed to one of the tiles. Joined rather than assumed
-// to be the first parameter: the list for anything wider than a build carries
-// the branch and the variant in its address already.
 // The findings list, narrowed to what a deadline tile counts: undecided, and
 // running out inside the window. Built here so the figure and the screen it
 // opens ask the same question.
 function runningOut(at: Parameters<typeof findingsPath>[0], within: string): string {
-  return `${findingsPath(at, true)}&running=${within}&state=undecided`;
+  return findingsPath(at, true, { running: within, state: "undecided" });
+}
+
+// The findings list, narrowed to what the readiness panel counts as blocking:
+// everything nobody has agreed to, above the product's line as the list is by
+// default. The count takes none of the list's other defaults, so neither does
+// the link.
+export function blockingPath(at: Parameters<typeof findingsPath>[0]): string {
+  const asked = new URLSearchParams([
+    ["state", "undecided"],
+    ["state", "waiting"],
+    ["state", "lapsed"],
+  ]);
+  return findingsPath(at, true, asked);
 }
 
 function withOnly(path: string, only: string): string {
@@ -305,7 +315,7 @@ function Readiness({ at }: { at: Scoped }) {
       {at.product && (
         <footer>
           <Link
-            to={`${findingsPath({ product: at.product, stream: at.stream, variant: at.variant })}?state=undecided&state=waiting&state=lapsed`}
+            to={blockingPath({ product: at.product, stream: at.stream, variant: at.variant })}
             className="linkish"
           >
             Work what is blocking →
@@ -897,10 +907,9 @@ function Lapsed() {
   const lapsedTotal = lapsed.data?.total ?? 0;
   const expiredTotal = expired.data?.total ?? 0;
   const allTotal = everywhere.data?.total ?? 0;
-  // A read that did not happen is not a count of nothing. Falling through, the
-  // panel stated "Nothing has lapsed" over a failed read and the tally beside
-  // the heading drew a confident zero — which is the defect this whole change
-  // is about, on the busiest screen there is.
+  // A read that did not happen is not a count of nothing, and "Nothing has
+  // lapsed" over a failed read is a confident zero on the busiest screen there
+  // is.
   const unread = stopped.isError || lapsed.isError || expired.isError;
 
   return (
@@ -970,13 +979,15 @@ function Status() {
   const builds = scanning.data?.items ?? [];
   // The rows in hand, for the three this names. The figures below come from
   // the response instead: the server counts them across the whole answer and
-  // cuts the page afterwards, and a build out of support belongs on neither
-  // side of a coverage figure — silence there is expected. Counted from the
-  // page, this said "195 of 200" for any estate past two hundred builds and
-  // put a release nothing had scanned in a year on the covered side.
+  // cuts the page afterwards. A build out of support or out of use belongs on
+  // neither side of a coverage figure, because silence there is expected, and
+  // the covered side is the server's own count of builds scanned and not
+  // quiet — the figure the coverage report shows under the same name.
   const quiet = builds.filter((b) => b.quiet);
   const unsupported = scanning.data?.unsupported ?? 0;
-  const live = (scanning.data?.total ?? 0) - unsupported;
+  const retired = scanning.data?.retired ?? 0;
+  const live = (scanning.data?.total ?? 0) - unsupported - retired;
+  const scanned = scanning.data?.scanned ?? 0;
   const quietTotal = scanning.data?.quiet ?? 0;
   // The most recent arrival across every build, which is what the line says.
   // The first row that has one is not it: this list is ordered longest-silent
@@ -1015,7 +1026,7 @@ function Status() {
           <span className="what">Builds being scanned</span>
           <span className="when">
             <Count of={scanning}>
-              {() => `${(live - quietTotal).toLocaleString()} of ${live.toLocaleString()}`}
+              {() => `${scanned.toLocaleString()} of ${live.toLocaleString()}`}
             </Count>
           </span>
         </li>

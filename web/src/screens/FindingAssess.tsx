@@ -7,7 +7,26 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { RECORDABLE } from "../ui/severities";
 import { RATINGS } from "./FindingClaim";
+
+// The rating the form opens on: the standing one, then the published one, and
+// only where the form offers it. A published "negligible" or "none" is a word
+// the select cannot show and the route refuses, so it opens on medium instead.
+export function startingRating(assessed?: string, published?: string): string {
+  const offered = RATINGS as readonly string[];
+  return [assessed, published].find((word) => offered.includes(word ?? "")) ?? "medium";
+}
+
+// Whether a rating is milder than the published one, on the whole ladder a
+// published word can be on. "negligible" and "none" sit below low, so nothing
+// the form offers is milder than either. Unrated reads as medium.
+export function milderThan(rating: string, published?: string): boolean {
+  const rank = (word: string) => (RECORDABLE as readonly string[]).indexOf(word);
+  const theirs = rank(published || "medium");
+  const ours = rank(rating);
+  return ours >= 0 && theirs >= 0 && ours > theirs;
+}
 
 // Rating the issue itself, as against what was published.
 //
@@ -36,7 +55,7 @@ export function Assess({
   // The rating standing, where one is. Somebody opening this to reword the
   // reasoning is not proposing a rating, and seeding from the published one
   // makes saving the reasoning revert the rating without saying so.
-  const [severity, setSeverity] = useState<string>(assessed || published || "medium");
+  const [severity, setSeverity] = useState<string>(() => startingRating(assessed, published));
   const [reasoning, setReasoning] = useState("");
 
   const assess = useMutation({
@@ -54,9 +73,7 @@ export function Assess({
     },
   });
 
-  const milder =
-    RATINGS.indexOf(severity as (typeof RATINGS)[number]) <
-    RATINGS.indexOf((published || "medium") as (typeof RATINGS)[number]);
+  const milder = milderThan(severity, published);
 
   return (
     <div className="rating">

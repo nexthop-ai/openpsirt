@@ -33,6 +33,7 @@ import { Decide, said, type Recorded } from "../ui/Decide";
 import { useKept } from "../ui/Saved";
 import { Because } from "../ui/Outcome";
 import { fromAt, listQuery, pathTo, where, windowFor, withinVariant } from "./list";
+import { useReseed } from "../ui/reseed";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
 // sits, the evidence — and the working screen for deciding it, before and
@@ -174,6 +175,14 @@ export function Finding() {
   }
   const [reclassifying, setReclassifying] = useState(false);
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
+  // The rest of what belongs to one finding, put back on walking to the next:
+  // the confirmation of what was recorded, the decision being extended, and
+  // the rating form.
+  useReseed(`${product}|${stream}|${variant}|${oneFinding}`, () => {
+    setRecorded(null);
+    setExtending(null);
+    setReclassifying(false);
+  });
   // The saved filter this was opened under, where it is one that prepares a
   // claim. The address names the filter rather than repeating what it says, so
   // what a rule prepares is decided in one place — and a link somebody sends

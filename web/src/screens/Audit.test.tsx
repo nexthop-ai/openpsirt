@@ -1,0 +1,79 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { act } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Audit, CHANGES_MOST, periodSent } from "./Audit";
+import { screen, serve, settle, mounted } from "../test/mount";
+
+const mount = mounted();
+
+afterEach(() => vi.restoreAllMocks());
+
+describe("the change history on the record", () => {
+  it("never asks for more rows than the route answers", async () => {
+    const asked: number[] = [];
+    serve((path, init) => {
+      if (path === "/v1/session/me") {
+        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+      }
+      if (path === "/v1/administration/changes") {
+        const limit = (init as { params: { query: { limit: number } } }).params.query.limit;
+        asked.push(limit);
+        if (limit > CHANGES_MOST) return { status: 422 };
+        const items = Array.from({ length: limit }, (_, i) => ({
+          id: i + 1,
+          at: "2026-09-01T00:00:00Z",
+          actor: "ana",
+          kind: "setting",
+          subject: `s${i}`,
+        }));
+        return { data: { items, total: 400 } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Audit />, "/audit"));
+    await settle();
+    const more = () =>
+      Array.from(mount.host().querySelectorAll("button")).find(
+        (each) => each.textContent === "Show more",
+      );
+    for (let press = 0; press < 3 && more(); press++) {
+      act(() => more()?.click());
+      await settle();
+    }
+    expect(Math.max(...asked)).toBe(CHANGES_MOST);
+    expect(more()).toBeUndefined();
+    expect(mount.host().textContent).not.toContain("could not be read");
+  });
+});
+
+describe("the period on the record", () => {
+  it("includes the day named as its end in everything it asks for", async () => {
+    const ends: Record<string, unknown> = {};
+    serve((path, init) => {
+      if (path === "/v1/session/me") {
+        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+      }
+      const query = (init as { params?: { query?: Record<string, unknown> } }).params?.query;
+      if (query && "to" in query) ends[path] = query.to;
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Audit />, "/audit?from=2026-01-01&to=2026-03-31"));
+    await settle();
+    expect(ends["/v1/audit"]).toBe("2026-04-01");
+    expect(ends["/v1/administration/changes"]).toBe("2026-04-01");
+    const files = Array.from(mount.host().querySelectorAll("a"))
+      .map((each) => each.getAttribute("href") ?? "")
+      .filter((href) => href.startsWith("/v1/"));
+    expect(files.length).toBeGreaterThan(0);
+    for (const href of files) expect(href).toContain("to=2026-04-01");
+  });
+
+  it("asks nothing of a day that is not on the calendar", () => {
+    expect(periodSent(new URLSearchParams("from=2026-02-30&to=2026-02-30"))).toEqual({
+      from: "",
+      to: "",
+    });
+  });
+});

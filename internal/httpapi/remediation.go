@@ -20,6 +20,7 @@ import (
 type BucketBody struct {
 	Label string `json:"label"`
 	Days  int    `json:"days" doc:"The start of the stretch, so these can be ordered without reading the label"`
+	Until int    `json:"to_days,omitempty" doc:"The end of the stretch, which is not itself in it. Absent for the last, which has no end"`
 	Open  int    `json:"open"`
 	// BySeverity and Undecided are the two cuts worth having. One number says
 	// a hundred things are over three months old and not whether any of them
@@ -119,7 +120,7 @@ func registerRemediation(api huma.API, in Ingest) {
 		}
 		for _, bucket := range got.Aging {
 			out.Body.Aging = append(out.Body.Aging, BucketBody{
-				Label: bucket.Label, Days: bucket.Days, Open: bucket.Open,
+				Label: bucket.Label, Days: bucket.Days, Until: bucket.Until, Open: bucket.Open,
 				BySeverity: bucket.BySeverity, Undecided: bucket.Undecided,
 			})
 		}

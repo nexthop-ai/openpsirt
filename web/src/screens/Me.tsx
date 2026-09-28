@@ -15,12 +15,8 @@ import { UNITS, write, type Unit } from "./duration";
 import { Wide } from "../ui/Wide";
 
 // A person's own page: what they can reach, what is sent to them, and the
-// credentials they hold.
-//
-// Two of these were more than an omission. A person could not mint a token
-// for a script anywhere in the interface, and could not turn the daily digest
-// on at all — though the documentation says it is off until asked for, which
-// leaves somebody looking for a switch that exists only in the API.
+// credentials they hold. The one place in the interface a person mints a token
+// for a script or turns the daily digest on, which is off until asked for.
 //
 // The digest matters more after routing by rule: it is what tells somebody
 // that work arrived for their team without anybody sending a message.
@@ -96,7 +92,7 @@ export function Me() {
         on={!!me.digest}
         unassigned={!!me.digest_unassigned}
         reachable={!!me.reachable}
-        onSet={() => void queries.invalidateQueries({ queryKey: ["me"] })}
+        onSet={() => void queries.invalidateQueries({ queryKey: ["whoami"] })}
       />
 
       <Tokens />
@@ -189,9 +185,9 @@ function Digest({
 function Tokens() {
   const queries = useQueryClient();
   const [name, setName] = useState("");
-  // Held as typed rather than as a number. Read through Number(), clearing
-  // the box was zero, which the writer floored at one — so an empty field
-  // minted a token lasting an hour rather than refusing to mint one at all.
+  // Held as typed rather than as a number. Read through Number(), an empty
+  // box is zero, which the writer floors at one — so an empty field would mint
+  // a token lasting an hour rather than refusing to mint one at all.
   const [count, setCount] = useState("30");
   const [product, setProduct] = useState("");
   // A token carrying only the roles that read. The narrowing the
@@ -277,7 +273,11 @@ function Tokens() {
         <Failed error={withdraw.error} what="That could not be withdrawn." />
       )}
 
-      {rows.length === 0 ? (
+      {tokens.isError ? (
+        <Failed error={tokens.error} what="Your tokens could not be read." />
+      ) : tokens.isPending ? (
+        <Loading />
+      ) : rows.length === 0 ? (
         <Empty title="You hold no tokens." detail="Make one for a script that reads as you." />
       ) : (
         <Wide>
@@ -319,8 +319,8 @@ function Tokens() {
                       <span className="hint">whatever you can do</span>
                     )}
                   </td>
-                  <td className="hint">{on(row.expires_at) ?? "—"}</td>
-                  <td className="hint">{on(row.last_used_at) ?? "never"}</td>
+                  <td className="hint">{on(row.expires_at) || "—"}</td>
+                  <td className="hint">{on(row.last_used_at) || "never"}</td>
                   <td>
                     {row.withdrawn ? (
                       <span style={{ color: "var(--faint)" }}>withdrawn</span>

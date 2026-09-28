@@ -14,6 +14,9 @@ import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
 import { Required } from "./Required";
 
+// The build an upload is sent to.
+type Target = { product: string; stream: string; variant: string };
+
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
 // build with no automation yet, or for trying the tool on any SBOM to hand.
 // Exactly the two parts the endpoint takes — one inventory and any
@@ -30,7 +33,18 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
   // The scan an upload matched, where the build already held it. Said here
   // rather than answered with the receipts screen, because nothing new is
   // waiting there and arriving on it reads as the upload having been taken.
-  const [held, setHeld] = useState<number | null>(null);
+  // Held with the build it was uploaded to, so the way to it names that build
+  // whatever the target has been changed to since.
+  const [held, setHeld] = useState<{
+    scan: number;
+    product: string;
+    stream: string;
+    variant: string;
+  } | null>(null);
+  // Whether this opening of the drawer has tried an upload. A failure belongs
+  // to the attempt that made it, and the drawer is not remounted between
+  // openings.
+  const [tried, setTried] = useState(false);
 
   // Prefilled from the scope each time it opens, so the common case is
   // choosing a file and nothing else. The drawer stays mounted while it is
@@ -43,18 +57,23 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     setInventory(null);
     setSuppressions([]);
     setHeld(null);
+    setTried(false);
   });
 
   const { products, streams, variants } = useCatalog(open, product);
 
+  // The build is the mutation's variables rather than read from the form, so
+  // what happens after the upload answers is about the build it was sent to.
+  // A pending mutation is handed the latest render's options, and the pickers
+  // can move while the file is on its way.
   const upload = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (to: Target) => {
       const form = new FormData();
       if (inventory) form.append("inventory", inventory);
       for (const each of suppressions) form.append("suppressions", each);
       return unwrap(
         await api.POST("/v1/products/{product}/streams/{stream}/variants/{variant}/scans", {
-          params: { path: { product, stream, variant } },
+          params: { path: to },
           // The client would otherwise serialize this as JSON; a multipart
           // body is handed to fetch as it is, which sets the boundary itself.
           body: form as never,
@@ -62,17 +81,17 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         }),
       );
     },
-    onSuccess: (result) => {
+    onSuccess: (result, to) => {
       if (result.outcome === "already_held") {
-        setHeld(result.scan_id);
+        setHeld({ scan: result.scan_id, ...to });
         return;
       }
       void queries.invalidateQueries({ queryKey: ["scans"] });
       void queries.invalidateQueries({ queryKey: ["scanning"] });
       onClose();
       navigate(
-        `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}` +
-          `/variants/${encodeURIComponent(variant)}/scans`,
+        `/products/${encodeURIComponent(to.product)}/streams/${encodeURIComponent(to.stream)}` +
+          `/variants/${encodeURIComponent(to.variant)}/scans`,
       );
     },
   });
@@ -86,7 +105,16 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" disabled={!ready} onClick={() => upload.mutate()}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!ready}
+            onClick={() => {
+              setTried(true);
+              setHeld(null);
+              upload.mutate({ product, stream, variant });
+            }}
+          >
             {upload.isPending ? "Uploading…" : "Upload"}
           </button>
           <button type="button" className="btn quiet" onClick={onClose}>
@@ -100,16 +128,20 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         <span className="mono">suppressions</span>.
       </p>
 
-      {upload.error != null && <Failed error={upload.error} what="That could not be uploaded." />}
+      {tried && upload.error != null && (
+        <Failed error={upload.error} what="That could not be uploaded." />
+      )}
       {held !== null && (
         <div className="alert info">
           <strong>Already held</strong>
           <span>
-            This build already holds this inventory, as scan {held}. Nothing was queued.{" "}
+            {held.product} · {held.stream} · {held.variant} already holds this inventory, as scan{" "}
+            {held.scan}. Nothing was queued.{" "}
             <Link
               to={
-                `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}` +
-                `/variants/${encodeURIComponent(variant)}/scans`
+                `/products/${encodeURIComponent(held.product)}` +
+                `/streams/${encodeURIComponent(held.stream)}` +
+                `/variants/${encodeURIComponent(held.variant)}/scans`
               }
               onClick={onClose}
               className="linkish"

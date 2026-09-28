@@ -143,6 +143,7 @@ export function References({
     lookup?: string;
   }[];
 }) {
+  const [whole, setWhole] = useState(false);
   const all = advisory ? [{ url: advisory, kind: "advisory" }, ...refs] : refs;
   if (all.length === 0) return null;
   const order: Record<string, number> = { patch: 0, advisory: 1, report: 2, other: 3 };
@@ -153,7 +154,7 @@ export function References({
     <div className="evblock">
       <h4>References</h4>
       <ul className="refs">
-        {sorted.slice(0, 12).map((ref) => (
+        {(whole ? sorted : sorted.slice(0, SHOWN_REFERENCES)).map((ref) => (
           <li key={ref.url}>
             <span className={ref.kind === "patch" ? "kind patch" : "kind"}>{ref.kind}</span>{" "}
             <span className="ref">
@@ -163,10 +164,23 @@ export function References({
           </li>
         ))}
       </ul>
-      <p className="hint">Patches first.</p>
+      <p className="hint">
+        Patches first.
+        {sorted.length > SHOWN_REFERENCES && (
+          <>
+            {" "}
+            <button type="button" className="linkish" onClick={() => setWhole(!whole)}>
+              {whole ? "Fewer" : `${sorted.length - SHOWN_REFERENCES} more`}
+            </button>
+          </>
+        )}
+      </p>
     </div>
   );
 }
+
+// The references shown before the rest are folded into a count.
+const SHOWN_REFERENCES = 12;
 
 // The branches shown before the rest are folded into a count.
 const SHOWN_BRANCHES = 3;

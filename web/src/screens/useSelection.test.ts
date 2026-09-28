@@ -42,8 +42,8 @@ describe("what the list is asking", () => {
   it("leaves the page size in the question", () => {
     // Changing how many rows a page holds re-cuts the population the selection
     // was made out of, unlike moving through it.
-    expect(questionIn(new URLSearchParams("limit=50"))).not.toBe(
-      questionIn(new URLSearchParams("limit=200")),
+    expect(questionIn(new URLSearchParams("page=50"))).not.toBe(
+      questionIn(new URLSearchParams("page=200")),
     );
   });
 });

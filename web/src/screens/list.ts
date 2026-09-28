@@ -91,11 +91,9 @@ export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
 // Work nobody holds and nobody has decided, as filters on this list.
 //
 // One spelling, because three places open it: the sidebar entry, the badge
-// beside that entry, and the route the old `/unassigned` address resolves
-// through. The screen that used to answer this went — it asked the server a
-// question with no decision predicate in it, so it counted differently from
-// its own heading, and it carried no deadline, no age, no filters and no sort
-// over a list that runs to thousands of rows.
+// beside that entry, and the route the `/unassigned` address resolves through.
+// It is the findings list, so it carries the deadline, the age, the filters and
+// the sort a list running to thousands of rows needs.
 export const UNOWNED = "assigned=nobody&state=undecided";
 export const UNOWNED_LIST = `/findings?${UNOWNED}`;
 
@@ -210,13 +208,91 @@ export function pageSize(params: URLSearchParams): number {
   return PAGES.includes(asked as (typeof PAGES)[number]) ? asked : PAGE;
 }
 
+// The list's query, as the generated client types it.
+type Query = NonNullable<operations["list-findings"]["parameters"]["query"]>;
+
+// One word a closed parameter takes, whether it takes one or several.
+type Word<K extends keyof Query> = Extract<
+  NonNullable<Query[K]> extends readonly (infer W)[] ? W : NonNullable<Query[K]>,
+  string
+>;
+
+// Every word the server takes for each closed parameter, as a record so the
+// compiler holds it to the generated client both ways: a word the server drops
+// is an excess property here, and a word it gains is a missing one.
+const WORDS: { [K in ClosedParameter]: Record<Word<K>, true> } = {
+  severity: { low: true, medium: true, high: true, critical: true },
+  on: { branch: true, tag: true },
+  support: { "in-support": true, "past-eol": true },
+  declared_as: {
+    required: true,
+    optional: true,
+    excluded: true,
+    build: true,
+    design: true,
+    development: true,
+    other: true,
+    runtime: true,
+  },
+  state: { undecided: true, waiting: true, agreed: true, lapsed: true },
+  outcome: {
+    affected: true,
+    "not-applicable": true,
+    mismatched: true,
+    deferred: true,
+    "wont-fix": true,
+    "already-fixed": true,
+    "upgrade-needed": true,
+    "patch-needed": true,
+  },
+  assigned: { me: true, somebody: true, nobody: true },
+  fix_state: { fixed: true, none: true, "wont-fix": true, unknown: true, mixed: true },
+  vex_status: { not_affected: true, affected: true, fixed: true, under_investigation: true },
+  origin: { scanner: true, manual: true },
+  planned: { planned: true, unplanned: true, either: true },
+  across_variants: { only: true, every: true },
+  sort: { urgency: true, age: true, deadline: true, places: true, epss: true, severity: true },
+};
+
+type ClosedParameter =
+  | "severity"
+  | "on"
+  | "support"
+  | "declared_as"
+  | "state"
+  | "outcome"
+  | "assigned"
+  | "fix_state"
+  | "vex_status"
+  | "origin"
+  | "planned"
+  | "across_variants"
+  | "sort";
+
+// The words the address carries for one closed parameter that the server
+// takes, in the order they came, and none of the others.
+//
+// A word the server does not have refuses the whole request, so one stale or
+// mistyped word in a saved link would draw the list as a failure. Dropped here
+// it widens the list by that one filter instead, and the chip above the list
+// still names it, because the chips read the address.
+export function pick<K extends ClosedParameter>(name: K, values: string[]): Word<K>[] {
+  const allowed = WORDS[name] as Record<string, true>;
+  return values.filter((value): value is Word<K> => Object.hasOwn(allowed, value));
+}
+
+// The same for a parameter that takes one word: the word, or nothing.
+function one<K extends ClosedParameter>(name: K, value: string): Word<K> | undefined {
+  return pick(name, [value])[0];
+}
+
 // A number the address carries, or nothing where it is not one.
 //
-// `Number("")` is 0 and `Number("soon")` is NaN, and both went to the server
-// as they were: NaN reached it as the text "NaN" and 0 reached a parameter
-// whose minimum is 1. The address is somebody else's text like any other, and
-// a value outside what the server takes is a parameter to leave off rather
-// than one to send wrong.
+// `Number("")` is 0 and `Number("soon")` is NaN: sent as they are, NaN
+// reaches the server as the text "NaN" and 0 reaches a parameter whose
+// minimum is 1. The address is somebody else's text like any other, and a
+// value outside what the server takes is a parameter to leave off rather than
+// one to send wrong.
 export function num(raw: string | null, least: number, most: number): number | undefined {
   if (raw === null || raw.trim() === "") return undefined;
   const asked = Number(raw);
@@ -224,10 +300,6 @@ export function num(raw: string | null, least: number, most: number): number | u
   return asked;
 }
 
-// The filters, as the server takes them. Every value is narrowed to what the
-// generated client will accept rather than asserted: a value the address
-// carries is somebody else's text, and the client's types are the only place
-// that says which words the server has.
 // The components somebody has hidden from this page.
 //
 // Carried as the parameter repeated, like every other filter that takes a set,
@@ -246,33 +318,38 @@ export function hiddenIn(params: URLSearchParams): string[] {
   ];
 }
 
+// The filters, as the server takes them. Every value is narrowed to what the
+// generated client will accept rather than asserted: a value the address
+// carries is somebody else's text, and the client's types are the only place
+// that says which words the server has.
 export function listQuery(params: URLSearchParams) {
-  const sort = params.get("sort") ?? "";
+  const sort = one("sort", params.get("sort") ?? "");
   const running = params.get("running") ?? "";
   const hiding = hiddenIn(params);
-  const floor = params.get("floor") ?? "low";
-  // Exploited and fix-available were one parameter holding one of two words,
-  // so asking for both at once was not expressible — an accident of the
-  // control they were drawn as rather than anything the server thinks. They
-  // are two flags now; the old word is still read, so an address somebody
-  // saved still opens the list they saved.
+  const floor = one("severity", params.get("floor") ?? "") ?? "low";
+  // Exploited and fix-available are two flags, so both can be asked at once.
+  // The single word `only` is read too, so an address somebody saved with it
+  // still opens the list they saved.
   const only = params.get("only") ?? "";
   const exploited = params.get("exploited") === "1" || only === "exploited";
   const fixable = params.get("fixable") === "1" || only === "hasFix";
   // Repeated in the address rather than one value, because "undecided or
   // waiting" is a question a single value could not ask.
-  const states = params.getAll("state").filter(Boolean);
-  const outcomes = params.getAll("outcome").filter(Boolean);
-  const assigned = params.getAll("assigned").filter(Boolean);
-  const fixStates = params.getAll("fix_state").filter(Boolean);
+  const states = pick("state", params.getAll("state"));
+  const outcomes = pick("outcome", params.getAll("outcome"));
+  const assigned = pick("assigned", params.getAll("assigned"));
+  const fixStates = pick("fix_state", params.getAll("fix_state"));
   const ecosystems = params.getAll("ecosystem").filter(Boolean);
-  const declaredAs = params.getAll("declared_as").filter(Boolean);
+  const declaredAs = pick("declared_as", params.getAll("declared_as"));
   // The sort of release, and its support. Two questions
   // rather than one: a tag can be in support and a branch can be past its
   // date.
-  const releases = params.getAll("on").filter(Boolean);
-  const support = params.getAll("support").filter(Boolean);
-  const vexStatus = params.getAll("vex_status").filter(Boolean);
+  const releases = pick("on", params.getAll("on"));
+  const support = pick("support", params.getAll("support"));
+  const vexStatus = pick("vex_status", params.getAll("vex_status"));
+  const origin = one("origin", params.get("origin") ?? "");
+  const planned = one("planned", params.get("planned") ?? "");
+  const variants = one("across_variants", params.get("variants") ?? "");
   // The four somebody types into. Each is a set for the same reason the
   // closed lists are: a family of packages, a couple of somebody's own words,
   // two publishers, the memory-safety weaknesses. Any of them rather than all
@@ -285,6 +362,7 @@ export function listQuery(params: URLSearchParams) {
   // Both are a count of days the server takes from one upward, so a word, an
   // empty box and a zero are all "do not ask about this" rather than values.
   const openFor = num(params.get("open_for"), 1, Number.MAX_SAFE_INTEGER);
+  const openUnder = num(params.get("open_under"), 1, Number.MAX_SAFE_INTEGER);
   // The run that opened it, as the run screen links to. An identifier the
   // address carries is somebody else's text like any other, so a value that is
   // not a run number is a parameter to leave off rather than one to send wrong.
@@ -299,13 +377,14 @@ export function listQuery(params: URLSearchParams) {
   return {
     limit: pageSize(params),
     offset: num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0,
-    ...(sort ? { sort: sort as (typeof SORTS)[keyof typeof SORTS] } : {}),
+    ...(sort ? { sort } : {}),
     ...(sort && params.get("asc") === "yes" ? { asc: true } : {}),
-    ...(floor !== "low" ? { severity: floor as "low" | "medium" | "high" | "critical" } : {}),
+    ...(floor !== "low" ? { severity: floor } : {}),
     ...(exploited ? { exploited: true } : {}),
     ...(fixable ? { fixable: true } : {}),
     ...(likelihood > 0 && likelihood <= 1 ? { epss_at_least: likelihood } : {}),
     ...(params.get("opened_after") ? { opened_after: params.get("opened_after") ?? "" } : {}),
+    ...(params.get("opened_before") ? { opened_before: params.get("opened_before") ?? "" } : {}),
     ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
     ...(claim !== undefined ? { claim } : {}),
     ...(claim !== undefined && claimStates.length > 0
@@ -319,22 +398,9 @@ export function listQuery(params: URLSearchParams) {
     ...(params.get("closed_after") ? { closed_after: params.get("closed_after") ?? "" } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),
     ...(ecosystems.length > 0 ? { ecosystem: ecosystems } : {}),
-    ...(releases.length > 0 ? { on: releases as ("branch" | "tag")[] } : {}),
-    ...(support.length > 0 ? { support: support as ("in-support" | "past-eol")[] } : {}),
-    ...(declaredAs.length > 0
-      ? {
-          declared_as: declaredAs as (
-            | "required"
-            | "optional"
-            | "excluded"
-            | "build"
-            | "design"
-            | "development"
-            | "other"
-            | "runtime"
-          )[],
-        }
-      : {}),
+    ...(releases.length > 0 ? { on: releases } : {}),
+    ...(support.length > 0 ? { support } : {}),
+    ...(declaredAs.length > 0 ? { declared_as: declaredAs } : {}),
     ...(params.get("under") ? { under: params.get("under") ?? "" } : {}),
     ...(params.get("beneath") ? { beneath: params.get("beneath") ?? "" } : {}),
     ...(params.get("beneath") && params.get("beneath_version")
@@ -347,48 +413,27 @@ export function listQuery(params: URLSearchParams) {
       ? { beneath_namespace: params.get("beneath_namespace") ?? "" }
       : {}),
     ...(params.get("under_build") === "yes" ? { under_build: true } : {}),
-    ...(states.length > 0
-      ? { state: states as ("undecided" | "waiting" | "agreed" | "lapsed")[] }
-      : {}),
-    ...(outcomes.length > 0
-      ? {
-          outcome: outcomes as (
-            "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed"
-          )[],
-        }
-      : {}),
-    ...(assigned.length > 0 ? { assigned: assigned as ("me" | "somebody" | "nobody")[] } : {}),
+    ...(states.length > 0 ? { state: states } : {}),
+    ...(outcomes.length > 0 ? { outcome: outcomes } : {}),
+    ...(assigned.length > 0 ? { assigned } : {}),
     ...(params.get("reassessed") === "1" ? { reassessed: true } : {}),
     ...(params.get("unconfirmed") === "1" ? { unconfirmed: true } : {}),
-    ...(fixStates.length > 0
-      ? {
-          fix_state: fixStates as ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[],
-        }
-      : {}),
+    ...(fixStates.length > 0 ? { fix_state: fixStates } : {}),
     ...(weaknesses.length > 0 ? { weakness: weaknesses } : {}),
     ...(openFor !== undefined ? { open_for: openFor } : {}),
+    ...(openUnder !== undefined ? { open_under: openUnder } : {}),
     ...(running === "overdue" ? { overdue: true } : {}),
     ...(dueWithin !== undefined ? { due_within: dueWithin } : {}),
     ...(params.get("sent_back") === "1" ? { sent_back: true } : {}),
     ...(params.get("differs") === "1" ? { differs: true } : {}),
-    ...(params.get("variants") === "only" || params.get("variants") === "every"
-      ? { across_variants: params.get("variants") as "only" | "every" }
-      : {}),
+    ...(variants ? { across_variants: variants } : {}),
     ...(publishers.length > 0 ? { vex_publisher: publishers } : {}),
-    ...(vexStatus.length > 0
-      ? {
-          vex_status: vexStatus as (
-            "not_affected" | "affected" | "fixed" | "under_investigation"
-          )[],
-        }
-      : {}),
+    ...(vexStatus.length > 0 ? { vex_status: vexStatus } : {}),
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
     ...(tags.length > 0 ? { tag: tags } : {}),
-    ...(params.get("origin") ? { origin: params.get("origin") as "scanner" | "manual" } : {}),
-    ...(params.get("planned") && params.get("planned") !== "either"
-      ? { planned: params.get("planned") as "planned" | "unplanned" }
-      : {}),
+    ...(origin ? { origin } : {}),
+    ...(planned && planned !== "either" ? { planned } : {}),
     ...(params.get("below") === "yes" ? { below_floor: true } : {}),
   };
 }

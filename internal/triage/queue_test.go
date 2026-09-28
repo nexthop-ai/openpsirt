@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -315,6 +316,48 @@ func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
 		}
 		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
 			t.Error("and it took effect at once")
+		}
+	})
+}
+
+func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
+	// A form deciding about several places says whether a deferral would stand
+	// on its own, and each place is measured against what it was put off for
+	// before — so every place's total is read, and a place never deferred has
+	// none.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		until := time.Now().UTC().Add(20 * 24 * time.Hour)
+		at := f.at()
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: at, Outcome: triage.Deferred, DeferredUntil: &until,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := f.store.DeferredAt(ctx, f.triager, at.ProductID, at.VulnerabilityID,
+			[]string{at.PlaceIdentity, "a-place-nobody-deferred"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if days := got[at.PlaceIdentity].Hours() / 24; days < 19 || days > 21 {
+			t.Errorf("the deferred place reads %.1f days, want about twenty", days)
+		}
+		if other := got["a-place-nobody-deferred"]; other != 0 {
+			t.Errorf("a place nobody deferred reads %s", other)
+		}
+
+		// Read as the person asking: somebody who reads nothing here is told
+		// nothing was put off.
+		stranger := access.Subject{Kind: access.Person, ID: -1}
+		theirs, err := f.store.DeferredAt(ctx, stranger, at.ProductID, at.VulnerabilityID,
+			[]string{at.PlaceIdentity})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if seen := theirs[at.PlaceIdentity]; seen != 0 {
+			t.Errorf("somebody who reads nothing was told %s put off", seen)
 		}
 	})
 }

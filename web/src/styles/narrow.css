@@ -38,7 +38,9 @@
   background: rgb(8 12 20 / 35%);
 }
 
-@media (width <= 780px) {
+/* A screen, not a page: a portrait sheet of paper is narrower than this, and
+   the phone's tab bar and cards have no place on it. */
+@media screen and (width <= 780px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -250,21 +252,6 @@ a {
   border: 0;
   border-top: 1px solid var(--line);
   margin: 6px 0;
-}
-
-.advanced .field > span:first-child {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  font-weight: 600;
-}
-.advanced .field.row > span {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: var(--step--1);
-  color: var(--ink);
-  font-weight: 500;
 }
 
 /* Rendered markdown, wherever a person's text is shown. */

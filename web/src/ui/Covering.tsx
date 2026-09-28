@@ -22,6 +22,12 @@ export const UNPLACED = "nothing recorded what pulls this in";
 
 type Group = { consumer: string; note?: string; items: Sitting[] };
 
+// How many consumers a set of places sits under, which is the unit the
+// control below narrows in and the one a reader can reconcile with it.
+export function consumersOf(places: Sitting[]): number {
+  return groupsOf(places).length;
+}
+
 function groupsOf(places: Sitting[]): Group[] {
   const byConsumer = new Map<string, Group>();
   for (const place of places) {

@@ -63,6 +63,7 @@ import {
   withParam,
   withParams,
 } from "./list";
+import { useReseed } from "../ui/reseed";
 
 // The filters the bar sets itself, so the count on More filters leaves them out.
 const ON_THE_BAR = new Set(["q", "floor", "state", "assigned", "running"]);
@@ -211,6 +212,11 @@ export function Findings() {
   // is offered again.
   const [declined, setDeclined] = useState<string | null>(null);
   const [typed, setTyped] = useState(searching);
+  // The box says what the list applies. Whatever takes the term out of the
+  // address — the chip, clearing every filter, a saved filter, Back — takes
+  // it out of the box too, or pressing Enter there puts back a search the
+  // reader thought was gone.
+  useReseed(searching, () => setTyped(searching));
   // The direction an order opens at, which is not the same for all of them:
   // "sort by severity" means the worst first and "sort by due" means the
   // soonest, and both were opening most-first.
@@ -386,8 +392,8 @@ export function Findings() {
   //
   // The three answer the same narrowing at three grains, and the difference
   // between them is the whole reason to switch: a product whose by-issue list
-  // is 7,455 rows is 341 by component and 284 by upgrade, and nothing said so
-  // — so the list opened on its longest view and read as the only one.
+  // is 7,455 rows is 341 by component and 284 by upgrade. Without the counts
+  // the list opens on its longest view and reads as the only one.
   //
   // Asked with a page of one, because the total is what is wanted. The
   // by-issue count is the one the screen already holds where the by-issue view

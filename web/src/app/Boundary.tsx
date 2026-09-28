@@ -1,8 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, Fragment, type ErrorInfo, type ReactNode } from "react";
 import { Failed } from "../ui/Failed";
+import { askAgain } from "./retrying";
 
 // The boundary a render-time throw reaches.
 //
@@ -19,11 +20,14 @@ import { Failed } from "../ui/Failed";
 // It logs as well as renders. A boundary that only renders swallows the
 // stack that was going to the console, which takes away the thing a developer
 // needs and leaves the sentence a reader cannot act on.
+//
+// Try again draws the children afresh, keyed on the attempt, so a screen that
+// failed to load asks for itself again rather than rethrowing what it held.
 export class Boundary extends Component<
   { children: ReactNode; what?: string; where?: string },
-  { error?: Error }
+  { error?: Error; attempt: number }
 > {
-  state: { error?: Error } = {};
+  state: { error?: Error; attempt: number } = { attempt: 0 };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -34,7 +38,9 @@ export class Boundary extends Component<
   }
 
   render() {
-    if (!this.state.error) return this.props.children;
+    if (!this.state.error) {
+      return <Fragment key={this.state.attempt}>{this.props.children}</Fragment>;
+    }
     return (
       <div>
         <Failed
@@ -42,7 +48,14 @@ export class Boundary extends Component<
           what={this.props.what ?? "This screen could not be drawn."}
         />
         <div className="actions" style={{ marginTop: 12 }}>
-          <button type="button" className="btn" onClick={() => this.setState({ error: undefined })}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              askAgain();
+              this.setState((was) => ({ error: undefined, attempt: was.attempt + 1 }));
+            }}
+          >
             Try again
           </button>
         </div>

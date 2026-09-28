@@ -73,7 +73,15 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
 
       <div className="field" style={{ maxWidth: "40ch" }}>
         <label htmlFor="carry-from">Carry from</label>
-        <select id="carry-from" value={from} onChange={(e) => setFrom(e.target.value)}>
+        <select
+          id="carry-from"
+          value={from}
+          onChange={(e) => {
+            // What was ticked belongs to the line it was offered from.
+            setFrom(e.target.value);
+            setPicked(new Set());
+          }}
+        >
           <option value="">Pick a line</option>
           {others.map((s) => (
             <option key={s.name} value={s.name ?? ""}>

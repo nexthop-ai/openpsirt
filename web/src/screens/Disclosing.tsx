@@ -34,9 +34,9 @@ export function Disclosing() {
   const queries = useQueryClient();
   const who = useWho().data;
   // The distance ahead to look. Empty is this deployment's own embargo length,
-  // which the server supplies: a fixed thirty days against the ninety-day
-  // policy that ships drew an empty screen while embargoes were running, and
-  // an empty screen reads as "nothing is coming".
+  // which the server supplies: a fixed window shorter than the policy leaves
+  // the screen empty while embargoes are running, and an empty screen reads as
+  // "nothing is coming".
   const [days, setDays] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
   // Which act is being recorded. Chosen rather than read off the date typed:
@@ -118,7 +118,14 @@ export function Disclosing() {
         <p>Embargoes running out, soonest first. Reaching a date discloses nothing on its own.</p>
         <label className="field" style={{ marginLeft: "auto" }}>
           <span>Within</span>
-          <select value={days} onChange={(event) => setDays(event.target.value)}>
+          <select
+            value={days}
+            onChange={(event) => {
+              // A narrowed list starts at its own beginning.
+              setDays(event.target.value);
+              setOffset(0);
+            }}
+          >
             <option value="">The whole embargo window</option>
             <option value="7">Within 7 days</option>
             <option value="30">Within 30 days</option>

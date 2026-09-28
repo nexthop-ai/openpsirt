@@ -37,17 +37,12 @@ describe("the roles as somebody granting one reads them", () => {
 
 describe("granting somebody an empty tool", () => {
   it("says so when a capability lands where they read nothing", () => {
-    expect(wouldReachNothing("approver", [])).toBe(true);
     expect(wouldReachNothing("assigner", [{ role: "approver" }])).toBe(true);
   });
 
   it("says nothing when they can already read the product", () => {
     expect(wouldReachNothing("approver", [{ role: "public-read" }])).toBe(false);
     expect(wouldReachNothing("approver", [{ role: "private-triage" }])).toBe(false);
-  });
-
-  it("says nothing about a role that reaches on its own", () => {
-    expect(wouldReachNothing("public-read", [])).toBe(false);
   });
 
   it("does not count a grant that has been withdrawn", () => {

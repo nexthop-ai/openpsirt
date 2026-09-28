@@ -14,9 +14,10 @@
 // and a write that does. Only the first arrival counts, so a screen with six
 // reads in flight raises one banner.
 //
-// The identity read is the exception, and resolves its own 401 to "nobody is
-// signed in" rather than raising this — a fresh browser has no session, and
-// offering to resume one that never began is not an answer to anything.
+// The identity read resolves its own 401. Where nobody was signed in it is
+// "nobody is signed in" rather than this — a fresh browser has no session, and
+// offering to resume one that never began is not an answer to anything. Where
+// somebody was, it raises this and keeps the identity it had.
 //
 // A module rather than React state because the thing that notices is the query
 // client, which is created outside the tree and has no way to reach into it.

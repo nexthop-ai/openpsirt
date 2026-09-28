@@ -5,11 +5,9 @@ import { useSearchParams } from "react-router-dom";
 
 // The window a report sheet covers, and the words for it.
 //
-// One control and one naming rule. Three sheets each had their own copy of
-// the segmented control and its own rule for what to call a number, so a
-// 365-day window was "a year" on one sheet and "365 days" on another — a
-// reader comparing the two cannot tell whether they asked the same question.
-// That is the failure the severity ladder has a gate against, one table down.
+// One control and one naming rule, so a window is called the same thing on
+// every sheet: a reader comparing two sheets cannot otherwise tell whether they
+// asked the same question.
 //
 // The memberships stay per sheet, because which windows a question is worth
 // asking over genuinely differs: a triage-latency figure over ten years says
@@ -36,9 +34,8 @@ export function daysAsked(params: URLSearchParams, fallback: number): number {
 }
 
 // windowStart is when a window began, as the date the lists and the record
-// take. Beside the reader of the number rather than in each sheet: two sheets
-// held a copy, and a link built from one of them is what makes a figure and
-// the list it opens ask the same question.
+// take. Beside the reader of the number rather than in each sheet, so a figure
+// and the list it opens ask the same question.
 export function windowStart(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
@@ -68,21 +65,42 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 // Asked is a period somebody asked for. Either side may be missing: a start
 // with no end runs to now, and an end with no start runs from the beginning.
+//
+// Both days are in it, the way a person reads "2026-01-01 to 2026-03-31". The
+// server takes an end that is not itself in the period, so what is sent is
+// the day after the last one picked.
 export type Asked = { from: string; to: string };
+
+// endExclusive is the day after a period's last day, which is the end the
+// server and every list take. Nothing where the period has no end.
+export function endExclusive(day: string): string {
+  if (day === "") return "";
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+// calendarDay is a day as the address names it, or nothing where it names no
+// day on the calendar. A parser rolls a day past the end of its month into the
+// next month rather than refusing it, and the day after that is what reaches
+// the server.
+export function calendarDay(value: string): string {
+  if (!DAY.test(value)) return "";
+  const named = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(named.getTime()) || named.toISOString().slice(0, 10) !== value) return "";
+  return value;
+}
 
 // periodAsked is the period the address asks for, or neither date.
 export function periodAsked(params: URLSearchParams): Asked {
-  const kept = (name: string) => {
-    const value = params.get(name) ?? "";
-    if (!DAY.test(value) || Number.isNaN(new Date(value).getTime())) return "";
-    return value;
-  };
+  const kept = (name: string) => calendarDay(params.get(name) ?? "");
   const from = kept("from");
   const to = kept("to");
   // A period that ends before it starts holds nothing, and the server refuses
   // it. Dropped here so the sheet asks a question that can be answered rather
-  // than drawing an error somebody has to read to understand.
-  if (from !== "" && to !== "" && from >= to) return { from: "", to: "" };
+  // than drawing an error somebody has to read to understand. One that starts
+  // and ends on the same day is that day.
+  if (from !== "" && to !== "" && from > to) return { from: "", to: "" };
   return { from, to };
 }
 
@@ -97,10 +115,12 @@ export function stated(period: Asked): boolean {
 export function asked(period: Asked, days: number): { from?: string; to?: string; days?: number } {
   // A sheet with no default window asks for none. Zero is not a window the
   // server can answer for — it carries a minimum of one — so it is left out
-  // rather than sent and refused, which is how the deadline-compliance sheet
-  // drew its own failure on load.
+  // rather than sent and refused.
   if (!stated(period)) return days > 0 ? { days } : {};
-  return { ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}) };
+  return {
+    ...(period.from ? { from: period.from } : {}),
+    ...(period.to ? { to: endExclusive(period.to) } : {}),
+  };
 }
 
 // coveringPeriod is what a sheet's heading calls the stretch it covers.
@@ -166,7 +186,6 @@ export function WindowPicker({ offered, days }: { offered: readonly number[]; da
               next.set("days", String(n));
               // The two ways of saying when cannot travel together, so naming
               // a window drops the period as naming dates drops the window.
-              // Without this the chip drew itself pressed and changed nothing.
               next.delete("from");
               next.delete("to");
               setParams(next);

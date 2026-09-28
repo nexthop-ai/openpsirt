@@ -40,6 +40,9 @@ export function Obligations() {
   }
   const items = shelf.data?.items ?? [];
   const inForce = windows.data?.items ?? [];
+  // A failed read of the windows is not a deployment with none declared, and
+  // a notice for a window nobody could read is not one for a retired window.
+  const unread = windows.isError;
 
   return (
     <>
@@ -52,8 +55,9 @@ export function Obligations() {
         </p>
       </div>
 
-      {who.data?.admin && <Windows windows={inForce} />}
-      {!who.data?.admin && inForce.length === 0 && (
+      {unread && <Failed error={windows.error} what="The windows could not be read." />}
+      {!unread && who.data?.admin && <Windows windows={inForce} />}
+      {!unread && !who.data?.admin && inForce.length === 0 && (
         <p className="hint">No windows are declared. An administrator declares them.</p>
       )}
 
@@ -64,14 +68,22 @@ export function Obligations() {
         />
       ) : (
         items.map((incident) => (
-          <Incident key={incident.id} incident={incident} windows={inForce} />
+          <Incident key={incident.id} incident={incident} windows={inForce} known={!unread} />
         ))
       )}
     </>
   );
 }
 
-function Incident({ incident, windows }: { incident: Incident; windows: Window[] }) {
+function Incident({
+  incident,
+  windows,
+  known,
+}: {
+  incident: Incident;
+  windows: Window[];
+  known: boolean;
+}) {
   const [telling, setTelling] = useState(false);
 
   return (
@@ -132,7 +144,7 @@ function Incident({ incident, windows }: { incident: Incident; windows: Window[]
                   · for {one.window}
                   {/* A retired window's name may be declared again, so a
                       notice for the old one says which it was. */}
-                  {!windows.some((each) => each.id === one.window_id) && " (retired)"}
+                  {known && !windows.some((each) => each.id === one.window_id) && " (retired)"}
                 </span>
               )}
               <br />

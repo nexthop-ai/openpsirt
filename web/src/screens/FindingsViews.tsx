@@ -31,6 +31,7 @@ import { Exploited, Severity } from "../ui/Severity";
 // list anybody assembles a day's work out of.
 import { PAGE, type Row } from "./list";
 import { Wide } from "../ui/Wide";
+import { cut } from "../ui/cut";
 
 // A component's place, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
@@ -221,11 +222,8 @@ export function ByComponent({
               return (
                 <tr key={`${name} ${row.version} ${row.ecosystem ?? ""}`} className="row">
                   <td>
-                    {/* The name opens the component. It used to narrow the
-                        list, with the component itself behind a small
-                        "Open →" in the last column next to "Hide" — an act
-                        parked away from the thing it acts on, which is the
-                        shape the By fix view was deleted for. */}
+                    {/* The name opens the component: the act sits on the
+                        thing it acts on rather than in a column of its own. */}
                     <Link
                       className="linkish id"
                       title={`Open ${name}`}
@@ -569,7 +567,7 @@ export function Peek({
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {it?.description ? (
         <p style={{ margin: "8px 0 0", fontSize: "var(--step--1)", maxWidth: "78ch" }}>
-          {it.description.slice(0, 420)}
+          {cut(it.description, 420)}
         </p>
       ) : (
         <p className="hint" style={{ margin: 0 }}>

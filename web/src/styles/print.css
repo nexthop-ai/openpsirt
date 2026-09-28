@@ -21,7 +21,11 @@
     background: #fff;
   }
   .rail,
+  .railscrim,
   .chrome,
+  .tabbar,
+  .fab,
+  .menubtn,
   .noprint,
   .filters,
   .controls,
@@ -29,8 +33,8 @@
   .screen-head > span {
     display: none !important;
   }
-  .shell,
-  .page {
+  .app,
+  .stage {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;

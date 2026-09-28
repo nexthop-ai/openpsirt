@@ -223,7 +223,7 @@ export function Saved({
       {saving && (
         <div className="advanced" style={{ width: "100%" }}>
           <label className="field">
-            <span>Call it</span>
+            <span className="l">Call it</span>
             <input
               {...notACredential}
               type="text"
@@ -243,7 +243,7 @@ export function Saved({
           {rule && (
             <>
               <label className="field">
-                <span>It would say</span>
+                <span className="l">It would say</span>
                 <select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
                   <option value="">Select one</option>
                   {Object.entries(PREPARES).map(([word, label]) => (
@@ -255,7 +255,7 @@ export function Saved({
               </label>
               {needsJustification && (
                 <label className="field">
-                  <span>Because</span>
+                  <span className="l">Because</span>
                   <select value={reason} onChange={(event) => setJustification(event.target.value)}>
                     <option value="">Select one</option>
                     {/* From the one list rather than typed out again, so the
@@ -278,7 +278,7 @@ export function Saved({
                   week after it was saved. */}
               {outcome === "deferred" && (
                 <label className="field">
-                  <span>For how long</span>
+                  <span className="l">For how long</span>
                   <input
                     {...notACredential}
                     type="number"
@@ -295,7 +295,7 @@ export function Saved({
                 </label>
               )}
               <label className="field" style={{ flexBasis: "100%" }}>
-                <span>In these words</span>
+                <span className="l">In these words</span>
                 <textarea
                   {...notACredential}
                   rows={3}

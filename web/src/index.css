@@ -11,10 +11,6 @@
 @import "@fontsource/instrument-sans/500.css";
 @import "@fontsource/instrument-sans/600.css";
 @import "@fontsource/instrument-sans/700.css";
-@import "@fontsource/hanken-grotesk/400.css";
-@import "@fontsource/hanken-grotesk/500.css";
-@import "@fontsource/hanken-grotesk/600.css";
-@import "@fontsource/hanken-grotesk/700.css";
 @import "@fontsource/manrope/400.css";
 @import "@fontsource/manrope/500.css";
 @import "@fontsource/manrope/600.css";
@@ -23,18 +19,13 @@
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
 @import "@fontsource/jetbrains-mono/600.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource/ibm-plex-mono/600.css";
 
 /* The stylesheet, split across the files below, in cascade order.
 
    Order is load-bearing, and the split is by position rather than by theme for
-   that reason — the sections are in the order they were in when this was one
-   file of four thousand two hundred lines. That is how a stylesheet gets
-   there: every addition goes at the end, and the end is where an override has
-   to be. Now the order the cascade sees is the order these imports state, and
-   an import has to come before any rule, so this file holds no rules at all. */
+   that reason: an override has to come after what it overrides. The order the
+   cascade sees is the order these imports state, and an import has to come
+   before any rule, so this file holds no rules at all. */
 @import "./styles/tokens.css";
 @import "./styles/frame.css";
 @import "./styles/parts.css";

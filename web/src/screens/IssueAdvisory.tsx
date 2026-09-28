@@ -43,6 +43,9 @@ export function IssueAdvisory({
   // The advisory being worked on. Held here because an advisory is started
   // and then filled in, and the two are separate acts against separate names.
   const [advisory, setAdvisory] = useState("");
+  // The advisory, product and flaw last added together, so a retry after a
+  // later step failed does not add the flaw a second time.
+  const [added, setAdded] = useState("");
   // Open on a flaw recorded here, which is where somebody arriving from
   // recording one goes next. Folded on anything else until somebody asks: most
   // issues on this screen are a scanner's report about somebody else's
@@ -88,17 +91,21 @@ export function IssueAdvisory({
       if (name === "") {
         const started = await unwrap(await api.POST("/v1/advisories", { body: {} }));
         name = started.advisory;
+        // Remembered the moment it exists, so any later step failing leaves
+        // the next attempt on this name rather than minting another.
+        setAdvisory(name);
       }
-      try {
+      // Named once. A later step failing after the flaw was added leaves it
+      // added, and the next attempt goes on from there.
+      const naming = `${name}|${of}|${vulnerability}`;
+      if (added !== naming) {
         await unwrap(
           await api.POST("/v1/advisories/{advisory}/issues", {
             params: { path: { advisory: name } },
             body: { product: of, vulnerability },
           }),
         );
-      } catch (failed) {
-        setAdvisory(name);
-        throw failed;
+        setAdded(naming);
       }
       const document = await unwrap(
         await api.GET("/v1/advisories/{advisory}/document", {

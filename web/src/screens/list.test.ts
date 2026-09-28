@@ -180,6 +180,44 @@ describe("the filters as the server takes them", () => {
     expect(listQuery(new URLSearchParams("running=7"))).toMatchObject({ due_within: 7 });
   });
 
+  it("leaves out a word the server would refuse, and keeps the rest", () => {
+    // One stale word in a saved link otherwise refuses the whole request.
+    const asked = listQuery(
+      new URLSearchParams(
+        "state=open&state=undecided&floor=severe&sort=newest&outcome=bogus&outcome=patch-needed" +
+          "&origin=robot&planned=maybe&variants=some&on=trunk&assigned=them&fix_state=gone",
+      ),
+    );
+    expect(asked).toMatchObject({ state: ["undecided"], outcome: ["patch-needed"] });
+    for (const key of [
+      "severity",
+      "sort",
+      "origin",
+      "planned",
+      "across_variants",
+      "on",
+      "assigned",
+      "fix_state",
+    ]) {
+      expect(asked, key).not.toHaveProperty(key);
+    }
+  });
+
+  it("sends both ends of a stretch a report links with", () => {
+    expect(
+      listQuery(
+        new URLSearchParams(
+          "open_for=7&open_under=28&opened_after=2026-01-01&opened_before=2026-04-01",
+        ),
+      ),
+    ).toMatchObject({
+      open_for: 7,
+      open_under: 28,
+      opened_after: "2026-01-01",
+      opened_before: "2026-04-01",
+    });
+  });
+
   it("refuses a page size nobody offered", () => {
     // It reaches the server as a limit, and the server has its own bound; the
     // point here is that the screen and the query agree on one number.

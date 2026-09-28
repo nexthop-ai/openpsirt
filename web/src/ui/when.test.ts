@@ -51,6 +51,19 @@ describe("how a moment is written", () => {
 
   it("turns away a day that is shaped right and is not one", () => {
     expect(on("2026-13-45T00:00:00Z")).toBe("");
+    // A parser rolls this into March rather than refusing it.
+    expect(on("2026-02-30")).toBe("");
+    expect(at("2026-02-30T00:00:00Z")).toBe("");
+    expect(on("2028-02-29")).toBe("2028-02-29");
+  });
+
+  it("turns a non-moment away from the relative forms too", () => {
+    const now = new Date("2026-09-07T12:00:00Z");
+    // A bare number parses as a year.
+    expect(since("42", now)).toBe("");
+    expect(since("2026-02-30", now)).toBe("");
+    expect(lasted("42", "2026-09-07T12:00:00Z")).toBe("");
+    expect(lasted("2026-09-07T11:00:00Z", "43")).toBe("");
   });
 
   it("answers how long ago in the coarsest unit that still says something", () => {

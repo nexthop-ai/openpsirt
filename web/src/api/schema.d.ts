@@ -6373,6 +6373,11 @@ export interface components {
             open: number;
             /**
              * Format: int64
+             * @description The end of the stretch, which is not itself in it. Absent for the last, which has no end
+             */
+            to_days?: number;
+            /**
+             * Format: int64
              * @description The number nobody has said anything about. A claim waiting for a second person is not an answer
              */
             undecided: number;
@@ -6994,7 +6999,7 @@ export interface components {
             items: components["schemas"]["CoverageBody"][] | null;
             /**
              * Format: int64
-             * @description The number in support never scanned, across every build and not only this page
+             * @description The number in support and in use never scanned, across every build and not only this page. Those gone quiet are among the quiet as well
              */
             never: number;
             /**
@@ -7007,6 +7012,16 @@ export interface components {
              * @description The span this deployment allows, in days
              */
             quiet_after_days: number;
+            /**
+             * Format: int64
+             * @description The number in support and taken out of use, across every build and not only this page. Nothing may be filed against these, so they are never counted as quiet
+             */
+            retired: number;
+            /**
+             * Format: int64
+             * @description The number in support and in use that a scan has reached and that have not gone quiet, across every build and not only this page
+             */
+            scanned: number;
             /**
              * Format: int64
              * @description The number of builds to report on
@@ -11233,6 +11248,11 @@ export interface components {
             decision?: number;
             /** @description The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it */
             declared_as?: string;
+            /**
+             * Format: double
+             * @description The total this place has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood
+             */
+            deferred_days?: number;
             /** @description Name this when recording a decision about it */
             place: string;
             /** @description The build has already argued this place away */
@@ -13902,6 +13922,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -13918,11 +13940,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -14012,6 +14036,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -14028,11 +14054,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -15760,6 +15788,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -15776,11 +15806,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -15921,6 +15953,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -15937,11 +15971,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -16044,6 +16080,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -16060,11 +16098,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -16172,6 +16212,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -16188,11 +16230,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;
@@ -16298,6 +16342,8 @@ export interface operations {
                 epss_at_least?: number;
                 /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
                 open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
                 /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
@@ -16314,11 +16360,13 @@ export interface operations {
                 claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here after this date, as 2026-03-31 */
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
                 proposed_after?: string;

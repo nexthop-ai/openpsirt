@@ -3,7 +3,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, type Body } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { scopeQuery, useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
@@ -45,11 +45,14 @@ export function Coverage() {
   // page afterwards, so recounting here states a figure about the page under
   // a heading about the estate — and the estate is the question.
   //
-  // A build out of support is never counted as quiet, and never counted in
-  // the coverage figure either: silence there is expected, and counting it
-  // puts a release nothing has scanned in a year on the covered side.
+  // A build out of support, or taken out of use, is never counted as quiet,
+  // and never counted in the coverage figure either: silence there is
+  // expected, and counting it puts a build nothing has scanned in a year on
+  // the covered side.
   const unsupported = coverage.data?.unsupported ?? 0;
-  const live = (coverage.data?.total ?? 0) - unsupported;
+  const retired = coverage.data?.retired ?? 0;
+  const live = (coverage.data?.total ?? 0) - unsupported - retired;
+  const scanned = coverage.data?.scanned ?? 0;
   const quiet = coverage.data?.quiet ?? 0;
   // Never scanned is its own answer rather than a long silence: a build
   // nothing has ever been filed against may be one nobody wired up, and its
@@ -76,17 +79,15 @@ export function Coverage() {
               <div className="kpi">
                 <span className="l">Being scanned</span>
                 <span className="n">
-                  {(live - quiet).toLocaleString()} of {live.toLocaleString()}
+                  {scanned.toLocaleString()} of {live.toLocaleString()}
                 </span>
-                <span className="d">
-                  builds still in support, counted whole rather than per product
-                </span>
+                <span className="d">builds in support and in use, reached and not quiet</span>
               </div>
               <div className="kpi">
                 <span className="l">Gone quiet</span>
                 <span className="n">{quiet.toLocaleString()}</span>
                 <span className="d">
-                  nothing has arrived for longer than this deployment allows
+                  nothing has arrived for longer than allowed, never scanned included
                 </span>
               </div>
               <div className="kpi">
@@ -96,11 +97,10 @@ export function Coverage() {
               </div>
             </div>
             <p className="hint" style={{ marginTop: 10 }}>
-              {unsupported > 0 && (
+              {unsupported + retired > 0 && (
                 <>
-                  A further {unsupported.toLocaleString()}{" "}
-                  {unsupported === 1 ? "build is" : "builds are"} out of support, listed below and
-                  not counted.{" "}
+                  A further {(unsupported + retired).toLocaleString()} out of support or out of use,
+                  listed below and not counted.{" "}
                 </>
               )}
               Download <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
@@ -153,15 +153,7 @@ export function Coverage() {
                           {build.quiet_days === 1 ? "day" : "days"}
                         </td>
                         <td>
-                          {build.quiet ? (
-                            <span className="state open">
-                              {build.last_received_at ? "quiet" : "never scanned"}
-                            </span>
-                          ) : build.retired ? (
-                            <span className="hint">out of support</span>
-                          ) : (
-                            <span className="state closed">scanned</span>
-                          )}
+                          <State build={build} />
                         </td>
                       </tr>
                     ))}
@@ -193,4 +185,17 @@ function scansAt(product: string, stream: string, variant: string): string {
     `/streams/${encodeURIComponent(stream)}` +
     `/variants/${encodeURIComponent(variant)}/scans`
   );
+}
+
+// The one word a build's row says about its state, in the order the counts
+// above sort a build: silence that is expected first, then silence that is
+// not, and scanned only for a build a scan has reached.
+export function State({ build }: { build: Body<"CoverageBody"> }) {
+  if (build.out_of_support) return <span className="hint">out of support</span>;
+  if (build.retired) return <span className="hint">taken out of use</span>;
+  if (build.quiet) {
+    return <span className="state open">{build.last_received_at ? "quiet" : "never scanned"}</span>;
+  }
+  if (!build.last_received_at) return <span className="hint">never scanned</span>;
+  return <span className="state closed">scanned</span>;
 }
