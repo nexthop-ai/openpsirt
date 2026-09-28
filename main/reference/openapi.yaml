@@ -11,7 +11,10 @@ components:
           readOnly: true
           type: string
         admin:
-          description: Whether they administer this deployment
+          description: Whether administration is granted to them in the application, by an administrator or through a group
+          type: boolean
+        admin_by_configuration:
+          description: Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it
           type: boolean
         audits:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
@@ -1413,12 +1416,18 @@ components:
       properties:
         about:
           type: string
+        actor:
+          description: "What made the change: a person in the application, or the deployment's startup configuration, which names administrators"
+          enum:
+            - person
+            - configuration
+          type: string
         at:
           type: string
         became:
           type: string
         by:
-          description: The person who made the change, by sign-in identity
+          description: The person who made the change, by sign-in identity. Absent where configuration made it
           type: string
         by_name:
           description: Their display name, where it differs from their identity
@@ -1449,7 +1458,7 @@ components:
           type: string
       required:
         - at
-        - by
+        - actor
         - kind
         - about
       type: object
@@ -7050,7 +7059,10 @@ components:
       additionalProperties: false
       properties:
         admin:
-          description: Whether they administer this deployment
+          description: Whether administration is granted to them in the application, by an administrator or through a group
+          type: boolean
+        admin_by_configuration:
+          description: Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it
           type: boolean
         audits:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
@@ -7995,7 +8007,7 @@ components:
           readOnly: true
           type: string
         admin:
-          description: Whether they administer this deployment. Omit it to leave it as it is
+          description: Whether administration is granted to them in the application. Omit it to leave it as it is. Administration named in OPENPSIRT_BOOTSTRAP_ADMINS is not changed by this, and a grant made here outlasts the name
           type: boolean
         audits:
           description: "Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"
@@ -15693,6 +15705,8 @@ paths:
 
         It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
 
+        Somebody with no identifier pinned answers 404 and records nothing.
+
         Requires: administrator
       operationId: unbind-identifier
       parameters:
@@ -19918,7 +19932,7 @@ paths:
       description: |-
         Withdraws the grant. The record of it is kept, because who could see an embargoed case, and when, is exactly what is asked afterwards.
 
-        Taking somebody off a case they are not on succeeds and changes nothing.
+        Taking somebody off a case they are not on answers 404 and records nothing.
 
         Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
       operationId: remove-collaborator

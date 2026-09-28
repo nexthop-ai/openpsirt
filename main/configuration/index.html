@@ -1453,11 +1453,11 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <p>A sign-in method is not in this list because one is required: the process
 refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
-<p>A database built by v0.1.0, v0.2.0 or v0.3.0 is upgraded in place, at startup
-or by <code>openpsirt migrate up</code>. One built by an earlier release passes through
-each later release's upgrade on the way. v0.4.0 changes no schema, so a v0.3.0
-database is already current. A database built by any build between releases is
-recreated.</p>
+<p>A database built by v0.1.0, v0.2.0, v0.3.0 or v0.4.0 is upgraded in place, at
+startup or by <code>openpsirt migrate up</code>. One built by an earlier release passes
+through each later release's upgrade on the way. v0.4.0 changed no schema, so a
+v0.3.0 database takes the same upgrade a v0.4.0 one does. A database built by
+any build between releases is recreated.</p>
 <p>Read the sections for the release you are coming from, and every section after
 it: from v0.1.0, read all five.</p>
 <h3 id="every-upgrade">Every upgrade<a class="headerlink" href="#every-upgrade" title="Permanent link">&para;</a></h3>
@@ -1484,8 +1484,9 @@ it: from v0.1.0, read all five.</p>
 </tbody>
 </table>
 <p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back that
-changed the schema, run with this build before the earlier one is deployed.
-Going back to v0.3.0 needs none. v0.1.0 started against an
+carries a migration, run with this build before the earlier one is deployed.
+v0.4.0 carries none, so going back to v0.4.0 or v0.3.0 is one, and to v0.2.0
+is two. v0.1.0 started against an
 upgraded schema reports it current and cannot read it. Patch branch lookups
 come back off in v0.2.0, which reads its own setting for them: turn them on
 again under its Settings.</p>
@@ -1601,7 +1602,7 @@ again under its Settings.</p>
 </tbody>
 </table>
 <h3 id="from-v040">From v0.4.0<a class="headerlink" href="#from-v040" title="Permanent link">&para;</a></h3>
-<p>Also read after an upgrade from v0.1.0, v0.2.0 or v0.3.0.</p>
+<p>Also read after an upgrade from any earlier release.</p>
 <table>
 <thead>
 <tr>
@@ -1613,6 +1614,32 @@ again under its Settings.</p>
 <tr>
 <td><code>OPENPSIRT_DATABASE_URL</code> is refused at startup when it has a fragment (<code>#…</code>), an <code>@</code> in its path or in a query parameter's name, or no <code>//</code> after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped <code>/</code>, <code>?</code>, <code>#</code> or <code>@</code>, part of which v0.4.0 wrote to its startup log. An <code>@</code> in a query parameter's value, as in <code>?user=app@corp</code>, is accepted as before</td>
 <td>Percent-encode <code>/ ? # @</code> in the user name and password, as <code>%2F</code>, <code>%3F</code>, <code>%23</code> and <code>%40</code></td>
+</tr>
+<tr>
+<td>Removing a name from <code>OPENPSIRT_BOOTSTRAP_ADMINS</code> and restarting revokes the administration the name granted. v0.4.0 left it standing</td>
+<td>Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too</td>
+</tr>
+<tr>
+<td>With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group</td>
+<td>Record them again to reopen the window</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>After the upgrade from v0.4.0</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A name added to or removed from <code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
+<td>Recorded in the administrative changes at the start that applies it, by configuration</td>
+</tr>
+<tr>
+<td>Somebody named in <code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
+<td>Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom</td>
 </tr>
 </tbody>
 </table>
@@ -2404,7 +2431,7 @@ for a process and not for an install.</p>
 <tbody>
 <tr>
 <td><code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
-<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart</td>
+<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -2454,7 +2481,7 @@ username, and two providers issuing them independently cannot be told apart.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_OIDC_GROUPS_CLAIM</code></td>
-<td>The claim carrying group membership, if the provider asserts it</td>
+<td>The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored</td>
 <td>unset</td>
 </tr>
 </tbody>
