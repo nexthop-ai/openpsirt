@@ -274,7 +274,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Skipped++
 		case errors.Is(err, errMismatched):
 			took.Mismatched++
-		case errors.As(err, &unreadable{}), errors.Is(err, outward.ErrRefused):
+		case errors.As(err, &unreadable{}), steppedOver(err):
 			// About this document rather than about the publisher, so the pass
 			// steps over it. Held instead, one withdrawn advisory still listed
 			// would stop everything issued after it, for ever. An address the
@@ -806,7 +806,7 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 	served, err := f.fetch(ctx, client, address, mostSumBytes)
 	var refused unreadable
 	switch {
-	case errors.As(err, &refused), errors.Is(err, outward.ErrRefused):
+	case errors.As(err, &refused), steppedOver(err):
 		return false, nil
 	case err != nil:
 		return false, err
@@ -1039,4 +1039,12 @@ type link struct {
 
 type content struct {
 	Source string `json:"src"`
+}
+
+// steppedOver is whether the client refused an address in a way it repeats on
+// every pass. A name resolving inside this network is left out: a filtering
+// resolver or a split view answers that way until it is corrected, so it is
+// read as a publisher that could not be reached and holds the mark.
+func steppedOver(err error) bool {
+	return errors.Is(err, outward.ErrRefused) && !errors.Is(err, outward.ErrInside)
 }

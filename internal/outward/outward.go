@@ -161,6 +161,13 @@ func client(within time.Duration, reachable func(string) error,
 // the address, so a caller can tell this from a provider that did not answer.
 var ErrRefused = errors.New("refused")
 
+// ErrInside says an address a name resolved to lies inside this network. It
+// comes wrapped with ErrRefused. Unlike the other refusals it is about what a
+// name resolves to today, which a resolver answering differently tomorrow
+// changes, so a caller stepping over what the client refuses holds on to
+// this one.
+var ErrInside = errors.New("a provider is not reached inside this network")
+
 // guard refuses a request to a host the client does not permit.
 //
 // Checked at the round trip rather than only at the dial, because the dial
@@ -200,8 +207,7 @@ func Reachable(address string) error {
 		return fmt.Errorf("%w a connection to %q: not an address", ErrRefused, host)
 	}
 	if inside(ip) {
-		return fmt.Errorf("%w a connection to %s: a provider is not reached inside this network",
-			ErrRefused, ip)
+		return fmt.Errorf("%w a connection to %s: %w", ErrRefused, ip, ErrInside)
 	}
 	return nil
 }

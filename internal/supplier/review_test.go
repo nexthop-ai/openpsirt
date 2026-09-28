@@ -179,6 +179,32 @@ func TestADocumentTheClientTurnsAwayDoesNotStopTheSupplier(t *testing.T) {
 	})
 }
 
+// A document whose name resolved inside this network holds the mark. A
+// filtering resolver or a split view answers that way until it is corrected,
+// and stepped over, the document would never be read once it was.
+func TestADocumentResolvingInsideThisNetworkHoldsTheMark(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-35.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0035", "libnl-3-200", "3.7.1", "CVE-2026-5100"))
+		p.publishes("/2026/EL-36.json", "2026-09-21T00:00:00Z",
+			advisory("EL-2026-0036", "libnl-3-200", "3.7.2", "CVE-2026-5101"))
+		p.inward["/2026/EL-36.json"] = true
+
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err == nil {
+			t.Fatal("a document resolving inside this network read as one to step over")
+		}
+		if took.Refused != 0 {
+			t.Errorf("it was counted as a refusal about the document: %+v", took)
+		}
+		if !took.CaughtUpTo.Equal(time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("the mark reached %v", took.CaughtUpTo)
+		}
+	})
+}
+
 // A feed entry naming its document relative to the feed is read at the address
 // that resolves to, as a link on the publisher's own page would be.
 func TestAFeedEntryNamingItsDocumentRelativelyIsRead(t *testing.T) {

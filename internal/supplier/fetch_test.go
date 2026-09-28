@@ -5,6 +5,7 @@ package supplier_test
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +47,9 @@ type publisher struct {
 	// excluded are hosts the client refuses the way it refuses one an
 	// administrator excluded.
 	excluded []string
+	// inward are paths the client refuses the way it refuses a name that
+	// resolved to an address inside this network.
+	inward map[string]bool
 	// asking runs as each path is asked for, before it is answered.
 	asking func(path string)
 }
@@ -55,6 +59,7 @@ func serving(t *testing.T) *publisher {
 	p := &publisher{
 		documents: map[string]string{}, stamped: map[string]string{},
 		failing: map[string]int{}, linked: map[string][]string{}, moved: map[string]string{},
+		inward: map[string]bool{},
 	}
 	// https, because the fetcher refuses anything else: what comes back is
 	// read as a publisher's own judgment, and over plain http it is read as
@@ -145,7 +150,7 @@ func (p *publisher) reaching(also ...string) *http.Client {
 		refused[strings.ToLower(host)] = true
 	}
 	return &http.Client{
-		Transport: aliased{known: known, refused: refused, at: served.Host,
+		Transport: aliased{known: known, refused: refused, inward: p.inward, at: served.Host,
 			inner: p.server.Client().Transport},
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("%w a redirect to %s", outward.ErrRefused, req.URL.Host)
@@ -156,6 +161,7 @@ func (p *publisher) reaching(also ...string) *http.Client {
 type aliased struct {
 	known   map[string]bool
 	refused map[string]bool
+	inward  map[string]bool
 	at      string
 	inner   http.RoundTripper
 }
@@ -164,6 +170,10 @@ func (a aliased) RoundTrip(req *http.Request) (*http.Response, error) {
 	if a.refused[strings.ToLower(req.URL.Hostname())] {
 		return nil, fmt.Errorf("%w a request to %s: an administrator excluded it",
 			outward.ErrRefused, req.URL.Hostname())
+	}
+	if a.inward[req.URL.Path] {
+		// What the dialer's check answers for an address inside this network.
+		return nil, &net.OpError{Op: "dial", Net: "tcp", Err: outward.Reachable("10.0.0.7:443")}
 	}
 	if !a.known[strings.ToLower(req.URL.Hostname())] {
 		return nil, fmt.Errorf("no such host %s", req.URL.Hostname())
