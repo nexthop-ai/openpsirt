@@ -428,7 +428,7 @@ func identifiedBy(t *testing.T, f *fixture, identity string) graph.Component {
 	t.Helper()
 	var row graph.Component
 	err := f.db.DB.NewSelect().Model(&row).
-		Column("purl", "cpe", "upstream_name", "fold_key").
+		Column("purl", "cpe", "upstream_name", "upstream_folded", "fold_key").
 		Where("identity = ?", identity).
 		Scan(t.Context())
 	if err != nil {
@@ -460,6 +460,35 @@ func TestTheScannerIsHandedWhatALaterInventoryStated(t *testing.T) {
 		}
 		if len(listed) != 1 || listed[0].Purl != stated {
 			t.Errorf("the scanner is handed %+v, want the one component as %s", listed, stated)
+		}
+	})
+}
+
+func TestALaterReportNamesTheSourcePackageAStoredRowLacks(t *testing.T) {
+	// A reader turns `upstream=linux` into the source package, so a kernel
+	// first stored without one is given it by the later report, and the fold
+	// key moves with it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		components := graph.NewComponents(f.db.DB)
+		bare := graph.Described{
+			Purl: "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64",
+			Name: "linux-image", Version: "6.12.41-1",
+		}
+		if _, err := components.Intern(ctx, []graph.Described{bare}); err != nil {
+			t.Fatal(err)
+		}
+		stated := bare
+		stated.UpstreamName = "Linux"
+		if _, err := components.Intern(ctx, []graph.Described{stated}); err != nil {
+			t.Fatal(err)
+		}
+		got := identifiedBy(t, f, bare.Identity())
+		if got.UpstreamName != "Linux" || got.UpstreamFolded != "linux" {
+			t.Errorf("the source package is stored as %q, folded %q", got.UpstreamName, got.UpstreamFolded)
+		}
+		if got.FoldKey != stated.FoldKey() {
+			t.Error("the fold key did not follow the source package")
 		}
 	})
 }

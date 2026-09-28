@@ -416,9 +416,15 @@ the document that arrived.
 | The supplier and the license | `DESIGN-findings.md` § Component suppliers |
 
 A qualifier already stored stays as written whatever a later report says about
-it, so what is stored does not depend on the order reports arrive in. The fold
+it, so a later report adds to what is stored and never changes it. The fold
 key is worked out again from the filled row, because it reads the distribution
 and the source package. Identity reads neither, and does not move.
+
+| When the fold key moves | Reason |
+|---|---|
+| Each build holding the component has its upgrade commitment carried to the new key | A commitment is keyed on the fold. Left on the old key it covers nothing open, which reads as landed |
+| A build already committed on the new key keeps that commitment | One commitment per fold per build, and it is the one somebody made for that fold |
+| The commitment on the old key is withdrawn only where nothing the build holds still folds to it | A fold splits when some of its binaries state a distribution and some do not, and each side is still work |
 
 The platform enumeration is kept and excluded from identity. A scanner given one
 matches things a package identifier alone misses — vendor firmware, operating
@@ -593,7 +599,8 @@ root, against 0.018 s.
 | Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a claim is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
 | Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |
-| A fold key that moves leaves a commitment on the old key behind | A later report stating a distribution or a source package the stored row lacked gives the component a new fold key. An upgrade commitment is keyed on the fold, so one made under the old key stops covering it and the component reads as uncommitted |
+| A fold that splits is committed on both sides | A later report stating a distribution for some of a source package's binaries and not the rest splits its fold, and the commitment is carried to the new key and kept on the old. Revising the claim behind it through one component revises that side alone |
+| Carrying a commitment is not recorded as an act | Nobody made it. The carried commitment keeps who declared it and when |
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |
