@@ -26,6 +26,7 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 	// nobody believes either fills the findings with one or goes unrecorded,
 	// and an unrecorded claim destroys the evidence that it was answered.
 	each(t, func(t *testing.T, f *fixture) {
+		f.store.Clock(minting)
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
 			Summary: "The management socket accepts a request nobody authenticated.",
@@ -40,7 +41,7 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 		if row.VulnerabilityID != nil {
 			t.Errorf("a claim nobody judged points at issue %d", *row.VulnerabilityID)
 		}
-		if !referenceFor(row.Reference, "SONIC", 2026) {
+		if !referenceFor(row.Reference, "SONIC", minting().Year()) {
 			t.Errorf("filed under %q, want the product's name, an R, the year and a number",
 				row.Reference)
 		}
@@ -419,6 +420,7 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 	// is reachable by its reference like any other, rather than only through
 	// the issue it was minted with.
 	each(t, func(t *testing.T, f *fixture) {
+		f.store.Clock(minting)
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
@@ -440,7 +442,7 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 		if err != nil || row == nil {
 			t.Fatalf("the report on a recorded flaw: %v %v", row, err)
 		}
-		if !referenceFor(row.Reference, "SONIC", 2026) {
+		if !referenceFor(row.Reference, "SONIC", minting().Year()) {
 			t.Errorf("it was filed under %q", row.Reference)
 		}
 		if row.VulnerabilityID == nil || *row.VulnerabilityID != issue {

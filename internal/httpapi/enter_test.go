@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func TestAFlawInOurOwnProductIsRecordedAndReadBackLikeAnyOther(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
 			t.Fatalf("decode: %v (%s)", err, got.Body.String())
 		}
-		if !strings.HasPrefix(recorded.Identifier, "MINE-2026-") {
+		if !regexp.MustCompile(`^MINE-\d{4}-\d+$`).MatchString(recorded.Identifier) {
 			t.Errorf("filed under %q, want one of the product's own identifiers",
 				recorded.Identifier)
 		}

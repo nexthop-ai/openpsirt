@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -17,11 +18,12 @@ import (
 )
 
 func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
-	// The case Phase 2 exists for: somebody knows about a flaw in their own
-	// product before anybody outside does. It has no CVE, no scanner said
-	// anything about it, and it still has to be triaged, assigned, decided and
-	// reported like everything else.
+	// The case recording by hand exists for: somebody knows about a flaw in
+	// their own product before anybody outside does. It has no CVE, no scanner
+	// said anything about it, and it still has to be triaged, assigned,
+	// decided and reported like everything else.
 	each(t, func(t *testing.T, f *fixture) {
+		f.store.Clock(minting)
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
@@ -40,7 +42,7 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 		if err != nil {
 			t.Fatalf("recording a flaw: %v", err)
 		}
-		if !mintedFor(identifier, "SONIC", 2026) {
+		if !mintedFor(identifier, "SONIC", minting().Year()) {
 			t.Errorf("filed under %q, want the product's own name, the year and a number",
 				identifier)
 		}
@@ -83,7 +85,7 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !mintedFor(next, "SONIC", 2026) {
+		if !mintedFor(next, "SONIC", minting().Year()) {
 			t.Errorf("the second identifier this year is %q", next)
 		}
 		if next == identifier {
@@ -452,6 +454,11 @@ func TestABuildTakenBackOutIsNeitherAFixNorANote(t *testing.T) {
 		t.Errorf("a real fix went missing:\n%s", notes)
 	}
 }
+
+// minting is the moment a test asserting the year in an identifier holds the
+// store at. The year comes from the store's clock, so an assertion against the
+// wall clock holds only until the calendar turns over.
+func minting() time.Time { return time.Date(2027, 3, 1, 12, 0, 0, 0, time.UTC) }
 
 // mintedFor reports whether an identifier is one this deployment issued for a
 // product in a year: the name, the year, and a number.
