@@ -317,7 +317,7 @@ func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
 		if err := <-hook.done; err != nil {
 			t.Errorf("the other of two saves of one name answered %v", err)
 		}
-		kept, err := f.store.SavedFilters(t.Context(), person.ID, product, 10)
+		kept, _, err := f.store.SavedFilters(t.Context(), person.ID, product, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
