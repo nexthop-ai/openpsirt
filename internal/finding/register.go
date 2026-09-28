@@ -331,7 +331,7 @@ func registerState(word string) (string, bool) {
 	lapsed := "de.state = 'lapsed'"
 	switch word {
 	case "undecided":
-		return "NOT (" + live + " OR " + lapsed + ") OR de.id IS NULL", true
+		return "de.id IS NULL", true
 	case "agreed":
 		return "(" + live + " AND de.state = 'approved')", true
 	case "lapsed":
@@ -358,13 +358,34 @@ func (s *Store) registerJoins(productID int64,
 		// The component's consumer. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		// Liveness is asked of the columns rather than of the join, for the
-		// reason the column list gives.
+		// The one decision on the record at the place, or none.
 		Join(`LEFT JOIN "decision" AS "de" ON de.product_id = ?
 			AND de.vulnerability_id = f.vulnerability_id
-			AND de.place_identity = f.place_identity`, productID).
+			AND de.place_identity = f.place_identity
+			AND `+onTheRecordHere, productID).
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`)
 }
+
+// onTheRecordHere picks, among every decision row ever written at a place,
+// the one the register reports: the live decision that covers the finding's
+// versions, or where none does, the latest lapsed one. A withdrawn row is on
+// no record, and a live decision keyed on other versions answers for another
+// build's finding at the same place.
+//
+// Rows are never deleted, so a place carries its whole history, and matched by
+// place alone a place withdrawn and claimed again reads twice. The versions
+// are the findings list's own test, so the register and the list agree about
+// every place. The claim's outcome is read by a scalar rather than through the
+// join, because the claim joined is the one this condition selects.
+var onTheRecordHere = `((de.live_key IS NOT NULL AND ` +
+	keyMatchesOn("de", `(SELECT clr.outcome FROM "claim" AS "clr" WHERE clr.id = de.claim_id)`) + `)
+	OR (de.state = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
+		WHERE d2.product_id = de.product_id
+		  AND d2.vulnerability_id = de.vulnerability_id
+		  AND d2.place_identity = de.place_identity
+		  AND ((d2.live_key IS NOT NULL AND ` +
+	keyMatchesOn("d2", `(SELECT cl2.outcome FROM "claim" AS "cl2" WHERE cl2.id = d2.claim_id)`) + `)
+		    OR (d2.state = 'lapsed' AND d2.id > de.id)))))`
 
 // registerQuery is the register, unbounded. What a caller adds is how much of
 // it they want.
@@ -376,12 +397,9 @@ func (s *Store) registerQuery(productID int64,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
 
 	return s.registerJoins(productID, narrow).
-		// Liveness is asked of the columns rather than of the join. In the
-		// join it hid a lapsed decision entirely, so a place whose judgment
-		// stopped applying reported as never decided and the register lost who
-		// proposed and who approved it — which is what a compliance reader
-		// comes here for. The findings list says "lapsed" about the same
-		// place, so the two surfaces disagreed.
+		// A lapsed decision is on the record: who proposed and who approved
+		// it is what a compliance reader comes here for, and the findings list
+		// says "lapsed" about the same place.
 		Join(`LEFT JOIN "person" AS "pp" ON pp.id = de.proposed_by`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).

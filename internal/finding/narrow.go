@@ -1090,6 +1090,15 @@ const KeyMatches = "(cl.outcome = '" + Mismatched + "' OR (" +
 	"COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr +
 	" AND COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
 
+// keyMatchesOn is KeyMatches over a decision under another alias, with the
+// claim's outcome given as an expression, for a statement that asks it before
+// the claim is joined or of a second decision beside the first.
+func keyMatchesOn(decision, outcome string) string {
+	return "(" + outcome + " = '" + Mismatched + "' OR (" +
+		"COALESCE(" + decision + ".component_upstream_version, '') = " + ComponentUpstreamExpr +
+		" AND COALESCE(" + decision + ".consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
+}
+
 // Mismatched is the outcome whose claim is about identity, named here so the
 // expression above and the triage package cannot drift on the spelling.
 const Mismatched = "mismatched"

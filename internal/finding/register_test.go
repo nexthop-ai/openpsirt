@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -326,5 +327,122 @@ func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
 			t.Errorf("a word the register does not know kept %d of %d rows",
 				len(nonsense), len(whole))
 		}
+	})
+}
+
+// A place reads once in the register, whatever history it carries.
+//
+// Decision rows are never deleted: a withdrawal or a lapse clears the live key
+// and leaves the row. The register reports the one decision on the record — the
+// live one, or the latest lapsed one where nothing is live — so a place claimed
+// again after a withdrawal is one row, waiting, and not also a second row
+// reading as undecided.
+func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", swss), found("CVE-2026-2", teamd),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, before, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		withdrawn := finding.PlaceIdentity(swss.Name, "")
+		lapsed := finding.PlaceIdentity(teamd.Name, "")
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"), withdrawn, "withdrawn", swss.Version, "")
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"), withdrawn, "proposed", swss.Version, "again")
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "approved", teamd.Version, "anew")
+
+		rows, total, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != before || len(rows) != before {
+			t.Errorf("the register holds %d rows and says %d, want the %d it held before any decision",
+				len(rows), total, before)
+		}
+		states := map[string][]string{}
+		for _, row := range rows {
+			states[row.Place] = append(states[row.Place], row.State)
+		}
+		if got := states[withdrawn]; len(got) != 1 || got[0] != "waiting" {
+			t.Errorf("a place withdrawn and claimed again reads %v, want one row waiting", got)
+		}
+		if got := states[lapsed]; len(got) != 1 || got[0] != "agreed" {
+			t.Errorf("a place lapsed and agreed again reads %v, want one row agreed", got)
+		}
+		undecided, total, err := f.store.Register(ctx, who, f.target,
+			finding.Registering{States: []string{"undecided"}}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range undecided {
+			if row.Place == withdrawn || row.Place == lapsed {
+				t.Errorf("undecided lists %s, which a live decision answers", row.Place)
+			}
+		}
+		if total != len(undecided) {
+			t.Errorf("undecided says %d and holds %d", total, len(undecided))
+		}
+	})
+}
+
+// The register says what the findings list says about a place a live decision
+// was keyed on at other versions: nothing stands there.
+func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		directly := func(library graph.Described) graph.Snapshot {
+			return graph.Snapshot{
+				Root: root, Components: []graph.Described{library},
+				Dependencies: []graph.Dependency{{Parent: root, Child: library}},
+			}
+		}
+		f.shipped(t, directly(libnl))
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherBuild(t, "202411")
+		f.shippedTo(t, other, directly(libnlNew))
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
+			found("CVE-2026-1", libnlNew),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"),
+			finding.PlaceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
+
+		reads := func(target int64, want string) {
+			t.Helper()
+			rows, total, err := f.store.Register(ctx, who, target, finding.Registering{}, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != 1 || len(rows) != 1 || rows[0].State != want {
+				t.Fatalf("build %d's register reads %+v (total %d), want one row %q", target, rows, total, want)
+			}
+			if want == "undecided" && (rows[0].Outcome != "" || rows[0].ProposedBy != "") {
+				t.Errorf("build %d's register names a judgment that does not cover it: %+v", target, rows[0])
+			}
+		}
+		reads(f.target, "agreed")
+		reads(other, "undecided")
 	})
 }
