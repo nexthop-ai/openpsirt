@@ -728,7 +728,7 @@ func version(s string) string { return strings.TrimSpace(s) }
 // it: 6,845 components, longest version 49 characters, longest name 120,
 // longest package identifier 140, and nothing at all over 191. The headroom is
 // about fourfold on the field that matters.
-const versionLimit = 191
+const versionLimit = database.NameWidth
 
 // keyable refuses a place whose versions will not fit the key a decision is
 // matched on.
