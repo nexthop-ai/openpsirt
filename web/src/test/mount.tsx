@@ -55,7 +55,21 @@ type Served = (path: string, init: unknown) => Answer | undefined;
 // A path the function does not answer is a 500, so a test that forgets a
 // read sees the screen's failure branch rather than a hang.
 export function serve(answer: Served) {
-  return vi.spyOn(api, "GET").mockImplementation((async (path: string, init: unknown) => {
+  return vi.spyOn(api, "GET").mockImplementation(answering(answer));
+}
+
+// One request a screen sent: the path and what it was sent with.
+export type Sent = [path: string, init: unknown];
+
+// The generated client's POST, answered the same way. What it returns reads
+// back every request sent so far, in order.
+export function accept(answer: Served): () => Sent[] {
+  const spy = vi.spyOn(api, "POST").mockImplementation(answering(answer));
+  return () => spy.mock.calls as unknown as Sent[];
+}
+
+function answering(answer: Served) {
+  return (async (path: string, init: unknown) => {
     const said = answer(path, init) ?? { status: 500 };
     const status = said.status ?? 200;
     const ok = status >= 200 && status < 300;
@@ -64,7 +78,7 @@ export function serve(answer: Served) {
       error: ok ? undefined : { detail: `HTTP ${status}` },
       response: new Response(null, { status }),
     };
-  }) as never);
+  }) as never;
 }
 
 // Where the router is, after whatever the test pressed.
@@ -82,14 +96,33 @@ export function location(): string {
   return seen.at;
 }
 
-// A screen inside a router and a query client of its own, at an address.
-//
-// A fresh client per draw and no retries, so a failed read settles at once and
-// nothing one test cached is read by the next.
-export function screen(node: ReactNode, at = "/", pattern = "*"): ReactNode {
-  const queries = new QueryClient({
+// A query client with no retries, so a failed read settles at once.
+export function client(): QueryClient {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+}
+
+// The query keys a client is asked to invalidate from here on, each joined
+// with "/" and sorted, so a test compares the set an act invalidates.
+export function watchInvalidations(queries: QueryClient): () => string[] {
+  const spy = vi.spyOn(queries, "invalidateQueries");
+  return () =>
+    spy.mock.calls
+      .map(([filters]) => ((filters as { queryKey?: unknown[] })?.queryKey ?? []).join("/"))
+      .sort();
+}
+
+// A screen inside a router and a query client of its own, at an address.
+//
+// A fresh client per draw, so nothing one test cached is read by the next. A
+// test that watches what a screen invalidates passes the client it watches.
+export function screen(
+  node: ReactNode,
+  at = "/",
+  pattern = "*",
+  queries: QueryClient = client(),
+): ReactNode {
   return (
     <QueryClientProvider client={queries}>
       <MemoryRouter initialEntries={[at]}>
