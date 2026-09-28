@@ -192,10 +192,14 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 		case "creationInfo":
 			// A reference to a creation-information element, or the element
 			// written in place: a linked format may write a reference out as
-			// the thing it refers to.
+			// the thing it refers to. Written in place with an identifier of
+			// its own, it is the record every other reference to that
+			// identifier means, wherever it was written.
 			var inline spdx3Element
 			ref, err := c.b.stringOrObject(func(key string) error {
 				switch key {
+				case "@id", "spdxId":
+					return c.into(&inline.id)
 				case "created":
 					return c.into(&inline.created)
 				case "specVersion":

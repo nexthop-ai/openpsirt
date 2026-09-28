@@ -798,6 +798,22 @@ func TestCreationInformationWrittenInPlaceIsRead(t *testing.T) {
 		t.Errorf("built at %v, want the document's own %v", doc.BuiltAt, want)
 	}
 
+	// Written in place on an element ahead of the document, with an
+	// identifier the document refers to, it is the document's record.
+	embedded := strings.Replace(minimalSPDX3, `"_:creationInfo", "type": "CreationInfo", "specVersion": "3.0.1",
+     "created": "2026-08-14T09:12:33Z"},`, `"_:elsewhere", "type": "CreationInfo", "specVersion": "3.0.1",
+     "created": "2020-01-01T00:00:00Z"},
+    {"spdxId": "urn:first", "type": "software_Package", "name": "first",
+     "creationInfo": {"@id": "_:creationInfo", "type": "CreationInfo", "specVersion": "3.0.1",
+       "created": "2026-09-01T00:00:00Z"}},`, 1)
+	if !strings.Contains(embedded, `"_:elsewhere"`) {
+		t.Fatal("the fixture no longer has the shape this rewrites")
+	}
+	doc = read(t, embedded)
+	if want := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC); !doc.BuiltAt.Equal(want) {
+		t.Errorf("built at %v, want the time the record written in place states, %v", doc.BuiltAt, want)
+	}
+
 	// A version in place is checked as one referred to is.
 	if _, err := sbom.Read(strings.NewReader(inline(document,
 		"2026-09-01T00:00:00Z", "4.0.0")), sbom.Limits{}); err == nil {
