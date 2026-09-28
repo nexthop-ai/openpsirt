@@ -191,13 +191,7 @@ func TestAStaleClaimIsTakenOverByAnotherWorker(t *testing.T) {
 	opts.ClaimTimeout = time.Millisecond
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
-		if _, err := q.Add(ctx, "ingest", "abandoned"); err != nil {
-			t.Fatal(err)
-		}
-		first, err := q.Claim(ctx, "worker-that-dies", "ingest")
-		if err != nil || first == nil {
-			t.Fatalf("first claim: %v", err)
-		}
+		first := claimed(t, q, "ingest", "abandoned", "worker-that-dies")
 		time.Sleep(20 * time.Millisecond)
 
 		second, err := q.Claim(ctx, "worker-that-lives", "ingest")
@@ -490,13 +484,7 @@ func TestARenewedClaimIsNotTakenOver(t *testing.T) {
 		ctx := t.Context()
 		moment := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 		queue.SetClock(q, func() time.Time { return moment })
-		if _, err := q.Add(ctx, "ingest", "slow-but-alive"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "slow", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
+		job := claimed(t, q, "ingest", "slow-but-alive", "slow")
 
 		// Time passes, well past the timeout from when the job was claimed,
 		// and the worker says so as it goes.
@@ -531,13 +519,7 @@ func TestOnlyTheWorkerHoldingAJobMayRenewIt(t *testing.T) {
 		ctx := t.Context()
 		moment := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 		queue.SetClock(q, func() time.Time { return moment })
-		if _, err := q.Add(ctx, "ingest", "handed-on"); err != nil {
-			t.Fatal(err)
-		}
-		lost, err := q.Claim(ctx, "slow", "ingest")
-		if err != nil || lost == nil {
-			t.Fatalf("first claim: %v %+v", err, lost)
-		}
+		lost := claimed(t, q, "ingest", "handed-on", "slow")
 		moment = moment.Add(opts.ClaimTimeout + time.Minute)
 		taken, err := q.Claim(ctx, "fresh", "ingest")
 		if err != nil || taken == nil {
@@ -580,13 +562,7 @@ func TestWorkStopsWhenItsJobIsTakenOver(t *testing.T) {
 		ctx := t.Context()
 		moment := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 		queue.SetClock(q, func() time.Time { return moment })
-		if _, err := q.Add(ctx, "ingest", "taken-over"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "slow", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
+		job := claimed(t, q, "ingest", "taken-over", "slow")
 		working, release := q.Holding(ctx, job.ID, "slow", quiet())
 
 		// Another worker, further along the clock, finds the claim stale and
@@ -624,13 +600,7 @@ func TestRenewalsStopWithTheWorkTheyHeldFor(t *testing.T) {
 	opts.Heartbeat = time.Millisecond
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
-		if _, err := q.Add(ctx, "ingest", "brief"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
+		job := claimed(t, q, "ingest", "brief", "worker")
 		working, release := q.Holding(ctx, job.ID, "worker", quiet())
 		if lost := release(); lost != nil {
 			t.Errorf("a claim nobody took was reported lost: %v", lost)
@@ -654,13 +624,7 @@ func TestSetAsideWorkCanBeSeenAndPutBack(t *testing.T) {
 	opts.Backoff = 0
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
-		if _, err := q.Add(ctx, "ingest", "unreadable"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claiming: %v", err)
-		}
+		job := claimed(t, q, "ingest", "unreadable", "worker")
 		if err := q.Fail(ctx, job.ID, "worker", errors.New("not an inventory")); err != nil {
 			t.Fatal(err)
 		}
@@ -703,13 +667,7 @@ func TestOnlySetAsideWorkIsPutBack(t *testing.T) {
 	// workers, which on an ingest looks like real change rather than an error.
 	each(t, queue.DefaultOptions(), func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
-		if _, err := q.Add(ctx, "ingest", "in-progress"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claiming: %v", err)
-		}
+		job := claimed(t, q, "ingest", "in-progress", "worker")
 		if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotSetAside) {
 			t.Errorf("putting back running work answered %v, want it refused", err)
 		}
@@ -920,13 +878,7 @@ func TestWorkThatNeverReturnsGivesUpItsClaimAtTheCeiling(t *testing.T) {
 		// The clock moves while the renewals are running, so it is read from
 		// two goroutines and has to be safe for that.
 		moment := moving(t, q, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
-		if _, err := q.Add(ctx, "ingest", "wedged"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "wedged", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
+		job := claimed(t, q, "ingest", "wedged", "wedged")
 
 		working, release := q.Holding(ctx, job.ID, "wedged", quiet())
 		// The work is still running — nothing here ends it. What moves is the
@@ -957,13 +909,7 @@ func TestAClaimWithNoCeilingIsRenewedForAsLongAsTheWorkRuns(t *testing.T) {
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		moment := moving(t, q, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
-		if _, err := q.Add(ctx, "ingest", "unbounded"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "patient", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
+		job := claimed(t, q, "ingest", "unbounded", "patient")
 
 		working, release := q.Holding(ctx, job.ID, "patient", quiet())
 		moment(24 * time.Hour)
@@ -1029,4 +975,22 @@ func TestBoundsThatCannotWorkTogetherAreRefusedAtStartup(t *testing.T) {
 	if err := noCeiling.Check(); err != nil {
 		t.Errorf("work stated as having no ceiling was refused: %v", err)
 	}
+}
+
+// claimed adds one job and claims it as worker, which is where most of these
+// begin: the claim is the precondition rather than the subject.
+func claimed(t *testing.T, q *queue.Queue, kind, ref, worker string) *queue.Job {
+	t.Helper()
+	ctx := t.Context()
+	if _, err := q.Add(ctx, kind, ref); err != nil {
+		t.Fatal(err)
+	}
+	job, err := q.Claim(ctx, worker, kind)
+	if err != nil || job == nil {
+		t.Fatalf("claim: %v %+v", err, job)
+	}
+	if job.Reference != ref {
+		t.Fatalf("claimed %q, want the job just added, %q", job.Reference, ref)
+	}
+	return job
 }

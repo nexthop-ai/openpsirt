@@ -88,13 +88,7 @@ func TestFinishingWorkSurvivesACommitThatLosesARace(t *testing.T) {
 	handle, owner := dbtest.Racing(t, nil)
 
 	q := queue.New(handle, queue.DefaultOptions())
-	if _, err := q.Add(ctx, "ingest", "finishes"); err != nil {
-		t.Fatal(err)
-	}
-	job, err := q.Claim(ctx, "worker", "ingest")
-	if err != nil || job == nil {
-		t.Fatalf("claiming: %v", err)
-	}
+	job := claimed(t, q, "ingest", "finishes", "worker")
 
 	owner.Arm(1)
 	if err := q.Succeed(ctx, job.ID, "worker"); err != nil {
