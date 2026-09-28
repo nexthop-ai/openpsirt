@@ -248,7 +248,7 @@ func (b *Bucket) Put(ctx context.Context, key string, body io.Reader, size int64
 	_, err := b.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(b.bucket),
 		Key:           aws.String(key),
-		Body:          body,
+		Body:          &exactly{body: body, left: size},
 		ContentLength: aws.Int64(size),
 		ContentType:   aws.String(contentType),
 	}, perCall...)
@@ -256,6 +256,40 @@ func (b *Bucket) Put(ctx context.Context, key string, body io.Reader, size int64
 		return fmt.Errorf("store object: %w", err)
 	}
 	return nil
+}
+
+// exactly passes a body through and fails the read that would complete the
+// declared length when more follows, or the read that ends before it.
+//
+// The HTTP client notices a longer body only after the declared bytes have
+// gone, and a server that has read them can answer first, so the object is
+// stored cut short. Failing before the last bytes leave keeps the request
+// short of its declared length, which no store accepts.
+type exactly struct {
+	body io.Reader
+	left int64
+}
+
+func (e *exactly) Read(p []byte) (int, error) {
+	if e.left <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > e.left {
+		p = p[:e.left]
+	}
+	n, err := e.body.Read(p)
+	e.left -= int64(n)
+	switch {
+	case e.left == 0:
+		var one [1]byte
+		if extra, _ := io.ReadFull(e.body, one[:]); extra > 0 {
+			return 0, errors.New("more bytes arrived than were declared")
+		}
+		return n, nil
+	case errors.Is(err, io.EOF):
+		return n, fmt.Errorf("%d bytes short of the declared length: %w", e.left, io.ErrUnexpectedEOF)
+	}
+	return n, err
 }
 
 func (b *Bucket) Open(ctx context.Context, key string) (io.ReadCloser, error) {

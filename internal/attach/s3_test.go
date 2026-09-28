@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/iotest"
 	"time"
 )
 
@@ -237,6 +238,32 @@ func TestAPlaintextStoreTakesAStreamedBody(t *testing.T) {
 		if err := bucket.Put(ctx, "wrong-length", io.MultiReader(strings.NewReader(body)),
 			declared, "text/plain"); err == nil {
 			t.Fatalf("%d bytes were stored where %d were declared", len(body), declared)
+		}
+	}
+}
+
+// A body of the wrong length never delivers the declared number of bytes.
+//
+// The client finds a longer body only after the declared bytes have gone, and
+// a server that has read them may already have answered and stored them. Held
+// short of the declared length, the request is one no store completes.
+func TestABodyOfTheWrongLengthNeverReachesItsDeclaredLength(t *testing.T) {
+	for body, declared := range map[string]int64{"abc": 4, "abcde": 4, "abcd": 4} {
+		for name, stream := range map[string]io.Reader{
+			"whole":    strings.NewReader(body),
+			"one byte": iotest.OneByteReader(strings.NewReader(body)),
+		} {
+			got, err := io.ReadAll(&exactly{body: stream, left: declared})
+			if int64(len(body)) == declared {
+				if err != nil || string(got) != body {
+					t.Errorf("%s: %q declared %d read as %q, %v", name, body, declared, got, err)
+				}
+				continue
+			}
+			if err == nil || int64(len(got)) >= declared {
+				t.Errorf("%s: %q declared %d delivered %d bytes (%v)",
+					name, body, declared, len(got), err)
+			}
 		}
 	}
 }

@@ -121,7 +121,9 @@ second implementation is tempted to reach past it.
 
 Both backends store exactly the number of bytes they are told to expect. A body
 shorter or longer is refused and nothing is stored, so an upload's digest is
-always of the whole file.
+always of the whole file. The object store is sent a longer body's excess as a
+failure before its last declared byte, since a server that has read the
+declared length can accept it before the client notices more.
 
 ### Store credentials
 
