@@ -160,6 +160,10 @@ type Floor struct {
 	ProductID int64
 }
 
+// LeastFirst is the four rated words, least first — the order a line's floor is
+// offered in.
+func LeastFirst() []string { return append([]string(nil), ranked...) }
+
 // TriageFloors are the words a line may be set to, least first, with the word
 // for no line at the head.
 //

@@ -7530,7 +7530,7 @@ export interface components {
              * @description The reason it stopped applying
              * @enum {string}
              */
-            ended: "lapsed" | "withdrawn";
+            ended: "withdrawn" | "lapsed";
             ended_at?: string;
             /** @description The package version the claim says the fix arrived in, where it claims one has */
             fixed_version?: string;
@@ -8613,17 +8613,6 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        "List-assignedResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-assignedResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["UnassignedBody"][] | null;
-            /** Format: int64 */
-            total: number;
-        };
         "List-attachmentsResponse": {
             /**
              * Format: uri
@@ -8712,28 +8701,6 @@ export interface components {
             /** Format: int64 */
             total: number;
             waiting: components["schemas"]["QueuedBody"][] | null;
-        };
-        "List-team-assignedResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-team-assignedResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["UnassignedBody"][] | null;
-            /** Format: int64 */
-            total: number;
-        };
-        "List-unassignedResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-unassignedResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["UnassignedBody"][] | null;
-            /** Format: int64 */
-            total: number;
         };
         ListBodyAdvisoryListedBody: {
             /**
@@ -11923,6 +11890,17 @@ export interface components {
             variant_name?: string;
             version: string;
             vulnerability: string;
+        };
+        UnassignedPageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnassignedPageBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["UnassignedBody"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         "Undo-batchResponse": {
             /**
@@ -15141,7 +15119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-assignedResponse"];
+                    "application/json": components["schemas"]["UnassignedPageBody"];
                 };
             };
             /** @description Error */
@@ -21046,7 +21024,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-team-assignedResponse"];
+                    "application/json": components["schemas"]["UnassignedPageBody"];
                 };
             };
             /** @description Error */
@@ -21401,7 +21379,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-unassignedResponse"];
+                    "application/json": components["schemas"]["UnassignedPageBody"];
                 };
             };
             /** @description Error */

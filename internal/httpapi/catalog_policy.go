@@ -92,7 +92,7 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		// The same words the deployment's line takes, checked the same way. A
 		// product that could be set to something the deployment could not
 		// would be a second vocabulary for one idea.
-		word := strings.TrimSpace(strings.ToLower(in.Body.Floor))
+		word := strings.TrimSpace(strings.ToLower(string(in.Body.Floor)))
 		if word != "" && !slices.Contains(theFloor, word) {
 			return nil, huma.Error422UnprocessableEntity(
 				fmt.Sprintf("%q is not a line to triage from — write one of %s, "+

@@ -42,7 +42,7 @@ type Sighting struct {
 	// State is how far it has been decided, by the same definition the
 	// findings list uses: a group is agreed when every place is, waiting when
 	// any is, undecided when none has a claim.
-	State       string
+	State       ClaimStanding
 	Undisclosed bool
 	// Recorded is a flaw recorded here in our own product rather than an
 	// issue a scanner reported.

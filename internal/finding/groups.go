@@ -96,7 +96,7 @@ type Group struct {
 	// standing decision, lapsed when a decision here stopped applying and
 	// nothing replaced it. Empty where none of the four holds — some places
 	// approved and the rest never decided, with nothing waiting or lapsed.
-	State string
+	State ClaimStanding
 	// SentBack says a live claim at one of the places is currently with its
 	// author, which is the row the proposer is looking for in the list.
 	SentBack bool
@@ -189,6 +189,31 @@ type Group struct {
 	Matched Matched `bun:"matched"`
 }
 
+// ClaimStanding is how far a group, or one place, has been decided: the word
+// the findings list, the register and every row that reports one say.
+type ClaimStanding string
+
+const (
+	// StandingUndecided is nothing standing: nobody decided, or every claim
+	// was withdrawn.
+	StandingUndecided ClaimStanding = "undecided"
+	// StandingWaiting is a claim waiting for a second person.
+	StandingWaiting ClaimStanding = "waiting"
+	// StandingAgreed is every place answered by a claim that stands.
+	StandingAgreed ClaimStanding = "agreed"
+	// StandingLapsed is a claim that stopped applying when the code moved,
+	// with nothing standing in its place.
+	StandingLapsed ClaimStanding = "lapsed"
+)
+
+// Unsettled reports whether a standing leaves work to do: anything but agreed.
+func (s ClaimStanding) Unsettled() bool { return s != StandingAgreed }
+
+// ClaimStandings is every standing, in the order the list offers them.
+func ClaimStandings() []ClaimStanding {
+	return []ClaimStanding{StandingUndecided, StandingWaiting, StandingAgreed, StandingLapsed}
+}
+
 // stateWord says how far a group has been decided, from the same counts the
 // state filter uses. The order is the filter's: a group every place of which
 // is answered is agreed whatever else its history holds; one with a claim
@@ -196,25 +221,24 @@ type Group struct {
 // lapsed; one nobody ever decided about is undecided. Some places approved
 // and the rest never decided, with nothing waiting or lapsed, is none of the
 // four, and says so by saying nothing.
-func stateWord(places, waiting, approved, lapsed int) string {
+func stateWord(places, waiting, approved, lapsed int) ClaimStanding {
 	switch {
 	case places > 0 && approved == places:
-		return "agreed"
+		return StandingAgreed
 	case waiting > 0:
-		return "waiting"
+		return StandingWaiting
 	case lapsed > 0 && approved == 0:
-		return "lapsed"
+		return StandingLapsed
 	case waiting == 0 && approved == 0 && lapsed == 0:
 		// Nothing stands, rather than nothing was ever said — the same
-		// predicate the filter's own "undecided" uses. Asked as "no claim
-		// row exists", a place whose only claim was withdrawn fell through
-		// every case and drew a blank word, while the filter put it in the
-		// undecided bucket. The row and the filter now answer from one rule,
-		// which is why no count of claims-of-any-kind is read here or taken
-		// from the statement.
-		return "undecided"
+		// predicate the filter's own undecided uses. A place whose only claim
+		// was withdrawn has a claim row and nothing standing, and the row and
+		// the filter answer it from one rule, which is why no count of
+		// claims-of-any-kind is read here or taken from the statement.
+		return StandingUndecided
+	default:
+		return ""
 	}
-	return ""
 }
 
 // worstBand is the highest severity among a set of counts, or empty where
@@ -853,13 +877,10 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// undisclosed, which is what it is for anybody deciding what may be
 		// said about it.
 		//
-		// Counted rather than aggregated over the word. A maximum of the word
-		// was written on the belief that "private" sorts after "public", and
-		// it does not — so the expression returned "public" for exactly the
-		// mixed group it was written to catch, and a list showed no embargo
-		// marker on a row holding an undisclosed place. The four engines do
-		// not agree on a boolean aggregate either, and counting is the same
-		// question asked portably.
+		// Counted rather than aggregated over the word. "private" does not
+		// sort after "public", so a maximum of the word answers "public" for
+		// a mixed group. The four engines do not agree on a boolean aggregate
+		// either, and counting is the same question asked portably.
 		ColumnExpr(access.AnyPrivateAs("f.visibility", "undisclosed")).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Both ends of what the places say, because a group whose places

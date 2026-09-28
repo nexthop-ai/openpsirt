@@ -175,6 +175,11 @@ const (
 	ReturnedClaim ClaimKind = "returned"
 )
 
+// ClaimKinds is every sort of action a claim can be.
+func ClaimKinds() []ClaimKind {
+	return []ClaimKind{FindingClaim, TogetherClaim, ExtensionClaim, ReturnedClaim}
+}
+
 // newClaim records an action and what it argues, inside whatever transaction is
 // writing its rows.
 //

@@ -32,10 +32,10 @@ func registerScoring(api huma.API, in Ingest) {
 		Vector string `query:"vector" required:"true" doc:"A CVSS 3.0, 3.1 or 4.0 base vector"`
 	}) (*struct {
 		Body struct {
-			Vector   string  `json:"vector" doc:"As it was read, upper-cased"`
-			Version  string  `json:"version" doc:"The scheme the vector is on"`
-			Score    float64 `json:"score"`
-			Severity string  `json:"severity" enum:"none,low,medium,high,critical" doc:"The band the score falls in"`
+			Vector   string    `json:"vector" doc:"As it was read, upper-cased"`
+			Version  string    `json:"version" doc:"The scheme the vector is on"`
+			Score    float64   `json:"score"`
+			Severity scoreBand `json:"severity" doc:"The band the score falls in"`
 		}
 	}, error) {
 		if _, err := reading(ctx); err != nil {
@@ -59,16 +59,16 @@ func registerScoring(api huma.API, in Ingest) {
 		}
 		out := &struct {
 			Body struct {
-				Vector   string  `json:"vector" doc:"As it was read, upper-cased"`
-				Version  string  `json:"version" doc:"The scheme the vector is on"`
-				Score    float64 `json:"score"`
-				Severity string  `json:"severity" enum:"none,low,medium,high,critical" doc:"The band the score falls in"`
+				Vector   string    `json:"vector" doc:"As it was read, upper-cased"`
+				Version  string    `json:"version" doc:"The scheme the vector is on"`
+				Score    float64   `json:"score"`
+				Severity scoreBand `json:"severity" doc:"The band the score falls in"`
 			}
 		}{}
 		out.Body.Vector = scored.Vector
 		out.Body.Version = scored.Scheme()
 		out.Body.Score = float64(scored.ScoreCenti) / 100
-		out.Body.Severity = scored.Severity
+		out.Body.Severity = scoreBand(scored.Severity)
 		return out, nil
 	})
 }

@@ -17,6 +17,37 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
+// UnassignedPage is a page of pieces of work, each an issue in a component in
+// a product, with how many there are in all. Nobody's, one person's and one
+// team's lists answer in it.
+type UnassignedPage struct {
+	Body struct {
+		Items []UnassignedBody `json:"items"`
+		Total int              `json:"total"`
+	}
+}
+
+// unassignedPage is a page of pieces of work as the lists answer it.
+func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
+	out := &UnassignedPage{}
+	out.Body.Items = make([]UnassignedBody, 0, len(rows))
+	for _, row := range rows {
+		out.Body.Items = append(out.Body.Items, UnassignedBody{
+			Vulnerability: row.Vulnerability, Severity: row.Severity,
+			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
+			Component: row.Component, Version: row.Version,
+			Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
+			Product: row.Product, ProductName: row.ProductName,
+			Stream: row.Stream, Variant: row.Variant,
+			StreamName:  row.StreamName,
+			VariantName: row.VariantName,
+			Places:      row.Places, Builds: row.Builds,
+		})
+	}
+	out.Body.Total = total
+	return out
+}
+
 // UnassignedBody is one finding nobody is dealing with.
 type UnassignedBody struct {
 	Vulnerability string `json:"vulnerability"`
@@ -355,12 +386,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		ScopeQuery
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*struct {
-		Body struct {
-			Items []UnassignedBody `json:"items"`
-			Total int              `json:"total"`
-		}
-	}, error) {
+	}) (*UnassignedPage, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -374,28 +400,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what nobody is dealing with could not be read", err)
 		}
-		out := &struct {
-			Body struct {
-				Items []UnassignedBody `json:"items"`
-				Total int              `json:"total"`
-			}
-		}{}
-		out.Body.Items = make([]UnassignedBody, 0, len(rows))
-		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, UnassignedBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity,
-				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
-				Component: row.Component, Version: row.Version,
-				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: row.ProductName,
-				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  row.StreamName,
-				VariantName: row.VariantName,
-				Places:      row.Places, Builds: row.Builds,
-			})
-		}
-		out.Body.Total = total
-		return out, nil
+		return unassignedPage(rows, total), nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -417,12 +422,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		ScopeQuery
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*struct {
-		Body struct {
-			Items []UnassignedBody `json:"items"`
-			Total int              `json:"total"`
-		}
-	}, error) {
+	}) (*UnassignedPage, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -482,28 +482,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		if len(rows) == 0 && input.Product != "" && !sees {
 			return nil, noSuchProduct()
 		}
-		out := &struct {
-			Body struct {
-				Items []UnassignedBody `json:"items"`
-				Total int              `json:"total"`
-			}
-		}{}
-		out.Body.Items = make([]UnassignedBody, 0, len(rows))
-		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, UnassignedBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity,
-				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
-				Component: row.Component, Version: row.Version,
-				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: row.ProductName,
-				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  row.StreamName,
-				VariantName: row.VariantName,
-				Places:      row.Places, Builds: row.Builds,
-			})
-		}
-		out.Body.Total = total
-		return out, nil
+		return unassignedPage(rows, total), nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -526,12 +505,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		ScopeQuery
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*struct {
-		Body struct {
-			Items []UnassignedBody `json:"items"`
-			Total int              `json:"total"`
-		}
-	}, error) {
+	}) (*UnassignedPage, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -569,28 +543,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		if len(rows) == 0 && input.Product != "" && !sees {
 			return nil, noSuchProduct()
 		}
-		out := &struct {
-			Body struct {
-				Items []UnassignedBody `json:"items"`
-				Total int              `json:"total"`
-			}
-		}{}
-		out.Body.Items = make([]UnassignedBody, 0, len(rows))
-		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, UnassignedBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity,
-				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
-				Component: row.Component, Version: row.Version,
-				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: row.ProductName,
-				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  row.StreamName,
-				VariantName: row.VariantName,
-				Places:      row.Places, Builds: row.Builds,
-			})
-		}
-		out.Body.Total = total
-		return out, nil
+		return unassignedPage(rows, total), nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{

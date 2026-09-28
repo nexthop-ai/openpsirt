@@ -89,7 +89,7 @@ type ProductBody struct {
 	// said something of its own. Absent means it follows the deployment, which
 	// is a different statement from stating the same word — a product that
 	// stated it would stop following when the deployment changed its mind.
-	TriageFloor string `json:"triage_floor,omitempty" enum:"everything,low,medium,high,critical" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
+	TriageFloor line `json:"triage_floor,omitempty" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
 	// PairShare and PairApprovers are this product's own thresholds for one
 	// pair agreeing to each other's work, where it states them. Absent follows
 	// the deployment.
@@ -128,7 +128,7 @@ func countedOr(n *int) int {
 type TriageFloorBody struct {
 	// Floor is the least severity worth triaging here, "everything" for a
 	// product that hides nothing, or empty to follow the deployment.
-	Floor string `json:"floor" enum:"everything,low,medium,high,critical," doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
+	Floor lineOrClear `json:"floor" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
 }
 
 // StreamBody is a branch or a tag.

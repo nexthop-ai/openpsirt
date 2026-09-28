@@ -31,8 +31,8 @@ type BindingBody struct {
 	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
 	// ProductDisplayName is the label shown beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
-	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The role membership of this group grants"`
+	ProductDisplayName string     `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	Role               roleOrOver `json:"role" doc:"The role membership of this group grants"`
 }
 
 func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *setting.Store) {
@@ -161,7 +161,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			held := products[binding.ProductID]
 			out.Body.Items = append(out.Body.Items, BindingBody{
 				Group: binding.GroupName, Product: held.Address,
-				ProductDisplayName: held.Display, Role: string(binding.Role),
+				ProductDisplayName: held.Display, Role: roleOrOver(binding.Role),
 			})
 		}
 
@@ -175,7 +175,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			}
 			for _, group := range groups {
 				out.Body.Items = append(out.Body.Items,
-					BindingBody{Group: group, Role: string(over)})
+					BindingBody{Group: group, Role: roleOrOver(over)})
 			}
 		}
 		return out, nil
@@ -203,7 +203,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 				return err
 			}
 
-			if over, deployment := overTheDeployment(in.Body.Role); deployment {
+			if over, deployment := overTheDeployment(string(in.Body.Role)); deployment {
 				if in.Body.Product != "" {
 					return huma.Error422UnprocessableEntity(
 						"that is held over the deployment rather than against a product, " +
@@ -235,7 +235,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			// because that is what a binding states and what the withdrawal
 			// resolves.
 			if err := noted(ctx, tx, trail.Role, in.Body.Group+" on "+product.Name,
-				nil, trail.Said(in.Body.Role, true)); err != nil {
+				nil, trail.Said(string(in.Body.Role), true)); err != nil {
 				return notRecorded(a.Logger, err)
 			}
 			return nil

@@ -205,6 +205,10 @@ func roundUp(x float64) float64 {
 	return (math.Floor(float64(scaled)/10000) + 1) / 10
 }
 
+// ScoreBands is every word a score can fall in, least first: "none" for a
+// score of zero, then the four rated words.
+func ScoreBands() []string { return append([]string{"none"}, LeastFirst()...) }
+
 // bandOf is the word a score falls in, by the published bands.
 //
 // One ladder for every scheme here. The bands are the same five words over the

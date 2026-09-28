@@ -174,7 +174,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		if row.Places > 1 {
 			fmt.Fprintf(&out, ", at %d places", row.Places)
 		}
-		fmt.Fprintf(&out, " — %s", stateSaid(row.State))
+		fmt.Fprintf(&out, " — %s", stateSaid(string(row.State)))
 		if row.DueAt != nil {
 			fmt.Fprintf(&out, ", due %s", row.DueAt.UTC().Format(time.DateOnly))
 		}

@@ -38,6 +38,11 @@ const (
 	Rejected Disposition = "rejected"
 )
 
+// Dispositions is every disposition a report can be given.
+func Dispositions() []Disposition {
+	return []Disposition{Accepted, Duplicate, NotReproducible, OutOfScope, Rejected}
+}
+
 // Rulable reports whether a ruling may carry this disposition.
 func (d Disposition) Rulable() bool {
 	switch d {

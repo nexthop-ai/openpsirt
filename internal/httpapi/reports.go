@@ -61,7 +61,7 @@ type ChangedBody struct {
 	// somebody can sign a release off against: an approved
 	// not-applicable and a row nobody has looked at are opposite answers
 	// and read alike without it.
-	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
+	State         standing      `json:"state,omitempty" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
 	Outcome       outcome       `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
 	Due           string        `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
@@ -438,7 +438,7 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 		// is still there, which is the only list either means anything on.
 		if bumped {
 			body.ArrivedFrom = row.ArrivedFrom
-			body.State = row.State
+			body.State = standing(row.State)
 			body.Outcome, body.Justification = outcome(row.Outcome), justification(row.Justification)
 			if row.Due != nil {
 				body.Due = row.Due.Format(time.DateOnly)

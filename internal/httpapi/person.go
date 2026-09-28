@@ -143,7 +143,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 		for _, grant := range held {
 			body.Holds = append(body.Holds, HeldBody{
-				Product: named[grant.ProductID].Address, Role: string(grant.Role),
+				Product: named[grant.ProductID].Address, Role: role(grant.Role),
 				ProductDisplayName: named[grant.ProductID].Display,
 				Effective:          grant.Active, Source: string(grant.Source),
 			})

@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { Body } from "../api/client";
 import { own } from "./own";
 
 // A place's decision state, in the words every screen says it in.
@@ -9,7 +10,10 @@ import { own } from "./own";
 // document all state the same four words about the same fact. The server says
 // them too, for the document it renders; that copy is the server's and moves
 // with it.
-const STATE_SAID: Record<string, string> = {
+//
+// Keyed by the server's own word for it, so a state it adds or drops is a
+// compile error here rather than a row drawn as open.
+const STATE_SAID: Record<Stands, string> = {
   undecided: "nobody has said",
   waiting: "waiting for a second person",
   agreed: "agreed",
@@ -17,19 +21,19 @@ const STATE_SAID: Record<string, string> = {
 };
 
 // And how each is drawn, by the class names the rest of the interface uses.
-const STATE_DRAWN: Record<string, string> = {
+const STATE_DRAWN: Record<Stands, string> = {
   undecided: "open",
   waiting: "waiting",
   agreed: "agreed",
   lapsed: "lapsed",
 };
 
-// The four, in the order a reader works down: what nobody has answered first.
-export const STATES = ["undecided", "waiting", "agreed", "lapsed"] as const;
-
 // One of the four, as a type, so an address that names something else cannot
 // reach a query parameter that takes them.
-export type Stands = (typeof STATES)[number];
+export type Stands = Body<"DisposedBody">["state"];
+
+// The four, in the order a reader works down: what nobody has answered first.
+export const STATES = Object.keys(STATE_SAID) as readonly Stands[];
 
 // The class for the one case none of the four covers: some places answered and
 // the rest never decided. The server leaves the word empty there. Drawn as

@@ -6,9 +6,11 @@ package httpapi_test
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -153,6 +155,130 @@ func TestAJustificationBesideOurOutcomeCarriesOurReasons(t *testing.T) {
 		if len(open) > 0 {
 			t.Errorf("%s sit beside one of our outcomes and state none of our reasons, so the "+
 				"generated client types them as a bare string", strings.Join(open, ", "))
+		}
+	})
+}
+
+// enumsIn is every closed vocabulary the document the server builds offers,
+// by where it sits.
+func enumsIn(t *testing.T, r *reach) map[string][]string {
+	t.Helper()
+	document, err := json.Marshal(r.api.OpenAPI())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var walked map[string]any
+	if err := json.Unmarshal(document, &walked); err != nil {
+		t.Fatal(err)
+	}
+	found := map[string][]string{}
+	var visit func(at string, node any)
+	visit = func(at string, node any) {
+		switch held := node.(type) {
+		case map[string]any:
+			if listed, carries := held["enum"].([]any); carries {
+				offered := make([]string, 0, len(listed))
+				for _, one := range listed {
+					word, ok := one.(string)
+					if !ok {
+						t.Fatalf("%s offers something that is not a word: %v", at, one)
+					}
+					offered = append(offered, word)
+				}
+				found[at] = offered
+			}
+			for key, value := range held {
+				visit(at+"."+key, value)
+			}
+		case []any:
+			for i, value := range held {
+				visit(at+"."+strconv.Itoa(i), value)
+			}
+		}
+	}
+	visit("", walked)
+	return found
+}
+
+// keeping is the words of a vocabulary one of its rules keeps, in its order.
+func keeping[T ~string](all []T, keeps func(T) bool) []string {
+	return words(slices.DeleteFunc(all, func(one T) bool { return !keeps(one) }))
+}
+
+// TestEveryEnumOfADomainVocabularyIsOneTheDomainNames holds the rest of the
+// closed vocabularies to the lists their packages state: roles, embargo acts,
+// dispositions, what became of a claim, decision states, claim kinds,
+// standings and the severity words.
+//
+// An enum made only of one vocabulary's words is that vocabulary offered, and
+// it has to be one of the lists the owning package names, in its order. A
+// retyped literal fails here whether it is the whole list, a shorter one or
+// the same words reordered. An enum reaching outside every vocabulary is some
+// other list, and not this one's to police.
+func TestEveryEnumOfADomainVocabularyIsOneTheDomainNames(t *testing.T) {
+	vocabularies := []struct {
+		name  string
+		named [][]string
+	}{
+		{"roles", [][]string{
+			words(access.Roles()),
+			append(words(access.Roles()), words(access.OverTheDeployment())...),
+		}},
+		{"embargo acts", [][]string{words(finding.Acts())}},
+		{"dispositions", [][]string{
+			words(finding.Dispositions()),
+			keeping(finding.Dispositions(), finding.Disposition.Rulable),
+			keeping(finding.Dispositions(), finding.Disposition.NeedsSecondPerson),
+		}},
+		{"words for what became of a claim", [][]string{words(triage.WhatHappenedAll())}},
+		{"decision states", [][]string{
+			words(triage.States()),
+			keeping(triage.States(), triage.State.Live),
+			keeping(triage.States(), triage.State.Ended),
+		}},
+		{"claim kinds", [][]string{words(triage.ClaimKinds())}},
+		{"standings", [][]string{
+			words(finding.ClaimStandings()),
+			keeping(finding.ClaimStandings(), finding.ClaimStanding.Unsettled),
+		}},
+		{"severity words", [][]string{
+			finding.Bands(), finding.LeastFirst(), finding.Recordable(),
+			finding.TriageFloors(), append(finding.TriageFloors(), ""), finding.ScoreBands(),
+		}},
+	}
+
+	twoReach(t, func(t *testing.T, r *reach) {
+		checked := 0
+		for at, offered := range enumsIn(t, r) {
+			var of []string
+			named := false
+			for _, each := range vocabularies {
+				all := []string{}
+				for _, list := range each.named {
+					all = append(all, list...)
+				}
+				if len(offered) < 2 || slices.ContainsFunc(offered, func(word string) bool {
+					return !slices.Contains(all, word)
+				}) {
+					continue
+				}
+				of = append(of, each.name)
+				named = named || slices.ContainsFunc(each.named, func(list []string) bool {
+					return slices.Equal(list, offered)
+				})
+			}
+			if len(of) == 0 {
+				continue
+			}
+			checked++
+			if !named {
+				t.Errorf("%s offers %v, which is made of the %s and is none of the lists the "+
+					"owning package names — a subset is a named rule there, not a shorter "+
+					"literal here", at, offered, strings.Join(of, " or the "))
+			}
+		}
+		if checked == 0 {
+			t.Fatal("the document offers none of these vocabularies, so this checked nothing")
 		}
 	})
 }

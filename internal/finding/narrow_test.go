@@ -196,7 +196,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		}
 
 		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0,
-			finding.Filter{States: []string{"waiting"}})
+			finding.Filter{States: []finding.ClaimStanding{"waiting"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +204,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 			t.Errorf("a claim in another product made %d rows here read as waiting", waiting)
 		}
 		_, undecided, err := f.store.Groups(ctx, who, f.scope, 50, 0,
-			finding.Filter{States: []string{"undecided"}})
+			finding.Filter{States: []finding.ClaimStanding{"undecided"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -282,14 +282,14 @@ func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
 		if len(groups) != 1 || groups[0].State != "waiting" {
 			t.Fatalf("a lapsed place claimed again reads as %+v, want one row waiting", groups)
 		}
-		_, lapsed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []string{"lapsed"}})
+		_, lapsed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.ClaimStanding{"lapsed"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if lapsed != 0 {
 			t.Errorf("lapsed kept %d rows that read as waiting", lapsed)
 		}
-		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []string{"waiting"}})
+		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.ClaimStanding{"waiting"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,10 +342,10 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(groups) != 1 || groups[0].State != want {
+			if len(groups) != 1 || string(groups[0].State) != want {
 				t.Errorf("build %d reads as %+v, want one row %q", target, groups, want)
 			}
-			_, agreed, err := f.store.Groups(ctx, who, f.scopeOf(t, target), 50, 0, finding.Filter{States: []string{"agreed"}})
+			_, agreed, err := f.store.Groups(ctx, who, f.scopeOf(t, target), 50, 0, finding.Filter{States: []finding.ClaimStanding{"agreed"}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -469,7 +469,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 		count := func(state string) int {
 			t.Helper()
-			_, n, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []string{state}})
+			_, n, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.ClaimStanding{finding.ClaimStanding(state)}})
 			if err != nil {
 				t.Fatalf("%s: %v", state, err)
 			}
@@ -484,7 +484,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, group := range groups {
-				if group.Vulnerability == "CVE-2026-1" && group.State != want {
+				if group.Vulnerability == "CVE-2026-1" && string(group.State) != want {
 					t.Errorf("the row reads as %q, want %q", group.State, want)
 				}
 			}
@@ -579,7 +579,7 @@ func TestNarrowingByHowFarDecided(t *testing.T) {
 		// answered. Both asserted: "undecided keeps everything" alone is what
 		// a clause that never runs also looks like.
 		_, undecided, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{States: []string{"undecided"}})
+			finding.Filter{States: []finding.ClaimStanding{"undecided"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -589,7 +589,7 @@ func TestNarrowingByHowFarDecided(t *testing.T) {
 		}
 		for _, state := range []string{"agreed", "waiting", "lapsed"} {
 			_, n, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-				finding.Filter{States: []string{state}})
+				finding.Filter{States: []finding.ClaimStanding{finding.ClaimStanding(state)}})
 			if err != nil {
 				t.Fatalf("%s: %v", state, err)
 			}
@@ -821,7 +821,7 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage)
 
-		count := func(t *testing.T, states ...string) int {
+		count := func(t *testing.T, states ...finding.ClaimStanding) int {
 			t.Helper()
 			_, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
 				finding.Filter{States: states})

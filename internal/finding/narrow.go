@@ -274,7 +274,7 @@ type Filter struct {
 	// A set rather than one word. "Undecided or waiting on approval" is
 	// the working list of a triager who wants everything not yet settled, and
 	// a single value could not ask it.
-	States []string
+	States []ClaimStanding
 	// Outcomes keeps groups a standing decision of one of these kinds covers —
 	// the way to ask "what have we dismissed", which States cannot answer:
 	// "agreed" says a judgment stands, not which judgment. Read against what
@@ -1386,30 +1386,29 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 //
 // Named apart from the switch that used it so several can be combined, and so
 // each keeps the reasoning that made it what it is.
-func stateHaving(state string) string {
+func stateHaving(state ClaimStanding) string {
 	switch state {
-	case "agreed":
+	case StandingAgreed:
 		return "SUM(COALESCE(dd.approved, 0)) = COUNT(*)"
-	case "waiting":
+	case StandingWaiting:
 		return "SUM(COALESCE(dd.waiting, 0)) > 0"
-	case "lapsed":
+	case StandingLapsed:
 		// Lapsed means nothing replaced it: a claim made again at the place
 		// after the old one lapsed is waiting, which is what the row says,
 		// and the filter has to find the row by the word it reads.
 		return "SUM(COALESCE(dd.lapsed, 0)) > 0 AND SUM(COALESCE(dd.approved, 0)) = 0" +
 			" AND SUM(COALESCE(dd.waiting, 0)) = 0"
-	case "undecided":
+	case StandingUndecided:
 		// Nothing stands, rather than nothing was ever said. A claim that has
 		// been withdrawn leaves a row that covers the place and says nothing
-		// about it, so counting rows put the finding in no state at all: not
-		// undecided, and not any of the three below either. It vanished from
-		// every bucket and from the count above the list, and nothing ever
-		// offered it as work again.
+		// about it, so a count of rows would put the finding in no state at
+		// all, out of every bucket and the count above the list.
 		return "SUM(COALESCE(dd.waiting, 0)) = 0" +
 			" AND SUM(COALESCE(dd.approved, 0)) = 0" +
 			" AND SUM(COALESCE(dd.lapsed, 0)) = 0"
+	default:
+		return ""
 	}
-	return ""
 }
 
 // containsTerm prepares a term to be searched for literally.
@@ -1484,10 +1483,10 @@ func having(q *bun.SelectQuery, condition string, args ...any) *bun.SelectQuery 
 // string does not become a name nothing matches — and so a repeated parameter
 // carrying an empty member, which is what an unset control submits, does not
 // narrow a set to nothing when it means everything.
-func trimmed(names []string) []string {
-	kept := make([]string, 0, len(names))
+func trimmed[T ~string](names []T) []T {
+	kept := make([]T, 0, len(names))
 	for _, name := range names {
-		if name = strings.TrimSpace(name); name != "" {
+		if name = T(strings.TrimSpace(string(name))); name != "" {
 			kept = append(kept, name)
 		}
 	}

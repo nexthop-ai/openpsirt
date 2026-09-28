@@ -42,13 +42,13 @@ type ReportBody struct {
 	// Disposition is what the claim was judged to be, where that has taken
 	// effect. Absent is a claim nobody has answered, or one whose ruling is
 	// waiting for a second person.
-	Disposition    string `json:"disposition,omitempty" enum:"accepted,duplicate,not-reproducible,out-of-scope,rejected" doc:"What the claim was judged to be, once that has taken effect"`
-	DuplicateOf    string `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
-	Ruling         int64  `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
-	Waiting        string `json:"waiting,omitempty" enum:"out-of-scope,rejected" doc:"A disposition proposed and waiting for a second person"`
-	RecordedBy     string `json:"recorded_by" doc:"The person who wrote it down, by sign-in identity"`
-	RecordedByName string `json:"recorded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	RecordedAt     string `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
+	Disposition    disposition        `json:"disposition,omitempty" doc:"What the claim was judged to be, once that has taken effect"`
+	DuplicateOf    string             `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
+	Ruling         int64              `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
+	Waiting        dispositionWaiting `json:"waiting,omitempty" doc:"A disposition proposed and waiting for a second person"`
+	RecordedBy     string             `json:"recorded_by" doc:"The person who wrote it down, by sign-in identity"`
+	RecordedByName string             `json:"recorded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	RecordedAt     string             `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
 }
 
 // registerWhoTold is the record of who told us, and the act of saying we
@@ -329,15 +329,15 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 		}
 		if row.VulnerabilityID != nil {
 			body.Issue = identifiers[*row.VulnerabilityID]
-			body.Disposition = string(finding.Accepted)
+			body.Disposition = disposition(finding.Accepted)
 		}
 		if row.RulingID != nil {
 			ruling := rulings[*row.RulingID]
 			body.Ruling = ruling.ID
 			if ruling.InForce() {
-				body.Disposition = string(ruling.Disposition)
+				body.Disposition = disposition(ruling.Disposition)
 			} else {
-				body.Waiting = string(ruling.Disposition)
+				body.Waiting = dispositionWaiting(ruling.Disposition)
 			}
 			if ruling.DuplicateOf != nil {
 				body.DuplicateOf = identifiers[*ruling.DuplicateOf]
