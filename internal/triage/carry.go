@@ -231,13 +231,13 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 // the two named columns: the component's and its consumer's upstream
 // versions, empty where the line holds nothing open there.
 //
-// Both come from one finding, the lowest pair of versions among those open at
-// the place. A decision is keyed on the pair, and a place can hold two
-// findings — one library vendored twice — so a minimum taken of each version
-// alone can pair versions no finding holds together. Ordered on both and
-// taken once, both columns read the same row on every engine.
+// Both come from one finding: the first open at the place in the order both
+// versions sort as text. A decision is keyed on the pair, and a place can hold
+// two findings — one library vendored twice — so a minimum taken of each
+// version alone can pair versions no finding holds together. Ordered on both
+// and taken once, both columns read the same row.
 func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.SelectQuery) *bun.SelectQuery {
-	lowest := func(expr string) string {
+	first := func(expr string) string {
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
@@ -248,8 +248,8 @@ func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.Se
 	}
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
-			ColumnExpr(lowest(finding.ComponentUpstreamExpr)+` AS ?`, toTarget, bun.Ident(componentAs)).
-			ColumnExpr(lowest(finding.ConsumerUpstreamExpr)+` AS ?`, toTarget, bun.Ident(consumerAs))
+			ColumnExpr(first(finding.ComponentUpstreamExpr)+` AS ?`, toTarget, bun.Ident(componentAs)).
+			ColumnExpr(first(finding.ConsumerUpstreamExpr)+` AS ?`, toTarget, bun.Ident(consumerAs))
 	}
 }
 

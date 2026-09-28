@@ -117,6 +117,28 @@ func TestACarriedPlaceTakesBothVersionsFromOneFinding(t *testing.T) {
 	})
 }
 
+// The preview reads the same one finding's pair. Two findings at the place,
+// each holding one of the judgment's versions and not the other: a pair drawn
+// half from each is the judgment's own key, and the judgment would read as
+// already applying and never be offered.
+func TestACrossedPairIsNotReadAsAlreadyApplying(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.agreed(t, f.at())
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.3", "9.0")
+		f.placeAt(t, "202411", next, "2.0", "4.5.6")
+
+		offered, err := f.store.WouldCarry(t.Context(), f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if offered.Applying != 0 || len(offered.Moved) != 1 {
+			t.Fatalf("offered %+v with %d already applying, want the judgment offered as moved",
+				offered.Moved, offered.Applying)
+		}
+	})
+}
+
 func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
 	// A patch promise is refused without its date, so a carry that left it
 	// behind could never land.
