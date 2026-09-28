@@ -22,7 +22,6 @@ import (
 func TestSomebodyWhoHasLeftIsRefusedAtEveryWayIn(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
 		person, err := rights.Ensure(ctx, "leaver@example.com", "Leaver", nil, nil)

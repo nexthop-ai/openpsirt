@@ -16,7 +16,6 @@ import (
 func eachSetting(t *testing.T, fn func(t *testing.T, s *setting.Store)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		fn(t, setting.NewStore(db.DB))
 	})
 }
@@ -137,7 +136,6 @@ func TestASettingThatCannotBeReadIsNotReportedAsUnset(t *testing.T) {
 // collision itself is forced in race_test.go.
 func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 		store := setting.NewStore(db.DB)
 

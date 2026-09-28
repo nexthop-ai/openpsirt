@@ -37,7 +37,6 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
 		f := &fixture{

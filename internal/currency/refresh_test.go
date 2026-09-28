@@ -149,16 +149,8 @@ func read(t *testing.T, db *database.DB) map[string]stored {
 	return out
 }
 
-func each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
-	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
-		fn(t, db)
-	})
-}
-
 func TestWhatUpstreamHasReleasedIsRecorded(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		shipped := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 		r, _ := seed(t, db, []component{
 			{purl: "pkg:golang/golang.org/x/net@v0.17.0"},
@@ -191,7 +183,7 @@ func TestWhatUpstreamHasReleasedIsRecorded(t *testing.T) {
 // of what Debian is carrying, and answering as though it did would be worse
 // than not answering.
 func TestADistributionPackageIsNotAskedAbout(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:deb/debian/openssl@3.5.6-1"},
 			// The same thing, written the way a producer that capitalizes its
@@ -226,7 +218,7 @@ func TestADistributionPackageIsNotAskedAbout(t *testing.T) {
 // never heard of. Recording that we asked is what stops it being asked again
 // tomorrow, and every day after, forever.
 func TestAPackageNobodyPublishesIsLeftAloneForAMonth(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, _ := seed(t, db, []component{
 			{purl: "pkg:golang/github.com/example/private@v1.0.0"},
 		}, map[string]currency.Latest{}, nil)
@@ -272,7 +264,7 @@ func TestAPackageNobodyPublishesIsLeftAloneForAMonth(t *testing.T) {
 // An index having a bad day must not be recorded as an answer, or a failure
 // becomes a stored fact that nothing revisits for a day.
 func TestAnIndexThatFailsIsAskedAgain(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, _ := seed(t, db, []component{
 			{purl: "pkg:pypi/django@4.2"},
 		}, nil, context.DeadlineExceeded)
@@ -292,7 +284,7 @@ func TestAnIndexThatFailsIsAskedAgain(t *testing.T) {
 
 // Asked recently is left alone; asked long enough ago is asked again.
 func TestOnlyWhatIsStaleIsAskedAgain(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		recent := time.Now().UTC().Add(-time.Hour)
 		old := time.Now().UTC().Add(-2 * currency.StaleAfter)
 		had := "1.0.0"
@@ -388,7 +380,7 @@ func TestUpstreamIsOnlyCalledSilentAfterAClearYear(t *testing.T) {
 // for each of them, which is what it did before, got through the backlog and
 // then spent a slot on every one of them again a month later.
 func TestEcosystemsWithNoIndexDoNotStarveTheQueue(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		var of []component
 		for i := 0; i < currency.MostPerPass; i++ {
 			of = append(of, component{purl: fmt.Sprintf("pkg:generic/thing-%03d@1.0", i)})
@@ -425,7 +417,7 @@ func TestEcosystemsWithNoIndexDoNotStarveTheQueue(t *testing.T) {
 // recorded rather than retried. Left retryable it starves the queue the same
 // way, and one uploaded document full of such names stops the worker.
 func TestANameThatCannotBeAskedAboutIsNotRetriedForever(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, _ := seed(t, db, []component{{purl: "pkg:golang/example.com/m@v1"}},
 			nil, currency.ErrUnaskable)
 
@@ -445,7 +437,7 @@ func TestANameThatCannotBeAskedAboutIsNotRetriedForever(t *testing.T) {
 // requests with a timeout each, so reading it only at the top of a pass leaves
 // an operator who has just turned it off waiting the better part of an hour.
 func TestTurningItOffStopsTheCurrentPass(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		var of []component
 		for i := 0; i < 10; i++ {
 			of = append(of, component{purl: fmt.Sprintf("pkg:cargo/crate-%d@1.0", i)})
@@ -487,7 +479,7 @@ func (s stopping) Latest(ctx context.Context, name string) (currency.Latest, err
 // conditions, and overwriting would destroy a version we had and then sit on
 // the hole for a month.
 func TestAnIndexSayingNoDoesNotDestroyWhatWeAlreadyKnew(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		had := "1.0.0"
 		long := time.Now().UTC().Add(-2 * currency.StaleAfter)
 		r, _ := seed(t, db, []component{
@@ -510,7 +502,7 @@ func TestAnIndexSayingNoDoesNotDestroyWhatWeAlreadyKnew(t *testing.T) {
 // A version answered with no date keeps the date held for it while the version
 // has not moved, and loses it when the version moves.
 func TestAVersionAnsweredWithNoDateKeepsTheDateItHad(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		long := time.Now().UTC().Add(-2 * currency.StaleAfter)
 		same, older := "4.17.21", "1.0.0"
 		r, _ := seed(t, db, []component{
@@ -544,7 +536,7 @@ func TestAVersionAnsweredWithNoDateKeepsTheDateItHad(t *testing.T) {
 // A name in an ecosystem with an index that cannot be read at all is recorded
 // as asked, so it does not stay due for ever.
 func TestAnUnreadableNameInAnAskableEcosystemIsRecorded(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, asked := seed(t, db, []component{{purl: "pkg:npm/%zz/x@1"}}, nil, nil)
 		if _, err := r.Once(t.Context()); err != nil {
 			t.Fatal(err)
@@ -561,7 +553,7 @@ func TestAnUnreadableNameInAnAskableEcosystemIsRecorded(t *testing.T) {
 // Every version of one package in a pass takes one answer, so the index is
 // asked about the package once.
 func TestAPackageIsAskedAboutOnceHoweverManyVersionsAreHeld(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:npm/lodash@4.17.19"},
 			{purl: "pkg:npm/lodash@4.17.20"},
@@ -611,7 +603,6 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
 		// Seeded for its components and its setting; the refresher it returns
 		// is not the one this drives, because this needs two of them.
 		seed(t, db, []component{
@@ -675,7 +666,7 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 // judged. Both arrive over the network from somebody else and are rendered to
 // staff who hold the most access.
 func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		long := strings.Repeat("a", currency.MostSummary+120)
 		r, _ := seed(t, db, []component{
 			{purl: "pkg:npm/kept@1.0.0"},
@@ -761,7 +752,7 @@ func TestARefusalTheIndexWillRepeatDoesNotHoldTheHeadOfTheWindow(t *testing.T) {
 	// and the components behind it were never reached. A package a registry
 	// withdrew, a region it will not serve and a request it will not accept
 	// are all of them.
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:npm/refused@1.0.0"},
 			{purl: "pkg:npm/behind-it@1.0.0"},
@@ -815,7 +806,7 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 	// intervals. So a slow index handed the pass to a second replica
 	// mid-flight and both asked — the thing a lease exists to prevent, at
 	// somebody else's expense.
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		var of []component
 		says := map[string]currency.Latest{}
@@ -857,7 +848,7 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 // two are recorded identically on purpose and a check on storage alone would
 // pass against a version that asked and then threw the answer away.
 func TestANameOfOursIsNotAskedAbout(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		// The second one already has an answer, which is the deployment that
 		// had asking turned on before any of this existed. Everything stored
 		// against it came from sending the name that stops here.
@@ -912,7 +903,7 @@ func TestANameOfOursIsNotAskedAbout(t *testing.T) {
 // The same candidates the report of unanswered names reads: a name that was in
 // a build last year and is not now is not one to send to an index tonight.
 func TestOnlyWhatABuildStillCarriesIsAskedAbout(t *testing.T) {
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		old := time.Now().UTC().Add(-48 * time.Hour)
 		was := "0.9.0"
 		r, asked := seed(t, db, []component{
@@ -1021,7 +1012,7 @@ func TestAnIndexThisDeploymentCannotReachDoesNotHoldBackTheOthers(t *testing.T) 
 	// unreachable index's components are never recorded, so they are always
 	// the never-asked head of the window; read once per pass, they filled it
 	// and no other ecosystem was asked again.
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		old := time.Now().Add(-48 * time.Hour).UTC()
 		var of []component
 		for i := range currency.MostPerPass {
@@ -1061,7 +1052,7 @@ func TestASlowIndexDoesNotOutlastTheLease(t *testing.T) {
 	// A component is several requests to some indexes, so twenty-five of them
 	// against a slow index can take longer than the lease. The pass asks for
 	// the lease again once half of it has gone, whatever the count.
-	each(t, func(t *testing.T, db *database.DB) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		var of []component
 		for i := range currency.RenewEvery {

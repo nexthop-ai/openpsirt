@@ -28,8 +28,6 @@ import (
 // and updating a row that does not exist reports 0.
 func TestTwoWritesInOneInstantStillRecordTheSetting(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
-
 		frozen := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
 		store := &Store{db: db.DB, now: func() time.Time { return frozen }}
 

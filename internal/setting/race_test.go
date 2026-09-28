@@ -38,7 +38,6 @@ import (
 // broken version was correct on SQLite and wrong on all three servers.
 func TestEveryReplicaThatLosesTheMintTakesTheWinnersKey(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 
 		const replicas = 4
@@ -141,7 +140,6 @@ func TestEveryReplicaThatLosesTheMintTakesTheWinnersKey(t *testing.T) {
 // writer would wait for a connection the first is holding.
 func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
 		ctx := t.Context()
 
 		// Something to replace, written by a store with no seam on it so that
