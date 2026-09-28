@@ -571,7 +571,7 @@ which, and a test holds the table against the list of kinds.
 | Kind of notification | Examples | Where it goes |
 |---|---|---|
 | Somebody's own | Assigned, named in a note, a claim sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
-| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, the vulnerability data stale, a supplier silent | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
+| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, a judgment a merge of two issues superseded, the vulnerability data stale, a supplier silent | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
 | Shared, undisclosed | An embargo approaching or due, an obligation window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
 
 | Person's setting | Default | Effect |
