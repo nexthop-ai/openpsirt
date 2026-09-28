@@ -116,12 +116,13 @@ anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
 those three are worked out on every read — nothing stores them, nothing refreshes
 them, and nothing has to be invalidated when a scan closes a finding.
 
-A roll-up across the builds one issue was promised in is not built. "Two of
-three chosen releases are clear" is the reading, and its only source is a
-screen offering a set of builds to tick with no version, no date and no
-reasoning attached — which is the shape this refuses. What is built answers per
-build, the grain a commitment is made at, and where an issue stands across
-several is read from the findings list, which has a row per build.
+A roll-up of one promise across the builds it names is not built. "Landed in
+two of three releases, planned in the third, due on the first" is the reading,
+and its source is the promise itself: the releases it names, the version and
+the date, each release's part resolved by that release's next scan. What is
+built answers per build, the grain a commitment is made at, and where an issue
+stands across several is read from the findings list, which has a row per
+build.
 
 ## Deadlines
 

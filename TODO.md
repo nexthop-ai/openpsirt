@@ -66,7 +66,7 @@ Missing or wrong, with no decision needed to fix it.
 | A version 4 CVSS score is left out of published advisories | CSAF 2.0 has no field for one. A flaw rated only under 4.0 publishes no score until the document moves to CSAF 2.1 |
 | Advisories carry no document-level notes of our own | The title and each issuance's revision summary are typed here. Everything else is assembled from the flaws it covers |
 | The review queue cannot be narrowed by what is waiting | A claim awaiting agreement, a lapsed decision, a deferral that ran out and a promise past its date share one list |
-| No single view of an upgrade promise across the builds it names | Each build answers for itself |
+| No single view of an upgrade promise across the builds it names | Each build answers for itself. The promise already records the releases, the version and the date, so the view reads nothing new |
 | Mail is plain text only | An HTML part needs a markdown renderer on the server, and none exists |
 | The interface has no spacing scale | Six tokens name values already in use, and most spacing is written by hand at many sizes. Choosing a scale is a design judgment made in a browser |
 | Nothing checks that every API operation is reached by some screen | An operation no screen calls is found only by reading |
