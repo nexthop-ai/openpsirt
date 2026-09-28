@@ -709,19 +709,24 @@ func TestAHeaderOnlyReadHoldsNothingItWalkedPast(t *testing.T) {
 		if i > 0 {
 			b.WriteString(",")
 		}
+		// A scope and a claim its pedigree carries, which are recorded per
+		// component on a full read and are nothing a header needs.
 		fmt.Fprintf(&b, `{"bom-ref": "n%d", "name": "package-%d", "version": "1.2.3",`+
-			`"purl": "pkg:deb/debian/package-%d@1.2.3"}`, i, i, i)
+			`"purl": "pkg:deb/debian/package-%d@1.2.3", "scope": "optional",`+
+			`"pedigree": {"patches": [{"type": "backport",`+
+			`"resolves": [{"type": "security", "id": "CVE-2026-%d"}]}]}}`, i, i, i, i)
 	}
 	b.WriteString(`]}}}`)
 
-	bound, contained, members, err := sbom.HeaderHeld(b.String(), sbom.DefaultLimits())
+	bound, contained, members, scopes, claims, err := sbom.HeaderHeld(b.String(), sbom.DefaultLimits())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bound != 0 || contained != 0 || members != 0 {
+	if bound != 0 || contained != 0 || members != 0 || scopes != 0 || claims != 0 {
 		t.Errorf("a header-only read of %d nested components bound %d identifiers, held %d "+
-			"edges and recorded %d components, and it documents itself as skipping them",
-			components, bound, contained, members)
+			"edges, recorded %d components, %d scopes and %d claims, and it documents "+
+			"itself as skipping them",
+			components, bound, contained, members, scopes, claims)
 	}
 }
 

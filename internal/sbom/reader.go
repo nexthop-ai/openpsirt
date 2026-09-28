@@ -349,6 +349,9 @@ func (c *reader) scopeFor(stated string, child graph.Described) string {
 // scoped records what a producer said one component's scope is, for the format
 // that states it there.
 func (c *reader) scoped(described graph.Described, stated string) {
+	if c.headerOnly {
+		return
+	}
 	if word := scopeWord(stated); word != "" {
 		c.scopes[described.Identity()] = word
 	}

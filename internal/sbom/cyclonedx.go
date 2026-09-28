@@ -275,8 +275,12 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	}
 	// A claim the pedigree carries is about the component it was read from,
 	// which is only fully known now: key order is the producer's business, so
-	// the patches may well have been read before the name they belong to.
+	// the patches may well have been read before the name they belong to. A
+	// header-only read keeps none: a header carries no claims.
 	for _, claim := range carried {
+		if c.headerOnly {
+			break
+		}
 		claim.Targets = []Target{{Purl: described.Purl, Name: described.Name}}
 		c.doc.Suppressions = append(c.doc.Suppressions, claim)
 	}

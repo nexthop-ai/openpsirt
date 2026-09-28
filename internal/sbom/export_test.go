@@ -68,10 +68,10 @@ func TopLevelKeys() map[string][]string {
 // header read holds is garbage by the time it returns, so the heap after it
 // says nothing about the heap during it — and during it is inside the upload
 // request.
-func HeaderHeld(body string, lim Limits) (bound, contained, members int, err error) {
+func HeaderHeld(body string, lim Limits) (bound, contained, members, scopes, claims int, err error) {
 	c := newReader(strings.NewReader(body), lim, true)
 	if err := c.read(); err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
-	return len(c.byRef), len(c.contained), len(c.described), nil
+	return len(c.byRef), len(c.contained), len(c.described), len(c.scopes), len(c.doc.Suppressions), nil
 }
