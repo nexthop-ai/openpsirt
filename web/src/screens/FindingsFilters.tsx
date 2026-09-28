@@ -341,6 +341,20 @@ export function activeFilters(params: URLSearchParams): Active[] {
   // It removes itself like every other chip, which is how somebody arriving
   // from that link widens back out to the whole build.
   add("opened_by_run", "Opened by run", at("opened_by_run"));
+  // The same for a claim: the claim page links to where its rows sat. One
+  // chip for the claim and the states together, because the states mean
+  // nothing without it.
+  const claimStates = params.getAll("claim_state").filter(Boolean);
+  add(
+    "claim",
+    "Where claim",
+    at("claim") &&
+      `#${at("claim")}${claimStates.length > 0 ? ` was ${claimStates.join(" or ")}` : ""}`,
+    [
+      ["claim", ""],
+      ["claim_state", ""],
+    ],
+  );
   add("proposed_after", "Claimed after", at("proposed_after"));
   add("closed_after", "Closed after", at("closed_after"));
   each("weakness", "Weakness", []);

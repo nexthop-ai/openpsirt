@@ -268,6 +268,16 @@ what became of it, what it wrote, and what it covers now.
 | **What became of it** | One word over every row, the same word the proposer's own list reads, with when it became that and who did it. A claim whose rows did not all end the same way is said to be mixed rather than reported as whichever came first. A claim marked as having come back is one with an approval on record that is not standing on one — asked of a claim that is currently approved, "was this ever approved" answers about the agreement being read |
 | **What it wrote** | Rows, distinct issues, distinct places |
 | **Present reach** | Folds, packages, consumers and findings its live rows cover, matched the way a finding asks whether a decision applies to it, and every build they reach. A row withdrawn or lapsed covers nothing, so a claim taken back reaches nothing |
+| **Reach when it stopped** | One part for its withdrawn rows and one for its lapsed rows, each present only where such a row exists: the rows, the distinct places they sat at, the latest moment one stopped, and every build holding an open finding at one of those places at the moment that finding's row stopped. A partly lapsed claim reports the lapsed part here and what is still in force as its present reach |
+
+| Reach when it stopped | |
+|---|---|
+| Worked out on request from the rows and each finding's own opening and closing | Nothing is stored beside them, because both moments are already on the rows |
+| Each row is asked at its own moment | The rows of one part can stop on different days |
+| A finding counts where it opened at or before that moment and had not closed by it | A finding closed before a withdrawal and one opened after it were never covered by the row |
+| Matched by place, not by version | A lapse is the version moving at a place, so matched on versions a lapsed row reaches nothing at the moment it lapsed |
+| Narrowed to findings the reader may see | The same rule as the present reach |
+| The findings list narrows to one claim's places, optionally by the state of its row there | What sits at those places now is one link away, and the list stays the one place findings are listed |
 
 | Rule | |
 |---|---|

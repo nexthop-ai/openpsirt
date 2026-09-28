@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -237,6 +238,99 @@ func TestAWithdrawnClaimReachesNothing(t *testing.T) {
 		}
 		if after.Reach.Findings != 0 || len(after.Builds) != 0 {
 			t.Errorf("a withdrawn claim reaches %+v in %v, want nothing", after.Reach, after.Builds)
+		}
+	})
+}
+
+func TestAWithdrawnClaimReportsWhatItReachedWhenItWasWithdrawn(t *testing.T) {
+	// Taken back, a claim reaches nothing now. What it reached then is the
+	// builds holding one of its places open at that moment: a finding closed
+	// before it and one opened after it are not part of it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		at := f.at()
+		at.PlaceIdentity = "place-of-libfoo"
+		at.ConsumerUpstream = ""
+		libfoo := f.component(t, "libfoo", "1.2.3")
+
+		held := f.build(t, f.product, "2026.03")
+		f.finds(t, held, libfoo, at.PlaceIdentity, access.Public)
+		gone := f.build(t, f.product, "2026.02")
+		closed := f.finds(t, gone, libfoo, at.PlaceIdentity, access.Public)
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("closed_at = ?", time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)).
+			Set("closed_run_id = ?", gone.run).
+			Where("id = ?", closed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		made := f.claims(t, at)
+		if err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+		later := f.build(t, f.product, "2026.04")
+		f.opened(t, f.finds(t, later, libfoo, at.PlaceIdentity, access.Public),
+			time.Now().UTC().Add(time.Hour))
+
+		whole, err := f.store.Whole(ctx, f.triager, made.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if whole.Reach.Findings != 0 || len(whole.Builds) != 0 {
+			t.Errorf("a withdrawn claim reaches %+v in %v now, want nothing", whole.Reach, whole.Builds)
+		}
+		if len(whole.Ended) != 1 {
+			t.Fatalf("ended parts %+v, want the withdrawn one alone", whole.Ended)
+		}
+		part := whole.Ended[0]
+		if part.State != triage.Withdrawn || part.Rows != 1 || part.Places != 1 {
+			t.Errorf("the withdrawn part is %+v, want one row at one place", part)
+		}
+		if len(part.Builds) != 1 || !strings.HasPrefix(part.Builds[0], "2026.03") {
+			t.Errorf("it reached %v when withdrawn, want 2026.03 alone", part.Builds)
+		}
+		if part.At.IsZero() {
+			t.Error("the withdrawn part carries no moment")
+		}
+	})
+}
+
+func TestAPartlyLapsedClaimReportsTheLapsedPartApart(t *testing.T) {
+	// One place of two lapsed. The claim still reaches the other now, and
+	// what the lapsed one reached when it lapsed is reported on its own.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		in := f.build(t, f.product, "2026.03")
+		f.finds(t, in, libfoo, "under-a", access.Public)
+		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		f.ends(t, made[0].ID, time.Now().UTC().Truncate(time.Microsecond))
+
+		whole, err := f.store.Whole(ctx, f.triager, made[0].ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(whole.Ended) != 1 {
+			t.Fatalf("ended parts %+v, want the lapsed one alone", whole.Ended)
+		}
+		part := whole.Ended[0]
+		if part.State != triage.LapsedState || part.Rows != 1 || part.Places != 1 {
+			t.Errorf("the lapsed part is %+v, want one row at one place", part)
+		}
+		if len(part.Builds) != 1 || !strings.HasPrefix(part.Builds[0], "2026.03") {
+			t.Errorf("it reached %v when it lapsed, want 2026.03 alone", part.Builds)
+		}
+	})
+}
+
+func TestAClaimNothingEndedReportsNoEndedPart(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		made := f.claims(t, f.at())
+		whole, err := f.store.Whole(t.Context(), f.triager, made.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(whole.Ended) != 0 {
+			t.Errorf("a standing claim reports ended parts %+v", whole.Ended)
 		}
 	})
 }

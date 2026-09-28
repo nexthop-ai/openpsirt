@@ -298,6 +298,8 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		FixStates:         fixStates(n.FixState),
 		Weaknesses:        n.Weakness,
 		SentBack:          n.SentBack,
+		Claim:             n.Claim,
+		ClaimStates:       n.ClaimState,
 		Publishers:        n.Publisher,
 		VexStatus:         plainly(n.Said),
 		OpenedByRun:       n.OpenedByRun,
@@ -364,6 +366,8 @@ type Narrowing struct {
 	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in"`
 	Weakness     []string    `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
 	SentBack     bool        `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
+	Claim        int64       `query:"claim" minimum:"1" doc:"Keep only what sits at a place this claim wrote a decision for, by the claim's identifier"`
+	ClaimState   []string    `query:"claim_state,explode" enum:"proposed,approved,withdrawn,lapsed" uniqueItems:"true" doc:"With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim"`
 	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
 	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
 	OpenedByRun  int64       `query:"opened_by_run" minimum:"1" doc:"Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it"`

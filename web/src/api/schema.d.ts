@@ -6755,6 +6755,8 @@ export interface components {
              * @description The number of things pulling them in
              */
             consumers: number;
+            /** @description The claim's withdrawn rows and its lapsed rows, each with what they reached when they stopped. Empty while every row is live */
+            ended: components["schemas"]["EndedReachBody"][] | null;
             /** @description A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place */
             finding?: components["schemas"]["FindingRefBody"];
             /**
@@ -7480,6 +7482,27 @@ export interface components {
             readonly $schema?: string;
             /** @description The date support ends, as YYYY-MM-DD, or empty to clear it */
             on: string;
+        };
+        EndedReachBody: {
+            /** @description The latest moment one of them stopped */
+            at: string;
+            /** @description Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant */
+            builds: string[] | null;
+            /**
+             * Format: int64
+             * @description The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now
+             */
+            places: number;
+            /**
+             * Format: int64
+             * @description The number of decisions that stopped this way
+             */
+            rows: number;
+            /**
+             * @description How these rows stopped applying
+             * @enum {string}
+             */
+            state: "withdrawn" | "lapsed";
         };
         Engine: {
             name: string;
@@ -13882,6 +13905,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
@@ -13988,6 +14015,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
@@ -15732,6 +15763,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
@@ -15889,6 +15924,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
@@ -16008,6 +16047,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
@@ -16132,6 +16175,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
@@ -16254,6 +16301,10 @@ export interface operations {
                 weakness?: string[] | null;
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                claim?: number;
+                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
+                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */

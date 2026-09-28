@@ -1084,3 +1084,74 @@ func TestANarrowingThatCannotBeAppliedAnswersNothingRatherThanEverything(t *test
 		}
 	})
 }
+
+// A claim's places open the list: every place one of its rows sits at, or
+// only the places where its row is in the states asked for. A row of the
+// same claim in another product is not a place of this product.
+func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", swss), found("CVE-2026-2", teamd),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")
+		if err != nil {
+			t.Fatal(err)
+		}
+		claim, other := claimBy(t, f.db, somebody.ID), claimBy(t, f.db, somebody.ID)
+		wrote := func(claimID, productID int64, issue string, at graph.Described, state string) {
+			t.Helper()
+			row := map[string]any{
+				"claim_id": claimID, "product_id": productID,
+				"vulnerability_id": f.issueID(t, issue),
+				"place_identity":   finding.PlaceIdentity(at.Name, ""),
+				"visibility":       "public", "state": state,
+				"needs_approval": true, "proposed_by": somebody.ID,
+				"proposed_at": time.Now().UTC(), "ended_at": time.Now().UTC(),
+			}
+			if _, err := f.db.DB.NewInsert().Model(&row).
+				TableExpr("\"decision\"").Exec(ctx); err != nil {
+				t.Fatalf("record a decision: %v", err)
+			}
+		}
+		wrote(claim, f.productID, "CVE-2026-1", swss, "withdrawn")
+		wrote(claim, f.productID, "CVE-2026-2", teamd, "lapsed")
+		wrote(other, elsewhere.ID, "CVE-2026-1", swss, "withdrawn")
+
+		for _, c := range []struct {
+			because string
+			filter  finding.Filter
+			want    int
+		}{
+			{"every place the claim wrote at", finding.Filter{Claim: claim}, 2},
+			{"the places where it was withdrawn",
+				finding.Filter{Claim: claim, ClaimStates: []string{"withdrawn"}}, 1},
+			{"the places where it lapsed",
+				finding.Filter{Claim: claim, ClaimStates: []string{"lapsed"}}, 1},
+			{"a claim whose only row is in another product", finding.Filter{Claim: other}, 0},
+		} {
+			_, kept, err := f.store.Groups(ctx, who, f.scope, 50, 0, c.filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kept != c.want {
+				t.Errorf("%s: the list kept %d, want %d", c.because, kept, c.want)
+			}
+			_, across, err := f.store.Anywhere(ctx, who, 50, 0, c.filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if across != c.want {
+				t.Errorf("%s: the list across products kept %d, want %d", c.because, across, c.want)
+			}
+		}
+	})
+}

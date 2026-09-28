@@ -387,6 +387,12 @@ type Filter struct {
 	// SentBack keeps groups where a live claim is with its author, which is
 	// the row a proposer is looking for and cannot ask for today.
 	SentBack bool
+	// Claim keeps what sits at a place one claim wrote a row for, and
+	// ClaimStates narrows those rows to the ones in these states. Zero is no
+	// narrowing, and the states mean nothing without a claim. It is how a
+	// claim that stopped applying opens what now sits where it was.
+	Claim       int64
+	ClaimStates []string
 	// DiffersBetweenBuilds keeps groups that are open in some builds of the
 	// selection and not others — the rows a comparison is about. Meaningless
 	// where the selection is one build, and ignored there rather than
@@ -788,6 +794,22 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		where, args := f.product()
 		q = q.Where(standsAs(where, claimSentBack),
 			append(append([]any{}, args...), claimSentBack.args...)...)
+	}
+	if f.Claim > 0 {
+		// A condition on a row: a place either held one of the claim's rows
+		// or did not, so a group keeps the places that did.
+		where, args := f.product()
+		held := `EXISTS (SELECT 1 FROM "decision" AS "dc"
+			WHERE dc.claim_id = ?
+			  AND dc.product_id = ` + where + `
+			  AND dc.vulnerability_id = f.vulnerability_id
+			  AND dc.place_identity = f.place_identity`
+		asked := append([]any{f.Claim}, args...)
+		if states := trimmed(f.ClaimStates); len(states) > 0 {
+			held += " AND dc.state IN (?)"
+			asked = append(asked, bun.List(states))
+		}
+		q = q.Where(held+")", asked...)
 	}
 	// Open in some builds of the selection and not others, which is what a
 	// comparison is about. Counted over the builds the selection holds rather

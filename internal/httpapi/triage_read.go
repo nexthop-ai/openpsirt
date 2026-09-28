@@ -71,6 +71,9 @@ type ClaimDetail struct {
 	Consumers int      `json:"consumers" doc:"The number of things pulling them in"`
 	Findings  int      `json:"findings" doc:"The number of findings underneath, which is what the disposition register expands to"`
 	Builds    []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
+	// Ended is what the rows that stopped applying reached when they stopped,
+	// apart from the present reach above, which counts live rows alone.
+	Ended []EndedReachBody `json:"ended" doc:"The claim's withdrawn rows and its lapsed rows, each with what they reached when they stopped. Empty while every row is live"`
 	// Outliers is the rows of a bulk set that do not look like the rest.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a claim over many issues: the rows that do not look like the rest, and how many there are"`
 	// Undisclosed says at least one row is about a finding nobody has
@@ -78,6 +81,32 @@ type ClaimDetail struct {
 	// that may be mentioned follows the visibility of what is being discussed,
 	// and a claim is as careful as its most careful row.
 	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one row is about a finding nobody has announced"`
+}
+
+// EndedReachBody is the rows of a claim that stopped applying one way, and
+// what they reached at that moment.
+type EndedReachBody struct {
+	State  string   `json:"state" enum:"withdrawn,lapsed" doc:"How these rows stopped applying"`
+	At     string   `json:"at" doc:"The latest moment one of them stopped"`
+	Rows   int      `json:"rows" doc:"The number of decisions that stopped this way"`
+	Places int      `json:"places" doc:"The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now"`
+	Builds []string `json:"builds" doc:"Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant"`
+}
+
+// endedReach renders the parts of a claim that stopped applying.
+func endedReach(parts []triage.EndedPart) []EndedReachBody {
+	out := make([]EndedReachBody, 0, len(parts))
+	for _, part := range parts {
+		body := EndedReachBody{
+			State: string(part.State), Rows: part.Rows, Places: part.Places,
+			Builds: part.Builds,
+		}
+		if !part.At.IsZero() {
+			body.At = part.At.UTC().Format(time.RFC3339)
+		}
+		out = append(out, body)
+	}
+	return out
 }
 
 // claimArgument renders what a claim says, with the reasoning it currently
@@ -298,6 +327,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			Consumers:          whole.Reach.Consumers,
 			Findings:           whole.Reach.Findings,
 			Builds:             whole.Builds,
+			Ended:              endedReach(whole.Ended),
 			Undisclosed:        whole.Undisclosed,
 		}
 		if whole.When != nil {

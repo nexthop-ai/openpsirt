@@ -289,6 +289,12 @@ export function listQuery(params: URLSearchParams) {
   // address carries is somebody else's text like any other, so a value that is
   // not a run number is a parameter to leave off rather than one to send wrong.
   const openedBy = num(params.get("opened_by_run"), 1, Number.MAX_SAFE_INTEGER);
+  // The claim whose places the list is narrowed to, as the claim page links to.
+  // The states narrow its rows and are sent only with it.
+  const claim = num(params.get("claim"), 1, Number.MAX_SAFE_INTEGER);
+  const claimStates = params
+    .getAll("claim_state")
+    .filter((word) => ["proposed", "approved", "withdrawn", "lapsed"].includes(word));
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   return {
     limit: pageSize(params),
@@ -301,6 +307,14 @@ export function listQuery(params: URLSearchParams) {
     ...(likelihood > 0 && likelihood <= 1 ? { epss_at_least: likelihood } : {}),
     ...(params.get("opened_after") ? { opened_after: params.get("opened_after") ?? "" } : {}),
     ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
+    ...(claim !== undefined ? { claim } : {}),
+    ...(claim !== undefined && claimStates.length > 0
+      ? {
+          claim_state: [...new Set(claimStates)] as (
+            "proposed" | "approved" | "withdrawn" | "lapsed"
+          )[],
+        }
+      : {}),
     ...(params.get("proposed_after") ? { proposed_after: params.get("proposed_after") ?? "" } : {}),
     ...(params.get("closed_after") ? { closed_after: params.get("closed_after") ?? "" } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),
