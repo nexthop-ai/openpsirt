@@ -7,9 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -21,27 +19,10 @@ import (
 // store refuses, or one whose edges named components it did not list, would
 // pass every test in either package alone.
 func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	world.Each(t, func(t *testing.T, w *world.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		filedAgainst, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		filedAgainst := w.Target
 
 		doc, err := sbom.Read(fixture(t, "image.cdx.json"), sbom.Limits{})
 		if err != nil {
@@ -102,27 +83,10 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 // component is interned: an edge holding the copy from before the licenses
 // were resolved stores the component without one.
 func TestALicenseReadFromAnElementReachesTheStoredComponent(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	world.Each(t, func(t *testing.T, w *world.World) {
+		db := w.DB
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "app", "App")
-		if err != nil {
-			t.Fatal(err)
-		}
-		stream, err := cat.DeclareStream(ctx, product.ID, "main", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "linux", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := w.Target
 		doc, err := sbom.Read(fixture(t, "rust-app.spdx3.json"), sbom.Limits{})
 		if err != nil {
 			t.Fatal(err)
