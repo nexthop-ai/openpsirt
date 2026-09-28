@@ -1,0 +1,1166 @@
+column admin_change.about varchar(593) null=NO default=- extra= collation=utf8mb4_bin
+column admin_change.at datetime(6) null=NO default=- extra= collation=-
+column admin_change.became mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column admin_change.by bigint(20) null=NO default=- extra= collation=-
+column admin_change.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column admin_change.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column admin_change.was mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column advisory.edition_id bigint(20) null=YES default=NULL extra= collation=-
+column advisory.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column advisory.identifier varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column advisory.identifier_folded varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column advisory.mint_number bigint(20) null=NO default=- extra= collation=-
+column advisory.minted_at datetime(6) null=NO default=- extra= collation=-
+column advisory.minted_by bigint(20) null=NO default=- extra= collation=-
+column advisory.minted_year bigint(20) null=NO default=- extra= collation=-
+column advisory.released_from datetime(6) null=YES default=NULL extra= collation=-
+column advisory_approval.advisory_id bigint(20) null=NO default=- extra= collation=-
+column advisory_approval.approved_at datetime(6) null=NO default=- extra= collation=-
+column advisory_approval.approved_by bigint(20) null=NO default=- extra= collation=-
+column advisory_approval.edition_id bigint(20) null=NO default=- extra= collation=-
+column advisory_approval.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column advisory_approval.withdrawn_at datetime(6) null=YES default=NULL extra= collation=-
+column advisory_approval.withdrawn_by bigint(20) null=YES default=NULL extra= collation=-
+column advisory_edition.advisory_id bigint(20) null=NO default=- extra= collation=-
+column advisory_edition.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column advisory_edition.ordinal bigint(20) null=NO default=- extra= collation=-
+column advisory_edition.title mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column advisory_edition.written_at datetime(6) null=NO default=- extra= collation=-
+column advisory_edition.written_by bigint(20) null=NO default=- extra= collation=-
+column advisory_issuance.advisory_id bigint(20) null=NO default=- extra= collation=-
+column advisory_issuance.digest varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column advisory_issuance.document mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column advisory_issuance.edition_id bigint(20) null=NO default=- extra= collation=-
+column advisory_issuance.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column advisory_issuance.issued_at datetime(6) null=NO default=- extra= collation=-
+column advisory_issuance.issued_by bigint(20) null=NO default=- extra= collation=-
+column advisory_issuance.ordinal bigint(20) null=NO default=- extra= collation=-
+column advisory_issuance.summary mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column advisory_issue.added_at datetime(6) null=NO default=- extra= collation=-
+column advisory_issue.added_by bigint(20) null=NO default=- extra= collation=-
+column advisory_issue.advisory_id bigint(20) null=NO default=- extra= collation=-
+column advisory_issue.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column advisory_issue.product_id bigint(20) null=NO default=- extra= collation=-
+column advisory_issue.removed_at datetime(6) null=YES default=NULL extra= collation=-
+column advisory_issue.removed_by bigint(20) null=YES default=NULL extra= collation=-
+column advisory_issue.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column advisory_source.caught_up_mark varchar(64) null=YES default=NULL extra= collation=utf8mb4_bin
+column advisory_source.caught_up_to datetime(6) null=YES default=NULL extra= collation=-
+column advisory_source.created_at datetime(6) null=NO default=- extra= collation=-
+column advisory_source.created_by bigint(20) null=NO default=- extra= collation=-
+column advisory_source.display_name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column advisory_source.failed mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column advisory_source.fetched_at datetime(6) null=YES default=NULL extra= collation=-
+column advisory_source.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column advisory_source.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column advisory_source.product_id bigint(20) null=NO default=- extra= collation=-
+column advisory_source.reached_at datetime(6) null=YES default=NULL extra= collation=-
+column advisory_source.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column advisory_source.url mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column api_key.created_at datetime(6) null=NO default=- extra= collation=-
+column api_key.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column api_key.last_used_at datetime(6) null=YES default=NULL extra= collation=-
+column api_key.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column api_key.product_id bigint(20) null=NO default=- extra= collation=-
+column api_key.revoked_at datetime(6) null=YES default=NULL extra= collation=-
+column api_key.secret_hash varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column api_key.stream_id bigint(20) null=YES default=NULL extra= collation=-
+column api_key.variant_id bigint(20) null=YES default=NULL extra= collation=-
+column application_setting.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column application_setting.updated_at datetime(6) null=NO default=- extra= collation=-
+column application_setting.value text null=NO default=- extra= collation=utf8mb4_bin
+column assessment.decided_at datetime(6) null=YES default=NULL extra= collation=-
+column assessment.decided_by bigint(20) null=YES default=NULL extra= collation=-
+column assessment.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column assessment.live_vulnerability_id bigint(20) null=YES default=NULL extra= collation=-
+column assessment.needs_approval tinyint(1) null=NO default=- extra= collation=-
+column assessment.product_id bigint(20) null=NO default=- extra= collation=-
+column assessment.proposed_at datetime(6) null=NO default=- extra= collation=-
+column assessment.proposed_by bigint(20) null=NO default=- extra= collation=-
+column assessment.published varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column assessment.reasoning mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column assessment.severity varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column assessment.state varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column assessment.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column attachment.attached_at datetime(6) null=YES default=NULL extra= collation=-
+column attachment.content_type varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column attachment.digest varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column attachment.filename mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column attachment.flaw_report_id bigint(20) null=YES default=NULL extra= collation=-
+column attachment.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column attachment.object_key varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column attachment.product_id bigint(20) null=NO default=- extra= collation=-
+column attachment.redacted_at datetime(6) null=YES default=NULL extra= collation=-
+column attachment.redacted_by bigint(20) null=YES default=NULL extra= collation=-
+column attachment.redacted_reason mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column attachment.size_bytes bigint(20) null=NO default=- extra= collation=-
+column attachment.token varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column attachment.uploaded_at datetime(6) null=NO default=- extra= collation=-
+column attachment.uploaded_by bigint(20) null=NO default=- extra= collation=-
+column attachment.vulnerability_id bigint(20) null=YES default=NULL extra= collation=-
+column case_collaborator.added_at datetime(6) null=NO default=- extra= collation=-
+column case_collaborator.added_by bigint(20) null=NO default=- extra= collation=-
+column case_collaborator.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column case_collaborator.live_person_id bigint(20) null=YES default=NULL extra= collation=-
+column case_collaborator.person_id bigint(20) null=NO default=- extra= collation=-
+column case_collaborator.product_id bigint(20) null=NO default=- extra= collation=-
+column case_collaborator.removed_at datetime(6) null=YES default=NULL extra= collation=-
+column case_collaborator.removed_by bigint(20) null=YES default=NULL extra= collation=-
+column case_collaborator.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column claim.committed_to date null=YES default=NULL extra= collation=-
+column claim.deferred_until date null=YES default=NULL extra= collation=-
+column claim.derived_from bigint(20) null=YES default=NULL extra= collation=-
+column claim.elsewhere mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim.fixed_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column claim.justification mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column claim.mitigation mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim.outcome varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column claim.proposed_at datetime(6) null=NO default=- extra= collation=-
+column claim.proposed_by bigint(20) null=NO default=- extra= collation=-
+column claim.revision_id bigint(20) null=YES default=NULL extra= collation=-
+column claim.selected_by mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim.selected_matched int(11) null=YES default=NULL extra= collation=-
+column claim.selected_named int(11) null=YES default=NULL extra= collation=-
+column claim.selected_where mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim.upgrade_to mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column claim_approval.approved_at datetime(6) null=NO default=- extra= collation=-
+column claim_approval.approved_by bigint(20) null=NO default=- extra= collation=-
+column claim_approval.batch varchar(64) null=YES default=NULL extra= collation=utf8mb4_bin
+column claim_approval.carried_from bigint(20) null=YES default=NULL extra= collation=-
+column claim_approval.claim_id bigint(20) null=NO default=- extra= collation=-
+column claim_approval.covered bigint(20) null=YES default=NULL extra= collation=-
+column claim_approval.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column claim_approval.revision_id bigint(20) null=NO default=- extra= collation=-
+column claim_approval.withdrawn_at datetime(6) null=YES default=NULL extra= collation=-
+column claim_approval.withdrawn_by bigint(20) null=YES default=NULL extra= collation=-
+column claim_comment.body mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column claim_comment.claim_id bigint(20) null=NO default=- extra= collation=-
+column claim_comment.edited_at datetime(6) null=YES default=NULL extra= collation=-
+column claim_comment.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column claim_comment.written_at datetime(6) null=NO default=- extra= collation=-
+column claim_comment.written_by bigint(20) null=NO default=- extra= collation=-
+column claim_comment_revision.body mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column claim_comment_revision.comment_id bigint(20) null=NO default=- extra= collation=-
+column claim_comment_revision.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column claim_comment_revision.ordinal bigint(20) null=NO default=- extra= collation=-
+column claim_comment_revision.replaced_at datetime(6) null=NO default=- extra= collation=-
+column claim_revision.body mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column claim_revision.claim_id bigint(20) null=NO default=- extra= collation=-
+column claim_revision.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column claim_revision.ordinal bigint(20) null=NO default=- extra= collation=-
+column claim_revision.written_at datetime(6) null=NO default=- extra= collation=-
+column claim_revision.written_by bigint(20) null=NO default=- extra= collation=-
+column component.cpe mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.first_seen_at datetime(6) null=NO default=- extra= collation=-
+column component.fold_key varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column component.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column component.identity varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column component.latest_checked_at datetime(6) null=YES default=NULL extra= collation=-
+column component.latest_released_at datetime(6) null=YES default=NULL extra= collation=-
+column component.latest_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.license mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.name mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column component.name_folded varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column component.project_url mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.purl mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.summary mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.supplier mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.upstream_folded varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column component.upstream_name mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.upstream_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column component.version mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column decision.claim_id bigint(20) null=NO default=- extra= collation=-
+column decision.component_upstream_version varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column decision.consumer_upstream_version varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column decision.ended_at datetime(6) null=YES default=NULL extra= collation=-
+column decision.from_statement_id bigint(20) null=YES default=NULL extra= collation=-
+column decision.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column decision.live_key varchar(64) null=YES default=NULL extra= collation=utf8mb4_bin
+column decision.needs_approval tinyint(1) null=NO default=- extra= collation=-
+column decision.place_identity varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column decision.product_id bigint(20) null=NO default=- extra= collation=-
+column decision.proposed_at datetime(6) null=NO default=- extra= collation=-
+column decision.proposed_by bigint(20) null=NO default=- extra= collation=-
+column decision.selected_by mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column decision.sent_back_at datetime(6) null=YES default=NULL extra= collation=-
+column decision.severity_centi bigint(20) null=YES default=NULL extra= collation=-
+column decision.state varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column decision.visibility varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column decision.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column disclosure_movement.act varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column disclosure_movement.approved_at datetime(6) null=YES default=NULL extra= collation=-
+column disclosure_movement.approved_by bigint(20) null=YES default=NULL extra= collation=-
+column disclosure_movement.asked_at datetime(6) null=NO default=- extra= collation=-
+column disclosure_movement.asked_by bigint(20) null=NO default=- extra= collation=-
+column disclosure_movement.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column disclosure_movement.needs_approval tinyint(1) null=NO default=- extra= collation=-
+column disclosure_movement.product_id bigint(20) null=NO default=- extra= collation=-
+column disclosure_movement.reason mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column disclosure_movement.until datetime(6) null=NO default=- extra= collation=-
+column disclosure_movement.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column disclosure_movement.was datetime(6) null=NO default=- extra= collation=-
+column exploited_here.cleared_at datetime(6) null=YES default=NULL extra= collation=-
+column exploited_here.cleared_because mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column exploited_here.cleared_by bigint(20) null=YES default=NULL extra= collation=-
+column exploited_here.grounds mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column exploited_here.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column exploited_here.known_at datetime(6) null=NO default=- extra= collation=-
+column exploited_here.live_vulnerability_id bigint(20) null=YES default=NULL extra= collation=-
+column exploited_here.product_id bigint(20) null=NO default=- extra= collation=-
+column exploited_here.recorded_at datetime(6) null=NO default=- extra= collation=-
+column exploited_here.recorded_by bigint(20) null=NO default=- extra= collation=-
+column exploited_here.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column finding.arrived_from mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.assigned_at datetime(6) null=YES default=NULL extra= collation=-
+column finding.assigned_to bigint(20) null=YES default=NULL extra= collation=-
+column finding.closed_at datetime(6) null=YES default=NULL extra= collation=-
+column finding.closed_because varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.closed_by bigint(20) null=YES default=NULL extra= collation=-
+column finding.closed_note mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.closed_run_id bigint(20) null=YES default=NULL extra= collation=-
+column finding.component_id bigint(20) null=NO default=- extra= collation=-
+column finding.consumer_id bigint(20) null=YES default=NULL extra= collation=-
+column finding.disclose_at datetime(6) null=YES default=NULL extra= collation=-
+column finding.due_at datetime(6) null=YES default=NULL extra= collation=-
+column finding.exploited_learned_at datetime(6) null=YES default=NULL extra= collation=-
+column finding.fix_state varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.fixed_at date null=YES default=NULL extra= collation=-
+column finding.fixed_in mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column finding.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column finding.last_changed_at datetime(6) null=NO default=- extra= collation=-
+column finding.matched varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.matched_from mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.matched_in mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.matched_range mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.moved_to mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column finding.opened_at datetime(6) null=NO default=- extra= collation=-
+column finding.opened_run_id bigint(20) null=YES default=NULL extra= collation=-
+column finding.place_identity varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column finding.rated_at datetime(6) null=YES default=NULL extra= collation=-
+column finding.routed_by bigint(20) null=YES default=NULL extra= collation=-
+column finding.suppressed_by bigint(20) null=YES default=NULL extra= collation=-
+column finding.target_id bigint(20) null=NO default=- extra= collation=-
+column finding.urgency bigint(20) null=NO default=- extra= collation=-
+column finding.urgency_exploited tinyint(1) null=NO default=- extra= collation=-
+column finding.urgency_exploited_here tinyint(1) null=NO default=- extra= collation=-
+column finding.urgency_shipped tinyint(1) null=NO default=- extra= collation=-
+column finding.visibility varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column finding.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column finding_tag.added_at datetime(6) null=NO default=- extra= collation=-
+column finding_tag.added_by bigint(20) null=NO default=- extra= collation=-
+column finding_tag.component_id bigint(20) null=NO default=- extra= collation=-
+column finding_tag.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column finding_tag.product_id bigint(20) null=NO default=- extra= collation=-
+column finding_tag.tag varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column finding_tag.typed mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column finding_tag.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column flaw_report.acknowledged_at datetime(6) null=YES default=NULL extra= collation=-
+column flaw_report.acknowledged_by bigint(20) null=YES default=NULL extra= collation=-
+column flaw_report.contact mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column flaw_report.credit mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column flaw_report.evaluated_at datetime(6) null=YES default=NULL extra= collation=-
+column flaw_report.evaluated_by bigint(20) null=YES default=NULL extra= collation=-
+column flaw_report.found_here tinyint(1) null=NO default=0 extra= collation=-
+column flaw_report.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column flaw_report.product_id bigint(20) null=NO default=- extra= collation=-
+column flaw_report.received_on date null=YES default=NULL extra= collation=-
+column flaw_report.recorded_at datetime(6) null=NO default=- extra= collation=-
+column flaw_report.recorded_by bigint(20) null=NO default=- extra= collation=-
+column flaw_report.reference varchar(593) null=NO default=- extra= collation=utf8mb4_bin
+column flaw_report.reported_by mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column flaw_report.ruling_id bigint(20) null=YES default=NULL extra= collation=-
+column flaw_report.summary mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column flaw_report.vulnerability_id bigint(20) null=YES default=NULL extra= collation=-
+column goose_db_version.id bigint(20) unsigned null=NO default=- extra=auto_increment collation=-
+column goose_db_version.is_applied tinyint(1) null=NO default=- extra= collation=-
+column goose_db_version.tstamp timestamp null=YES default=current_timestamp() extra= collation=-
+column goose_db_version.version_id bigint(20) null=NO default=- extra= collation=-
+column graph_edge.child_id bigint(20) null=NO default=- extra= collation=-
+column graph_edge.closed_scan_id bigint(20) null=YES default=NULL extra= collation=-
+column graph_edge.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column graph_edge.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column graph_edge.opened_scan_id bigint(20) null=NO default=- extra= collation=-
+column graph_edge.parent_id bigint(20) null=NO default=- extra= collation=-
+column graph_edge.target_id bigint(20) null=NO default=- extra= collation=-
+column graph_node.closed_scan_id bigint(20) null=YES default=NULL extra= collation=-
+column graph_node.component_id bigint(20) null=NO default=- extra= collation=-
+column graph_node.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column graph_node.is_root tinyint(1) null=NO default=- extra= collation=-
+column graph_node.opened_scan_id bigint(20) null=NO default=- extra= collation=-
+column graph_node.target_id bigint(20) null=NO default=- extra= collation=-
+column group_admin.created_at datetime(6) null=NO default=- extra= collation=-
+column group_admin.grants varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column group_admin.group_name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column group_admin.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column group_role.created_at datetime(6) null=NO default=- extra= collation=-
+column group_role.group_name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column group_role.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column group_role.product_id bigint(20) null=NO default=- extra= collation=-
+column group_role.role varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column issue_note.body mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column issue_note.edited_at datetime(6) null=YES default=NULL extra= collation=-
+column issue_note.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column issue_note.product_id bigint(20) null=NO default=- extra= collation=-
+column issue_note.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column issue_note.written_at datetime(6) null=NO default=- extra= collation=-
+column issue_note.written_by bigint(20) null=NO default=- extra= collation=-
+column issue_note_revision.body mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column issue_note_revision.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column issue_note_revision.note_id bigint(20) null=NO default=- extra= collation=-
+column issue_note_revision.ordinal bigint(20) null=NO default=- extra= collation=-
+column issue_note_revision.replaced_at datetime(6) null=NO default=- extra= collation=-
+column issue_rating.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column issue_rating.product_id bigint(20) null=NO default=- extra= collation=-
+column issue_rating.severity varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column issue_rating.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column job.attempts int(11) null=NO default=- extra= collation=-
+column job.claimed_at datetime(6) null=YES default=NULL extra= collation=-
+column job.claimed_by varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column job.created_at datetime(6) null=NO default=- extra= collation=-
+column job.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column job.kind varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column job.last_error mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column job.max_attempts int(11) null=NO default=- extra= collation=-
+column job.reference varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column job.run_after datetime(6) null=NO default=- extra= collation=-
+column job.state varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column job.updated_at datetime(6) null=NO default=- extra= collation=-
+column lease.held_by varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column lease.held_until datetime(6) null=YES default=NULL extra= collation=-
+column lease.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column notification.about varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column notification.about_open varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column notification.attempts bigint(20) null=NO default=- extra= collation=-
+column notification.body mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column notification.cleared_at datetime(6) null=YES default=NULL extra= collation=-
+column notification.concerns varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column notification.created_at datetime(6) null=NO default=- extra= collation=-
+column notification.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column notification.kind varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column notification.lifetime varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column notification.link mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column notification.person_id bigint(20) null=NO default=- extra= collation=-
+column notification.private tinyint(1) null=NO default=- extra= collation=-
+column notification.product_id bigint(20) null=YES default=NULL extra= collation=-
+column notification.read_at datetime(6) null=YES default=NULL extra= collation=-
+column notification.sent_at datetime(6) null=YES default=NULL extra= collation=-
+column notification.together varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column notification.vulnerability_id bigint(20) null=YES default=NULL extra= collation=-
+column obligation_window.declared_at datetime(6) null=NO default=- extra= collation=-
+column obligation_window.declared_by bigint(20) null=NO default=- extra= collation=-
+column obligation_window.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column obligation_window.lead_hours int(11) null=YES default=NULL extra= collation=-
+column obligation_window.length_hours int(11) null=NO default=- extra= collation=-
+column obligation_window.live_name varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column obligation_window.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column obligation_window.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column obligation_window_product.product_id bigint(20) null=NO default=- extra= collation=-
+column obligation_window_product.window_id bigint(20) null=NO default=- extra= collation=-
+column outbound.created_at datetime(6) null=NO default=- extra= collation=-
+column outbound.created_by bigint(20) null=NO default=- extra= collation=-
+column outbound.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column outbound.kind varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column outbound.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column outbound.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column outbound.secret mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column outbound.url mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column outbound_delivery.about varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column outbound_delivery.attempts bigint(20) null=NO default=- extra= collation=-
+column outbound_delivery.failed mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column outbound_delivery.first_seen datetime(6) null=NO default=- extra= collation=-
+column outbound_delivery.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column outbound_delivery.notification_id bigint(20) null=NO default=- extra= collation=-
+column outbound_delivery.outbound_id bigint(20) null=NO default=- extra= collation=-
+column outbound_delivery.sent_at datetime(6) null=YES default=NULL extra= collation=-
+column party.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column party.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column patch_commit.branch_count bigint(20) null=NO default=- extra= collation=-
+column patch_commit.commit_hash varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column patch_commit.created_at datetime(6) null=NO default=- extra= collation=-
+column patch_commit.found tinyint(1) null=NO default=- extra= collation=-
+column patch_commit.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column patch_commit.looked_at datetime(6) null=YES default=NULL extra= collation=-
+column patch_commit.repository_id bigint(20) null=NO default=- extra= collation=-
+column patch_commit_branch.branch varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column patch_commit_branch.commit_id bigint(20) null=NO default=- extra= collation=-
+column patch_commit_branch.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column patch_repository.created_at datetime(6) null=NO default=- extra= collation=-
+column patch_repository.failed mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column patch_repository.fetched_at datetime(6) null=YES default=NULL extra= collation=-
+column patch_repository.held_bytes bigint(20) null=YES default=NULL extra= collation=-
+column patch_repository.host varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column patch_repository.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column patch_repository.reached_at datetime(6) null=YES default=NULL extra= collation=-
+column patch_repository.url mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column patch_repository.url_identity varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column person.admin_derived tinyint(1) null=NO default=- extra= collation=-
+column person.admin_derived_at datetime(6) null=YES default=NULL extra= collation=-
+column person.audits tinyint(1) null=NO default=- extra= collation=-
+column person.audits_derived tinyint(1) null=NO default=- extra= collation=-
+column person.audits_derived_at datetime(6) null=YES default=NULL extra= collation=-
+column person.created_at datetime(6) null=NO default=- extra= collation=-
+column person.deactivated_at datetime(6) null=YES default=NULL extra= collation=-
+column person.digest tinyint(1) null=NO default=- extra= collation=-
+column person.digest_sent_at datetime(6) null=YES default=NULL extra= collation=-
+column person.digest_unassigned tinyint(1) null=NO default=- extra= collation=-
+column person.display_name mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column person.email mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column person.email_source varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column person.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column person.identity varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column person.is_admin tinyint(1) null=NO default=- extra= collation=-
+column person.is_bootstrap tinyint(1) null=NO default=- extra= collation=-
+column person.last_seen_at datetime(6) null=YES default=NULL extra= collation=-
+column person.party_id bigint(20) null=NO default=- extra= collation=-
+column person_identity.bound_at datetime(6) null=YES default=NULL extra= collation=-
+column person_identity.claimable_until datetime(6) null=YES default=NULL extra= collation=-
+column person_identity.created_at datetime(6) null=NO default=- extra= collation=-
+column person_identity.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column person_identity.person_id bigint(20) null=NO default=- extra= collation=-
+column person_identity.provider varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column person_identity.subject varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column person_identity.username varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column personal_token.created_at datetime(6) null=NO default=- extra= collation=-
+column personal_token.expires_at datetime(6) null=NO default=- extra= collation=-
+column personal_token.holds varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column personal_token.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column personal_token.last_used_at datetime(6) null=YES default=NULL extra= collation=-
+column personal_token.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column personal_token.person_id bigint(20) null=NO default=- extra= collation=-
+column personal_token.product_id bigint(20) null=YES default=NULL extra= collation=-
+column personal_token.revoked_at datetime(6) null=YES default=NULL extra= collation=-
+column personal_token.secret_hash varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column product.created_at datetime(6) null=NO default=- extra= collation=-
+column product.display_name mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column product.eol_on date null=YES default=NULL extra= collation=-
+column product.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column product.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column product.pair_approvers int(11) null=YES default=NULL extra= collation=-
+column product.pair_share int(11) null=YES default=NULL extra= collation=-
+column product.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column product.triage_floor varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column report_ruled.flaw_report_id bigint(20) null=NO default=- extra= collation=-
+column report_ruled.ruling_id bigint(20) null=NO default=- extra= collation=-
+column report_ruling.approved_at datetime(6) null=YES default=NULL extra= collation=-
+column report_ruling.approved_by bigint(20) null=YES default=NULL extra= collation=-
+column report_ruling.disposition varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column report_ruling.duplicate_of bigint(20) null=YES default=NULL extra= collation=-
+column report_ruling.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column report_ruling.product_id bigint(20) null=NO default=- extra= collation=-
+column report_ruling.proposed_at datetime(6) null=NO default=- extra= collation=-
+column report_ruling.proposed_by bigint(20) null=NO default=- extra= collation=-
+column report_ruling.reasoning mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column report_ruling.settled_at datetime(6) null=YES default=NULL extra= collation=-
+column report_ruling.withdrawn_at datetime(6) null=YES default=NULL extra= collation=-
+column report_ruling.withdrawn_by bigint(20) null=YES default=NULL extra= collation=-
+column role_grant.active tinyint(1) null=NO default=- extra= collation=-
+column role_grant.created_at datetime(6) null=NO default=- extra= collation=-
+column role_grant.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column role_grant.person_id bigint(20) null=NO default=- extra= collation=-
+column role_grant.product_id bigint(20) null=NO default=- extra= collation=-
+column role_grant.role varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column role_grant.source varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column role_grant_all.active tinyint(1) null=NO default=- extra= collation=-
+column role_grant_all.created_at datetime(6) null=NO default=- extra= collation=-
+column role_grant_all.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column role_grant_all.person_id bigint(20) null=NO default=- extra= collation=-
+column role_grant_all.role varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column role_grant_all.source varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column routing_rule.beneath varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column routing_rule.created_at datetime(6) null=NO default=- extra= collation=-
+column routing_rule.created_by bigint(20) null=NO default=- extra= collation=-
+column routing_rule.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column routing_rule.name mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column routing_rule.ordinal bigint(20) null=NO default=- extra= collation=-
+column routing_rule.product_id bigint(20) null=NO default=- extra= collation=-
+column routing_rule.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column routing_rule.team_id bigint(20) null=NO default=- extra= collation=-
+column routing_rule.upstream varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column saved_filter.created_at datetime(6) null=NO default=- extra= collation=-
+column saved_filter.defer_days int(11) null=YES default=NULL extra= collation=-
+column saved_filter.display_name mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column saved_filter.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column saved_filter.justification mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column saved_filter.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column saved_filter.outcome varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column saved_filter.person_id bigint(20) null=NO default=- extra= collation=-
+column saved_filter.product_id bigint(20) null=NO default=- extra= collation=-
+column saved_filter.query mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column saved_filter.reasoning mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan.built_at datetime(6) null=NO default=- extra= collation=-
+column scan.components int(11) null=YES default=NULL extra= collation=-
+column scan.content_hash varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column scan.credential varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column scan.failure mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column scan.parser_version varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column scan.placed int(11) null=YES default=NULL extra= collation=-
+column scan.received_at datetime(6) null=NO default=- extra= collation=-
+column scan.root_identifier mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan.serial mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan.status varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column scan.target_id bigint(20) null=NO default=- extra= collation=-
+column scan_document.content_hash varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column scan_document.created_at datetime(6) null=NO default=- extra= collation=-
+column scan_document.discarded_at datetime(6) null=YES default=NULL extra= collation=-
+column scan_document.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column scan_document.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column scan_document.ordinal int(11) null=NO default=- extra= collation=-
+column scan_document.scan_id bigint(20) null=NO default=- extra= collation=-
+column scan_document.size_bytes bigint(20) null=NO default=- extra= collation=-
+column scan_document_chunk.body mediumblob null=NO default=- extra= collation=-
+column scan_document_chunk.document_id bigint(20) null=NO default=- extra= collation=-
+column scan_document_chunk.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column scan_document_chunk.seq int(11) null=NO default=- extra= collation=-
+column scan_refusal.at datetime(6) null=NO default=- extra= collation=-
+column scan_refusal.built_at datetime(6) null=YES default=NULL extra= collation=-
+column scan_refusal.content_hash varchar(64) null=YES default=NULL extra= collation=utf8mb4_bin
+column scan_refusal.credential varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column scan_refusal.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column scan_refusal.reason mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column scan_refusal.target_id bigint(20) null=NO default=- extra= collation=-
+column scan_run.caution mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan_run.database_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan_run.failure mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan_run.finished_at datetime(6) null=YES default=NULL extra= collation=-
+column scan_run.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column scan_run.ran_here tinyint(1) null=NO default=- extra= collation=-
+column scan_run.scanner mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column scan_run.scanner_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column scan_run.started_at datetime(6) null=NO default=- extra= collation=-
+column scan_run.target_id bigint(20) null=NO default=- extra= collation=-
+column session.created_at datetime(6) null=NO default=- extra= collation=-
+column session.csrf_token varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column session.expires_at datetime(6) null=NO default=- extra= collation=-
+column session.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column session.last_used_at datetime(6) null=YES default=NULL extra= collation=-
+column session.person_id bigint(20) null=NO default=- extra= collation=-
+column session.token_hash varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column stream.created_at datetime(6) null=NO default=- extra= collation=-
+column stream.display_name mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column stream.eol_on date null=YES default=NULL extra= collation=-
+column stream.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column stream.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column stream.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column stream.parent_id bigint(20) null=YES default=NULL extra= collation=-
+column stream.product_id bigint(20) null=NO default=- extra= collation=-
+column stream.released_on date null=YES default=NULL extra= collation=-
+column stream.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column suppression.closed_scan_id bigint(20) null=YES default=NULL extra= collation=-
+column suppression.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column suppression.identity varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column suppression.justification mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column suppression.opened_scan_id bigint(20) null=NO default=- extra= collation=-
+column suppression.origin varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column suppression.statement mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column suppression.status varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column suppression.subject_name mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column suppression.subject_purl mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column suppression.target_id bigint(20) null=NO default=- extra= collation=-
+column suppression.vulnerability mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column target.created_at datetime(6) null=NO default=- extra= collation=-
+column target.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column target.last_run_id bigint(20) null=YES default=NULL extra= collation=-
+column target.last_scan_id bigint(20) null=YES default=NULL extra= collation=-
+column target.stream_id bigint(20) null=NO default=- extra= collation=-
+column target.variant_id bigint(20) null=NO default=- extra= collation=-
+column team.created_at datetime(6) null=NO default=- extra= collation=-
+column team.display_name mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column team.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column team.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column team.party_id bigint(20) null=NO default=- extra= collation=-
+column team.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column team_member.added_at datetime(6) null=NO default=- extra= collation=-
+column team_member.added_by bigint(20) null=NO default=- extra= collation=-
+column team_member.person_id bigint(20) null=NO default=- extra= collation=-
+column team_member.team_id bigint(20) null=NO default=- extra= collation=-
+column told_outside.exploited_here_id bigint(20) null=NO default=- extra= collation=-
+column told_outside.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column told_outside.recipient mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column told_outside.recorded_at datetime(6) null=NO default=- extra= collation=-
+column told_outside.recorded_by bigint(20) null=NO default=- extra= collation=-
+column told_outside.said mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column told_outside.told_at datetime(6) null=NO default=- extra= collation=-
+column told_outside.window_id bigint(20) null=YES default=NULL extra= collation=-
+column upgrade.claim_id bigint(20) null=YES default=NULL extra= collation=-
+column upgrade.committed_to date null=YES default=NULL extra= collation=-
+column upgrade.declared_at datetime(6) null=NO default=- extra= collation=-
+column upgrade.declared_by bigint(20) null=NO default=- extra= collation=-
+column upgrade.fold_key varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column upgrade.from_version mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column upgrade.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column upgrade.target_id bigint(20) null=NO default=- extra= collation=-
+column upgrade.to_version mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column variant.created_at datetime(6) null=NO default=- extra= collation=-
+column variant.customer_facing tinyint(1) null=NO default=- extra= collation=-
+column variant.display_name mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column variant.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column variant.name varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column variant.product_id bigint(20) null=NO default=- extra= collation=-
+column variant.retired_at datetime(6) null=YES default=NULL extra= collation=-
+column vex_issuance.digest varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column vex_issuance.document mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column vex_issuance.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vex_issuance.issued_at datetime(6) null=NO default=- extra= collation=-
+column vex_issuance.issued_by bigint(20) null=NO default=- extra= collation=-
+column vex_issuance.ordinal bigint(20) null=NO default=- extra= collation=-
+column vex_issuance.target_id bigint(20) null=NO default=- extra= collation=-
+column vex_statement.about varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.component varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.digest varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.document mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.document_id varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vex_statement.justification varchar(191) null=YES default=NULL extra= collation=utf8mb4_bin
+column vex_statement.product_id bigint(20) null=NO default=- extra= collation=-
+column vex_statement.publisher varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.purl mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vex_statement.source varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.statement mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vex_statement.status varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vex_statement.superseded_at datetime(6) null=YES default=NULL extra= collation=-
+column vex_statement.uploaded_at datetime(6) null=NO default=- extra= collation=-
+column vex_statement.uploaded_by bigint(20) null=NO default=- extra= collation=-
+column vex_statement.vulnerability varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability.advisory mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability.description mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability.exploited tinyint(1) null=NO default=- extra= collation=-
+column vulnerability.first_seen_at datetime(6) null=NO default=- extra= collation=-
+column vulnerability.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vulnerability.identifier mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability.identifier_folded varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability.likelihood_on date null=YES default=NULL extra= collation=-
+column vulnerability.likelihood_percentile_ppm bigint(20) null=YES default=NULL extra= collation=-
+column vulnerability.likelihood_ppm bigint(20) null=YES default=NULL extra= collation=-
+column vulnerability.score_centi bigint(20) null=YES default=NULL extra= collation=-
+column vulnerability.score_kind mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability.score_source mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability.score_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability.severity varchar(16) null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability.vector mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability_alias.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vulnerability_alias.identifier varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_alias.identifier_folded varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_alias.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column vulnerability_rating.generation bigint(20) null=NO default=- extra= collation=-
+column vulnerability_rating.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vulnerability_rating.score_centi bigint(20) null=NO default=- extra= collation=-
+column vulnerability_rating.score_kind mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability_rating.score_source mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability_rating.score_version mediumtext null=YES default=NULL extra= collation=utf8mb4_bin
+column vulnerability_rating.vector mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_rating.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column vulnerability_reference.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vulnerability_reference.kind varchar(16) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_reference.url mediumtext null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_reference.url_identity varchar(64) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_reference.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+column vulnerability_weakness.cwe varchar(191) null=NO default=- extra= collation=utf8mb4_bin
+column vulnerability_weakness.id bigint(20) null=NO default=- extra=auto_increment collation=-
+column vulnerability_weakness.is_primary tinyint(1) null=NO default=- extra= collation=-
+column vulnerability_weakness.vulnerability_id bigint(20) null=NO default=- extra= collation=-
+foreign key admin_change admin_change_by_fk (by) -> person (id) RESTRICT
+foreign key advisory advisory_by_fk (minted_by) -> person (id) RESTRICT
+foreign key advisory_approval advisory_approval_advisory_fk (advisory_id) -> advisory (id) RESTRICT
+foreign key advisory_approval advisory_approval_back_fk (withdrawn_by) -> person (id) RESTRICT
+foreign key advisory_approval advisory_approval_by_fk (approved_by) -> person (id) RESTRICT
+foreign key advisory_approval advisory_approval_edition_fk (edition_id) -> advisory_edition (id) RESTRICT
+foreign key advisory_edition advisory_edition_advisory_fk (advisory_id) -> advisory (id) RESTRICT
+foreign key advisory_edition advisory_edition_by_fk (written_by) -> person (id) RESTRICT
+foreign key advisory_issuance advisory_issuance_advisory_fk (advisory_id) -> advisory (id) RESTRICT
+foreign key advisory_issuance advisory_issuance_by_fk (issued_by) -> person (id) RESTRICT
+foreign key advisory_issuance advisory_issuance_edition_fk (edition_id) -> advisory_edition (id) RESTRICT
+foreign key advisory_issue advisory_issue_advisory_fk (advisory_id) -> advisory (id) RESTRICT
+foreign key advisory_issue advisory_issue_by_fk (added_by) -> person (id) RESTRICT
+foreign key advisory_issue advisory_issue_issue_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key advisory_issue advisory_issue_off_fk (removed_by) -> person (id) RESTRICT
+foreign key advisory_issue advisory_issue_product_fk (product_id) -> product (id) RESTRICT
+foreign key advisory_source advisory_source_by_fk (created_by) -> person (id) RESTRICT
+foreign key advisory_source advisory_source_product_fk (product_id) -> product (id) RESTRICT
+foreign key api_key api_key_product_fk (product_id) -> product (id) RESTRICT
+foreign key api_key api_key_stream_fk (stream_id) -> stream (id) RESTRICT
+foreign key api_key api_key_variant_fk (variant_id) -> variant (id) RESTRICT
+foreign key assessment assessment_decider_fk (decided_by) -> person (id) RESTRICT
+foreign key assessment assessment_product_fk (product_id) -> product (id) RESTRICT
+foreign key assessment assessment_proposer_fk (proposed_by) -> person (id) RESTRICT
+foreign key assessment assessment_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key attachment attachment_product_fk (product_id) -> product (id) RESTRICT
+foreign key attachment attachment_redacted_by_fk (redacted_by) -> person (id) RESTRICT
+foreign key attachment attachment_report_fk (flaw_report_id) -> flaw_report (id) RESTRICT
+foreign key attachment attachment_uploaded_by_fk (uploaded_by) -> person (id) RESTRICT
+foreign key attachment attachment_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key case_collaborator case_collaborator_by_fk (added_by) -> person (id) RESTRICT
+foreign key case_collaborator case_collaborator_issue_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key case_collaborator case_collaborator_person_fk (person_id) -> person (id) RESTRICT
+foreign key case_collaborator case_collaborator_product_fk (product_id) -> product (id) RESTRICT
+foreign key claim claim_derived_fk (derived_from) -> claim (id) RESTRICT
+foreign key claim claim_proposer_fk (proposed_by) -> person (id) RESTRICT
+foreign key claim_approval claim_approval_approver_fk (approved_by) -> person (id) RESTRICT
+foreign key claim_approval claim_approval_carried_fk (carried_from) -> claim_approval (id) SET NULL
+foreign key claim_approval claim_approval_claim_fk (claim_id) -> claim (id) RESTRICT
+foreign key claim_approval claim_approval_revision_fk (revision_id) -> claim_revision (id) RESTRICT
+foreign key claim_approval claim_approval_withdrawer_fk (withdrawn_by) -> person (id) RESTRICT
+foreign key claim_comment claim_comment_author_fk (written_by) -> person (id) RESTRICT
+foreign key claim_comment claim_comment_claim_fk (claim_id) -> claim (id) RESTRICT
+foreign key claim_comment_revision claim_comment_revision_fk (comment_id) -> claim_comment (id) RESTRICT
+foreign key claim_revision claim_revision_author_fk (written_by) -> person (id) RESTRICT
+foreign key claim_revision claim_revision_claim_fk (claim_id) -> claim (id) RESTRICT
+foreign key decision decision_claim_fk (claim_id) -> claim (id) RESTRICT
+foreign key decision decision_product_fk (product_id) -> product (id) RESTRICT
+foreign key decision decision_proposer_fk (proposed_by) -> person (id) RESTRICT
+foreign key decision decision_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key disclosure_movement disclosure_movement_approved_by_fk (approved_by) -> person (id) RESTRICT
+foreign key disclosure_movement disclosure_movement_asked_by_fk (asked_by) -> person (id) RESTRICT
+foreign key disclosure_movement disclosure_movement_product_fk (product_id) -> product (id) RESTRICT
+foreign key disclosure_movement disclosure_movement_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key exploited_here exploited_here_clearer_fk (cleared_by) -> person (id) RESTRICT
+foreign key exploited_here exploited_here_product_fk (product_id) -> product (id) RESTRICT
+foreign key exploited_here exploited_here_recorder_fk (recorded_by) -> person (id) RESTRICT
+foreign key exploited_here exploited_here_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key finding finding_closed_run_id_fk (closed_run_id) -> scan_run (id) RESTRICT
+foreign key finding finding_component_id_fk (component_id) -> component (id) RESTRICT
+foreign key finding finding_consumer_id_fk (consumer_id) -> component (id) RESTRICT
+foreign key finding finding_opened_run_id_fk (opened_run_id) -> scan_run (id) RESTRICT
+foreign key finding finding_suppressed_by_fk (suppressed_by) -> suppression (id) RESTRICT
+foreign key finding finding_target_id_fk (target_id) -> target (id) RESTRICT
+foreign key finding finding_vulnerability_id_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key finding_tag finding_tag_by_fk (added_by) -> person (id) RESTRICT
+foreign key finding_tag finding_tag_component_fk (component_id) -> component (id) RESTRICT
+foreign key finding_tag finding_tag_issue_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key finding_tag finding_tag_product_fk (product_id) -> product (id) RESTRICT
+foreign key flaw_report flaw_report_answered_by_fk (acknowledged_by) -> person (id) RESTRICT
+foreign key flaw_report flaw_report_by_fk (recorded_by) -> person (id) RESTRICT
+foreign key flaw_report flaw_report_issue_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key flaw_report flaw_report_judged_by_fk (evaluated_by) -> person (id) RESTRICT
+foreign key flaw_report flaw_report_product_fk (product_id) -> product (id) RESTRICT
+foreign key flaw_report flaw_report_ruling_fk (ruling_id) -> report_ruling (id) RESTRICT
+foreign key graph_edge graph_edge_child_fk (child_id) -> graph_node (id) RESTRICT
+foreign key graph_edge graph_edge_closed_fk (closed_scan_id) -> scan (id) RESTRICT
+foreign key graph_edge graph_edge_opened_fk (opened_scan_id) -> scan (id) RESTRICT
+foreign key graph_edge graph_edge_parent_fk (parent_id) -> graph_node (id) RESTRICT
+foreign key graph_edge graph_edge_target_fk (target_id) -> target (id) RESTRICT
+foreign key graph_node graph_node_closed_fk (closed_scan_id) -> scan (id) RESTRICT
+foreign key graph_node graph_node_component_fk (component_id) -> component (id) RESTRICT
+foreign key graph_node graph_node_opened_fk (opened_scan_id) -> scan (id) RESTRICT
+foreign key graph_node graph_node_target_fk (target_id) -> target (id) RESTRICT
+foreign key group_role group_role_product_fk (product_id) -> product (id) RESTRICT
+foreign key issue_note issue_note_author_fk (written_by) -> person (id) RESTRICT
+foreign key issue_note issue_note_issue_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key issue_note issue_note_product_fk (product_id) -> product (id) RESTRICT
+foreign key issue_note_revision issue_note_revision_fk (note_id) -> issue_note (id) RESTRICT
+foreign key issue_rating issue_rating_product_fk (product_id) -> product (id) RESTRICT
+foreign key issue_rating issue_rating_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key notification notification_person_fk (person_id) -> person (id) RESTRICT
+foreign key notification notification_product_fk (product_id) -> product (id) RESTRICT
+foreign key notification notification_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key obligation_window obligation_window_declarer_fk (declared_by) -> person (id) RESTRICT
+foreign key obligation_window_product obligation_window_product_product_fk (product_id) -> product (id) RESTRICT
+foreign key obligation_window_product obligation_window_product_window_fk (window_id) -> obligation_window (id) RESTRICT
+foreign key outbound outbound_by_fk (created_by) -> person (id) RESTRICT
+foreign key outbound_delivery outbound_delivery_fk (outbound_id) -> outbound (id) RESTRICT
+foreign key outbound_delivery outbound_delivery_nt (notification_id) -> notification (id) CASCADE
+foreign key patch_commit patch_commit_repository_fk (repository_id) -> patch_repository (id) RESTRICT
+foreign key patch_commit_branch patch_commit_branch_commit_fk (commit_id) -> patch_commit (id) RESTRICT
+foreign key person person_party_fk (party_id) -> party (id) RESTRICT
+foreign key person_identity person_identity_person_fk (person_id) -> person (id) RESTRICT
+foreign key personal_token personal_token_person_fk (person_id) -> person (id) RESTRICT
+foreign key personal_token personal_token_product_fk (product_id) -> product (id) RESTRICT
+foreign key report_ruled report_ruled_report_fk (flaw_report_id) -> flaw_report (id) RESTRICT
+foreign key report_ruled report_ruled_ruling_fk (ruling_id) -> report_ruling (id) RESTRICT
+foreign key report_ruling report_ruling_approved_by_fk (approved_by) -> person (id) RESTRICT
+foreign key report_ruling report_ruling_duplicate_fk (duplicate_of) -> vulnerability (id) RESTRICT
+foreign key report_ruling report_ruling_product_fk (product_id) -> product (id) RESTRICT
+foreign key report_ruling report_ruling_proposed_by_fk (proposed_by) -> person (id) RESTRICT
+foreign key report_ruling report_ruling_withdrawn_by_fk (withdrawn_by) -> person (id) RESTRICT
+foreign key role_grant role_grant_person_fk (person_id) -> person (id) RESTRICT
+foreign key role_grant role_grant_product_fk (product_id) -> product (id) RESTRICT
+foreign key role_grant_all role_grant_all_person_fk (person_id) -> person (id) RESTRICT
+foreign key routing_rule routing_rule_by_fk (created_by) -> person (id) RESTRICT
+foreign key routing_rule routing_rule_product_fk (product_id) -> product (id) RESTRICT
+foreign key routing_rule routing_rule_team_fk (team_id) -> team (id) RESTRICT
+foreign key saved_filter saved_filter_person_fk (person_id) -> person (id) RESTRICT
+foreign key saved_filter saved_filter_product_fk (product_id) -> product (id) RESTRICT
+foreign key scan scan_target_fk (target_id) -> target (id) RESTRICT
+foreign key scan_document scan_document_scan_id_fk (scan_id) -> scan (id) RESTRICT
+foreign key scan_document_chunk scan_document_chunk_document_id_fk (document_id) -> scan_document (id) RESTRICT
+foreign key scan_refusal scan_refusal_target_fk (target_id) -> target (id) RESTRICT
+foreign key scan_run scan_run_target_id_fk (target_id) -> target (id) RESTRICT
+foreign key session session_person_fk (person_id) -> person (id) RESTRICT
+foreign key stream stream_parent_fk (parent_id) -> stream (id) RESTRICT
+foreign key stream stream_product_fk (product_id) -> product (id) RESTRICT
+foreign key suppression suppression_closed_scan_id_fk (closed_scan_id) -> scan (id) RESTRICT
+foreign key suppression suppression_opened_scan_id_fk (opened_scan_id) -> scan (id) RESTRICT
+foreign key suppression suppression_target_id_fk (target_id) -> target (id) RESTRICT
+foreign key target target_stream_fk (stream_id) -> stream (id) RESTRICT
+foreign key target target_variant_fk (variant_id) -> variant (id) RESTRICT
+foreign key team team_party_fk (party_id) -> party (id) RESTRICT
+foreign key team_member team_member_added_by_fk (added_by) -> person (id) RESTRICT
+foreign key team_member team_member_person_fk (person_id) -> person (id) RESTRICT
+foreign key team_member team_member_team_fk (team_id) -> team (id) RESTRICT
+foreign key told_outside told_outside_record_fk (exploited_here_id) -> exploited_here (id) RESTRICT
+foreign key told_outside told_outside_recorder_fk (recorded_by) -> person (id) RESTRICT
+foreign key told_outside told_outside_window_fk (window_id) -> obligation_window (id) RESTRICT
+foreign key upgrade upgrade_declared_by_fk (declared_by) -> person (id) RESTRICT
+foreign key upgrade upgrade_target_id_fk (target_id) -> target (id) RESTRICT
+foreign key variant variant_product_fk (product_id) -> product (id) RESTRICT
+foreign key vex_issuance vex_issuance_by_fk (issued_by) -> person (id) RESTRICT
+foreign key vex_issuance vex_issuance_target_fk (target_id) -> target (id) RESTRICT
+foreign key vex_statement vex_statement_by_fk (uploaded_by) -> person (id) RESTRICT
+foreign key vex_statement vex_statement_product_fk (product_id) -> product (id) RESTRICT
+foreign key vulnerability_alias vulnerability_alias_vulnerability_id_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key vulnerability_rating vulnerability_rating_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key vulnerability_reference vulnerability_reference_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+foreign key vulnerability_weakness vulnerability_weakness_vulnerability_fk (vulnerability_id) -> vulnerability (id) RESTRICT
+index admin_change PRIMARY unique=1 (id)
+index admin_change admin_change_about_idx unique=0 (about, at)
+index admin_change admin_change_by_fk unique=0 (by)
+index admin_change admin_change_kind_idx unique=0 (kind, at)
+index admin_change admin_change_recent_idx unique=0 (at)
+index advisory PRIMARY unique=1 (id)
+index advisory advisory_by_fk unique=0 (minted_by)
+index advisory advisory_identifier_once unique=1 (identifier_folded)
+index advisory advisory_number_once unique=1 (minted_year, mint_number)
+index advisory_approval PRIMARY unique=1 (id)
+index advisory_approval advisory_approval_advisory_fk unique=0 (advisory_id)
+index advisory_approval advisory_approval_back_fk unique=0 (withdrawn_by)
+index advisory_approval advisory_approval_by_fk unique=0 (approved_by)
+index advisory_approval advisory_approval_edition_idx unique=0 (edition_id)
+index advisory_edition PRIMARY unique=1 (id)
+index advisory_edition advisory_edition_by_fk unique=0 (written_by)
+index advisory_edition advisory_edition_once unique=1 (advisory_id, ordinal)
+index advisory_issuance PRIMARY unique=1 (id)
+index advisory_issuance advisory_issuance_by_fk unique=0 (issued_by)
+index advisory_issuance advisory_issuance_edition_fk unique=0 (edition_id)
+index advisory_issuance advisory_issuance_once unique=1 (advisory_id, ordinal)
+index advisory_issue PRIMARY unique=1 (id)
+index advisory_issue advisory_issue_by_fk unique=0 (added_by)
+index advisory_issue advisory_issue_issue_fk unique=0 (vulnerability_id)
+index advisory_issue advisory_issue_off_fk unique=0 (removed_by)
+index advisory_issue advisory_issue_once unique=1 (advisory_id, product_id, vulnerability_id)
+index advisory_issue advisory_issue_product_fk unique=0 (product_id)
+index advisory_source PRIMARY unique=1 (id)
+index advisory_source advisory_source_by_fk unique=0 (created_by)
+index advisory_source advisory_source_due_idx unique=0 (retired_at, fetched_at)
+index advisory_source advisory_source_named_once unique=1 (product_id, name)
+index api_key PRIMARY unique=1 (id)
+index api_key api_key_name_unique unique=1 (name)
+index api_key api_key_product_idx unique=0 (product_id)
+index api_key api_key_secret_unique unique=1 (secret_hash)
+index api_key api_key_stream_fk unique=0 (stream_id)
+index api_key api_key_variant_fk unique=0 (variant_id)
+index application_setting PRIMARY unique=1 (name)
+index assessment PRIMARY unique=1 (id)
+index assessment assessment_decider_fk unique=0 (decided_by)
+index assessment assessment_issue_idx unique=0 (vulnerability_id, product_id, state)
+index assessment assessment_live_unique unique=1 (live_vulnerability_id, product_id)
+index assessment assessment_product_fk unique=0 (product_id)
+index assessment assessment_proposer_fk unique=0 (proposed_by)
+index assessment assessment_waiting_idx unique=0 (state, needs_approval)
+index attachment PRIMARY unique=1 (id)
+index attachment attachment_issue_idx unique=0 (product_id, vulnerability_id)
+index attachment attachment_redacted_by_fk unique=0 (redacted_by)
+index attachment attachment_report_idx unique=0 (flaw_report_id)
+index attachment attachment_token_unique unique=1 (token)
+index attachment attachment_unattached_idx unique=0 (attached_at, uploaded_at)
+index attachment attachment_uploaded_by_fk unique=0 (uploaded_by)
+index attachment attachment_vulnerability_fk unique=0 (vulnerability_id)
+index case_collaborator PRIMARY unique=1 (id)
+index case_collaborator case_collaborator_by_fk unique=0 (added_by)
+index case_collaborator case_collaborator_issue_fk unique=0 (vulnerability_id)
+index case_collaborator case_collaborator_live_idx unique=1 (product_id, vulnerability_id, live_person_id)
+index case_collaborator case_collaborator_person_idx unique=0 (person_id, live_person_id)
+index claim PRIMARY unique=1 (id)
+index claim claim_derived_idx unique=0 (derived_from)
+index claim claim_proposer_fk unique=0 (proposed_by)
+index claim_approval PRIMARY unique=1 (id)
+index claim_approval claim_approval_approver_fk unique=0 (approved_by)
+index claim_approval claim_approval_batch_idx unique=0 (batch)
+index claim_approval claim_approval_carried_fk unique=0 (carried_from)
+index claim_approval claim_approval_claim_idx unique=0 (claim_id)
+index claim_approval claim_approval_revision_fk unique=0 (revision_id)
+index claim_approval claim_approval_withdrawer_fk unique=0 (withdrawn_by)
+index claim_comment PRIMARY unique=1 (id)
+index claim_comment claim_comment_author_fk unique=0 (written_by)
+index claim_comment claim_comment_claim_idx unique=0 (claim_id)
+index claim_comment_revision PRIMARY unique=1 (id)
+index claim_comment_revision claim_comment_revision_once unique=1 (comment_id, ordinal)
+index claim_revision PRIMARY unique=1 (id)
+index claim_revision claim_revision_author_fk unique=0 (written_by)
+index claim_revision claim_revision_unique unique=1 (claim_id, ordinal)
+index component PRIMARY unique=1 (id)
+index component component_fold_idx unique=0 (fold_key)
+index component component_folded_idx unique=0 (name_folded)
+index component component_identity_unique unique=1 (identity)
+index component component_upstream_folded_idx unique=0 (upstream_folded)
+index decision PRIMARY unique=1 (id)
+index decision decision_applies_idx unique=0 (product_id, vulnerability_id, place_identity, component_upstream_version, consumer_upstream_version)
+index decision decision_claim_idx unique=0 (claim_id)
+index decision decision_live_unique unique=1 (live_key)
+index decision decision_proposer_fk unique=0 (proposed_by)
+index decision decision_vulnerability_fk unique=0 (vulnerability_id)
+index disclosure_movement PRIMARY unique=1 (id)
+index disclosure_movement disclosure_movement_approved_by_fk unique=0 (approved_by)
+index disclosure_movement disclosure_movement_asked_by_fk unique=0 (asked_by)
+index disclosure_movement disclosure_movement_place_idx unique=0 (vulnerability_id, product_id)
+index disclosure_movement disclosure_movement_product_fk unique=0 (product_id)
+index exploited_here PRIMARY unique=1 (id)
+index exploited_here exploited_here_clearer_fk unique=0 (cleared_by)
+index exploited_here exploited_here_issue_idx unique=0 (vulnerability_id, product_id)
+index exploited_here exploited_here_live_unique unique=1 (live_vulnerability_id, product_id)
+index exploited_here exploited_here_product_idx unique=0 (product_id, recorded_at)
+index exploited_here exploited_here_recorder_fk unique=0 (recorded_by)
+index finding PRIMARY unique=1 (id)
+index finding finding_assigned_idx unique=0 (assigned_to, closed_at)
+index finding finding_closed_run_id_fk unique=0 (closed_run_id)
+index finding finding_component_id_fk unique=0 (component_id)
+index finding finding_component_idx unique=0 (target_id, component_id, closed_at)
+index finding finding_consumer_id_fk unique=0 (consumer_id)
+index finding finding_due_idx unique=0 (closed_at, suppressed_by, due_at)
+index finding finding_group_idx unique=0 (target_id, closed_at, visibility, vulnerability_id, component_id, urgency, urgency_exploited, urgency_exploited_here)
+index finding finding_open_idx unique=0 (target_id, closed_at)
+index finding finding_opened_run_id_fk unique=0 (opened_run_id)
+index finding finding_place_idx unique=0 (place_identity, vulnerability_id)
+index finding finding_suppressed_by_fk unique=0 (suppressed_by)
+index finding finding_vulnerability_idx unique=0 (vulnerability_id, closed_at)
+index finding_tag PRIMARY unique=1 (id)
+index finding_tag finding_tag_by_fk unique=0 (added_by)
+index finding_tag finding_tag_component_fk unique=0 (component_id)
+index finding_tag finding_tag_issue_fk unique=0 (vulnerability_id)
+index finding_tag finding_tag_named_idx unique=0 (product_id, tag)
+index finding_tag finding_tag_once unique=1 (product_id, vulnerability_id, component_id, tag)
+index flaw_report PRIMARY unique=1 (id)
+index flaw_report flaw_report_answered_by_fk unique=0 (acknowledged_by)
+index flaw_report flaw_report_by_fk unique=0 (recorded_by)
+index flaw_report flaw_report_issue_unique unique=1 (vulnerability_id)
+index flaw_report flaw_report_judged_by_fk unique=0 (evaluated_by)
+index flaw_report flaw_report_product_idx unique=0 (product_id, recorded_at)
+index flaw_report flaw_report_reference_unique unique=1 (reference)
+index flaw_report flaw_report_ruling_idx unique=0 (ruling_id)
+index flaw_report flaw_report_unanswered_idx unique=0 (acknowledged_at, received_on)
+index goose_db_version PRIMARY unique=1 (id)
+index graph_edge PRIMARY unique=1 (id)
+index graph_edge graph_edge_child_idx unique=0 (child_id, closed_scan_id)
+index graph_edge graph_edge_closed_fk unique=0 (closed_scan_id)
+index graph_edge graph_edge_current_idx unique=0 (target_id, closed_scan_id, parent_id, child_id)
+index graph_edge graph_edge_opened_fk unique=0 (opened_scan_id)
+index graph_edge graph_edge_parent_fk unique=0 (parent_id)
+index graph_node PRIMARY unique=1 (id)
+index graph_node graph_node_closed_fk unique=0 (closed_scan_id)
+index graph_node graph_node_component_fk unique=0 (component_id)
+index graph_node graph_node_current_idx unique=0 (target_id, closed_scan_id, component_id)
+index graph_node graph_node_opened_fk unique=0 (opened_scan_id)
+index group_admin PRIMARY unique=1 (id)
+index group_admin group_admin_unique unique=1 (group_name, grants)
+index group_role PRIMARY unique=1 (id)
+index group_role group_role_product_fk unique=0 (product_id)
+index group_role group_role_unique unique=1 (group_name, product_id, role)
+index issue_note PRIMARY unique=1 (id)
+index issue_note issue_note_author_fk unique=0 (written_by)
+index issue_note issue_note_product_fk unique=0 (product_id)
+index issue_note issue_note_thread_idx unique=0 (vulnerability_id, product_id, id)
+index issue_note_revision PRIMARY unique=1 (id)
+index issue_note_revision issue_note_revision_once unique=1 (note_id, ordinal)
+index issue_rating PRIMARY unique=1 (id)
+index issue_rating issue_rating_product_fk unique=0 (product_id)
+index issue_rating issue_rating_unique unique=1 (vulnerability_id, product_id)
+index job PRIMARY unique=1 (id)
+index job job_runnable_idx unique=0 (kind, state, run_after, id)
+index job job_set_aside_idx unique=0 (state, updated_at, id)
+index lease PRIMARY unique=1 (name)
+index notification PRIMARY unique=1 (id)
+index notification notification_condition_idx unique=1 (person_id, kind, about_open)
+index notification notification_product_fk unique=0 (product_id)
+index notification notification_unread_idx unique=0 (person_id, read_at, cleared_at)
+index notification notification_vulnerability_fk unique=0 (vulnerability_id)
+index obligation_window PRIMARY unique=1 (id)
+index obligation_window obligation_window_declarer_fk unique=0 (declared_by)
+index obligation_window obligation_window_live_unique unique=1 (live_name)
+index obligation_window_product PRIMARY unique=1 (window_id, product_id)
+index obligation_window_product obligation_window_product_product_fk unique=0 (product_id)
+index outbound PRIMARY unique=1 (id)
+index outbound outbound_by_fk unique=0 (created_by)
+index outbound outbound_kind_idx unique=0 (kind, retired_at)
+index outbound outbound_named_once unique=1 (name, kind)
+index outbound_delivery PRIMARY unique=1 (id)
+index outbound_delivery outbound_delivery_nt unique=0 (notification_id)
+index outbound_delivery outbound_delivery_once unique=1 (outbound_id, about)
+index outbound_delivery outbound_delivery_settled_idx unique=0 (outbound_id, notification_id)
+index party PRIMARY unique=1 (id)
+index patch_commit PRIMARY unique=1 (id)
+index patch_commit patch_commit_due_idx unique=0 (repository_id, looked_at)
+index patch_commit patch_commit_unique unique=1 (repository_id, commit_hash)
+index patch_commit_branch PRIMARY unique=1 (id)
+index patch_commit_branch patch_commit_branch_unique unique=1 (commit_id, branch)
+index patch_repository PRIMARY unique=1 (id)
+index patch_repository patch_repository_url_unique unique=1 (url_identity)
+index person PRIMARY unique=1 (id)
+index person person_identity_unique unique=1 (identity)
+index person person_party_unique unique=1 (party_id)
+index person_identity PRIMARY unique=1 (id)
+index person_identity person_identity_person_idx unique=0 (person_id)
+index person_identity person_identity_subject_unique unique=1 (subject)
+index person_identity person_identity_username_unique unique=1 (username)
+index personal_token PRIMARY unique=1 (id)
+index personal_token personal_token_name_unique unique=1 (person_id, name)
+index personal_token personal_token_product_fk unique=0 (product_id)
+index personal_token personal_token_secret_unique unique=1 (secret_hash)
+index product PRIMARY unique=1 (id)
+index product product_name_unique unique=1 (name)
+index report_ruled PRIMARY unique=1 (ruling_id, flaw_report_id)
+index report_ruled report_ruled_report_idx unique=0 (flaw_report_id)
+index report_ruling PRIMARY unique=1 (id)
+index report_ruling report_ruling_approved_by_fk unique=0 (approved_by)
+index report_ruling report_ruling_duplicate_idx unique=0 (duplicate_of)
+index report_ruling report_ruling_proposed_by_fk unique=0 (proposed_by)
+index report_ruling report_ruling_waiting_idx unique=0 (product_id, settled_at, withdrawn_at)
+index report_ruling report_ruling_withdrawn_by_fk unique=0 (withdrawn_by)
+index role_grant PRIMARY unique=1 (id)
+index role_grant role_grant_product_fk unique=0 (product_id)
+index role_grant role_grant_unique unique=1 (person_id, product_id, role, source)
+index role_grant_all PRIMARY unique=1 (id)
+index role_grant_all role_grant_all_unique unique=1 (person_id, role, source)
+index routing_rule PRIMARY unique=1 (id)
+index routing_rule routing_rule_by_fk unique=0 (created_by)
+index routing_rule routing_rule_order_idx unique=0 (product_id, retired_at, ordinal)
+index routing_rule routing_rule_team_fk unique=0 (team_id)
+index saved_filter PRIMARY unique=1 (id)
+index saved_filter saved_filter_name_unique unique=1 (person_id, product_id, name)
+index saved_filter saved_filter_product_fk unique=0 (product_id)
+index scan PRIMARY unique=1 (id)
+index scan scan_content_unique unique=1 (target_id, content_hash)
+index scan scan_newest_idx unique=0 (target_id, status, built_at)
+index scan scan_recency_idx unique=0 (target_id, received_at)
+index scan_document PRIMARY unique=1 (id)
+index scan_document scan_document_place_unique unique=1 (scan_id, kind, ordinal)
+index scan_document_chunk PRIMARY unique=1 (id)
+index scan_document_chunk scan_document_chunk_seq_unique unique=1 (document_id, seq)
+index scan_refusal PRIMARY unique=1 (id)
+index scan_refusal scan_refusal_target_unique unique=1 (target_id)
+index scan_run PRIMARY unique=1 (id)
+index scan_run scan_run_target_id_fk unique=0 (target_id)
+index session PRIMARY unique=1 (id)
+index session session_expires_idx unique=0 (expires_at)
+index session session_person_idx unique=0 (person_id)
+index session session_token_unique unique=1 (token_hash)
+index stream PRIMARY unique=1 (id)
+index stream stream_name_unique unique=1 (product_id, name)
+index stream stream_parent_fk unique=0 (parent_id)
+index suppression PRIMARY unique=1 (id)
+index suppression suppression_closed_scan_id_fk unique=0 (closed_scan_id)
+index suppression suppression_open_idx unique=0 (target_id, closed_scan_id)
+index suppression suppression_opened_scan_id_fk unique=0 (opened_scan_id)
+index target PRIMARY unique=1 (id)
+index target target_unique unique=1 (stream_id, variant_id)
+index target target_variant_idx unique=0 (variant_id)
+index team PRIMARY unique=1 (id)
+index team team_name_unique unique=1 (name)
+index team team_party_unique unique=1 (party_id)
+index team_member PRIMARY unique=1 (team_id, person_id)
+index team_member team_member_added_by_fk unique=0 (added_by)
+index team_member team_member_person_idx unique=0 (person_id)
+index told_outside PRIMARY unique=1 (id)
+index told_outside told_outside_record_idx unique=0 (exploited_here_id, told_at)
+index told_outside told_outside_recorder_fk unique=0 (recorded_by)
+index told_outside told_outside_window_fk unique=0 (window_id)
+index upgrade PRIMARY unique=1 (id)
+index upgrade upgrade_declared_by_fk unique=0 (declared_by)
+index upgrade upgrade_unique unique=1 (target_id, fold_key)
+index variant PRIMARY unique=1 (id)
+index variant variant_name_unique unique=1 (product_id, name)
+index vex_issuance PRIMARY unique=1 (id)
+index vex_issuance vex_issuance_by_fk unique=0 (issued_by)
+index vex_issuance vex_issuance_once unique=1 (target_id, ordinal)
+index vex_statement PRIMARY unique=1 (id)
+index vex_statement vex_statement_about_idx unique=0 (product_id, vulnerability, component, superseded_at)
+index vex_statement vex_statement_by_fk unique=0 (uploaded_by)
+index vex_statement vex_statement_from_idx unique=0 (product_id, publisher, source, document_id, superseded_at)
+index vulnerability PRIMARY unique=1 (id)
+index vulnerability vulnerability_folded_unique unique=1 (identifier_folded)
+index vulnerability_alias PRIMARY unique=1 (id)
+index vulnerability_alias vulnerability_alias_folded_idx unique=0 (identifier_folded, vulnerability_id)
+index vulnerability_alias vulnerability_alias_unique unique=1 (identifier)
+index vulnerability_alias vulnerability_alias_vulnerability_id_fk unique=0 (vulnerability_id)
+index vulnerability_rating PRIMARY unique=1 (id)
+index vulnerability_rating vulnerability_rating_unique unique=1 (vulnerability_id, generation)
+index vulnerability_reference PRIMARY unique=1 (id)
+index vulnerability_reference vulnerability_reference_unique unique=1 (vulnerability_id, url_identity)
+index vulnerability_weakness PRIMARY unique=1 (id)
+index vulnerability_weakness vulnerability_weakness_cwe_idx unique=0 (cwe)
+index vulnerability_weakness vulnerability_weakness_unique unique=1 (vulnerability_id, cwe)
+table admin_change InnoDB Dynamic utf8mb4_bin
+table advisory InnoDB Dynamic utf8mb4_bin
+table advisory_approval InnoDB Dynamic utf8mb4_bin
+table advisory_edition InnoDB Dynamic utf8mb4_bin
+table advisory_issuance InnoDB Dynamic utf8mb4_bin
+table advisory_issue InnoDB Dynamic utf8mb4_bin
+table advisory_source InnoDB Dynamic utf8mb4_bin
+table api_key InnoDB Dynamic utf8mb4_bin
+table application_setting InnoDB Dynamic utf8mb4_bin
+table assessment InnoDB Dynamic utf8mb4_bin
+table attachment InnoDB Dynamic utf8mb4_bin
+table case_collaborator InnoDB Dynamic utf8mb4_bin
+table claim InnoDB Dynamic utf8mb4_bin
+table claim_approval InnoDB Dynamic utf8mb4_bin
+table claim_comment InnoDB Dynamic utf8mb4_bin
+table claim_comment_revision InnoDB Dynamic utf8mb4_bin
+table claim_revision InnoDB Dynamic utf8mb4_bin
+table component InnoDB Dynamic utf8mb4_bin
+table decision InnoDB Dynamic utf8mb4_bin
+table disclosure_movement InnoDB Dynamic utf8mb4_bin
+table exploited_here InnoDB Dynamic utf8mb4_bin
+table finding InnoDB Dynamic utf8mb4_bin
+table finding_tag InnoDB Dynamic utf8mb4_bin
+table flaw_report InnoDB Dynamic utf8mb4_bin
+table goose_db_version InnoDB Dynamic utf8mb4_uca1400_ai_ci
+table graph_edge InnoDB Dynamic utf8mb4_bin
+table graph_node InnoDB Dynamic utf8mb4_bin
+table group_admin InnoDB Dynamic utf8mb4_bin
+table group_role InnoDB Dynamic utf8mb4_bin
+table issue_note InnoDB Dynamic utf8mb4_bin
+table issue_note_revision InnoDB Dynamic utf8mb4_bin
+table issue_rating InnoDB Dynamic utf8mb4_bin
+table job InnoDB Dynamic utf8mb4_bin
+table lease InnoDB Dynamic utf8mb4_bin
+table notification InnoDB Dynamic utf8mb4_bin
+table obligation_window InnoDB Dynamic utf8mb4_bin
+table obligation_window_product InnoDB Dynamic utf8mb4_bin
+table outbound InnoDB Dynamic utf8mb4_bin
+table outbound_delivery InnoDB Dynamic utf8mb4_bin
+table party InnoDB Dynamic utf8mb4_bin
+table patch_commit InnoDB Dynamic utf8mb4_bin
+table patch_commit_branch InnoDB Dynamic utf8mb4_bin
+table patch_repository InnoDB Dynamic utf8mb4_bin
+table person InnoDB Dynamic utf8mb4_bin
+table person_identity InnoDB Dynamic utf8mb4_bin
+table personal_token InnoDB Dynamic utf8mb4_bin
+table product InnoDB Dynamic utf8mb4_bin
+table report_ruled InnoDB Dynamic utf8mb4_bin
+table report_ruling InnoDB Dynamic utf8mb4_bin
+table role_grant InnoDB Dynamic utf8mb4_bin
+table role_grant_all InnoDB Dynamic utf8mb4_bin
+table routing_rule InnoDB Dynamic utf8mb4_bin
+table saved_filter InnoDB Dynamic utf8mb4_bin
+table scan InnoDB Dynamic utf8mb4_bin
+table scan_document InnoDB Dynamic utf8mb4_bin
+table scan_document_chunk InnoDB Dynamic utf8mb4_bin
+table scan_refusal InnoDB Dynamic utf8mb4_bin
+table scan_run InnoDB Dynamic utf8mb4_bin
+table session InnoDB Dynamic utf8mb4_bin
+table stream InnoDB Dynamic utf8mb4_bin
+table suppression InnoDB Dynamic utf8mb4_bin
+table target InnoDB Dynamic utf8mb4_bin
+table team InnoDB Dynamic utf8mb4_bin
+table team_member InnoDB Dynamic utf8mb4_bin
+table told_outside InnoDB Dynamic utf8mb4_bin
+table upgrade InnoDB Dynamic utf8mb4_bin
+table variant InnoDB Dynamic utf8mb4_bin
+table vex_issuance InnoDB Dynamic utf8mb4_bin
+table vex_statement InnoDB Dynamic utf8mb4_bin
+table vulnerability InnoDB Dynamic utf8mb4_bin
+table vulnerability_alias InnoDB Dynamic utf8mb4_bin
+table vulnerability_rating InnoDB Dynamic utf8mb4_bin
+table vulnerability_reference InnoDB Dynamic utf8mb4_bin
+table vulnerability_weakness InnoDB Dynamic utf8mb4_bin

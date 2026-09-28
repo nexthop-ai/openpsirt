@@ -1,8 +1,8 @@
 # Current state
 
-The latest release is 0.2.0. Below 1.0 there is no compatibility promise for
-the API or the schema. A database built by v0.1.0 or v0.2.0 is upgraded in
-place, and a database built by any other earlier build is recreated.
+The latest release is 0.4.0. Below 1.0 there is no compatibility promise for
+the API or the schema. A database built by v0.1.0, v0.2.0 or v0.3.0 is
+upgraded in place, and a database built by any other earlier build is recreated.
 [Configuration](configuration.md#upgrading) says what an upgrade changes.
 
 ## Areas

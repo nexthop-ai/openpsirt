@@ -35,9 +35,11 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
-A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
-`openpsirt migrate up`. One built by v0.1.0 passes through the v0.2.0 upgrade on
-the way. A database built by any build between releases is recreated.
+A database built by v0.1.0, v0.2.0 or v0.3.0 is upgraded in place, at startup
+or by `openpsirt migrate up`. One built by an earlier release passes through
+each later release's upgrade on the way. v0.4.0 changes no schema, so a v0.3.0
+database is already current. A database built by any build between releases is
+recreated.
 
 Read the sections for the release you are coming from, and every section after
 it: from v0.1.0, read all four.
@@ -50,8 +52,9 @@ it: from v0.1.0, read all four.
 | Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them |
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
-Going back is `openpsirt migrate down`, once for each release stepped back, run
-with this build before the earlier one is deployed. v0.1.0 started against an
+Going back is `openpsirt migrate down`, once for each release stepped back that
+changed the schema, run with this build before the earlier one is deployed.
+Going back to v0.3.0 needs none. v0.1.0 started against an
 upgraded schema reports it current and cannot read it. Patch branch lookups
 come back off in v0.2.0, which reads its own setting for them: turn them on
 again under its Settings.

@@ -11,8 +11,8 @@ somewhere to triage what it finds and follow it through to a fix and an
 advisory.
 
 > Alpha. Below 1.0 the API and the schema carry no compatibility promise. A
-> database built by v0.1.0 or v0.2.0 is upgraded in place; a database built by
-> any other earlier build is recreated.
+> database built by v0.1.0, v0.2.0 or v0.3.0 is upgraded in place; a database
+> built by any other earlier build is recreated.
 > [Current state](docs/built.md) says what is built and what is not.
 
 ## Contents
