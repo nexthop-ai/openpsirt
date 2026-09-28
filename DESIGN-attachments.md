@@ -206,10 +206,11 @@ writing transaction, because the first answer was read before the bytes were.
 
 The second check is serialized across uploads. A total read beside another
 upload's uncommitted row does not include it, so two uploads arriving together
-would both fit and both commit. Each writing transaction first updates one
-fixed row of the lease table, which holds no value and which nothing takes as
-a lease; the update is what makes the next upload wait for this one to commit
-before it reads the total. Uploads are serialized per deployment while a quota
+would both fit and both commit. Each writing transaction first writes a fresh
+value into one fixed row of the lease table, which nothing takes as a lease;
+the write is what makes the next upload wait for this one to commit before it
+reads the total, and what two cluster nodes conflict on
+(`DESIGN-database.md` § Replica coordination). Uploads are serialized per deployment while a quota
 or a share is set, and each holds the lock for two reads and an insert.
 
 Attaching is triage work rather than read work. Tested as a read — whether the

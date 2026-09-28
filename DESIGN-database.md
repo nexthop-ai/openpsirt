@@ -785,6 +785,7 @@ only in-memory lock stops a single process migrating twice.
 | Two workers taking one job | A conditional update. Row locking sits beside it for throughput and is not the guarantee — see `DESIGN-queue.md` |
 | Two replicas migrating at startup | A database-level lock with a bounded wait |
 | Two scans of one build | The apply takes the build's own row first, so the second waits rather than interleaving |
+| Two uploads checking the room left | The upload's transaction writes a fresh value into one fixed lock row before it sums what is held, so the second waits, and on a cluster the two writes conflict at certification. A write of the value already held is matched and not written on MySQL and MariaDB, so it never reaches certification |
 | An administrator changing a setting | Read per request, so a change takes effect on every replica at once |
 
 SQLite cannot take part, being a single file, so a scaled deployment runs on one

@@ -459,6 +459,43 @@ func TestTwoUploadsTogetherCannotBothTakeTheLastRoom(t *testing.T) {
 	})
 }
 
+// Every upload's lock is a write that changes the row.
+//
+// An update setting a column to the value it holds is matched and not
+// written on MySQL and MariaDB, and a cluster certifies only rows that were
+// written. Two uploads on two nodes would then both pass the check of the
+// room left.
+func TestEveryUploadLockChangesTheLockRow(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.who(t, access.PublicTriage)
+		held := func() string {
+			t.Helper()
+			var by *string
+			if err := f.db.DB.NewSelect().Table("lease").Column("held_by").
+				Where(`"name" = ?`, "attachment uploads").Scan(t.Context(), &by); err != nil {
+				t.Fatal(err)
+			}
+			if by == nil {
+				return ""
+			}
+			return *by
+		}
+		var seen []string
+		for range 2 {
+			if _, err := f.store.Upload(t.Context(), who,
+				attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "evidence.log",
+				strings.NewReader("x"), 1, roomy, plenty, plenty, false); err != nil {
+				t.Fatal(err)
+			}
+			seen = append(seen, held())
+		}
+		if seen[0] == "" || seen[0] == seen[1] {
+			t.Errorf("two uploads left the lock row holding %q and then %q: a lock that "+
+				"writes nothing new is never certified across a cluster", seen[0], seen[1])
+		}
+	})
+}
+
 func TestADeploymentWithNoStoreHoldsNothingAndSaysSo(t *testing.T) {
 	// An operator who wants no object store should not have to run one,
 	// and everything else has to work.

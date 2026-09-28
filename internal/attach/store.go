@@ -5,6 +5,7 @@ package attach
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -407,10 +408,15 @@ func ensureUploadLock(ctx context.Context, db bun.IDB) error {
 // uncommitted insert does not include it, under the isolation every engine
 // here defaults to. An update of one fixed row takes a lock the next upload
 // has to wait on, so the second sum is read after the first insert commits.
-// It is a lock and holds no value.
+//
+// The write puts a new value in the row every time. An update setting a
+// column to what it already holds is matched and not written on MySQL and
+// MariaDB, and a cluster certifies only rows that were written, so two
+// uploads on two nodes would both pass. The value itself means nothing, and
+// nothing takes this lease by name.
 func lockUploads(ctx context.Context, tx bun.Tx) error {
 	if _, err := tx.NewUpdate().Model((*lockRow)(nil)).
-		Set(`"name" = ?`, uploadLock).
+		Set(`"held_by" = ?`, rand.Text()).
 		Where(`"name" = ?`, uploadLock).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("wait for other uploads: %w", err)
