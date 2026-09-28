@@ -63,12 +63,9 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	productID int64) ([]BuildStanding, BuildStanding, error) {
 
 	var whole BuildStanding
-	if !subject.Sees(productID) {
-		return nil, whole, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return nil, whole, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return nil, whole, err
 	}
 	// The store's clock, like everything else here, so a frozen clock
 	// reaches it and so one answer is worked out from one moment.
@@ -137,7 +134,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Undecided int    `bun:"undecided"`
 		Agreed    int    `bun:"agreed"`
 	}
-	err := counted(s.db.NewSelect().
+	err = counted(s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, groups).
 		Join(`JOIN "target" AS "tg" ON tg.id = grouped.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).

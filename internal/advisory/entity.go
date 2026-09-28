@@ -506,7 +506,7 @@ func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
 		Join(`JOIN "product" AS "pd" ON pd.id = ac.product_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = ac.vulnerability_id`).
 		ColumnExpr(`pd.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(pd.display_name, ''), pd.name) AS "product_name"`).
+		ColumnExpr(catalog.ShownExpr("pd")+` AS "product_name"`).
 		ColumnExpr(`pd.id AS "product_id"`).
 		ColumnExpr(`v.identifier AS "issue"`).
 		ColumnExpr(`v.id AS "issue_id"`).

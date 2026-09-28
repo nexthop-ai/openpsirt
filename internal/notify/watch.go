@@ -544,9 +544,6 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read how long counts as absent: %w", err)
 	}
-	if after <= 0 {
-		return nil, nil
-	}
 	since := time.Now().UTC().Add(-after)
 
 	var rows []struct {

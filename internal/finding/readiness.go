@@ -78,11 +78,8 @@ type Readiness struct {
 func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	productID, streamID, variantID int64) (*Readiness, error) {
 
-	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	if len(access.Visible(subject, productID)) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	if _, err := access.Readable(subject, productID); err != nil {
+		return nil, err
 	}
 	floor, err := FloorFor(ctx, s.db, productID)
 	if err != nil {
@@ -187,10 +184,10 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
 		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		Where("tg.stream_id = ?", streamID).
 		Where("tg.variant_id = ?", variantID).
 		Limit(1).

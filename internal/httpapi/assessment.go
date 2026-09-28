@@ -124,7 +124,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		}
 		outgrown(ctx, in, claim.ProductID, claim.VulnerabilityID)
 		body := assessmentBody(*claim, input.Vulnerability, subject.ID)
-		body.Product, body.ProductName = product.Name, product.DisplayName
+		body.Product, body.ProductName = product.Name, catalog.Shown(product.DisplayName, product.Name)
 		return &struct{ Body AssessmentBody }{Body: body}, nil
 	})
 

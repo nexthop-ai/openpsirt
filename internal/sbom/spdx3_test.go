@@ -36,27 +36,7 @@ const minimalSPDX3 = `{
 func TestReadsTheThirdVersionAsAGraphOfTypedElements(t *testing.T) {
 	doc := read(t, minimalSPDX3)
 
-	if doc.Root.Name != "product" || doc.Root.Version != "1.0" {
-		t.Errorf("root is %q@%q", doc.Root.Name, doc.Root.Version)
-	}
-	if !doc.RootDeclared {
-		t.Error("the document named what it is about and that was not recorded")
-	}
-	if want := "https://example.invalid/product-1.0"; doc.Serial != want {
-		t.Errorf("serial is %q, want %q", doc.Serial, want)
-	}
-	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !doc.BuiltAt.Equal(want) {
-		t.Errorf("built at %v, want %v", doc.BuiltAt, want)
-	}
-	if len(doc.Components) != 1 {
-		t.Fatalf("read %d components, want 1", len(doc.Components))
-	}
-	if got := doc.Components[0].Purl; got != "pkg:deb/debian/libc6@2.41" {
-		t.Errorf("package identifier is %q", got)
-	}
-	if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
-		t.Errorf("edges are %v", got)
-	}
+	assertMinimal(t, doc)
 }
 
 func TestAllThreeVocabulariesReadTheSameInventoryTheSame(t *testing.T) {

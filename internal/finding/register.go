@@ -126,13 +126,9 @@ func (s *Store) registerSize(ctx context.Context, subject access.Subject,
 func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 	targetID int64) (int64, func(*bun.SelectQuery) *bun.SelectQuery, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return 0, nil, err
-	}
-	visible := access.Visible(subject, productID)
-	if !subject.Sees(productID) || len(visible) == 0 {
-		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	return productID, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.TableExpr(`"finding" AS "f"`).

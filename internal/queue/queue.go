@@ -274,11 +274,6 @@ func (q *Queue) depthIn(ctx context.Context, db bun.IDB, kind string) (int, erro
 	return n, nil
 }
 
-// MaxBacklog is how much work of one kind may be waiting before more of that
-// kind is refused, as this queue was built. Where a deployment has set its own
-// number, Backlog is what is in force.
-func (q *Queue) MaxBacklog() int { return q.opts.MaxBacklog }
-
 // Backlog is the limit in force, which is what an administrator set or the
 // number this queue was built with.
 func (q *Queue) Backlog(ctx context.Context) (int, error) {

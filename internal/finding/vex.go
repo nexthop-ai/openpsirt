@@ -357,8 +357,8 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	// evidence for the one finding, and a collaborator brought in on that
 	// finding is who it is for. Asked product-wide, the detail route answered
 	// a fault for the one row their grant exists to let them open.
-	if !access.SeesOn(subject, productID, vulnerabilityID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	if _, err := access.ReadableOn(subject, productID, vulnerabilityID); err != nil {
+		return nil, err
 	}
 	if len(names) == 0 || strings.TrimSpace(component) == "" {
 		return nil, nil

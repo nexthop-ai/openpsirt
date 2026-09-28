@@ -28,10 +28,8 @@ export default defineConfig({
   // Go half, so that a figure quoted for this repository covers both.
   test: {
     environment: "jsdom",
-    // `scripts/` as well as `src/`, because the gate scripts live there and
-    // were outside the glob: a test for one could not be collected even if
-    // somebody wrote it, which is why none of the four had one. They are
-    // `.mjs` with their detection exported, so the test beside them is an
+    // `scripts/` as well as `src/`, because the gate scripts live there. They
+    // are `.mjs` with their detection exported, so the test beside them is an
     // ordinary `.test.ts`.
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
     coverage: {

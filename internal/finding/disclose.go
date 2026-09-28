@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -42,8 +43,8 @@ type Embargoed struct {
 // Passed says the date has arrived and nothing has been decided about it.
 func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) }
 
-// Disclosing reports what is approaching disclosure, and what is past it,
-// soonest first.
+// DisclosingPage reports what is approaching disclosure, and what is past it,
+// soonest first, from a position in the list, with how many there are in all.
 //
 // Before the date, not on it. The date arriving is the last
 // moment to act on it rather than the first useful warning, and a list that
@@ -60,14 +61,6 @@ func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) 
 // in a product sees none of that product's. What that costs them is a shorter
 // list; what the alternative costs is the disclosure the whole split exists to
 // prevent.
-func (s *Store) Disclosing(ctx context.Context, subject access.Subject, scope Scope,
-	within time.Duration, limit int) ([]Embargoed, int, error) {
-
-	return s.DisclosingPage(ctx, subject, scope, within, limit, 0)
-}
-
-// DisclosingPage is the same list, from a position in it, with how many there
-// are in all.
 //
 // Paged because a ceiling with no offset means what is past it cannot be read
 // through the API at all — not slowly, not at all — and the total because a
@@ -122,12 +115,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`v.description AS "summary"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		Apply(catalog.BuildNames("p", "st", "va")).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Whoever is dealing with it, and nobody where the places disagree.
 		// A minimum named one of them: a partly assigned embargo read as one
@@ -632,8 +620,9 @@ type Waiting struct {
 	Vulnerability string
 }
 
-// Pending lists movements of a disclosure date waiting for a second person,
-// across every product the subject may read undisclosed work in.
+// PendingPage lists movements of a disclosure date waiting for a second person,
+// across every product the subject may read undisclosed work in, from a
+// position in the list, with how many there are in all.
 //
 // Narrowed in the query rather than afterwards. The list is itself a
 // disclosure: a row says an issue exists, is embargoed, and is being kept
@@ -646,14 +635,6 @@ type Waiting struct {
 // of the review queue's rule, where the entry is work the reader might do.
 // Here it is a state of the case rather than a task, so it is shown and said
 // to be theirs.
-func (s *Store) Pending(ctx context.Context, subject access.Subject,
-	limit int) ([]Waiting, int, error) {
-
-	return s.PendingPage(ctx, subject, limit, 0)
-}
-
-// PendingPage is the same list, from a position in it, with how many there are
-// in all.
 //
 // Paged because a ceiling with no offset means what is past it cannot be read
 // through the API at all, and the total because a screen was printing the

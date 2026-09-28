@@ -89,7 +89,7 @@ func TestWhatKeepsBeingPutOffIsListedWithHowOftenAndHowLong(t *testing.T) {
 		f.putOff(t, "place-a", now.Add(-30*24*time.Hour), now.Add(30*24*time.Hour), triage.Approved)
 		f.putOff(t, "place-b", now.Add(-10*24*time.Hour), now.Add(20*24*time.Hour), triage.Approved)
 
-		rows, _, err := f.store.Repeats(t.Context(), f.triager, 0, 2, 100)
+		rows, _, err := f.store.RepeatsPage(t.Context(), f.triager, 0, 2, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +119,7 @@ func TestSomethingPutOffOnceIsNotAPattern(t *testing.T) {
 		now := time.Now().UTC()
 		f.putOff(t, "place-a", now, now.Add(30*24*time.Hour), triage.Approved)
 
-		rows, _, err := f.store.Repeats(t.Context(), f.triager, 0, triage.DefaultRepeatedAt, 100)
+		rows, _, err := f.store.RepeatsPage(t.Context(), f.triager, 0, triage.DefaultRepeatedAt, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,7 +140,7 @@ func TestTimeTakenBackCountsForAsLongAsItHeld(t *testing.T) {
 		f.putOffUntilTakenBack(t, "place-a", now.Add(-60*24*time.Hour),
 			now.Add(-1*time.Hour), now.Add(-30*24*time.Hour))
 
-		rows, _, err := f.store.Repeats(t.Context(), f.triager, 0, 2, 100)
+		rows, _, err := f.store.RepeatsPage(t.Context(), f.triager, 0, 2, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +167,7 @@ func TestADeferralTakenBackBeforeItHeldCountsForNothing(t *testing.T) {
 		from := now.Add(-60 * 24 * time.Hour)
 		f.putOffUntilTakenBack(t, "place-a", from, now.Add(30*24*time.Hour), from)
 
-		rows, _, err := f.store.Repeats(t.Context(), f.triager, 0, 2, 100)
+		rows, _, err := f.store.RepeatsPage(t.Context(), f.triager, 0, 2, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +186,7 @@ func TestSomebodyWhoHoldsNothingIsToldOfNoDeferrals(t *testing.T) {
 		f.putOff(t, "place-a", now.Add(-30*24*time.Hour), now.Add(30*24*time.Hour), triage.Approved)
 
 		stranger := access.NewPerson(99, "nobody@example.com", false, nil, 0)
-		rows, _, err := f.store.Repeats(t.Context(), stranger, 0, 2, 100)
+		rows, _, err := f.store.RepeatsPage(t.Context(), stranger, 0, 2, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -226,7 +226,7 @@ func TestTwoProductsDisplayedAlikeAreNotOnePattern(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rows, _, err := f.store.Repeats(ctx, who, 0, 2, 100)
+		rows, _, err := f.store.RepeatsPage(ctx, who, 0, 2, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

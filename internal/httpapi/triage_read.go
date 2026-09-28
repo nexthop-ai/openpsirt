@@ -507,9 +507,8 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 			Finding:  findingRef(described, decision.ID),
 			Decision: decisionBody(decision),
 			Place: PlaceBody{
-				Product: productNames[decision.ProductID],
-				ProductName: labelBeside(productLabels[decision.ProductID],
-					productNames[decision.ProductID]),
+				Product:       productNames[decision.ProductID],
+				ProductName:   productLabels[decision.ProductID],
 				Vulnerability: issueNames[decision.VulnerabilityID],
 				Place:         decision.PlaceIdentity,
 			},
@@ -531,10 +530,10 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 		return nil
 	}
 	body := &FindingRefBody{
-		Product: d.Product, ProductName: labelBeside(d.ProductName, d.Product),
+		Product: d.Product, ProductName: d.ProductName,
 		Stream: d.Stream, Variant: d.Variant,
-		StreamName:    labelBeside(d.StreamName, d.Stream),
-		VariantName:   labelBeside(d.VariantName, d.Variant),
+		StreamName:    d.StreamName,
+		VariantName:   d.VariantName,
 		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
 		Ecosystem: graph.EcosystemOf(d.Purl), Namespace: graph.NamespaceOf(d.Purl),
 		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,

@@ -942,22 +942,10 @@ func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 // label somebody chose and resolves to nobody; Handles is what a route naming
 // a person in its path matches.
 func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error) {
-	names := map[int64]string{}
-	if len(ids) == 0 {
-		return names, nil
-	}
-	var people []Account
-	if err := s.db.NewSelect().Model(&people).
-		Column("id", "identity", "display_name").
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+	names, err := database.NamesByID(ctx, s.db, `"person"`,
+		database.Composed(`COALESCE(NULLIF("display_name", ''), "identity")`), ids)
+	if err != nil {
 		return nil, fmt.Errorf("read who these people are: %w", err)
-	}
-	for _, person := range people {
-		if person.DisplayName != "" {
-			names[person.ID] = person.DisplayName
-			continue
-		}
-		names[person.ID] = person.Identity
 	}
 	return names, nil
 }
@@ -967,25 +955,14 @@ func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error
 // Beside Names, and the other half of it: Names is for showing and this is for
 // resolving, and wherever somebody has a display name the two are different
 // strings. ByIdentity matches the folded identity column alone, so a list that
-// published a display name in a field a route resolves could not be acted on —
-// which is how a collaborator on an embargoed case became somebody the API
-// could list and not remove.
+// publishes a display name in a field a route resolves cannot be acted on: a
+// collaborator on an embargoed case listed that way cannot be removed.
 //
-// The package offered no batch identity lookup at all, so a handler that had
-// to round-trip a name had nothing else to reach for.
+// Batched, for the reason Names is.
 func (s *Store) Handles(ctx context.Context, ids []int64) (map[int64]string, error) {
-	handles := map[int64]string{}
-	if len(ids) == 0 {
-		return handles, nil
-	}
-	var people []Account
-	if err := s.db.NewSelect().Model(&people).
-		Column("id", "identity").
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+	handles, err := database.NamesByID(ctx, s.db, `"person"`, `"identity"`, ids)
+	if err != nil {
 		return nil, fmt.Errorf("read what these people sign in as: %w", err)
-	}
-	for _, person := range people {
-		handles[person.ID] = person.Identity
 	}
 	return handles, nil
 }

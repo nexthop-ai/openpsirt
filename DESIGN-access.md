@@ -957,6 +957,18 @@ A pipeline is refused a read rather than shown an empty one, receipts for its
 own uploads excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
 
+Every read of findings in one product or one build asks one question first:
+which visibilities this subject reads there. None is a refusal, whether the
+subject cannot see the product or sees it and reads nothing in it — a pipeline
+key, an administrator granted no reading. A read about one issue asks the same
+question widened by a case the subject was brought into.
+
+| Read | Answer to a subject that reads nothing there |
+|---|---|
+| Findings, places, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the tags in use | Refused |
+| What each run opened and closed | Refused, for an empty list of runs as well |
+| The receipts list | The receipts, with no counts of what each run changed. The receipts are the pipeline's own; the counts are a report on findings |
+
 Refused where the read is, not only at the edge. A store read answering a
 credential that is not a person with an empty result leaves the invariant the
 design places in the data layer enforced by one function in a handler, and a

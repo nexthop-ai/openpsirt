@@ -671,7 +671,7 @@ const statedWidth = 4096
 // foldedWidth is the column's width, which is what every indexed name column
 // in this schema is bounded to: the widest a unique index stays inside on
 // every engine.
-const foldedWidth = 191
+const foldedWidth = database.NameWidth
 
 // fillBlank writes one producer-supplied column onto rows that have none.
 //

@@ -236,16 +236,9 @@ type Planned struct {
 func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 	targetID int64) ([]Planned, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	_, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return nil, err
-	}
-	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 
 	var rows []Upgrade

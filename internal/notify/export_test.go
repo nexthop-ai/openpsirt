@@ -3,7 +3,10 @@
 
 package notify
 
-import "context"
+import (
+	"context"
+	"net/http"
+)
 
 // SweepBatch is how many notifications one sweep carries.
 //
@@ -25,4 +28,18 @@ func StillToTell(s *Signal, ctx context.Context, name string) (int, error) {
 	}
 	rows, err := s.window(ctx, to)
 	return len(rows), err
+}
+
+// TrustForTest points the sweep at a client that trusts a test server's
+// certificate.
+//
+// Doing nothing else: the guard that refuses anything but https and refuses a
+// redirect is what is being tested around, not switched off — a test server
+// speaks https with a certificate nothing else trusts, and the alternative is
+// testing the delivery over plain http, which is the one thing this refuses to
+// do.
+func TrustForTest(s *Signal, client *http.Client) {
+	client.CheckRedirect = s.client.CheckRedirect
+	client.Transport = &outboundGuard{inner: client.Transport}
+	s.client = client
 }

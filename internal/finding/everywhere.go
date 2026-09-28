@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -114,7 +115,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	}
 	sightings := narrow(s.db.NewSelect()).
 		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`va.name AS "variant"`).
 		ColumnExpr(`c.name AS "component"`).

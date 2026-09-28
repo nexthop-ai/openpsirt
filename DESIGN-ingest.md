@@ -384,7 +384,7 @@ question a CycloneDX `dependsOn` answers.
 
 | Read as | Types |
 |---|---|
-| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF` |
+| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF`, `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF` |
 | What the document is about | `DESCRIBES` and `DESCRIBED_BY`, between the document and a package |
 | What a component was derived from | `ANCESTOR_OF` and `DESCENDANT_OF` |
 | Nothing | Everything else |
@@ -393,9 +393,9 @@ A type stated either way round is the same edge. A producer may say a
 program contains a library or that the library is contained by the program, and
 the graph does not have two shapes.
 
-What built something is not what shipped. A build tool, a test dependency
-and a development dependency are statements about the build rather than about
-what is in the product, so none of them places a component under another. The
+What built something is not what shipped. A build tool, a development tool and
+a test dependency are statements about the build rather than about what is in
+the product, so none of them places a component under another. The
 component is still held and still counted as sitting under nothing, which is
 the same treatment CycloneDX build tooling gets by arriving under `formulation`
 rather than beside the contents.

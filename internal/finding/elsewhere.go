@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // Reach is how far a judgment travels, in the three parts somebody deciding
@@ -149,12 +150,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// grouped five-join queries and two authorization checks each, so the
 	// cost the removed sampling was there to avoid came straight back.
 	at := places[0]
-	if !access.SeesOn(subject, at.ProductID, at.VulnerabilityID) {
-		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
-	}
-	visible := access.VisibleOn(subject, at.ProductID, at.VulnerabilityID)
-	if len(visible) == 0 {
-		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
+	visible, err := access.ReadableOn(subject, at.ProductID, at.VulnerabilityID)
+	if err != nil {
+		return Reach{}, err
 	}
 	identities := make([]string, 0, len(places))
 	// The key of each place, which decides whether a build is
@@ -180,7 +178,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		ConsumerUpstream  string `bun:"consumer_upstream"`
 		Places            int    `bun:"places"`
 	}
-	err := s.db.NewSelect().
+	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
@@ -190,9 +188,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
 		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).

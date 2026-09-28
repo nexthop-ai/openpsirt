@@ -286,20 +286,7 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 		}
 		return q
 	}
-
-	total, err := narrow(s.db.NewSelect().Model((*Change)(nil))).Count(ctx)
-	if err != nil {
-		return nil, 0, fmt.Errorf("count what has been changed: %w", err)
-	}
-	var changes []Change
-	err = narrow(s.db.NewSelect().Model(&changes)).
-		Order("at DESC", "id DESC").
-		Limit(limit).Offset(offset).
-		Scan(ctx)
-	if err != nil {
-		return nil, 0, fmt.Errorf("read what has been changed: %w", err)
-	}
-	return changes, total, nil
+	return s.page(ctx, narrow, limit, offset, "what has been changed")
 }
 
 // About reads the trail for one subject of a change, newest first.
@@ -331,10 +318,17 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 				WhereOr(`about LIKE ?`+database.LikeClause, database.LikeEscaped(name)+" on %")
 		})
 	}
+	return s.page(ctx, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))
+}
+
+// page is one page of the trail under a narrowing, newest first, with how many
+// the narrowing holds in all. what names the reading, for its errors.
+func (s *Store) page(ctx context.Context, narrow func(*bun.SelectQuery) *bun.SelectQuery,
+	limit, offset int, what string) ([]Change, int, error) {
 
 	total, err := narrow(s.db.NewSelect().Model((*Change)(nil))).Count(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("count what changed about %q: %w", name, err)
+		return nil, 0, fmt.Errorf("count %s: %w", what, err)
 	}
 	var changes []Change
 	err = narrow(s.db.NewSelect().Model(&changes)).
@@ -342,7 +336,7 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 		Limit(limit).Offset(offset).
 		Scan(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("read what changed about %q: %w", name, err)
+		return nil, 0, fmt.Errorf("read %s: %w", what, err)
 	}
 	return changes, total, nil
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
@@ -112,11 +113,12 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	comment := new(Comment)
 	if err := s.db.NewSelect().Model(comment).
 		Where("id = ?", commentID).Scan(ctx); err != nil {
-		// The bare sentinel, not a wrapped one. The identifier in the message
-		// is the difference a caller counts: "change comment 10000: not
-		// authorized" against "not authorized" separates the two answers this
-		// is written to make identical.
-		return 0, ErrNotTheirs
+		// The bare sentinel for a comment that is not there, not a wrapped
+		// one. The identifier in the message is the difference a caller
+		// counts: "change comment 10000: not authorized" against "not
+		// authorized" separates the two answers this is written to make
+		// identical. A read that failed is a fault, and carries its cause.
+		return 0, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
 	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, mayTakePart); err != nil {
 		return 0, err
@@ -224,7 +226,7 @@ func (s *Store) Earlier(ctx context.Context, subject access.Subject,
 	comment := new(Comment)
 	if err := s.db.NewSelect().Model(comment).
 		Where("id = ?", commentID).Scan(ctx); err != nil {
-		return nil, ErrNotTheirs
+		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
 	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, readable); err != nil {
 		return nil, err

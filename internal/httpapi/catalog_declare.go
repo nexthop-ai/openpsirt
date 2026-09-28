@@ -69,7 +69,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if in.Body.Parent != "" {
 			parent, err := store.StreamByName(ctx, product.ID, in.Body.Parent)
 			if err != nil {
-				return nil, undeclared(d.Logger, err, "that product could not be looked up")
+				return nil, undeclared(d.Logger, err, "the release it was cut from could not be looked up")
 			}
 			parentID = &parent.ID
 		}

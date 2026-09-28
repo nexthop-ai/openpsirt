@@ -301,11 +301,9 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 			Set("evaluated_at = ?", now).
 			Set("evaluated_by = ?", subject.ID).
 			Where("id = ?", row.ID).
-			// Whether it is still unjudged is asked here and nowhere else.
-			// Asked before the write as well, the answer read a row that may
-			// have moved since — and the second guard was unreachable by any
-			// input a single caller can produce, so it was a rule with no
-			// test rather than a second line of defense.
+			// Whether it is still unjudged is asked here and nowhere else: a
+			// read before the write answers about a row that may have moved
+			// since.
 			Where("vulnerability_id IS NULL").
 			// A report under a ruling is answered, or about to be. Accepting
 			// it as well would leave it two things at once.
@@ -351,23 +349,8 @@ var ErrNoSuchIssueHere = errors.New("no issue here goes by that name")
 // one it is a running total of how many claims this product has received and
 // when the last one arrived, which is a disclosure made by the name alone.
 func mintReference(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
-	prefix := strings.ToUpper(strings.TrimSpace(product))
-	if prefix == "" {
-		return "", fmt.Errorf("a product with no name cannot issue a reference")
-	}
-	return drawIdentifier(ctx, fmt.Sprintf("reports of %s in %d", prefix, year),
-		func(number int64) string {
-			return fmt.Sprintf("%s-R-%d-%d", prefix, year, number)
-		},
-		func(ctx context.Context, candidate string) (bool, error) {
-			taken, err := tx.NewSelect().
-				TableExpr(`"flaw_report" AS "fr"`).
-				Where("fr.reference = ?", candidate).
-				Count(ctx)
-			if err != nil {
-				return false, fmt.Errorf(
-					"read whether that reference is spoken for: %w", err)
-			}
-			return taken > 0, nil
-		})
+	return drawNamed(ctx, tx, product, year, naming{
+		what: "reference", an: "a", pool: "reports of %s in %d", shape: "%s-R-%d-%d",
+		table: "flaw_report", column: "reference",
+	})
 }

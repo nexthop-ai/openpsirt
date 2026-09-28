@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -77,7 +78,7 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 		ColumnExpr("eh.*").
 		ColumnExpr(`v.identifier AS "issue"`).
 		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`p.display_name AS "product_name"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		// Whether any finding of the issue in this product is undisclosed.
 		// As an integer rather than a boolean: the four engines spell a
 		// boolean three ways.

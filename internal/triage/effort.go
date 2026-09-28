@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -94,7 +95,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			AND pf.place_identity = de.place_identity`).
 		Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS "product_name"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
 		ColumnExpr(`COALESCE(pc.name, '') AS "component"`).
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
 		ColumnExpr(`COUNT(DISTINCT de.id) AS "decisions"`).

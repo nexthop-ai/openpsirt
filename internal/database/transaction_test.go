@@ -78,13 +78,7 @@ func TestARetriedTransactionLeavesNothingBehindFromTheAttemptThatFailed(t *testi
 	// closures write the same rows every time. It shows up when one appends.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		if _, err := db.NewRaw(`CREATE TABLE "retried" ("id" INTEGER PRIMARY KEY, "note" VARCHAR(16))`).
-			Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			_, _ = db.NewRaw(`DROP TABLE "retried"`).Exec(context.WithoutCancel(ctx))
-		})
+		scratchTable(t, db, "retried", `"id" INTEGER PRIMARY KEY, "note" VARCHAR(16)`)
 
 		attempts := 0
 		err := database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
@@ -205,13 +199,7 @@ func TestFindingNothingIsToldApartFromFailing(t *testing.T) {
 	// either one changes behavior rather than logging.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		if _, err := db.NewRaw(`CREATE TABLE "nothing_here" ("id" INTEGER PRIMARY KEY)`).
-			Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			_, _ = db.NewRaw(`DROP TABLE "nothing_here"`).Exec(context.WithoutCancel(ctx))
-		})
+		scratchTable(t, db, "nothing_here", `"id" INTEGER PRIMARY KEY`)
 
 		var id int64
 		err := db.NewRaw(`SELECT "id" FROM "nothing_here" WHERE "id" = 1`).Scan(ctx, &id)
@@ -333,12 +321,7 @@ func TestACountThatCannotBeReadIsAFaultRatherThanZero(t *testing.T) {
 func TestACountThatCanBeReadIsReturned(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		if _, err := db.NewRaw(`CREATE TABLE "counted" ("id" INTEGER PRIMARY KEY)`).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			_, _ = db.NewRaw(`DROP TABLE "counted"`).Exec(context.WithoutCancel(ctx))
-		})
+		scratchTable(t, db, "counted", `"id" INTEGER PRIMARY KEY`)
 		res, err := db.NewRaw(`INSERT INTO "counted" ("id") VALUES (1), (2), (3)`).Exec(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -350,5 +333,22 @@ func TestACountThatCanBeReadIsReturned(t *testing.T) {
 		if n != 3 {
 			t.Errorf("three rows were written and the count says %d", n)
 		}
+	})
+}
+
+// scratchTable makes a table of the test's own and drops it when the test
+// ends, whether or not it passed.
+//
+// Dropped on a context the test's ending does not cancel: the test's own is
+// already done by the time a cleanup runs, and a drop sent on it is refused
+// before it leaves, which leaves the table for the next run to trip over.
+func scratchTable(t *testing.T, db *database.DB, name, columns string) {
+	t.Helper()
+	ctx := t.Context()
+	if _, err := db.NewRaw("CREATE TABLE ? ("+columns+")", bun.Ident(name)).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.NewRaw("DROP TABLE ?", bun.Ident(name)).Exec(context.WithoutCancel(ctx))
 	})
 }

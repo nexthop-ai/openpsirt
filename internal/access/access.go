@@ -576,6 +576,35 @@ func SeesOn(s Subject, productID, vulnerabilityID int64) bool {
 	return s.Sees(productID) || s.OnCase(productID, vulnerabilityID)
 }
 
+// Readable is which visibilities this subject may read of the findings in one
+// product, refused where that is none.
+//
+// Refused the same way whether the subject cannot see the product or sees it
+// and may read nothing in it — a pipeline key, an administrator granted no
+// reading. An empty answer says the product holds nothing, which is a
+// different statement from "you may not ask".
+func Readable(s Subject, productID int64) ([]Visibility, error) {
+	visible := Visible(s, productID)
+	if !s.Sees(productID) || len(visible) == 0 {
+		return nil, readRefused(productID)
+	}
+	return visible, nil
+}
+
+// ReadableOn is Readable asked about one issue, which a collaborator brought
+// into its case reads at any visibility.
+func ReadableOn(s Subject, productID, vulnerabilityID int64) ([]Visibility, error) {
+	visible := VisibleOn(s, productID, vulnerabilityID)
+	if !SeesOn(s, productID, vulnerabilityID) || len(visible) == 0 {
+		return nil, readRefused(productID)
+	}
+	return visible, nil
+}
+
+func readRefused(productID int64) error {
+	return Denied(fmt.Sprintf("read findings in product %d", productID))
+}
+
 // Visible is which visibilities this subject may read in one product.
 //
 // Here rather than in each package that queries, because it is one rule and a
@@ -662,8 +691,8 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 // Not every product, for an administrator. Administering the
 // catalog is knowing a product exists, which is what Sees answers; this is
 // what narrows findings, counts, aggregates and exports, and an administrator
-// reads those only where they hold a role. The "all" flag is kept because the
-// queries are written around it, and nothing sets it now.
+// reads those only where they hold a role. The "all" flag is set only for the
+// unnarrowed subject Everything makes.
 func (s Subject) Products() (ids []int64, all bool) {
 	if s.Kind != Person {
 		return nil, false

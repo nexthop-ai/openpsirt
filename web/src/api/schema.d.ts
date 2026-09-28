@@ -6321,7 +6321,7 @@ export interface components {
             group: string;
             /** @description The product the role is held against, by the name that addresses it */
             product?: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             /**
              * @description The role membership of this group grants
@@ -6395,12 +6395,12 @@ export interface components {
             /** Format: int64 */
             medium: number;
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             /** Format: int64 */
             total: number;
             variant: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
         };
         BuildName: {
@@ -7042,7 +7042,7 @@ export interface components {
             readonly $schema?: string;
             added_at: string;
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             summary?: string;
             vulnerability: string;
@@ -7483,15 +7483,15 @@ export interface components {
             places: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             summary?: string;
             variant: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
             vulnerability: string;
         };
@@ -7880,7 +7880,7 @@ export interface components {
             places: number;
             /** @description The product this is open in. Present only on the list that spans products */
             product?: string;
-            /** @description That product's display name, where it has one */
+            /** @description That product's display name, or its name where it has none */
             product_name?: string;
             /**
              * Format: double
@@ -7902,7 +7902,7 @@ export interface components {
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
             /** @description A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build */
             stream?: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             /** @description The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding */
             summary?: string;
@@ -7914,7 +7914,7 @@ export interface components {
             upstream?: string;
             /** @description The variant of that build */
             variant?: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
             /** @description The version that ships */
             version: string;
@@ -7990,7 +7990,7 @@ export interface components {
             places: number;
             /** @description The build to link to, by product, branch or tag, and variant. The product by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             /** Format: double */
             score?: number;
@@ -7999,10 +7999,10 @@ export interface components {
             /** @description Our rating where one stands, else as published */
             severity?: string;
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             variant: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
             /** @description The version that ships */
             version: string;
@@ -8154,7 +8154,7 @@ export interface components {
             everywhere?: boolean;
             /** @description The product the role is held against, by the name that addresses it. Absent where it is held across every product */
             product?: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             /**
              * @description The rights it carries
@@ -8389,7 +8389,7 @@ export interface components {
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             proposed_at: string;
             proposed_by: string;
@@ -8465,14 +8465,14 @@ export interface components {
             places: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             variant: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
             /** @description The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved */
             version?: string;
@@ -9078,10 +9078,10 @@ export interface components {
              */
             places: number;
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             variant: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
             /** @description The version that build ships under this name — pass it as ?version= when applying a decision there */
             version?: string;
@@ -9874,7 +9874,7 @@ export interface components {
             place: string;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             readonly product_name?: string;
             /** @description The issue, by any name it is known under */
             vulnerability: string;
@@ -10481,7 +10481,7 @@ export interface components {
              */
             open: number;
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
         };
         Remediation: {
@@ -10524,7 +10524,7 @@ export interface components {
             place: string;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
             /** @description A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern */
@@ -11300,7 +11300,7 @@ export interface components {
             people: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             /**
              * Format: int64
@@ -11721,16 +11721,16 @@ export interface components {
             places: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it differs from its name */
+            /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
             /** @description A branch or tag holding it. Where builds is more than one, any of them */
             stream: string;
-            /** @description The branch or tag as it was spelled, where that differs from its name */
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
             /** @description A build variant holding it. Where builds is more than one, any of them */
             variant: string;
-            /** @description The variant as it was spelled, where that differs from its name */
+            /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
             version: string;
             vulnerability: string;

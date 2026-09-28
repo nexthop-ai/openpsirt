@@ -81,11 +81,11 @@ type DecisionBody struct {
 // the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
 	Product       string  `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
-	ProductName   string  `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductName   string  `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	Stream        string  `json:"stream"`
-	StreamName    string  `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	StreamName    string  `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant       string  `json:"variant"`
-	VariantName   string  `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	VariantName   string  `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	Vulnerability string  `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
 	Component     string  `json:"component"`
 	Version       string  `json:"version" doc:"The version that ships"`
@@ -111,7 +111,7 @@ type FindingRefBody struct {
 // place freely would be choosing which decisions apply where.
 type PlaceBody struct {
 	Product       string `json:"product" minLength:"1" doc:"The product, by the name that addresses it"`
-	ProductName   string `json:"product_name,omitempty" readOnly:"true" doc:"The product's display name, where it differs from its name"`
+	ProductName   string `json:"product_name,omitempty" readOnly:"true" doc:"The product's display name, or its name where it has none"`
 	Vulnerability string `json:"vulnerability" minLength:"1" doc:"The issue, by any name it is known under"`
 	Place         string `json:"place" minLength:"1" doc:"The place in the build, as the findings list gives it"`
 }
@@ -910,28 +910,10 @@ func decisionBody(d triage.Decision) DecisionBody {
 	// and this row says where it lands. A decision read without its claim is
 	// a programming error rather than a state a caller can reach, so it is
 	// left to fail here rather than rendered as an outcome nobody chose.
-	said := d.Claim
-	body := DecisionBody{
-		ID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome), State: string(d.State),
-	}
-	if said.Mitigation != nil {
-		body.Mitigation = *said.Mitigation
-	}
-	if said.Justification != nil {
-		body.Justification = justification(*said.Justification)
-	}
-	if said.FixedVersion != nil {
-		body.FixedVersion = *said.FixedVersion
-	}
-	if said.DeferredUntil != nil {
-		body.DeferredUntil = said.DeferredUntil.Format(time.DateOnly)
-	}
-	if said.CommittedTo != nil {
-		body.CommittedTo = said.CommittedTo.Format(time.DateOnly)
-	}
-	if said.UpgradeTo != nil {
-		body.UpgradeTo = *said.UpgradeTo
-	}
+	// The argument is drawn the one way a claim's argument is drawn, and the
+	// row adds what belongs to it.
+	body := claimArgument(*d.Claim, "")
+	body.ID, body.ClaimID, body.State = d.ID, d.ClaimID, string(d.State)
 	if d.SentBackAt != nil {
 		body.SentBackAt = d.SentBackAt.UTC().Format(time.RFC3339)
 	}

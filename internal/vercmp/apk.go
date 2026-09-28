@@ -163,18 +163,14 @@ func apkNext(s apkState) apkState {
 		s.token = apkDigit
 		return apkDigits(s)
 	case isDigit(c):
-		// A number means a further part where the last token was a number, and
-		// the count on a suffix where it was a suffix. Anywhere else it is not
-		// a version.
-		switch was {
-		case apkInitialDigit, apkDigit:
-			s.token = apkDigit
-		case apkSuffix:
-			s.token = apkSuffixNumber
-		default:
+		// A number here is the count on a suffix. A number following a number
+		// never reaches this: every numeric token is read whole by the token
+		// before it, so anywhere but after a suffix it is not a version.
+		if was != apkSuffix {
 			s.token = apkInvalid
 			return s
 		}
+		s.token = apkSuffixNumber
 		return apkDigits(s)
 	case c == '_':
 		if was > apkSuffixNumber {

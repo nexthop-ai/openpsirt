@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
@@ -248,7 +249,7 @@ func (s *Store) EarlierNote(ctx context.Context, subject access.Subject,
 
 	note := new(IssueNote)
 	if err := s.db.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
-		return nil, ErrNoSuchNote
+		return nil, database.FromRead(err, ErrNoSuchNote, fmt.Sprintf("read note %d", noteID))
 	}
 	if _, err := s.Notes(ctx, subject, note.ProductID, note.VulnerabilityID); err != nil {
 		return nil, err

@@ -146,8 +146,9 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 		if got := open(f.holding(t, access.PublicRead)); got != 1 {
 			t.Errorf("a reader of disclosed findings only was told %d, expected 1", got)
 		}
-		if got := open(access.NewPerson(2, "stranger", false, nil, 0)); got != 0 {
-			t.Errorf("somebody with no rights was told %d", got)
+		if _, err := f.store.Releases(t.Context(), access.NewPerson(2, "stranger", false, nil, 0),
+			f.productID); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody with no rights got %v, want a refusal", err)
 		}
 	})
 }
@@ -156,10 +157,9 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 // DESIGN-access.md places in the data layer, over the reads that answer a
 // selection rather than one row.
 //
-// Roughly twenty of them answered a credential that is not a person with an
-// empty result, so the invariant lived in one function at the HTTP edge — and
-// a check in a handler is the one somebody forgets. Subject.Kind is a string,
-// so the zero subject took every one of those branches too.
+// Refused by the read itself, because a check in a handler is the one somebody
+// forgets. Subject.Kind is a string, so the zero subject is not a person either
+// and takes the same branches.
 func TestAPipelineKeyIsRefusedByTheReadRatherThanAnsweredEmpty(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -189,13 +189,96 @@ func TestAPipelineKeyIsRefusedByTheReadRatherThanAnsweredEmpty(t *testing.T) {
 					return err
 				}},
 				{"what is running out of time", func(s access.Subject) error {
-					_, _, err := f.store.RunningOut(ctx, s, finding.Scope{}, 14*24*time.Hour, 10)
+					_, _, err := f.store.RunningOutPage(ctx, s, finding.Scope{}, 14*24*time.Hour, 10, 0)
 					return err
 				}},
 			} {
 				if err := read.ask(who.subject); !errors.Is(err, access.ErrDenied) {
 					t.Errorf("%s asking %s got %v, want a refusal",
 						who.what, read.what, err)
+				}
+			}
+		}
+	})
+}
+
+// TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem pins one answer
+// across the reads of one build: a subject that sees the product and may read
+// none of its findings is refused, never answered empty. An empty answer says
+// the build has nothing to report, which is a different statement from "you
+// may not ask".
+func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		runID := f.run(t)
+		if _, err := f.store.Apply(ctx, f.target, runID,
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		issue := f.open(t)[0].VulnerabilityID
+
+		for _, who := range []struct {
+			what    string
+			subject access.Subject
+		}{
+			{"a pipeline key", access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID})},
+			{"an administrator granted nothing", f.admin(t)},
+			{"an approver alone", f.holding(t, access.Approver)},
+		} {
+			for _, read := range []struct {
+				what string
+				ask  func(access.Subject) error
+			}{
+				{"what is open", func(s access.Subject) error {
+					_, err := f.store.Open(ctx, s, f.target)
+					return err
+				}},
+				{"what each run changed", func(s access.Subject) error {
+					_, err := f.store.Changes(ctx, s, f.target, []int64{runID})
+					return err
+				}},
+				{"what no run changed", func(s access.Subject) error {
+					_, err := f.store.Changes(ctx, s, f.target, nil)
+					return err
+				}},
+				{"one run", func(s access.Subject) error {
+					_, err := f.store.Ran(ctx, s, f.target, runID)
+					return err
+				}},
+				{"the upgrades promised", func(s access.Subject) error {
+					_, err := f.store.PendingUpgrades(ctx, s, f.target)
+					return err
+				}},
+				{"the patches carried", func(s access.Subject) error {
+					_, _, err := f.store.CarriedPatches(ctx, s, f.target, "", 10, 0)
+					return err
+				}},
+				{"what publishers said", func(s access.Subject) error {
+					_, err := f.store.SaidAbout(ctx, s, f.productID, issue,
+						[]string{"CVE-2026-1"}, "libnl", "")
+					return err
+				}},
+				{"how the builds stand", func(s access.Subject) error {
+					_, _, err := f.store.HowItStands(ctx, s, f.productID)
+					return err
+				}},
+				{"what the releases hold", func(s access.Subject) error {
+					_, err := f.store.Releases(ctx, s, f.productID)
+					return err
+				}},
+				{"the tags in use", func(s access.Subject) error {
+					_, err := f.store.TagsInUse(ctx, s, f.productID)
+					return err
+				}},
+				{"how a release is trending", func(s access.Subject) error {
+					_, err := f.store.ReleaseTrend(ctx, s,
+						finding.Scope{ProductID: &f.productID}, 10)
+					return err
+				}},
+			} {
+				if err := read.ask(who.subject); !errors.Is(err, access.ErrDenied) {
+					t.Errorf("%s asking %s got %v, want a refusal", who.what, read.what, err)
 				}
 			}
 		}

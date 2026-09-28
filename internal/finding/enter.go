@@ -552,13 +552,11 @@ var (
 func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int64, string, error) {
 	name := strings.TrimSpace(in.Component)
 	if name != "" {
-		// The resolver every other component lookup already goes through,
-		// rather than a second one here. This took the first row a name
-		// matched, which is the guess that was measured wrong elsewhere: three
-		// vendored versions of one library all resolved to the same component,
-		// so a flaw recorded against one of them was filed against whichever
-		// had been interned first and nothing said so. An ambiguous name is
-		// now a refusal carrying the choices.
+		// The resolver every other component lookup goes through. An
+		// ambiguous name is refused with the choices: one image carries three
+		// vendored versions of one library under one name, and taking the
+		// first row the name matches files a flaw against whichever was
+		// interned first.
 		id, err := graph.ComponentAsIn(ctx, db, targetID, name, graph.Choice{
 			Version:   strings.TrimSpace(in.Version),
 			Ecosystem: strings.TrimSpace(in.Ecosystem),
@@ -633,32 +631,51 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 //
 // Shaped like a vendor advisory identifier because that is what it becomes:
 // the product, the year, and a number. The number is drawn rather than
-// counted. Counting from one made the identifier a running total of what
-// this product has kept quiet — anybody could ask for the first one, walk
-// upward until the answers changed, and read off both how many undisclosed
-// flaws exist and when the last one was recorded. That is a disclosure made by
-// the name alone, before any route is asked anything.
+// counted. A counted identifier is a running total of what this product has
+// kept quiet: walking upward from the first until the answers change reads off
+// both how many undisclosed flaws exist and when the last one was recorded,
+// which is a disclosure made by the name alone.
 //
 // Drawn from a source fit for the purpose, because guessing the next one is
 // the whole of what this prevents. What happens to a collision is
 // drawIdentifier's, below.
 func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
+	return drawNamed(ctx, tx, product, year, naming{
+		what: "identifier", an: "an", pool: "%s in %d", shape: "%s-%d-%d",
+		table: "vulnerability", column: "identifier",
+	})
+}
+
+// naming is one kind of name a product issues: what it is called, the pool
+// its numbers are drawn from, its shape, and the column that records the
+// names already issued. The table and column are written here in code and
+// never taken from a request.
+type naming struct {
+	what, an      string
+	pool, shape   string
+	table, column string
+}
+
+// drawNamed issues a name of one kind for a product in a year: the product's
+// name in capitals, the year, and a drawn number, drawn again where the name
+// is spoken for.
+func drawNamed(ctx context.Context, tx bun.IDB, product string, year int, n naming) (string, error) {
 	prefix := strings.ToUpper(strings.TrimSpace(product))
 	if prefix == "" {
-		return "", fmt.Errorf("a product with no name cannot issue an identifier")
+		return "", fmt.Errorf("a product with no name cannot issue %s %s", n.an, n.what)
 	}
-	return drawIdentifier(ctx, fmt.Sprintf("%s in %d", prefix, year),
+	return drawIdentifier(ctx, fmt.Sprintf(n.pool, prefix, year),
 		func(number int64) string {
-			return fmt.Sprintf("%s-%d-%d", prefix, year, number)
+			return fmt.Sprintf(n.shape, prefix, year, number)
 		},
 		func(ctx context.Context, candidate string) (bool, error) {
 			taken, err := tx.NewSelect().
-				TableExpr(`"vulnerability" AS "v"`).
-				Where("v.identifier = ?", candidate).
+				TableExpr("?", bun.Ident(n.table)).
+				Where("? = ?", bun.Ident(n.column), candidate).
 				Count(ctx)
 			if err != nil {
 				return false, fmt.Errorf(
-					"read whether that identifier is spoken for: %w", err)
+					"read whether that %s is spoken for: %w", n.what, err)
 			}
 			return taken > 0, nil
 		})

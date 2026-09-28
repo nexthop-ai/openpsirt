@@ -594,18 +594,6 @@ func (s *Store) reaching() int {
 	return RoutingReach
 }
 
-// NewStoreReaching is a store whose rules may name at most this many places in
-// one build.
-//
-// For the test alone, which has to show the refusal without building a fixture
-// of two thousand components: what is being checked is that the cap refuses,
-// and a slow fixture says the same thing.
-func NewStoreReaching(db bun.IDB, reach int) *Store {
-	s := NewStore(db)
-	s.reach = reach
-	return s
-}
-
 // RoutingReach is how many places in one build a rule's pattern may name.
 //
 // A rule says where in the tree something sits, and a pattern matching most of

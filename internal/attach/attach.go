@@ -21,6 +21,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
 // Attachment is one file, and the record that outlives it.
@@ -186,7 +187,7 @@ func Disposition(a *Attachment) string {
 // markdown people copy between screens and an encoding with case in it invites
 // a store that folds it.
 func mintToken() (string, error) {
-	raw := make([]byte, 16)
+	raw := make([]byte, markdown.TokenBytes)
 	if _, err := rand.Read(raw); err != nil {
 		return "", fmt.Errorf("mint an attachment identifier: %w", err)
 	}

@@ -5,11 +5,10 @@ package finding
 
 // Reading findings back, and the naming layer every other read here shares.
 //
-// The remainder, after the filter, the page and the component view moved to
-// files of their own: the whole-target read, which product a target belongs
-// to, and the two lookups that turn identifiers into names. The narrowing is
-// in narrow.go, the page in groups.go, and what is open at one component in
-// component.go.
+// The whole-target read, which product a target belongs to and what a subject
+// may read of it, and the lookups that turn identifiers into names. The
+// narrowing is in narrow.go, the page in groups.go, and what is open at one
+// component in component.go.
 
 import (
 	"context"
@@ -34,20 +33,9 @@ import (
 // from the caller. A caller that could name the product could name a different
 // one, and then the check would be answering a question nobody asked.
 func (s *Store) Open(ctx context.Context, subject access.Subject, targetID int64) ([]Finding, error) {
-	productID, err := productOf(ctx, s.db, targetID)
+	_, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return nil, err
-	}
-	if !subject.Sees(productID) {
-		// Not merely empty: a product somebody holds nothing on does not
-		// exist as far as they are concerned, and an empty list is a
-		// different statement from a refusal.
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 
 	var rows []Finding
@@ -65,6 +53,27 @@ func (s *Store) Open(ctx context.Context, subject access.Subject, targetID int64
 // productOf reads which product a build belongs to.
 func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
 	return catalog.NewStore(db).ProductOf(ctx, targetID)
+}
+
+// readableIn is the product a build belongs to and which visibilities this
+// subject may read of its findings, refused where that is none.
+//
+// Every read of one build's findings starts here, so a subject who may read
+// nothing in the product is refused by all of them alike rather than answered
+// empty by some. Where the read is about one issue a collaborator may have
+// been brought into, the caller asks access.ReadableOn instead.
+func readableIn(ctx context.Context, db bun.IDB, subject access.Subject,
+	targetID int64) (int64, []access.Visibility, error) {
+
+	productID, err := productOf(ctx, db, targetID)
+	if err != nil {
+		return 0, nil, err
+	}
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return 0, nil, err
+	}
+	return productID, visible, nil
 }
 
 // issuesNamed reads what these issues are called and how bad they were

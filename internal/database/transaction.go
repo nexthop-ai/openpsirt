@@ -89,8 +89,7 @@ var ErrGoAgain = errors.New("lost a race with another writer")
 
 // WorthRetrying reports whether a failure is one that going again can fix.
 //
-// This is the one place besides the migrations and the queue's locking that
-// knows which engine it is talking to, and it has to be: what each of them
+// It knows which engine it is talking to, and it has to: what each of them
 // calls "you lost a race, try again" is a different code, and treating an
 // unrecognized failure as retryable would hammer a database over a constraint
 // violation that will never come out differently.

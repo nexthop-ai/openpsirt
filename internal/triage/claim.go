@@ -324,7 +324,7 @@ func (s *Store) extendable(ctx context.Context, subject access.Subject, from int
 
 	source := new(Claim)
 	if err := s.db.NewSelect().Model(source).Where("id = ?", from).Scan(ctx); err != nil {
-		return nil, ErrNotTheirs
+		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", from))
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Where("claim_id = ?", from).Scan(ctx); err != nil {
@@ -868,7 +868,7 @@ func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID i
 
 	claim := new(Claim)
 	if err := s.db.NewSelect().Model(claim).Where("id = ?", claimID).Scan(ctx); err != nil {
-		return nil, nil, ErrNotTheirs
+		return nil, nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", claimID))
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").

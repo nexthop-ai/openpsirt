@@ -946,18 +946,9 @@ func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID 
 	if err != nil {
 		return 0, nil, err
 	}
-	if !subject.Sees(productID) {
-		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	readable := []access.Visibility{}
-	if subject.Reads(access.Public, productID) {
-		readable = append(readable, access.Public)
-	}
-	if subject.Reads(access.Private, productID) {
-		readable = append(readable, access.Private)
-	}
-	if len(readable) == 0 {
-		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	readable, err := access.Readable(subject, productID)
+	if err != nil {
+		return 0, nil, err
 	}
 	// The product comes back with what may be read in it, because the rating
 	// a band is drawn from belongs to that same product: a count severity-

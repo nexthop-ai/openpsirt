@@ -286,14 +286,7 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 	if err != nil {
 		return fmt.Errorf("record when this release went out: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("record when this release went out: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("release %d: %w", streamID, ErrNotFound)
-	}
-	return nil
+	return counted(res, "release", streamID, "record when this release went out")
 }
 
 // FillInParent records which branch a tag was cut from, where nothing has been
@@ -371,14 +364,7 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 	if err != nil {
 		return fmt.Errorf("record when this %s goes out of support: %w", what, err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("record when this %s goes out of support: %w", what, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%s %d: %w", what, id, ErrNotFound)
-	}
-	return nil
+	return counted(res, what, id, "record when this "+what+" goes out of support")
 }
 
 // EndOfLifeFor reads the date in force for one release.
@@ -633,14 +619,7 @@ func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
 	if err != nil {
 		return fmt.Errorf("record this product's thresholds for one pair: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("record this product's thresholds for one pair: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("product %d: %w", productID, ErrNotFound)
-	}
-	return nil
+	return counted(res, "product", productID, "record this product's thresholds for one pair")
 }
 
 // SetTriageFloor records what a product considers worth triaging, or clears it
@@ -661,14 +640,7 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 	if err != nil {
 		return fmt.Errorf("record what this product triages: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("record what this product triages: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("product %d: %w", productID, ErrNotFound)
-	}
-	return nil
+	return counted(res, "product", productID, "record what this product triages")
 }
 
 // ProductByName finds a product, or reports that it was never declared.
@@ -1039,18 +1011,9 @@ func (s *Store) ExistingTarget(ctx context.Context, streamID, variantID int64) (
 //
 // Batched for the reason ProductNames is, and stated there.
 func (s *Store) ProductsCalled(ctx context.Context, ids []int64) (map[int64]string, error) {
-	called := map[int64]string{}
-	if len(ids) == 0 {
-		return called, nil
-	}
-	var products []Product
-	if err := s.db.NewSelect().Model(&products).
-		Column("id", "name").
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+	called, err := database.NamesByID(ctx, s.db, `"product"`, `"name"`, ids)
+	if err != nil {
 		return nil, fmt.Errorf("read what these products are called: %w", err)
-	}
-	for _, product := range products {
-		called[product.ID] = product.Name
 	}
 	return called, nil
 }
@@ -1061,18 +1024,10 @@ func (s *Store) ProductsCalled(ctx context.Context, ids []int64) (map[int64]stri
 // Batched for the same reason people are: the lists that need it are long, and
 // a query per row is how a page of fifty becomes fifty-one round trips.
 func (s *Store) ProductNames(ctx context.Context, ids []int64) (map[int64]string, error) {
-	names := map[int64]string{}
-	if len(ids) == 0 {
-		return names, nil
-	}
-	var products []Product
-	if err := s.db.NewSelect().Model(&products).
-		Column("id", "display_name").
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+	names, err := database.NamesByID(ctx, s.db, `"product"`,
+		database.Composed(ShownExpr(`"product"`)), ids)
+	if err != nil {
 		return nil, fmt.Errorf("read which products these are: %w", err)
-	}
-	for _, product := range products {
-		names[product.ID] = product.DisplayName
 	}
 	return names, nil
 }

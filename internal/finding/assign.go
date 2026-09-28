@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -217,9 +218,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 			"give work to somebody else in product %d — you may take what nobody owns, "+
 				"and hand back your own", productID))
 	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return 0, false, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return 0, false, err
 	}
 
 	moved, err = s.moveWork(ctx, s.db, subject, productID, vulnerabilityID, componentID,
@@ -292,14 +293,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetID,
 	vulnerabilityID, componentID int64) (access.Visibility, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return access.Public, err
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return access.Public, access.Denied(
-			fmt.Sprintf("read findings in product %d", productID))
 	}
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
@@ -330,10 +326,9 @@ func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetI
 func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject,
 	productID int64, targets []int64, component, version string) (access.Visibility, error) {
 
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return access.Public, access.Denied(
-			fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return access.Public, err
 	}
 	if len(targets) == 0 {
 		return access.Public, nil
@@ -944,12 +939,7 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
-		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		Apply(catalog.BuildNames("p", "st", "va")).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &builds)
 	if err != nil {

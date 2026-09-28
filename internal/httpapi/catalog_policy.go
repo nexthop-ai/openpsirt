@@ -242,12 +242,12 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 			}
 			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
 			if err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
+				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
 				from, err := store.StreamByName(ctx, product.ID, named)
 				if err != nil {
-					return undeclared(d.Logger, err, "that product could not be looked up")
+					return undeclared(d.Logger, err, "the release it was cut from could not be looked up")
 				}
 				if err := store.FillInParent(ctx, stream.ID, from.ID); err != nil {
 					return asked(d.Logger, err)
@@ -301,7 +301,7 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			if stream, err = store.StreamByName(ctx, product.ID, in.Stream); err != nil {
-				return undeclared(d.Logger, err, "that product could not be looked up")
+				return undeclared(d.Logger, err, "that release could not be looked up")
 			}
 			before := stream.EOLOn
 			if err := store.SetStreamEndOfLife(ctx, stream.ID, on); err != nil {

@@ -168,7 +168,12 @@ func registerReports(api huma.API, in Ingest) {
 			return nil, err
 		}
 		releases, err := finding.NewStore(in.DB.DB).Releases(ctx, subject, named.ID)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			// A product somebody sees and reads nothing in answers as one
+			// they cannot see, for the reason the lookup above does.
+			return nil, noSuchProduct()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "what is open per build could not be read", err)
 		}
 		out := &listOutput[ReleaseBody]{}
@@ -261,7 +266,7 @@ func (pair TwoBuilds) targets(ctx context.Context, in Ingest, subject access.Sub
 // ReleasePointBody is the state one release shipped with.
 type ReleasePointBody struct {
 	Stream     string         `json:"stream"`
-	StreamName string         `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	StreamName string         `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
 	Open       int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
 	BySeverity map[string]int `json:"by_severity,omitempty"`
@@ -327,7 +332,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		for _, point := range points {
 			out.Body.Items = append(out.Body.Items, ReleasePointBody{
 				Stream: point.Stream, Cut: point.Cut.Format(time.RFC3339),
-				StreamName: labelBeside(point.StreamName, point.Stream),
+				StreamName: point.StreamName,
 				Open:       point.Open, BySeverity: point.BySeverity,
 			})
 		}

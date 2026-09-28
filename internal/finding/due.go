@@ -298,8 +298,9 @@ func InForce() (string, []any) {
 		[]any{"approved", "proposed", false}
 }
 
-// RunningOut reports findings whose deadline is within this many days and
-// which nobody has decided about, most pressing first.
+// RunningOutPage reports findings whose deadline is within this many days and
+// which nobody has decided about, most pressing first, from a position in the
+// list.
 //
 // Undecided only. A deadline that has been answered is not a deadline
 // running out: a dismissal takes a finding off the clock, because the claim is
@@ -317,20 +318,12 @@ func InForce() (string, []any) {
 // rather than after — measured at about eight seconds over 441,108 findings.
 // Stored at ingest, this is one range over an index.
 //
-// A finding with no deadline is left out. That is a row recorded before the
-// deadline was stored, and it will have one the next time a scan reopens it —
-// which is honestly "not known yet" rather than "not due", and either way not
-// something to interrupt anybody about.
-func (s *Store) RunningOut(ctx context.Context, subject access.Subject, scope Scope,
-	within time.Duration, limit int) ([]Late, int, error) {
-
-	return s.RunningOutPage(ctx, subject, scope, within, limit, 0)
-}
-
-// RunningOutPage is the same list, from a position in it.
+// A finding with no deadline is left out: nobody has rated a flaw recorded
+// here, it is below the line, it is in a release out of support or built once,
+// or it has nothing upstream to take, and NoDeadline says which. None of those is something to interrupt anybody about.
 //
-// Separate from RunningOut because a screen reads the first page and a file
-// reads all of them, and the file is the reason the offset exists: an export
+// Paged because a screen reads the first page and a file reads all of them,
+// and the file is the reason the offset exists: an export
 // that stopped at the screen's page would be the screen with extra steps, and
 // what somebody exports a deadline report for is precisely the part they have
 // not read.
@@ -395,12 +388,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`c.purl AS "purl"`).
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		Apply(catalog.BuildNames("p", "st", "va")).
 		// The earliest of the places this row covers, because that is the one
 		// that makes the whole group late.
 		ColumnExpr(`MIN(f.due_at) AS "due"`).

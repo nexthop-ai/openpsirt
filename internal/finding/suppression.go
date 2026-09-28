@@ -252,15 +252,12 @@ type Carried struct {
 func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targetID int64,
 	component string, limit, offset int) ([]Carried, int, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
-		return nil, 0, err
-	}
 	// A build's own claims say what it ships and what it has patched, which is
 	// as much about the build as its inventory is — so it is read by whoever
 	// may read the product's findings and by nobody else.
-	if !subject.Sees(productID) {
-		return nil, 0, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	_, _, err := readableIn(ctx, s.db, subject, targetID)
+	if err != nil {
+		return nil, 0, err
 	}
 	limit = database.AList.Of(limit)
 

@@ -4,6 +4,7 @@
 package markdown_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -11,6 +12,10 @@ import (
 )
 
 const token = "0f9a1b2c3d4e5f60718293a4b5c6d7e8"
+
+// tokenShape is how a refusal describes a reference, at the width the store
+// mints.
+var tokenShape = fmt.Sprintf("%d hexadecimal characters", 2*markdown.TokenBytes)
 
 func TestAnImageMayComeFromAnAttachmentAndNowhereElse(t *testing.T) {
 	// An image loaded from a third party reports who read a finding and when,
@@ -150,7 +155,7 @@ func TestAReferenceIsRefusedUnlessItNamesAFileThisDeploymentMinted(t *testing.T)
 			}
 			// And it says what to write instead, because the person reading
 			// this typed it and can fix it.
-			if !strings.Contains(err.Error(), "32 hexadecimal characters") {
+			if !strings.Contains(err.Error(), tokenShape) {
 				t.Errorf("the refusal does not say what a reference looks like: %v", err)
 			}
 			// The proof it referred to nothing: the half that resolves them
@@ -172,8 +177,8 @@ func TestAReferenceSchemeInCapitalsIsRefusedForItsSpelling(t *testing.T) {
 		source string
 		wrong  string
 	}{
-		{"an attachment", "[the log](Attachment:" + token + ")", "32 hexadecimal characters"},
-		{"an attachment image", "![shot](ATTACHMENT:" + token + ")", "32 hexadecimal characters"},
+		{"an attachment", "[the log](Attachment:" + token + ")", tokenShape},
+		{"an attachment image", "![shot](ATTACHMENT:" + token + ")", tokenShape},
 		{"an issue", "[the flaw](Issue:CVE-2026-1234)", "is not one"},
 	} {
 		t.Run(c.what, func(t *testing.T) {

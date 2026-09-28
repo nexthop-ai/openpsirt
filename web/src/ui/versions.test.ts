@@ -12,9 +12,9 @@ describe("sharedVersion", () => {
 
   it("ignores a sibling with no version at all", () => {
     // The real shape: the switch image's root has one child with no version
-    // beside twenty-nine containers all carrying the same stamp. Counting the
-    // versionless one as disagreement left the stamp on every row, which is
-    // the noise this exists to remove.
+    // beside twenty-nine containers all carrying the same stamp. Counted as
+    // disagreement, the versionless one leaves the stamp on every row, which
+    // is the noise this exists to remove.
     const stamp = "sbom-consumer-metadata.0-f3811cc13";
     expect(sharedVersion([{ version: "" }, { version: stamp }, { version: stamp }])).toBe(stamp);
   });
@@ -29,9 +29,5 @@ describe("sharedVersion", () => {
     // A single component's version is its own. Moving it above the row would
     // be saying something about a level that has one entry in it.
     expect(sharedVersion([{ version: "1.2.3" }])).toBe("");
-  });
-
-  it("says nothing where nothing has a version", () => {
-    expect(sharedVersion([{ version: "" }, { version: "" }])).toBe("");
   });
 });

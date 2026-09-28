@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -223,7 +224,7 @@ func stateWord(places, waiting, approved, lapsed int) string {
 // two places for "worst" to come to mean different things — and because the
 // order of these words is a fact about the domain, not a display choice.
 func worstBand(counts map[string]int) string {
-	for _, band := range []string{"critical", "high", "medium", "low"} {
+	for _, band := range Bands() {
 		if counts[band] > 0 {
 			return band
 		}
@@ -247,12 +248,9 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 		return 0, nil, nil, fmt.Errorf("read findings: the selection names no product")
 	}
 	productID := *scope.ProductID
-	if !subject.Sees(productID) {
-		return 0, nil, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return 0, nil, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return 0, nil, nil, err
 	}
 	targets, err := s.buildsWorking(ctx, scope, filter.Workable)
 	if err != nil {
@@ -574,9 +572,9 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`tg.id AS "id"`).
 		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
 		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`va.display_name AS "variant_name"`).
+		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("name the builds a page sits in: %w", err)

@@ -214,9 +214,9 @@ func attachmentFault(line int, destination string, target destinationTarget) (Fa
 	}
 	return Fault{
 		Line: line, Offending: destination,
-		Reason: "an attachment is referred to by the identifier this deployment " +
-			"minted for it — 32 hexadecimal characters — and nothing else " +
-			"resolves to a file. Attach the file and use the reference it gives you",
+		Reason: fmt.Sprintf("an attachment is referred to by the identifier this deployment "+
+			"minted for it — %d hexadecimal characters — and nothing else "+
+			"resolves to a file. Attach the file and use the reference it gives you", 2*TokenBytes),
 	}, true
 }
 
@@ -500,10 +500,15 @@ func isLetter(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
+// TokenBytes is how many random bytes an attachment's identifier carries. It
+// is written as twice as many hexadecimal characters, lower case, which is the
+// shape a reference to one has to take.
+const TokenBytes = 16
+
 // mintedToken reports whether a reference is shaped like one this deployment
-// makes: 32 hexadecimal characters, lower case.
+// makes: TokenBytes written in hexadecimal, lower case.
 func mintedToken(token string) bool {
-	if len(token) != 32 {
+	if len(token) != 2*TokenBytes {
 		return false
 	}
 	for i := 0; i < len(token); i++ {

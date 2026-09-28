@@ -97,51 +97,44 @@ const betweenRuns = 5 * time.Second
 
 // Run scans until the context ends.
 func (r *Runner) Run(ctx context.Context, interval time.Duration) {
-	background.Every(ctx, interval, betweenRuns, func(ctx context.Context) {
-		for {
-			outcome, err := r.Once(ctx)
-			if err != nil {
-				if ctx.Err() == nil {
-					r.logger.Error("scanning a target", "error", err)
-				}
-				break
-			}
-			if outcome == nil {
-				break
-			}
-			r.logger.Info("scanned a target",
-				"target", outcome.TargetID, "run", outcome.RunID,
-				"components", outcome.Components,
-				"findings_opened", outcome.Applied.Opened,
-				"findings_closed", outcome.Applied.Closed,
-				"suppressed", outcome.Applied.Suppressed,
-				"patched", outcome.Applied.Patched,
-				"claims_reaching", outcome.Applied.ClaimsReaching,
-				"claims_reaching_nothing", outcome.Applied.ClaimsReachingNothing,
-				"updated", outcome.Applied.Updated,
-				"unexplained", outcome.Applied.Unexplained,
-				"unplaced", outcome.Applied.Unplaced,
-				"lapsed", outcome.Lapsed)
-
-			// Several findings vanishing at once, with the components still
-			// present and unchanged, is one broken scan rather than a dozen
-			// independent oddities. Each one is already flagged on its own —
-			// this only says which shape the fault is, so nobody spends the
-			// morning chasing them separately.
-			//
-			// A count rather than a proportion: on a large image a handful of
-			// genuine disappearances is ordinary and a handful of unexplained
-			// ones is not, and dividing by the size of the image would hide
-			// exactly that.
-			if outcome.Applied.Unexplained >= unexplainedAlert {
-				r.logger.Warn("several findings disappeared with nothing to explain it, "+
-					"which usually means one scan went wrong rather than many things changing",
-					"target", outcome.TargetID, "run", outcome.RunID,
-					"unexplained", outcome.Applied.Unexplained,
-					"closed", outcome.Applied.Closed)
-			}
+	background.Drain(ctx, interval, betweenRuns, func(ctx context.Context) (bool, error) {
+		outcome, err := r.Once(ctx)
+		if err != nil || outcome == nil {
+			return false, err
 		}
-	})
+		r.logger.Info("scanned a target",
+			"target", outcome.TargetID, "run", outcome.RunID,
+			"components", outcome.Components,
+			"findings_opened", outcome.Applied.Opened,
+			"findings_closed", outcome.Applied.Closed,
+			"suppressed", outcome.Applied.Suppressed,
+			"patched", outcome.Applied.Patched,
+			"claims_reaching", outcome.Applied.ClaimsReaching,
+			"claims_reaching_nothing", outcome.Applied.ClaimsReachingNothing,
+			"updated", outcome.Applied.Updated,
+			"unexplained", outcome.Applied.Unexplained,
+			"unplaced", outcome.Applied.Unplaced,
+			"lapsed", outcome.Lapsed)
+
+		// Several findings vanishing at once, with the components still
+		// present and unchanged, is one broken scan rather than a dozen
+		// independent oddities. Each one is already flagged on its own —
+		// this only says which shape the fault is, so nobody spends the
+		// morning chasing them separately.
+		//
+		// A count rather than a proportion: on a large image a handful of
+		// genuine disappearances is ordinary and a handful of unexplained
+		// ones is not, and dividing by the size of the image would hide
+		// exactly that.
+		if outcome.Applied.Unexplained >= unexplainedAlert {
+			r.logger.Warn("several findings disappeared with nothing to explain it, "+
+				"which usually means one scan went wrong rather than many things changing",
+				"target", outcome.TargetID, "run", outcome.RunID,
+				"unexplained", outcome.Applied.Unexplained,
+				"closed", outcome.Applied.Closed)
+		}
+		return true, nil
+	}, func(err error) { r.logger.Error("scanning a target", "error", err) })
 }
 
 // unexplainedAlert is how many unexplained disappearances in one scan suggest

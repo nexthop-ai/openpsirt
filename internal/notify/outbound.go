@@ -441,7 +441,7 @@ func outboundClient() *http.Client {
 	// above is what says the permission is intended.
 	dialer := &net.Dialer{Timeout: signalTimeout}
 	return &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: signalTimeout,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refused a redirect to %s: a destination is configured, not followed",
 				req.URL.Host)
@@ -635,20 +635,6 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 			kind, access.ErrNothingMatched)
 	}
 	return nil
-}
-
-// TrustForTest points the sweep at a client that trusts a test server's
-// certificate.
-//
-// Exported for tests only, and doing nothing else: the guard that refuses
-// anything but https and refuses a redirect is what is being tested around,
-// not switched off — a test server speaks https with a certificate nothing
-// else trusts, and the alternative is testing the delivery over plain http,
-// which is the one thing this refuses to do.
-func TrustForTest(s *Signal, client *http.Client) {
-	client.CheckRedirect = s.client.CheckRedirect
-	client.Transport = &outboundGuard{inner: client.Transport}
-	s.client = client
 }
 
 // withoutTheAddress is why a delivery failed, with the destination taken out.

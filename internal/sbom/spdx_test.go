@@ -37,27 +37,7 @@ func TestReadsTheSecondFormatWithoutBeingToldWhichItIs(t *testing.T) {
 	// take either format.
 	doc := read(t, minimalSPDX)
 
-	if doc.Root.Name != "product" || doc.Root.Version != "1.0" {
-		t.Errorf("root is %q@%q", doc.Root.Name, doc.Root.Version)
-	}
-	if !doc.RootDeclared {
-		t.Error("the document named what it is about and that was not recorded")
-	}
-	if want := "https://example.invalid/product-1.0"; doc.Serial != want {
-		t.Errorf("serial is %q, want %q", doc.Serial, want)
-	}
-	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !doc.BuiltAt.Equal(want) {
-		t.Errorf("built at %v, want %v", doc.BuiltAt, want)
-	}
-	if len(doc.Components) != 1 {
-		t.Fatalf("read %d components, want 1 — the root is not repeated among them", len(doc.Components))
-	}
-	if got := doc.Components[0].Purl; got != "pkg:deb/debian/libc6@2.41" {
-		t.Errorf("package identifier is %q", got)
-	}
-	if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
-		t.Errorf("edges are %v", got)
-	}
+	assertMinimal(t, doc)
 }
 
 func TestTheHeaderOfTheSecondFormatIsReadWithoutItsContents(t *testing.T) {
@@ -893,5 +873,35 @@ func TestWhoSuppliedAPackageDoesNotDependOnKeyOrder(t *testing.T) {
 		if !found {
 			t.Error("the package was not read")
 		}
+	}
+}
+
+// assertMinimal checks what every vocabulary's minimal document says: one
+// product at 1.0, its serial and build time, and one library under it.
+//
+// One copy, because the minimal fixtures mirror each other on purpose, and a
+// value changed in them has to be changed in one place here.
+func assertMinimal(t *testing.T, doc *sbom.Document) {
+	t.Helper()
+	if doc.Root.Name != "product" || doc.Root.Version != "1.0" {
+		t.Errorf("root is %q@%q", doc.Root.Name, doc.Root.Version)
+	}
+	if !doc.RootDeclared {
+		t.Error("the document named what it is about and that was not recorded")
+	}
+	if want := "https://example.invalid/product-1.0"; doc.Serial != want {
+		t.Errorf("serial is %q, want %q", doc.Serial, want)
+	}
+	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !doc.BuiltAt.Equal(want) {
+		t.Errorf("built at %v, want %v", doc.BuiltAt, want)
+	}
+	if len(doc.Components) != 1 {
+		t.Fatalf("read %d components, want 1 — the root is not repeated among them", len(doc.Components))
+	}
+	if got := doc.Components[0].Purl; got != "pkg:deb/debian/libc6@2.41" {
+		t.Errorf("package identifier is %q", got)
+	}
+	if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
+		t.Errorf("edges are %v", got)
 	}
 }

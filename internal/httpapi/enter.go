@@ -28,11 +28,11 @@ type EmbargoedBody struct {
 	Component     string `json:"component"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	Stream      string `json:"stream"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant     string `json:"variant"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	Severity    string `json:"severity,omitempty"`
 	DiscloseAt  string `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
 	// Passed says the date has arrived. It is a date to answer rather than a
@@ -369,10 +369,10 @@ func registerDisclosure(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, EmbargoedBody{
 				Vulnerability: row.Vulnerability, Summary: row.Summary,
 				Component: row.Component, Product: row.Product,
-				ProductName: labelBeside(row.ProductName, row.Product),
+				ProductName: row.ProductName,
 				Stream:      row.Stream, Variant: row.Variant, Severity: row.Severity,
-				StreamName:  labelBeside(row.StreamName, row.Stream),
-				VariantName: labelBeside(row.VariantName, row.Variant),
+				StreamName:  row.StreamName,
+				VariantName: row.VariantName,
 				DiscloseAt:  stamp(row.DiscloseAt), Passed: row.Passed(now),
 				Places: row.Places,
 			})

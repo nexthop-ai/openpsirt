@@ -360,26 +360,11 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 	}
 	window := new(Window)
 	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
-		*window = Window{}
-		if err := tx.NewSelect().Model(window).
-			Where("ow.id = ?", id).Where("ow.retired_at IS NULL").
-			Scan(ctx); err != nil {
-			if database.IsNoRows(err) {
-				return ErrNoSuchWindow
-			}
-			return fmt.Errorf("read the window: %w", err)
+		before, err := inForce(ctx, tx, id)
+		if err != nil {
+			return err
 		}
-		var before []string
-		if err := tx.NewSelect().
-			TableExpr(`"obligation_window_product" AS "owp"`).
-			Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
-			ColumnExpr("p.name").
-			Where("owp.window_id = ?", id).
-			Order("p.name ASC").
-			Scan(ctx, &before); err != nil {
-			return fmt.Errorf("read which products the window applies to: %w", err)
-		}
-		window.ProductNames = before
+		*window = *before
 		was := describe(*window)
 		products, names, err := productsNamed(ctx, tx, said.Products)
 		if err != nil {
@@ -433,14 +418,9 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 		return access.Denied("retire a window")
 	}
 	return s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
-		window := new(Window)
-		if err := tx.NewSelect().Model(window).
-			Where("ow.id = ?", id).Where("ow.retired_at IS NULL").
-			Scan(ctx); err != nil {
-			if database.IsNoRows(err) {
-				return ErrNoSuchWindow
-			}
-			return fmt.Errorf("read the window: %w", err)
+		window, err := inForce(ctx, tx, id)
+		if err != nil {
+			return err
 		}
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
 			Set("retired_at = ?", s.now().Truncate(time.Microsecond)).
@@ -460,19 +440,32 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 		if retired == 0 {
 			return ErrNoSuchWindow
 		}
-		var products []string
-		if err := tx.NewSelect().
-			TableExpr(`"obligation_window_product" AS "owp"`).
-			Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
-			ColumnExpr("p.name").
-			Where("owp.window_id = ?", id).
-			Order("p.name ASC").
-			Scan(ctx, &products); err != nil {
-			return fmt.Errorf("read which products the window applies to: %w", err)
-		}
-		window.ProductNames = products
 		return noteWindow(ctx, tx, subject, window.Name, describe(*window), nil)
 	})
+}
+
+// inForce reads a window still in force, with the names of the products it is
+// limited to, which is what the trail says a window was.
+func inForce(ctx context.Context, tx bun.IDB, id int64) (*Window, error) {
+	window := new(Window)
+	if err := tx.NewSelect().Model(window).
+		Where("ow.id = ?", id).Where("ow.retired_at IS NULL").
+		Scan(ctx); err != nil {
+		if database.IsNoRows(err) {
+			return nil, ErrNoSuchWindow
+		}
+		return nil, fmt.Errorf("read the window: %w", err)
+	}
+	if err := tx.NewSelect().
+		TableExpr(`"obligation_window_product" AS "owp"`).
+		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
+		ColumnExpr("p.name").
+		Where("owp.window_id = ?", id).
+		Order("p.name ASC").
+		Scan(ctx, &window.ProductNames); err != nil {
+		return nil, fmt.Errorf("read which products the window applies to: %w", err)
+	}
+	return window, nil
 }
 
 // writing runs do inside one transaction, retried as a whole.

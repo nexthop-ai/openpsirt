@@ -43,13 +43,9 @@ func (s *Store) AtComponent(ctx context.Context, subject access.Subject, targetI
 func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetID,
 	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
 	if err != nil {
 		return nil, 0, 0, err
-	}
-	visible := access.Visible(subject, productID)
-	if !subject.Sees(productID) || len(visible) == 0 {
-		return nil, 0, 0, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	limit = database.AComponentsWorth.Of(limit)
 
@@ -383,13 +379,9 @@ type Narrowing struct {
 func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, targetID int64,
 	fold []int64, contains string, named int) (Narrowing, error) {
 
-	productID, err := productOf(ctx, tx, targetID)
+	_, visible, err := readableIn(ctx, tx, subject, targetID)
 	if err != nil {
 		return Narrowing{}, err
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return Narrowing{}, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 
 	q := tx.NewSelect().

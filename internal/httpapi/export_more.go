@@ -118,9 +118,9 @@ func registerDueExport(api huma.API, in Ingest) {
 						row.Vulnerability, row.Severity,
 						strconv.FormatBool(row.Exploited),
 						row.Component, row.Version,
-						row.Product, labelBeside(row.ProductName, row.Product),
-						row.Stream, labelBeside(row.StreamName, row.Stream),
-						row.Variant, labelBeside(row.VariantName, row.Variant),
+						row.Product, row.ProductName,
+						row.Stream, row.StreamName,
+						row.Variant, row.VariantName,
 						strconv.Itoa(row.Places), held, heldName,
 						row.Due.Format(time.DateOnly),
 						// Rounded down rather than toward zero, the way the

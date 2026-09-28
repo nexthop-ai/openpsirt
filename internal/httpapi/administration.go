@@ -248,7 +248,7 @@ type HeldBody struct {
 	// one the withdraw route resolves, so it carries the address and this
 	// carries the label — a screen rendering the label and sending it back
 	// grants a role it cannot withdraw.
-	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	// Everywhere says it is held across the estate, covering products
 	// declared afterwards. Reported rather than left to be inferred from an
 	// absent product: an access review asks what somebody holds, and "on

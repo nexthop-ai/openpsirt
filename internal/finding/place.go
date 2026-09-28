@@ -106,12 +106,9 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 	// Asked about the issue rather than about the product, because
 	// reaching a finding is what makes it yours to argue about — and a
 	// collaborator was given exactly one issue to reach.
-	if !access.SeesOn(subject, productID, vulnerabilityID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.VisibleOn(subject, productID, vulnerabilityID)
-	if len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.ReadableOn(subject, productID, vulnerabilityID)
+	if err != nil {
+		return nil, err
 	}
 
 	var rows []placeRow
@@ -190,12 +187,9 @@ type At struct {
 func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subject,
 	productID int64, targets []int64, places []At) (*time.Time, error) {
 
-	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return nil, err
 	}
 	if len(targets) == 0 || len(places) == 0 {
 		return nil, nil
@@ -328,12 +322,12 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 	subject access.Subject, productID int64, targets []int64,
 	component, version string) ([]InBundle, error) {
 
-	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return nil, err
 	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 || len(targets) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	if len(targets) == 0 {
+		return nil, nil
 	}
 
 	folds, err := OneFoldNamed(ctx, db, targets, component, version)
@@ -444,12 +438,9 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		return nil, err
 	}
 	// Asked about the issue, for the reason PlaceFor is.
-	if !access.SeesOn(subject, productID, vulnerabilityID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
-	visible := access.VisibleOn(subject, productID, vulnerabilityID)
-	if len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	visible, err := access.ReadableOn(subject, productID, vulnerabilityID)
+	if err != nil {
+		return nil, err
 	}
 
 	var rows []struct {

@@ -49,15 +49,14 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	productID int64) ([]Release, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are different
-	// statements, and a pipeline key asking this is the second. A person who
-	// cannot see the product is the first, and is answered below — this is a
-	// narrowed read, and an empty answer is the correct one for somebody the
-	// product does not exist for.
+	// statements, and a subject that reads nothing in the product — a
+	// pipeline key, an administrator granted no reading — is asking the
+	// second.
 	if subject.Kind != access.Person {
 		return nil, access.Denied("read what the releases hold")
 	}
-	if !subject.Sees(productID) {
-		return nil, nil
+	if _, err := access.Readable(subject, productID); err != nil {
+		return nil, err
 	}
 	_, all := subject.Products()
 

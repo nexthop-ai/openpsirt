@@ -57,9 +57,6 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read how long a claim may wait: %w", err)
 	}
-	if after <= 0 {
-		return nil, nil
-	}
 	since := time.Now().UTC().Add(-after)
 
 	var rows []struct {
@@ -228,9 +225,6 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		setting.SentBackAfter, setting.DefaultSentBackAfter)
 	if err != nil {
 		return nil, fmt.Errorf("read how long a sent-back claim may sit: %w", err)
-	}
-	if after <= 0 {
-		return nil, nil
 	}
 	since := time.Now().UTC().Add(-after)
 
@@ -408,9 +402,6 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		setting.QueuedAfter, setting.DefaultQueuedAfter)
 	if err != nil {
 		return nil, fmt.Errorf("read how long work may sit in a queue: %w", err)
-	}
-	if after <= 0 {
-		return nil, nil
 	}
 	since := time.Now().UTC().Add(-after)
 

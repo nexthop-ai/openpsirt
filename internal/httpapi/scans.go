@@ -421,9 +421,6 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// coverage report reads as a pipeline nobody wired up, telling the wrong
 	// person about the commoner of the two failures this record exists for.
 	note := func(reason string, builtAt *time.Time, hash *string) {
-		if in.DB == nil {
-			return
-		}
 		if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, ingest.Refusal{
 			TargetID: target.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
 		}); noted != nil {
@@ -878,7 +875,10 @@ func registerReceipts(api huma.API, in Ingest) {
 		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, target.ID, runs)
 		switch {
 		case errors.Is(err, access.ErrDenied):
-			return nil, nothingScannedThere()
+			// The receipts above were this caller's to read, so a refusal here
+			// is of the counts alone: a pipeline key reading back its own
+			// uploads reads no findings, and its receipts carry no counts.
+			changed = nil
 		case err != nil:
 			return nil, wentWrong(in.Logger, "what the scans changed could not be read", err)
 		}

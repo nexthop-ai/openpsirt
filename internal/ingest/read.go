@@ -164,41 +164,30 @@ const betweenReads = 5 * time.Second
 // asked. The interval is what a producer waits to see its scan reflected,
 // which is not a number anybody is watching a clock for.
 func (r *Reader) Run(ctx context.Context, interval time.Duration) {
-	background.Every(ctx, interval, betweenReads, func(ctx context.Context) {
-		// Keep going while there is work, so a backlog drains at the speed of
-		// the work rather than at the speed of the poll.
-		for {
-			result, err := r.Once(ctx)
-			if err != nil {
-				// A read cut short by shutdown is not a fault in the scan or
-				// in this process; it is handed back and read again later.
-				if ctx.Err() == nil {
-					r.logger.Error("reading a scan", "error", err)
-				}
-				break
-			}
-			if result == nil {
-				break
-			}
-			if result.Superseded {
-				r.logger.Info("skipped a scan a newer one had already replaced", "scan", result.ScanID)
-				continue
-			}
-			r.logger.Info("read a scan",
-				"scan", result.ScanID, "components", result.Components,
-				"nodes_opened", result.Applied.NodesOpened, "nodes_closed", result.Applied.NodesClosed,
-				"edges_opened", result.Applied.EdgesOpened, "edges_closed", result.Applied.EdgesClosed,
-				"suppressions", result.Suppressions,
-				"claims_opened", result.ClaimsOpened, "claims_closed", result.ClaimsClosed,
-				"claims_unstated", result.ClaimsUnstated,
-				// Tolerated rather than refused. A change in any of these says
-				// the producer changed.
-				"unrooted", result.Unrooted, "unversioned", result.Unversioned,
-				"dangling_edges", result.DanglingEdges, "file_references", result.FileReferences,
-				"self_references", result.SelfReferences,
-				"documents_retained", result.Retained)
+	background.Drain(ctx, interval, betweenReads, func(ctx context.Context) (bool, error) {
+		result, err := r.Once(ctx)
+		if err != nil || result == nil {
+			return false, err
 		}
-	})
+		if result.Superseded {
+			r.logger.Info("skipped a scan a newer one had already replaced", "scan", result.ScanID)
+			return true, nil
+		}
+		r.logger.Info("read a scan",
+			"scan", result.ScanID, "components", result.Components,
+			"nodes_opened", result.Applied.NodesOpened, "nodes_closed", result.Applied.NodesClosed,
+			"edges_opened", result.Applied.EdgesOpened, "edges_closed", result.Applied.EdgesClosed,
+			"suppressions", result.Suppressions,
+			"claims_opened", result.ClaimsOpened, "claims_closed", result.ClaimsClosed,
+			"claims_unstated", result.ClaimsUnstated,
+			// Tolerated rather than refused. A change in any of these says
+			// the producer changed.
+			"unrooted", result.Unrooted, "unversioned", result.Unversioned,
+			"dangling_edges", result.DanglingEdges, "file_references", result.FileReferences,
+			"self_references", result.SelfReferences,
+			"documents_retained", result.Retained)
+		return true, nil
+	}, func(err error) { r.logger.Error("reading a scan", "error", err) })
 }
 
 // read turns one accepted scan into stored graph.

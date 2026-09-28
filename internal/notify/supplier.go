@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
@@ -49,7 +50,7 @@ func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 	err = w.db.NewSelect().
 		Model((*supplier.Source)(nil)).
 		ColumnExpr("sp.*").
-		ColumnExpr(`p.display_name AS "product"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product"`).
 		Join(`JOIN "product" AS "p" ON p.id = sp.product_id`).
 		Where("sp.retired_at IS NULL").
 		// A retired product's suppliers are never read again, and retiring
