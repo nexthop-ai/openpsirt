@@ -154,7 +154,8 @@ where the server offers it, the other connects in cleartext unless asked.
 | How anybody knows | The connection is asked what it negotiated, and the answer is in the line that logs the engine and version. A production engine connected in cleartext is warned about by name, with the setting that fixes it |
 | Required is a stated choice | A deployment says that encryption is required, and a connection that did not get it is refused as the process starts. Taking whatever the server offers stays available and is the other choice; what changed is that it is chosen rather than the only behavior |
 | Required is asked of the connection, never of the URL | The engines spell the transport differently and each spelling has several values, so a check reading the URL would be three parsers agreeing about what "encrypted" means — and would still be wrong about a server that ignored what was asked for |
-| Required is also imposed on every connection the pool opens | The question is asked of one connection at startup, and the pool opens connections for the life of the process. A transport that falls back to cleartext — `sslmode` of `prefer` or `allow`, `tls=preferred`, or none named — is replaced by one that does not, and one that asks for cleartext is refused. One the deployment named that cannot fall back is left as written |
+| Required is also imposed on every connection the pool opens | The question is asked of one connection at startup, and the pool opens connections for the life of the process. A transport that falls back to cleartext — `sslmode` of `prefer` or `allow`, `tls=preferred`, or none named — is replaced by one that does not, and one that asks for cleartext is refused, as is `allowFallbackToPlaintext` set true. One the deployment named that cannot fall back is left as written. A MySQL value is read as the driver reads it, in any case and with 0 and 1 as false and true |
+| A PostgreSQL URL naming no mode | The driver takes `PGSSLMODE` there, and a mode in the URL overrides it, so the environment's mode is judged in the URL's place. A mode is appended only where that one is weak, so a `verify-full` set in the environment is never replaced by one checking no certificate |
 | A server that will not say is refused under it | What the requirement asks for is certainty, and "we could not find out" is not it |
 | Required against SQLite is refused | A file opened directly has no connection to encrypt. Accepting it would make the setting one that changes nothing, which is worse than not offering it |
 
@@ -250,6 +251,7 @@ schema they build on each of the four engines, captured from the tag.
 |---|---|
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | A database the release built has applied exactly those. An edit changes a schema deployments already hold without changing the version they recorded |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit. On SQLite the description also says whether each table's key is `AUTOINCREMENT` and whether each index is partial, which the engine's column and index listings leave out |
+| The SQLite records of v0.1.0 to v0.4.0 | Each carries a line per table saying whether its key is `AUTOINCREMENT`, and `partial=0` on every index line: none of those releases built a partial index. Those lines were added to records taken before the description named the two facts, and every other line is as the tag captured it. The addition corrects the record to what those releases always built, and changes no schema |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
 declares the table rather than adding a migration beside it — within the
@@ -313,7 +315,7 @@ fresh install walks the whole chain. They are shaped the way every migration aft
 |---|---|
 | Every table and index is made by the release's own statement | The release's declaration of each table it creates or changes sits beside its migration, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
 | One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
-| Not retried in place | Migrations 37 and 38 open that transaction directly rather than through the one retrying helper, and the releases that shipped them froze them. A lost race fails the migration and the next start runs it again whole, which is the same retry one level up. A later release's migration takes its transaction through the helper |
+| Not retried in place | Migrations 37 and 38 open that transaction directly rather than through the one retrying helper, and the releases that shipped them froze them. On PostgreSQL and SQLite a lost race fails the migration and the next start runs it again whole. On MySQL and MariaDB it leaves the schema part changed, as § Migrations says of any failed upgrade. A later release's migration takes its transaction through the helper |
 | PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as the release declares it and costs no row rewrite on any of the three |
 | SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the release's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
@@ -470,6 +472,7 @@ last migration as its own.
 |---|---|
 | The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
 | A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists, and a schema change is a migration numbered after its last, for the next release |
+| A patch to an older line, after a newer release is recorded | Not cut. A tag is refused unless it is on `main`, and `main` holds the newer release's record and migrations, so every release is newer than the last one recorded |
 
 ### Upgrade rehearsal
 
@@ -538,6 +541,7 @@ in turn.
 | Rule | |
 |---|---|
 | The pinned connection is used every half minute while the lock is held | It is checked out of the pool for the whole migration, beyond the pool's idle timeout. Idle, a server's or an intermediary's idle timeout ends the session, the server releases the lock, and a waiting replica migrates the half-migrated schema |
+| A keep-alive use carries no deadline | Both drivers close a connection whose query outlives its context, and the lock goes with the session, so a use that times out in a network stall is the same lost lock by another route |
 | A lock not held at its release fails the migration | The session was lost part way, and another instance may have migrated alongside. The work finished; what it ran under is not certain, and that is an error rather than a warning |
 | A pool of one connection is refused before the lock is taken, on the three servers | The lock holds one connection and the migration runs on another, so a pool of one waits for ever with nothing logged. The refusal names `OPENPSIRT_DB_MAX_OPEN` |
 

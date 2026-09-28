@@ -350,20 +350,31 @@ func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
 	}
 }
 
-// The refusal names the address with the password masked, since a refusal is
-// logged.
+// A refusal names the address with anything that may be a password masked,
+// since a refusal is logged. That holds on every arm, including a value the
+// parser reads as a scheme and an opaque rest, and one it cannot parse at all.
 func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
 	for _, key := range []string{"BASE_URL", "DIRECTORY_URL"} {
-		t.Run(key, func(t *testing.T) {
-			t.Setenv(envPrefix+key, "https://user:hunter2@psirt.example.test/")
-			_, err := Load()
-			if err == nil {
-				t.Fatal("an address carrying credentials was accepted")
-			}
-			if strings.Contains(err.Error(), "hunter2") {
-				t.Errorf("the refusal repeats the password: %v", err)
-			}
-		})
+		for _, value := range []string{
+			"https://user:hunter2@psirt.example.test/",
+			"admin:hunter2@psirt.example.test",
+			"ftp://user:hunter2@psirt.example.test/",
+			"https://user:hunter2@/",
+			"https://user:hunter2@psirt.example.test/below",
+			"https://user:hunter2@psirt.example.test:bad/",
+			"http://user:hunter2@psirt.example.test/",
+		} {
+			t.Run(key+" "+value, func(t *testing.T) {
+				t.Setenv(envPrefix+key, value)
+				_, err := Load()
+				if err == nil {
+					t.Fatal("an address carrying credentials was accepted")
+				}
+				if strings.Contains(err.Error(), "hunter2") {
+					t.Errorf("the refusal repeats the password: %v", err)
+				}
+			})
+		}
 	}
 }
 

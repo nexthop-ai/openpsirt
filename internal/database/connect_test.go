@@ -240,50 +240,94 @@ func TestAQuotedSQLModeIsAcceptedByTheServer(t *testing.T) {
 // transport that cannot fall back to cleartext, not only the one asked at
 // startup. A transport that may fall back is made one that may not, one that
 // is cleartext outright is refused, and one the deployment named that cannot
-// fall back is left as written.
+// fall back is left as written — in the URL, or for PostgreSQL in PGSSLMODE
+// where the URL names none. A MySQL value is read the way the driver reads it,
+// in any case and as 0 or 1.
 func TestARequiredTransportIsImposedOnEveryConnection(t *testing.T) {
 	for _, c := range []struct {
 		url      string
+		env      string // PGSSLMODE
 		required bool
 		want     string // a fragment of the connection string, or "" where refused
+		not      string // a fragment it must not carry
 	}{
-		{"postgres://u:p@db/openpsirt", true, "sslmode=require"},
-		{"postgres://u:p@db/openpsirt?sslmode=prefer", true, "sslmode=require"},
-		{"postgres://u:p@db/openpsirt?sslmode=allow&x=1", true, "sslmode=require&x=1"},
-		{"postgres://u:p@db/openpsirt?sslmode=verify-full", true, "sslmode=verify-full"},
-		{"postgres://u:p@db/openpsirt?sslmode=disable", true, ""},
-		{"postgres://u:p@db/openpsirt?sslmode=prefer", false, "sslmode=prefer"},
-		{"mysql://u:p@db/openpsirt", true, "tls=skip-verify"},
-		{"mysql://u:p@db/openpsirt?tls=preferred", true, "tls=skip-verify"},
-		{"mariadb://u:p@db/openpsirt?tls=true", true, "tls=true"},
-		{"mysql://u:p@db/openpsirt?tls=false", true, ""},
-		{"mysql://u:p@db/openpsirt", false, "tls=preferred"},
+		{"postgres://u:p@db/openpsirt", "", true, "sslmode=require", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=prefer", "", true, "sslmode=require", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=allow&x=1", "", true, "sslmode=require&x=1", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=verify-full", "", true, "sslmode=verify-full", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=disable", "", true, "", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=prefer", "", false, "sslmode=prefer", ""},
+		{"postgres://u:p@db/openpsirt", "verify-full", true, "openpsirt", "sslmode"},
+		{"postgres://u:p@db/openpsirt?x=1", "verify-ca", true, "x=1", "sslmode"},
+		{"postgres://u:p@db/openpsirt", "prefer", true, "sslmode=require", ""},
+		{"postgres://u:p@db/openpsirt", "disable", true, "", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=require", "disable", true, "sslmode=require", ""},
+		{"mysql://u:p@db/openpsirt", "", true, "tls=skip-verify", ""},
+		{"mysql://u:p@db/openpsirt?tls=preferred", "", true, "tls=skip-verify", ""},
+		{"mysql://u:p@db/openpsirt?tls=PREFERRED", "", true, "tls=skip-verify", "PREFERRED"},
+		{"mariadb://u:p@db/openpsirt?tls=true", "", true, "tls=true", ""},
+		{"mysql://u:p@db/openpsirt?tls=false", "", true, "", ""},
+		{"mysql://u:p@db/openpsirt?tls=FALSE", "", true, "", ""},
+		{"mysql://u:p@db/openpsirt?tls=0", "", true, "", ""},
+		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=true", "", true, "", ""},
+		{"mariadb://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=1", "", true, "", ""},
+		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=false", "", true, "tls=true", ""},
+		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=true", "", false, "allowFallbackToPlaintext=true", ""},
+		{"mysql://u:p@db/openpsirt", "", false, "tls=preferred", ""},
 	} {
 		target, err := database.ParseURL(c.url)
 		if err != nil {
 			t.Fatal(err)
 		}
 		target.RequireEncryption = c.required
-		dsn, err := database.MandatoryTransport(target)
+		getenv := func(name string) string {
+			if name == "PGSSLMODE" {
+				return c.env
+			}
+			return ""
+		}
+		dsn, err := database.MandatoryTransport(target, getenv)
 		if c.want == "" {
 			if err == nil {
-				t.Errorf("%s: a transport in cleartext was accepted as %q", c.url, dsn)
+				t.Errorf("%s (PGSSLMODE=%s): a transport in cleartext was accepted as %q", c.url, c.env, dsn)
 			} else if !strings.Contains(err.Error(), database.RequiredEncryption) {
 				t.Errorf("%s: the refusal does not name the setting: %v", c.url, err)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("%s: %v", c.url, err)
+			t.Errorf("%s (PGSSLMODE=%s): %v", c.url, c.env, err)
 			continue
 		}
 		if !strings.Contains(dsn, c.want) {
 			t.Errorf("%s (required %v): opened as %q, want it to carry %s", c.url, c.required, dsn, c.want)
 		}
+		if c.not != "" && strings.Contains(dsn, c.not) {
+			t.Errorf("%s (PGSSLMODE=%s): opened as %q, which carries %s", c.url, c.env, dsn, c.not)
+		}
 		for _, weak := range []string{"sslmode=prefer", "sslmode=allow", "tls=preferred"} {
 			if c.required && strings.Contains(dsn, weak) {
 				t.Errorf("%s: required, and still opened with %s", c.url, weak)
 			}
+		}
+	}
+}
+
+// Opening a pool goes through the transport rule. The refusal comes before
+// anything is dialled, so it needs no server.
+func TestOpeningRefusesACleartextTransportWhenEncryptionIsRequired(t *testing.T) {
+	for _, raw := range []string{
+		"postgres://u:p@127.0.0.1:1/x?sslmode=disable",
+		"mysql://u:p@127.0.0.1:1/x?tls=false",
+	} {
+		target, err := database.ParseURL(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target.RequireEncryption = true
+		if _, err := database.Open(t.Context(), target); err == nil ||
+			!strings.Contains(err.Error(), database.RequiredEncryption) {
+			t.Errorf("%s: opened, or refused for another reason: %v", raw, err)
 		}
 	}
 }

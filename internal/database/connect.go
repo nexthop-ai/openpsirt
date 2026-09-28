@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -123,7 +124,7 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	dsn, err := mandatoryTransport(target)
+	dsn, err := mandatoryTransport(target, os.Getenv)
 	if err != nil {
 		return nil, err
 	}
@@ -174,14 +175,25 @@ const RequiredEncryption = "OPENPSIRT_DB_REQUIRE_ENCRYPTION"
 // The check below asks one connection, at startup, and a pool opens
 // connections for the whole life of the process. A transport that falls back
 // to cleartext where the server does not offer encryption — PostgreSQL's
-// default, and the floor this sets for MySQL and MariaDB — would let any later
+// default, and the floor this sets for MySQL and MariaDB — lets any later
 // connection go out in cleartext with nothing refused and nothing logged,
 // whether the server stopped offering it, a failover reached one that never
 // did, or something on the path answered for it. So where encryption is
 // required, a transport that may fall back is made one that may not, and one
 // that is cleartext outright is refused. A transport the deployment named that
 // cannot fall back is left as written.
-func mandatoryTransport(target Target) (string, error) {
+//
+// A PostgreSQL URL that names no mode takes the one in PGSSLMODE, and a mode in
+// the URL overrides the environment's. So where the URL is silent the
+// environment's mode is judged in its place, and the URL is only given a mode
+// where the environment's is weak: appending one there would replace a
+// verify-full the deployment set with a mode that checks no certificate.
+//
+// The MySQL driver folds the case of the two words it reads for a transport and
+// reads 0 and 1 as false and true, so a value is compared in that form. It also
+// falls back to cleartext under any transport where allowFallbackToPlaintext is
+// true, so that setting is refused where encryption is required.
+func mandatoryTransport(target Target, getenv func(string) string) (string, error) {
 	if !target.RequireEncryption {
 		return target.DSN, nil
 	}
@@ -198,6 +210,11 @@ func mandatoryTransport(target Target) (string, error) {
 		// SQLite has no connection, and the check below says so.
 		return target.DSN, nil
 	}
+	refuse := func(setting string) error {
+		return fmt.Errorf("%s is set and %s asks for a connection that may go in cleartext, "+
+			"with %s: ask for encryption in the database URL, or unset it",
+			RequiredEncryption, target.Redacted, setting)
+	}
 	// The query is what follows the address: after the host for a URL, and
 	// after the database for the MySQL driver's form, whose password is not
 	// escaped and may hold a question mark.
@@ -208,36 +225,69 @@ func mandatoryTransport(target Target) (string, error) {
 			return "", fmt.Errorf("%s: the connection string names no database", target.Redacted)
 		}
 	}
-	at := strings.Index(target.DSN[after:], "?")
-	if at < 0 {
-		return target.DSN + "?" + name + "=" + mandatory, nil
+	head, query := target.DSN, ""
+	if at := strings.Index(target.DSN[after:], "?"); at >= 0 {
+		head, query = target.DSN[:after+at], target.DSN[after+at+1:]
 	}
-	head, query := target.DSN[:after+at], target.DSN[after+at+1:]
-	pairs := strings.Split(query, "&")
+	var pairs []string
+	if query != "" {
+		pairs = strings.Split(query, "&")
+	}
 	named := false
 	for i, pair := range pairs {
 		key, value, _ := strings.Cut(pair, "=")
+		if key != name && (target.Engine == Postgres || key != "allowFallbackToPlaintext") {
+			continue
+		}
+		value, err := url.QueryUnescape(value)
+		if err != nil {
+			return "", fmt.Errorf("%s: %s is unreadable", target.Redacted, key)
+		}
+		if target.Engine != Postgres {
+			value = driverBool(value)
+		}
 		if key != name {
+			if value == "true" {
+				return "", refuse(key + "=" + value)
+			}
 			continue
 		}
 		named = true
-		value, err := url.QueryUnescape(value)
-		if err != nil {
-			return "", fmt.Errorf("%s: %s is unreadable", target.Redacted, name)
-		}
 		switch {
 		case slices.Contains(cleartext, value):
-			return "", fmt.Errorf("%s is set and %s asks for a connection in cleartext, "+
-				"with %s=%s: ask for encryption in the database URL, or unset it",
-				RequiredEncryption, target.Redacted, name, value)
+			return "", refuse(name + "=" + value)
 		case slices.Contains(weak, value):
 			pairs[i] = name + "=" + mandatory
+		}
+	}
+	if !named && target.Engine == Postgres {
+		switch env := getenv("PGSSLMODE"); {
+		case slices.Contains(cleartext, env):
+			return "", refuse("PGSSLMODE=" + env)
+		case !slices.Contains(weak, env):
+			named = true
 		}
 	}
 	if !named {
 		pairs = append(pairs, name+"="+mandatory)
 	}
+	if len(pairs) == 0 {
+		return head, nil
+	}
 	return head + "?" + strings.Join(pairs, "&"), nil
+}
+
+// driverBool is a MySQL transport value in the form the driver reads it: its
+// words folded to lower case, and 0 and 1 as the false and true they mean.
+func driverBool(value string) string {
+	switch folded := strings.ToLower(value); folded {
+	case "0":
+		return "false"
+	case "1":
+		return "true"
+	default:
+		return folded
+	}
 }
 
 // encryptionAsAsked refuses a connection that did not get the encryption the

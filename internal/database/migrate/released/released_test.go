@@ -284,12 +284,12 @@ func TestAReleaseCodeNamesOneReleaseOnly(t *testing.T) {
 
 // The last migration in the tree is the tree's, whichever release owns it, so
 // freezing a release older than one already recorded is refused rather than
-// claiming the newer one's migration.
+// claiming the newer one's migration, and says the release cannot be cut.
 func TestFreezingAReleaseOlderThanOneRecordedIsRefused(t *testing.T) {
 	root, migrations := tree(t)
 	frozen(t, root, migrations, "v0.2.0", 3)
 	if _, err := Freeze(root, migrations, "v0.1.1"); err == nil ||
-		!strings.Contains(err.Error(), "older than v0.2.0") {
+		!strings.Contains(err.Error(), "older than v0.2.0") || !strings.Contains(err.Error(), "cannot be cut") {
 		t.Errorf("v0.1.1 after v0.2.0 answered %v", err)
 	}
 }

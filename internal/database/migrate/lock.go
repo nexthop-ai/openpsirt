@@ -79,11 +79,12 @@ func keepAlive(ctx context.Context, conn *sql.Conn) (stop func()) {
 			case <-done:
 				return
 			case <-tick.C:
-				use, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
-				// A use that fails says the session may be gone, which the
-				// release reports when it finds the lock no longer held.
-				_, _ = conn.ExecContext(use, "SELECT 1")
-				cancel()
+				// No deadline: both drivers close a connection whose query
+				// outlived its context, and the server releases the lock with
+				// the session. A use that fails says the session may be gone,
+				// which the release reports when it finds the lock no longer
+				// held.
+				_, _ = conn.ExecContext(context.WithoutCancel(ctx), "SELECT 1")
 			}
 		}
 	}()

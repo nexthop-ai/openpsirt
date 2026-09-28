@@ -8,6 +8,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -504,7 +505,8 @@ func Load() (Config, error) {
 	if where := c.DirectoryURL; where != "" {
 		at, err := url.Parse(where)
 		if err != nil {
-			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: %w", err)
+			// The parser's error repeats the value, password and all.
+			return Config{}, errors.New("OPENPSIRT_DIRECTORY_URL: not an address at all")
 		}
 		// An address and nothing else. A name is joined to the end of this, so
 		// anything the address carries after its path lands in the middle of
@@ -514,7 +516,7 @@ func Load() (Config, error) {
 		if at.Scheme != "https" || at.Host == "" || at.User != nil ||
 			at.RawQuery != "" || at.Fragment != "" {
 			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: want an https address "+
-				"with no query, fragment or credentials, got %q", at.Redacted())
+				"with no query, fragment or credentials, got %q", masked(where))
 		}
 		// One trailing slash, so that a name joined to it is a file inside the
 		// directory rather than a sibling of it. Every trailing slash, because
@@ -569,26 +571,40 @@ func absoluteBase(base string) error {
 		return nil
 	}
 	parsed, err := url.Parse(base)
+	// Every refusal is logged, and shows the value with anything that may be a
+	// credential masked. Before a scheme is checked a password can sit
+	// anywhere: `admin:hunter2@psirt.example.com` parses with the scheme
+	// `admin` and no user information.
+	shown := masked(base)
 	switch {
 	case err != nil:
-		return fmt.Errorf("OPENPSIRT_BASE_URL: not an address at all: %q", base)
+		return errors.New("OPENPSIRT_BASE_URL: not an address at all")
 	case parsed.Scheme != "http" && parsed.Scheme != "https":
 		return fmt.Errorf(
 			"OPENPSIRT_BASE_URL: want an absolute address such as "+
-				"https://psirt.example.com, got %q", base)
+				"https://psirt.example.com, got %q", shown)
 	case parsed.Host == "":
-		return fmt.Errorf("OPENPSIRT_BASE_URL: names no host: %q", base)
+		return fmt.Errorf("OPENPSIRT_BASE_URL: names no host: %q", shown)
 	case parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.ForceQuery:
-		// Shown with any password masked: a refusal is logged.
 		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address alone, with no query, "+
-			"fragment or credentials: %q", parsed.Redacted())
+			"fragment or credentials: %q", shown)
 	case strings.Trim(parsed.Path, "/") != "":
 		// A path below the address would make every link this deployment
 		// writes point somewhere it does not answer.
 		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address, not a path below it: %q",
-			base)
+			shown)
 	}
 	return nil
+}
+
+// masked is an address as a refusal may show it. Everything up to the last
+// "@" is replaced, because whatever precedes it may be a password whether or
+// not the parser read it as user information.
+func masked(address string) string {
+	if at := strings.LastIndex(address, "@"); at >= 0 {
+		return "xxxxx@" + address[at+1:]
+	}
+	return address
 }
 
 // reader reads typed settings and keeps the first value it could not read.

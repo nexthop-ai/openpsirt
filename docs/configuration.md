@@ -110,7 +110,7 @@ Also read after an upgrade from any earlier release.
 | With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
 | A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels unless told otherwise | Where the controller is not ingress-nginx, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
 | `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
-| With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable` or `tls=false` in the database URL is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting from the URL |
+| With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
 | Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
 
 | After the upgrade from v0.4.0 | |
@@ -173,7 +173,8 @@ read.
 | Where it is set | |
 |---|---|
 | The URL asks for a transport that falls back to cleartext, or says nothing | Every connection is opened with one that does not: `sslmode=require` on PostgreSQL where the URL says `prefer`, `allow` or nothing, and `tls=skip-verify` on MySQL and MariaDB where it says `preferred` or nothing. Encrypted, with no certificate checked, which is what the default already gave where the server offered it |
-| The URL asks for cleartext | `sslmode=disable` or `tls=false`: refused at startup, naming the setting |
+| A PostgreSQL URL says nothing and `PGSSLMODE` is set | The environment's mode is judged in the URL's place: `require`, `verify-ca` and `verify-full` are left to apply, `prefer` and `allow` become `require`, and `disable` is refused |
+| The URL asks for cleartext | `sslmode=disable`, `tls=false` or `tls=0` in any case, or `allowFallbackToPlaintext` true: refused at startup, naming the setting |
 | The connection is encrypted | Nothing happens. The transport is logged as it always is |
 | The connection is in cleartext | Refused at startup, naming the setting |
 | The server will not say which | Refused. What this asks for is certainty, and "we could not find out" is not it |
