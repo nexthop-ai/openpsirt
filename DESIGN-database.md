@@ -465,8 +465,10 @@ stay. Each component takes v0.4.0's identity again, each sender is recorded by
 name, and the node columns go. Every chat channel goes, with what was delivered
 to it, because v0.4.0 reaches only a webhook; the two chat tables go, so what
 each person chose about chat is lost and a later upgrade starts them at the
-defaults again. A notification's team and a destination's new columns go. A saved filter stays in v0.5.0's
-words, which v0.4.0's list reads too.
+defaults again. A notification's team and a destination's new columns go. A
+saved filter stays in v0.5.0's words, which v0.4.0's list reads too, except
+that a hidden name holding a comma is read by v0.4.0 as several names, and
+upgrading again keeps them apart.
 
 Two components v0.4.0 identifies alike refuse the roll back, and the refusal
 names both: a name shaped like a package identifier beside that package, or a

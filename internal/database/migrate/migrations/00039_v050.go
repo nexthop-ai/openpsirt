@@ -188,8 +188,9 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // v0.4.0 reads it. A trail row configuration or a merge wrote has no person,
 // which v0.4.0 has no place for, so it goes with the column that says who
 // acted. Whether a person typed each name an issue answers to goes with its
-// column, and the names stay. A kept filter stays in v0.5.0's
-// words, which v0.4.0's list reads too.
+// column, and the names stay. A kept filter stays in v0.5.0's words, which
+// v0.4.0's list reads too, except that a hidden name holding a comma is read
+// by v0.4.0 as several names, and upgrading again keeps them apart.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err

@@ -23,6 +23,7 @@ func TestAKeptQueryIsRewrittenIntoTheWordsTheListReads(t *testing.T) {
 		{"a word that narrowed nothing", "only=soon&q=openssl", "q=openssl"},
 		{"hidden names joined", "hide=zlib%2C+openssl%2C%2Clibc", "hide=zlib&hide=openssl&hide=libc"},
 		{"hidden names joined unescaped", "hide=a,b", "hide=a&hide=b"},
+		{"a name the list escapes its own way", "hide=a%7Eb%2Cc*d", "hide=a%7Eb&hide=c*d"},
 		{"a flag already there", "exploited=1&only=exploited", "exploited=1"},
 		{"a hidden name already there", "hide=zlib&hide=zlib%2Copenssl", "hide=zlib&hide=openssl"},
 		{"a repeated parameter it does not name", "state=undecided&state=undecided", "state=undecided&state=undecided"},

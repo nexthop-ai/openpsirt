@@ -46,12 +46,18 @@ func savedFiltersRespelled(ctx context.Context, tx bun.Tx) error {
 	return nil
 }
 
+// asTheListWrites turns Go's query escaping into the browser's. The list
+// recognizes a kept filter as open by comparing its query with the address
+// byte for byte, and the two escape differently: Go leaves a tilde bare and
+// escapes an asterisk, and the browser does the opposite.
+var asTheListWrites = strings.NewReplacer("~", "%7E", "%2A", "*")
+
 // respelled is one kept query in v0.5.0's words.
 //
 //   - "only=exploited" is "exploited=1", and "only=hasFix" is "fixable=1".
 //     Any other value of "only" narrowed nothing and is dropped.
 //   - A "hide" value holding commas is one "hide" per name, each trimmed, with
-//     empty names dropped.
+//     empty names dropped, and escaped as the list escapes it.
 //   - A parameter the rewrite produces that the query already carries is not
 //     written twice. A parameter the query carried is kept as written.
 func respelled(query string) string {
@@ -89,7 +95,7 @@ func respelled(query string) string {
 		case key == "hide" && strings.Contains(value, ","):
 			for _, name := range strings.Split(value, ",") {
 				if name = strings.TrimSpace(name); name != "" {
-					add("hide=" + url.QueryEscape(name))
+					add("hide=" + asTheListWrites.Replace(url.QueryEscape(name)))
 				}
 			}
 		default:
