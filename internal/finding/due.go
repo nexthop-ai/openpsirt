@@ -321,10 +321,9 @@ func InForce() (string, []any) {
 // rather than after — measured at about eight seconds over 441,108 findings.
 // Stored at ingest, this is one range over an index.
 //
-// A finding with no deadline is left out. That is a row recorded before the
-// deadline was stored, and it will have one the next time a scan reopens it —
-// which is honestly "not known yet" rather than "not due", and either way not
-// something to interrupt anybody about.
+// A finding with no deadline is left out: it is below the line, in a release
+// out of support or built once, or has nothing upstream to take, and NoDeadline
+// says which. None of those is something to interrupt anybody about.
 func (s *Store) RunningOut(ctx context.Context, subject access.Subject, scope Scope,
 	within time.Duration, limit int) ([]Late, int, error) {
 

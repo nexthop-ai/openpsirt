@@ -644,8 +644,8 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 // Not every product, for an administrator. Administering the
 // catalog is knowing a product exists, which is what Sees answers; this is
 // what narrows findings, counts, aggregates and exports, and an administrator
-// reads those only where they hold a role. The "all" flag is kept because the
-// queries are written around it, and nothing sets it now.
+// reads those only where they hold a role. The "all" flag is set only for the
+// unnarrowed subject Everything makes.
 func (s Subject) Products() (ids []int64, all bool) {
 	if s.Kind != Person {
 		return nil, false

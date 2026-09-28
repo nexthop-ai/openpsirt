@@ -75,11 +75,10 @@ describe("what a sheet says it was asked of", () => {
 });
 
 describe("every address a report leads to", () => {
-  // Eight entries build an address from a scope by hand, and nothing pinned
-  // one of them against the router. An address that matches no route
-  // redirects to the front page, so a report that leads nowhere looks exactly
-  // like one nobody clicked — the test above pins the seven slug reports
-  // against the pages behind them and says nothing about these.
+  // Entries that build an address from a scope by hand are pinned against the
+  // router here; the slug reports are pinned by the test above. An address
+  // that matches no route redirects to the front page, so a report that leads
+  // nowhere looks exactly like one nobody clicked.
   const anywhere = { product: "sonic", stream: "master", variant: "broadcom" };
 
   it("resolves to a screen", () => {

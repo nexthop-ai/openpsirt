@@ -7,11 +7,9 @@ import { label, waiting } from "./notices";
 // The two decisions the notification area makes for itself, tested apart from
 // the drawing.
 //
-// The interface as a whole has one test file for several thousand lines, and
-// that is worth saying plainly rather than leaving implied: `tsc` and a
-// type-checked client prove the screens compile against the shapes the server
-// sends, and nothing proves what they say. These are the pieces where saying
-// the wrong thing is a defect rather than a matter of taste.
+// `tsc` and a type-checked client prove the screens compile against the shapes
+// the server sends, and prove nothing about what they say. These are pieces
+// where saying the wrong thing is a defect rather than a matter of taste.
 describe("what a notification is called", () => {
   it("says what happened in words rather than the word a machine matches on", () => {
     expect(label("assigned")).toBe("assigned to you");
