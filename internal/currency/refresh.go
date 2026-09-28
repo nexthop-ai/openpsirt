@@ -418,7 +418,8 @@ func (r *Refresher) pause(ctx context.Context) {
 // Ordered oldest first, with never-asked before everything, so a first run
 // works through the list rather than circling the same slice of it.
 //
-// An ecosystem whose index failed earlier in the pass is left out.
+// An ecosystem whose index failed earlier in the pass is left out, and so is a
+// component no build carries any longer: its last answer stays as it was.
 func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, error) {
 	var rows []stale
 	err := r.db.NewSelect().
@@ -426,6 +427,7 @@ func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, 
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		Where("c.purl <> ''").
+		Where(carried).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return askableExcept(q, failing)
 		}).
@@ -448,6 +450,12 @@ func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, 
 	}
 	return rows, nil
 }
+
+// carried is the condition that some build still carries a component: an open
+// node of the graph points at it. The pass asks about these and no others,
+// which is the candidate set of the report of unanswered names.
+const carried = `EXISTS (SELECT 1 FROM "graph_node" AS "n" ` +
+	`WHERE "n"."component_id" = "c"."id" AND "n"."closed_scan_id" IS NULL)`
 
 // askableOnly narrows to the ecosystems there is an index for.
 //

@@ -416,7 +416,8 @@ has announced, and a public index records every request made of it.
 | NuGet | `api.nuget.org` |
 
 Nothing else is reached, and a redirect is not followed. A distribution
-package is never asked about.
+package is never asked about, and nor is a component no current build carries:
+it keeps the answer it last had.
 
 Where egress is restricted, allow the hosts for the ecosystems your builds
 carry. An index that cannot be reached is asked once a pass and then left for

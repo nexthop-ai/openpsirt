@@ -277,6 +277,7 @@ name to a public index.
 | A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
 | The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
 | A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
+| The candidates are components some build still carries, and a component no build carries keeps its last answer | A name that was in a build last year and is not now is not one to send to an index tonight. The report of names with no upstream answer reads the same set, so the two describe the same candidates |
 
 | Ecosystem | Index | The newest version is |
 |---|---|---|

@@ -53,14 +53,34 @@ type component struct {
 	// stale answer apart from a question the index could not answer, which
 	// are left alone for very different lengths of time.
 	version *string
+	// dropped is a component a build carried once and no longer does. Every
+	// other seeded component is carried by the one build the seed keeps.
+	dropped bool
 }
 
-// seed puts components in the graph and returns a refresher over them.
+// seed puts components in the graph, carried by a build unless dropped, and
+// returns a refresher over them.
 func seed(t *testing.T, db *database.DB, of []component,
 	says map[string]currency.Latest, err error) (*currency.Refresher, *[]string) {
 
 	t.Helper()
 	ctx := t.Context()
+	var targets []int64
+	if err := db.DB.NewSelect().TableExpr(`"target"`).Column("id").
+		OrderExpr(`"id" ASC`).Limit(1).Scan(ctx, &targets); err != nil {
+		t.Fatalf("read a build to carry the components: %v", err)
+	}
+	if len(targets) == 0 {
+		targets = append(targets, fixture.New(t, db).Target.ID)
+	}
+	scan := &ingest.Scan{
+		TargetID: targets[0], ContentHash: fmt.Sprintf("seed-%d", time.Now().UnixNano()),
+		BuiltAt: time.Now().UTC(), ReceivedAt: time.Now().UTC(),
+		ParserVersion: "test", Status: ingest.Accepted,
+	}
+	if _, err := db.DB.NewInsert().Model(scan).Exec(ctx); err != nil {
+		t.Fatalf("record the scan that carries the components: %v", err)
+	}
 	for i, each := range of {
 		row := &graph.Component{
 			Identity:        "identity-" + each.purl,
@@ -73,6 +93,13 @@ func seed(t *testing.T, db *database.DB, of []component,
 		}
 		if _, insert := db.DB.NewInsert().Model(row).Exec(ctx); insert != nil {
 			t.Fatalf("seed component %d: %v", i, insert)
+		}
+		node := &graph.Node{TargetID: targets[0], ComponentID: row.ID, OpenedScanID: scan.ID}
+		if each.dropped {
+			node.ClosedScanID = &scan.ID
+		}
+		if _, insert := db.DB.NewInsert().Model(node).Exec(ctx); insert != nil {
+			t.Fatalf("carry component %d: %v", i, insert)
 		}
 	}
 	// The pass is off unless a deployment turns it on, and `Once` enforces that
@@ -875,6 +902,37 @@ func TestANameOfOursIsNotAskedAbout(t *testing.T) {
 			if got[purl].Released != nil || got[purl].Summary != nil || got[purl].Project != nil {
 				t.Errorf("%s was held back and keeps what an index said about it", purl)
 			}
+		}
+	})
+}
+
+// Only a component some build still carries is asked about, and one no build
+// carries keeps the answer it last had.
+//
+// The same candidates the report of unanswered names reads: a name that was in
+// a build last year and is not now is not one to send to an index tonight.
+func TestOnlyWhatABuildStillCarriesIsAskedAbout(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB) {
+		old := time.Now().UTC().Add(-48 * time.Hour)
+		was := "0.9.0"
+		r, asked := seed(t, db, []component{
+			{purl: "pkg:npm/carried@1.0.0"},
+			{purl: "pkg:npm/dropped@1.0.0", dropped: true, checked: &old, version: &was},
+		}, map[string]currency.Latest{
+			"carried": {Version: "1.2.0"},
+			"dropped": {Version: "2.0.0"},
+		}, nil)
+
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		if len(*asked) != 1 || (*asked)[0] != "carried" {
+			t.Fatalf("asked about %v, want only the component a build still carries", *asked)
+		}
+		after := read(t, db)["pkg:npm/dropped@1.0.0"]
+		if after.Version == nil || *after.Version != was ||
+			after.Checked == nil || !after.Checked.Equal(old.Truncate(time.Microsecond)) {
+			t.Errorf("a component no build carries was rewritten: %+v", after)
 		}
 	})
 }

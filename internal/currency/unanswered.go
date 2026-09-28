@@ -104,7 +104,9 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		Join(`JOIN "target" AS "tg" ON tg.id = n.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		// Still carried. A component that was in a build last year and is not
-		// now is not a name that would leave this deployment tonight.
+		// now is not a name that would leave this deployment tonight. The
+		// same set the pass asks about, spelled as a join here because the
+		// product a node's build belongs to narrows the report.
 		Where("n.closed_scan_id IS NULL").
 		Where("c.purl <> ''").
 		// Asked and answered with nothing. A component never reached is not
