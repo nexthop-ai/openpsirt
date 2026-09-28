@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"regexp"
 	"strings"
 	"time"
 
@@ -129,6 +130,17 @@ var ErrNoSuchComponent = errors.New("this build holds nothing by that name")
 // only from a caller inside this process.
 var ErrNothingSaid = errors.New("a recorded finding has to say what the flaw is")
 
+// MostWeaknesses is how many weaknesses one recorded flaw states.
+const MostWeaknesses = 16
+
+// ErrNotAWeakness refuses a weakness that is not a weakness identifier, or
+// more of them than one flaw states.
+var ErrNotAWeakness = fmt.Errorf("a flaw states at most %d weaknesses, each written as CWE- "+
+	"and a number, such as CWE-125", MostWeaknesses)
+
+// weaknessID is the shape of a weakness identifier: CWE- and a number from one.
+var weaknessID = regexp.MustCompile(`^CWE-[1-9][0-9]{0,5}$`)
+
 // ErrTooManyPlaces says one recording would open more findings than this
 // deployment allows one action to write.
 //
@@ -214,6 +226,18 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	}
 	if strings.TrimSpace(in.Summary) == "" {
 		return nil, "", ErrNothingSaid
+	}
+	// Each weakness is a row, in a column a name's width on three engines, so
+	// how many and what shape are refused here rather than found out by the
+	// insert — which one engine accepts and three answer as a fault.
+	kinds := cleaned(in.Weaknesses)
+	if len(kinds) > MostWeaknesses {
+		return nil, "", ErrNotAWeakness
+	}
+	for _, kind := range kinds {
+		if !weaknessID.MatchString(kind) {
+			return nil, "", ErrNotAWeakness
+		}
 	}
 	// The same submission policy a justification goes through. It is our
 	// own prose, written here and rendered as markdown where it is read
@@ -373,7 +397,6 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
-		kinds := cleaned(in.Weaknesses)
 		named := Named{
 			Identifier:  identifier,
 			Severity:    severity,

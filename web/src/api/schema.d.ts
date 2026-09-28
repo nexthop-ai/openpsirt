@@ -10386,7 +10386,7 @@ export interface components {
             vector?: string;
             /** @description The version, where the build holds that name at several */
             version?: string;
-            /** @description The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which */
+            /** @description The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
         };
         RecordBody: {

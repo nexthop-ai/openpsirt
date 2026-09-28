@@ -784,6 +784,7 @@ is never raised: there is nobody outside to answer.
 | The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `DESIGN-ingest.md` holds which rating in a generation is kept |
 | Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's. Where a published document has to name one, the name is looked up then rather than checked now, and an identifier no catalog assigns is left out of that document rather than out of the record |
 | Which one is the root cause is carried rather than picked | A published advisory states one weakness and an issue is commonly classified as several. The feeds say which they call primary, and a person recording a flaw names theirs first — the same statement made by hand. Choosing the lowest number or the earliest string instead is an answer with nothing behind it, and the two disagree: `CWE-20` is the lower number and `CWE-119` the earlier string |
+| A person recording a flaw states at most sixteen weaknesses, each CWE- and a number | Each is a row, and the column holding it is a name's width on three engines. Anything else is refused before anything is written, where the insert would otherwise succeed on one engine and fail as a fault on three |
 
 ### Version 4 classes
 
