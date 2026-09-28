@@ -153,9 +153,8 @@ func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 
 // Teams lists the teams in use, by name.
 //
-// Bounded like every other listing. A picker declaring that it returns
-// twenty-five names appended every team there is after them, so a deployment
-// with two hundred teams answered a bounded question with an unbounded list.
+// Bounded like every other listing, so a picker asking for a page of names
+// gets a page however many teams there are.
 //
 // The term narrows in the statement rather than after it: filtering a bounded
 // read in the caller cuts before the match is looked for, so a team whose name

@@ -513,12 +513,11 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 // placeColumns adds the joins and the column expressions a place row is read
 // from, to a query over finding AS "f".
 //
-// The eight expressions and the reasoning behind two of them were written out
-// verbatim in three queries here. Each copy still compiles and still returns
-// rows when one of them gains a column, so nothing notices a site left behind
-// — and what these feed is the key a decision expires on, which is the one
-// thing in this package that must not differ between the read that writes it
-// and the read that matches it.
+// One spelling for every query that reads a place. A copy still compiles and
+// still returns rows when another gains a column, so nothing would notice a
+// site left behind — and what these feed is the key a decision expires on,
+// which must not differ between the read that writes it and the read that
+// matches it.
 //
 // It does not take the ordering with it: the three order differently, and what
 // a decision is keyed on must not depend on what the database returned first.

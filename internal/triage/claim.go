@@ -52,12 +52,11 @@ type Claim struct {
 	// Outcome is what the claim says, held once because one act is one
 	// argument.
 	//
-	// These were on the row. A judgment reaching forty-four places was
-	// forty-four copies of one sentence, each revisable on its own — so
-	// revising one returned that row to the queue and left the other
-	// forty-three saying the old thing while the claim read as agreed. Every
-	// one of them was constant across every row of every claim in the measured
-	// deployment, and nothing has ever produced a claim whose rows differ.
+	// Held on the claim rather than on each row: a judgment reaching many
+	// places held per row is many copies of one sentence, each revisable on
+	// its own, and revising one would leave the rest saying the old thing
+	// while the claim read as agreed. In the measured deployment every one of
+	// these was constant across every row of every claim.
 	Outcome Outcome `bun:"outcome,notnull"`
 	// Justification is one of the recognized reasons, for the outcome that
 	// claims something does not apply — where which reason it is *is* the
