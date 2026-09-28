@@ -381,7 +381,7 @@ question a CycloneDX `dependsOn` answers.
 
 | Read as | Types |
 |---|---|
-| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF` |
+| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF`, `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF` |
 | What the document is about | `DESCRIBES` and `DESCRIBED_BY`, between the document and a package |
 | What a component was derived from | `ANCESTOR_OF` and `DESCENDANT_OF` |
 | Nothing | Everything else |

@@ -566,17 +566,20 @@ Two tests asserting the same property are redundant only when they take the
 same path through the code under test. The check is a path argument, not a
 comparison of assertion text. A whole-tree scan produced seventeen mechanical
 overlap clusters and every genuine one was refuted: the worked example is
-`web/src/ui/versions.test.ts:19` against `:31` over `versions.ts:19-21` — both
-return the empty string, and only the first reaches the comparison on line 21,
-where the second returns on line 20 without it. The other shapes were the same
-behavior at two layers, and the same predicate over different input classes.
-Nothing was deleted.
+`sharedVersion` in `web/src/ui/versions.ts`, where "says nothing where the
+versions differ" and "leaves a level of one alone" both return the empty
+string, and only the first reaches the comparison of every version; the second
+returns at the length test without it. The other shapes were the same behavior
+at two layers, and the same predicate over different input classes. Nothing was
+deleted.
 
-The same test the other way round. `:25` and `:31` also both return the
-empty string, and they *are* the same path: a level of one and a level of none
-both leave the length test on line 19 with nothing, and neither reaches line
-21. Two assertions that read differently and execute identically is what this
-rule says to look for.
+The same test the other way round. "Leaves a level of one alone" and "says
+nothing where nothing has a version" also both return the empty string, and
+they *are* the same path: a level of one and a level of none both leave the
+length test with nothing, and neither reaches the comparison. Two assertions
+that read differently and execute identically is what this rule says to look
+for. The tests are named here rather than cited by line, because a line number
+stops saying what it said the first time either file is edited.
 
 ## Commits and pull requests
 

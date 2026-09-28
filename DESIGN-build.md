@@ -62,7 +62,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `DESIGN-findings.md` |
 | `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
-| `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |
+| `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes or characters without splitting a character |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
 | `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `DESIGN-remediation.md` |
 | `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gates that are not linters |

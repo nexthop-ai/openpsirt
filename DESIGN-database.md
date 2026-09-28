@@ -88,17 +88,22 @@ Engine-specific code is confined to these places:
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
+| Typing a composed expression as a moment | A `CASE` over bound values is untyped, and PostgreSQL refuses to write it into a timestamp column. The cast target differs: PostgreSQL takes a zoned timestamp, MySQL and MariaDB a six-digit datetime, and SQLite stores text and takes none |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
-| Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
+| Listing the harness's own databases | PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
+| Listing the tables of the harness's SQLite schema | SQLite keeps its schema in a catalog of its own. The servers are asked the same question through the information schema |
+| Commit durability on the harness servers | A global setting on the two MySQL-protocol servers, relaxed so the suite runs faster. PostgreSQL asks per session in the connection string, so it has nothing to branch on |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 | Migration 37 | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
-This list is the complete set and is checked by grep rather than trusted —
-`make confined`, which refuses a dialect named anywhere but the places above
-and holds the same list, so widening one without the other is what fails. It
-reads the tests too: a branch in a test is a branch, and the one thing it lets
-past there is an engine named to choose which engine runs.
+This list is the complete set, and where an engine may be named is checked by
+grep rather than trusted: `make confined` refuses a dialect named anywhere but
+the places it allows. It allows them by path, and two of its paths are whole
+packages — this one and the test harness — so a new branch inside either passes
+it, and the row naming that branch here is kept by review. It reads the tests
+too: a branch in a test is a branch, and the one thing it lets past there is an
+engine named to choose which engine runs.
 
 What it looks for is the branch rather than the SQL: the two upsert idioms as
 bun spells them, and asking a handle which engine it is. A gate blind to the
@@ -629,12 +634,14 @@ What its absence costs: the picker deciding who may be named on an embargoed
 case answers a term of "%" with every person the deployment can offer, in one
 request.
 
-Folding happens in Go and again in the engine. Folding in Go is Unicode-aware
-and `LOWER()` on SQLite is ASCII-only, so a term carrying a non-ASCII capital
-is found on three engines and missed on the fourth wherever the column has no
-folded copy. The component half has one; the issue half does not, and issue
-identifiers are ASCII in every scheme anybody publishes — which is why this is
-written down rather than fixed.
+Folding happens in Go, and a column compared against a folded term has a
+folded copy of its own, made on the way in. Folding in Go is Unicode-aware and
+`LOWER()` on SQLite is ASCII-only, so a term carrying a non-ASCII capital
+compared against `LOWER()` of a column is found on three engines and missed on
+the fourth. Both halves of the findings search have a folded copy. The
+component search compares against it; the issue search still folds the raw
+identifier with the engine, which differs only outside ASCII, and issue
+identifiers are ASCII in every scheme anybody publishes.
 
 ## Affected-row counts
 
@@ -955,10 +962,9 @@ value being shortened is usually a message saying why something else failed, so
 the refused write is the one recording a failure, and the operator is left with
 neither.
 
-A width is measured in characters and the bound here is in bytes, so a name
-outside ASCII is shortened further than the column requires. That is the safe
-direction — the bound belongs to a lookup key, and the full value is stored
-beside it without one.
+A lookup key is cut in characters, which is how its column is declared; a
+value bounded for a byte budget is cut in bytes. Both cut on a character
+boundary.
 
 ## Test harness
 
