@@ -239,7 +239,7 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			}
 			if shown != "" && shown != product.DisplayName {
 				if err := store.SetProductDisplayName(ctx, product.ID, shown); err != nil {
-					return declineDeclaration(err)
+					return declineDeclaration(d.Logger, err)
 				}
 				if err := noted(ctx, tx, trail.Catalog, about,
 					trail.Said(product.DisplayName, true), trail.Said(shown, true)); err != nil {
@@ -472,13 +472,12 @@ func heldByReaders(level string) error {
 
 // declineRename turns a refused rename into the answer that describes it.
 //
-// Beside declineDeclaration, whose default arm publishes a store error's own
-// text as a 400. A rename loses a race with another rename on a unique index,
-// and that arm answered with the engine's constraint message — the name of an
-// index nobody outside this repository has.
+// A rename that loses a race with another rename on a unique index is answered
+// as a name already taken, rather than with the engine's constraint message —
+// the name of an index nobody outside this repository has.
 func declineRename(logger *slog.Logger, err error) error {
 	if errors.Is(err, catalog.ErrExists) || errors.Is(err, catalog.ErrNotFound) {
-		return declineDeclaration(err)
+		return declineDeclaration(logger, err)
 	}
 	if database.IsDuplicate(err) {
 		return huma.NewError(http.StatusConflict, "that name is already taken")

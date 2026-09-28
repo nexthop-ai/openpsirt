@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -309,6 +311,33 @@ func TestAFailureQuotingAProducersOwnTextIsStoredAsText(t *testing.T) {
 		}
 		if len(stored.Failure) > 2000 {
 			t.Errorf("stored %d bytes, over the 2000 the column takes", len(stored.Failure))
+		}
+	})
+}
+
+func TestAReceiptSaysNothingOfTheDatabaseAScanFailedOn(t *testing.T) {
+	// The receipt is read back by the key that sent the scan. A database's
+	// own failure names the address and the user it dialed, so a scan that
+	// failed on one says it could not be applied and no more.
+	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+		ctx := t.Context()
+		scan, _, err := s.Record(ctx, arriving(targetID, "failed-on-the-database", time.Now().UTC()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cause := fmt.Errorf("apply the scan: %w", &net.OpError{
+			Op: "dial", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 4, 7), Port: 5432},
+			Err: errors.New("connection refused"),
+		})
+		if err := s.MarkFailed(ctx, scan.ID, cause); err != nil {
+			t.Fatalf("record that the scan failed: %v", err)
+		}
+		stored, err := s.ByID(ctx, scan.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stored.Failure != "the scan could not be applied" {
+			t.Errorf("the receipt says %q", stored.Failure)
 		}
 	})
 }

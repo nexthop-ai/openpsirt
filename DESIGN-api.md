@@ -144,8 +144,11 @@ A store's own sentence and a failed query are distinguished by the engine's
 error types, asked in one place, rather than by the message text. Answered
 alike as a 422 with the message in it, a broken database reaches the caller as
 a bad request carrying the statement text and, for a connection failure, the
-address and user it tried. Where the type cannot decide, the error is treated
-as a refusal.
+address and user it tried. A connection that could not be made or was cut
+short is read from the network's and each driver's own error for it. Every
+mapper from a store's error to an answer asks this before publishing a
+message, and a failed upload's receipt carries a fixed sentence in place of
+one. Where the type cannot decide, the error is treated as a refusal.
 
 A 404 is never built from an error's own text. It asserts that a name reaches
 nothing, and the body then publishes whatever the error carried — for a store

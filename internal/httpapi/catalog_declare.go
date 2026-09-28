@@ -47,7 +47,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 			}
 			product, did, err := store.EnsureProduct(ctx, in.Body.Name, in.Body.DisplayName)
 			if err != nil {
-				return declineDeclaration(err)
+				return declineDeclaration(d.Logger, err)
 			}
 			if did.Restored {
 				if err := noted(ctx, tx, trail.Catalog, product.Name,
@@ -100,7 +100,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 			stream, did, err := store.EnsureStream(ctx, product.ID, in.Body.Name,
 				catalog.Kind(in.Body.Kind), parentID)
 			if err != nil {
-				return declineDeclaration(err)
+				return declineDeclaration(d.Logger, err)
 			}
 			if did.Restored {
 				if err := noted(ctx, tx, trail.Catalog, product.Name+" "+stream.Name,
@@ -156,7 +156,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 			}
 			variant, did, err := store.EnsureVariant(ctx, product.ID, in.Body.Name, facing)
 			if err != nil {
-				return declineDeclaration(err)
+				return declineDeclaration(d.Logger, err)
 			}
 			if did.Restored {
 				if err := noted(ctx, tx, trail.Catalog, product.Name+" "+variant.Name,

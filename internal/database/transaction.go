@@ -9,7 +9,9 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
+	"net"
 	"strings"
 	"time"
 
@@ -313,22 +315,17 @@ func Handle(db bun.IDB) (*bun.DB, bool) {
 // FromEngine reports whether an error came from the database rather than from
 // the caller having asked for something impossible.
 //
-// The distinction is what an API handler needs and had no way to ask for. A
-// store answers two kinds of error through one return: "you may not do that
+// A store answers two kinds of error through one return: "you may not do that
 // here", which is a sentence somebody wrote for a person to read, and "the
 // query failed", which carries the statement text and whatever the driver put
-// in its message — for a connection failure, the address and the user it tried.
-// A default arm that turned both into a 422 with the message in it answered a
-// broken database as though the caller had mistyped, and handed them the
-// inside of the deployment while doing it.
+// in its message — for a connection failure, the address and the user it
+// tried. An API handler publishes the first and logs the second.
 //
 // It reads the driver's own types rather than the message, so a sentence a
 // store wrote that happens to contain the word "duplicate" is not mistaken for
-// one. All three drivers have such a type, SQLite included: this listed two
-// and called the third one absent, so on the engine the quick loop actually
-// runs, a constraint violation, a missing column and a full disk were all
-// answered as the caller's mistake, with the driver's own text in the body and
-// nothing logged.
+// one. All three drivers have such a type, SQLite included, and a connection
+// that could not be made or was cut short is read from the network's and the
+// drivers' own errors for it.
 func FromEngine(err error) bool {
 	if err == nil {
 		return false
@@ -343,6 +340,19 @@ func FromEngine(err error) bool {
 	}
 	var lite *sqlite.Error
 	if errors.As(err, &lite) {
+		return true
+	}
+	// Below the protocol: a connection that could not be made or was cut
+	// short. Each driver's message names the address and the user it dialed.
+	var connect *pgconn.ConnectError
+	if errors.As(err, &connect) {
+		return true
+	}
+	var network net.Error
+	if errors.As(err, &network) {
+		return true
+	}
+	if errors.Is(err, mysql.ErrInvalidConn) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
 	// Not a driver's own type, but only ever produced by one: a statement that
