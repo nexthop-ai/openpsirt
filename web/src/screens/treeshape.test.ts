@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { keyOf, partsOf } from "./treeshape";
+import { STEP, keyOf, partsOf, stepsOf } from "./treeshape";
 
 // The key is what every piece of the tree's state is held against: what is
 // open, what has been drawn already, what sits under each node, and which
@@ -41,5 +41,19 @@ describe("what tells one component from another in the tree", () => {
       ecosystem: "",
       namespace: "",
     });
+  });
+});
+
+describe("a path down the tree", () => {
+  it("splits back into the keys it was made of", () => {
+    const keys = [
+      keyOf({ component: "sonic-broadcom" }),
+      keyOf({ component: "curl", version: "8.14.1", ecosystem: "deb", namespace: "debian" }),
+    ];
+    expect(stepsOf(keys.join(STEP))).toEqual(keys);
+  });
+
+  it("has no steps where the address names none", () => {
+    expect(stepsOf("")).toEqual([]);
   });
 });

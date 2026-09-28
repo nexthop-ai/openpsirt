@@ -37,9 +37,9 @@ export function Work() {
   const at = useScope();
   const scope = scopeQuery(at);
   const { offset, go: goTo } = usePaging();
-  // The product the picker is on, which is the whole of what this answers for.
-  // It read across every product while the picker was set, so somebody scoped
-  // to one was shown and counted work from products they were not looking at.
+  // The product the picker is on, which is the whole of what this answers for:
+  // somebody scoped to one product is shown and counted work from that product
+  // alone.
   const holdings = useQuery({
     queryKey: ["holdings", scope.product ?? ""],
     queryFn: async () =>
@@ -52,11 +52,9 @@ export function Work() {
   // Whose work is being looked at on the second tab. Empty is the roll-up of
   // everybody; a name is that holder's list.
   //
-  // The kind of holder, because a team is not a person. Work goes to a
-  // team by standing rule and by an assignment naming one, and the totals list
-  // says a team holds it — but the person's route resolves an identity, so a
-  // team's name matched nobody and the screen answered "they are not holding
-  // anything" over work it had just counted.
+  // The kind of holder, because a team is not a person. Work goes to a team by
+  // standing rule and by an assignment naming one, and the person's route
+  // resolves an identity, so a team's list is read from the team's own route.
   const person = params.get("person") ?? "";
   const team = params.get("team") ?? "";
   const holder = team || person;
@@ -434,6 +432,3 @@ function Held({
     </>
   );
 }
-
-// Two letters for the corner. A display name people set is usually a full
-// name; an identity is usually not, and either has to fit in a small circle.

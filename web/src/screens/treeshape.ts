@@ -51,6 +51,16 @@ export function keyOf(node: {
   );
 }
 
+// The separator between the steps of a path down the tree, as the address
+// carries it and the tree reads it. Apart from the one inside a key, so a
+// path of keys splits back into the same keys.
+export const STEP = "\u001f";
+
+// The steps of a path as the address carries it.
+export function stepsOf(path: string): string[] {
+  return path.split(STEP).filter(Boolean);
+}
+
 // partsOf reads a key back into the four things a request needs.
 export function partsOf(key: string): {
   component: string;

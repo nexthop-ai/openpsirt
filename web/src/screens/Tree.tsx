@@ -5,7 +5,7 @@ import { Shape } from "../ui/Shape";
 import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { keyOf, partsOf, type At, type Node } from "./treeshape";
+import { STEP, keyOf, partsOf, stepsOf, type At, type Node } from "./treeshape";
 import { buildPath } from "./list";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -55,10 +55,7 @@ function Strip({ by }: { by?: Record<string, number> }) {
 // there are and offers all of them.
 const CHILDREN = 400;
 
-// The version every component at one level carries, where they all carry the
-// same one, and empty otherwise.
-//
-// A count past this is emphasised, so the branch worth descending is visible
+// A count past this is emphasized, so the branch worth descending is visible
 // without reading every number on the way down.
 const HOT = 500;
 
@@ -88,6 +85,11 @@ const fetchAround =
       ),
     );
 
+// The rows under one node, in whichever of the three states the read is in:
+// nothing yet, refused, or the rows themselves. Two of them are not the same
+// answer, and drawn alike a refused node spins for ever.
+type Under = { kids?: Node[]; error?: unknown };
+
 // The dependency graph, drawn as a tree and expanded a node at a time.
 //
 // Not a full render: a real image holds thousands of components and tens of
@@ -97,11 +99,6 @@ const fetchAround =
 // exploration.
 //
 // The selected component lives in the URL, so a link carries it.
-// The rows under one node, in whichever of the three states the read is in:
-// nothing yet, refused, or the rows themselves. Two of them are not the same
-// answer, and drawing them alike is what left a node spinning for ever.
-type Under = { kids?: Node[]; error?: unknown };
-
 export function Tree() {
   const { product = "" } = useParams();
   const who = useWho();
@@ -289,12 +286,12 @@ function Whole() {
   // opened so the component is on screen under the parents that pull it in,
   // rather than the reader being left at the root to find it again.
   const path = params.get("path") ?? "";
-  useReseed(`${rootKey}\u001f${path}`, () => {
+  useReseed(`${rootKey}${STEP}${path}`, () => {
     if (!rootKey) return;
     setOpened((prev) => {
       const next = new Set(prev);
       next.add(rootKey);
-      for (const step of path.split("\u001f").filter(Boolean)) next.add(step);
+      for (const step of stepsOf(path)) next.add(step);
       return next;
     });
   });
@@ -307,7 +304,7 @@ function Whole() {
   // the component it was opened for. Each of those rows is kept individually
   // rather than by drawing the whole level: the step here is `host-image`,
   // whose level is 5,157 rows, and widening it renders every one of them.
-  const onPath = useMemo(() => new Set(path.split("\u001f").filter(Boolean)), [path]);
+  const onPath = useMemo(() => new Set(stepsOf(path)), [path]);
 
   // Children are read for each node the reader has opened. The root's own are
   // already in hand from the query above, so it is not asked for twice.
@@ -540,16 +537,16 @@ function onComponent(at: At, component: string | undefined): string {
   return `${buildPath(at)}/findings?component=${encodeURIComponent(component ?? "")}`;
 }
 
-// The component's own screen: everything open against it across every build,
-// where it could go, and the act that moves it. Reachable from a finding and
-// from the findings list, and from here, which is where somebody looking at
-// the graph asks about a component.
 // The build the tree is drawn for, so the component's screen opens on the
 // graph of the build somebody was looking at rather than the first one.
 function buildQuery(at: At): string {
   return `?stream=${encodeURIComponent(at.stream)}` + `&variant=${encodeURIComponent(at.variant)}`;
 }
 
+// The component's own screen: everything open against it across every build,
+// where it could go, and the act that moves it. Reachable from a finding and
+// from the findings list, and from here, which is where somebody looking at
+// the graph asks about a component.
 function componentPage(at: At, component: string | undefined): string {
   return (
     `/products/${encodeURIComponent(at.product)}` +

@@ -489,18 +489,6 @@ export function identityOf(row: Row): string {
   return `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""} ${row.namespace ?? ""}`;
 }
 
-// The address a row opens. The version is part of it: a component name is
-// not unique within a build. It carries the list it came from so the finding
-// can offer the row before and the row after. The list's address travels as
-// one value rather than as its own parameters, so a filter added to the list
-// needs nothing here and cannot collide with a name the finding screen already
-// uses.
-//
-// Opened through a saved filter that prepares a claim, the
-// filter's name travels too, and the finding fills its decision form from what
-// that filter prepares. The name rather than the words: the filter is the one
-// place deciding what it says, and a copy in an address is a second one that
-// goes stale the moment somebody saves over the name.
 // The prefix one build's screens live under, which every address under a
 // build shares. Written once, because a copy cannot be checked against the
 // router or against another copy.
@@ -518,6 +506,18 @@ export function apiBuildPath(at: { product: string; stream: string; variant: str
   return "/v1" + buildPath(at);
 }
 
+// The address a row opens. The version is part of it: a component name is
+// not unique within a build. It carries the list it came from so the finding
+// can offer the row before and the row after. The list's address travels as
+// one value rather than as its own parameters, so a filter added to the list
+// needs nothing here and cannot collide with a name the finding screen already
+// uses.
+//
+// Opened through a saved filter that prepares a claim, the filter's name
+// travels too, and the finding fills its decision form from what that filter
+// prepares. The name rather than the words: the filter is the one place
+// deciding what it says, and a copy in an address is a second one that goes
+// stale the moment somebody saves over the name.
 export function pathTo(
   at: { product: string; stream: string; variant: string },
   // Only the three fields the address is built from, so that what a caller has
