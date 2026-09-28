@@ -10,13 +10,82 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/text"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
+
+func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
+	// The description and aliases come from a feed and the component from a
+	// scan file, and the document is one somebody forwards. Each is text in
+	// it: no link, image, markup, heading or list a third party opened.
+	twoReach(t, func(t *testing.T, r *reach) {
+		link := "[Download the fix](https://evil.example/p)"
+		hostile := graph.Described{
+			Purl: "pkg:generic/hostile@1.0", Name: "- <img src=https://evil.example/t.gif>",
+			Version: "1.0 ![x](https://evil.example/v)",
+		}
+		r.scan(t, "hostile-names",
+			graph.Snapshot{
+				Root:         seededRoot,
+				Components:   []graph.Described{hostile},
+				Dependencies: []graph.Dependency{{Parent: seededRoot, Child: hostile}},
+			},
+			[]finding.Reported{{
+				Issue: finding.Named{
+					Identifier:  "CVE-2026-7777",
+					Aliases:     []string{"GHSA-" + link},
+					Severity:    "high <b>x</b>",
+					Description: "# Upgrade now\n\n" + link + "\n<script>alert(1)</script>",
+					Advisory:    "https://nvd.nist.gov/vuln/detail/CVE-2026-7777",
+				},
+				Component: hostile,
+				FixState:  finding.FixedUpstream, FixedIn: "www.evil.example",
+			}})
+
+		got := asPerson(t, r, "triager", http.MethodGet, "/v1/issues/CVE-2026-7777/document", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("the document answered %d: %s", got.Code, got.Body.String())
+		}
+		written := got.Body.String()
+		if !strings.Contains(written, "Upgrade now") || !strings.Contains(written, "evil.example/t.gif") {
+			t.Fatalf("the document does not carry the hostile text at all, so this checked nothing:\n%s",
+				written)
+		}
+
+		source := []byte(written)
+		document := goldmark.New(goldmark.WithExtensions(extension.GFM)).Parser().
+			Parse(text.NewReader(source))
+		_ = ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+			if !entering {
+				return ast.WalkContinue, nil
+			}
+			switch typed := node.(type) {
+			case *ast.Heading:
+				// The document's own headings, and none a feed wrote.
+				if heading := string(typed.Lines().Value(source)); strings.Contains(heading, "Upgrade") {
+					t.Errorf("a feed wrote a heading:\n%s", written)
+				}
+			case *ast.AutoLink:
+				if url := string(typed.URL(source)); strings.Contains(url, "evil.example") {
+					t.Errorf("%q became a link:\n%s", url, written)
+				}
+			case *ast.Link, *ast.Image, *ast.RawHTML, *ast.HTMLBlock:
+				t.Errorf("a third party's text became %s:\n%s", node.Kind(), written)
+			}
+			return ast.WalkContinue, nil
+		})
+	})
+}
 
 func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 	// "A critical just landed in openssl — which of our products ship an
-	// affected version" was a question asked one product at a time, which
-	// at a dozen products is the first thing anybody complains about.
+	// affected version" is one question, and asked one product at a time it
+	// is the first thing anybody complains about at a dozen products.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 
@@ -148,9 +217,8 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 // is answered in.
 //
 // The issue itself, the builds of ours carrying it, the decision about each
-// and the argument behind it, were four screens and a copy-paste — so the
-// answer was assembled differently every time and the half somebody forgot was
-// the half that mattered.
+// and the argument behind it, in one document, so two people answering the
+// same inquiry answer it the same way.
 func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)

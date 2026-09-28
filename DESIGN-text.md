@@ -168,9 +168,29 @@ Both live in the same column, so the origin decides. Rendering the column would
 hand whoever wrote the scan file a formatting language aimed at the browsers of
 the people holding the most access in this deployment.
 
-Escaping, like sanitizing, happens where the text is put into a document —
-which is the interface, not here. What the server guarantees is that the two
-origins stay distinguishable, so a renderer can tell which it is holding.
+Escaping, like sanitizing, happens where the text is put into a document. The
+interface escapes what it shows, and the two origins stay distinguishable so a
+renderer can tell which it is holding.
+
+The server puts third-party text into two documents of its own: the release
+note and the issue document, both served as markdown (`DESIGN-reporting.md`).
+Each value there that did not pass the submission policy is escaped as it is
+written, so a renderer shows it as the text it is.
+
+| Escaped | Where | Opens |
+|---|---|---|
+| A control character, a newline among them | Anywhere, as a space | A line and a block the string chose |
+| `\` `` ` `` `*` `[` `]` `<` `~` `\|` | Anywhere | An escape, code, emphasis, a link or image, markup or an autolink, strikethrough, a table cell |
+| `_` | Unless a letter or digit is on both sides | Emphasis |
+| `&` | Before a letter or `#` | A character reference |
+| `:` | Before `//` | A bare address, which a renderer that links addresses links |
+| `.` | After `www` at the start of a word | The same, for an address with no scheme |
+| `@` | Before a letter or digit | A mail link, and a mention in a renderer with accounts |
+| `#`, `-` or `+` before a space, and `>` | First in the string | A heading, a list item, a rule or a quotation where the string opens a line, a list item's content included |
+| `.` or `)` before a space | After leading digits | An ordered list item |
+
+Only a character that can open syntax where it sits is escaped. Both documents
+are also read as source, where `1\.2\.3` for every version is noise.
 
 ## Refusals
 

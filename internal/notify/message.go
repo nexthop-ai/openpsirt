@@ -16,8 +16,9 @@ import (
 // second place is the one that is wrong.
 type Message struct {
 	Subject string
-	// Text is markdown, which is what a mail carries as its text part. A
-	// chat adapter translates rather than forwarding it.
+	// Text is what a mail carries as its text part. The signed request
+	// escapes the characters a chat channel reads as markup before it
+	// sends it.
 	Text string
 	// Link is the address a channel may carry. For something undisclosed it
 	// is the way in and never the thing itself, which is why it is composed
@@ -33,15 +34,14 @@ type Message struct {
 // what kind of thing this is and never what it is about.
 //
 // Kept against Kinds by a test, because this is a hand-maintained table over a
-// closed vocabulary and it was one row short.
+// closed vocabulary.
 var called = map[Kind]string{
 	Assigned:      "Work assigned to you",
 	SentBack:      "A claim of yours was sent back",
 	BuildQuiet:    "A build has stopped being scanned",
 	HoldingAbsent: "Somebody away is holding work",
 	// The one kind whose purpose is a specific sentence — "this release has a
-	// critical, we need to cut a new one" — and the one this table was
-	// missing, so it shipped as the fallback below.
+	// critical, we need to cut a new one".
 	CriticalOnRelease: "A release carries an unaddressed critical",
 	Mentioned:         "You were named in a note",
 	DisclosureDue:     "An embargo has reached its date",

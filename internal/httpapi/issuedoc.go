@@ -110,26 +110,29 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		return "", wentWrong(in.Logger, "what this issue is could not be read", err)
 	}
 
-	fmt.Fprintf(&out, "# %s\n\n", known.Identifier)
+	fmt.Fprintf(&out, "# %s\n\n", markdown.Literal(known.Identifier))
 	out.WriteString("Internal. The reasoning below is ours rather than our word to a " +
 		"customer; what goes out is the advisory or the VEX document.\n")
 	fmt.Fprintf(&out, "\nAssembled %s.\n", time.Now().UTC().Format(time.DateOnly))
 
-	// The issue itself, from what the feeds said.
+	// The issue itself, from what the feeds said. Every value below that a
+	// feed, a scan file or a person outside the text policy chose is
+	// escaped where it is written, because this is a document somebody
+	// forwards and a renderer would act on markup in it.
 	out.WriteString("\n## The issue\n\n")
 	if known.Description != "" {
-		fmt.Fprintf(&out, "%s\n\n", known.Description)
+		fmt.Fprintf(&out, "%s\n\n", markdown.Literal(known.Description))
 	}
 	var said []string
 	if known.Severity != "" {
-		said = append(said, known.Severity)
+		said = append(said, markdown.Literal(known.Severity))
 	}
 	if known.Score > 0 {
 		// The scheme with the number, where one is recorded. A document that
 		// leaves this deployment is read beside documents from elsewhere, and
 		// a bare number cannot be placed against one on the other scheme.
 		if known.ScoreVersion != "" {
-			said = append(said, fmt.Sprintf("%.1f on CVSS %s", known.Score, known.ScoreVersion))
+			said = append(said, fmt.Sprintf("%.1f on CVSS %s", known.Score, markdown.Literal(known.ScoreVersion)))
 		} else {
 			said = append(said, fmt.Sprintf("%.1f", known.Score))
 		}
@@ -141,7 +144,11 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		fmt.Fprintf(&out, "- Rated %s\n", strings.Join(said, ", "))
 	}
 	if len(known.Aliases) > 0 {
-		fmt.Fprintf(&out, "- Also known as %s\n", strings.Join(known.Aliases, ", "))
+		aliases := make([]string, 0, len(known.Aliases))
+		for _, alias := range known.Aliases {
+			aliases = append(aliases, markdown.Literal(alias))
+		}
+		fmt.Fprintf(&out, "- Also known as %s\n", strings.Join(aliases, ", "))
 	}
 	// The places it is written up, each address through the rule an address
 	// stored beside a claim goes through: this is a document somebody
@@ -161,7 +168,9 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	fmt.Fprintf(&out, "\n## Its places\n\n%s\n\n", howManyCarry(total, len(rows)))
 	for _, row := range rows {
 		fmt.Fprintf(&out, "- %s %s (%s) — %s %s",
-			row.Product, row.Stream, row.Variant, row.Component, row.Version)
+			markdown.Literal(row.Product), markdown.Literal(row.Stream),
+			markdown.Literal(row.Variant), markdown.Literal(row.Component),
+			markdown.Literal(row.Version))
 		if row.Places > 1 {
 			fmt.Fprintf(&out, ", at %d places", row.Places)
 		}
@@ -170,7 +179,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 			fmt.Fprintf(&out, ", due %s", row.DueAt.UTC().Format(time.DateOnly))
 		}
 		if row.FixedIn != "" {
-			fmt.Fprintf(&out, ", fixed upstream in %s", row.FixedIn)
+			fmt.Fprintf(&out, ", fixed upstream in %s", markdown.Literal(row.FixedIn))
 		}
 		out.WriteString("\n")
 	}
@@ -202,15 +211,15 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	})
 	for _, one := range judged {
 		body := judgedBody(one)
-		fmt.Fprintf(&out, "- %s in %s — %s", body.Outcome, body.Product, body.State)
+		fmt.Fprintf(&out, "- %s in %s — %s", body.Outcome, markdown.Literal(body.Product), body.State)
 		if body.Standing {
 			out.WriteString(", standing")
 		}
-		fmt.Fprintf(&out, ", proposed by %s on %s", body.ProposedBy, body.ProposedAt)
+		fmt.Fprintf(&out, ", proposed by %s on %s", markdown.Literal(body.ProposedBy), body.ProposedAt)
 		if len(body.Approvals) > 0 {
 			agreed := make([]string, 0, len(body.Approvals))
 			for _, approval := range body.Approvals {
-				said := approval.By
+				said := markdown.Literal(approval.By)
 				if approval.WithdrawnAt != "" {
 					said += " (withdrawn)"
 				}
@@ -238,7 +247,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 // affected, and yes must not be the only answer this can give.
 func unaffected(name string) string {
 	return fmt.Sprintf("# %s\n\nNothing you can see carries this issue.\n\n"+
-		"Assembled %s.\n", name, time.Now().UTC().Format(time.DateOnly))
+		"Assembled %s.\n", markdown.Literal(name), time.Now().UTC().Format(time.DateOnly))
 }
 
 // howManyCarry is the line above the list: how many builds carry it, and
