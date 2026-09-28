@@ -39,8 +39,6 @@ The owner has chosen to wait on each of these.
 | PDF reports rendered on the server | Reports are printed from the browser |
 | Asking GitHub or GitLab which branches hold a commit | Patch branches clone each repository. An API call would skip the clone for a repository with few linked commits |
 | Fetching a repository from a mirror | The kernel stable tree is 5.1 GB from kernel.org and 1.1 GB from a mirror that sends commits only |
-| Marking the patch for the branch a component ships | Matching a branch such as `linux-6.12.y` to a version works differently in every project |
-| Cloning through an outbound HTTP proxy | The patch-branch fetcher connects directly, so a network with no direct route cannot use it |
 | Publishing which outcomes dismiss and which state a reason | The interface holds a copy of both classes, so an outcome the server moves to another class is not a compile error there |
 
 ## Decided, not built
@@ -77,6 +75,7 @@ Missing or wrong, with no decision needed to fix it.
 | A flaw found here and upgraded from v0.2.0 or earlier has no report | Those releases kept nothing saying who recorded it. A later claim about it is accepted as the flaw where it should be ruled a duplicate |
 | No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
 | A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
+| Patch branches cannot clone through an outbound HTTP proxy | The fetcher connects directly, so a network with no direct route out fetches nothing |
 
 ## Weak tests
 
