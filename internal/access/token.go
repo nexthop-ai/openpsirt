@@ -168,9 +168,10 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 		}
 	}
 	s.grants = narrowed
-	// Administration is not a role in this vocabulary and cannot be named, so
-	// a token asked to carry some roles carries none of it.
+	// Administration and auditing are not roles in this vocabulary and cannot
+	// be named, so a token asked to carry some roles carries neither.
 	s.Admin = false
+	s.Audits = false
 	s.unnarrowed = false
 	// And the case's write half goes unless a triage role was named, for the
 	// same reason: what a token carries is what it was asked to carry, and a
@@ -244,18 +245,15 @@ func (s Subject) delegate() Subject {
 // narrowedTo keeps only what this subject holds on one product.
 //
 // Narrowing intersects rather than replaces, so a token pinned to something
-// its owner cannot read reaches nothing rather than being granted it. Admin is
-// dropped entirely: administration is global, and a token narrowed to one
-// product carrying it would not be narrowed at all.
+// its owner cannot read reaches nothing rather than being granted it.
+// Administration and auditing are dropped entirely: both are held over the
+// whole deployment, and a token narrowed to one product carrying either would
+// not be narrowed at all.
 //
-// A copy with things removed, never a fresh subject. Written as a struct
-// literal it carried five fields and silently dropped the rest — who somebody
-// is, which teams they are on, and the cases they were brought into — none of
-// which is a per-product fact. Through such a token every "assigned to me"
-// surface answered empty and taking an unowned finding for yourself was
-// refused with a message saying you were giving work to somebody else, while
-// the same acts worked through the same person's session. A collaborator's
-// narrowed token could not open the case it was brought into.
+// A copy with things removed, never a fresh subject. Who somebody is, which
+// teams they are on, and the cases they were brought into are not per-product
+// facts, and a token without them answers every "assigned to me" surface
+// empty and cannot open a case its owner was brought into.
 //
 // Written this way, a field added later is kept by default. Dropping one is
 // then a line somebody wrote, which is the direction that fails safely: a
@@ -267,8 +265,10 @@ func (s Subject) narrowedTo(productID int64) Subject {
 	if ok {
 		s.grants[productID] = held
 	}
-	// Administration is global, so a narrowed token carries none of it.
+	// Administration and auditing are global, so a narrowed token carries
+	// neither.
 	s.Admin = false
+	s.Audits = false
 	s.unnarrowed = false
 	// A role held across every product is held on this one, and nowhere else
 	// through this token. The estate grants were spread across products when
@@ -319,12 +319,13 @@ func (s *Store) AllTokens(ctx context.Context) ([]Token, error) {
 // after it stops working.
 func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 	revoked := s.now().Truncate(time.Microsecond)
-	if _, err := s.db.NewUpdate().Model((*Token)(nil)).
+	result, err := s.db.NewUpdate().Model((*Token)(nil)).
 		Set("revoked_at = ?", revoked).
-		Where("id = ?", id).Where("revoked_at IS NULL").Exec(ctx); err != nil {
+		Where("id = ?", id).Where("revoked_at IS NULL").Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("revoke a token: %w", err)
 	}
-	return nil
+	return matched(result, "revoke a token", "that token is already revoked")
 }
 
 // TokenByName finds one of somebody's tokens.

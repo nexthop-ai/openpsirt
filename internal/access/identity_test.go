@@ -459,18 +459,12 @@ func TestUnbindingMakesAnAuthorizationRedeemableAgain(t *testing.T) {
 		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
 			t.Fatal(err)
 		}
-		// Bound well inside the window, then unbound long after it would have
-		// lapsed had anybody been counting.
-		lapsed := f.store.ClaimingWithin(time.Nanosecond)
-		if err := lapsed.UnbindIdentifier(ctx, person.ID); err != nil {
+		// Bound well inside the window, which has lapsed since.
+		if _, err := f.db.DB.NewRaw(`UPDATE "person_identity" SET "claimable_until" = ?`+
+			` WHERE "person_id" = ?`, time.Now().Add(-time.Hour), person.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.MatchProvider(ctx, "entra", "aad-9f2c", "alice"); err == nil {
-			t.Log("the window this store unbound with was tiny, so it lapsed at once")
-		}
 
-		// With the ordinary window it is redeemable again, which is what
-		// unbinding promises.
 		if err := f.store.UnbindIdentifier(ctx, person.ID); err != nil {
 			t.Fatal(err)
 		}

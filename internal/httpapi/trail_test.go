@@ -123,8 +123,15 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "unbind-identifier", what: "how somebody signs in, unpinned",
-		method: http.MethodDelete, path: "/v1/people/newcomer/identifier",
 		kind: "account", about: "newcomer",
+		drive: func(t *testing.T, r *reach, _ *seeded) *httptest.ResponseRecorder {
+			// Pinned by a first sign-in, which leaves no row, so there is an
+			// identifier to unbind. Where the acts before this left nobody
+			// recorded under the name, nothing is pinned, and the act below
+			// answers as it does for anybody unrecorded.
+			_, _ = r.rights.MatchProvider(t.Context(), "okta", "okta-newcomer", "newcomer")
+			return asPerson(t, r, "admin", http.MethodDelete, "/v1/people/newcomer/identifier", "")
+		},
 	},
 	{
 		// A group bound to a role grants it to everybody in that group from

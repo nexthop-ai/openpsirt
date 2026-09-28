@@ -37,6 +37,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 	"github.com/nexthop-ai/openpsirt/internal/webui"
 )
@@ -148,11 +149,20 @@ func run(args []string, stdout, stderr *os.File) error {
 
 	// Named administrators are granted at every start, which is what makes
 	// this the way back in rather than a one-time setup step.
-	if err := access.Bootstrap(ctx, access.NewStore(db.DB), cfg.BootstrapAdmins); err != nil {
+	// Each one named or no longer named is recorded in the administrative
+	// trail, against configuration.
+	unnamed, err := trail.NameAdministrators(ctx, db.DB, cfg.BootstrapAdmins)
+	if err != nil {
 		return startupFailed(err, "granting the administrators named in configuration", cfg)
 	}
 	if len(cfg.BootstrapAdmins) > 0 {
 		logger.Info("administrators granted from configuration", "count", len(cfg.BootstrapAdmins))
+	}
+	// Taking administration away is also said in the log, where an operator
+	// who just edited the configuration is looking.
+	for _, identity := range unnamed {
+		logger.Warn("administration named in configuration withdrawn: no longer named",
+			"identity", identity)
 	}
 
 	// A deployment that cannot reach its own administration has one route

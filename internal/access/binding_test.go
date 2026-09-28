@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -89,8 +90,13 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 	// cannot be a way in behind the groups' back.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
+		// Recorded the way an administrator records somebody: with the
+		// authorization their first sign-in redeems.
 		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Claim(ctx, person.ID, "someone"); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
@@ -147,13 +153,96 @@ func TestAGroupCanCarryAdministration(t *testing.T) {
 	})
 }
 
+func TestAGroupDoesNotRedeemALapsedAuthorization(t *testing.T) {
+	// An authorization nobody redeemed stops being redeemable on every path.
+	// A mapped group admits somebody new; it does not hand them the account
+	// an administrator wrote for somebody who never came.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		waiting, err := f.store.Ensure(ctx, "alice", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, waiting.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, who := range []access.Arrival{
+			{Provider: "https://idp.example", Subject: "00u1a2b3", Username: "alice"},
+			{ViaProxy: true, Username: "alice"},
+		} {
+			_, err := f.store.AdmitByGroups(ctx, who, []string{"platform"})
+			if !errors.Is(err, access.ErrDenied) {
+				t.Errorf("a lapsed authorization was redeemed through a group (proxy=%v): %v",
+					who.ViaProxy, err)
+			}
+		}
+		doors, err := f.store.Identities(ctx, waiting.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, door := range doors {
+			if door.Subject != nil {
+				t.Error("the waiting account was pinned to whoever arrived")
+			}
+			if door.ClaimableUntil == nil || door.ClaimableUntil.After(time.Now()) {
+				t.Error("the lapsed window was renewed")
+			}
+		}
+	})
+}
+
+func TestAGroupDoesNotHandOverAnAccountWithNoAuthorizationWaiting(t *testing.T) {
+	// An account whose name has moved away has nothing waiting under that
+	// name. Somebody who arrives holding the name next, in a mapped group, is
+	// somebody new rather than the account's holder, as they are in direct
+	// mode.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		alice, err := f.store.Ensure(ctx, "alice", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Claim(ctx, alice.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "https://idp.example", "S1", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		// Renamed at the provider, which moves the name her identity carries.
+		if _, err := f.store.MatchProvider(ctx, "https://idp.example", "S1", "robert"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		arrival := access.Arrival{Provider: "https://idp.example", Subject: "S2", Username: "alice"}
+		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"platform"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a new arrival under a name that moved away took the account: %v", err)
+		}
+		doors, err := f.store.Identities(ctx, alice.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, door := range doors {
+			if door.Subject == nil || *door.Subject != "S1" {
+				t.Errorf("the account gained a door it never had: %+v", door)
+			}
+		}
+	})
+}
+
 func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *testing.T) {
 	// The documented way back in when the mapping is wrong or the provider is
 	// unreachable. A re-derivation that stripped it would take the recovery
 	// path away at exactly the moment it is needed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
 		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "the-operator"}, []string{"nothing-mapped"})
@@ -169,12 +258,24 @@ func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *
 func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"}); err != nil {
+		naming, err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"})
+		if err != nil {
 			t.Fatal(err)
 		}
+		if len(naming.Named) != 2 || len(naming.Unnamed) != 0 {
+			t.Errorf("naming two came back as %+v", naming)
+		}
 		// Removed from configuration and restarted.
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"first"}); err != nil {
+		naming, err = f.store.NameBootstrapAdmins(ctx, []string{"first"})
+		if err != nil {
 			t.Fatal(err)
+		}
+		if len(naming.Unnamed) != 1 || naming.Unnamed[0] != "second" {
+			t.Errorf("the names no longer in configuration came back as %v", naming.Unnamed)
+		}
+		// The one still named was named already, so nothing new is.
+		if len(naming.Named) != 0 {
+			t.Errorf("a name configuration already held came back as newly named: %v", naming.Named)
 		}
 
 		second, err := f.store.ByIdentity(ctx, "second")
@@ -184,12 +285,45 @@ func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
 		if second.IsBootstrap {
 			t.Error("somebody removed from configuration is still named by it")
 		}
+		// Administration configuration gave is what configuration takes back.
+		if subject, err := f.store.Resolve(ctx, "second"); err == nil && subject.Admin {
+			t.Error("somebody removed from configuration still administers")
+		} else if err != nil && !errors.Is(err, access.ErrDenied) {
+			t.Fatalf("resolution failed for an unrelated reason: %v", err)
+		}
 		first, err := f.store.ByIdentity(ctx, "first")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !first.IsBootstrap || !first.IsAdmin {
+		if !first.IsBootstrap {
 			t.Error("somebody still named lost it")
+		}
+		if subject, err := f.store.Resolve(ctx, "first"); err != nil || !subject.Admin {
+			t.Errorf("somebody still named does not administer: %v", err)
+		}
+	})
+}
+
+func TestAdministrationGrantedHereOutlivesBeingNamedInConfiguration(t *testing.T) {
+	// The two halves are recorded apart, so removing a name from
+	// configuration takes back only what configuration gave.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"both"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Ensure(ctx, "both", "", access.Stated(true), nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.NameBootstrapAdmins(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.Resolve(ctx, "both")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.Admin {
+			t.Error("administration granted here went with the name in configuration")
 		}
 	})
 }
@@ -302,7 +436,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 
 		// Naming somebody in configuration is enough in either mode, and with
 		// that in place the group can be unbound.
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); err != nil {

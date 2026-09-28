@@ -5,6 +5,7 @@ package access_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -73,8 +74,8 @@ func TestATokenShrinksWhenItsOwnerDoes(t *testing.T) {
 		if err := f.store.Withdraw(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.ResolveToken(ctx, secret); err == nil {
-			t.Error("a token outlived every role its owner had")
+		if _, err := f.store.ResolveToken(ctx, secret); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a token outlived every role its owner had: %v", err)
 		}
 	})
 }
@@ -105,16 +106,17 @@ func TestANarrowedTokenReachesLessThanItsOwnerAndNeverMore(t *testing.T) {
 		if err := f.store.Withdraw(ctx, person.ID, sonic, access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		// Asserted unconditionally. Guarding this on the resolution succeeding
-		// would make the property stop being checked the moment resolution
-		// failed for any unrelated reason, and the test would still pass.
-		switch subject, err := f.store.ResolveToken(ctx, narrowed); {
-		case err == nil && subject.Reads(access.Public, sonic):
+		// The owner still holds a role on another product, so the token
+		// resolves, and resolved it reaches nothing.
+		subject, err = f.store.ResolveToken(ctx, narrowed)
+		if err != nil {
+			t.Fatalf("resolution failed for an unrelated reason: %v", err)
+		}
+		if subject.Reads(access.Public, sonic) {
 			t.Error("narrowing granted what its owner had lost")
-		case err == nil:
-			if reached, all := subject.Products(); all || len(reached) != 0 {
-				t.Errorf("a token whose owner holds nothing still reaches %v (all=%v)", reached, all)
-			}
+		}
+		if reached, all := subject.Products(); all || len(reached) != 0 {
+			t.Errorf("a token whose owner holds nothing there still reaches %v (all=%v)", reached, all)
 		}
 	})
 }
@@ -180,8 +182,8 @@ func TestARevokedTokenStopsWorking(t *testing.T) {
 		if err := f.store.RevokeToken(ctx, token.ID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.ResolveToken(ctx, secret); err == nil {
-			t.Error("a revoked token still worked")
+		if _, err := f.store.ResolveToken(ctx, secret); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a revoked token was not refused: %v", err)
 		}
 
 		// Kept rather than deleted, so what used it stays answerable.
@@ -215,11 +217,50 @@ func TestOneKindOfCredentialIsNeverLookedUpAsAnother(t *testing.T) {
 		}
 		// These two would hold with the prefixes deleted, because the stores
 		// query different tables — so they pin the shape and not the dispatch.
-		if _, err := f.store.ResolveKey(ctx, secret); err == nil {
-			t.Error("a personal token resolved as a pipeline key")
+		if _, err := f.store.ResolveKey(ctx, secret); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a personal token was not refused as a pipeline key: %v", err)
 		}
-		if _, err := f.store.ResolveToken(ctx, keySecret); err == nil {
-			t.Error("a pipeline key resolved as a personal token")
+		if _, err := f.store.ResolveToken(ctx, keySecret); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a pipeline key was not refused as a personal token: %v", err)
+		}
+	})
+}
+
+func TestANarrowedTokenDoesNotReadTheDeploymentsOwnRecords(t *testing.T) {
+	// The audit permission is held over the whole deployment, as
+	// administration is. A token narrowed to one product or to a few roles
+	// that still read every person, grant and change would not be narrowed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		auditor, err := f.store.Ensure(ctx, "an-auditor", "", nil, access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sonic := f.products["sonic"]
+		if err := f.store.GrantRole(ctx, auditor.ID, sonic, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct {
+			name    string
+			product *int64
+			holds   []access.Role
+			reads   bool
+		}{
+			{"whole", nil, nil, true},
+			{"one-product", &sonic, nil, false},
+			{"read-only", nil, []access.Role{access.PublicRead}, false},
+		} {
+			_, secret, err := f.store.NewToken(ctx, auditor.ID, c.name, c.product, c.holds, time.Hour, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			subject, err := f.store.ResolveToken(ctx, secret)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := subject.ReadsTheDeployment(); got != c.reads {
+				t.Errorf("a %s token reads the deployment's own records: %v, want %v", c.name, got, c.reads)
+			}
 		}
 	})
 }
@@ -243,9 +284,6 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 		subject, err := f.store.ResolveToken(ctx, narrow)
 		if err != nil {
 			t.Fatal(err)
-		}
-		if subject.Admin {
-			t.Fatal("a narrowed token carried administration")
 		}
 		if !subject.Delegated() {
 			t.Error("a token did not arrive marked as a minted credential")
@@ -398,9 +436,6 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		// And it is still narrower than its owner, which is the whole point.
 		if narrowed.Reads(access.Public, elsewhere) {
 			t.Error("a token pinned to one product reads another")
-		}
-		if narrowed.Admin {
-			t.Error("a narrowed token carries administration")
 		}
 		if !narrowed.Reads(access.Public, here) {
 			t.Error("a narrowed token does not read the product it is pinned to")

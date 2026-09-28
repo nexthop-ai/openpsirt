@@ -43,7 +43,8 @@ func described(ctx context.Context, a Administering, store *access.Store,
 		return nil, err
 	}
 	body := &PersonBody{
-		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+		Identity: person.Identity, DisplayName: person.DisplayName,
+		Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 		Email: person.Email, EmailSource: string(person.EmailSource),
 	}
@@ -124,7 +125,12 @@ func (a Administering) handle() bun.IDB {
 type PersonBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"The label shown instead of the identity"`
-	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Admin and AdminByConfiguration are the two sources of administration,
+	// reported apart: removing a name from configuration revokes only what
+	// the name gave, and a reader deciding whether somebody stays an
+	// administrator after that needs to see which of the two they hold.
+	Admin                bool `json:"admin,omitempty" doc:"Whether administration is granted to them in the application, by an administrator or through a group"`
+	AdminByConfiguration bool `json:"admin_by_configuration,omitempty" doc:"Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it"`
 	// Audits is the read-only half: this deployment's own records, and no
 	// product's findings or decisions.
 	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
@@ -195,7 +201,7 @@ type RecordBody struct {
 	// somebody an administrator, taking it away, and saying nothing about it.
 	// A plain bool decodes an absent field as false, so granting a role — a
 	// request that says nothing about administration — withdraws it.
-	Admin *bool `json:"admin,omitempty" doc:"Whether they administer this deployment. Omit it to leave it as it is"`
+	Admin *bool `json:"admin,omitempty" doc:"Whether administration is granted to them in the application. Omit it to leave it as it is. Administration named in OPENPSIRT_BOOTSTRAP_ADMINS is not changed by this, and a grant made here outlasts the name"`
 	// Audits is the same shape for the other thing held over the deployment:
 	// reading its own records and writing none of them.
 	Audits *bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"`
@@ -350,7 +356,8 @@ func registerAdministration(api huma.API, a Administering) {
 		out.Body.Items = make([]PersonBody, 0, len(people))
 		for _, person := range people {
 			body := PersonBody{
-				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+				Identity: person.Identity, DisplayName: person.DisplayName,
+				Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 				// Their address, and which of the two sources said
 				// so. On the list as well as on the one-person read: the
@@ -457,29 +464,31 @@ func registerAdministration(api huma.API, a Administering) {
 				}
 			}
 
+			// What was stored before is the value the write was made against,
+			// so the record at the foot of this says what this write moved.
+			// A read of its own, taken first, can see a value another
+			// administrator replaces before the write reads it, and the
+			// record would then claim a move this request did not make.
+			//
 			// Nobody recorded under that name, and a read that failed, are
-			// different answers. Told apart by the sentinel rather than by
-			// "any error at all": read as "this person is new", a dropped
+			// different answers: read as "this person is new", a dropped
 			// connection takes administration away from somebody who has it,
 			// records nothing saying so, and answers 201.
-			//
-			// Read here rather than before the transaction, because what the
-			// record at the foot of it says depends on the answer and a retry
-			// re-runs against a database that has moved (REQ-71).
-			before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
+			var before *access.Account
+			before, person, err = store.Restate(ctx, in.Body.Identity, in.Body.DisplayName,
+				in.Body.Admin, in.Body.Audits)
 			switch {
-			case lookupErr == nil:
-			case errors.Is(lookupErr, access.ErrNoSuchPerson):
-				before = nil
-			default:
-				return wentWrong(a.Logger, "that person could not be looked up", lookupErr)
+			case errors.Is(err, database.ErrGoAgain):
+				// A lost race is taken again whole, and the retry reads the
+				// value the other writer left.
+				return err
+			case errors.Is(err, access.ErrNoIdentity):
+				return huma.Error400BadRequest(err.Error())
+			case err != nil:
+				return wentWrong(a.Logger, "that person could not be recorded", err)
 			}
 			recorded = before == nil
 
-			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
-				in.Body.Admin, in.Body.Audits); err != nil {
-				return huma.Error400BadRequest(err.Error())
-			}
 			if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
 				return asked(a.Logger, err)
 			}
@@ -679,7 +688,8 @@ func registerAdministration(api huma.API, a Administering) {
 			"that issued it, so every account pinned to the old one is refused once a new one is " +
 			"configured: the name matches and the identifier does not.\n\n" +
 			"It re-opens the window a pinned identifier closes, in which whoever arrives under " +
-			"that username is taken to be its holder. Do it when you expect them to sign in.",
+			"that username is taken to be its holder. Do it when you expect them to sign in.\n\n" +
+			"Somebody with no identifier pinned answers 404 and records nothing.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
@@ -693,7 +703,10 @@ func registerAdministration(api huma.API, a Administering) {
 			if err != nil {
 				return noSuchPerson()
 			}
-			if err := store.UnbindIdentifier(ctx, person.ID); err != nil {
+			switch err := store.UnbindIdentifier(ctx, person.ID); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return huma.Error404NotFound("they have no identifier bound")
+			case err != nil:
 				return wentWrong(a.Logger, "cannot unbind how they sign in", err)
 			}
 			if err := noted(ctx, tx, trail.Account, in.Identity,

@@ -57,6 +57,8 @@ should be here.
 | Public and private mean disclosed, not readable | Every request is authenticated either way, so a mistake in these rules exposes something to a colleague rather than to the internet |
 | Anything unrecognized reads as not disclosed | A column added later would otherwise default every row that predates it to visible |
 | A deployment that cannot tell who is asking serves nobody | Failing closed means an unconfigured deployment is up and refusing, which is visible, rather than up and answering everybody |
+| Stating administration or auditing is conditional on the value read, and one that matched nothing is taken again whole | Two administrators granting the same thing at once would both record it as moved. The retry reads the value the other left, and records nothing where nothing moved |
+| The trail records a move from the value the write was conditioned on | A separate read taken first can see a value another administrator replaces before the write reads it, and would record a move this write did not make |
 | Recording somebody says nothing about administration unless it is stated | Three things stay distinguishable: granting it, taking it away, and saying nothing. Decided from a read taken before the write, a request about a role passed back whatever that read returned — so two requests at once lost one, and a read that failed answered "nobody is recorded as this" and withdrew it from somebody who had it, with nothing saying anybody had |
 
 ## Roles
@@ -702,6 +704,11 @@ miss the case this exists for and refuse the one it does not care about.
 
 | Rule | Reason |
 |---|---|
+| Discovery asks for the issuer as the operator wrote it, and again as the provider publishes it where the two differ only by a trailing slash | A provider's discovery document is compared with the question character for character. Some providers publish their issuer with the slash and most without, and an operator writes whichever they copied. A difference beyond the slash is refused at startup |
+| The issuer is recorded without a trailing slash | Identities stay attributed to one provider whichever spelling an operator writes |
+
+| Rule | Reason |
+|---|---|
 | An identifier is read only as the issuer that minted it meant it | Two providers issue into their own namespaces and neither knows the other's. The same string names different people at each, so reading one as the other hands somebody the roles of whoever held that string before |
 | An arrival that names no provider is refused | An identifier with no issuer names nobody, and binding one records a subject a later sign-in cannot tell apart from another provider's |
 | A bound identity whose issuer is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
@@ -736,6 +743,8 @@ it. That window ends.
 | Authorizing somebody again restarts it, and so does unbinding them | Otherwise the window is written once and never again: an authorization nobody redeemed could be reopened by no act at all, and the administrators named in configuration — whose authorization is written again at every start — would lose their way in on the day it lapsed, with nothing logged |
 | The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing |
 | Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
+| A group mapping does not reopen it | A group-bound sign-in adopts an account an administrator recorded only while its authorization is redeemable. Adopting a lapsed one would renew the window for whoever arrived holding the name |
+| A group mapping adopts only an authorization waiting under the name | An account whose holder's name moved away at the provider has none, and whoever holds the name next is somebody new. Direct mode refuses the same arrival |
 | A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |
 
 ### The username claim
@@ -749,6 +758,8 @@ is no default.
 | The property required is that an end user cannot choose the value | Narrower than immutable, and deliberately. The claim is not the identity — the subject is, and a rename after binding is followed as a label — so what matters is only that nobody can arrive holding a name an administrator wrote for somebody else |
 | The subject cannot serve as the claim | An authorization is written before anybody has arrived, so the name it is written for has to be one a person can type. The subject is not knowable then |
 | There is no safe default rather than a different default | OpenID Connect permits a provider to let people choose their own `preferred_username`; whether a given one does is a question only its operator can answer. On a provider where the login is assigned by an administrator it is the right answer, and on one with self-registration it is the attack |
+| A missing claim is refused before discovery | Like every other refusal of what configuration supplies, it names the setting to fix and needs no provider to be reachable |
+| The groups claim is named with surrounding spaces ignored, once | Whether a provider reports groups decides whether roles may be switched to group-bound, so the claim reported is the claim read. A name read with its spaces reports a source of groups that yields none, and every arrival is then refused |
 
 ## Sessions and request forgery
 
@@ -815,6 +826,24 @@ startup rather than the first. That makes it the way back in: lose
 administrative access, add yourself, restart. It survives re-derivation from
 groups, because a sign-in that stripped it would take the recovery path away at
 the moment it is needed. It remains a pre-authorization and not a bypass.
+
+Administration has three sources, recorded apart, and somebody administers
+when any one of them holds.
+
+| Source | Recorded as | Taken back by |
+|---|---|---|
+| Named in configuration | The name, written at every startup | Removing the name and restarting |
+| Granted here | The administration flag | An administrator here |
+| Derived from a group | The administration flag, marked derived and stamped | Leaving the group, the stamp going stale, or switching to direct roles |
+
+| Rule | Reason |
+|---|---|
+| Configuration writes only its own source | A name removed from configuration takes back what the name gave, and nothing granted here or derived from a group |
+| Somebody named and also granted here keeps administration when the name goes | The grant here is a separate act that nobody took back |
+| A person is read with two answers: granted here, and named in configuration | Deciding whether somebody stays an administrator once a name goes needs to see which they hold. A group's grant reads as granted here |
+| Stating administration here writes only the grant made here | A named person reads as not granted here until somebody grants it, and granting it is how they keep administration after the name goes. The People screen's box is that grant, with a line beneath it where configuration names them too |
+| A name added or removed is recorded in the administrative trail, with configuration as the actor, and a removal is also logged at startup by identity | An operator who just edited the configuration reads the log; an access review reads the trail |
+| The upgrade from v0.4.0 clears the flag for every named administrator whose flag no group derived | v0.4.0 wrote the name into the flag and kept nothing telling the two apart. The name still holds, so nobody loses administration at the upgrade; an administrator granted here and also named has to be granted again once the name goes |
 
 A deployment may not start unable to administer itself. In group-bound mode that
 means at least one group mapped to administration, or somebody named in
@@ -897,7 +926,7 @@ for work it was never scoped for.
 | Narrowing removes, never rebuilds | Who somebody is, the teams they are on and the cases they were brought into are not per-product facts, and a token pinned to a product must not stop them being themselves. Written as a fresh subject it carried five fields and dropped the rest, so every "assigned to me" surface answered empty and taking an unowned finding for yourself was refused as giving work to somebody else |
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
-| Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration is dropped by narrowing entirely, because a token narrowed to one product that still administered everything would not be narrowed |
+| Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration and the audit permission are dropped by narrowing to a product or to named roles, because both are held over the whole deployment, and a token narrowed to one product that still administered or read every record of the deployment would not be narrowed. An unnarrowed token keeps both |
 | A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and without this the only way to get one is to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
 | Expiry is not optional, with a maximum an administrator sets | A credential that never runs out is one nobody ever revokes. Revoking marks rather than deletes, so what used it stays answerable |
 
@@ -1000,11 +1029,13 @@ record, because it is the same question one layer up.
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the floor to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
+| Every row names its actor: a person, or configuration | Configuration is the deployment's startup configuration, and the one actor that is no person. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, and records nothing else. A row by a person names the person |
+| Configuration records a name when it starts or stops naming somebody | Administration moved with nobody in the application having moved it. A start naming the same people as the last records nothing, because nothing moved |
 | The record is written in the transaction that makes the change | Both are one act. Written afterwards, a change could succeed while the record of it silently failed, and a trail that is sometimes missing a line answers an auditor's question wrongly rather than not at all |
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
 | What follows the change is outside it | Deactivating somebody also ends their sessions and hands their work back. The sessions end inside, because they are what deactivation means; the work is handed back afterwards, bounded by how much they held rather than by the request |
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
-| A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration and a team membership all take access away, and all of them read what they matched |
+| A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration, a team membership, a place on a case, a personal token, a pipeline key and a pinned identifier all take something away, and all of them read what they matched. Revoking one already revoked, or unbinding somebody with nothing pinned, is refused as not found |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
 | **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
@@ -1229,7 +1260,8 @@ A person's record carries a mail address, and it is optional. Somebody without
 one is told nothing outside the application and keeps the area inside it.
 
 Two sources, one field. An administrator sets it with the rest of the record,
-and a sign-in provider fills in one nobody set. Which it came from is kept, so a
+and a sign-in provider fills in one nobody set, whether roles are assigned or
+derived from groups. Which it came from is kept, so a
 provider may refresh what a provider gave and may never overwrite what somebody
 here decided. Written the other way round, an administrator correcting a wrong
 address would watch the next sign-in put it back.

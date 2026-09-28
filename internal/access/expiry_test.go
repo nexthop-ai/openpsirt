@@ -315,3 +315,75 @@ func (s *Store) claimAgain(ctx context.Context, personID int64, identity string)
 	}).Exec(ctx)
 	return err
 }
+
+// A conditional write that matched nothing lost a race, and says so rather
+// than reporting a move it did not make: the caller records the move from the
+// value it read, so success here would put a change nobody made in the trail.
+func TestAMoveThatLostARaceIsTakenAgain(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		at := time.Now()
+		store, id := atClock(t, db, &at)
+		// Read before another writer withdrew administration and granted
+		// auditing, so both values it holds are stale.
+		stale, err := store.byID(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Ensure(ctx, "someone", "", Stated(false), Stated(true)); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct {
+			what          string
+			admin, audits *bool
+		}{
+			{"administration", Stated(false), nil},
+			{"auditing", nil, Stated(true)},
+		} {
+			copied := *stale
+			if err := store.move(ctx, &copied, c.admin, c.audits); !errors.Is(err, database.ErrGoAgain) {
+				t.Errorf("a move of %s that matched nothing answered %v", c.what, err)
+			}
+		}
+	})
+}
+
+// What Restate answers as before is the value its own write was made against.
+// Another writer that got there first leaves before and after equal, so the
+// caller records no move; a caller reading before for itself could have read
+// the value the other writer replaced.
+func TestRestatingSaysWhatTheWriteMovedFrom(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		at := time.Now()
+		store, _ := atClock(t, db, &at)
+
+		// Another administrator withdrew it first.
+		if _, err := store.Ensure(ctx, "someone", "", Stated(false), nil); err != nil {
+			t.Fatal(err)
+		}
+		before, after, err := store.Restate(ctx, "someone", "", Stated(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before.IsAdmin || after.IsAdmin {
+			t.Errorf("a withdrawal somebody else made read as %v then %v", before.IsAdmin, after.IsAdmin)
+		}
+
+		before, after, err = store.Restate(ctx, "someone", "", Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before.IsAdmin || !after.IsAdmin {
+			t.Errorf("a grant this write made read as %v then %v", before.IsAdmin, after.IsAdmin)
+		}
+
+		before, after, err = store.Restate(ctx, "somebody-new", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before != nil || after == nil {
+			t.Errorf("somebody newly recorded read as %v then %v", before, after)
+		}
+	})
+}

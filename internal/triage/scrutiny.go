@@ -292,9 +292,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 			` WHERE rga.person_id = ap.approved_by`+
 			` AND rga.active = ? AND rga.role = ?)`, true, access.Approver).
 		// An administrator reaches every product, so one is never in this list
-		// however their grants read.
+		// however their grants read. Either half makes one: granted here, or
+		// named in configuration.
 		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
-			` WHERE ad.id = ap.approved_by AND ad.is_admin = ?)`, true).
+			` WHERE ad.id = ap.approved_by AND (ad.is_admin = ? OR ad.is_bootstrap = ?))`, true, true).
 		GroupExpr("de.claim_id, pe.identity, pd.name, cl.outcome").
 		OrderExpr("written DESC").
 		Limit(room)).Scan(ctx, &lapsed)

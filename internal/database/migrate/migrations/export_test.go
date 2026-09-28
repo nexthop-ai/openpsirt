@@ -15,3 +15,9 @@ func StatementsV030(engine database.Engine) map[string][]string {
 		"component":   componentV030(t),
 	}
 }
+
+// StatementsV050 is v0.5.0's declaration of each table it changes.
+func StatementsV050(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{"admin_change": trailV050(t)}
+}

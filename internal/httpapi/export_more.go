@@ -561,7 +561,7 @@ func registerChangeExport(api huma.API, in Ingest) {
 			About: []Stated{
 				{"from", asDay(since)}, {"to", asDay(until)}, {"kind", input.Kind},
 			},
-			Header: []string{"at", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
+			Header: []string{"at", "actor", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				changes, _, err := store.Changes(ctx, subject, trail.Kind(input.Kind),
 					trail.Over{Since: since, Until: until}, limit, offset)
@@ -573,7 +573,9 @@ func registerChangeExport(api huma.API, in Ingest) {
 				// other name this file carries.
 				who := make([]int64, 0, len(changes))
 				for _, change := range changes {
-					who = append(who, change.By)
+					if person := change.Person(); person != 0 {
+						who = append(who, person)
+					}
 				}
 				people, err := whoSigned(ctx, in.DB.DB, who)
 				if err != nil {
@@ -582,8 +584,8 @@ func registerChangeExport(api huma.API, in Ingest) {
 				rows := make([][]string, 0, len(changes))
 				for _, change := range changes {
 					rows = append(rows, []string{
-						change.At.UTC().Format(time.RFC3339), people.identity(change.By),
-						people.label(change.By),
+						change.At.UTC().Format(time.RFC3339), string(change.Actor),
+						people.identity(change.Person()), people.label(change.Person()),
 						string(change.Kind), change.Name,
 						orBlank(change.Was), orBlank(change.Became),
 						strconv.FormatBool(change.Was == nil),

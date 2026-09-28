@@ -230,18 +230,11 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 }
 
 func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
-	// A grant on an embargoed case that the API can show and cannot withdraw.
-	//
-	// Store.Names answers a display name where one is set, and the list put
-	// that in a field named identity. The removal route resolves {identity}
-	// through ByIdentity, which matches the folded identity column — so
-	// somebody with a display name was listed under a value matching no row,
-	// the chip's remove answered 404, and the grant on the undisclosed issue
-	// stood.
-	//
-	// Nothing could have caught it: every fixture in the tree sets a display
-	// name equal to the identity, which is the one case where the two strings
-	// agree.
+	// A grant on an embargoed case the API shows has to be one it can
+	// withdraw. The removal route resolves {identity} against the folded
+	// identity column, so the list carries the identity in that field and the
+	// display name beside it. The person here has a display name unlike their
+	// identity, which is the case where the two strings disagree.
 	twoReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
 		r.scannedWithEvidence(t)
@@ -314,6 +307,13 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 		read(t, r, "private-triage", at, &listed)
 		if len(listed.Items) != 0 {
 			t.Errorf("they are still on the case: %+v", listed.Items)
+		}
+
+		// Taken off twice, the second is not a withdrawal and says so.
+		if got := asPerson(t, r, "private-triage", http.MethodDelete,
+			at+"/ana", ""); got.Code != http.StatusNotFound {
+			t.Errorf("taking off somebody no longer on the case answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }

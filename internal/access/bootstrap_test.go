@@ -15,7 +15,7 @@ import (
 // a deployment nobody can administer is satisfied by the phantom.
 func TestABootstrapNameWithAProviderPrefixIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		err := f.store.NameBootstrapAdmins(t.Context(), []string{"okta:alice"})
+		_, err := f.store.NameBootstrapAdmins(t.Context(), []string{"okta:alice"})
 		if err == nil {
 			t.Fatal("a name in the old provider:username form was accepted")
 		}
@@ -34,14 +34,14 @@ func TestABootstrapNameWithAProviderPrefixIsRefused(t *testing.T) {
 // something.
 func TestABootstrapNameIsAPlainUsername(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if err := f.store.NameBootstrapAdmins(t.Context(), []string{"alice"}); err != nil {
+		if _, err := f.store.NameBootstrapAdmins(t.Context(), []string{"alice"}); err != nil {
 			t.Fatalf("a plain name was refused: %v", err)
 		}
 		person, err := f.store.ByIdentity(t.Context(), "alice")
 		if err != nil {
 			t.Fatalf("the named administrator was not recorded: %v", err)
 		}
-		if !person.IsAdmin {
+		if !person.Administers() {
 			t.Error("the named administrator does not administer")
 		}
 	})

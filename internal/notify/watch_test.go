@@ -43,6 +43,16 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Somebody who administers only by being named in configuration,
+		// which is the deployment's way back in and the one administrator
+		// some deployments have.
+		if _, err := rights.NameBootstrapAdmins(ctx, []string{"operator@example.com"}); err != nil {
+			t.Fatal(err)
+		}
+		operator, err := rights.ByIdentity(ctx, "operator@example.com")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		cat := catalog.NewStore(db.DB)
 		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
@@ -82,17 +92,20 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		}
 
 		// Declared and never filed against, which is the same failure as
-		// having stopped — caught earlier.
+		// having stopped — caught earlier. One alert for each administrator.
 		opened, cleared, err := watch.Once(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if opened != 1 || cleared != 0 {
-			t.Fatalf("a build nothing was filed against: opened %d cleared %d, want 1 and 0",
+		if opened != 2 || cleared != 0 {
+			t.Fatalf("a build nothing was filed against: opened %d cleared %d, want 2 and 0",
 				opened, cleared)
 		}
 		if n := seeing(admin); n != 1 {
 			t.Errorf("the administrator was told %d things, want 1", n)
+		}
+		if n := seeing(operator); n != 1 {
+			t.Errorf("the administrator named in configuration was told %d things, want 1", n)
 		}
 		if n := seeing(reader); n != 0 {
 			t.Errorf("somebody who administers nothing was told %d things", n)
@@ -115,8 +128,8 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if opened != 0 || cleared != 1 {
-			t.Errorf("after a scan arrived: opened %d cleared %d, want 0 and 1", opened, cleared)
+		if opened != 0 || cleared != 2 {
+			t.Errorf("after a scan arrived: opened %d cleared %d, want 0 and 2", opened, cleared)
 		}
 		if n := seeing(admin); n != 0 {
 			t.Errorf("the alert should have cleared itself, %d still waiting", n)

@@ -489,7 +489,7 @@ func (w *Watch) administrators(ctx context.Context) ([]int64, error) {
 	}
 	var admins []int64
 	for _, person := range people {
-		if person.IsAdmin {
+		if person.Administers() {
 			admins = append(admins, person.ID)
 		}
 	}

@@ -171,9 +171,31 @@ func TestAProviderIsNeverReachedInsideThisNetwork(t *testing.T) {
 func TestAProviderOnTheInternetIsReached(t *testing.T) {
 	// The guard has to let the ordinary case through, or every sign-in fails
 	// and the refusals above prove nothing.
-	for _, address := range []string{"140.82.121.4:443", "[2606:50c0:8000::153]:443"} {
+	for _, address := range []string{
+		"140.82.121.4:443",
+		"[2606:50c0:8000::153]:443",
+		// 140.82.121.4 through the well-known NAT64 prefix, which is how an
+		// IPv6-only network with DNS64 reaches a host with no IPv6 address.
+		"[64:ff9b::8c52:7904]:443",
+	} {
 		if err := Reachable(address); err != nil {
 			t.Errorf("%s was refused: %v", address, err)
 		}
+	}
+}
+
+func TestAnExcludedNetworkIsNotReachedThroughNAT64(t *testing.T) {
+	// The address a NAT64 gateway translates to is the one an administrator
+	// excluded, so it is refused however it is spelled.
+	excluded, err := ParseExcluded("140.82.121.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := excluded.Reachable("[64:ff9b::8c52:7904]:443"); err == nil ||
+		!strings.Contains(err.Error(), "an administrator excluded it") {
+		t.Errorf("an excluded address was reached through NAT64: %v", err)
+	}
+	if !excluded.Host("64:ff9b::8c52:7904") {
+		t.Error("an excluded address named through NAT64 was not recognized as excluded")
 	}
 }

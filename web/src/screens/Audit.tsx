@@ -495,7 +495,15 @@ function Administered() {
             {rows.map((row, i) => (
               <tr key={`${row.at} ${row.about} ${i}`}>
                 <td className="id">{(row.at ?? "").slice(0, 16).replace("T", " ")}</td>
-                <td>{row.by_name || row.by}</td>
+                <td>
+                  {row.actor === "configuration" ? (
+                    <span className="hint" title="The deployment's startup configuration">
+                      configuration
+                    </span>
+                  ) : (
+                    row.by_name || row.by
+                  )}
+                </td>
                 <td>
                   <span className="hint">{row.kind}</span> {row.about}
                 </td>

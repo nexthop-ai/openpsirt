@@ -363,15 +363,28 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 
 	if !known {
 		// Somebody an administrator recorded who has not signed in yet is that
-		// person, not a second one. An identity is a username now, so the
-		// record waiting under it is theirs — where it was qualified by the
-		// path they arrived on, the two were different rows and this arrival
-		// quietly became a second account.
+		// person, not a second one. An identity is a username, so the record
+		// waiting under it is theirs whichever path they arrived by.
 		//
 		// Their administration is left alone: it is derived below from the
 		// groups they arrived with, and reading it from here would overwrite
 		// that with what the row happened to say.
+		//
+		// Adopted only while the authorization waiting for them is still
+		// redeemable. The match above refused a lapsed one or one pinned to
+		// another identifier, and a group does not reopen either: the window
+		// holds on every path, and renewing it here would hand the account to
+		// whoever arrived holding the name.
+		//
+		// An account with no authorization waiting under the name is refused
+		// too. Its holder's name moved away at the provider, which moved the
+		// name their identity carries, and whoever holds the name now is
+		// somebody else.
 		if waiting, err := s.ByIdentity(ctx, who.handle()); err == nil {
+			claimed, err := s.claimedBy(ctx, who.handle())
+			if err != nil || claimed.Subject != nil || lapsed(claimed, s.now()) {
+				return nil, ErrDenied
+			}
 			person = waiting
 		} else {
 			person = &Account{
@@ -392,14 +405,16 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		}
 	}
 
+	// Only what a group granted is taken back by a group, which is what
+	// admin_derived records. Somebody promoted inside the application keeps
+	// that: their administration did not come from a group, so a group not
+	// mentioning them says nothing about it.
+	//
 	// An administrator named in configuration keeps it whatever the groups
-	// say. That naming is the documented way back in when the mapping is
-	// wrong or the provider is unreachable. Somebody promoted inside the
-	// application keeps that: their administration did not come from a
-	// group, so a group not mentioning them says nothing about it. Only
-	// what a group granted is taken back by a group, which is what
-	// admin_derived records.
-	effective := admin.administers || person.IsBootstrap || (person.IsAdmin && !person.AdminDerived)
+	// say, and not through this column: that half is is_bootstrap, which
+	// Resolve reads beside it. Folded in here, configuration's grant would
+	// be written as one made here and outlive the name.
+	effective := admin.administers || (person.IsAdmin && !person.AdminDerived)
 	// A group's grant is derived only where it is what made them an
 	// administrator. Written as "whatever the groups say this time", the
 	// column destroys the input the line above depends on next time:
@@ -587,9 +602,7 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	case Direct:
 		// Only the per-product table is cleared of derived rows, because only
 		// it holds any: a group binding names a product, so nothing derives a
-		// role across the estate. `DESIGN-access.md` states that as the rule,
-		// and the delete that stood here against the estate table matched
-		// nothing on every deployment there has ever been.
+		// role across the estate.
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 			Where("source = ?", Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)
@@ -610,12 +623,11 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 		// make a mode switch destroy access that was never derived and cannot
 		// be restored by switching back.
 		//
-		// The two are told apart by the identity: a person admitted by a
-		// group mapping is the one whose administration came from one. Anybody
-		// holding a role assigned to them, or named in configuration, keeps it.
+		// The two are told apart by admin_derived. Somebody named in
+		// configuration keeps administration through is_bootstrap, which this
+		// does not touch.
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
 			Set("is_admin = ?", false).
-			Where("is_bootstrap = ?", false).
 			Where("admin_derived = ?", true).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups administered: %w", err)
 		}
@@ -660,10 +672,9 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 // the counts describe a database the delete has not reached.
 func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	// Somebody who has left cannot administer anything: they are refused at
-	// sign-in. Counted, a deactivated bootstrap administrator made this answer
-	// true on their strength alone — so the last admin group could be unbound
-	// and the deployment started cleanly with nobody able to administer it,
-	// which is exactly what this check exists to prevent.
+	// sign-in. Counting a deactivated bootstrap administrator would let the
+	// last admin group be unbound and the deployment start with nobody able to
+	// administer it, which is what this check exists to prevent.
 	bootstrapped, err := db.NewSelect().Model((*Account)(nil)).
 		Where("is_bootstrap = ?", true).
 		Where("deactivated_at IS NULL").Count(ctx)
@@ -699,7 +710,7 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 // NameBootstrapAdmins makes configuration authoritative over who is named.
 //
 // Applied at every startup rather than once, so that losing administration is
-// recoverable by naming somebody and restarting — the documented way back in .
+// recoverable by naming somebody and restarting — the documented way back in.
 // It is a pre-authorization and not a bypass: being named grants the role and
 // admits nobody who has not authenticated.
 //
@@ -709,31 +720,30 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 // whenever the two disagree — silently, at the one moment somebody needs this
 // to work.
 //
-// Anybody no longer named stops being one. Configuration says who is named, so
-// a deployment that removes somebody and restarts should not still have them
-// named — though an administrator promoted from inside the application keeps
-// that, because it did not come from here.
-func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) error {
+// Configuration's administration is recorded apart from administration
+// granted here, and this writes only its own half. Anybody no longer named
+// stops administering through the name, and keeps whatever was granted here or
+// derived from a group, because that did not come from configuration. Who
+// came to be named and who stopped being named are returned, so that the start
+// that applied them can record and say so.
+func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) (Naming, error) {
 	named := make([]string, 0, len(identities))
 	for _, identity := range identities {
 		// Folded, because that is how an identity is stored and how a sign-in
-		// matches one. Compared with its capitals, a name written "Alice" in
-		// configuration cleared nobody and named nobody: the row is "alice",
-		// so the NOT IN below did not spare it and the update below did not
-		// find it — the way back into a deployment nobody can administer,
-		// silently doing nothing.
+		// matches one. A name written "Alice" in configuration names the row
+		// "alice", both in the NOT IN below and in the update that names them.
 		trimmed := folded(identity)
 		if trimmed == "" {
 			continue
 		}
-		// The old form was "provider:username". Accepted silently it makes an
+		// A name written "provider:username" is refused. Accepted it makes an
 		// administrator account literally called "okta:alice" that nobody can
 		// sign in as, while the real alice is refused — and the startup check
 		// that exists to catch a deployment nobody can administer is satisfied
 		// by the phantom. This is the way back in, so it fails loudly at the
 		// one moment somebody needs it.
 		if before, _, found := strings.Cut(trimmed, ":"); found && before != "" {
-			return fmt.Errorf(
+			return Naming{}, fmt.Errorf(
 				"%q names an administrator as \"provider:username\". A name here is the "+
 					"plain username the provider or the trusted proxy reports, with no "+
 					"prefix. Write %q and start again",
@@ -745,25 +755,36 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 	// Both halves or neither. Clearing who was named and naming who is
 	// named now are one act: this function is the way back into a
 	// deployment nobody can administer, and run half through it is what
-	// creates that state rather than what ends it. It runs at startup, so
-	// the next start repairs it — by running the same sequence, which is
-	// not a guarantee, and a start that fails after the clear leaves a
-	// database another node is already reading.
-	return database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
+	// creates that state rather than what ends it.
+	var naming Naming
+	err := database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
 		within := s.over(db)
+		naming = Naming{}
+		leaving := db.NewSelect().Model((*Account)(nil)).Column("identity").
+			Where("is_bootstrap = ?", true).OrderExpr("identity")
 		clearing := db.NewUpdate().Model((*Account)(nil)).
 			Set("is_bootstrap = ?", false).Where("is_bootstrap = ?", true)
 		if len(named) > 0 {
+			leaving = leaving.Where("identity NOT IN (?)", bun.List(named))
 			clearing = clearing.Where("identity NOT IN (?)", bun.List(named))
+		}
+		if err := leaving.Scan(ctx, &naming.Unnamed); err != nil {
+			return fmt.Errorf("read who is no longer named as an administrator: %w", err)
 		}
 		if _, err := clearing.Exec(ctx); err != nil {
 			return fmt.Errorf("clear who was named as an administrator: %w", err)
 		}
 
 		for _, identity := range named {
-			person, err := within.Ensure(ctx, identity, "", Stated(true), nil)
+			// Recorded without a word about administration: being named is
+			// the grant, and it is held in is_bootstrap below rather than
+			// in the column an administrator here writes.
+			person, err := within.Ensure(ctx, identity, "", nil, nil)
 			if err != nil {
 				return err
+			}
+			if !person.IsBootstrap {
+				naming.Named = append(naming.Named, identity)
 			}
 			// Named in configuration is an authorization to sign in, so the
 			// way they will sign in is recorded with it. Without this the
@@ -772,12 +793,10 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 			if err := within.Claim(ctx, person.ID, identity); err != nil {
 				return err
 			}
-			// Named here, and readmitted. This is the documented way back
-			// into a deployment nobody can administer, and it did not work
-			// for the case that produces one: a departed administrator is
-			// refused at sign-in, and nothing else clears the date. Naming
-			// them in configuration is the deliberate act of letting them
-			// back in, so it is the act that undoes it.
+			// Naming them in configuration is the deliberate act of letting
+			// a departed administrator back in, so it clears the date. A
+			// departed administrator is refused at sign-in, and nothing else
+			// clears it.
 			//
 			// Here rather than in Ensure, which recording a person also
 			// calls: an administrator re-recording a departed colleague must
@@ -791,4 +810,17 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 		}
 		return nil
 	})
+	if err != nil {
+		return Naming{}, err
+	}
+	return naming, nil
+}
+
+// Naming is what one application of the administrators configuration names
+// changed.
+type Naming struct {
+	// Named is who configuration names and did not before.
+	Named []string
+	// Unnamed is who configuration named before and does not now.
+	Unnamed []string
 }

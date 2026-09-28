@@ -274,3 +274,73 @@ func TestAMaximalCaseFitsTheColumn(t *testing.T) {
 		}
 	})
 }
+
+// Configuration names administrators with no person behind the change, and
+// the trail records each one it names and each one it stops naming against
+// configuration. A start that changes nothing records nothing.
+func TestConfigurationsAdministratorsAreRecordedAgainstConfiguration(t *testing.T) {
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		ctx := t.Context()
+		admin := w.DeclarePerson("admin@example.com", "Alex Admin", true)
+		reader := access.NewPerson(admin.ID, admin.Identity, true, nil, 0)
+		s := trail.NewStore(w.DB.DB)
+		accounts := func() []trail.Change {
+			t.Helper()
+			changes, _, err := s.Changes(ctx, reader, trail.Account, trail.Over{}, 100, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return changes
+		}
+
+		if _, err := trail.NameAdministrators(ctx, w.DB.DB, []string{"operator"}); err != nil {
+			t.Fatal(err)
+		}
+		named := accounts()
+		if len(named) != 1 {
+			t.Fatalf("naming one administrator left %d rows, want 1", len(named))
+		}
+		if one := named[0]; one.Actor != trail.ByConfiguration || one.By != nil ||
+			one.Name != "operator" || one.Was != nil ||
+			one.Became == nil || *one.Became != trail.NamedInConfiguration {
+			t.Errorf("naming an administrator was recorded as %+v", one)
+		}
+
+		// Restarted naming the same people.
+		if _, err := trail.NameAdministrators(ctx, w.DB.DB, []string{"operator"}); err != nil {
+			t.Fatal(err)
+		}
+		if again := accounts(); len(again) != 1 {
+			t.Errorf("a start naming the same people left %d rows, want the one", len(again))
+		}
+
+		unnamed, err := trail.NameAdministrators(ctx, w.DB.DB, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(unnamed) != 1 || unnamed[0] != "operator" {
+			t.Errorf("the names no longer in configuration came back as %v", unnamed)
+		}
+		removed := accounts()
+		if len(removed) != 2 {
+			t.Fatalf("removing the name left %d rows, want 2", len(removed))
+		}
+		if one := removed[0]; one.Actor != trail.ByConfiguration || one.By != nil ||
+			one.Was == nil || *one.Was != trail.NamedInConfiguration ||
+			one.Became == nil || *one.Became != trail.UnnamedByConfiguration {
+			t.Errorf("removing an administrator's name was recorded as %+v", one)
+		}
+
+		// And a person's change is still a person's.
+		if err := s.Record(ctx, reader, trail.Setting, "triage-floor", nil, trail.Said("high", true)); err != nil {
+			t.Fatal(err)
+		}
+		changes, _, err := s.Changes(ctx, reader, trail.Setting, trail.Over{}, 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(changes) != 1 || changes[0].Actor != trail.ByPerson || changes[0].Person() != admin.ID {
+			t.Errorf("a person's change was recorded as %+v", changes)
+		}
+	})
+}

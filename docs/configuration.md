@@ -35,11 +35,11 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
-A database built by v0.1.0, v0.2.0 or v0.3.0 is upgraded in place, at startup
-or by `openpsirt migrate up`. One built by an earlier release passes through
-each later release's upgrade on the way. v0.4.0 changes no schema, so a v0.3.0
-database is already current. A database built by any build between releases is
-recreated.
+A database built by v0.1.0, v0.2.0, v0.3.0 or v0.4.0 is upgraded in place, at
+startup or by `openpsirt migrate up`. One built by an earlier release passes
+through each later release's upgrade on the way. v0.4.0 changed no schema, so a
+v0.3.0 database takes the same upgrade a v0.4.0 one does. A database built by
+any build between releases is recreated.
 
 Read the sections for the release you are coming from, and every section after
 it: from v0.1.0, read all five.
@@ -53,8 +53,9 @@ it: from v0.1.0, read all five.
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
 Going back is `openpsirt migrate down`, once for each release stepped back that
-changed the schema, run with this build before the earlier one is deployed.
-Going back to v0.3.0 needs none. v0.1.0 started against an
+carries a migration, run with this build before the earlier one is deployed.
+v0.4.0 carries none, so going back to v0.4.0 or v0.3.0 is one, and to v0.2.0
+is two. v0.1.0 started against an
 upgraded schema reports it current and cannot read it. Patch branch lookups
 come back off in v0.2.0, which reads its own setting for them: turn them on
 again under its Settings.
@@ -100,11 +101,18 @@ Also read after an upgrade from v0.1.0 or v0.2.0.
 
 ### From v0.4.0
 
-Also read after an upgrade from v0.1.0, v0.2.0 or v0.3.0.
+Also read after an upgrade from any earlier release.
 
 | Change | What to do |
 |---|---|
 | `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
+| Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
+| With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
+
+| After the upgrade from v0.4.0 | |
+|---|---|
+| A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
+| Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
 
 ## Serving
 
@@ -545,7 +553,7 @@ for a process and not for an install.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart | unset |
+| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked | unset |
 | `OPENPSIRT_SESSION_LIFETIME` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held | 12 hours |
 
 ### An OpenID Connect provider
@@ -561,7 +569,7 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
 | `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
-| `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
+| `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored | unset |
 
 ### The username claim
 

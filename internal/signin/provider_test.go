@@ -23,17 +23,11 @@ import (
 
 // A provider, standing where a real one would.
 //
-// Without one, every method of both adapters goes unexecuted: the nonce
+// It is what reaches the boundary code of both adapters: the nonce
 // comparison that ties a token to the sign-in that started here, the
 // blank-subject refusal that access.MatchProvider's own comment relies on
 // these adapters to make, and the endpoint-host check that stops a discovery
-// document redirecting sign-ins somewhere else. Each could be deleted with the
-// suite green.
-//
-// Difficulty is not what decides it: where a boundary here has an in-process
-// stand-in the package behind it is at 65–96%, and where it has none the
-// boundary code is at 0.0% while the pure code in the same file is at
-// 88.9–100%.
+// document redirecting sign-ins somewhere else.
 type provider struct {
 	*httptest.Server
 	key *rsa.PrivateKey
@@ -286,34 +280,133 @@ func TestAProviderNamingItsEndpointsElsewhereIsRefusedAtStartup(t *testing.T) {
 }
 
 func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
-	// The three refusals that return before any network call, and the two
-	// fields that escaped the constructor: the provider name becomes a path
-	// segment and a route parameter, and an unusable one produces a deployment
-	// that starts, logs "sign-in configured", and signs nobody in.
+	// Each refusal returns before any network call, and each case is complete
+	// but for the one thing it names, so the refusal it meets is that one.
+	// The provider name becomes a path segment and a route parameter, and an
+	// unusable one produces a deployment that starts and signs nobody in. The
+	// username claim decides who redeems an authorization, and a default
+	// would decide that for every deployment that never examined it.
+	whole := func(change func(*OIDCConfig)) OIDCConfig {
+		cfg := OIDCConfig{
+			Name: "acme", Issuer: "https://issuer.example",
+			ClientID: "c", ClientSecret: "s", UsernameClaim: "sub",
+		}
+		change(&cfg)
+		return cfg
+	}
 	for _, c := range []struct {
 		what string
 		cfg  OIDCConfig
+		says string
 	}{
-		{"an unreadable issuer", OIDCConfig{Issuer: "://", UsernameClaim: "sub"}},
-		{"an issuer over plain http", OIDCConfig{
-			Issuer: "http://issuer.example", UsernameClaim: "sub"}},
-		{"no client secret", OIDCConfig{
-			Issuer: "https://issuer.example", UsernameClaim: "sub"}},
-		{"no username claim", OIDCConfig{
-			Issuer: "https://issuer.example", ClientID: "c", ClientSecret: "s"}},
-		{"a name carrying a slash", OIDCConfig{
-			Name: "acme/corp", Issuer: "https://issuer.example",
-			ClientID: "c", ClientSecret: "s", UsernameClaim: "sub"}},
-		{"a name carrying a space", OIDCConfig{
-			Name: "acme corp", Issuer: "https://issuer.example",
-			ClientID: "c", ClientSecret: "s", UsernameClaim: "sub"}},
-		{"an empty name", OIDCConfig{
-			Issuer: "https://issuer.example", ClientID: "c", ClientSecret: "s",
-			UsernameClaim: "sub"}},
+		{"an unreadable issuer", whole(func(c *OIDCConfig) { c.Issuer = "://" }), "is not a URL naming a host"},
+		{"an issuer over plain http", whole(func(c *OIDCConfig) { c.Issuer = "http://issuer.example" }), "is not https"},
+		{"no client identifier", whole(func(c *OIDCConfig) { c.ClientID = "" }), "client identifier and secret"},
+		{"no client secret", whole(func(c *OIDCConfig) { c.ClientSecret = "" }), "client identifier and secret"},
+		{"no username claim", whole(func(c *OIDCConfig) { c.UsernameClaim = "  " }), "OIDC_USERNAME_CLAIM"},
+		{"a name carrying a slash", whole(func(c *OIDCConfig) { c.Name = "acme/corp" }), "OIDC_NAME"},
+		{"a name carrying a space", whole(func(c *OIDCConfig) { c.Name = "acme corp" }), "OIDC_NAME"},
+		{"an empty name", whole(func(c *OIDCConfig) { c.Name = "" }), "OIDC_NAME"},
 	} {
-		if _, err := NewOIDC(context.Background(), c.cfg); err == nil {
+		_, err := NewOIDC(context.Background(), c.cfg)
+		if err == nil {
 			t.Errorf("a provider configured with %s was accepted", c.what)
+			continue
 		}
+		if !strings.Contains(err.Error(), c.says) {
+			t.Errorf("a provider configured with %s was refused for another reason: %v", c.what, err)
+		}
+	}
+}
+
+func TestAGroupsClaimIsReadUnderTheNameItReports(t *testing.T) {
+	// Whether a provider reports groups decides whether roles may be switched
+	// to group-bound, so the claim it reports is the claim it reads. A name
+	// with stray spaces read as a source of groups and yielded none, which
+	// locks out every arrival once roles are group-bound.
+	p := standing(t)
+	adapter, err := p.adapter(t, OIDCConfig{GroupsClaim: " groups "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !adapter.GroupsSource() {
+		t.Fatal("a named groups claim is not a source of groups")
+	}
+	_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.claims["nonce"] = pending.Nonce
+	p.claims["preferred_username"] = "ana"
+	p.claims["groups"] = []string{"kernel"}
+	who, err := adapter.Complete(t.Context(), "a-code", pending, "https://here.example/back")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(who.Groups) != 1 || who.Groups[0] != "kernel" {
+		t.Errorf("the groups claim yielded %v, want the one group", who.Groups)
+	}
+
+	blank, err := p.adapter(t, OIDCConfig{GroupsClaim: "   "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blank.GroupsSource() {
+		t.Error("a groups claim of spaces is a source of groups")
+	}
+}
+
+func TestAnIssuerIsTheSameProviderWithOrWithoutATrailingSlash(t *testing.T) {
+	// A provider compares the issuer it publishes with the one it was asked
+	// about exactly. Some publish theirs with a trailing slash and most
+	// without, and an operator writes whichever they copied. The identities it
+	// issues are recorded against the issuer without one, so both spellings
+	// name the same provider.
+	for _, published := range []string{"/", ""} {
+		p := standing(t)
+		p.document = map[string]any{"issuer": p.URL + published}
+		p.claims["iss"] = p.URL + published
+		cfg := func(issuer string) OIDCConfig {
+			return OIDCConfig{
+				Name: "acme", Issuer: issuer, ClientID: "a-client", ClientSecret: "a-secret",
+				UsernameClaim: "preferred_username", client: p.Client(),
+			}
+		}
+		for _, written := range []string{p.URL + "/", p.URL} {
+			adapter, err := NewOIDC(t.Context(), cfg(written))
+			if err != nil {
+				t.Errorf("published %q, written %q: could not be configured: %v",
+					p.URL+published, written, err)
+				continue
+			}
+			if adapter.Issuer() != p.URL {
+				t.Errorf("identities are recorded against %q, want %q", adapter.Issuer(), p.URL)
+			}
+			_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
+			if err != nil {
+				t.Fatal(err)
+			}
+			p.claims["nonce"] = pending.Nonce
+			p.claims["preferred_username"] = "ana"
+			if _, err := adapter.Complete(t.Context(), "a-code", pending, "https://here.example/back"); err != nil {
+				t.Errorf("published %q, written %q: a token was refused: %v",
+					p.URL+published, written, err)
+			}
+		}
+	}
+}
+
+func TestAnIssuerDifferingByMoreThanASlashIsRefused(t *testing.T) {
+	// The comparison is the provider's, and a spelling that names another
+	// path is refused at startup rather than at every sign-in.
+	p := standing(t)
+	p.document = map[string]any{"issuer": p.URL + "/tenant-a"}
+	_, err := NewOIDC(t.Context(), OIDCConfig{
+		Name: "acme", Issuer: p.URL, ClientID: "a-client", ClientSecret: "a-secret",
+		UsernameClaim: "preferred_username", client: p.Client(),
+	})
+	if err == nil {
+		t.Error("an issuer spelled differently from what the provider publishes was accepted")
 	}
 }
 
@@ -385,6 +478,9 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 		if len(who.Groups) != 1 || who.Groups[0] != "kernel" {
 			t.Errorf("an organization typed %q and registered as %q derived groups %v, "+
 				"want the one team", typed, canonical, who.Groups)
+		}
+		if !adapter.GroupsSource() {
+			t.Errorf("an organization typed %q is not a source of groups", typed)
 		}
 		// The numeric identifier rather than the login: a login can be changed
 		// by its owner and then taken by somebody else.

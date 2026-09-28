@@ -1936,6 +1936,8 @@ export interface paths {
          *
          *     It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
          *
+         *     Somebody with no identifier pinned answers 404 and records nothing.
+         *
          *     Requires: administrator
          */
         delete: operations["unbind-identifier"];
@@ -2828,7 +2830,7 @@ export interface paths {
          * Take somebody off a case
          * @description Withdraws the grant. The record of it is kept, because who could see an embargoed case, and when, is exactly what is asked afterwards.
          *
-         *     Taking somebody off a case they are not on succeeds and changes nothing.
+         *     Taking somebody off a case they are not on answers 404 and records nothing.
          *
          *     Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
          */
@@ -5767,8 +5769,10 @@ export interface components {
              * @example https://example.com/schemas/AboutPersonBody.json
              */
             readonly $schema?: string;
-            /** @description Whether they administer this deployment */
+            /** @description Whether administration is granted to them in the application, by an administrator or through a group */
             admin?: boolean;
+            /** @description Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it */
+            admin_by_configuration?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
             /** @description The date they left. Absent means they are active */
@@ -6596,10 +6600,15 @@ export interface components {
         };
         ChangeBody: {
             about: string;
+            /**
+             * @description What made the change: a person in the application, or the deployment's startup configuration, which names administrators
+             * @enum {string}
+             */
+            actor: "person" | "configuration";
             at: string;
             became?: string;
-            /** @description The person who made the change, by sign-in identity */
-            by: string;
+            /** @description The person who made the change, by sign-in identity. Absent where configuration made it */
+            by?: string;
             /** @description Their display name, where it differs from their identity */
             by_name?: string;
             /** @description This change cleared it */
@@ -9754,8 +9763,10 @@ export interface components {
             version: string;
         };
         PersonBody: {
-            /** @description Whether they administer this deployment */
+            /** @description Whether administration is granted to them in the application, by an administrator or through a group */
             admin?: boolean;
+            /** @description Whether OPENPSIRT_BOOTSTRAP_ADMINS names them. They administer this deployment while it does, whatever admin says. Removing the name and restarting revokes it */
+            admin_by_configuration?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
             /** @description The date they left. Absent means they may still sign in */
@@ -10340,7 +10351,7 @@ export interface components {
              * @example https://example.com/schemas/RecordBody.json
              */
             readonly $schema?: string;
-            /** @description Whether they administer this deployment. Omit it to leave it as it is */
+            /** @description Whether administration is granted to them in the application. Omit it to leave it as it is. Administration named in OPENPSIRT_BOOTSTRAP_ADMINS is not changed by this, and a grant made here outlasts the name */
             admin?: boolean;
             /** @description Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is */
             audits?: boolean;

@@ -466,7 +466,10 @@ func registerRevocation(api huma.API, a Administering) {
 						return huma.Error404NotFound("they hold no token called that")
 					})
 			}
-			if err := rights.RevokeToken(ctx, token.ID); err != nil {
+			switch err := rights.RevokeToken(ctx, token.ID); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return huma.Error404NotFound("they hold no token in force called that")
+			case err != nil:
 				return wentWrong(a.Logger, "cannot revoke a token", err)
 			}
 			if err := noted(ctx, tx, trail.Credential, in.Identity+" · "+in.Name,

@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -205,7 +206,10 @@ func registerTokens(api huma.API, in Ingest) {
 						return huma.Error404NotFound("no token of yours is called that")
 					})
 			}
-			if err := rights.RevokeToken(ctx, token.ID); err != nil {
+			switch err := rights.RevokeToken(ctx, token.ID); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return huma.Error404NotFound("no token of yours in force is called that")
+			case err != nil:
 				return wentWrong(in.Logger, "cannot revoke a token", err)
 			}
 			if err := noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,

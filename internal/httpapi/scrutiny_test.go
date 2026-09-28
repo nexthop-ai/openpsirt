@@ -197,3 +197,39 @@ func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 		}
 	})
 }
+
+func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
+	// An administrator reaches every product, so what they agreed to has not
+	// lapsed however their grants read. Named in configuration is
+	// administration too, and the only kind some deployments have.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/reviewer/roles/mine/approver", ""); got.Code >= 300 {
+			t.Fatalf("withdrawing the right answered %d: %s", got.Code, got.Body.String())
+		}
+		lapsedBy := func() []string {
+			t.Helper()
+			var who []string
+			for _, row := range scrutiny(t, r, "private-triage", "").Lapsed {
+				who = append(who, row.ApprovedBy)
+			}
+			return who
+		}
+		if who := lapsedBy(); len(who) != 1 || who[0] != "reviewer" {
+			t.Fatalf("with the right withdrawn, the lapsed approvals are by %v", who)
+		}
+
+		if _, err := r.rights.NameBootstrapAdmins(t.Context(), []string{"reviewer"}); err != nil {
+			t.Fatal(err)
+		}
+		if who := lapsedBy(); len(who) != 0 {
+			t.Errorf("an approver named in configuration is reported as having lost the right: %v", who)
+		}
+	})
+}

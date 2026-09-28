@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -165,7 +166,10 @@ func registerKeys(api huma.API, a Administering) {
 				if key.Name != in.Name || key.RevokedAt != nil {
 					continue
 				}
-				if err := store.Revoke(ctx, key.ID); err != nil {
+				switch err := store.Revoke(ctx, key.ID); {
+				case errors.Is(err, access.ErrNothingMatched):
+					return noSuchKey()
+				case err != nil:
 					return wentWrong(a.Logger, "cannot withdraw the credential", err)
 				}
 				if err := noted(ctx, tx, trail.Credential, in.Name,

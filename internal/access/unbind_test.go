@@ -4,6 +4,7 @@
 package access_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -27,12 +28,11 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 			t.Fatalf("the first sign-in was refused: %v", err)
 		}
 
-		// The deployment changes provider. The new one issues identifiers of
-		// its own, so hers does not match what was pinned — which is the same
-		// answer somebody who took a released name gets, and correctly so:
-		// nothing here can tell the two apart.
-		if _, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "alice"); err == nil {
-			t.Fatal("an identifier from a different provider was accepted, so a released name would be too")
+		// The deployment changes provider. The new one issues identifiers
+		// into its own namespace, so the same string there names somebody
+		// else, and the pinned row is not theirs.
+		if _, err := f.store.MatchProvider(ctx, "entra", "github-1001", "alice"); !errors.Is(err, access.ErrDenied) {
+			t.Fatalf("an identifier issued by a different provider was accepted: %v", err)
 		}
 
 		// An administrator unbinds. The authorization stays: she was granted
@@ -41,7 +41,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 			t.Fatalf("unbinding was refused: %v", err)
 		}
 
-		matched, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "alice")
+		matched, err := f.store.MatchProvider(ctx, "entra", "entra-abc", "alice")
 		if err != nil {
 			t.Fatalf("she was still refused after unbinding: %v", err)
 		}
@@ -58,11 +58,14 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 		if len(identities) != 1 {
 			t.Fatalf("one person has %d identities", len(identities))
 		}
-		if identities[0].Subject == nil || *identities[0].Subject != "okta-abc" {
+		if identities[0].Subject == nil || *identities[0].Subject != "entra-abc" {
 			t.Fatalf("the new identifier was not pinned: %+v", identities[0])
 		}
-		if _, err := f.store.MatchProvider(ctx, "okta", "github-1001", "alice"); err == nil {
-			t.Error("the old identifier still signs in, so unbinding widened rather than moved the pin")
+		if identities[0].Provider == nil || *identities[0].Provider != "entra" {
+			t.Fatalf("the pin does not name the provider that issued it: %+v", identities[0])
+		}
+		if _, err := f.store.MatchProvider(ctx, "okta", "github-1001", "alice"); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("the old identifier still signs in, so unbinding widened rather than moved the pin: %v", err)
 		}
 	})
 }
@@ -74,17 +77,20 @@ func TestUnbindingAnIdentifierGrantsNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		alice := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
+			t.Fatal(err)
+		}
 		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "mallory"); err == nil {
-			t.Error("somebody nobody authorized was let in")
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "mallory"); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody nobody authorized was not refused: %v", err)
 		}
 		// And an arrival with no identifier at all is still refused, which is
 		// the rule unbinding must not quietly relax: an unpinned row is
 		// redeemable by name, not by nothing.
-		if _, err := f.store.MatchProvider(ctx, "okta", "", "alice"); err == nil {
-			t.Error("an arrival naming no identifier redeemed an unbound authorization")
+		if _, err := f.store.MatchProvider(ctx, "okta", "", "alice"); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("an arrival naming no identifier was not refused: %v", err)
 		}
 	})
 }
@@ -95,6 +101,9 @@ func TestUnbindingAnIdentifierKeepsWhatTheyHold(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		alice := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
+			t.Fatal(err)
+		}
 		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -104,6 +113,27 @@ func TestUnbindingAnIdentifierKeepsWhatTheyHold(t *testing.T) {
 		}
 		if !subject.Reads(access.Public, f.products["sonic"]) {
 			t.Error("unbinding took her role with it")
+		}
+	})
+}
+
+// Somebody with nothing pinned has nothing to unbind. Answered as a withdrawal
+// it did not make, the trail would record one.
+func TestUnbindingSomebodyWithNothingBoundMatchesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		alice := authorized(t, f, "alice", "alice")
+		if err := f.store.UnbindIdentifier(ctx, alice.ID); !errors.Is(err, access.ErrNothingMatched) {
+			t.Errorf("unbinding somebody never pinned answered %v", err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.UnbindIdentifier(ctx, alice.ID); !errors.Is(err, access.ErrNothingMatched) {
+			t.Errorf("unbinding somebody already unbound answered %v", err)
 		}
 	})
 }

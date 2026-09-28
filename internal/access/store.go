@@ -30,9 +30,14 @@ type Account struct {
 	PartyID     int64  `bun:"party_id,notnull"`
 	Identity    string `bun:"identity,notnull"`
 	DisplayName string `bun:"display_name"`
-	IsAdmin     bool   `bun:"is_admin,notnull"`
-	// IsBootstrap is set from configuration at every startup, and is what
-	// keeps a re-derivation from group membership out of the way back in.
+	// IsAdmin is administration granted here: by an administrator, or
+	// derived from a group. Configuration's half is IsBootstrap, and
+	// Administers is the two together.
+	IsAdmin bool `bun:"is_admin,notnull"`
+	// IsBootstrap is set from configuration at every startup. It is
+	// administration of its own, held while the name stays in configuration,
+	// and it keeps a re-derivation from group membership out of the way back
+	// in.
 	IsBootstrap bool `bun:"is_bootstrap,notnull"`
 	// AdminDerived says a group granted this rather than a person. Only what
 	// a group gave is taken back when groups stop deciding, so somebody
@@ -77,6 +82,13 @@ type Account struct {
 	// as the proposer of judgments and the approver of others.
 	DeactivatedAt *time.Time `bun:"deactivated_at"`
 }
+
+// Administers reports whether they administer this deployment, from either
+// half: granted here, or named in configuration.
+//
+// What is stored, unbounded by the stamp a group's grant carries. Resolve is
+// what applies that bound to a request.
+func (a Account) Administers() bool { return a.IsAdmin || a.IsBootstrap }
 
 // Party is a name that work can be assigned to: a person or a team.
 //
@@ -254,6 +266,44 @@ func (s *Store) Within(ctx context.Context,
 	})
 }
 
+// move writes what is held over the deployment where it differs from what was
+// read, and records the new values on the account.
+//
+// Conditional on what was read, so the value being replaced is read by the
+// statement that replaces it. A write that matched nothing lost a race with
+// another writer who moved the same flag since, and is ErrGoAgain: the caller
+// records the move from the value it read, and a fresh transaction is what
+// reads the value that is there now.
+func (s *Store) move(ctx context.Context, existing *Account, admin, audits *bool) error {
+	for _, flag := range []struct {
+		column, what string
+		held         *bool
+		asked        *bool
+	}{
+		{"is_admin", "is an administrator", &existing.IsAdmin, admin},
+		{"audits", "audits this deployment", &existing.Audits, audits},
+	} {
+		if flag.asked == nil || *flag.held == *flag.asked {
+			continue
+		}
+		result, err := s.db.NewUpdate().Model((*Account)(nil)).
+			Set("? = ?", bun.Ident(flag.column), *flag.asked).Where("id = ?", existing.ID).
+			Where("? = ?", bun.Ident(flag.column), *flag.held).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
+		}
+		n, err := database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
+		}
+		if n == 0 {
+			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, database.ErrGoAgain)
+		}
+		*flag.held = *flag.asked
+	}
+	return nil
+}
+
 // Ensure records somebody who has been granted access, or confirms one already
 // recorded.
 //
@@ -275,42 +325,44 @@ func (s *Store) Within(ctx context.Context,
 func (s *Store) Ensure(ctx context.Context, identity, displayName string,
 	admin, audits *bool) (*Account, error) {
 
+	_, person, err := s.Restate(ctx, identity, displayName, admin, audits)
+	return person, err
+}
+
+// ErrNoIdentity is a person asked for with no name to record them under.
+var ErrNoIdentity = errors.New("a person needs an identity to be granted anything")
+
+// Restate is Ensure, answering what was stored before the write beside what
+// is stored after it. Before is nil where they were not recorded.
+//
+// Before is the value the conditional write was made against, read by the
+// statement that decides whether anything moved. A caller recording the move
+// from a read of its own can read a value another writer has since replaced,
+// and record a move this write did not make.
+func (s *Store) Restate(ctx context.Context, identity, displayName string,
+	admin, audits *bool) (before, after *Account, err error) {
+
 	// Folded, so that what is recorded here and what a sign-in matches are the
 	// same string. An identity is a username, and a username is a name people
 	// type.
 	identity = folded(identity)
 	if identity == "" {
-		return nil, fmt.Errorf("a person needs an identity to be granted anything")
+		return nil, nil, ErrNoIdentity
 	}
 
 	existing, err := s.ByIdentity(ctx, identity)
 	if err == nil {
-		// Conditional on what is stored, so the value being replaced is read
-		// by the statement that replaces it. The affected-row count then says
-		// whether it moved, which is what the trail records.
-		if admin != nil && existing.IsAdmin != *admin {
-			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-				Set("is_admin = ?", *admin).Where("id = ?", existing.ID).
-				Where("is_admin = ?", existing.IsAdmin).Exec(ctx); err != nil {
-				return nil, fmt.Errorf("record that %q is an administrator: %w", identity, err)
-			}
-			existing.IsAdmin = *admin
+		was := *existing
+		if err := s.move(ctx, existing, admin, audits); err != nil {
+			return nil, nil, err
 		}
-		if audits != nil && existing.Audits != *audits {
-			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-				Set("audits = ?", *audits).Where("id = ?", existing.ID).
-				Where("audits = ?", existing.Audits).Exec(ctx); err != nil {
-				return nil, fmt.Errorf("record that %q audits this deployment: %w", identity, err)
-			}
-			existing.Audits = *audits
-		}
-		return existing, nil
+		return &was, existing, nil
 	}
 	if !errors.Is(err, ErrNoSuchPerson) {
 		// A read that failed is not somebody who is not there. Answered as
 		// "not there", this went on to record them again — and with them a
 		// fresh party row, for a person who already had one.
-		return nil, err
+		return nil, nil, err
 	}
 
 	person := &Account{
@@ -325,9 +377,9 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string,
 		CreatedAt:   s.now().Truncate(time.Microsecond),
 	}
 	if err := s.record(ctx, person); err != nil {
-		return nil, fmt.Errorf("record %q: %w", identity, err)
+		return nil, nil, fmt.Errorf("record %q: %w", identity, err)
 	}
-	return person, nil
+	return nil, person, nil
 }
 
 // record writes a new person, and the party they are assignable as.
@@ -562,6 +614,9 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 			administers = false
 		}
 	}
+	// Named in configuration is administration of its own, which no group
+	// confirms and no stamp bounds.
+	administers = administers || person.IsBootstrap
 	// Auditing is bounded exactly as administration is, and for the same
 	// reason: a group is what says so, and a credential that never signs in
 	// never asks a group again.
@@ -751,13 +806,13 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 
 // Revoke stops a key working, without removing what it did.
 func (s *Store) Revoke(ctx context.Context, keyID int64) error {
-	_, err := s.db.NewUpdate().Model((*Key)(nil)).
+	result, err := s.db.NewUpdate().Model((*Key)(nil)).
 		Set("revoked_at = ?", s.now().Truncate(time.Microsecond)).
 		Where("id = ?", keyID).Where("revoked_at IS NULL").Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("revoke key %d: %w", keyID, err)
 	}
-	return nil
+	return matched(result, fmt.Sprintf("revoke key %d", keyID), "that key is already revoked")
 }
 
 // hashSecret is what gets stored.
