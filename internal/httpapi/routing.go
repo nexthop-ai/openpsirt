@@ -71,16 +71,12 @@ func registerRouting(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// A rule is configuration rather than a finding, so there is nothing
-		// in it for the data layer to narrow: a reader either gets the whole
-		// precedence order or none of it. The declaration says triage and its
-		// three siblings enforce it, so this one does too — read against each
-		// other they say different things, which is the whole failure mode
-		// this pair is kept in step to avoid.
-		if !subject.TriagesIn(product.ID) {
+		// The store asks for triage on the product, which is what the
+		// declaration says and what its three siblings enforce.
+		rules, err := finding.NewStore(in.DB.DB).Rules(ctx, subject, product.ID)
+		if errors.Is(err, access.ErrDenied) {
 			return nil, noSuchProduct()
 		}
-		rules, err := finding.NewStore(in.DB.DB).Rules(ctx, product.ID)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the rules could not be read", err)
 		}

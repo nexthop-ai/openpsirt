@@ -285,16 +285,17 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 // Asked of triage on the claim's own product, because taking a rating back is
 // making one: the published severity returns in that product, and everything
 // reading it follows.
-func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) error {
+func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return errors.New("withdrawing is something a person does")
+		return nil, errors.New("withdrawing is something a person does")
 	}
 	// Before the identifier is resolved, for the reason Agree gives.
 	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
-		return access.Denied("take a rating back")
+		return nil, access.Denied("take a rating back")
 	}
-	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		claim := new(Assessment)
+	claim := new(Assessment)
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		*claim = Assessment{}
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
 			return database.FromRead(err, ErrNoSuchAssessment, fmt.Sprintf("read assessment %d", id))
 		}
@@ -330,6 +331,10 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		}
 		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, "")
 	})
+	if err != nil {
+		return nil, err
+	}
+	return claim, nil
 }
 
 // liveRating writes the rating in force for one product, or clears it.

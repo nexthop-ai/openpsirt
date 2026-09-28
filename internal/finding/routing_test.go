@@ -54,12 +54,18 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 			t.Errorf("the first rule is ordinal %d, want the first place", rule.Ordinal)
 		}
 
-		rules, err := f.store.Rules(ctx, f.productID)
+		rules, err := f.store.Rules(ctx, who, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(rules) != 1 || rules[0].Beneath != "libnl-3-*" {
 			t.Fatalf("the rules read back as %+v", rules)
+		}
+		// The precedence order is the product's triage configuration, read
+		// by whoever triages there and nobody who only reads.
+		if _, err := f.store.Rules(ctx, f.planner(t, access.PublicRead), f.productID); !errors.Is(
+			err, access.ErrDenied) {
+			t.Errorf("somebody who only reads the product read its rules: %v", err)
 		}
 
 		// Its catch, before anything is placed.

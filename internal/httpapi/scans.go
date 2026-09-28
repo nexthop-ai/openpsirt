@@ -846,15 +846,11 @@ func registerReceipts(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "that build could not be looked up", err)
 		}
 
-		// A key sees the receipts for what it sent and nothing more. Reading
-		// back one's own upload is the other half of the acceptance, not a
-		// report about the product.
-		var sender string
-		if subject.Kind == access.Pipeline {
-			sender = subject.Identity
-		}
+		// A key sees the receipts for what it sent and nothing more, which the
+		// store decides. Reading back one's own upload is the other half of the
+		// acceptance, not a report about the product.
 		scans := ingest.NewStore(in.DB.DB)
-		receipts, total, err := scans.Receipts(ctx, subject, target.ID, sender, input.Limit, input.Offset)
+		receipts, total, err := scans.Receipts(ctx, subject, target.ID, input.Limit, input.Offset)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			// The answer a build nobody declared gets. A 500 here against a
@@ -973,7 +969,7 @@ func registerReceipts(api huma.API, in Ingest) {
 		// that has uploaded nothing would otherwise still learn when the build
 		// was last scanned and with what, which is a report about the product
 		// rather than an acknowledgement of its own upload.
-		if sender != "" {
+		if subject.Kind == access.Pipeline {
 			return out, nil
 		}
 		last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, target.ID)

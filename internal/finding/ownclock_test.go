@@ -151,7 +151,7 @@ func TestRatingAFlawAgainDoesNotRestartItsClock(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := f.store.Withdraw(ctx, who, first.ID); err != nil {
+		if _, err := f.store.Withdraw(ctx, who, first.ID); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Assess(ctx, who, f.productID, issue,

@@ -133,7 +133,7 @@ func registerObligations(api huma.API, in Ingest) {
 			body.Product, body.ProductName = entry.Product, entry.ProductName
 			body.Told = toldBodies(entry.Told, named, people)
 			for _, due := range entry.Windows {
-				window, _ := windowFor(subject, due.Window)
+				window := windowFor(due.Window)
 				body.Windows = append(body.Windows, DueBody{
 					Window: window, EndsAt: due.EndsAt.UTC().Format(time.RFC3339),
 					Passed: due.Passed, Near: due.Near, Answered: due.Answered,
@@ -162,16 +162,14 @@ func registerObligations(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		windows, err := obligation.NewStore(in.DB.DB).Windows(ctx)
+		windows, err := obligation.NewStore(in.DB.DB).Windows(ctx, subject)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the windows could not be read", err)
 		}
 		out := &struct{ Body WindowsBody }{}
 		out.Body.Items = make([]WindowBody, 0, len(windows))
 		for _, window := range windows {
-			if body, shown := windowFor(subject, window); shown {
-				out.Body.Items = append(out.Body.Items, body)
-			}
+			out.Body.Items = append(out.Body.Items, windowFor(window))
 		}
 		return out, nil
 	})
@@ -202,8 +200,8 @@ func registerObligations(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedWindow(in, err)
 		}
-		body, _ := windowFor(subject, *window)
-		return &struct{ Body WindowBody }{Body: body}, nil
+		shown, _ := window.As(subject)
+		return &struct{ Body WindowBody }{Body: windowFor(shown)}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -235,8 +233,8 @@ func registerObligations(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedWindow(in, err)
 		}
-		body, _ := windowFor(subject, *window)
-		return &struct{ Body WindowBody }{Body: body}, nil
+		shown, _ := window.As(subject)
+		return &struct{ Body WindowBody }{Body: windowFor(shown)}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -337,13 +335,9 @@ func refusedWindow(in Ingest, err error) error {
 	return refusedDecision(in.Logger, err)
 }
 
-// windowFor is a window as this subject may read it, and whether they may
-// read it at all.
-//
-// A window limited to products the reader may not know exist is not theirs to
-// see, and the products it names are narrowed to the ones they may: the list
-// of products is itself a statement about what an organization ships.
-func windowFor(subject access.Subject, window obligation.Window) (WindowBody, bool) {
+// windowFor is a window as a response carries it. What the reader may read of
+// it is decided by the store, which hands over the window already narrowed.
+func windowFor(window obligation.Window) WindowBody {
 	body := WindowBody{
 		ID: window.ID, Name: window.Name, Hours: window.Hours,
 		Products:   []string{},
@@ -352,12 +346,8 @@ func windowFor(subject access.Subject, window obligation.Window) (WindowBody, bo
 	if window.LeadHours != nil {
 		body.LeadHours = *window.LeadHours
 	}
-	for i, id := range window.Products {
-		if subject.Sees(id) {
-			body.Products = append(body.Products, window.ProductNames[i])
-		}
-	}
-	return body, len(window.Products) == 0 || len(body.Products) > 0
+	body.Products = append(body.Products, window.ProductNames...)
+	return body
 }
 
 // windowSaid is what a caller sent, as the store reads it. A warning of zero is

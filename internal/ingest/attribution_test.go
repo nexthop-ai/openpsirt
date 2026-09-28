@@ -36,7 +36,7 @@ func TestAFailedRunDoesNotPoisonTheUploadsBeforeIt(t *testing.T) {
 		finishRun(t, s, target, now.Add(-2*time.Hour), "the scanner fell over")
 		finishRun(t, s, target, now.Add(-time.Hour), "")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,7 +65,7 @@ func TestAnUploadReadsAsFailedWhileEveryRunSinceHasFailed(t *testing.T) {
 		file(t, s, target, "only", now.Add(-3*time.Hour))
 		finishRun(t, s, target, now.Add(-2*time.Hour), "the scanner fell over")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,7 +95,7 @@ func TestARunIsAttributedToOneUploadHoweverThePageFalls(t *testing.T) {
 
 		claimed := 0
 		for offset := range 3 {
-			page, _, err := s.Receipts(ctx, reader, target, "", 1, offset)
+			page, _, err := s.Receipts(ctx, reader, target, 1, offset)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -208,7 +208,7 @@ func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 		file(t, s, target, "september", now.Add(-4*time.Hour))
 		finishRunWith(t, s, target, now.Add(-3*time.Hour), "", "0.101.0", "2026-09-01")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +233,7 @@ func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 		file(t, s, target, "one", now.Add(-2*time.Hour))
 		file(t, s, target, "two", now.Add(-90*time.Minute))
 		finishRunWith(t, s, target, now.Add(-time.Hour), "", "0.102.0", "2026-09-06")
-		receipts, _, err = s.Receipts(ctx, reader, target, "", 50, 0)
+		receipts, _, err = s.Receipts(ctx, reader, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,7 +297,7 @@ func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
 		}
 		finishRun(t, s, target, now.Add(-time.Hour), "")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,7 +335,7 @@ func TestEveryRunKeepsItsOwnUploadAcrossALongHistory(t *testing.T) {
 			finishRun(t, s, target, at.Add(time.Hour), "")
 		}
 
-		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

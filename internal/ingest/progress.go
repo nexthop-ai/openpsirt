@@ -80,8 +80,7 @@ type Receipt struct {
 // that belongs to another build, or that this credential did not send, answers
 // as one that does not exist — the two are the same sentence deliberately,
 // because telling them apart is telling somebody what exists elsewhere.
-func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID int64,
-	credential string) (*Scan, error) {
+func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID int64) (*Scan, error) {
 
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
@@ -94,7 +93,7 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	q := s.db.NewSelect().Model(held).
 		Where("id = ?", scanID).
 		Where("target_id = ?", targetID)
-	if credential != "" {
+	if credential := sentBy(subject); credential != "" {
 		q = q.Where("credential = ?", credential)
 	}
 	if err := q.Scan(ctx); err != nil {
@@ -104,14 +103,24 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	return held, nil
 }
 
+// sentBy is the credential a subject's reads of uploads are narrowed to: a
+// key reads back what it sent and nothing more, and a person reads every
+// upload to a build they may see.
+func sentBy(subject access.Subject) string {
+	if subject.Kind == access.Pipeline {
+		return subject.Identity
+	}
+	return ""
+}
+
 // Receipts reports what became of the scans filed against a target, newest
 // first, with how many there are in total.
 //
-// A credential narrows it to what that credential sent. The narrowing belongs
-// here rather than in the caller: filtering a page after it has been read
-// returns short pages and a total counting rows the reader was not shown,
-// which is both wrong and a count of somebody else's uploads.
-func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64, credential string, limit, offset int) ([]Receipt, int, error) {
+// A key is narrowed to what it sent. The narrowing belongs here rather than in
+// the caller: filtering a page after it has been read returns short pages and
+// a total counting rows the reader was not shown, which is both wrong and a
+// count of somebody else's uploads.
+func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64, limit, offset int) ([]Receipt, int, error) {
 	// Asked here rather than only in the handler. A check beside the query
 	// cannot be skipped by adding another endpoint, which is the whole reason
 	// visibility is decided in this layer — and receipts carry a producer's
@@ -134,6 +143,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// asks for the whole table.
 	limit = database.AList.Of(limit)
 
+	credential := sentBy(subject)
 	sent := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("target_id = ?", targetID)
 		if credential != "" {

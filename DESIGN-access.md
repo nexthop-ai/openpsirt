@@ -475,6 +475,13 @@ are in use on a product both read findings and both answer for the whole
 product, so a reader reached straight from a request is a product-wide read
 with nobody attached.
 
+Product-scoped configuration is no exception. A product's routing rules, the
+obligation windows and the products each is limited to, an upload's receipt and
+the documents it kept are each read with the subject, and the store decides
+what that subject reaches: the rules for whoever triages the product, a window
+narrowed to the products the reader may know exist, and a key's own uploads.
+The sweeps that apply rules and watch windows read as the deployment.
+
 The trail's readers are the same shape. A row there names who was brought into
 which case, undisclosed ones among them, so a line in the handler is the only
 thing between that and a caller. Each takes a subject and refuses one that does

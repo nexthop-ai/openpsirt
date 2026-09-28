@@ -70,12 +70,8 @@ func registerRetained(api huma.API, in Ingest) {
 		// reads back what it sent and nothing more, which is the rule the
 		// receipts list applies. Asked of the store rather than here, so the
 		// two endpoints cannot come to differ about it.
-		var sender string
-		if subject.Kind == access.Pipeline {
-			sender = subject.Identity
-		}
 		if _, err := ingest.NewStore(in.DB.DB).Of(ctx, subject, target.ID,
-			input.Scan, sender); err != nil {
+			input.Scan); err != nil {
 			return nil, absent(in.Logger, err, "that scan could not be looked up",
 				func() error { return huma.Error404NotFound("no such scan on this build") })
 		}
