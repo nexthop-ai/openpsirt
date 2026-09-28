@@ -141,6 +141,27 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
+// servers is each on the three server engines alone, for a test whose subject
+// is two transactions open at once, which SQLite's one connection cannot hold.
+func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
+	t.Helper()
+	castSeed.Servers(t, func(t *testing.T, db *database.DB, c cast) {
+		rights := access.NewStore(db.DB)
+		subject := func(identity string) access.Subject {
+			resolved, err := rights.Resolve(t.Context(), identity)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return resolved
+		}
+		fn(t, &fixture{
+			db: db, store: triage.NewStore(db.DB), product: c.product, issue: c.issue,
+			proposer: c.proposer, approver: c.approver,
+			triager: subject("proposer"), reviewer: subject("approver"), onlooker: subject("onlooker"),
+		})
+	})
+}
+
 func TestAClaimStandsOnlyOnceSomebodyHasAgreedToIt(t *testing.T) {
 	// The control, stated as behavior rather than as a state name. A claim
 	// that hides risk suppresses nothing while it waits — otherwise one person

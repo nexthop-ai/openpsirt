@@ -66,6 +66,19 @@ func (s *Seeded[T]) Two(t *testing.T, fn func(t *testing.T, db *database.DB, mad
 	run(t, s.unbox(fn), map[database.Engine]bool{database.SQLite: true, database.Postgres: true}, beside, s)
 }
 
+// Servers runs fn against the seeded template on the three server engines, as
+// Servers does: for a test whose subject is two transactions open at once.
+func (s *Seeded[T]) Servers(t *testing.T, fn func(t *testing.T, db *database.DB, made T)) {
+	t.Helper()
+	servers := map[database.Engine]bool{}
+	for _, engine := range database.Engines() {
+		if engine != database.SQLite {
+			servers[engine] = true
+		}
+	}
+	run(t, s.unbox(fn), servers, beside, s)
+}
+
 // unbox adapts a typed test body to the shape run drives, which carries what
 // a seed made without knowing its type.
 func (s *Seeded[T]) unbox(fn func(t *testing.T, db *database.DB, made T)) body {

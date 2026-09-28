@@ -14,7 +14,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -916,10 +915,7 @@ func TestTheRatingsListIsPagedAndSaysHowManyThereAre(t *testing.T) {
 // servers only, because SQLite's one connection cannot hold the two
 // transactions open at once.
 func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		if f.db.Server.Engine == database.SQLite {
-			t.Skip("two transactions at once need a server")
-		}
+	servers(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		bad := found("CVE-2026-RACE", swss)

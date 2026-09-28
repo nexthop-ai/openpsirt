@@ -14,7 +14,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -981,10 +980,7 @@ func TestRevisingYourOwnClaimIsNotSomebodyElseUndoingIt(t *testing.T) {
 // claim and sent them back to their author. The servers only, because
 // SQLite's one connection cannot hold the two transactions open at once.
 func TestHoldingRowsBackThatAnApprovalTookMovesNothing(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		if f.db.Server.Engine == database.SQLite {
-			t.Skip("two transactions at once need a server")
-		}
+	servers(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		recorded := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
 		hook := &beforeHoldingBack{run: func() {

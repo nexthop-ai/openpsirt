@@ -276,6 +276,22 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
+// servers is each on the three server engines alone, for a test whose subject
+// is two transactions open at once, which SQLite's one connection cannot hold.
+func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
+	t.Helper()
+	catalogSeed.Servers(t, func(t *testing.T, db *database.DB, c seededCatalog) {
+		fn(t, &fixture{
+			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
+			target: c.target, productID: c.product, scans: ingest.NewStore(db.DB),
+			scope: finding.Scope{
+				ProductID: &c.product, StreamID: &c.stream, VariantID: &c.variant,
+			},
+			built: time.Now().UTC().Add(-72 * time.Hour),
+		})
+	})
+}
+
 // planner is somebody who exists, holding triage on this fixture's product.
 //
 // Recorded rather than invented, because a declaration names who made it and
