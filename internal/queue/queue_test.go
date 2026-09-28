@@ -294,15 +294,15 @@ func TestAStaleClaimIsTakenOverByAnotherWorker(t *testing.T) {
 }
 
 func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
-	// The other way work stops succeeding, and the one nothing reported.
+	// The other way work stops succeeding, and the one nothing reports.
 	//
 	// A worker that fails tells the queue so, and the attempts ceiling is
 	// charged where it tells it. A worker that is killed — evicted, out of
-	// memory, a node that went — tells nothing, so the ceiling was never
-	// reached and the job was reclaimed on every poll for ever. A scan that
-	// kills its worker therefore stopped that build being scanned, silently:
-	// the row stayed in the running state, which reads everywhere else as
-	// work somebody is doing.
+	// memory, a node that went — tells nothing, so every claim counts
+	// against the ceiling. Charged only where a worker reports, a scan that
+	// kills its worker is reclaimed on every poll for ever and its build
+	// silently stops being scanned, in a running state that reads everywhere
+	// else as work somebody is doing.
 	opts := queue.DefaultOptions()
 	opts.MaxAttempts = 3
 	opts.ClaimTimeout = time.Millisecond
@@ -854,6 +854,10 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 	// loop that buried once and stopped, or that never reset its timer, would
 	// leave the defect it exists for in place — and Once is correct in both
 	// cases, which is why the loop itself is what this drives.
+	//
+	// The second job is abandoned only after the pass has buried the first,
+	// so nothing but a later pass can reach it. Verified by making Run return
+	// after its first pass: the second job stays claimed until the deadline.
 	opts := queue.DefaultOptions()
 	opts.MaxAttempts = 1
 	opts.ClaimTimeout = time.Millisecond
@@ -861,9 +865,8 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
 
-		// Two, queued one after the other, so what is pinned is a pass that
-		// keeps running rather than one that fired once.
-		for _, ref := range []string{"first", "second"} {
+		abandon := func(ref string) {
+			t.Helper()
 			if _, err := q.Add(ctx, queue.Scan, ref); err != nil {
 				t.Fatal(err)
 			}
@@ -871,7 +874,28 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		setAside := func(want int) {
+			t.Helper()
+			deadline := time.After(10 * time.Second)
+			for {
+				var aside int
+				if err := db.QueryRowContext(ctx,
+					`SELECT COUNT(*) FROM "job" WHERE "state" = ?`, string(queue.Dead)).
+					Scan(&aside); err != nil {
+					t.Fatal(err)
+				}
+				if aside == want {
+					return
+				}
+				select {
+				case <-deadline:
+					t.Fatalf("the pass set aside %d of %d abandoned jobs", aside, want)
+				case <-time.After(5 * time.Millisecond):
+				}
+			}
+		}
 
+		abandon("first")
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		returned := make(chan struct{})
 		go func() {
@@ -879,24 +903,9 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 			queue.NewUndertaker(q, queue.NewLeases(db.DB), "the-only-replica", quiet).
 				Run(ctx, time.Millisecond)
 		}()
-
-		deadline := time.After(10 * time.Second)
-		for {
-			var aside int
-			if err := db.QueryRowContext(ctx,
-				`SELECT COUNT(*) FROM "job" WHERE "state" = ?`, string(queue.Dead)).
-				Scan(&aside); err != nil {
-				t.Fatal(err)
-			}
-			if aside == 2 {
-				break
-			}
-			select {
-			case <-deadline:
-				t.Fatalf("the pass set aside %d of 2 abandoned jobs", aside)
-			case <-time.After(5 * time.Millisecond):
-			}
-		}
+		setAside(1)
+		abandon("second")
+		setAside(2)
 
 		// And it stops when it is told to. A pass that ignores cancellation
 		// holds the database open while the process is trying to shut down.
