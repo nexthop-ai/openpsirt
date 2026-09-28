@@ -78,7 +78,6 @@ Missing or wrong, with no decision needed to fix it.
 | `cgit.freedesktop.org` patch links fail, except drm-misc | Those projects moved to GitLab, most under new paths. Each needs its new address checked before it is read there. The System screen shows the failure |
 | One demo component has no walkable route to the build root | `golang.org/x/net` under `sonic-mgmt-common-codegen`. The screen names the consumer. The inventory may hold a disconnected fragment |
 | No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
-| The main recorded scanner output is from grype 0.112.0 | The image ships 0.119.0, as does the known-exploited recording. Re-recording changes what several tests assert |
 | The scanner's memory use is not measured | The pod's limits are a judgment. A measurement of peak memory on the full-size fixture, cold and warm, would settle them |
 | A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
 
