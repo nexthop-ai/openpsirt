@@ -559,13 +559,12 @@ func asked(logger *slog.Logger, err error) error {
 	if errors.Is(err, access.ErrDenied) {
 		return huma.Error403Forbidden("not authorized")
 	}
-	// A lost race, which the transaction around the act takes again. Answered
-	// as a refusal it is a 422 telling the caller to go again, and the retry
-	// helper never sees it.
-	if errors.Is(err, database.ErrGoAgain) {
-		return err
-	}
-	if database.FromEngine(err) {
+	// A lost race is a fault that carries its cause: the transaction around
+	// the act reads the cause and takes it again, and a caller with no
+	// transaction around it, or one out of attempts, is answered 500 in words
+	// of our own and logged. Answered as a refusal it is a 422 telling the
+	// caller to go again, and the retry helper never sees it.
+	if errors.Is(err, database.ErrGoAgain) || database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
 	}
 	return huma.Error422UnprocessableEntity(err.Error())

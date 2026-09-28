@@ -870,7 +870,9 @@ exist:
 The third is a named error the retry helper recognizes, beside the engine codes
 it reads. The condition is one a query expresses rather than one an engine
 reports — a conditional update that matched nothing because another writer moved
-the row — so nothing in a driver's vocabulary says it.
+the row — so nothing in a driver's vocabulary says it. A handler answers it as
+a fault that carries it: the helper reads the cause and goes again, and where
+nothing goes again the caller is told 500 in words of the handler's own.
 
 The joining spelling is a named helper rather than an `if` on the handle's type,
 because written by hand it reads as a fallback to writing outside a transaction.
