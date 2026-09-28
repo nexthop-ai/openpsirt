@@ -335,7 +335,7 @@ func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		got, err := f.store.DeferredAt(ctx, at.ProductID, at.VulnerabilityID,
+		got, err := f.store.DeferredAt(ctx, f.triager, at.ProductID, at.VulnerabilityID,
 			[]string{at.PlaceIdentity, "a-place-nobody-deferred"})
 		if err != nil {
 			t.Fatal(err)

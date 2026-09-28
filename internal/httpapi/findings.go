@@ -14,6 +14,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
@@ -951,7 +952,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {
 			return nil, wentWrong(in.Logger, "which branches carry the patches could not be read", err)
 		}
-		if err := putOff(ctx, in, named.ProductID, issue, body.Places); err != nil {
+		if err := putOff(ctx, in, subject, named.ProductID, issue, body.Places); err != nil {
 			return nil, wentWrong(in.Logger, "how long these places were put off could not be read", err)
 		}
 		// The record kept in this product, where one stands. Read here rather
@@ -1102,8 +1103,8 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 }
 
 // putOff fills in how long each place has been put off for, in one read.
-func putOff(ctx context.Context, in Ingest, productID, vulnerabilityID int64,
-	places []SittingBody) error {
+func putOff(ctx context.Context, in Ingest, subject access.Subject, productID,
+	vulnerabilityID int64, places []SittingBody) error {
 	if len(places) == 0 {
 		return nil
 	}
@@ -1111,7 +1112,7 @@ func putOff(ctx context.Context, in Ingest, productID, vulnerabilityID int64,
 	for _, place := range places {
 		names = append(names, place.Place)
 	}
-	totals, err := triage.NewStore(in.DB.DB).DeferredAt(ctx, productID, vulnerabilityID, names)
+	totals, err := triage.NewStore(in.DB.DB).DeferredAt(ctx, subject, productID, vulnerabilityID, names)
 	if err != nil {
 		return err
 	}
