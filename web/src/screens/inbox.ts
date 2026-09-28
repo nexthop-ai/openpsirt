@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Disposition, Report, Rulable } from "../api/intake";
+import { own } from "../ui/own";
 
 // What a report was judged to be, in the words every screen says it in.
-export const DISPOSITION_SAID: Record<Disposition, string> = {
+const DISPOSITION_SAID: Record<Disposition, string> = {
   accepted: "Accepted",
   duplicate: "Duplicate",
   "not-reproducible": "Not reproducible",
@@ -23,7 +24,7 @@ export const RULABLE: readonly Rulable[] = [
 // A word the table does not know is shown as it arrived.
 export function dispositionSaid(disposition: string | undefined): string {
   if (!disposition) return "";
-  return DISPOSITION_SAID[disposition as Disposition] ?? disposition;
+  return own<string>(DISPOSITION_SAID, disposition) ?? disposition;
 }
 
 // Rejecting and declaring out of scope wait for somebody else.

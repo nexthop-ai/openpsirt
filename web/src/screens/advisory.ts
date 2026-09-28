@@ -1,6 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { own } from "../ui/own";
+
 // What the advisory screens work out, apart from what draws them.
 
 // The editorial statuses, with the word on screen and what reaching it means.
@@ -29,14 +31,8 @@ const said: Record<string, { label: string; tone: string; means: string }> = {
 };
 
 // This table's entry for a word, or nothing.
-//
-// Asked through a guard rather than by indexing: an object literal inherits
-// from the prototype, so a server-supplied word naming a member of it —
-// `constructor`, `toString` — comes back as a function, and the optional
-// chain that guards the lookup does not guard the field read after it.
 export function standing(status?: string): (typeof said)[string] | undefined {
-  const word = status ?? "";
-  return Object.hasOwn(said, word) ? said[word] : undefined;
+  return own(said, status);
 }
 
 // The status as a reader sees it. A word this table does not know is shown as
