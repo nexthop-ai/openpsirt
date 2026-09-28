@@ -3851,7 +3851,7 @@ export interface paths {
          * List what a build pulls in directly
          * @description Returns the build's own component and what it depends on, most findings first. The root is named separately from the list because it is what the list hangs from rather than a member of it.
          *
-         *     The list also holds every component nothing else in the build depends on, and the root's counts cover them. Where the inventory named no root, those components are the list.
+         *     The list also holds every component nothing else in the build depends on, and the root's counts cover them. An inventory naming no root of its own is filed with the build standing in for it.
          *
          *     The starting point for walking the graph. A full render is not offered and would not be useful: a real image holds thousands of components and tens of thousands of edges, which neither draws nor reads. Ask for one step at a time.
          *
@@ -10868,7 +10868,7 @@ export interface components {
              */
             edges: number;
             items: components["schemas"]["NeighborBody"][] | null;
-            /** @description The build itself, which everything below descends from. Absent where the inventory named no root of its own */
+            /** @description The build itself, which everything below descends from. Absent where nothing has been applied to the build */
             root?: components["schemas"]["NeighborBody"];
             /** @description The search this answers, where one was asked */
             term?: string;

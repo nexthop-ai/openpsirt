@@ -940,6 +940,8 @@ several places is one answer with one count.
 | Rule | |
 |---|---|
 | Issues, not finding rows | A library reachable under three parents is one issue. Counted as rows it reads three times its number, and the order follows the count |
+| A hit carries what is beneath it | By the walk and the bands the tree uses, so a container found by name reads what browsing to it reads |
+| The build's own root is not a hit | It is the build rather than one of its components, which is what the count beside the list says |
 | Counted in one pass over the build, grouped by component | Counted per matched component, SQLite reads the build's open findings once for each, and a term matching many names takes most of a minute |
 | Search hits marked in the list | The search answers with components and carries no chain to the root, so there is no position to open the tree at. The list stays while the term does, and the component's own screen is the control beside each hit |
 

@@ -362,17 +362,11 @@ func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
 // ComponentVersionAt resolves a component by name and, where one is given,
 // version.
 //
-// A name is not unique within a build, and not rarely. This was written
-// assuming it nearly always was, resolving a collision by taking the lowest
-// identifier — stable between requests, which was the property being protected.
-// A real switch image then shipped three vendored versions of one library, and
-// every one of them resolved to the first: two of the three findings answered
-// "no such finding" for a row the list had just drawn, and the third answered
-// about a version nobody asked about.
-//
-// So the version narrows it where the caller has one, and an ambiguous name
-// with no version is an error rather than a guess. A caller that guesses on
-// behalf of somebody is worse than one that says it cannot tell.
+// A name is not unique within a build, and not rarely: a real switch image
+// ships three vendored versions of one library. The version narrows it where
+// the caller has one, and an ambiguous name with no version is refused rather
+// than resolved to the lowest identifier, which answers about a version nobody
+// asked about.
 func (s *Store) ComponentVersionAt(ctx context.Context, targetID int64, name, version string) (int64, error) {
 	return s.ComponentAs(ctx, targetID, name, Choice{Version: version})
 }
@@ -418,8 +412,8 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 	if ecosystem != "" {
 		// The ecosystem is escaped and the trailing "/%" is not: the first is
 		// a value somebody supplied and the second is the pattern this clause
-		// is. An unescaped ecosystem made "_" match any character, so one
-		// name could be resolved as another's component.
+		// is. Unescaped, "_" matches any character, and one name resolves as
+		// another's component.
 		query = query.Where("LOWER(c.purl) LIKE ?"+database.LikeClause,
 			"pkg:"+database.LikeEscaped(strings.ToLower(ecosystem))+"/%")
 	}
@@ -549,12 +543,10 @@ type Neighbor struct {
 func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int64,
 	name string, which Choice) ([]Neighbor, []Neighbor, error) {
 
-	// Authorized before the name is resolved, which is what the two siblings
-	// here already do. The other way round a refusal was informative: a name
-	// the build does not hold answered 404, a name it holds twice answered 409
-	// naming every version and ecosystem, and a name it holds once answered
-	// 403 — so a subject who may not read findings here could read the
-	// build's inventory back one name at a time.
+	// Authorized before the name is resolved. Resolved first, the refusal is
+	// informative: an absent name, a name held twice and a name held once
+	// answer differently, and a subject who may not read findings here reads
+	// the build's inventory back one name at a time.
 	productID, readable, err := s.visibleIn(ctx, subject, targetID)
 	if err != nil {
 		return nil, nil, err
@@ -683,16 +675,6 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	if err != nil {
 		return nil, nil, err
 	}
-	if root == nil {
-		// A document that named no root of its own. The children are still
-		// what somebody reads, so they are still filled in and ordered — the
-		// list is the screen either way.
-		if err := s.filled(ctx, productID, targetID, readable, kids); err != nil {
-			return nil, nil, err
-		}
-		ordered(kids)
-		return nil, kids, nil
-	}
 	// The root and its children counted in the one statement. The root's own
 	// number is the whole build's, and it was a second walk of the same edges
 	// when asked for on its own. What nothing pulls in is adopted by the root:
@@ -741,9 +723,8 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 			targetID, bun.List(readable)).
 		Where("c.id = ?", componentID).
 		Scan(ctx, row)
-	if database.IsNoRows(err) {
-		return nil, nil
-	}
+	// No row is a fault like any other: an open node references its component
+	// by foreign key.
 	if err != nil {
 		return nil, fmt.Errorf("read what this build is: %w", err)
 	}
@@ -893,22 +874,19 @@ func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 // The number a row is ranked on is the number that describes it: for a
 // branch, everything open beneath it, and for a leaf, its own count — which
 // for a leaf are the same number anyway. A container holds nothing of its own,
-// so ranking it on that put every container at zero and the list fell back to
-// alphabetical, which is what it looked like.
+// so ranked on that every container reads zero and the list is alphabetical.
 //
-// A node that opens still comes before one that does not. A container holds no
-// findings of its own, and on a real image the root's 5,270 children put the
-// first thing that opens at position 546 when structure was not held above
-// contents. A tree whose first screen contains no branches is a list, and the
-// reader never learns the build has containers in it.
+// A node that opens comes before one that does not. On a real image the root's
+// 5,270 children put the first thing that opens at position 546 unless
+// structure is held above contents. A tree whose first screen contains no
+// branches is a list, and the reader never learns the build has containers in
+// it.
 //
-// The cost, stated because it was the reason branches were ordered by name
-// before: an edge here means "contains or depends on" and the document does
+// The cost: an edge here means "contains or depends on" and the document does
 // not distinguish the two, so forty kernel-module packages each depending on
-// the one kernel each report the kernel's findings beneath them. Deep in a
-// tree that groups them together at the top. Ranking by name instead avoided
-// that and produced a worse problem everywhere else — an alphabetical list of
-// containers, which is what the ordering exists to prevent.
+// the one kernel each report the kernel's findings beneath them, and deep in a
+// tree they group together at the top. Ranked by name they would not, and
+// every other list would be an alphabetical list of containers.
 func ordered(rows []Neighbor) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
@@ -1001,8 +979,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		// The build's own root is not one of its components, which is what the
-		// list beside this number already says. Counted, the header read one
-		// higher than the rows below it on every build.
+		// list beside this number says.
 		Where("n.is_root = ?", false).
 		Count(ctx)
 	if err != nil {
@@ -1050,7 +1027,7 @@ type Tally struct {
 func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int64,
 	term string, limit int) ([]Neighbor, error) {
 
-	_, readable, err := s.visibleIn(ctx, subject, targetID)
+	productID, readable, err := s.visibleIn(ctx, subject, targetID)
 	if err != nil {
 		return nil, err
 	}
@@ -1064,15 +1041,17 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	// name is matched on its folded form, which is lowercased and trimmed
 	// when stored, so no engine is asked to compare loosely; and the term is
 	// escaped as well as folded, so a term of "%" searches for a percent sign.
+	// The build's own root is not one of its components, which is what the
+	// count beside the list says.
 	matched := `(SELECT DISTINCT n.component_id AS "cid"
 		FROM "graph_node" AS "n"
 		JOIN "component" AS "m" ON m.id = n.component_id
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL
+		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.is_root = ?
 		  AND m.name_folded LIKE ?` + database.LikeClause + `) AS "matched"`
 
 	var rows []Neighbor
 	err = s.db.NewSelect().
-		TableExpr(matched, targetID, "%"+database.LikeEscaped(Folded(term))+"%").
+		TableExpr(matched, targetID, false, "%"+database.LikeEscaped(Folded(term))+"%").
 		Join(`JOIN "component" AS "c" ON c.id = matched.cid`).
 		// Issues rather than finding rows, which is what this field is and
 		// what the two queries that browse to the same component answer: a
@@ -1096,6 +1075,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
 			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
 			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
@@ -1106,6 +1086,12 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("search the build: %w", err)
+	}
+	// What is beneath each hit, by the statement the tree uses, so a hit and
+	// the same component browsed to carry one number. The page stays ranked
+	// on each hit's own findings, which is what the limit above cuts by.
+	if err := s.filled(ctx, productID, targetID, readable, rows); err != nil {
+		return nil, err
 	}
 	return rows, nil
 }
