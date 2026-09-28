@@ -119,6 +119,21 @@ by whom; the object-store and filesystem backends implement one interface behind
 it. A separate package would put that interface at a package boundary, where a
 second implementation is tempted to reach past it.
 
+Both backends store exactly the number of bytes they are told to expect. A body
+shorter or longer is refused and nothing is stored, so an upload's digest is
+always of the whole file.
+
+### The filesystem store
+
+The same store holds attachments in development and the published provider
+directory in production, where the same names are written again every pass.
+
+| Rule | |
+|---|---|
+| A file is written beside its name and renamed into place | A failure part way through leaves nothing a later read could mistake for a whole file |
+| The file written beside has a name of its own per write | A process killed part way through leaves it behind, and under a fixed name every later write of that key would be refused. Two writers of one key do not collide |
+| One left behind for an hour is removed when its key is next written | No write of one file takes that long, and nothing else removes it |
+
 ### Unencrypted store access
 
 An endpoint that is not `https` is refused, and two things lift that (REQ-70).

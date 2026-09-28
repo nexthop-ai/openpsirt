@@ -171,4 +171,11 @@ func TestAPlaintextStoreTakesAStreamedBody(t *testing.T) {
 	if err := bucket.Reachable(ctx); err != nil {
 		t.Fatal(err)
 	}
+	// Exactly the declared length, as Storage.Put says.
+	for body, declared := range map[string]int64{"abc": 4, "abcde": 4} {
+		if err := bucket.Put(ctx, "wrong-length", io.MultiReader(strings.NewReader(body)),
+			declared, "text/plain"); err == nil {
+			t.Fatalf("%d bytes were stored where %d were declared", len(body), declared)
+		}
+	}
 }

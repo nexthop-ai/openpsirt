@@ -307,17 +307,10 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 
 	digest := sha256.New()
 	whole := io.MultiReader(strings.NewReader(string(head)), body)
-	counted := &counting{}
-	if err := s.files.Put(ctx, key, io.TeeReader(io.TeeReader(whole, digest), counted),
-		size, contentType); err != nil {
+	// A body that is not the declared size is the store's to refuse, and
+	// both do (Storage.Put).
+	if err := s.files.Put(ctx, key, io.TeeReader(whole, digest), size, contentType); err != nil {
 		return nil, err
-	}
-	if counted.n != size {
-		if removed := s.files.Delete(ctx, key); removed != nil && s.logger != nil {
-			s.logger.ErrorContext(ctx, "a short upload left bytes behind",
-				"key", key, "error", removed)
-		}
-		return nil, fmt.Errorf("%d bytes arrived of the %d declared", counted.n, size)
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -361,15 +354,6 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		return nil, fmt.Errorf("record an attachment: %w", err)
 	}
 	return row, nil
-}
-
-// counting counts what passed through it, so that a declared size that does
-// not match what arrived is caught rather than trusted.
-type counting struct{ n int64 }
-
-func (c *counting) Write(p []byte) (int, error) {
-	c.n += int64(len(p))
-	return len(p), nil
 }
 
 // roomIn refuses an upload the deployment has no space for.
