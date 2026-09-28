@@ -333,3 +333,39 @@ func TestADecisionOnAnIssueDisclosedSinceThePlaceWasReadIsPublic(t *testing.T) {
 		}
 	})
 }
+
+func TestDecisionsAcrossProductsAreDescribedAtTheVisibilityReadInEach(t *testing.T) {
+	// A list of decisions can span products, and each visibility is a grant
+	// held per product. Somebody reading undisclosed work in one product and
+	// disclosed work in another reads the undisclosed findings behind a
+	// decision in the first, whatever the list also holds.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other := f.secondProduct(t)
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		f.finds(t, f.build(t, f.product, "2026.03"), libfoo, "place-here", access.Private)
+		f.finds(t, f.build(t, other, "2026.03"), libfoo, "place-there", access.Public)
+
+		both := f.holding(t, "triager-of-both", map[int64][]access.Role{
+			f.product: {access.PublicTriage, access.PrivateTriage},
+			other:     {access.PublicTriage, access.PrivateTriage},
+		})
+		here := f.proposes(t, both, f.placeIn(f.product, "place-here", access.Private))
+		there := f.proposes(t, both, f.placeIn(other, "place-there", access.Public))
+
+		mixed := f.holding(t, "mixed-reader", map[int64][]access.Role{
+			f.product: {access.PublicRead, access.PrivateRead},
+			other:     {access.PublicRead},
+		})
+		described, err := f.store.Describe(ctx, mixed, []triage.Decision{*here, *there})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if card, ok := described[here.ID]; !ok || card.Places != 1 {
+			t.Errorf("an undisclosed decision in a product read privately was described as %+v", card)
+		}
+		if card, ok := described[there.ID]; !ok || card.Places != 1 {
+			t.Errorf("a disclosed decision in a product read publicly was described as %+v", card)
+		}
+	})
+}

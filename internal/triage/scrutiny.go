@@ -435,8 +435,6 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	if len(ids) == 0 {
 		return covered, nil
 	}
-	readable := readableVisibilities(subject, ids, s, ctx)
-
 	var rows []struct {
 		ClaimID int64 `bun:"claim_id"`
 		Covers  int   `bun:"covers"`
@@ -455,7 +453,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where(finding.KeyMatches).
-		Where("f.visibility IN (?)", bun.List(readable)).
+		Apply(readableFindingsBy(subject, "f", "st.product_id")).
 		GroupExpr("de.claim_id").
 		Scan(ctx, &rows)
 	if err != nil {

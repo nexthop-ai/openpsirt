@@ -539,10 +539,9 @@ func (s *Store) authorOf(ctx context.Context, claim Claim) (int64, error) {
 // One statement over every row of the claim, whatever its size. A claim over a
 // kernel is two thousand rows, and a count per row was a count per round trip.
 func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int64) (int, error) {
-	// Narrowed like every other count here. What is stored on the approval is
-	// served back, so an unnarrowed count discloses how many undisclosed
-	// findings sit behind a claim to somebody who may not read one.
-	readable := readableVisibilities(subject, ids, s, ctx)
+	// Narrowed like every other count here, per product. What is stored on
+	// the approval is served back, so an unnarrowed count discloses how many
+	// undisclosed findings sit behind a claim to somebody who may not read one.
 	covered, err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id`+
@@ -555,7 +554,7 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where(finding.KeyMatches).
-		Where("f.visibility IN (?)", bun.List(readable)).
+		Apply(readableFindingsBy(subject, "f", "st.product_id")).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what this covers: %w", err)

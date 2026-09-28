@@ -371,7 +371,7 @@ an identifier before.
 
 | Rule | |
 |---|---|
-| The builds named are the ones the reader may see | A claim somebody may read matches findings they may not, so the builds, the fix versions behind the outliers and the counts on a card are all narrowed per product |
+| The builds named are the ones the reader may see | A claim somebody may read matches findings they may not, so the builds, the fix versions behind the outliers and the counts on a card are all narrowed per product. A list spanning products is narrowed per product too, at the visibility read in each |
 | A claim is shown only to somebody who may act on every row of it | Acting on a claim is acting on the argument, which does not come in halves. Shown half, a reader would agree to words whose other half waits on somebody else, and the size beside the card would be wrong |
 
 ## Approval
