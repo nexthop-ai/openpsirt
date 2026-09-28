@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
+	"github.com/uptrace/bun"
 )
 
 // Upgraded, a component is identified the way the graph identifies it now, an
@@ -33,7 +34,12 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 		{Purl: "pkg:npm/lodash@4.17.22?arch=x", CPE: "cpe:2.3:a:lodash:lodash:4.17.22", Name: "lodash", Version: "4.17.22"},
 		{Name: "vendored", Version: "1.0"},
 	}
-	var person, key int64
+	// What the seed made, which the checks read by identifier: other checks
+	// write rows to some of these tables too.
+	var (
+		person, key, targetID int64
+		scans, components     []int64
+	)
 	return upgradeCheck{
 		name: "AV040DatabaseTakesItsIdentitiesNodesAndSendersAcross",
 		seed: func(t *testing.T, ctx context.Context, db *database.DB) {
@@ -54,6 +60,7 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 			if err != nil {
 				t.Fatal(err)
 			}
+			targetID = target.ID
 			people := access.NewStore(db.DB)
 			alice, err := people.Ensure(ctx, "alice", "", nil, nil)
 			if err != nil {
@@ -68,7 +75,7 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 
 			// v0.4.0 recorded a sender by name.
 			now := time.Now().UTC().Truncate(time.Second)
-			var scans []int64
+			scans = nil
 			for i, sender := range []string{"alice", "ci-nightly", "nobody-known"} {
 				scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
 					TargetID: target.ID, ContentHash: sender, ParserVersion: "test",
@@ -84,7 +91,7 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 				t.Fatal(err)
 			}
 
-			var components []int64
+			components = nil
 			for _, d := range described {
 				old := v040Identity(d)
 				if _, err := db.DB.NewRaw(`INSERT INTO "component" ("identity", "purl", "cpe", "name",
@@ -112,14 +119,19 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 			}
 		},
 		upgraded: func(t *testing.T, ctx context.Context, db *database.DB) {
-			identities := read(t, ctx, db, "component", []string{"id", "identity"})
+			identities := readWhere(t, ctx, db, "component", []string{"id", "identity"},
+				`"id" IN (?)`, bun.List(components))
+			if len(identities) != len(described) {
+				t.Fatalf("upgraded, %d of the %d components are left", len(identities), len(described))
+			}
 			for i, row := range identities {
 				if want := described[i].Identity(); row["identity"] != want {
 					t.Errorf("upgraded, %s is identified as %s, and the graph identifies it as %s",
 						described[i].Name, row["identity"], want)
 				}
 			}
-			nodes := read(t, ctx, db, "graph_node", []string{"id", "purl", "cpe"})
+			nodes := readWhere(t, ctx, db, "graph_node", []string{"id", "purl", "cpe"},
+				`"component_id" IN (?)`, bun.List(components))
 			if len(nodes) != 2 || nodes[0]["purl"] != described[0].Purl || nodes[0]["cpe"] != described[0].CPE {
 				t.Errorf("upgraded, the open node holds %v, want its component's identifiers", nodes)
 			}
@@ -131,10 +143,10 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 				"key:" + strconv.FormatInt(key, 10),
 				"nobody-known",
 			}
-			if got := columnOf(t, db, "scan", "credential"); !slices.Equal(got, wantSenders) {
+			if got := columnOf(t, db, "scan", "credential", `"id" IN (?)`, bun.List(scans)); !slices.Equal(got, wantSenders) {
 				t.Errorf("upgraded, the scans were sent by %v, want %v", got, wantSenders)
 			}
-			if got := columnOf(t, db, "scan_refusal", "credential"); !slices.Equal(got, wantSenders[1:2]) {
+			if got := columnOf(t, db, "scan_refusal", "credential", `"target_id" = ?`, targetID); !slices.Equal(got, wantSenders[1:2]) {
 				t.Errorf("upgraded, the refusal was sent by %v, want %v", got, wantSenders[1:2])
 			}
 		},
@@ -153,7 +165,8 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 				!strings.Contains(err.Error(), "pkg:npm/lodash") {
 				t.Errorf("rolled back over two components v0.4.0 identifies alike: %v", err)
 			}
-			if got := read(t, ctx, db, "component", []string{"id", "identity"}); len(got) != 3 ||
+			if got := readWhere(t, ctx, db, "component", []string{"id", "identity"},
+				`"id" IN (?) OR "identity" = ?`, bun.List(components), shaped.Identity()); len(got) != 3 ||
 				got[0]["identity"] != described[0].Identity() {
 				t.Errorf("a refused roll back left the components as %v", got)
 			}
@@ -163,13 +176,19 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 			}
 		},
 		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			for i, row := range read(t, ctx, db, "component", []string{"id", "identity"}) {
+			back := readWhere(t, ctx, db, "component", []string{"id", "identity"},
+				`"id" IN (?)`, bun.List(components))
+			if len(back) != len(described) {
+				t.Fatalf("rolled back, %d of the %d components are left", len(back), len(described))
+			}
+			for i, row := range back {
 				if want := v040Identity(described[i]); row["identity"] != want {
 					t.Errorf("rolled back, %s is identified as %s, want v0.4.0's %s",
 						described[i].Name, row["identity"], want)
 				}
 			}
-			if got := columnOf(t, db, "scan", "credential"); !slices.Equal(got, []string{"alice", "ci-nightly", "nobody-known"}) {
+			if got := columnOf(t, db, "scan", "credential", `"id" IN (?)`, bun.List(scans)); !slices.Equal(got,
+				[]string{"alice", "ci-nightly", "nobody-known"}) {
 				t.Errorf("rolled back, the scans were sent by %v, want the names", got)
 			}
 		},
@@ -189,11 +208,12 @@ func v040Identity(d graph.Described) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// columnOf is one column of every row of a table, in identifier order.
-func columnOf(t *testing.T, db *database.DB, table, name string) []string {
+// columnOf is one column of the rows of a table where holds, in identifier
+// order.
+func columnOf(t *testing.T, db *database.DB, table, name, where string, args ...any) []string {
 	t.Helper()
 	var out []string
-	for _, row := range read(t, t.Context(), db, table, []string{"id", name}) {
+	for _, row := range readWhere(t, t.Context(), db, table, []string{"id", name}, where, args...) {
 		out = append(out, row[name])
 	}
 	return out

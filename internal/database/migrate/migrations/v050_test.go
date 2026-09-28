@@ -26,7 +26,8 @@ const v050 = 39
 // A phase a check has nothing to say in is nil.
 //
 // Every check's rows sit in one database, so a check reads its own rows by
-// what identifies them rather than by counting a table.
+// what identifies them rather than by counting a table. The checks are built
+// once and seeded once per engine, so a seed resets whatever state it keeps.
 type upgradeCheck struct {
 	name       string
 	seed       func(t *testing.T, ctx context.Context, db *database.DB)

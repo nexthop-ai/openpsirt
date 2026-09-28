@@ -24,6 +24,7 @@ func everyIssueIsReadAsItself() upgradeCheck {
 			// Rows change no schema, so this is v0.4.0's whatever the checks
 			// before it wrote.
 			built = describe(t, ctx, db)
+			issues = nil
 			for _, name := range []string{"CVE-2026-1", "GHSA-aaaa-bbbb-cccc"} {
 				issues = append(issues, insertIssue(t, ctx, db, name))
 			}

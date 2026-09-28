@@ -13,7 +13,13 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/uptrace/bun"
 )
+
+// trailRows is what the trail check's two rows are about: the change a person
+// made under v0.4.0, and the one configuration makes once upgraded. Other
+// checks write to the trail too, so these are the rows it reads.
+var trailRows = []string{"triage-floor", "operator"}
 
 // Upgraded, every trail row v0.4.0 wrote is a person's and keeps its person,
 // and configuration may then record a change with no person behind it.
@@ -37,7 +43,7 @@ func everyTrailRowIsAPersons() upgradeCheck {
 			}
 			admin = person.ID
 			if _, err := db.DB.NewRaw(`INSERT INTO "admin_change" ("at", "by", "kind", "about", "became")`+
-				` VALUES (?, ?, ?, ?, ?)`, time.Now().UTC(), admin, "setting", "triage-floor", "high").
+				` VALUES (?, ?, ?, ?, ?)`, time.Now().UTC(), admin, "setting", trailRows[0], "high").
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -47,20 +53,22 @@ func everyTrailRowIsAPersons() upgradeCheck {
 				Actor string `bun:"actor"`
 				By    *int64 `bun:"by"`
 			}
-			if err := db.DB.NewRaw(`SELECT "actor", "by" FROM "admin_change"`).Scan(ctx, &rows); err != nil {
+			if err := db.DB.NewRaw(`SELECT "actor", "by" FROM "admin_change" WHERE "about" IN (?)`,
+				bun.List(trailRows)).Scan(ctx, &rows); err != nil {
 				t.Fatal(err)
 			}
 			if len(rows) != 1 || rows[0].Actor != "person" || rows[0].By == nil || *rows[0].By != admin {
 				t.Errorf("upgraded, the trail reads %+v", rows)
 			}
-			if err := trail.NewStore(db.DB).RecordByConfiguration(ctx, trail.Account, "operator",
+			if err := trail.NewStore(db.DB).RecordByConfiguration(ctx, trail.Account, trailRows[1],
 				nil, trail.Said(trail.NamedInConfiguration, true)); err != nil {
 				t.Fatalf("upgraded, configuration could not record a change: %v", err)
 			}
 		},
 		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
 			var left []int64
-			if err := db.DB.NewRaw(`SELECT "by" FROM "admin_change"`).Scan(ctx, &left); err != nil {
+			if err := db.DB.NewRaw(`SELECT "by" FROM "admin_change" WHERE "about" IN (?)`,
+				bun.List(trailRows)).Scan(ctx, &left); err != nil {
 				t.Fatal(err)
 			}
 			if len(left) != 1 || left[0] != admin {
