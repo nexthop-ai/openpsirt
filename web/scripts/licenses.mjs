@@ -18,7 +18,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = import.meta.dirname;
 const lockfile = path.join(here, "..", "package-lock.json");
 
 // The allowlist is the Makefile's, passed in rather than repeated here. A

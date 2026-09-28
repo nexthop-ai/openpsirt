@@ -18,7 +18,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = import.meta.dirname;
 const src = path.join(here, "..", "src");
 
 // The most words one paragraph, hint, or empty-state detail may put on screen.
