@@ -139,6 +139,35 @@ func TestMovingAWithdrawnPromiseOntoATakenPlaceNamesTheClaimThere(t *testing.T) 
 	})
 }
 
+func TestAWithdrawnClaimIsNotOfferedForReaffirming(t *testing.T) {
+	// Withdrawing a partly lapsed claim leaves its lapsed row lapsed. The
+	// claim was taken back, so re-affirming it would re-make a judgment its
+	// author withdrew.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		f.ends(t, made[1].ID, time.Now().UTC().Truncate(time.Microsecond))
+		if ok, err := f.store.Reaffirmable(ctx, f.triager, made[0].ClaimID); err != nil || !ok {
+			t.Fatalf("a partly lapsed claim reads as re-affirmable %v (%v), want true, "+
+				"so this checks nothing", ok, err)
+		}
+		if err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
+			t.Fatal(err)
+		}
+
+		if ok, err := f.store.Reaffirmable(ctx, f.triager, made[0].ClaimID); err != nil || ok {
+			t.Errorf("a withdrawn claim reads as re-affirmable %v (%v)", ok, err)
+		}
+		listed, total, err := f.store.ToReaffirm(ctx, f.triager, 0, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 0 || total != 0 {
+			t.Errorf("a withdrawn claim is listed to re-affirm: %d rows, total %d", len(listed), total)
+		}
+	})
+}
+
 func TestAProposerWhoseRowsSpanSeveralReadsIsToldOnce(t *testing.T) {
 	// A sweep lapsing more rows than one read names reads who to tell in
 	// pieces. One person is one notice however the rows fall.

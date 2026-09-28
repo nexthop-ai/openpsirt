@@ -969,7 +969,9 @@ is one act at the grain the claim was made at.
 
 The lapsed population is reached by the findings list's `lapsed` state, and by
 the review queue's To reaffirm tab, which lists the reader's own lapsed claims.
-The act sits on the claim, or on several claims from that tab
+A claim with a withdrawn row is neither listed there nor offered on its page:
+its author took it back, and a withdrawal leaves a row that had already lapsed
+as it was. The act sits on the claim, or on several claims from that tab
 (§ Re-affirmation across claims).
 
 ### Approval gate
