@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -402,7 +403,8 @@ func TestADigestCarriesOnlyWhatNothingElseSaid(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		told, err := notify.ToldAbout(ctx, db.DB, me.ID)
+		told, err := notify.ToldAbout(ctx, db.DB, me.ID,
+			[]string{notify.Concerning(7, 11, 13), notify.Concerning(7, 12, 13)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -449,6 +451,40 @@ func TestNothingIsMailedAboutAConditionThatHasAlreadyCleared(t *testing.T) {
 		}
 		if len(sender.sent) != 0 {
 			t.Errorf("what was sent about a condition that had already cleared: %+v", sender.sent)
+		}
+	})
+}
+
+// A standing condition that comes to be about undisclosed work is stored as
+// such, though its key and its words have not moved.
+func TestAStandingConditionTakesUpWhetherItIsUndisclosed(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "me@example.com", "Me", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		for _, private := range []bool{false, true} {
+			if _, _, err := store.Reconcile(ctx, who.ID, notify.QueueUntaken, []notify.Holds{{
+				About: "queue", Body: "Work is waiting.", Link: "/work",
+				Private: private, ProductID: &product.ID,
+			}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var stored []notify.Notification
+		if err := db.DB.NewSelect().Model(&stored).Where("person_id = ?", who.ID).
+			Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(stored) != 1 || !stored[0].Private {
+			t.Fatalf("the condition is stored as %+v, want one undisclosed row", stored)
 		}
 	})
 }

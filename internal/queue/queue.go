@@ -618,12 +618,9 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 // it is allowed to be, in which case it is set aside. Retrying for ever would
 // let one job that can never succeed crowd out work that could.
 func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) error {
-	// The attempt count and the write that acts on it, in one act. The
-	// count was read with a bare select and compared in Go, so whether this
-	// was the last attempt rested on a value fetched separately from the
-	// statement that buries or re-queues the job. The claimed-by predicate
-	// makes that mostly safe, and "mostly safe" is not what the rule about
-	// reading outside a transaction means.
+	// The attempt count and the write that acts on it are read in one
+	// transaction, so whether this was the last attempt rests on the value
+	// the statement that buries or re-queues the job was written against.
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		job := new(Job)
 		if err := tx.NewSelect().Model(job).Where("id = ?", id).Scan(ctx); err != nil {
@@ -673,8 +670,7 @@ const mostOfAnError = 4096
 // A cut at a byte offset splits a multi-byte character and leaves an invalid
 // tail, which three of the four engines then refuse to store — so the bound
 // meant to keep a write small is what makes it fail. The cut itself is the
-// shared one: this spelled it a second time, correctly, which is how the
-// spellings that are not correct survive.
+// shared one.
 func head(s string, n int) string {
 	if len(s) <= n {
 		return s

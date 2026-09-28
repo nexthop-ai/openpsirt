@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -34,6 +35,10 @@ type Bucket struct {
 	// for it, cross the network in the clear. Worked out where the endpoint
 	// is checked, so that nothing has to decide it a second time.
 	clear bool
+	// The store is reached over plain HTTP, whether across a network or on
+	// this machine. An upload is a stream with no Seek, and over plain HTTP
+	// the client cannot hash or checksum one ahead of sending it.
+	plain bool
 }
 
 // BucketConfig is where an object store is and how to reach it.
@@ -57,9 +62,18 @@ type BucketConfig struct {
 	// unless an operator says otherwise, because what it exposes is not
 	// visible from the configuration that turns it on (REQ-70).
 	AllowHTTP bool
+	// Names are the settings this store is configured by, which a refusal
+	// names: two stores are configured alike, and a refusal naming the other
+	// store's setting sends an operator to one that is fine.
+	Names SettingNames
 }
 
-// NewBucket returns a store, or nil where the deployment configured none .
+// SettingNames are the environment variables one store is configured by.
+type SettingNames struct {
+	AllowHTTP, Key, Secret, Token string
+}
+
+// NewBucket returns a store, or nil where the deployment configured none.
 //
 // Credentials are taken from the environment when none are configured,
 // which is the whole reason for the official client: a deployment on
@@ -76,12 +90,21 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	}
 	// Configured credentials win over whatever the environment offers. An
 	// operator who names a key means that key, and silently preferring an
-	// instance role would be the tool deciding who it is.
-	if settings.Key != "" && settings.Secret != "" {
-		options = append(options, awsconfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(settings.Key, settings.Secret, settings.Token)))
+	// instance role would be the tool deciding who it is. So half a pair is
+	// refused rather than dropped: dropped, the process runs as whatever
+	// identity the environment has, and nothing says the key went unused.
+	key, secret := strings.TrimSpace(settings.Key), strings.TrimSpace(settings.Secret)
+	if (key == "") != (secret == "") {
+		return nil, fmt.Errorf("%s and %s are set together or not at all",
+			settings.Names.Key, settings.Names.Secret)
 	}
-	inTheClear := false
+	token := strings.TrimSpace(settings.Token)
+	credentialed := key != ""
+	if credentialed {
+		options = append(options, awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(key, secret, token)))
+	}
+	inTheClear, plain := false, false
 	endpoint := strings.TrimSpace(settings.Endpoint)
 	shown := endpoint
 	if endpoint != "" {
@@ -91,19 +114,18 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		}
 		// A name and password in the address are taken out of it and handed
 		// over as credentials, which is also what makes the signing
-		// well-defined. Left in, the raw string reached the client and every
-		// failure it reported carried the password — a startup reachability
-		// failure is printed to standard error, where a container runtime
-		// captures it into the log store the redaction exists to keep it out
-		// of.
+		// well-defined. The client is given the address without them, so
+		// nothing it reports can carry them to standard error, where a
+		// container runtime captures it into a log store.
 		//
 		// A configured key still wins, for the reason above.
 		if parsed.User != nil {
-			if settings.Key == "" && settings.Secret == "" {
+			if !credentialed {
 				password, _ := parsed.User.Password()
 				options = append(options, awsconfig.WithCredentialsProvider(
 					credentials.NewStaticCredentialsProvider(
-						parsed.User.Username(), password, settings.Token)))
+						parsed.User.Username(), password, token)))
+				credentialed = true
 			}
 			parsed.User = nil
 			endpoint = parsed.String()
@@ -117,7 +139,8 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// than two that can drift: the password has already been taken out
 		// of the one the client gets.
 		shown = endpoint
-		inTheClear = parsed.Scheme != "https" && !loopback(parsed.Hostname())
+		plain = parsed.Scheme != "https"
+		inTheClear = plain && !loopback(parsed.Hostname())
 		if inTheClear && !settings.AllowHTTP {
 			// Naming the way through. The operator meeting this is the one a
 			// plaintext store was allowed for, and a refusal that states only
@@ -125,9 +148,16 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 			// source.
 			return nil, fmt.Errorf(
 				"object store endpoint must be https, or loopback for development: %s"+
-					" — set OPENPSIRT_ATTACHMENT_ALLOW_HTTP to accept it on this network",
-				shown)
+					" — set %s to accept it on this network",
+				shown, settings.Names.AllowHTTP)
 		}
+	}
+	// A session token belongs to a key. With neither a key nor a name in the
+	// endpoint it is dropped, and the process runs as the environment's
+	// identity with nothing saying so.
+	if token != "" && !credentialed {
+		return nil, fmt.Errorf("%s is set without %s and %s",
+			settings.Names.Token, settings.Names.Key, settings.Names.Secret)
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, options...)
 	if err != nil {
@@ -160,6 +190,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		bucket:   bucket,
 		endpoint: shown,
 		clear:    inTheClear,
+		plain:    plain,
 	}, nil
 }
 
@@ -176,12 +207,9 @@ func (b *Bucket) Endpoint() string { return b.endpoint }
 
 // loopback says whether a host reaches no further than this machine.
 //
-// Asked of the address rather than compared against a table of three. The
-// table left the whole of 127.0.0.0/8 and the IPv4-mapped IPv6 forms outside
-// it, so a local store given its own loopback address was refused with a
-// message naming exactly what the operator had supplied — and the only way
-// past it said, in the deployment log, that a plaintext store had been
-// accepted across a network when it had not.
+// Loopback is the whole of 127.0.0.0/8 and ::1 in every spelling, including
+// the IPv4-mapped IPv6 forms, so it is asked of the parsed address rather than
+// matched against a list of spellings.
 //
 // The literal name stays, because it is a name rather than an address and the
 // deployment may have it in its own hosts file.
@@ -203,17 +231,65 @@ func (b *Bucket) Put(ctx context.Context, key string, body io.Reader, size int64
 	// Streamed rather than held. The signature covers the envelope and TLS
 	// covers the bytes, which is what lets a reader be passed through instead
 	// of a slice the size of the file.
+	//
+	// Over https the client sends a trailing checksum, which a stream
+	// satisfies. Over plain HTTP it would hash the body before sending it,
+	// which a stream with no Seek refuses, so the payload goes unsigned and
+	// the checksum is sent only where the operation requires one. The body's
+	// integrity is the upload path's own digest, taken as the bytes pass.
+	var perCall []func(*s3.Options)
+	if b.plain {
+		perCall = append(perCall,
+			s3.WithAPIOptions(v4.SwapComputePayloadSHA256ForUnsignedPayloadMiddleware),
+			func(o *s3.Options) {
+				o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+			})
+	}
 	_, err := b.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(b.bucket),
 		Key:           aws.String(key),
-		Body:          body,
+		Body:          &exactly{body: body, left: size},
 		ContentLength: aws.Int64(size),
 		ContentType:   aws.String(contentType),
-	})
+	}, perCall...)
 	if err != nil {
 		return fmt.Errorf("store object: %w", err)
 	}
 	return nil
+}
+
+// exactly passes a body through and fails the read that would complete the
+// declared length when more follows, or the read that ends before it.
+//
+// The HTTP client notices a longer body only after the declared bytes have
+// gone, and a server that has read them can answer first, so the object is
+// stored cut short. Failing before the last bytes leave keeps the request
+// short of its declared length, which no store accepts.
+type exactly struct {
+	body io.Reader
+	left int64
+}
+
+func (e *exactly) Read(p []byte) (int, error) {
+	if e.left <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > e.left {
+		p = p[:e.left]
+	}
+	n, err := e.body.Read(p)
+	e.left -= int64(n)
+	switch {
+	case e.left == 0:
+		var one [1]byte
+		if extra, _ := io.ReadFull(e.body, one[:]); extra > 0 {
+			return 0, errors.New("more bytes arrived than were declared")
+		}
+		return n, nil
+	case errors.Is(err, io.EOF):
+		return n, fmt.Errorf("%d bytes short of the declared length: %w", e.left, io.ErrUnexpectedEOF)
+	}
+	return n, err
 }
 
 func (b *Bucket) Open(ctx context.Context, key string) (io.ReadCloser, error) {

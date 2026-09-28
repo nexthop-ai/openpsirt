@@ -290,6 +290,43 @@ func TestOnlyTheReplicaHoldingTheLeaseDecidesWhatToScanAgain(t *testing.T) {
 	})
 }
 
+// A replica that stops holds the work for a few passes and no longer, and one
+// that stops cleanly hands it back at once.
+func TestAReplicaThatStopsDoesNotHoldTheReScansForADay(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx := t.Context()
+		if _, err := f.scheduling(t, "the-first-replica").Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var held queue.Lease
+		if err := f.db.NewSelect().Model(&held).Where("name = ?", scanner.ScheduleLease).
+			Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if held.HeldUntil == nil || time.Until(*held.HeldUntil) > time.Hour {
+			t.Errorf("one pass holds the work until %v, which outlasts a restart by far", held.HeldUntil)
+		}
+
+		// Run hands the lease back as its context ends.
+		running, stop := context.WithCancel(ctx)
+		done := make(chan struct{})
+		go func() {
+			f.scheduling(t, "the-first-replica").Run(running, time.Hour)
+			close(done)
+		}()
+		deadline := time.Now().Add(5 * time.Second)
+		for f.queued(t) == 0 && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		stop()
+		<-done
+		mine, err := queue.NewLeases(f.db.DB).Take(ctx, scanner.ScheduleLease, "the-next-replica", time.Hour)
+		if err != nil || !mine {
+			t.Errorf("the next replica could not take the work at once: %v %v", mine, err)
+		}
+	})
+}
+
 func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 	// The cap exists so a runaway producer cannot push everyone else's work
 	// behind its own. Counted across every kind it did the opposite: a bulk
@@ -381,13 +418,8 @@ func TestTheScheduleAsksOnItsOwnAndReturnsWhenCancelled(t *testing.T) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
 
-		// Due, so the first wake has something to ask for.
-		if _, err := f.db.DB.NewUpdate().Model((*finding.Run)(nil)).
-			Set("finished_at = ?", time.Now().UTC().Add(-90*24*time.Hour)).
-			Where("target_id = ?", f.target).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-
+		// The fixture's build has never been scanned, so it is due and the
+		// first wake has something to ask for.
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		schedule := scanner.NewSchedule(f.db, f.queue, quiet, "one")
 		returned := make(chan struct{})

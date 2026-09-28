@@ -624,6 +624,16 @@ and the calls made to a forge go through a client that talks to the configured
 host and nowhere else, does not follow a redirect, and does not connect to an
 address inside this network.
 
+An address inside this network is loopback, private, link-local, multicast or
+unspecified, or in one of the blocks the standard library does not call private
+and the internet does not route: carrier-grade translation, "this network",
+benchmarking, protocol assignments, reserved, IPv6 site-local, IPv4-compatible
+IPv6, and the local-use NAT64 prefix. An address in the well-known NAT64
+prefix, and a 6to4 address, is judged by the IPv4 address inside it. Every
+refusal the client makes itself, at the dial as well as before it, is told apart
+from a host that did not answer, and an address inside this network is told
+apart again, because what a name resolves to can change.
+
 One client, in one place, for every fetch out of this process. Written per
 caller it is forgotten by one of them: a bare client with a timeout and nothing
 else, or the library's default, which has no timeout and follows ten redirects

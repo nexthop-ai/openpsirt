@@ -4,6 +4,8 @@
 package notify_test
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -132,6 +134,197 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 		}
 		if !strings.Contains(text, "CVE-2026-8001") {
 			t.Errorf("the message does not name the finding that is disclosed:\n%s", text)
+		}
+	})
+}
+
+// The daily sweep names what arrived unowned and is disclosed, counts what is
+// not, and moves the reader's stamp to before it read even when the message
+// is refused.
+func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Rhea Reader", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, role := range []access.Role{access.PublicTriage, access.PrivateTriage} {
+			if err := rights.GrantRole(ctx, reader.ID, product.ID, role); err != nil {
+				t.Fatal(err)
+			}
+		}
+		lastDigest := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Microsecond)
+		if _, err := db.DB.NewUpdate().Model((*access.Account)(nil)).
+			Set("email = ?", "reader@example.com").
+			Set("digest = ?", true).
+			Set("digest_unassigned = ?", true).
+			Set("digest_sent_at = ?", lastDigest).
+			Where("id = ?", reader.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, each := range []struct {
+			identifier, component string
+			visibility            access.Visibility
+		}{
+			{"CVE-2026-8101", "libnl-3-200", access.Public},
+			{"SONIC-2026-8102", "sonic-embargoed-driver", access.Private},
+		} {
+			named, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
+				[]finding.Named{{Identifier: each.identifier, Severity: "high"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			component := &graph.Component{
+				Identity: each.component, Name: each.component, Version: "1.0",
+				Purl: "pkg:deb/debian/" + each.component + "@1.0",
+			}
+			if _, err := db.DB.NewInsert().Model(component).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			row := &finding.Finding{
+				TargetID: target.ID, Kind: "dependency", VulnerabilityID: named[each.identifier],
+				Visibility: each.visibility, ComponentID: component.ID,
+				PlaceIdentity: "place-" + each.component, Urgency: int64(i + 1),
+				OpenedAt: time.Now().UTC(),
+			}
+			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		sender := &recorder{fail: errors.New("no such mailbox")}
+		post := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test")
+		before := time.Now().UTC().Truncate(time.Microsecond)
+		if _, err := post.Digests(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(sender.sent) != 1 {
+			t.Fatalf("%d digests were tried, want 1", len(sender.sent))
+		}
+		text := sender.sent[0].message.Text
+		if !strings.Contains(text, "CVE-2026-8101") {
+			t.Errorf("the digest does not name the disclosed finding nobody owns:\n%s", text)
+		}
+		for _, secret := range []string{"SONIC-2026-8102", "sonic-embargoed-driver"} {
+			if strings.Contains(text, secret) {
+				t.Errorf("the digest carries %q, which nobody has announced:\n%s", secret, text)
+			}
+		}
+		if !strings.Contains(text, "1 that nobody owns") {
+			t.Errorf("the digest does not count the undisclosed finding nobody owns:\n%s", text)
+		}
+
+		stamped, err := rights.ByIdentity(ctx, "reader@example.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stamped.DigestSentAt == nil || stamped.DigestSentAt.Before(before.Add(-time.Second)) ||
+			!stamped.DigestSentAt.After(lastDigest) {
+			t.Errorf("the digest stamp reads %v after a refused send, want it moved on", stamped.DigestSentAt)
+		}
+	})
+}
+
+// A digest leaves out everything its reader was told about, however much that
+// is, and says nothing was cut when nothing was.
+func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		holder, err := rights.Ensure(ctx, "holder@example.com", "Hana Holder", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, holder.ID, product.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// More than one page of the told, and one thing nobody said.
+		const held = 60
+		store := notify.NewStore(db.DB)
+		for i := range held {
+			identifier := fmt.Sprintf("CVE-2026-%04d", i)
+			named, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
+				[]finding.Named{{Identifier: identifier, Severity: "medium"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			component := &graph.Component{
+				Identity: identifier, Name: "libnl-3-200", Version: "1.0",
+				Purl: "pkg:deb/debian/libnl-3-200@1.0",
+			}
+			if _, err := db.DB.NewInsert().Model(component).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			row := &finding.Finding{
+				TargetID: target.ID, Kind: "dependency",
+				VulnerabilityID: named[identifier], Visibility: access.Public,
+				ComponentID: component.ID, PlaceIdentity: "place-" + identifier,
+				Urgency: int64(i + 1), OpenedAt: time.Now().UTC(), AssignedTo: &holder.PartyID,
+			}
+			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if i == 0 {
+				continue
+			}
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: holder.ID, Kind: notify.Assigned, Body: identifier,
+				Concerns: notify.Concerning(product.ID, named[identifier], component.ID),
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		digest, err := notify.Assemble(ctx, db.DB, holder, 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(digest.Mine) != 1 || digest.Mine[0].Issue != "CVE-2026-0000" {
+			t.Fatalf("the digest carries %d things, want only the one nobody said: %+v",
+				len(digest.Mine), digest.Mine)
+		}
+		if text := digest.Message("https://psirt.example").Text; strings.Contains(text, "are listed") {
+			t.Errorf("the digest says something was cut when nothing was:\n%s", text)
 		}
 	})
 }

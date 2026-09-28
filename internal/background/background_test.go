@@ -15,9 +15,19 @@ import (
 func TestThePassRunsAtOnceAndThenOnTheInterval(t *testing.T) {
 	// The first tick is immediate on purpose: a process that has just started
 	// is the moment a sweep is most worth running, because whatever
-	// accumulated while it was down is waiting.
-	var ran atomic.Int64
+	// accumulated while it was down is waiting. With an hour's interval, a
+	// first run that waited for it would never arrive inside the deadline.
+	var once atomic.Int64
 	ctx, done := context.WithCancel(t.Context())
+	go background.Every(ctx, time.Hour, time.Hour, func(context.Context) {
+		once.Add(1)
+	})
+	waitFor(t, func() bool { return once.Load() >= 1 },
+		"the pass ran %d times, want it run at once", &once)
+	done()
+
+	var ran atomic.Int64
+	ctx, done = context.WithCancel(t.Context())
 	go background.Every(ctx, time.Millisecond, time.Hour, func(context.Context) {
 		ran.Add(1)
 	})
@@ -28,15 +38,23 @@ func TestThePassRunsAtOnceAndThenOnTheInterval(t *testing.T) {
 
 func TestAnIntervalOfNothingTakesTheFallback(t *testing.T) {
 	// A caller passes a configured value straight through, so what nothing
-	// means is decided here rather than nine times.
-	var ran atomic.Int64
-	ctx, done := context.WithCancel(t.Context())
-	go background.Every(ctx, 0, time.Millisecond, func(context.Context) {
-		ran.Add(1)
-	})
-	waitFor(t, func() bool { return ran.Load() >= 3 },
-		"the pass ran %d times, want the fallback interval in force", &ran)
-	done()
+	// means is decided here rather than at every caller. The fallback is an
+	// hour, so a pass run more than once shows no fallback was taken.
+	for _, interval := range []time.Duration{0, -time.Second} {
+		var ran atomic.Int64
+		ctx, done := context.WithCancel(t.Context())
+		go background.Every(ctx, interval, time.Hour, func(context.Context) {
+			ran.Add(1)
+		})
+		waitFor(t, func() bool { return ran.Load() >= 1 },
+			"the pass never ran (%d)", &ran)
+		time.Sleep(50 * time.Millisecond)
+		if n := ran.Load(); n != 1 {
+			t.Errorf("an interval of %v ran the pass %d times, want the hour's fallback in force",
+				interval, n)
+		}
+		done()
+	}
 }
 
 func TestThePassStopsWithItsContext(t *testing.T) {

@@ -5,8 +5,16 @@ package attach
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
+	"testing/iotest"
+	"time"
 )
 
 // An endpoint reached in the clear is refused unless it reaches no further than
@@ -33,10 +41,8 @@ func TestPlaintextEndpointNeedsSayingSo(t *testing.T) {
 			endpoint: "http://10.4.1.9:9000", refused: true},
 		{name: "loopback needs no allowance", endpoint: "http://127.0.0.1:9000", clear: false},
 		{name: "loopback by name needs none either", endpoint: "http://localhost:9000"},
-		// Loopback is the whole of 127.0.0.0/8 and the IPv6 forms, not three
-		// spellings of it. Giving a local store its own address is ordinary,
-		// and it was refused with a message naming exactly what the operator
-		// had supplied.
+		// Loopback is the whole of 127.0.0.0/8 and the IPv6 forms. Giving a
+		// local store its own loopback address is ordinary.
 		{name: "a local store on its own loopback address", endpoint: "http://127.0.0.2:9000"},
 		{name: "loopback written as IPv6", endpoint: "http://[::1]:9000"},
 		{name: "loopback written as an IPv4-mapped IPv6 literal",
@@ -82,6 +88,66 @@ func TestPlaintextEndpointNeedsSayingSo(t *testing.T) {
 	}
 }
 
+// The names the directory store is configured by.
+var directoryNames = SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+	AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP", Key: "OPENPSIRT_DIRECTORY_KEY",
+	Secret: "OPENPSIRT_DIRECTORY_SECRET", Token: "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
+}
+
+// Credentials configured by halves are refused, naming the store's own
+// settings, rather than dropped in favor of whatever identity the environment
+// offers.
+func TestHalfACredentialIsRefused(t *testing.T) {
+	for _, each := range []struct {
+		name                     string
+		endpoint                 string
+		key, secret, token, says string
+	}{
+		{name: "a key alone", key: "key", says: "OPENPSIRT_DIRECTORY_KEY and OPENPSIRT_DIRECTORY_SECRET"},
+		{name: "a secret alone", secret: "secret", says: "OPENPSIRT_DIRECTORY_KEY and OPENPSIRT_DIRECTORY_SECRET"},
+		{name: "a key and a blank secret", key: "key", secret: "  ",
+			says: "OPENPSIRT_DIRECTORY_KEY and OPENPSIRT_DIRECTORY_SECRET"},
+		{name: "a token alone", token: "token", says: "OPENPSIRT_DIRECTORY_SESSION_TOKEN is set without"},
+		{name: "a whole pair", key: "key", secret: "secret"},
+		{name: "a whole pair and a token", key: "key", secret: "secret", token: "token"},
+		{name: "a token beside a name in the endpoint", token: "token",
+			endpoint: (&url.URL{Scheme: "http", User: url.UserPassword("name", "word"), Host: "127.0.0.1:9000"}).String()},
+		{name: "nothing, which is the environment's identity"},
+	} {
+		t.Run(each.name, func(t *testing.T) {
+			_, err := NewBucket(context.Background(), BucketConfig{
+				Endpoint: each.endpoint, Bucket: "advisories", Region: "us-east-1",
+				Key: each.key, Secret: each.secret, Token: each.token,
+				Names: directoryNames,
+			})
+			if each.says == "" {
+				if err != nil {
+					t.Fatalf("refused: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("accepted, and the configured credential would go unused")
+			}
+			if !strings.Contains(err.Error(), each.says) {
+				t.Fatalf("the refusal does not name the settings: %v", err)
+			}
+		})
+	}
+}
+
+// The refusal of a plaintext endpoint names the allowance of the store it is
+// about, since the attachment and directory stores are allowed separately.
+func TestThePlaintextRefusalNamesItsOwnStore(t *testing.T) {
+	_, err := NewBucket(context.Background(), BucketConfig{
+		Endpoint: "http://objects.example.com", Bucket: "advisories", Region: "us-east-1",
+		Names: directoryNames,
+	})
+	if err == nil || !strings.Contains(err.Error(), "set OPENPSIRT_DIRECTORY_ALLOW_HTTP") {
+		t.Fatalf("refused as %v", err)
+	}
+}
+
 // Naming no bucket turns attachments off rather than building a store that
 // cannot answer.
 func TestNoBucketIsNoStore(t *testing.T) {
@@ -91,5 +157,113 @@ func TestNoBucketIsNoStore(t *testing.T) {
 	}
 	if bucket != nil {
 		t.Fatal("a store was built for no bucket")
+	}
+}
+
+// A plaintext store takes a body it cannot rewind.
+//
+// An upload is streamed through two digests on its way in, so what reaches the
+// client is a reader with no Seek. Over https the request carries a trailing
+// checksum, which a stream satisfies; over http the client hashes the body
+// before sending it unless told the payload is unsigned. The server here is on
+// a loopback address, which is the development store.
+func TestAPlaintextStoreTakesAStreamedBody(t *testing.T) {
+	held := map[string][]byte{}
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.Method {
+		case http.MethodPut:
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			held[r.URL.Path] = body
+		case http.MethodGet:
+			body, ok := held[r.URL.Path]
+			if !ok {
+				w.Header().Set("Content-Type", "application/xml")
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(w, `<Error><Code>NoSuchKey</Code></Error>`)
+				return
+			}
+			_, _ = w.Write(body)
+		case http.MethodDelete:
+			delete(held, r.URL.Path)
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	bucket, err := NewBucket(ctx, BucketConfig{
+		Endpoint: server.URL, Bucket: "attachments", Region: "us-east-1",
+		Key: "key", Secret: "secret", PathStyle: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const key, content = "attachments/ab/cd/abcd", "the bytes of a file"
+	// No Seek: the shape the upload path hands over.
+	streamed := io.MultiReader(strings.NewReader(content))
+	if err := bucket.Put(ctx, key, streamed, int64(len(content)), "text/plain"); err != nil {
+		t.Fatalf("a streamed body was refused: %v", err)
+	}
+	read, err := bucket.Open(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(read)
+	_ = read.Close()
+	if err != nil || string(got) != content {
+		t.Fatalf("read back %q, %v", got, err)
+	}
+	link, err := bucket.URLFor(ctx, key, time.Minute, `attachment; filename="a"`, "text/plain")
+	if err != nil || !strings.HasPrefix(link, server.URL+"/attachments/"+key+"?") {
+		t.Fatalf("signed %q, %v", link, err)
+	}
+	if err := bucket.Delete(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bucket.Open(ctx, key); !errors.Is(err, ErrNoSuchObject) {
+		t.Fatalf("a removed object read back as %v", err)
+	}
+	if err := bucket.Reachable(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Exactly the declared length, as Storage.Put says.
+	for body, declared := range map[string]int64{"abc": 4, "abcde": 4} {
+		if err := bucket.Put(ctx, "wrong-length", io.MultiReader(strings.NewReader(body)),
+			declared, "text/plain"); err == nil {
+			t.Fatalf("%d bytes were stored where %d were declared", len(body), declared)
+		}
+	}
+}
+
+// A body of the wrong length never delivers the declared number of bytes.
+//
+// The client finds a longer body only after the declared bytes have gone, and
+// a server that has read them may already have answered and stored them. Held
+// short of the declared length, the request is one no store completes.
+func TestABodyOfTheWrongLengthNeverReachesItsDeclaredLength(t *testing.T) {
+	for body, declared := range map[string]int64{"abc": 4, "abcde": 4, "abcd": 4} {
+		for name, stream := range map[string]io.Reader{
+			"whole":    strings.NewReader(body),
+			"one byte": iotest.OneByteReader(strings.NewReader(body)),
+		} {
+			got, err := io.ReadAll(&exactly{body: stream, left: declared})
+			if int64(len(body)) == declared {
+				if err != nil || string(got) != body {
+					t.Errorf("%s: %q declared %d read as %q, %v", name, body, declared, got, err)
+				}
+				continue
+			}
+			if err == nil || int64(len(got)) >= declared {
+				t.Errorf("%s: %q declared %d delivered %d bytes (%v)",
+					name, body, declared, len(got), err)
+			}
+		}
 	}
 }

@@ -111,11 +111,14 @@ going back to v0.4.0.
 | `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
 | With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
 | Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
+| Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
 
 | After the upgrade from v0.4.0 | |
 |---|---|
 | A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
 | Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
+| An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
+| Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
 
 ## Serving
 
@@ -293,8 +296,8 @@ web server serves them, at the address you give below.
 | `OPENPSIRT_DIRECTORY_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_DIRECTORY_REGION` | The region, where the store wants one | unset |
 | `OPENPSIRT_DIRECTORY_KEY` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_DIRECTORY_SECRET` | Its secret | unset |
-| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | A session token, where the credentials are temporary ones | unset |
+| `OPENPSIRT_DIRECTORY_SECRET` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
 | `OPENPSIRT_DIRECTORY_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants | set when an endpoint is |
 | `OPENPSIRT_DIRECTORY_ALLOW_HTTP` | Accept a store endpoint that is not `https` and is not this machine | off |
 | `OPENPSIRT_DIRECTORY_DIR` | A directory on this machine to write the files into instead. The bucket wins where both are set | unset |
@@ -415,7 +418,8 @@ has announced, and a public index records every request made of it.
 | NuGet | `api.nuget.org` |
 
 Nothing else is reached, and a redirect is not followed. A distribution
-package is never asked about.
+package is never asked about, and nor is a component no current build carries:
+it keeps the answer it last had.
 
 Where egress is restricted, allow the hosts for the ecosystems your builds
 carry. An index that cannot be reached is asked once a pass and then left for
@@ -719,8 +723,8 @@ environment rather than a key somebody stored.
 | `OPENPSIRT_ATTACHMENT_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_ATTACHMENT_REGION` | The region, where the store wants one | unset |
 | `OPENPSIRT_ATTACHMENT_KEY` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_ATTACHMENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | A session token, where the credentials are temporary ones | unset |
+| `OPENPSIRT_ATTACHMENT_SECRET` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
 | `OPENPSIRT_ATTACHMENT_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
 | `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
 | `OPENPSIRT_ATTACHMENT_DIR` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |

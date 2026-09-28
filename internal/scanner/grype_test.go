@@ -352,6 +352,29 @@ func TestTheRangeComesFromTheDetailTheKindWasDecidedBy(t *testing.T) {
 	}
 }
 
+// With no identifier comparison among the details, the kind is the ecosystem
+// advisory's, and so is the range, whatever a detail of a kind nobody here
+// checked says ahead of it.
+func TestTheAdvisorysRangeIsTakenWhereItDecidedTheKind(t *testing.T) {
+	const doc = `{"matches":[{
+	  "vulnerability":{"id":"CVE-2025-1001","severity":"High","namespace":"alpine:distro:alpine:3.24"},
+	  "artifact":{"name":"busybox","version":"1.37.0-r31",
+	    "purl":"pkg:apk/alpine/busybox@1.37.0-r31?distro=alpine-3.24.1"},
+	  "matchDetails":[
+	    {"type":"some-new-matcher","found":{"versionConstraint":"<= 2.0 (unknown)"}},
+	    {"type":"exact-direct-match","found":{"versionConstraint":"< 1.37.0-r15"}}
+	  ]
+	}]}`
+	result, err := scanner.ParseGrype(strings.NewReader(doc), scanner.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := result.Reported[0]
+	if got.Matched != finding.ByAdvisory || got.MatchedRange != "< 1.37.0-r15" {
+		t.Errorf("reached %q with the range %q, want the advisory's own", got.Matched, got.MatchedRange)
+	}
+}
+
 func TestPatchesOnTheRelatedRecordAreKept(t *testing.T) {
 	// A match against a distribution's package resolves to that
 	// distribution's record, which points at its own tracker and nothing
@@ -490,7 +513,7 @@ func TestWhatLabelsAReferenceIsItsHostAndItsPath(t *testing.T) {
 	} {
 		got := scanner.KindOf(c.address)
 		if got != c.want {
-			t.Errorf("%s is labelled %q, want %q", c.address, got, c.want)
+			t.Errorf("%s is labeled %q, want %q", c.address, got, c.want)
 		}
 	}
 }

@@ -4,6 +4,7 @@
 package outward
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -161,9 +162,26 @@ func TestAProviderIsNeverReachedInsideThisNetwork(t *testing.T) {
 		"0.0.0.0:443",
 		"[64:ff9b::a00:5]:443",   // 10.0.0.5 through a NAT64 gateway
 		"[64:ff9b:1::a00:5]:443", // the same, through a local-use NAT64 prefix
+		"100.64.0.1:443",         // carrier-grade translation
+		"100.127.255.254:443",
+		"0.1.2.3:443", // "this network", beyond the unspecified address
+		"198.18.0.1:443",
+		"192.0.0.8:443",
+		"240.0.0.1:443",
+		"[fec0::1]:443",
+		"[::a00:5]:443",      // IPv4-compatible 10.0.0.5
+		"[2002:a00:5::]:443", // 10.0.0.5 through a 6to4 relay
+		"[2002:7f00:1::]:443",
 	} {
-		if err := Reachable(address); err == nil {
+		err := Reachable(address)
+		if err == nil {
 			t.Errorf("%s was allowed", address)
+			continue
+		}
+		// Refused by the client itself, which a caller tells apart from a
+		// host that did not answer.
+		if !errors.Is(err, ErrRefused) || !strings.Contains(err.Error(), "not reached inside this network") {
+			t.Errorf("%s was refused as %v", address, err)
 		}
 	}
 }
@@ -177,6 +195,8 @@ func TestAProviderOnTheInternetIsReached(t *testing.T) {
 		// 140.82.121.4 through the well-known NAT64 prefix, which is how an
 		// IPv6-only network with DNS64 reaches a host with no IPv6 address.
 		"[64:ff9b::8c52:7904]:443",
+		// And through 6to4.
+		"[2002:8c52:7904::]:443",
 	} {
 		if err := Reachable(address); err != nil {
 			t.Errorf("%s was refused: %v", address, err)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/attach"
+	"github.com/nexthop-ai/openpsirt/internal/config"
 )
 
 // An endpoint carrying credentials, which is what an operator may write and
@@ -84,35 +85,39 @@ func TestAPlaintextStoreSaysSoAtEveryStart(t *testing.T) {
 // store was allowed for, and a refusal saying only what is forbidden leaves
 // them to find the way through by reading the source.
 func TestTheRefusalNamesTheWayThrough(t *testing.T) {
-	_, err := attach.NewBucket(context.Background(), attach.BucketConfig{
-		Endpoint: withPassword,
-		Bucket:   "attachments",
-		Region:   "us-east-1",
-	})
-	if err == nil {
-		t.Fatal("a plaintext endpoint across a network was accepted")
-	}
-	if !strings.Contains(err.Error(), "OPENPSIRT_ATTACHMENT_ALLOW_HTTP") {
-		t.Fatalf("the refusal does not name the setting: %v", err)
-	}
-	if strings.Contains(err.Error(), password) {
-		t.Fatalf("the refusal carries a password: %v", err)
+	for _, each := range []struct {
+		store string
+		open  func(context.Context, config.Config, *slog.Logger) (attach.Storage, error)
+		cfg   config.Config
+	}{
+		{"OPENPSIRT_ATTACHMENT_ALLOW_HTTP", attachmentStore,
+			config.Config{AttachmentEndpoint: withPassword, AttachmentBucket: "attachments",
+				AttachmentRegion: "us-east-1"}},
+		{"OPENPSIRT_DIRECTORY_ALLOW_HTTP", directoryStore,
+			config.Config{DirectoryEndpoint: withPassword, DirectoryBucket: "advisories",
+				DirectoryRegion: "us-east-1"}},
+	} {
+		t.Run(each.store, func(t *testing.T) {
+			_, err := each.open(context.Background(), each.cfg, slog.New(slog.DiscardHandler))
+			if err == nil {
+				t.Fatal("a plaintext endpoint across a network was accepted")
+			}
+			if !strings.Contains(err.Error(), each.store) {
+				t.Fatalf("the refusal does not name the setting: %v", err)
+			}
+			if strings.Contains(err.Error(), password) {
+				t.Fatalf("the refusal carries a password: %v", err)
+			}
+		})
 	}
 }
 
 // An endpoint that carries a password reaches the client without one.
 //
-// Two values were computed from one endpoint: a redacted one for everything a
-// person reads, and the raw string for the client. Handing the credentials
-// over as credentials instead makes the two one string, and is also what makes
-// the signing well-defined.
-//
-// Measured, not assumed: the leak this was filed for does not happen. A
-// reachability failure against a credentialed endpoint reports the operation
-// and the status and never the address, so the password did not reach standard
-// error by that route. What stands is that the endpoint the client is given
-// carries no credential to leak by any route, and that what a person is shown
-// is that same string rather than a second one that can drift from it.
+// The credentials are handed over as credentials, which makes the signing
+// well-defined, and the endpoint the client is given carries none to leak by
+// any route. What a person is shown is that same string rather than a second
+// one that can drift from it.
 func TestAnEndpointCarryingAPasswordDoesNotCarryItToTheClient(t *testing.T) {
 	bucket, err := attach.NewBucket(context.Background(), attach.BucketConfig{
 		Endpoint:  withPassword,

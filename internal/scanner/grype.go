@@ -226,11 +226,8 @@ type grypeMatch struct {
 		// action a federal agency is required to take, none of which
 		// is a fact about this deployment.
 		//
-		// Decoded as an empty element so that the count is what it
-		// depends on. A named field here would have to be the
-		// scanner's, and it was one the scanner has never emitted:
-		// the entries carry the issue under `cve`, so nothing read it
-		// and nothing noticed.
+		// Decoded as an empty element, because the count is all that
+		// is read. The entries carry the issue under `cve`.
 		KEV  []struct{}        `json:"knownExploited"`
 		CVSS []publishedRating `json:"cvss"`
 		// CWEs is what kind of weakness this is. Several entries
@@ -253,12 +250,9 @@ type grypeMatch struct {
 	// references usually are. A match against a distribution's package
 	// resolves to that distribution's record, and a distribution's record
 	// points at its own tracker and nothing else — the commits that carry
-	// the fix are on the upstream record, which arrives here.
-	//
-	// This declared only the identifier for a long time, so the scanner
-	// read those addresses and threw them away: a kernel CVE that lists
-	// eight `git.kernel.org` commits on its NVD record showed one Debian
-	// tracker link and no patches at all.
+	// the fix are on the upstream record, which arrives here. A kernel CVE
+	// lists eight `git.kernel.org` commits on its NVD record and one Debian
+	// tracker link on the distribution's.
 	RelatedVulnerabilities []struct {
 		ID         string   `json:"id"`
 		DataSource string   `json:"dataSource"`
@@ -497,10 +491,8 @@ func exploited(match grypeMatch) bool {
 // A detail stating a range but deciding no kind is the fallback, because a
 // range is evidence and having none is worse than having the other one's.
 func matchedRange(details []matchDetail) string {
-	for _, detail := range details {
-		if strings.Contains(strings.ToLower(detail.Type), "cpe") {
-			return strings.TrimSpace(detail.Found.VersionConstraint)
-		}
+	if _, detail := deciding(details); detail != nil {
+		return strings.TrimSpace(detail.Found.VersionConstraint)
 	}
 	for _, detail := range details {
 		if stated := strings.TrimSpace(detail.Found.VersionConstraint); stated != "" {
@@ -621,11 +613,9 @@ func tail(s string) string {
 // less: an unrecognized reference is reported as a discussion rather than
 // asserted to be a patch.
 //
-// Matched against the raw string, a query or a fragment decided the label:
-// `https://unrelated.test/?from=git.kernel.org` read as a patch. And a host
-// alternative matched a substring of the host, so `git.kernel.org.evil.test`
-// read as one too. Both err in the direction the paragraph above refuses, so
-// the address is parsed and each half is asked of the part it is about.
+// The label is decided by the parsed host and path, never by a query, a
+// fragment or a substring of the host: `https://unrelated.test/?from=git.kernel.org`
+// and `git.kernel.org.evil.test` are not patches.
 var (
 	// patchPath is a path that names a change.
 	patchPath = regexp.MustCompile(
@@ -895,24 +885,31 @@ func firstFixDate(available []struct {
 // know is a word whose strength nobody here has checked, and treating it as
 // authoritative is the direction that hides something.
 func matched(details []matchDetail) finding.Matched {
-	for _, detail := range details {
+	kind, _ := deciding(details)
+	return kind
+}
+
+// deciding is the kind a match reads as and the detail that decided it, which
+// is nil where no detail names a type this knows. The kind and the range are
+// both read from it, so the two cannot come from different details.
+func deciding(details []matchDetail) (finding.Matched, *matchDetail) {
+	for i, detail := range details {
 		if strings.Contains(strings.ToLower(detail.Type), "cpe") {
-			return finding.ByIdentifier
+			return finding.ByIdentifier, &details[i]
 		}
 	}
 	if len(details) == 0 {
-		return ""
+		return "", nil
 	}
 	// An allowlist, which is what makes the paragraph above true. A denylist
 	// here — anything not naming a CPE is the ecosystem advisory — would read
 	// a match kind this does not know as the authoritative one, and that is
-	// the direction that hides something. A word nobody here has checked is a
-	// word whose strength nobody here has checked.
-	for _, detail := range details {
+	// the direction that hides something.
+	for i, detail := range details {
 		switch strings.ToLower(detail.Type) {
 		case "exact-direct-match", "exact-indirect-match":
-			return finding.ByAdvisory
+			return finding.ByAdvisory, &details[i]
 		}
 	}
-	return finding.ByIdentifier
+	return finding.ByIdentifier, nil
 }

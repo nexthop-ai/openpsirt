@@ -1243,12 +1243,13 @@ func TestBeingToldAboutWorkKeepsItOutOfTheDigest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		told, err := notify.ToldAbout(t.Context(), r.db.DB, reader.ID)
+		told, err := r.db.DB.NewSelect().Model((*notify.Notification)(nil)).
+			Where("person_id = ?", reader.ID).Where("concerns <> ?", "").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(told) != 1 {
-			t.Fatalf("%d things were recorded as told, want 1", len(told))
+		if told != 1 {
+			t.Fatalf("%d things were recorded as told, want 1", told)
 		}
 
 		// The digest reads what it holds and must recognize the same work.

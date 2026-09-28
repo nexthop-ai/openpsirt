@@ -59,6 +59,18 @@ func TestTheDirectionsKeepOppositeEnds(t *testing.T) {
 	}
 }
 
+// A tail of bytes that begin no character loses at most the three a split
+// character can leave, rather than everything up to the first that does.
+func TestATailOfBinaryOutputIsNotTrimmedAway(t *testing.T) {
+	noise := strings.Repeat("\x80", 10) + "abc"
+	if got := Tail(noise, 12); got != noise[len(noise)-12+3:] {
+		t.Fatalf("the tail of binary output came back as %q", got)
+	}
+	if got := Tail(strings.Repeat("\x80", 20), 10); len(got) != 7 {
+		t.Fatalf("a tail of nothing but continuation bytes came back as %q", got)
+	}
+}
+
 func TestABoundOfNoneKeepsNothing(t *testing.T) {
 	// A caller computing a bound from a setting can arrive at zero, and a
 	// negative slice index is a panic rather than an empty string.
@@ -72,11 +84,9 @@ func TestABoundOfNoneKeepsNothing(t *testing.T) {
 
 func TestABadByteEarlyOnDoesNotSwallowWhatFollowsIt(t *testing.T) {
 	// The text cut is often a program's own output, and a scanner that fails
-	// writes whatever it likes to standard error. Asked whether the whole
-	// kept prefix decodes, the trim walked back past every good character to
-	// the first bad byte and threw away the rest — so the recorded reason for
-	// a failed scan was whatever preceded the binary, which is usually
-	// nothing. The cut is about the last character, not about the string.
+	// writes whatever it likes to standard error. The cut is about the last
+	// character, not about the string, so a bad byte before it does not move
+	// it.
 	noise := "\xff" + strings.Repeat("a", 100)
 	if got := Head(noise, 50); got != noise[:50] {
 		t.Fatalf("a bad byte at the front cut the message to %q", got)

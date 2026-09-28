@@ -60,7 +60,10 @@ func Head(s string, most int) string {
 
 // Tail keeps the last most bytes, cut on a character boundary.
 //
-// The partial character is at the front, so the trim goes forward.
+// The partial character is at the front, so the trim goes forward, and at most
+// the three bytes a split character can leave: the text cut is often a
+// program's own output, and a run of bytes that begin no character is not a
+// split one.
 func Tail(s string, most int) string {
 	if most <= 0 {
 		return ""
@@ -69,7 +72,7 @@ func Tail(s string, most int) string {
 		return s
 	}
 	cut := s[len(s)-most:]
-	for len(cut) > 0 && !utf8.RuneStart(cut[0]) {
+	for i := 0; i < utf8.UTFMax-1 && len(cut) > 0 && !utf8.RuneStart(cut[0]); i++ {
 		cut = cut[1:]
 	}
 	return cut

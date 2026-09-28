@@ -5,6 +5,8 @@ package attach
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -68,19 +70,24 @@ func newFiles(dir string, folder, file os.FileMode) (*Files, error) {
 	return &Files{root: root, folder: folder, file: file}, nil
 }
 
-// Name is the kind of store rather than the directory it came up on. The
-// interface says it is "what this store is called in a log line and in the
-// readiness answer", which is a question about which backend is configured —
-// and the directory was kept on the struct for it and never read.
+// Name is the kind of store rather than the directory it came up on: the
+// readiness answer and a log line say which backend is configured.
 func (f *Files) Name() string { return "files" }
 
 func (f *Files) Put(ctx context.Context, key string, body io.Reader, size int64, _ string) error {
 	if err := f.root.MkdirAll(path.Dir(key), f.folder); err != nil {
 		return fmt.Errorf("store a file: %w", err)
 	}
+	f.clearAbandoned(key)
 	// Written beside and renamed, so a failure part way through leaves nothing
-	// a later read could mistake for a whole file.
-	partial := key + ".partial"
+	// a later read could mistake for a whole file. The name beside is this
+	// write's own: a process killed part way through leaves its partial file
+	// behind, and a fixed name would refuse every later write of the key.
+	suffix := make([]byte, 8)
+	if _, err := rand.Read(suffix); err != nil {
+		return fmt.Errorf("store a file: %w", err)
+	}
+	partial := key + "." + hex.EncodeToString(suffix) + partialSuffix
 	file, err := f.root.OpenFile(partial, os.O_WRONLY|os.O_CREATE|os.O_EXCL, f.file)
 	if err != nil {
 		return fmt.Errorf("store a file: %w", err)
@@ -100,6 +107,11 @@ func (f *Files) Put(ctx context.Context, key string, body io.Reader, size int64,
 	if written != size {
 		return fmt.Errorf("store a file: %d bytes arrived of %d", written, size)
 	}
+	// Exactly size bytes, as Storage.Put says: a longer body is refused
+	// rather than cut to the declared length.
+	if n, _ := io.ReadFull(body, make([]byte, 1)); n > 0 {
+		return fmt.Errorf("store a file: more than %d bytes arrived", size)
+	}
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("store a file: %w", err)
 	}
@@ -108,6 +120,38 @@ func (f *Files) Put(ctx context.Context, key string, body io.Reader, size int64,
 	}
 	remove = false
 	return nil
+}
+
+// partialSuffix ends the name a file is written under before it is renamed
+// into place.
+const partialSuffix = ".partial"
+
+// abandonedAfter is how old a partial file is before no write can still be
+// making it. A write is one file of at most the upload limit.
+const abandonedAfter = time.Hour
+
+// clearAbandoned removes the partial files an interrupted write of key left
+// behind. Best effort: a partial file that stays costs disk, and the write
+// this precedes does not depend on it.
+func (f *Files) clearAbandoned(key string) {
+	dir, base := path.Split(key)
+	entries, err := fs.ReadDir(f.root.FS(), path.Clean("./"+dir))
+	if err != nil {
+		return
+	}
+	prefix := base + "."
+	for _, each := range entries {
+		name := each.Name()
+		if each.IsDir() || !strings.HasPrefix(name, prefix) ||
+			!strings.HasSuffix(name, partialSuffix) {
+			continue
+		}
+		info, err := each.Info()
+		if err != nil || time.Since(info.ModTime()) < abandonedAfter {
+			continue
+		}
+		_ = f.root.Remove(path.Join(dir, name))
+	}
 }
 
 func (f *Files) Open(ctx context.Context, key string) (io.ReadCloser, error) {

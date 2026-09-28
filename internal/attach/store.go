@@ -5,6 +5,7 @@ package attach
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -37,6 +38,10 @@ type Store struct {
 	// window is the whole of what the pass's guard is for, and waiting for it
 	// to happen by itself is a test that passes by not racing.
 	afterPage func()
+	// beforeRecord runs inside an upload's transaction, after the room is
+	// checked and before the row is written, so a test can hold two uploads
+	// in the window a concurrent writer would otherwise slip through.
+	beforeRecord func()
 }
 
 // NewStore returns a store over db, keeping bytes in files.
@@ -286,6 +291,11 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	if err := shareLeft(ctx, s.db, subject.ID, size, share); err != nil {
 		return nil, err
 	}
+	if quota > 0 || share > 0 {
+		if err := ensureUploadLock(ctx, s.db); err != nil {
+			return nil, err
+		}
+	}
 
 	token, err := mintToken()
 	if err != nil {
@@ -307,17 +317,10 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 
 	digest := sha256.New()
 	whole := io.MultiReader(strings.NewReader(string(head)), body)
-	counted := &counting{}
-	if err := s.files.Put(ctx, key, io.TeeReader(io.TeeReader(whole, digest), counted),
-		size, contentType); err != nil {
+	// A body that is not the declared size is the store's to refuse, and
+	// both do (Storage.Put).
+	if err := s.files.Put(ctx, key, io.TeeReader(whole, digest), size, contentType); err != nil {
 		return nil, err
-	}
-	if counted.n != size {
-		if removed := s.files.Delete(ctx, key); removed != nil && s.logger != nil {
-			s.logger.ErrorContext(ctx, "a short upload left bytes behind",
-				"key", key, "error", removed)
-		}
-		return nil, fmt.Errorf("%d bytes arrived of the %d declared", counted.n, size)
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -338,12 +341,22 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		}
 		// Asked again inside the transaction, because the first answer
 		// was read before the bytes were carried and the deployment
-		// may have filled up while they were.
+		// may have filled up while they were. Behind the lock, because a
+		// total read beside another upload's transaction does not hold that
+		// upload's file.
+		if quota > 0 || share > 0 {
+			if err := lockUploads(ctx, tx); err != nil {
+				return err
+			}
+		}
 		if err := roomIn(ctx, tx, size, quota); err != nil {
 			return err
 		}
 		if err := shareLeft(ctx, tx, subject.ID, size, share); err != nil {
 			return err
+		}
+		if s.beforeRecord != nil {
+			s.beforeRecord()
 		}
 		_, err := tx.NewInsert().Model(row).Exec(ctx)
 		return err
@@ -363,13 +376,52 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	return row, nil
 }
 
-// counting counts what passed through it, so that a declared size that does
-// not match what arrived is caught rather than trusted.
-type counting struct{ n int64 }
+// uploadLock names the row an upload's transaction locks before it reads how
+// much is stored. A row of the lease table, which is a row per name: nothing
+// holds or takes it, and updating it is what makes a second upload's
+// transaction wait for the first to commit, on every engine.
+const uploadLock = "attachment uploads"
 
-func (c *counting) Write(p []byte) (int, error) {
-	c.n += int64(len(p))
-	return len(p), nil
+// lockRow is the part of a lease row that locking one needs.
+type lockRow struct {
+	bun.BaseModel `bun:"table:lease"`
+
+	Name string `bun:"name,pk"`
+}
+
+// ensureUploadLock makes the row lockUploads updates.
+//
+// Outside the transaction, because a second writer's insert is refused by the
+// primary key, and on PostgreSQL a refused statement aborts the transaction it
+// is in.
+func ensureUploadLock(ctx context.Context, db bun.IDB) error {
+	_, err := db.NewInsert().Model(&lockRow{Name: uploadLock}).Exec(ctx)
+	if err != nil && !database.IsDuplicate(err) {
+		return fmt.Errorf("record the upload lock: %w", err)
+	}
+	return nil
+}
+
+// lockUploads makes every other upload's transaction wait for this one.
+//
+// The room is a sum over rows, and a sum read beside another writer's
+// uncommitted insert does not include it, under the isolation every engine
+// here defaults to. An update of one fixed row takes a lock the next upload
+// has to wait on, so the second sum is read after the first insert commits.
+//
+// The write puts a new value in the row every time. An update setting a
+// column to what it already holds is matched and not written on MySQL and
+// MariaDB, and a cluster certifies only rows that were written, so two
+// uploads on two nodes would both pass. The value itself means nothing, and
+// nothing takes this lease by name.
+func lockUploads(ctx context.Context, tx bun.Tx) error {
+	if _, err := tx.NewUpdate().Model((*lockRow)(nil)).
+		Set(`"held_by" = ?`, rand.Text()).
+		Where(`"name" = ?`, uploadLock).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("wait for other uploads: %w", err)
+	}
+	return nil
 }
 
 // roomIn refuses an upload the deployment has no space for.

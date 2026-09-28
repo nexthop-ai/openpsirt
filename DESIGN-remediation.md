@@ -277,6 +277,7 @@ name to a public index.
 | A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
 | The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
 | A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
+| The candidates are components some build still carries, and a component no build carries keeps its last answer | A name that was in a build last year and is not now is not one to send to an index tonight. The report of names with no upstream answer reads the same set, so the two describe the same candidates |
 
 | Ecosystem | Index | The newest version is |
 |---|---|---|
@@ -303,8 +304,8 @@ What comes back is classified, because the classes want opposite treatment.
 |---|---|---|
 | A version | Yes | The thing being asked for |
 | The index has never heard of it | Asked, with no version | A private module and a vendored fork both look like this, and neither is a fault. Recorded so the question is not asked again tomorrow |
-| A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read. An answer we will never get is still an answer about this component |
-| A bad day — too many requests, or the index itself unwell | Nothing | The one class worth coming back to: it stays due and the next pass asks again |
+| A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read, a status other than a bad day's, a redirect the client refuses. An answer we will never get is still an answer about this component |
+| A bad day — too many requests, the index itself unwell, or no answer at all | Nothing | The one class worth coming back to: it stays due and the next pass asks again. A Maven project document that fails this way fails the whole answer, so its date is asked for again too |
 
 Everything that is not a bad day is recorded. Read as one, a refusal the index
 repeats every time leaves the component unrecorded, and the window takes the
@@ -314,7 +315,15 @@ with the components behind it never reached.
 A previous answer is never overwritten by an empty one. An index returns
 not-found for a renamed package and for some transient conditions, and letting
 one of those destroy a version already in hand would sit on the hole for a
-month.
+month. A version answered with no date keeps the date held for it while the
+version has not moved: npm's abbreviated document and a Maven project document
+that did not come back both answer the version alone.
+
+| Rule | Reason |
+|---|---|
+| A package is asked about once a pass, however many of its versions are stored | A component is one version and the question is about the package, so every version in the pass's window takes the one answer |
+| A PyPI name is asked for as PyPI spells it | Lower case, each run of hyphens, underscores and dots one hyphen. Asked any other way the index redirects, and the client follows no redirect |
+| A name the Maven or NuGet asker refuses before sending is reported as unreadable | It was never sent, so "no index knows it" would put a name nobody asked about on the list somebody holds back from |
 
 ### Names held back
 

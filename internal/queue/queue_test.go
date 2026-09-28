@@ -124,27 +124,37 @@ func TestNothingToDoReturnsNothing(t *testing.T) {
 	})
 }
 
+// Failed work comes back after a delay that grows with each attempt, so a
+// dependency that is briefly unavailable is not hammered while it recovers.
 func TestFailedWorkComesBackLater(t *testing.T) {
-	each(t, queue.DefaultOptions(), func(t *testing.T, _ *database.DB, q *queue.Queue) {
+	opts := queue.DefaultOptions()
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Second)
+		queue.SetClock(q, func() time.Time { return now })
 		if _, err := q.Add(ctx, "ingest", "x"); err != nil {
 			t.Fatal(err)
 		}
-		job, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
-		if err := q.Fail(ctx, job.ID, "worker", errors.New("upstream unavailable")); err != nil {
-			t.Fatal(err)
-		}
-		// Held back deliberately, so a dependency that is briefly unavailable
-		// is not hammered while it recovers.
-		again, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if again != nil {
-			t.Error("failed work was handed straight back out with no delay")
+		for attempt := 1; attempt <= 2; attempt++ {
+			job, err := q.Claim(ctx, "worker", "ingest")
+			if err != nil || job == nil {
+				t.Fatalf("claim on attempt %d: %v %+v", attempt, err, job)
+			}
+			if err := q.Fail(ctx, job.ID, "worker", errors.New("upstream unavailable")); err != nil {
+				t.Fatal(err)
+			}
+			delay := time.Duration(attempt) * opts.Backoff
+			now = now.Add(delay - time.Second)
+			if again, err := q.Claim(ctx, "worker", "ingest"); err != nil || again != nil {
+				t.Fatalf("attempt %d came back before its delay of %v: %v %+v", attempt, delay, err, again)
+			}
+			now = now.Add(time.Second)
+			if attempt == 2 {
+				back, err := q.Claim(ctx, "worker", "ingest")
+				if err != nil || back == nil || back.ID != job.ID {
+					t.Fatalf("failed work did not come back after its delay: %v %+v", err, back)
+				}
+			}
 		}
 	})
 }
@@ -181,6 +191,79 @@ func TestWorkThatKeepsFailingIsSetAside(t *testing.T) {
 		}
 		if state != string(queue.Dead) {
 			t.Errorf("state is %q, want %q", state, queue.Dead)
+		}
+	})
+}
+
+// Work stopped because another worker took its job over ends with nothing to
+// report and nothing to retry, and the job stays with the worker that has it.
+func TestWorkWhoseJobWasTakenOverSettlesAsHandedOver(t *testing.T) {
+	opts := queue.DefaultOptions()
+	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		now := time.Now().UTC()
+		queue.SetClock(q, func() time.Time { return now })
+		if _, err := q.Add(ctx, "ingest", "taken"); err != nil {
+			t.Fatal(err)
+		}
+		first, err := q.Claim(ctx, "slow", "ingest")
+		if err != nil || first == nil {
+			t.Fatalf("first claim: %v", err)
+		}
+		now = now.Add(opts.ClaimTimeout + time.Minute)
+		if second, err := q.Claim(ctx, "fast", "ingest"); err != nil || second == nil {
+			t.Fatalf("the stale claim was not taken over: %v", err)
+		}
+		recovered := false
+		ending := q.Settle(ctx, first, "slow", "upload", nil,
+			context.Canceled, queue.ErrNoLongerHeld,
+			func(context.Context) error { recovered = true; return nil })
+		if !ending.HandedOver || ending.Err != nil {
+			t.Errorf("a takeover settled as %+v, want handed over with nothing to report", ending)
+		}
+		if recovered {
+			t.Error("the work's own failure was recorded for a job somebody else has")
+		}
+		var claimed string
+		if err := db.QueryRowContext(ctx, `SELECT "claimed_by" FROM "job" WHERE "id" = ?`,
+			first.ID).Scan(&claimed); err != nil {
+			t.Fatal(err)
+		}
+		if claimed != "fast" {
+			t.Errorf("the job is held by %q after the old worker settled", claimed)
+		}
+	})
+}
+
+// Work stopped at the ceiling on one hold is its own failure: reported, and
+// the attempt counted, so a job that wedges every worker is set aside.
+func TestWorkStoppedAtTheCeilingSettlesAsAFailure(t *testing.T) {
+	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, "ingest", "wedged"); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.Claim(ctx, "worker", "ingest")
+		if err != nil || job == nil {
+			t.Fatalf("claim: %v", err)
+		}
+		stopped := errors.New("stopped at the ceiling")
+		recovered := false
+		ending := q.Settle(ctx, job, "worker", "upload", nil, stopped, queue.ErrHeldTooLong,
+			func(context.Context) error { recovered = true; return nil })
+		if ending.HandedOver || !errors.Is(ending.Err, stopped) {
+			t.Errorf("a claim at its ceiling settled as %+v, want the work's failure", ending)
+		}
+		if !recovered {
+			t.Error("the work's own failure was not recorded")
+		}
+		var state, why string
+		if err := db.QueryRowContext(ctx, `SELECT "state", "last_error" FROM "job" WHERE "id" = ?`,
+			job.ID).Scan(&state, &why); err != nil {
+			t.Fatal(err)
+		}
+		if state != string(queue.Pending) || why == "" {
+			t.Errorf("the job is %q with %q, want it back on the queue with the reason", state, why)
 		}
 	})
 }

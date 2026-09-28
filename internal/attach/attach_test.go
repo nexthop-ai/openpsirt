@@ -6,10 +6,12 @@ package attach_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -46,40 +48,44 @@ const (
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
+	dbtest.Each(t, func(t *testing.T, db *database.DB) { fn(t, setUp(t, db)) })
+}
 
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+// setUp builds the fixture in one database.
+func setUp(t *testing.T, db *database.DB) *fixture {
+	t.Helper()
+	ctx := t.Context()
+	dbtest.Reset(t, db)
 
-		root := t.TempDir()
-		files, err := attach.NewFiles(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f := &fixture{
-			db: db, store: attach.NewStore(db.DB, files), files: files, root: root,
-			product: product.ID, target: target.ID,
-		}
-		f.issue = f.anIssue(t, identity, access.Public)
-		fn(t, f)
-	})
+	cat := catalog.NewStore(db.DB)
+	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	files, err := attach.NewFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &fixture{
+		db: db, store: attach.NewStore(db.DB, files), files: files, root: root,
+		product: product.ID, target: target.ID,
+	}
+	f.issue = f.anIssue(t, identity, access.Public)
+	return f
 }
 
 // anIssue records a vulnerability and one place it sits at, at a visibility.
@@ -397,6 +403,99 @@ func TestAnUploadTooBigOrWithNoRoomIsRefused(t *testing.T) {
 	})
 }
 
+// Two uploads arriving together cannot both take the last of the room.
+//
+// Each checks the room inside the transaction that records it, and a check
+// that does not wait for the other writer reads a total without the other's
+// file in it. Both pass, both commit, and the store ends over its quota.
+func TestTwoUploadsTogetherCannotBothTakeTheLastRoom(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		f := setUp(t, db)
+		who := f.who(t, access.PublicTriage)
+		body := strings.Repeat("x", 600)
+		const quota = 1000
+
+		// The first to reach the insert waits for the second to reach it too,
+		// or gives up once it is plain the second is waiting on the first.
+		var mu sync.Mutex
+		arrived := 0
+		both := make(chan struct{})
+		attach.BeforeRecord(f.store, func() {
+			mu.Lock()
+			arrived++
+			if arrived == 2 {
+				close(both)
+			}
+			mu.Unlock()
+			select {
+			case <-both:
+			case <-time.After(2 * time.Second):
+			}
+		})
+
+		errs := make(chan error, 2)
+		for range 2 {
+			go func() {
+				_, err := f.store.Upload(t.Context(), who,
+					attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "evidence.log",
+					strings.NewReader(body), int64(len(body)), roomy, quota, plenty, false)
+				errs <- err
+			}()
+		}
+		stored, full := 0, 0
+		for range 2 {
+			switch err := <-errs; {
+			case err == nil:
+				stored++
+			case errors.Is(err, attach.ErrNoRoom):
+				full++
+			default:
+				t.Fatalf("an upload failed: %v", err)
+			}
+		}
+		if stored != 1 || full != 1 {
+			t.Fatalf("%d stored and %d refused for room, where one fits", stored, full)
+		}
+	})
+}
+
+// Every upload's lock is a write that changes the row.
+//
+// An update setting a column to the value it holds is matched and not
+// written on MySQL and MariaDB, and a cluster certifies only rows that were
+// written. Two uploads on two nodes would then both pass the check of the
+// room left.
+func TestEveryUploadLockChangesTheLockRow(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.who(t, access.PublicTriage)
+		held := func() string {
+			t.Helper()
+			var by *string
+			if err := f.db.DB.NewSelect().Table("lease").Column("held_by").
+				Where(`"name" = ?`, "attachment uploads").Scan(t.Context(), &by); err != nil {
+				t.Fatal(err)
+			}
+			if by == nil {
+				return ""
+			}
+			return *by
+		}
+		var seen []string
+		for range 2 {
+			if _, err := f.store.Upload(t.Context(), who,
+				attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "evidence.log",
+				strings.NewReader("x"), 1, roomy, plenty, plenty, false); err != nil {
+				t.Fatal(err)
+			}
+			seen = append(seen, held())
+		}
+		if seen[0] == "" || seen[0] == seen[1] {
+			t.Errorf("two uploads left the lock row holding %q and then %q: a lock that "+
+				"writes nothing new is never certified across a cluster", seen[0], seen[1])
+		}
+	})
+}
+
 func TestADeploymentWithNoStoreHoldsNothingAndSaysSo(t *testing.T) {
 	// An operator who wants no object store should not have to run one,
 	// and everything else has to work.
@@ -431,19 +530,82 @@ func TestAKeyNeverComesFromWhatSomebodyTyped(t *testing.T) {
 		if strings.Contains(stored.Filename, "/") || strings.Contains(stored.Filename, "..") {
 			t.Errorf("the filename kept a path in it: %q", stored.Filename)
 		}
-		if strings.Contains(attach.Disposition(stored), `"`+"\n") {
-			t.Errorf("the disposition can be broken out of: %q", attach.Disposition(stored))
+	})
+}
+
+// A name somebody typed cannot end the quoted parameter it is written into,
+// carry a line break into a header, or name nothing.
+func TestANameCannotBreakOutOfTheHeaderItIsWrittenInto(t *testing.T) {
+	for typed, want := range map[string]string{
+		`a"b`:    "a_b",
+		`a\b`:    "a_b",
+		"a\r\nb": "ab",
+		"\x00":   "attachment",
+		"..":     "attachment",
+	} {
+		if got := attach.SafeName(typed); got != want {
+			t.Errorf("%q is kept as %q, want %q", typed, got, want)
+		}
+	}
+	disposition := attach.Disposition(&attach.Attachment{Filename: attach.SafeName(`x"y`),
+		ContentType: "application/octet-stream"})
+	if disposition != `attachment; filename="x_y"` {
+		t.Errorf("the disposition reads %q", disposition)
+	}
+}
+
+// An object the store will not delete is named and stepped over, and the rows
+// after it are still collected.
+func TestAnUndeletableObjectDoesNotStallTheSweep(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		stuck := f.upload(t, who, "stuck.log", []byte("the store will not let this go"))
+		after := f.upload(t, who, "after.log", []byte("this goes"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var said bytes.Buffer
+		store := attach.NewStore(f.db.DB, refusing{Storage: f.files, key: stuck.ObjectKey}).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		gone, err := store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gone != 1 {
+			t.Errorf("collected %d, want the one the store let go", gone)
+		}
+		if _, err := f.files.Open(ctx, after.ObjectKey); !errors.Is(err, attach.ErrNoSuchObject) {
+			t.Errorf("the object after the undeletable one is still there: %v", err)
+		}
+		for _, want := range []string{stuck.ObjectKey, "error="} {
+			if !strings.Contains(said.String(), want) {
+				t.Errorf("the undeletable object was reported without %q: %s", want, said.String())
+			}
 		}
 	})
 }
 
+// refusing is a store that will not delete one key.
+type refusing struct {
+	attach.Storage
+	key string
+}
+
+func (r refusing) Delete(ctx context.Context, key string) error {
+	if key == r.key {
+		return errors.New("the store refused")
+	}
+	return r.Storage.Delete(ctx, key)
+}
+
 // Attaching is triage work, and a share of the store is one person's.
 //
-// It was authorized with the read test, so a role granting nothing but the
-// ability to read disclosed findings on one product could write files into
-// the deployment's store — and what filling it costs is not the uploader's,
-// it is every other upload in every product afterwards. Nothing bounded any
-// one person's part of the total either.
+// A role granting nothing but the ability to read disclosed findings on one
+// product does not write files into the deployment's store, and what filling
+// it costs is every other upload in every product afterwards.
 func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -638,11 +800,10 @@ func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
 }
 
 func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
-	// The pass counted what it could not read and threw the error away, in
-	// the one writer here that destroys somebody's data. Counted alone the
-	// row is left standing with nothing naming it: the same number comes back
-	// every pass, and nobody can tell whether it is one row stuck or a
-	// different one each time, or what is wrong with it.
+	// The one writer here that destroys somebody's data names each row it
+	// could not claim. Counted alone, the same number comes back every pass,
+	// and nobody can tell whether it is one row stuck or a different one each
+	// time, or what is wrong with it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()

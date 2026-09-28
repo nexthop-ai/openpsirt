@@ -488,6 +488,19 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 	return s.Holds(PrivateTriage, productID)
 }
 
+// MayApprove is who may agree to somebody else's claim at one visibility: the
+// right to read there, and either the approver capability or the right to
+// triage there.
+//
+// The approver capability grants no reading of its own, so reading is asked
+// alongside it. A triager may approve too: the control that matters is that
+// claimant and approver are different people, which is checked separately.
+// The one spelling of the rule, for a signed-in subject and for the sweeps that
+// work out who to tell.
+func MayApprove(approver, reads, triages bool) bool {
+	return reads && (approver || triages)
+}
+
 // TriagesIn reports whether this subject triages findings of either visibility
 // in this product.
 //

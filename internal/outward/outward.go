@@ -161,6 +161,13 @@ func client(within time.Duration, reachable func(string) error,
 // the address, so a caller can tell this from a provider that did not answer.
 var ErrRefused = errors.New("refused")
 
+// ErrInside says an address a name resolved to lies inside this network. It
+// comes wrapped with ErrRefused. Unlike the other refusals it is about what a
+// name resolves to today, which a resolver answering differently tomorrow
+// changes, so a caller stepping over what the client refuses holds on to
+// this one.
+var ErrInside = errors.New("a provider is not reached inside this network")
+
 // guard refuses a request to a host the client does not permit.
 //
 // Checked at the round trip rather than only at the dial, because the dial
@@ -197,23 +204,31 @@ func Reachable(address string) error {
 		// Reached only from the dialer's control step, which runs on a
 		// resolved address. Anything that is not one here is unexpected
 		// rather than a name still awaiting resolution.
-		return fmt.Errorf("refused a connection to %q: not an address", host)
+		return fmt.Errorf("%w a connection to %q: not an address", ErrRefused, host)
 	}
-	if !reachable(ip) {
-		return fmt.Errorf("refused a connection to %s: a provider is not reached inside this network", ip)
+	if inside(ip) {
+		return fmt.Errorf("%w a connection to %s: %w", ErrRefused, ip, ErrInside)
 	}
 	return nil
 }
 
-// reachable says an address is on the public internet. An address in the
-// well-known NAT64 prefix is judged by the IPv4 address it translates to.
-func reachable(ip net.IP) bool {
+// inside is whether an address is anywhere but the public internet, including
+// through an address that carries an IPv4 one inside it.
+func inside(ip net.IP) bool {
 	if v4 := translated(ip); v4 != nil {
 		ip = v4
 	}
-	return !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() &&
-		!ip.IsLinkLocalMulticast() && !ip.IsUnspecified() && !ip.IsMulticast() &&
-		!sharedAddressSpace(ip)
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() ||
+		sharedAddressSpace(ip) {
+		return true
+	}
+	// A 6to4 address routes to the IPv4 address in its second to fifth
+	// bytes, through a relay: 2002:a00:5:: reaches 10.0.0.5.
+	if sixToFour.Contains(ip) {
+		return inside(net.IP(ip[2:6]))
+	}
+	return false
 }
 
 // wellKnownNAT64 is the prefix a NAT64 gateway translates into IPv4 with the
@@ -231,12 +246,11 @@ func translated(ip net.IP) net.IP {
 	return net.IPv4(ip[12], ip[13], ip[14], ip[15])
 }
 
+// sixToFour is the 6to4 prefix, whose addresses carry an IPv4 one.
+var sixToFour = mustNetwork("2002::/16")
+
 // sharedAddressSpace covers the ranges the standard library does not treat as
-// private but which are not the public internet either: the carrier-grade
-// translation block, the block meaning "this network", and the local-use
-// NAT64 prefix. A local-use prefix places the IPv4 address at whichever
-// length the network chose, so nothing here can read which address it
-// reaches, and it is refused whole.
+// private but which are not the public internet either.
 func sharedAddressSpace(ip net.IP) bool {
 	for _, network := range shared {
 		if network.Contains(ip) {
@@ -246,8 +260,19 @@ func sharedAddressSpace(ip net.IP) bool {
 	return false
 }
 
+// shared are the carrier-grade translation block, the block meaning "this
+// network", the benchmarking block, the protocol assignments block, the
+// reserved block, the deprecated site-local IPv6 block, the IPv4-compatible
+// IPv6 block, and the local-use NAT64 prefix. A local-use prefix places the
+// IPv4 address at whichever length the network chose, so nothing here can
+// read which address it reaches, and it is refused whole.
+//
+// Parsed once, where a mistyped block stops the process rather than being
+// skipped by every check afterwards.
 var shared = []*net.IPNet{
-	mustNetwork("100.64.0.0/10"), mustNetwork("0.0.0.0/8"), mustNetwork("64:ff9b:1::/48"),
+	mustNetwork("100.64.0.0/10"), mustNetwork("0.0.0.0/8"), mustNetwork("198.18.0.0/15"),
+	mustNetwork("192.0.0.0/24"), mustNetwork("240.0.0.0/4"), mustNetwork("fec0::/10"),
+	mustNetwork("::/96"), mustNetwork("64:ff9b:1::/48"),
 }
 
 func mustNetwork(block string) *net.IPNet {

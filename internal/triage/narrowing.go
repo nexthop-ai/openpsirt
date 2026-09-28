@@ -57,10 +57,8 @@ func mayApprove(subject access.Subject, productID int64, visibility access.Visib
 	if subject.Kind != access.Person {
 		return false
 	}
-	if !subject.Reads(visibility, productID) {
-		return false
-	}
-	return subject.Holds(access.Approver, productID) || mayDecide(subject, productID, visibility)
+	return access.MayApprove(subject.Holds(access.Approver, productID),
+		subject.Reads(visibility, productID), mayDecide(subject, productID, visibility))
 }
 
 // mayTakePart reports whether a subject may add to a decision rather than only

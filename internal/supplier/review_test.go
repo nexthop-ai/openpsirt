@@ -13,23 +13,30 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
 // The behaviours a review found missing, each pinned by the case that showed it.
 
+// A publisher stamps a batch with one moment, and a date-only stamp gives a
+// whole day the same one. A pass that stops inside such a group leaves the mark
+// inside it, and the rest of the group is still read.
 func TestDocumentsSharingAStampAreAllReadEventually(t *testing.T) {
-	// A publisher stamps a batch with one moment, and a date-only stamp gives
-	// a whole day the same one. On the moment alone, a pass that stopped
-	// inside such a group left the mark on that moment and skipped the rest of
-	// the group for ever — and no bound test could see it, because every entry
-	// in those had a day to itself.
+	aBatchIsReadWhole(t, "2026-05-01T00:00:00Z")
+}
+
+// A stamp finer than a microsecond is the same moment as the mark it leaves,
+// which is kept to the microsecond.
+func TestAStampFinerThanTheMarkIsTheMomentItLeaves(t *testing.T) {
+	aBatchIsReadWhole(t, "2026-05-01T00:00:00.1234567Z")
+}
+
+func aBatchIsReadWhole(t *testing.T, stamp string) {
+	t.Helper()
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		p := serving(t)
-		const stamp = "2026-05-01T00:00:00Z"
 		for i := range supplier.MostPerPass + 6 {
 			p.publishes(fmt.Sprintf("/batch/%02d.json", i), stamp,
 				advisory(fmt.Sprintf("EL-2026-3%03d", i), "libnl-3-200", "3.7.1",
@@ -48,13 +55,25 @@ func TestDocumentsSharingAStampAreAllReadEventually(t *testing.T) {
 
 		// The next pass starts from the pair the first one left, which is
 		// inside the group. Everything after it in that group is still due.
-		source.CaughtUpTo, source.CaughtUpMark = &took.CaughtUpTo, took.Mark
+		// The mark as it is stored, to the microsecond.
+		first := took.CaughtUpTo.Truncate(time.Microsecond)
+		source.CaughtUpTo, source.CaughtUpMark = &first, took.Mark
 		again, err := fetch.From(ctx, f.by, source)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if again.Documents != 6 {
 			t.Errorf("the second pass read %d of the 6 left in the group", again.Documents)
+		}
+		// And a third reads nothing, because nothing is left.
+		second := again.CaughtUpTo.Truncate(time.Microsecond)
+		source.CaughtUpTo, source.CaughtUpMark = &second, again.Mark
+		last, err := fetch.From(ctx, f.by, source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if last.Documents != 0 {
+			t.Errorf("a pass with nothing left read %d again", last.Documents)
 		}
 	})
 }
@@ -132,6 +151,87 @@ func TestADocumentThatCannotBeReadDoesNotStopTheSupplier(t *testing.T) {
 		// And the mark is past both, so neither is fetched again.
 		if !took.CaughtUpTo.Equal(time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)) {
 			t.Errorf("the mark stopped at %v", took.CaughtUpTo)
+		}
+	})
+}
+
+// A document the client turns away itself — here a redirect — is turned away
+// on every pass, so it is stepped over rather than holding the mark.
+func TestADocumentTheClientTurnsAwayDoesNotStopTheSupplier(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-31.json", "2026-09-20T00:00:00Z", "")
+		p.moved["/2026/EL-31.json"] = "/moved/EL-31.json"
+		p.publishes("/2026/EL-32.json", "2026-09-21T00:00:00Z",
+			advisory("EL-2026-0032", "libnl-3-200", "3.7.1", "CVE-2026-4900"))
+
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatalf("a redirected document failed the whole supplier: %v", err)
+		}
+		if took.Refused != 1 || took.Documents != 1 {
+			t.Errorf("read %+v, want the redirect refused and the next document read", took)
+		}
+		if !took.CaughtUpTo.Equal(time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("the mark stopped at %v", took.CaughtUpTo)
+		}
+	})
+}
+
+// A document whose name resolved inside this network holds the mark. A
+// filtering resolver or a split view answers that way until it is corrected,
+// and stepped over, the document would never be read once it was.
+func TestADocumentResolvingInsideThisNetworkHoldsTheMark(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-35.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0035", "libnl-3-200", "3.7.1", "CVE-2026-5100"))
+		p.publishes("/2026/EL-36.json", "2026-09-21T00:00:00Z",
+			advisory("EL-2026-0036", "libnl-3-200", "3.7.2", "CVE-2026-5101"))
+		p.inward["/2026/EL-36.json"] = true
+
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err == nil {
+			t.Fatal("a document resolving inside this network read as one to step over")
+		}
+		if took.Refused != 0 {
+			t.Errorf("it was counted as a refusal about the document: %+v", took)
+		}
+		if !took.CaughtUpTo.Equal(time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("the mark reached %v", took.CaughtUpTo)
+		}
+	})
+}
+
+// A feed entry naming its document relative to the feed is read at the address
+// that resolves to, as a link on the publisher's own page would be.
+func TestAFeedEntryNamingItsDocumentRelativelyIsRead(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		body := advisory("EL-2026-0034", "libnl-3-200", "3.7.1", "CVE-2026-5000")
+		p.override = func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/.well-known/csaf/provider-metadata.json":
+				_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
+					p.server.URL+"/csaf/feed.json")
+			case "/csaf/feed.json":
+				_, _ = fmt.Fprint(w, `{"feed":{"id":"f","title":"t","entry":[{"updated":"2026-09-20T00:00:00Z",`+
+					`"content":{"type":"application/json","src":"2026/EL-34.json"}}]}}`)
+			case "/csaf/2026/EL-34.json":
+				_, _ = fmt.Fprint(w, body)
+			default:
+				http.NotFound(w, r)
+			}
+		}
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Documents != 1 || took.Recorded != 1 {
+			t.Errorf("a relatively named document was not read: %+v", took)
 		}
 	})
 }
@@ -318,16 +418,7 @@ func TestASupplierWithdrawnMidPassStopsBeingRead(t *testing.T) {
 			advisory("EL-2026-0030", "libnl-3-200", "3.7.2", "CVE-2026-4800"))
 
 		store := supplier.NewStore(f.db.DB)
-		row, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-			Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		source := *row
-		source.CaughtUpTo = &long
+		source := from(t, f, p)
 
 		// Withdrawn as the pass runs, which is what the first document's write
 		// reads back.
@@ -342,6 +433,12 @@ func TestASupplierWithdrawnMidPassStopsBeingRead(t *testing.T) {
 		}
 		if took.Recorded != 0 || took.Documents != 0 {
 			t.Errorf("a withdrawn supplier recorded %+v", took)
+		}
+		// And nothing after the first is asked for.
+		for _, path := range p.asked {
+			if path == "/2026/EL-30.json" {
+				t.Error("a document was fetched after the supplier was withdrawn")
+			}
 		}
 	})
 }
@@ -470,18 +567,7 @@ func TestAPassThatFilledItsBoundLeavesTheSupplierDue(t *testing.T) {
 				advisory(fmt.Sprintf("EL-2026-5%03d", i), "libnl-3-200", "3.7.1",
 					fmt.Sprintf("CVE-2026-51%02d", i)))
 		}
-		store := supplier.NewStore(f.db.DB)
-		row, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-			Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
-		supplier.FetchForTest(pass, fetching(t, f, p))
+		store, _, pass := passOver(t, f, p, "test")
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
 		}

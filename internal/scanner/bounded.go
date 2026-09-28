@@ -39,10 +39,8 @@ func (b *bounded) Write(p []byte) (int, error) {
 	// Cut on a character boundary: what is kept is stored, and three engines
 	// of four refuse invalid UTF-8.
 	//
-	// The whole of what is on offer, bounded to the room left. Handed
-	// `p[:room]`, which is already exactly that many bytes, the bound had
-	// nothing to cut and returned it as it was — so the buffer still ended
-	// mid-character and the cut was a no-op.
+	// The cut is taken from the whole of p, so a character p splits at the
+	// limit is dropped whole.
 	b.kept.WriteString(bound.Head(string(p), int(room)))
 	return len(p), nil
 }

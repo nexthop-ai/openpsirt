@@ -308,9 +308,8 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		}
 		if err := s.files.Delete(ctx, row.ObjectKey); err != nil {
 			// The row is gone and the bytes are not. Named, because the key
-			// is the only thing left that can find them — and because a
-			// return here abandoned every row after it in the page, so one
-			// undeletable object stalled collection for ever.
+			// is the only thing left that can find them, and stepped over, so
+			// one undeletable object does not stall every row after it.
 			orphaned++
 			if s.logger != nil {
 				s.logger.ErrorContext(ctx,

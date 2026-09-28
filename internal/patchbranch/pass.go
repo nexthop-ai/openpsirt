@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -60,6 +61,9 @@ type Pass struct {
 	leases   *queue.Leases
 	replica  string
 	interval time.Duration
+	// renew is how often a visit asks for the lease again; renewTick where
+	// nothing set it.
+	renew time.Duration
 }
 
 // Options is what a deployment decides about the copies.
@@ -82,6 +86,11 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 	quota := options.Quota
 	if quota <= 0 {
 		quota = DefaultQuota
+	}
+	// Absolute from here on, so every path under it names one place whatever
+	// directory a command runs in.
+	if absolute, err := filepath.Abs(options.Dir); err == nil && options.Dir != "" {
+		options.Dir = absolute
 	}
 	pass := &Pass{
 		db: db, logger: logger,
@@ -271,7 +280,10 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 	}
 	byID := map[int64]*candidate{}
 	for _, repository := range repositories {
-		if excluded.Host(repository.Host) || waitingOut(repository, now) {
+		// Asked of the host in the address, which is stored whole, rather
+		// than of the host column, which is cut to the width of a name and
+		// can lose the suffix an exclusion names.
+		if excluded.Host(Commit{Repository: repository.URL}.Host()) || waitingOut(repository, now) {
 			continue
 		}
 		byID[repository.ID] = &candidate{repository: repository, held: held(repository)}
@@ -422,9 +434,9 @@ type ourFault struct{ err error }
 func (f ourFault) Error() string { return f.err.Error() }
 func (f ourFault) Unwrap() error { return f.err }
 
-// renewTick is how often a visit asks for the lease again. Throughout the visit, the fetch and the index write included: a
-// first fetch of the kernel from kernel.org takes a quarter of an hour, and
-// the lease is half an hour.
+// renewTick is how often a visit asks for the lease again, throughout the
+// visit, the fetch and the index write included: a first fetch of the kernel
+// from kernel.org takes a quarter of an hour, and the lease is half an hour.
 const renewTick = time.Minute
 
 // visit brings one repository's copy up to date and looks up every commit due
@@ -439,7 +451,11 @@ func (p *Pass) visit(ctx context.Context, c candidate, commits map[Commit]urgenc
 	held, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
 	go func() {
-		tick := time.NewTicker(renewTick)
+		every := p.renew
+		if every <= 0 {
+			every = renewTick
+		}
+		tick := time.NewTicker(every)
 		defer tick.Stop()
 		for {
 			select {

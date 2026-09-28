@@ -5,6 +5,7 @@ package supplier_test
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +47,11 @@ type publisher struct {
 	// excluded are hosts the client refuses the way it refuses one an
 	// administrator excluded.
 	excluded []string
+	// inward are paths the client refuses the way it refuses a name that
+	// resolved to an address inside this network.
+	inward map[string]bool
+	// asking runs as each path is asked for, before it is answered.
+	asking func(path string)
 }
 
 func serving(t *testing.T) *publisher {
@@ -53,12 +59,16 @@ func serving(t *testing.T) *publisher {
 	p := &publisher{
 		documents: map[string]string{}, stamped: map[string]string{},
 		failing: map[string]int{}, linked: map[string][]string{}, moved: map[string]string{},
+		inward: map[string]bool{},
 	}
 	// https, because the fetcher refuses anything else: what comes back is
 	// read as a publisher's own judgment, and over plain http it is read as
 	// whoever is between us and them.
 	p.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p.asked = append(p.asked, r.URL.Path)
+		if p.asking != nil {
+			p.asking(r.URL.Path)
+		}
 		if p.override != nil {
 			p.override(w, r)
 			return
@@ -140,7 +150,7 @@ func (p *publisher) reaching(also ...string) *http.Client {
 		refused[strings.ToLower(host)] = true
 	}
 	return &http.Client{
-		Transport: aliased{known: known, refused: refused, at: served.Host,
+		Transport: aliased{known: known, refused: refused, inward: p.inward, at: served.Host,
 			inner: p.server.Client().Transport},
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("%w a redirect to %s", outward.ErrRefused, req.URL.Host)
@@ -151,6 +161,7 @@ func (p *publisher) reaching(also ...string) *http.Client {
 type aliased struct {
 	known   map[string]bool
 	refused map[string]bool
+	inward  map[string]bool
 	at      string
 	inner   http.RoundTripper
 }
@@ -159,6 +170,10 @@ func (a aliased) RoundTrip(req *http.Request) (*http.Response, error) {
 	if a.refused[strings.ToLower(req.URL.Hostname())] {
 		return nil, fmt.Errorf("%w a request to %s: an administrator excluded it",
 			outward.ErrRefused, req.URL.Hostname())
+	}
+	if a.inward[req.URL.Path] {
+		// What the dialer's check answers for an address inside this network.
+		return nil, &net.OpError{Op: "dial", Net: "tcp", Err: outward.Reachable("10.0.0.7:443")}
 	}
 	if !a.known[strings.ToLower(req.URL.Hostname())] {
 		return nil, fmt.Errorf("no such host %s", req.URL.Hostname())
@@ -358,6 +373,25 @@ func from(t *testing.T, f *ships, p *publisher) supplier.Source {
 	row.CaughtUpMark = ""
 	row.CreatedAt = long
 	return *row
+}
+
+// passOver configures one publisher as a supplier, wound back so the documents
+// in a test are ahead of its mark, and a pass reading it through the test's
+// client.
+func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.Store, *supplier.Source, *supplier.Pass) {
+	t.Helper()
+	store := supplier.NewStore(f.db.DB)
+	row, err := store.Add(t.Context(), f.by, f.product, "Example Linux", p.described())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
+		Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	pass := supplier.NewPass(f.db.DB, quiet(), replica, sbom.Limits{}, outward.Excluded{})
+	supplier.FetchForTest(pass, fetching(t, f, p))
+	return store, row, pass
 }
 
 func TestAnAdvisoryAboutSomethingThisProductShipsIsRecordedAsEvidence(t *testing.T) {

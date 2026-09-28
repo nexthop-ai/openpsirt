@@ -6,6 +6,7 @@ package notify_test
 import (
 	"io"
 	"log/slog"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -82,14 +83,6 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		}
 
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		// Declared and never filed against, which is the same failure as
 		// having stopped — caught earlier. One alert for each administrator.
@@ -101,13 +94,13 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 			t.Fatalf("a build nothing was filed against: opened %d cleared %d, want 2 and 0",
 				opened, cleared)
 		}
-		if n := seeing(admin); n != 1 {
+		if n := waiting(t, db, admin); n != 1 {
 			t.Errorf("the administrator was told %d things, want 1", n)
 		}
-		if n := seeing(operator); n != 1 {
+		if n := waiting(t, db, operator); n != 1 {
 			t.Errorf("the administrator named in configuration was told %d things, want 1", n)
 		}
-		if n := seeing(reader); n != 0 {
+		if n := waiting(t, db, reader); n != 0 {
 			t.Errorf("somebody who administers nothing was told %d things", n)
 		}
 
@@ -131,8 +124,81 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		if opened != 0 || cleared != 2 {
 			t.Errorf("after a scan arrived: opened %d cleared %d, want 0 and 2", opened, cleared)
 		}
-		if n := seeing(admin); n != 0 {
+		if n := waiting(t, db, admin); n != 0 {
 			t.Errorf("the alert should have cleared itself, %d still waiting", n)
+		}
+	})
+}
+
+// Somebody who stops being an administrator stops being told what only
+// administrators are, the last of them included.
+func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		first, err := rights.Ensure(ctx, "first@example.com", "First", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		second, err := rights.Ensure(ctx, "second@example.com", "Second", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Table("target").
+			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
+			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		watch := notify.NewWatch(db.DB, quiet)
+		quietFor := func(who *access.Account) int {
+			t.Helper()
+			n, err := db.DB.NewSelect().Model((*notify.Notification)(nil)).
+				Where("person_id = ?", who.ID).Where("kind = ?", notify.BuildQuiet).
+				Where("cleared_at IS NULL").Count(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if quietFor(first) != 1 || quietFor(second) != 1 {
+			t.Fatalf("the administrators were told %d and %d things, want 1 each",
+				quietFor(first), quietFor(second))
+		}
+
+		for _, demoted := range []*access.Account{first, second} {
+			if _, err := rights.Ensure(ctx, demoted.Identity, "", access.Stated(false), nil); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := watch.Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if n := quietFor(demoted); n != 0 {
+				t.Errorf("%s stopped administering and is still told %d things", demoted.Identity, n)
+			}
 		}
 	})
 }
@@ -208,27 +274,19 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 			time.Now().UTC().Add(-24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(admin); n != 2 {
+		if n := waiting(t, db, admin); n != 2 {
 			t.Errorf("the administrator was told %d things about passed dates, want 2", n)
 		}
-		if n := seeing(owner); n != 1 {
+		if n := waiting(t, db, owner); n != 1 {
 			t.Errorf("whoever holds one was told %d things, want 1", n)
 		}
 		// Holding it is not enough. They may not read undisclosed work here,
 		// and the alert says an undisclosed finding exists.
-		if n := seeing(outsider); n != 0 {
+		if n := waiting(t, db, outsider); n != 0 {
 			t.Errorf("somebody who may not read undisclosed work was told %d things", n)
 		}
 
@@ -246,10 +304,10 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		if cleared == 0 {
 			t.Error("the date moved and the alert stayed")
 		}
-		if n := seeing(admin); n != 0 {
+		if n := waiting(t, db, admin); n != 0 {
 			t.Errorf("the administrator still sees %d after the dates moved", n)
 		}
-		if n := seeing(owner); n != 0 {
+		if n := waiting(t, db, owner); n != 0 {
 			t.Errorf("whoever holds it still sees %d after the date moved", n)
 		}
 	})
@@ -261,6 +319,13 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 func embargoed(t *testing.T, db *database.DB, targetID int64, identifier string,
 	owner int64, at time.Time) {
 	t.Helper()
+	embargoedAt(t, db, targetID, identifier, "sonic", owner, at)
+}
+
+// embargoedAt is embargoed at a component of the name given.
+func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, component string,
+	owner int64, at time.Time) {
+	t.Helper()
 	ctx := t.Context()
 	ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
 		[]finding.Named{{Identifier: identifier, Severity: "high"}})
@@ -269,7 +334,7 @@ func embargoed(t *testing.T, db *database.DB, targetID int64, identifier string,
 	}
 	components := graph.NewComponents(db.DB)
 	interned, err := components.Intern(ctx, []graph.Described{
-		{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"},
+		{Purl: "pkg:generic/" + component + "@1.0", Name: component, Version: "1.0"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -282,12 +347,81 @@ func embargoed(t *testing.T, db *database.DB, targetID int64, identifier string,
 	row := &finding.Finding{
 		TargetID: targetID, Kind: finding.Entered, Visibility: access.Private,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
-		PlaceIdentity: "place-of-" + identifier, LastChangedAt: now, OpenedAt: now,
+		PlaceIdentity: "place-of-" + identifier + "-" + component, LastChangedAt: now, OpenedAt: now,
 		DiscloseAt: &at, AssignedTo: &owner, AssignedAt: &now,
 	}
 	if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// An embargo is one condition per place it sits at, so each alert links the
+// place it is about and says the same thing on every sweep.
+func TestAnEmbargoAtTwoPlacesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Table("target").
+			Set("created_at = ?", time.Now().UTC()).
+			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		past := time.Now().UTC().Add(-24 * time.Hour)
+		embargoedAt(t, db, target.ID, "SONIC-2026-0001", "libfoo", admin.PartyID, past)
+		embargoedAt(t, db, target.ID, "SONIC-2026-0001", "libbar", admin.PartyID, past)
+
+		watch := notify.NewWatch(db.DB, quiet)
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, admin), 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var links []string
+		for _, row := range rows {
+			if row.Kind == notify.DisclosureDue {
+				links = append(links, row.Link)
+			}
+		}
+		sort.Strings(links)
+		if len(links) != 2 || !strings.HasSuffix(links[0], "/components/libbar") ||
+			!strings.HasSuffix(links[1], "/components/libfoo") {
+			t.Fatalf("an embargo at two places was told as %q", links)
+		}
+		// Nothing moved, so nothing is opened, cleared or rewritten.
+		opened, cleared, err := watch.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if opened != 0 || cleared != 0 {
+			t.Errorf("a sweep with nothing moved opened %d and cleared %d", opened, cleared)
+		}
+	})
 }
 
 func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
@@ -447,6 +581,16 @@ func critical(t *testing.T, db *database.DB, targetID int64, identifier, severit
 	}
 }
 
+// waiting is how many notifications somebody is being shown.
+func waiting(t *testing.T, db *database.DB, who *access.Account) int {
+	t.Helper()
+	_, total, err := notify.NewStore(db.DB).Waiting(t.Context(), asks(t, db, who), 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return total
+}
+
 // asks is the subject that person really is: the grants they hold, read back
 // from the database, and the cases they were brought into.
 //
@@ -550,22 +694,14 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 			time.Now().UTC().Add(24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(held); n != 1 {
+		if n := waiting(t, db, held); n != 1 {
 			t.Fatalf("whoever holds it was told %d things about a date coming, want 1", n)
 		}
-		if n := seeing(admin); n != 1 {
+		if n := waiting(t, db, admin); n != 1 {
 			t.Errorf("the administrator was told %d things, want 1", n)
 		}
 
@@ -580,11 +716,11 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(held); n != 0 {
+		if n := waiting(t, db, held); n != 0 {
 			t.Errorf("the previous holder still sees %d alerts about an embargo "+
 				"that is no longer theirs", n)
 		}
-		if n := seeing(next); n != 1 {
+		if n := waiting(t, db, next); n != 1 {
 			t.Errorf("whoever holds it now was told %d things, want 1", n)
 		}
 	})
@@ -611,14 +747,6 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		}
 		target := aScannedTarget(t, db)
 		watch := notify.NewWatch(db.DB, quiet)
-		seeing := func(who *access.Account) int {
-			t.Helper()
-			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return total
-		}
 
 		// A month of runs, every one of them against the same data. Nothing
 		// here has failed and nothing has gone quiet: the scans are arriving.
@@ -640,10 +768,10 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(admin); n == 0 {
+		if n := waiting(t, db, admin); n == 0 {
 			t.Fatal("the data has not moved in a month and nobody was told")
 		}
-		if n := seeing(reader); n != 0 {
+		if n := waiting(t, db, reader); n != 0 {
 			t.Errorf("somebody who administers nothing was told %d things", n)
 		}
 
@@ -653,7 +781,7 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if n := seeing(admin); n != 0 {
+		if n := waiting(t, db, admin); n != 0 {
 			t.Errorf("the data moved and %d alerts are still waiting", n)
 		}
 	})
@@ -756,12 +884,11 @@ func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testin
 			}
 		}
 		watch := notify.NewWatch(db.DB, quiet)
-		// The row's identity as well as its words. Asserted on the text alone
-		// this passed just as happily against a version-keyed condition: the
-		// second sweep would clear the old row and open a new one carrying the
-		// newer version, and Waiting returns whatever is uncleared — same
-		// assertion, same green, and a fresh unread alert about something that
-		// never stopped being true.
+		// The row's identity as well as its words. A version-keyed condition
+		// passes an assertion on the text alone: the second sweep clears the old
+		// row and opens a new one carrying the newer version, Waiting returns
+		// whatever is uncleared, and the reader gets a fresh unread alert about
+		// something that never stopped being true.
 		said := func() (int64, string) {
 			t.Helper()
 			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, admin), 50, 0)
@@ -900,8 +1027,7 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 	reason := string(triage.CodeNotPresent)
 	// The typed models rather than maps of column names, so the generated key
 	// comes back the way bun returns one. Asking the driver for it works on
-	// one engine and is unsupported on another, which is what four engines are
-	// for — and this failed on the second of them.
+	// one engine and is unsupported on another.
 	claim := &triage.Claim{
 		Kind: triage.FindingClaim, ProposedBy: who.ID, ProposedAt: now,
 		Outcome: triage.NotApplicable, Justification: &reason,
@@ -928,9 +1054,8 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 // A data bundle is a build stamp, so restoring an older one reproduces a
 // version string exactly. Measured as the first sighting of whichever version
 // ran most recently, an air-gapped deployment re-importing last quarter's
-// bundle was told the data had not moved in seven months — about data that had
-// moved two days earlier — and sent somebody looking for a fetch that never
-// failed.
+// bundle would be told the data had not moved in seven months, about data that
+// moved two days earlier.
 func TestAVersionComingBackIsNotTheDataStandingStill(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -1011,9 +1136,9 @@ func TestTwoReplicasADataFetchApartDoNotAlternate(t *testing.T) {
 
 // The window is a setting, and a window under a day is said in words.
 //
-// Neither staleness test set it, so replacing the read with the compiled
-// default left the suite green and nothing held that the knob did anything.
-// The words matter at the same time: "0 days" is what arithmetic gives for a
+// Set here to a value other than the compiled default, so a read replaced by
+// the default fails. The words matter at the same time: "0 days" is what
+// arithmetic gives for a
 // threshold measured in hours, and a deployment fetching nightly has a reason
 // to set one.
 func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
@@ -1066,6 +1191,127 @@ func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
 }
 
 // ranOn records a finished run that stated a data version, this many days ago.
+// A quiet build whose uploads are being turned away says so, and why, rather
+// than that nothing has arrived.
+func TestAQuietBuildBeingRefusedSaysWhyItIsRefused(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+		rights := access.NewStore(db.DB)
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		admin := recordPerson(t, rights, "admin@example.com", true, product.ID, "")
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Table("target").
+			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
+			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := ingest.NewStore(db.DB).Refused(ctx, access.Everything("the pipeline"),
+			ingest.Refusal{TargetID: target.ID, Reason: "the inventory could not be read"}); err != nil {
+			t.Fatal(err)
+		}
+		sweep(t, db)
+		told := openFor(t, db, admin, notify.BuildQuiet)
+		if len(told) != 1 || !strings.Contains(told[0], "turned away on") ||
+			!strings.Contains(told[0], "the inventory could not be read") {
+			t.Errorf("the administrator was told %q", told)
+		}
+	})
+}
+
+// An issue being exploited on a release is told to whoever may act on it,
+// whatever its rating.
+func TestAnExploitedIssueOnAReleaseIsToldWhateverItsRating(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+		rights := access.NewStore(db.DB)
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tag, err := cat.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		released, err := cat.TargetFor(ctx, tag.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		triager := recordPerson(t, rights, "triager@example.com", false, product.ID, access.PublicTriage)
+
+		critical(t, db, released.ID, "CVE-2026-EXPLOITED", "high")
+		if _, err := db.DB.NewUpdate().Table("finding").
+			Set("urgency_exploited = ?", true).
+			Where("target_id = ?", released.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		sweep(t, db)
+		told := openFor(t, db, triager, notify.CriticalOnRelease)
+		if len(told) != 1 || !strings.Contains(told[0], "is being exploited") {
+			t.Errorf("the triager was told %q", told)
+		}
+	})
+}
+
+// The data in force is the newest run's version, dated from when a version
+// was last seen for the first time, beside how long counts as stopped.
+func TestTheDataInForceIsTheNewestVersionDatedFromWhenItFirstArrived(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+		watch := notify.NewWatch(db.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+		none, err := watch.DataInForce(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if none.Version != "" || none.Since != nil || none.After <= 0 {
+			t.Fatalf("with nothing run the data reads %+v", none)
+		}
+
+		ran := ranOn(t, db, aScannedTarget(t, db))
+		ran(9, "v5:2026-01-01")
+		ran(5, "v5:2026-01-05")
+		ran(2, "v5:2026-01-05")
+		got, err := watch.DataInForce(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Version != "v5:2026-01-05" {
+			t.Errorf("the data in force reads %q", got.Version)
+		}
+		arrived := time.Now().UTC().Add(-5 * 24 * time.Hour)
+		if got.Since == nil || got.Since.Sub(arrived).Abs() > time.Hour {
+			t.Errorf("the data last moved at %v, want about %v", got.Since, arrived)
+		}
+	})
+}
+
 func ranOn(t *testing.T, db *database.DB, target int64) func(daysAgo int, version string) {
 	t.Helper()
 	return func(daysAgo int, version string) {

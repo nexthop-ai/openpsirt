@@ -227,6 +227,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Where the advisories that have gone out are written for somebody else
 	// to serve. Nothing configured is the ordinary case: documents are
 	// generated and handed over, and no directory is written.
+	logger.Info("checking the published advisory directory store")
 	published, err := directoryStore(ctx, cfg, logger)
 	if err != nil {
 		return err
@@ -1023,16 +1024,24 @@ func directoryStore(ctx context.Context, cfg config.Config,
 		Token:     cfg.DirectoryToken,
 		PathStyle: cfg.DirectoryPathStyle,
 		AllowHTTP: cfg.DirectoryAllowHTTP,
+		Names: attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+			AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP",
+			Key:       "OPENPSIRT_DIRECTORY_KEY",
+			Secret:    "OPENPSIRT_DIRECTORY_SECRET",
+			Token:     "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
+		},
 	})
+	// Named as this store's, because an object store's refusal reads the
+	// same for either of the two it backs.
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the published advisory directory's object store: %w", err)
 	}
 	if bucket != nil {
 		// Asked now rather than at the first pass. A bucket that does not
 		// answer is a configuration mistake, and the moment to report one is
 		// while whoever made it is still watching the logs.
 		if err := bucket.Reachable(ctx); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("the published advisory directory's object store: %w", err)
 		}
 		logger.Info("published advisories are written to an object store",
 			"bucket", cfg.DirectoryBucket)
@@ -1073,6 +1082,12 @@ func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger
 		Token:     cfg.AttachmentToken,
 		PathStyle: cfg.AttachmentPathStyle,
 		AllowHTTP: cfg.AttachmentAllowHTTP,
+		Names: attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+			AllowHTTP: "OPENPSIRT_ATTACHMENT_ALLOW_HTTP",
+			Key:       "OPENPSIRT_ATTACHMENT_KEY",
+			Secret:    "OPENPSIRT_ATTACHMENT_SECRET",
+			Token:     "OPENPSIRT_ATTACHMENT_SESSION_TOKEN",
+		},
 	})
 	if err != nil {
 		return nil, err

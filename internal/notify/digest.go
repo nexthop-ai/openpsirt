@@ -11,7 +11,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -34,6 +33,9 @@ type Digest struct {
 	// holding four hundred things that they hold fifty.
 	HeldTotal    int
 	UnownedTotal int
+	// HeldTold is how many of what they hold the walk passed over as already
+	// told, which is not something cut from the list.
+	HeldTold int
 }
 
 // Item is one piece of work, as a digest names it.
@@ -74,7 +76,8 @@ func (d Digest) Message(baseURL string) Message {
 		fmt.Fprintf(&text, "%s assigned to you that you have not been told about:\n\n",
 			count(len(d.Mine), "piece of work", "pieces of work"))
 		writeItems(&text, d.Mine)
-		text.WriteString(more(len(d.Mine)+d.Withheld.Count-d.Withheld.Unowned, d.HeldTotal))
+		text.WriteString(more(len(d.Mine)+d.Withheld.Count-d.Withheld.Unowned,
+			d.HeldTotal-d.HeldTold))
 	}
 	if len(d.Unowned) > 0 {
 		if text.Len() > 0 {
@@ -116,7 +119,7 @@ func more(shown, total int) string {
 // not say whether to open the tool now or after coffee, and a channel that
 // cannot answer that is one people stop reading. Neither says which finding,
 // which product or which build — a mail server has no business holding any of
-// that .
+// that.
 func (w Withheld) said() string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "%s not named here, because %s not been disclosed",
@@ -188,10 +191,6 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	// message by design — a rule is not a human action, so it is digest
 	// content rather than an interruption — which makes this the only
 	// place it is ever mentioned.
-	told, err := ToldAbout(ctx, db, person.ID)
-	if err != nil {
-		return digest, err
-	}
 	// Paged until enough have survived the filter, rather than filtering one
 	// page and stopping. What is being answered is "the things nothing else
 	// told you about", and the things it told you about are exactly what the
@@ -212,8 +211,19 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 			return digest, fmt.Errorf("read what %q holds: %w", person.Identity, err)
 		}
 		digest.HeldTotal = total
+		keys := make([]string, 0, len(held))
+		for _, row := range held {
+			keys = append(keys, Concerning(row.ProductID, row.VulnerabilityID, row.ComponentID))
+		}
+		told, err := ToldAbout(ctx, db, person.ID, keys)
+		if err != nil {
+			return digest, err
+		}
 		for _, row := range held {
 			if told[Concerning(row.ProductID, row.VulnerabilityID, row.ComponentID)] {
+				// Counted, so the line saying how much was left out counts
+				// only what the walk cut.
+				digest.HeldTold++
 				continue
 			}
 			digest.take(row)
@@ -287,30 +297,27 @@ func itemOf(row finding.Owned) Item {
 	}
 }
 
-// ToldAbout is what this person has already been told about individually.
+// ToldAbout is which of these things this person has already been told about
+// individually.
 //
-// Read once for the whole digest rather than asked per row: a person holding
-// two hundred things would otherwise be two hundred queries to answer one
-// message. Bounded, on a table nothing prunes. Every other read in this
-// package carries one, and this had neither a window nor a ceiling: it
-// returned every notification a person had ever received, once per person per
-// digest cycle.
-func ToldAbout(ctx context.Context, db *bun.DB, personID int64) (map[string]bool, error) {
+// Asked of one page of what they hold at a time, which bounds the read by the
+// page and makes it exact: however many things somebody has been told about,
+// what the page holds is either among them or not.
+func ToldAbout(ctx context.Context, db *bun.DB, personID int64,
+	among []string) (map[string]bool, error) {
+
+	told := make(map[string]bool, len(among))
+	if len(among) == 0 {
+		return told, nil
+	}
 	var concerns []string
 	if err := db.NewSelect().Model((*Notification)(nil)).
 		Column("concerns").
 		Where("person_id = ?", personID).
-		Where("concerns IS NOT NULL AND concerns <> ?", "").
-		// Newest first, because a ceiling that cuts the oldest is the right
-		// way round: what a digest must not repeat is what somebody was told
-		// recently, and a mention from two years ago that reappears once is
-		// the lesser fault.
-		OrderExpr("id DESC").
-		Limit(database.AList.Of(0)).
+		Where("concerns IN (?)", bun.List(among)).
 		Scan(ctx, &concerns); err != nil {
 		return nil, fmt.Errorf("read what person %d was told: %w", personID, err)
 	}
-	told := make(map[string]bool, len(concerns))
 	for _, about := range concerns {
 		told[about] = true
 	}

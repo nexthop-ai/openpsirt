@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,7 +49,7 @@ func TestWhatWentOutIsWhatIsWritten(t *testing.T) {
 		}
 
 		// A folder per year, and the filename the standard's rule gives.
-		at := filepath.Join(time.Now().UTC().Format("2006"), strings.ToLower(named)+".json")
+		at := f.pathOf(t, named)
 		body := f.read(t, at)
 
 		// The bytes are the ones the issuance recorded, rather than a
@@ -125,7 +126,7 @@ func TestARevisedAdvisoryIsPublishedAsItsNewestRevision(t *testing.T) {
 		}
 		f.write(t)
 
-		at := filepath.Join(time.Now().UTC().Format("2006"), strings.ToLower(named)+".json")
+		at := f.pathOf(t, named)
 		var doc advisory.Document
 		if err := json.Unmarshal(f.read(t, at), &doc); err != nil {
 			t.Fatal(err)
@@ -201,7 +202,7 @@ func TestTheFeedNamesEachDocumentAndTheHashBesideIt(t *testing.T) {
 		for _, link := range one.Link {
 			links[link.Rel] = link.Href
 		}
-		at := served + time.Now().UTC().Format("2006") + "/" + strings.ToLower(named) + ".json"
+		at := served + f.pathOf(t, named)
 		if links["self"] != at {
 			t.Errorf("the entry points at %q, want %q", links["self"], at)
 		}
@@ -325,6 +326,101 @@ func TestWritingTwiceWritesTheSameBytes(t *testing.T) {
 	})
 }
 
+// A pass over a record that has not moved since this process last wrote it
+// writes nothing at all, so a file removed between the two stays removed; a
+// record that moved is written again.
+func TestAnUnmovedRecordIsNotWrittenAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.issued(t, "A flaw in the recovery console")
+		writer := f.writer(t)
+		if written, err := writer.Write(t.Context()); err != nil || written.Unchanged {
+			t.Fatalf("the first pass wrote %+v (%v)", written, err)
+		}
+		index := filepath.Join(f.where, "index.txt")
+		if err := os.Remove(index); err != nil {
+			t.Fatal(err)
+		}
+		written, err := writer.Write(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !written.Unchanged {
+			t.Errorf("a pass over an unmoved record reported %+v", written)
+		}
+		if _, err := os.Stat(index); !os.IsNotExist(err) {
+			t.Error("a pass over an unmoved record wrote the index again")
+		}
+
+		f.issued(t, "A second flaw")
+		if written, err := writer.Write(t.Context()); err != nil || written.Unchanged {
+			t.Fatalf("a pass after a new advisory wrote %+v (%v)", written, err)
+		}
+		if _, err := os.Stat(index); err != nil {
+			t.Errorf("a pass after a new advisory did not write the index: %v", err)
+		}
+	})
+}
+
+// With nothing that may be published, a pass writes nothing and says so.
+func TestAPassWithEverythingHeldBackWritesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t)
+		named := f.minted(t, "A flaw in the recovery console")
+		if _, err := f.store.Add(t.Context(), f.who, named,
+			fixtures.ProductName, identifier); err != nil {
+			t.Fatal(err)
+		}
+		if written := f.write(t); !written.Unchanged || written.Documents != 0 {
+			t.Errorf("a pass with nothing to publish reported %+v", written)
+		}
+	})
+}
+
+// The feed lists the newest first, and it and the provider description are
+// dated from the newest document in the directory.
+func TestTheFeedIsNewestFirstAndDatedFromTheNewest(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		first := f.issued(t, "A flaw in the recovery console")
+		time.Sleep(10 * time.Millisecond)
+		second := f.issued(t, "A second flaw")
+		f.write(t)
+
+		gone, err := f.store.Issuances(t.Context(), f.who, second)
+		if err != nil || len(gone) != 1 {
+			t.Fatalf("issuances of %s: %v %d", second, err, len(gone))
+		}
+		newest := gone[0].IssuedAt.UTC()
+
+		var feed struct {
+			Feed struct {
+				Updated time.Time `json:"updated"`
+				Entry   []struct {
+					ID string `json:"id"`
+				} `json:"entry"`
+			} `json:"feed"`
+		}
+		if err := json.Unmarshal(f.read(t, "feed-tlp-white.json"), &feed); err != nil {
+			t.Fatal(err)
+		}
+		if len(feed.Feed.Entry) != 2 || feed.Feed.Entry[0].ID != second ||
+			feed.Feed.Entry[1].ID != first {
+			t.Errorf("the feed lists %+v, want %s then %s", feed.Feed.Entry, second, first)
+		}
+		if !feed.Feed.Updated.Equal(newest) {
+			t.Errorf("the feed is dated %v, want the newest document's %v", feed.Feed.Updated, newest)
+		}
+		var described struct {
+			LastUpdated time.Time `json:"last_updated"`
+		}
+		if err := json.Unmarshal(f.read(t, "provider-metadata.json"), &described); err != nil {
+			t.Fatal(err)
+		}
+		if !described.LastUpdated.Equal(newest) {
+			t.Errorf("the description is dated %v, want %v", described.LastUpdated, newest)
+		}
+	})
+}
+
 // A deployment that configured nowhere to write writes nothing, and says so
 // by answering with no writer at all rather than with a pass that does
 // nothing every hour.
@@ -400,19 +496,41 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
-// write runs one pass.
-func (f *fixture) write(t *testing.T) directory.Written {
+// writer is one writer over the fixture's store.
+func (f *fixture) writer(t *testing.T) *directory.Writer {
 	t.Helper()
 	writer := directory.New(f.db, f.files, issuer,
 		directory.Config{List: true, Mirror: false}, f.logger)
 	if writer == nil {
 		t.Fatal("no writer was started")
 	}
-	written, err := writer.Write(t.Context())
+	return writer
+}
+
+// write runs one pass, as a writer that has just started.
+func (f *fixture) write(t *testing.T) directory.Written {
+	t.Helper()
+	written, err := f.writer(t).Write(t.Context())
 	if err != nil {
 		t.Fatalf("writing the directory: %v", err)
 	}
 	return written
+}
+
+// pathOf is where the directory put an advisory, as its index lists it.
+//
+// Read from what was written rather than worked out from today's date: the
+// folder is the year the advisory was first recorded, which a run across a new
+// year does not share with the clock.
+func (f *fixture) pathOf(t *testing.T, named string) string {
+	t.Helper()
+	for _, line := range strings.Split(string(f.read(t, "index.txt")), "\n") {
+		if strings.HasSuffix(line, "/"+strings.ToLower(named)+".json") {
+			return line
+		}
+	}
+	t.Fatalf("the index does not list %s", named)
+	return ""
 }
 
 // read is one file out of the directory.
@@ -569,7 +687,7 @@ var (
 // looks exactly like a deployment that has published nothing.
 func TestWhatIsWrittenIsReadableByWhoeverServesIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		f.issued(t, "A flaw in the recovery console")
+		named := f.issued(t, "A flaw in the recovery console")
 		f.write(t)
 		for _, at := range f.every(t) {
 			held, err := os.Stat(filepath.Join(f.where, filepath.FromSlash(at)))
@@ -583,7 +701,7 @@ func TestWhatIsWrittenIsReadableByWhoeverServesIt(t *testing.T) {
 		}
 		// And the folders they sit in, which refuse a reader just as
 		// completely.
-		for _, at := range []string{".", time.Now().UTC().Format("2006")} {
+		for _, at := range []string{".", path.Dir(f.pathOf(t, named))} {
 			held, err := os.Stat(filepath.Join(f.where, at))
 			if err != nil {
 				t.Fatal(err)

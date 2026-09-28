@@ -88,7 +88,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
-		ColumnExpr(`MIN(ss.publisher) AS "publisher"`).
+		ColumnExpr(`ss.publisher AS "publisher"`).
 		ColumnExpr(`MIN(de.visibility) AS "visibility"`).
 		// Standing, because a decision nobody is relying on any more is not
 		// one whose evidence moving matters.
@@ -96,7 +96,9 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where("de.state = ?", triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where("ss.superseded_at IS NOT NULL").
-		GroupExpr("de.product_id, de.vulnerability_id, de.from_statement_id").
+		// Grouped exactly as the condition is identified, so one condition is
+		// one row and its link does not depend on which of several came last.
+		GroupExpr("de.product_id, de.vulnerability_id, ss.publisher").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where a publisher changed their mind: %w", err)
@@ -194,7 +196,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	}
 	private := map[int64]map[int64]bool{}
 	// The party itself. The assignment column holds a party rather than a
-	// person , and a notification goes to somebody, so the two are mapped
+	// person, and a notification goes to somebody, so the two are mapped
 	// in one place rather than at each use.
 	whose := make(map[int64]int64, len(people))
 	for _, person := range people {
@@ -214,9 +216,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	// is never handed a list is never reconciled — and their alert stands
 	// after the thing it was about has been answered.
 	//
-	// This does not arise for the conditions that only ever go to
-	// administrators, because that set does not move. It arises here because
-	// who hears about an embargo includes whoever holds it, and work is handed
+	// Who hears about an embargo includes whoever holds it, and work is handed
 	// around: the person who held it yesterday would keep an alert about a
 	// date that has since been moved, with nothing left to clear it.
 	out, err := w.everybodyAnd(ctx, kind, nil, admins)
@@ -224,23 +224,27 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		return nil, err
 	}
 	for _, row := range rows {
-		where := row.Product + " " + row.Stream + " " + row.Variant + " " + row.Vulnerability
 		// Two conditions, two identities: an embargo that is coming and one
 		// that has arrived clear differently, and a single alert would go on
 		// saying "coming" after the date had passed.
-		about, body := "disclosure "+where,
-			row.Vulnerability+" in "+row.Product+" reached its disclosure date on "+
+		about, body := "disclosure",
+			row.Vulnerability+" in "+row.Product+" at "+row.Component+
+				" reached its disclosure date on "+
 				row.DiscloseAt.Format(time.DateOnly)+" and nothing has been decided."
 		if lead > 0 {
-			about = "disclosure-near " + where
-			body = row.Vulnerability + " in " + row.Product + " discloses on " +
+			about = "disclosure-near"
+			body = row.Vulnerability + " in " + row.Product + " at " + row.Component +
+				" discloses on " +
 				row.DiscloseAt.Format(time.DateOnly) +
 				" and nothing has been decided. Extending it needs a second person, " +
 				"and that takes time to arrange."
 		}
 		holds := Holds{
-			About: identify(about),
-			Body:  body,
+			// One condition per place, because the link and whoever holds the
+			// work are per place.
+			About: identify(about, row.Product, row.Stream, row.Variant,
+				row.Vulnerability, row.Component),
+			Body: body,
 			Link: "/products/" + url.PathEscape(row.Product) +
 				"/streams/" + url.PathEscape(row.Stream) +
 				"/variants/" + url.PathEscape(row.Variant) +

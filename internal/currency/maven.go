@@ -6,6 +6,7 @@ package currency
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -69,14 +70,19 @@ func (m mavenCentral) Latest(ctx context.Context, name string) (Latest, error) {
 	escaped := url.PathEscape(version)
 	var project mavenProject
 	header, err := m.c.getXML(ctx, base+escaped+"/"+artifact+"-"+escaped+".pom", &project)
-	if err != nil {
+	switch {
+	case errors.Is(err, ErrUnknown), errors.Is(err, ErrUnaskable):
 		return latest, nil
+	case err != nil:
+		// A bad day rather than a document that is not there, so the
+		// component stays due and the date is asked for again.
+		return Latest{}, err
 	}
 	if modified, err := http.ParseTime(header.Get("Last-Modified")); err == nil {
 		latest.Released = modified.UTC()
 	}
 	latest.Summary = oneLine(firstOf(project.Description, project.Name))
-	latest.Project = firstOf(project.URL, project.SCM.URL)
+	latest.Project = firstAddress(project.URL, project.SCM.URL)
 	return latest, nil
 }
 

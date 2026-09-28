@@ -104,7 +104,9 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		Join(`JOIN "target" AS "tg" ON tg.id = n.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		// Still carried. A component that was in a build last year and is not
-		// now is not a name that would leave this deployment tonight.
+		// now is not a name that would leave this deployment tonight. The
+		// same set the pass asks about, spelled as a join here because the
+		// product a node's build belongs to narrows the report.
 		Where("n.closed_scan_id IS NULL").
 		Where("c.purl <> ''").
 		// Asked and answered with nothing. A component never reached is not
@@ -138,10 +140,10 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		found = found[:mostExamined]
 	}
 	for _, row := range found {
-		ecosystem, _, readable := Asked(row.Purl)
+		ecosystem, name, readable := Asked(row.Purl)
 		why := WhyUnknown
 		switch {
-		case !readable:
+		case !readable || !nameAskable(ecosystem, name):
 			why = WhyUnreadable
 		case ours.HeldBack(row.Purl):
 			why = WhyOurs
@@ -168,4 +170,19 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		rows = rows[:limit]
 	}
 	return rows, total, whole, nil
+}
+
+// nameAskable is whether an index's asker can turn a name into a request at
+// all. The Maven and NuGet askers refuse some names before sending anything,
+// with the same checks this makes, and a name refused that way was never
+// sent to anybody.
+func nameAskable(ecosystem, name string) bool {
+	switch ecosystem {
+	case "maven":
+		_, _, ok := mavenCoordinates(name)
+		return ok
+	case "nuget":
+		return walkable(name)
+	}
+	return true
 }

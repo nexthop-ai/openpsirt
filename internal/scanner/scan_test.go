@@ -104,11 +104,13 @@ func TestAReportInsideTheLimitIsRead(t *testing.T) {
 func TestAScannerWithTooMuchToSayStillScanned(t *testing.T) {
 	// The opposite direction from the report: complaints past the bound are
 	// dropped rather than failing a run that worked.
-	result, err := scanning(t, "complaint", scanner.Limits{MaxComplaint: 4 << 10})
+	result, err := scanning(t, "complaint", scanner.Limits{MaxComplaint: 256})
 	if err != nil {
 		t.Fatalf("a chatty scanner: %v", err)
 	}
-	if len(result.Caution) > 4<<10 {
+	// Below the 500 bytes a caution is cut to anyway, so the bound is what is
+	// measured.
+	if len(result.Caution) > 256 {
 		t.Errorf("what it said was kept at %d bytes", len(result.Caution))
 	}
 	if result.Caution == "" {

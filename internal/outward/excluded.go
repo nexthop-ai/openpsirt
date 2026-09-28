@@ -105,7 +105,7 @@ func (e Excluded) Reachable(address string) error {
 		host = address
 	}
 	if ip := net.ParseIP(host); ip != nil && e.address(ip) {
-		return fmt.Errorf("refused a connection to %s: an administrator excluded it", ip)
+		return fmt.Errorf("%w a connection to %s: an administrator excluded it", ErrRefused, ip)
 	}
 	return Reachable(address)
 }

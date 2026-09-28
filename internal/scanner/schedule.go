@@ -37,6 +37,9 @@ type Schedule struct {
 	// the queue and the second would find nothing to do.
 	replica string
 	now     func() time.Time
+	// interval is how often the pass runs, which is what the lease is sized
+	// from.
+	interval time.Duration
 }
 
 // NewSchedule returns a schedule over db, asking as whichever replica this is.
@@ -59,8 +62,19 @@ const ScheduleLease = "vulnerability.schedule"
 // day would take up to a day to notice they had.
 const betweenSchedules = 5 * time.Minute
 
-// Run asks until the context ends.
+// Run asks until the context ends, and hands the lease back then.
+//
+// Handed back so the replica that starts next asks at once. Every restart is a
+// different holder, and a lease left to lapse stops re-scans until it does.
 func (s *Schedule) Run(ctx context.Context, interval time.Duration) {
+	s.interval = interval
+	defer func() {
+		releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if err := s.leases.Release(releasing, ScheduleLease, s.replica); err != nil {
+			s.logger.Warn("handing back the lease on scanning again", "error", err)
+		}
+	}()
 	background.Every(ctx, interval, betweenSchedules, func(ctx context.Context) {
 		if asked, err := s.Once(ctx); err != nil {
 			// Logged and carried on, like every other background pass here. A
@@ -78,7 +92,7 @@ func (s *Schedule) Run(ctx context.Context, interval time.Duration) {
 // Once puts a scan on the queue for everything that is due one, reporting how
 // many it asked for.
 func (s *Schedule) Once(ctx context.Context) (int, error) {
-	mine, err := s.leases.Take(ctx, ScheduleLease, s.replica, s.leaseFor(ctx))
+	mine, err := s.leases.Take(ctx, ScheduleLease, s.replica, s.leaseFor())
 	if err != nil || !mine {
 		// Somebody else is doing it. Not an error and not worth saying: the
 		// work happens either way, and a cycle that skipped is the ordinary
@@ -142,13 +156,15 @@ func (s *Schedule) every(ctx context.Context) (time.Duration, error) {
 //
 // Long enough to cover a cycle rather than an instant of one: the pass reads a
 // list and writes a job per entry, and a lease that lapsed halfway would let a
-// second replica start asking for the same ones.
-func (s *Schedule) leaseFor(ctx context.Context) time.Duration {
-	every, err := s.every(ctx)
-	if err != nil || every < time.Hour {
-		return time.Hour
+// second replica start asking for the same ones. Sized from the pass rather
+// than from how often a build is scanned again, because a replica that stops
+// without handing it back holds the work for as long as the lease runs.
+func (s *Schedule) leaseFor() time.Duration {
+	interval := s.interval
+	if interval <= 0 {
+		interval = betweenSchedules
 	}
-	return every
+	return max(5*interval, time.Minute)
 }
 
 // dueLimit is how many re-scans one cycle asks for.

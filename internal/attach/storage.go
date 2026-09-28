@@ -28,15 +28,15 @@ type Storage interface {
 	// answer, so an operator can see which one a deployment came up with.
 	Name() string
 
-	// Put stores size bytes read from body under key.
+	// Put stores size bytes read from body under key. A body shorter or
+	// longer than size is an error, and nothing is stored under key.
 	//
 	// The reader is streamed rather than held: the size limit bounds one file,
 	// and holding each one would mean every upload happening at once is
 	// resident at once.
 	Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) error
 
-	// Open reads bytes back, for the files this application serves itself
-	// .
+	// Open reads bytes back, for the files this application serves itself.
 	Open(ctx context.Context, key string) (io.ReadCloser, error)
 
 	// Delete removes bytes, for a redaction. Removing what is already gone

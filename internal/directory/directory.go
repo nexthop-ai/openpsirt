@@ -186,7 +186,7 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	// have to date itself, and there is no moment to date it from: nothing
 	// has been published. Written once something is.
 	if len(published) == 0 {
-		return Written{Held: held}, nil
+		return Written{Held: held, Unchanged: true}, nil
 	}
 
 	// What the store already holds, where this process put it there. Writing

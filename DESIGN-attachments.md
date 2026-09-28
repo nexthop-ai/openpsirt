@@ -119,6 +119,31 @@ by whom; the object-store and filesystem backends implement one interface behind
 it. A separate package would put that interface at a package boundary, where a
 second implementation is tempted to reach past it.
 
+Both backends store exactly the number of bytes they are told to expect. A body
+shorter or longer is refused and nothing is stored, so an upload's digest is
+always of the whole file. The object store is sent a longer body's excess as a
+failure before its last declared byte, since a server that has read the
+declared length can accept it before the client notices more.
+
+### Store credentials
+
+| Rule | |
+|---|---|
+| Configured credentials win over the environment's | An operator who names a key means that key |
+| A key without its secret, a secret without its key, and a session token with no key and no name in the endpoint are refused at startup | Dropped, the process runs as whatever identity the environment offers, and nothing says the configured one went unused |
+| A refusal names the settings of the store it is about | The attachment store and the provider directory's store are configured alike under two prefixes, and a message naming the other store's setting sends the operator to settings that are fine |
+
+### The filesystem store
+
+The same store holds attachments in development and the published provider
+directory in production, where the same names are written again every pass.
+
+| Rule | |
+|---|---|
+| A file is written beside its name and renamed into place | A failure part way through leaves nothing a later read could mistake for a whole file |
+| The file written beside has a name of its own per write | A process killed part way through leaves it behind, and under a fixed name every later write of that key would be refused. Two writers of one key do not collide |
+| One left behind for an hour is removed when its key is next written | No write of one file takes that long, and nothing else removes it |
+
 ### Unencrypted store access
 
 An endpoint that is not `https` is refused, and two things lift that (REQ-70).
@@ -135,6 +160,7 @@ An endpoint that is not `https` is refused, and two things lift that (REQ-70).
 | A deployment that lifted it is told at every start | An attachment is delivered as a redirect, so the signed address is a bearer token: anybody on the path may spend it for the file it names. That is invisible from the setting that allows it, and the person who set it is rarely the person reading the logs a year later |
 | Neither the refusal nor the notice repeats a password | An endpoint may carry credentials, and a notice at every start would otherwise write them to the log at every start |
 | An endpoint carrying credentials is split before anything is given the address | The name and password are handed over as credentials, which is what makes the signing well-defined, and the address the client is given carries nothing to leak by any route. What a person is shown and what the client uses stop being two strings that can drift |
+| An upload to a plaintext store sends its payload unsigned, with a checksum only where the operation requires one | An upload is streamed through its digests and cannot be rewound, and over plain HTTP the client would otherwise hash or checksum the body before sending it, which a stream refuses. Over https a trailing checksum covers a stream and nothing changes |
 | Distinct from serving this application without TLS | That one is cookies on the way in, this one a file on the way out, and a deployment can want either without the other |
 
 ## Delivery
@@ -179,6 +205,15 @@ stored, so both survive the redirect.
 Both bounds are checked twice: before anything is carried, so an upload that
 cannot be kept is refused rather than transferred and discarded; and inside the
 writing transaction, because the first answer was read before the bytes were.
+
+The second check is serialized across uploads. A total read beside another
+upload's uncommitted row does not include it, so two uploads arriving together
+would both fit and both commit. Each writing transaction first writes a fresh
+value into one fixed row of the lease table, which nothing takes as a lease;
+the write is what makes the next upload wait for this one to commit before it
+reads the total, and what two cluster nodes conflict on
+(`DESIGN-database.md` § Replica coordination). Uploads are serialized per deployment while a quota
+or a share is set, and each holds the lock for two reads and an insert.
 
 Attaching is triage work rather than read work. Tested as a read — whether the
 subject may see the issue the file hangs off — a role granting nothing but the

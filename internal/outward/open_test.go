@@ -52,21 +52,15 @@ func TestAnOpenClientRefusesAnAddressInsideThisNetwork(t *testing.T) {
 	if err == nil {
 		t.Fatal("an open client reached a server inside this network")
 	}
-	if !strings.Contains(err.Error(), "not reached inside this network") {
+	if !strings.Contains(err.Error(), "not reached inside this network") || !errors.Is(err, ErrRefused) {
 		t.Errorf("refused for the wrong reason: %v", err)
 	}
 }
 
-func TestAnOpenClientIsHTTPSOnlyAndFollowsNoRedirect(t *testing.T) {
+// The scheme half is the guard's own check, run before anything that differs
+// between an open client and a pinned one, and is held where that is tested.
+func TestAnOpenClientFollowsNoRedirect(t *testing.T) {
 	client := Open(time.Second, Excluded{})
-	req, err := http.NewRequest(http.MethodGet, "http://downloads.example.test/csaf/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := client.Transport.RoundTrip(req); err == nil ||
-		!strings.Contains(err.Error(), "reached over https") {
-		t.Errorf("plain http: %v, want a refusal naming the scheme", err)
-	}
 	moved, err := http.NewRequest(http.MethodGet, "https://elsewhere.example.test/", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +89,7 @@ func TestAnOpenClientRefusesAnExcludedNetworkWhenItConnects(t *testing.T) {
 	if err == nil {
 		t.Fatal("an excluded network was reached")
 	}
-	if !strings.Contains(err.Error(), "an administrator excluded it") {
+	if !strings.Contains(err.Error(), "an administrator excluded it") || !errors.Is(err, ErrRefused) {
 		t.Errorf("refused for the wrong reason: %v", err)
 	}
 }
