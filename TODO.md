@@ -75,8 +75,6 @@ Missing or wrong, with no decision needed to fix it.
 | Nothing checks that every API operation is reached by some screen | An operation no screen calls is found only by reading |
 | Other multi-step flows lack a visible next step | Recording a decision says a second person must approve and offers no way to the review queue. A fix offers no way to the release that ships it |
 | A flaw found here and upgraded from v0.2.0 or earlier has no report | Those releases kept nothing saying who recorded it. A later claim about it is accepted as the flaw where it should be ruled a duplicate |
-| `cgit.freedesktop.org` patch links fail, except drm-misc | Those projects moved to GitLab, most under new paths. Each needs its new address checked before it is read there. The System screen shows the failure |
-| One demo component has no walkable route to the build root | `golang.org/x/net` under `sonic-mgmt-common-codegen`. The screen names the consumer. The inventory may hold a disconnected fragment |
 | No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
 | A build's own claim versioned only by branch covers every version | A claim attached to a scan is stored with no version column, so a claim naming no package identifier covers every version of its name. The uploaded VEX path keeps the version |
 
@@ -106,7 +104,6 @@ Each needs the owner to choose before anything is built.
 | Add a gate for tracker references in comments? | The rule is enforced by reading. No existing gate fits it |
 | Alert on the depth of the job queue? | The System screen shows the depth against the bound. An alert needs a threshold and an alert kind |
 | Keep 30 days as the longest a sign-in lasts? | It bounds how long a role a group withdrew can still be held. 90 days is defensible |
-| Share prepared claims between triagers? | Saved filters and the claims they prepare are personal, so several triagers on one backlog drift apart. Worth revisiting when a team works one backlog |
 | Start a disclosure date for an outside report ruled a duplicate? | The flaw was found here and has no date, and the outside reporter may be counting down to publication |
 
 ## Measured and left alone
@@ -116,4 +113,3 @@ Nothing is made faster until it is measured slow. These were measured and left.
 | Measurement | Result |
 |---|---|
 | A rescan of unchanged data | Rewrites every finding with a fix on PostgreSQL (1.3 s), MySQL (782 ms) and MariaDB (711 ms): 5,882 rows at the scale measured. SQLite writes none. The likely cause is how the date a fix arrived survives a round trip. No answer is wrong |
-| Cost per statement | The figures in `DESIGN-findings.md` predate a change in how many statements a night issues, so the ratio wants a fresh `make measure` |
