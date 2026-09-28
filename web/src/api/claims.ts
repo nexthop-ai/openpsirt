@@ -18,10 +18,8 @@ export type Claim = {
   key: string;
   id: number;
   decisionId: number;
-  // The server's own vocabulary, read out of the generated client. Restated
-  // here and narrowed by hand, the check that did the narrowing could not
-  // fail — its three comparisons exhausted every value but one — so a fifth
-  // kind would have been silently relabeled as a finding rather than caught.
+  // The server's own vocabulary, read out of the generated client, so a kind
+  // the server adds is a compile error here rather than a claim relabeled.
   kind: QueueRow["claim"]["kind"];
   derivedFrom: number | null;
   title: string;
@@ -86,11 +84,9 @@ export function claimOf(row: QueueRow): Claim {
 // Anything that changes a claim invalidates the same set: the queue it may
 // have left, the decisions it wrote, and the findings they hang off.
 //
-// One list, because there were two. A second copy listed four of these
-// keys and was used by revising and withdrawing, so a revision — which takes
-// back every standing approval — left the revision history and the approvals
-// beside the editor showing the old approval as standing. Somebody reading
-// that screen concluded the approval had survived the edit, which is the one
+// One list, shared by every act on a claim. A revision takes back every
+// standing approval, and a set missing the claim's own blocks leaves the
+// approvals beside the editor showing the old approval as standing — the one
 // state the second-person control exists to make visible, reported wrong at
 // the moment it changes.
 export function useAfterClaim() {
@@ -109,9 +105,7 @@ export function useAfterClaim() {
     void queries.invalidateQueries({ queryKey: ["claim"] });
     void queries.invalidateQueries({ queryKey: ["comments"] });
     // And the list the work came from. A claim answers findings, so agreeing
-    // to one moves what the list says about every place it covers — nine
-    // other screens invalidate this key after a write and this one did not,
-    // which is the shape of a list that silently shows the old answer.
+    // to one moves what the list says about every place it covers.
     void queries.invalidateQueries({ queryKey: ["findings"] });
   };
 }
