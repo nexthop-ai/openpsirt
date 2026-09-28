@@ -244,6 +244,7 @@ jobs:
           VERSION: ${{ steps.release.outputs.version }}
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          LATEST: ${{ steps.release.outputs.latest }}
         run: |
           version=$VERSION
           {
@@ -280,9 +281,12 @@ jobs:
             echo "The signature covers \`SHA256SUMS\`, which covers every file above."
           } > /tmp/notes.md
           if [ "$PRERELEASE" = "true" ]; then set -- --prerelease; else set --; fi
+          # GitHub marks a new release Latest unless told otherwise, so a fix
+          # to an older line is told which it is, as the image tags are.
           gh release create "$GITHUB_REF_NAME" \
             --title "$version" \
             --notes-file /tmp/notes.md \
+            --latest="$LATEST" \
             "$@" \
             bin/dist/*
 

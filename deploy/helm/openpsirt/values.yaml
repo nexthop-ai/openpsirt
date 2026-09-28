@@ -161,13 +161,16 @@ auth:
 # plugins admit; one that does not needs the node's addresses in `from`.
 networkPolicy:
   enabled: true
-  # The ingress controller's namespace and pods, by label. Either may be
-  # emptied to admit by the other alone.
+  # The ingress controller's namespace and pods, by label. With both unset,
+  # they are ingress-nginx's: a namespace named ingress-nginx and pods labelled
+  # app.kubernetes.io/name=ingress-nginx. Anything set in either replaces both
+  # defaults whole, so a label map given here is never merged with
+  # ingress-nginx's. Pod labels with no namespace labels match those pods in
+  # any namespace. Turn enabled off to admit by `from` alone.
   ingressController:
-    namespaceLabels:
-      kubernetes.io/metadata.name: ingress-nginx
-    podLabels:
-      app.kubernetes.io/name: ingress-nginx
+    enabled: true
+    namespaceLabels: {}
+    podLabels: {}
   # Further peers, in the NetworkPolicy's own form: an ipBlock for a controller
   # on the host network, or a namespace a metrics scraper runs in. The policy
   # is refused at render when this and the controller's labels are all empty.

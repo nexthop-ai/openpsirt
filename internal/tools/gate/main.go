@@ -282,8 +282,8 @@ func changed() ([]string, error) {
 	return files, nil
 }
 
-// inAPIPackage is whether a path is a file of the package the API document is
-// generated from, relative to the checkout or below another directory.
+// inAPIPackage is whether a path, relative to the checkout, is a file of the
+// package the API document is generated from.
 func inAPIPackage(file string) bool {
-	return strings.HasPrefix(file, apiPackage) || strings.Contains(file, "/"+apiPackage)
+	return strings.HasPrefix(file, apiPackage)
 }

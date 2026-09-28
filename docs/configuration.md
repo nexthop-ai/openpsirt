@@ -108,7 +108,7 @@ Also read after an upgrade from any earlier release.
 | `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
 | Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
 | With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
-| A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels unless told otherwise | Where the controller is not ingress-nginx, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
+| A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels and namespace unless told otherwise | Where the controller is not ingress-nginx, or runs in a namespace other than `ingress-nginx`, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. Anything in the cluster that reaches the Service directly rather than through the ingress, such as a pipeline uploading with a key, is refused until it is named under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
 | `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
 | With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
 | Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
@@ -696,8 +696,9 @@ set.
 | Chart value | Meaning | Default |
 |---|---|---|
 | `networkPolicy.enabled` | Whether the policy is rendered for a trusted-header install. Turn it off only where something else keeps other pods from reaching this one | `true` |
-| `networkPolicy.ingressController.namespaceLabels` | The labels of the ingress controller's namespace | ingress-nginx's |
-| `networkPolicy.ingressController.podLabels` | The labels of its pods | ingress-nginx's |
+| `networkPolicy.ingressController.enabled` | Whether the ingress controller is admitted by its labels. Off, the policy admits `networkPolicy.from` alone | `true` |
+| `networkPolicy.ingressController.namespaceLabels` | The labels of the ingress controller's namespace. Set here or in `podLabels`, it replaces both of ingress-nginx's defaults | ingress-nginx's, where neither is set |
+| `networkPolicy.ingressController.podLabels` | The labels of its pods, replacing the defaults the same way | ingress-nginx's, where neither is set |
 | `networkPolicy.from` | Further peers, in the NetworkPolicy's own form: an `ipBlock` for a controller on the host network, or a namespace a metrics scraper runs in | none |
 
 A policy is enforced only where the cluster's network plugin supports

@@ -20,18 +20,19 @@ import (
 func TestWhatATierIsChosenFrom(t *testing.T) {
 	// Written into a directory of its own, because classify reads the file to
 	// decide: whether it holds a query, and whether it registers an operation,
-	// are questions about the contents rather than the name.
+	// are questions about the contents rather than the name. The paths are
+	// relative to it, as the gate's are to the checkout.
 	dir := t.TempDir()
+	t.Chdir(dir)
 	write := func(name, content string) string {
 		t.Helper()
-		at := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(at), 0o750); err != nil {
+		if err := os.MkdirAll(filepath.Dir(name), 0o750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(at, []byte(content), 0o600); err != nil {
+		if err := os.WriteFile(name, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		return at
+		return name
 	}
 
 	for _, c := range []struct {

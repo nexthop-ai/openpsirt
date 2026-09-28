@@ -1,6 +1,17 @@
 {{- if and .Values.auth.trustedHeader.name .Values.networkPolicy.enabled }}
 {{- $controller := .Values.networkPolicy.ingressController }}
-{{- if not (or $controller.namespaceLabels $controller.podLabels .Values.networkPolicy.from) }}
+{{- $namespaces := dict }}
+{{- $pods := dict }}
+{{- if $controller.enabled }}
+{{- $namespaces = $controller.namespaceLabels | default dict }}
+{{- $pods = $controller.podLabels | default dict }}
+{{- /* Defaults applied here rather than in values.yaml: Helm merges an operator's map into a default map, so a controller's own labels would be kept beside ingress-nginx's and match no pod. */}}
+{{- if not (or $namespaces $pods) }}
+{{- $namespaces = dict "kubernetes.io/metadata.name" "ingress-nginx" }}
+{{- $pods = dict "app.kubernetes.io/name" "ingress-nginx" }}
+{{- end }}
+{{- end }}
+{{- if not (or $namespaces $pods .Values.networkPolicy.from) }}
 {{- fail "set networkPolicy.ingressController or networkPolicy.from: sign-in is asserted by a header, and a policy that admits nobody would refuse the proxy that sets it. Set networkPolicy.enabled=false only where something else keeps other pods from reaching this one" }}
 {{- end }}
 # Only the ingress controller, and what networkPolicy.from names, may reach the
@@ -18,12 +29,15 @@ spec:
     - Ingress
   ingress:
     - from:
-        {{- if or $controller.namespaceLabels $controller.podLabels }}
-        - {{- with $controller.namespaceLabels }}
+        {{- if or $namespaces $pods }}
+        {{- /* A podSelector alone selects pods in this namespace only, so a controller named by its pods alone is looked for in every namespace. */}}
+        - {{- if $namespaces }}
           namespaceSelector:
-            matchLabels: {{- toYaml . | nindent 14 }}
+            matchLabels: {{- toYaml $namespaces | nindent 14 }}
+          {{- else }}
+          namespaceSelector: {}
           {{- end }}
-          {{- with $controller.podLabels }}
+          {{- with $pods }}
           podSelector:
             matchLabels: {{- toYaml . | nindent 14 }}
           {{- end }}

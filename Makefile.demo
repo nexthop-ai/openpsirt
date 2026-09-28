@@ -63,6 +63,10 @@ DEMO_CAST ?= 8081:ana:public-read,public-triage,approver \
 # REL-09), which the two switch-image builds are.
 DEMO_BUILDS ?= internal/sbom/testdata/switch-image.cdx.json.xz,sonic,SONiC,master,broadcom \
                internal/sbom/testdata/switch-image-mellanox.cdx.json.xz,sonic,SONiC,master,mellanox
+# The first build's fields, split: inventory, product, product name, stream
+# and variant. The demo's single-product acts are about that build.
+comma := ,
+first-build = $(subst $(comma), ,$(firstword $(DEMO_BUILDS)))
 # In the tree rather than under $HOME: a command that writes to somebody's home
 # directory from a checkout is a surprise, and everything here is throwaway
 # state that should be deleted by deleting the checkout. Git-ignored.
@@ -465,7 +469,7 @@ DEMO_CSV = { gsub(/"/, "") } \
 # distribution saying "affected, not fixing it here" is not a distribution
 # saying "not affected", and only the second offers a dismissal.
 demo-vex:
-	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); \
+	@product='$(word 2,$(first-build))'; \
 	rows=$$(curl -sS --noproxy '*' \
 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none" \
 	  | awk -F',' '$(DEMO_CSV) { if ($$1 ~ /^CVE-/ && $$at["component"] != "") print $$1 "|" $$at["component"] }'); \
@@ -523,9 +527,9 @@ demo-vex:
 # cannot answer what another has already answered.
 demo-triage:
 	@command -v curl >/dev/null || { echo "curl is needed"; exit 1; }
-	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); \
-	stream=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ _ _ s _ <<< "$$b"; echo "$$s"; done | head -1); \
-	variant=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ _ _ _ v <<< "$$b"; echo "$$v"; done | head -1); \
+	@product='$(word 2,$(first-build))'; \
+	stream='$(word 4,$(first-build))'; \
+	variant='$(word 5,$(first-build))'; \
 	proposer=$$(echo "$(word 1,$(DEMO_CAST))" | cut -d: -f1); \
 	approver=$$(echo "$(word 2,$(DEMO_CAST))" | cut -d: -f1); \
 	at="http://$(DEMO_HOST):$$proposer"; \
@@ -587,9 +591,9 @@ demo-triage:
 	@# assigned to them: their assignments, and the dependency paths their own
 	@# findings sit on. Everything else in the product answers as a product
 	@# that does not exist, which is the rule rather than a gap.
-	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); \
-	stream=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ _ _ s _ <<< "$$b"; echo "$$s"; done | head -1); \
-	variant=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ _ _ _ v <<< "$$b"; echo "$$v"; done | head -1); \
+	@product='$(word 2,$(first-build))'; \
+	stream='$(word 4,$(first-build))'; \
+	variant='$(word 5,$(first-build))'; \
 	curl -sS --noproxy '*' -o /dev/null -w "  person holly %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
 	  -d '{"identity":"holly","display_name":"Holly","holds":[{"product":"'"$$product"'","role":"approver"}]}' \

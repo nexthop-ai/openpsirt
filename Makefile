@@ -1095,6 +1095,11 @@ docs-site:
 #
 # Named rather than folded into engines-check, because that one is about what
 # the tests run against and this is about what the release is built from.
+#
+# A base image is the first word after FROM that is not a flag, unless it names
+# an earlier stage, scratch, or a build argument, whose default is read from its
+# ARG line instead. A name with no tag is still a base, since alpine is
+# alpine:latest, and every base is named by digest.
 # The tidy run rewrites the tree, so what it found there is put back on every
 # exit path — including an interrupt, which used to leave the tree as tidy had
 # made it and the copies behind under a name every checkout on the machine
@@ -1134,8 +1139,10 @@ pins-check:
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
-	bases=$$(awk '/^FROM /{print $$2} /^ARG [A-Z_]*IMAGE=/{sub(/^ARG [A-Z_]*IMAGE=/, ""); print}' Dockerfile \
-	  | grep ':' || true); \
+	bases=$$(awk '/^ARG [A-Z_]*IMAGE=/ { sub(/^ARG [A-Z_]*IMAGE=/, ""); print; next } \
+	  /^FROM / { i = 2; while ($$i ~ /^--/) i++; base = $$i; known = (base in stage); \
+	    if (tolower($$(i + 1)) == "as") stage[$$(i + 2)] = 1; \
+	    if (known || base == "scratch" || base ~ /^\$$/) next; print base }' Dockerfile); \
 	[ -n "$$bases" ] || { echo "the image names no base, so no pin was compared."; fail=1; }; \
 	for base in $$bases; do \
 	  case "$$base" in \
@@ -1351,7 +1358,7 @@ else
 	  "SQLite behind more than one replica|SQLite is one file on one pod|--set database.url=sqlite:///data/openpsirt.db --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
 	  "a scanner cache claim every replica mounts and only one can|no ReadWriteMany access mode|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true" \
 	  "a scanner cache claim given twice|set scanner.persistence.enabled or scanner.persistence.existingClaim|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true --set scanner.persistence.existingClaim=mine" \
-	  "a trusted header fenced from everybody|set networkPolicy.ingressController or networkPolicy.from|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.namespaceLabels=null --set networkPolicy.ingressController.podLabels=null"; do \
+	  "a trusted header fenced from everybody|set networkPolicy.ingressController or networkPolicy.from|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.enabled=false"; do \
 	  refusals=$$((refusals + 1)); \
 	  what="$${missing%%|*}"; rest="$${missing#*|}"; \
 	  expect="$${rest%%|*}"; args="$${rest#*|}"; \
@@ -1366,6 +1373,17 @@ else
 	  [ "$$refusals" -gt 0 ] || { echo "no refusal was examined, so this checked nothing"; exit 1; }; \
 	  echo "  $$refusals installs the chart has to refuse, each for the reason it names"
 	@echo "the chart refuses every install that could not be signed into or could not start, and every mail configuration that would send nothing"
+	@# Helm merges a map an operator sets into a default map, so a policy
+	@# holding its defaults in values.yaml would keep ingress-nginx's labels beside
+	@# another controller's, and admit nobody while rendering cleanly.
+	@set -e; out=$$(helm template t deploy/helm/openpsirt -s templates/networkpolicy.yaml \
+	  --set database.existingSecret=s --set auth.bootstrapAdmins={admin} \
+	  --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} \
+	  --set networkPolicy.ingressController.podLabels.app=router); \
+	case "$$out" in *ingress-nginx*) echo "a controller's own labels were merged with ingress-nginx's:"; echo "$$out"; exit 1;; esac; \
+	case "$$out" in *"app: router"*) ;; *) echo "a controller's own labels were not rendered:"; echo "$$out"; exit 1;; esac; \
+	case "$$out" in *"namespaceSelector: {}"*) ;; *) echo "a controller named by its pods alone was looked for in this namespace only:"; echo "$$out"; exit 1;; esac
+	@echo "the network policy admits a controller by its own labels alone, in any namespace"
 	@# The refusals above assert that an install the chart cannot serve fails
 	@# at render. These assert the other half: that a legal one renders a
 	@# reference something answers. A secretKeyRef naming a Secret nothing
