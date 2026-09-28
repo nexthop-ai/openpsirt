@@ -25,6 +25,7 @@ REQ-69.
 - [Scheduled rescanning](#scheduled-rescanning)
 - [Scanner warnings](#scanner-warnings)
 - [Scanner output](#scanner-output)
+- [Scanner environment](#scanner-environment)
 - [Scan coverage](#scan-coverage)
 - [Receipts](#receipts)
 - [Document retrieval](#document-retrieval)
@@ -657,6 +658,24 @@ budget, and every bound is configurable.
 A report's size is components × matches × references, and a producer controls
 the first factor by uploading a scan file — so nothing about it is bounded by
 anything this deployment chose unless it is bounded here.
+
+## Scanner environment
+
+The scanner is somebody else's program reading somebody else's inventory, and
+it starts helpers of its own. It is given only what it needs of this process's
+environment, the same policy the repository copies' git runs under
+(`DESIGN-findings.md`).
+
+| Given | Why |
+|---|---|
+| Where to find programs, home and scratch space, the time zone | What any program needs to run |
+| The certificate bundle and the proxy, in either case | What reaching its vulnerability data needs |
+| Every variable under the scanner's own prefix | Its own settings, which an operator sets for it |
+| Its check for a newer release of itself, off | A request on every run to its publisher's host, which nobody configured and an air-gapped deployment cannot reach. An operator who sets it is left alone |
+
+| Not given | Why |
+|---|---|
+| Anything else, this deployment's settings included | They hold the database address with its password, the sign-in client secrets, the mail password and the object store's keys, none of which the scanner needs, and what it is not handed it cannot disclose |
 
 ### Ratings a report carries
 

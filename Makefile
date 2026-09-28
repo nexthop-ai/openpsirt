@@ -86,8 +86,15 @@ PKG          := github.com/nexthop-ai/openpsirt/internal/version
 # immediate for exactly that: an immediate assignment would bake the default
 # in before a target-specific value could reach it.
 STAMP_VERSION ?= $(VERSION)
+# The version reaches the linker through the environment rather than the
+# recipe's text. It comes from git describe, so it is a tag name, and a tag
+# name may carry shell syntax; substituted into a recipe it would be script.
+# The shell expands $STAMPED inside the double quotes the recipes put around
+# LDFLAGS, and treats what it expands to as data. Exported by the two targets
+# that link, so nothing else pays for asking git.
+build dist-binaries: export STAMPED = $(STAMP_VERSION)
 LDFLAGS       = -s -w \
-	-X '$(PKG).version=$(STAMP_VERSION)' \
+	-X '$(PKG).version=$$STAMPED' \
 	-X '$(PKG).commit=$(COMMIT)' \
 	-X '$(PKG).date=$(DATE)'
 
@@ -374,6 +381,10 @@ sbom:
 # scanner it bundles can stop working between the merge queue and the tag,
 # and a deployment that cannot scan ingests inventories it never reads.
 dist:
+	@# The image is gated here, so a machine that cannot run the gate cannot
+	@# make a release: the skip check-packaging answers elsewhere is refused.
+	@test -n "$(PACKAGING_TOOLS)" \
+	  || { echo "dist needs $(DOCKER) and helm, to gate the image and the chart it builds"; exit 1; }
 	@$(MAKE) --no-print-directory dist-version
 	@$(MAKE) --no-print-directory dist-clean
 	@$(MAKE) --no-print-directory web
@@ -590,9 +601,8 @@ openapi:
 	$(GO) run ./cmd/openpsirt -openapi > docs/reference/openapi.yaml
 	@echo "wrote docs/reference/openapi.yaml"
 
-# Everything CI runs, reachable from one command. Container and chart checks
-# are included because CI runs them; omitting them meant four of nine jobs
-# could not be reproduced locally.
+# Everything CI runs, reachable from one command, except the container and the
+# chart: those need docker and helm, and check-packaging holds them.
 check: build lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
@@ -678,7 +688,7 @@ web-check:
 secrets:
 	@into=$$(mktemp -d) && trap 'rm -rf "$$into"' EXIT && \
 	git ls-files -z --cached --others --exclude-standard \
-	  | while IFS= read -r -d '' file; do [ -f "$$file" ] && printf '%s\0' "$$file"; done \
+	  | while IFS= read -r -d '' file; do if [ -f "$$file" ]; then printf '%s\0' "$$file"; fi; done \
 	  | tar --null -T - -cf - | tar -C "$$into" -xf - && \
 	cd "$$into" && $(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
 		--no-banner --redact --config .gitleaks.toml
@@ -789,6 +799,12 @@ reserved-current: reserved-words
 	  || { echo "the reserved-word list is stale: the engines reserve words this"; \
 	       echo "list does not carry. Commit the regenerated file."; exit 1; }
 
+# The tag a release target is handed, as text. A value given on the command
+# line is a make variable, and expanding it expands whatever "$(...)" a tag
+# name carries — every character of that is legal in a ref — so the text is
+# taken unexpanded. The default from git describe is expanded as usual.
+tag-as-given = $(if $(filter command line,$(origin VERSION)),$(value VERSION),$(VERSION))
+
 # A release's record of its migrations: the schema they build on every engine,
 # and each file with its digest. Run on a branch from the head of main, with
 # the four engines up (make engines-up), and land what it writes before the tag.
@@ -798,7 +814,7 @@ reserved-current: reserved-words
 # The version reaches the recipe through the environment and is quoted there.
 # In a tag push it is a name somebody chose, and pasted into the recipe it would
 # be shell text.
-release-freeze: export RELEASE_TAG = $(VERSION)
+release-freeze: export RELEASE_TAG = $(tag-as-given)
 release-freeze:
 	OPENPSIRT_TEST_ENGINES=sqlite,postgres,mysql,mariadb OPENPSIRT_RELEASE_FREEZE="$$RELEASE_TAG" \
 	  $(GO) test -count=1 -run '^TestWriteTheSchemaAReleaseTags$$' ./internal/database/migrate/migrations/
@@ -808,14 +824,13 @@ release-freeze:
 # That the release a tag names was frozen, and that the tree still ships what
 # it froze. The release workflow runs it before anything is built, so a tag
 # nobody froze publishes nothing.
-release-check: export RELEASE_TAG = $(VERSION)
+release-check: export RELEASE_TAG = $(tag-as-given)
 release-check:
 	$(GO) run ./internal/tools/release check "$$RELEASE_TAG"
 
 # Decisions no design document names. The chain that makes this auditable runs
-# code to design document to decision, and nothing checked that it was whole:
-# 71 decisions in force were named nowhere, five of them cited by code that
-# runs. A decision not built yet is not exempt — its design document says so.
+# code to design document to decision, and this is what holds it whole. A
+# decision not built yet is not exempt — its design document says so.
 unclaimed:
 	$(GO) run ./internal/tools/unclaimed
 
@@ -958,13 +973,13 @@ engines-up: engines-check
 	  $(DOCKER) run -d --name "$$name" -p "$$ports" $$opts "$$image" "$$@" >/dev/null; \
 	  echo "  $$name: created from $$image"; \
 	}; \
-	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) $(ENGINE_PG_PORT):5432 \
+	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) 127.0.0.1:$(ENGINE_PG_PORT):5432 \
 	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER); \
-	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) $(ENGINE_MYSQL_PORT):3306 \
+	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) 127.0.0.1:$(ENGINE_MYSQL_PORT):3306 \
 	   $(MY_TEST_DATA) -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
-	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) $(ENGINE_MARIADB_PORT):3306 \
+	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) 127.0.0.1:$(ENGINE_MARIADB_PORT):3306 \
 	   $(MY_TEST_DATA) -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
-	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) $(ENGINE_FLOOR_PORT):5432 \
+	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) 127.0.0.1:$(ENGINE_FLOOR_PORT):5432 \
 	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER)
 	@# A container reported "Up" is not one that answers. Each server is asked
 	@# with its own client, inside its own container, so nothing here depends on
@@ -1119,6 +1134,23 @@ pins-check:
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
+	bases=$$(awk '/^FROM /{print $$2} /^ARG [A-Z_]*IMAGE=/{sub(/^ARG [A-Z_]*IMAGE=/, ""); print}' Dockerfile \
+	  | grep ':' || true); \
+	[ -n "$$bases" ] || { echo "the image names no base, so no pin was compared."; fail=1; }; \
+	for base in $$bases; do \
+	  case "$$base" in \
+	    *@sha256:*) ;; \
+	    *) echo "the base $$base is named by a tag alone, which its owner can move under a rebuild."; \
+	       echo "Name it by digest as well: $$base@sha256:..."; fail=1 ;; \
+	  esac; \
+	done; \
+	quota=$$(sed -n 's/^const DefaultQuota = \([0-9]*\) << \([0-9]*\)$$/\1 \2/p' internal/patchbranch/copies.go); \
+	chart=$$(sed -n 's/.*patchBranches\.quota | default \([0-9]*\).*/\1/p' $(CHART_DIR)/templates/deployment.yaml); \
+	[ -n "$$quota" ] && [ -n "$$chart" ] || { \
+	  echo "the patch branch quota was not found in copies.go or the chart, so it was not compared."; fail=1; }; \
+	[ -z "$$quota" ] || [ "$$(( $${quota% *} << $${quota#* } ))" = "$$chart" ] || { \
+	  echo "the chart sizes the patch branch volume for a quota of $$chart and the binary's is $$(( $${quota% *} << $${quota#* } ))."; \
+	  fail=1; }; \
 	# Every count is taken with "|| true": grep exits 1 on a count of zero, \
 	# recipes run under -e, and a check that dies on the empty case is one \
 	# that says nothing where it has the most to say. \
@@ -1222,7 +1254,7 @@ endif
 CHECK_IMAGE ?= openpsirt:check
 
 # Whether the two tools this needs are here, asked once rather than per line.
-PACKAGING_TOOLS := $(shell command -v docker >/dev/null 2>&1 && \
+PACKAGING_TOOLS := $(shell command -v $(DOCKER) >/dev/null 2>&1 && \
                      command -v helm >/dev/null 2>&1 && echo yes)
 
 check-packaging:
@@ -1231,32 +1263,32 @@ ifeq ($(PACKAGING_TOOLS),)
 	@# without docker or helm must still be able to run the gate — and a skip
 	@# that looks like a pass is what every other check here is written to
 	@# avoid, which is why it names what it did not do.
-	@echo "docker or helm is not installed, so the image and the chart are unchecked here."
+	@echo "$(DOCKER) or helm is not installed, so the image and the chart are unchecked here."
 	@echo "CI runs both on every push; install them to run these before one."
 else
 	@# Not quiet, for the reason dist-inventories is not: a build that fails
 	@# without saying why is diagnosed by running it again differently.
 	@if [ "$(CHECK_IMAGE)" = "openpsirt:check" ]; then \
-	  docker build -t $(CHECK_IMAGE) .; \
+	  $(DOCKER) build -t $(CHECK_IMAGE) .; \
 	fi
-	docker run --rm $(CHECK_IMAGE) -version
-	@test "$$(docker run --rm --entrypoint id $(CHECK_IMAGE) -u)" != "0" \
+	$(DOCKER) run --rm $(CHECK_IMAGE) -version
+	@test "$$($(DOCKER) run --rm --entrypoint id $(CHECK_IMAGE) -u)" != "0" \
 	  || { echo "image runs as root"; exit 1; }
-	@docker run --rm --entrypoint /usr/local/bin/grype $(CHECK_IMAGE) version >/dev/null \
+	@$(DOCKER) run --rm --entrypoint /usr/local/bin/grype $(CHECK_IMAGE) version >/dev/null \
 	  || { echo "image carries no working scanner, so it could ingest and never scan"; exit 1; }
 	@# That the image serves the interface, not merely that it starts. The Go
 	@# build embeds a git-ignored directory, so an image built from a clean
 	@# checkout carried no interface at all and every other check here passed.
 	@set -e; \
-	  id=$$(docker run -d --rm -p 127.0.0.1:0:8080 \
+	  id=$$($(DOCKER) run -d --rm -p 127.0.0.1:0:8080 \
 	         --tmpfs /tmp \
 	         -e OPENPSIRT_DATABASE_URL="sqlite:///tmp/check.db" \
 	         -e OPENPSIRT_ADDR="0.0.0.0:8080" \
 	         -e OPENPSIRT_PLAIN_HTTP=1 \
 	         -e OPENPSIRT_BOOTSTRAP_ADMINS=check \
 	         $(CHECK_IMAGE)); \
-	  trap 'docker rm -f $$id >/dev/null 2>&1 || true' EXIT; \
-	  port=$$(docker port $$id 8080/tcp | head -1 | sed 's/.*://'); \
+	  trap '$(DOCKER) rm -f $$id >/dev/null 2>&1 || true' EXIT; \
+	  port=$$($(DOCKER) port $$id 8080/tcp | head -1 | sed 's/.*://'); \
 	  waited=0; \
 	  until curl -fsS --noproxy '*' "http://127.0.0.1:$$port/readyz" >/dev/null 2>&1; do \
 	    waited=$$((waited + 1)); \
@@ -1279,6 +1311,20 @@ else
 	  --set auth.trustedHeader.sources='{10.0.0.0/8}' -s templates/deployment.yaml \
 	  | awk '/^  strategy:$$/ {s=1; next} s && /^    type: Recreate$$/ {found=1} /^  [^ ]/ {s=0} END {exit !found}' \
 	  || { echo "the chart's Deployment does not stop the earlier release before starting this one"; exit 1; }
+	@# Sign-in by a header believed from the pod network is sign-in any pod
+	@# can assert, so such an install is fenced to its ingress controller.
+	@helm template t deploy/helm/openpsirt --set database.existingSecret=s \
+	  --set auth.bootstrapAdmins='{admin}' --set auth.trustedHeader.name=X-User \
+	  --set auth.trustedHeader.sources='{10.0.0.0/8}' | grep -q '^kind: NetworkPolicy$$' \
+	  || { echo "a trusted-header install renders no NetworkPolicy, so any pod can assert the header"; exit 1; }
+	@# A rotated password the chart holds rolls the pods, the mail one included
+	@# where it is the only one.
+	@helm template t deploy/helm/openpsirt --set database.existingSecret=s \
+	  --set auth.bootstrapAdmins='{admin}' --set auth.trustedHeader.name=X-User \
+	  --set auth.trustedHeader.sources='{10.0.0.0/8}' --set mail.server=smtp:587 \
+	  --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh \
+	  -s templates/deployment.yaml | grep -q 'checksum/secrets:' \
+	  || { echo "rotating the chart-held mail password would not roll the pods"; exit 1; }
 	# An install that cannot reach a login is not an install, and mail that is
 	# half configured is mail nobody gets. Each of these refuses at template
 	# time rather than producing a deployment that starts, fails its own
@@ -1304,7 +1350,8 @@ else
 	  "a secret given twice|not both|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh --set auth.oidc.existingSecret=mine" \
 	  "SQLite behind more than one replica|SQLite is one file on one pod|--set database.url=sqlite:///data/openpsirt.db --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
 	  "a scanner cache claim every replica mounts and only one can|no ReadWriteMany access mode|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true" \
-	  "a scanner cache claim given twice|set scanner.persistence.enabled or scanner.persistence.existingClaim|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true --set scanner.persistence.existingClaim=mine"; do \
+	  "a scanner cache claim given twice|set scanner.persistence.enabled or scanner.persistence.existingClaim|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true --set scanner.persistence.existingClaim=mine" \
+	  "a trusted header fenced from everybody|set networkPolicy.ingressController or networkPolicy.from|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.namespaceLabels=null --set networkPolicy.ingressController.podLabels=null"; do \
 	  refusals=$$((refusals + 1)); \
 	  what="$${missing%%|*}"; rest="$${missing#*|}"; \
 	  expect="$${rest%%|*}"; args="$${rest#*|}"; \

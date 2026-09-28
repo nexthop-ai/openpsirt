@@ -36,10 +36,16 @@ From there, create people and grant roles per product:
 
 The API document is served at /openapi.json (and /openapi.yaml) to anybody
 signed in; there is no documentation page on the server itself.
-{{- if and .Values.auth.trustedHeader.name (not .Values.ingress.enabled) }}
+{{- if .Values.auth.trustedHeader.name }}
 
 NOTE: sign-in is asserted by the {{ .Values.auth.trustedHeader.name }} header, believed
 only from {{ join ", " .Values.auth.trustedHeader.sources }}. Reaching this service directly —
 by port-forward, or from a pod inside the cluster — bypasses whatever sets that
 header, so make sure nothing but the proxy can route to it.
+{{- if .Values.networkPolicy.enabled }}
+A NetworkPolicy admits only the ingress controller and networkPolicy.from. It is
+enforced only where the cluster's network plugin supports NetworkPolicy.
+{{- else }}
+networkPolicy.enabled is false, so nothing in the cluster restricts who reaches it.
+{{- end }}
 {{- end }}

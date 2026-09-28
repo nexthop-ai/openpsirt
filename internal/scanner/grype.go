@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -60,6 +61,46 @@ const DefaultTimeout = 30 * time.Minute
 // which is the trade the field exists for.
 const waitDelay = 10 * time.Second
 
+// inherited is what the scanner is given of this process's environment: where
+// to find programs, where home and scratch space are, the time zone, the
+// certificates and proxy it may need to reach its data, and its own settings.
+//
+// Nothing else. This process holds the database address with its password,
+// the sign-in client secrets, the mail password and the object store's keys,
+// and the scanner and every helper it starts need none of them. It is somebody
+// else's program reading somebody else's inventory, so what it is not handed
+// it cannot disclose. The same policy the repository copies' git is run under.
+var inherited = []string{
+	"PATH=", "HOME=", "TMPDIR=", "TZ=", "SSL_CERT_FILE=", "SSL_CERT_DIR=",
+	"HTTP_PROXY=", "HTTPS_PROXY=", "NO_PROXY=", "http_proxy=", "https_proxy=", "no_proxy=",
+	"GRYPE_",
+}
+
+// noUpdateCheck turns off the scanner's check for a newer release of itself,
+// which it otherwise makes to its publisher's host on every run. That is a
+// request to a host nobody configured, and it is made from deployments that
+// cannot reach the network at all. An operator who sets it is left alone.
+const noUpdateCheck = "GRYPE_CHECK_FOR_APP_UPDATE"
+
+// environment is the scanner's environment, from this process's.
+func environment(from []string) []string {
+	var kept []string
+	checks := false
+	for _, kv := range from {
+		for _, prefix := range inherited {
+			if strings.HasPrefix(kv, prefix) {
+				kept = append(kept, kv)
+				checks = checks || strings.HasPrefix(kv, noUpdateCheck+"=")
+				break
+			}
+		}
+	}
+	if !checks {
+		kept = append(kept, noUpdateCheck+"=false")
+	}
+	return kept
+}
+
 // Name identifies this scanner in everything it finds.
 func (g Grype) Name() string { return "grype" }
 
@@ -95,6 +136,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	// The executable is an operator's configuration and the arguments are
 	// fixed.
 	cmd := exec.CommandContext(ctx, g.executable(), "--output", "json") // #nosec G204
+	cmd.Env = environment(os.Environ())
 	cmd.Stdin = inventory
 	cmd.Stdout = &out
 	cmd.Stderr = &errs

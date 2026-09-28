@@ -108,6 +108,10 @@ Also read after an upgrade from any earlier release.
 | `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
 | Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
 | With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
+| A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels unless told otherwise | Where the controller is not ingress-nginx, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
+| `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
+| With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable` or `tls=false` in the database URL is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting from the URL |
+| Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
 
 | After the upgrade from v0.4.0 | |
 |---|---|
@@ -181,8 +185,14 @@ read.
 |---|---|---|
 | `OPENPSIRT_SCANNER_PATH` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
 | `OPENPSIRT_SCANNER_TIMEOUT` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
-| `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
+| `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it, and the chart sets it from `scanner.cacheDir`, where it mounts the volume; outside the chart, a deployment that moves it moves the volume with it, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
+| `GRYPE_CHECK_FOR_APP_UPDATE` | Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured | `false` |
+
+The scanner is given only part of this process's environment: `PATH`, `HOME`,
+`TMPDIR`, `TZ`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, the proxy variables in either
+case, and every `GRYPE_` variable. None of the `OPENPSIRT_` settings reaches it,
+so a credential the scanner needs has to be given under a name of its own.
 
 ### An air-gapped install
 
@@ -676,6 +686,21 @@ half of one, and the process stops rather than accept a header anybody can set.
 | `OPENPSIRT_TRUSTED_SOURCES` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored | unset |
 | `OPENPSIRT_TRUSTED_GROUPS_HEADER` | Where that proxy reports group membership, if it does | unset |
 | `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
+
+The header is believed by address alone. In a cluster the sources are usually
+the pod network, which every pod is on, so the chart renders a NetworkPolicy
+admitting only the ingress controller wherever `auth.trustedHeader.name` is
+set.
+
+| Chart value | Meaning | Default |
+|---|---|---|
+| `networkPolicy.enabled` | Whether the policy is rendered for a trusted-header install. Turn it off only where something else keeps other pods from reaching this one | `true` |
+| `networkPolicy.ingressController.namespaceLabels` | The labels of the ingress controller's namespace | ingress-nginx's |
+| `networkPolicy.ingressController.podLabels` | The labels of its pods | ingress-nginx's |
+| `networkPolicy.from` | Further peers, in the NetworkPolicy's own form: an `ipBlock` for a controller on the host network, or a namespace a metrics scraper runs in | none |
+
+A policy is enforced only where the cluster's network plugin supports
+NetworkPolicy.
 
 ## Attachment storage
 

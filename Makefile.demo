@@ -60,8 +60,7 @@ DEMO_CAST ?= 8081:ana:public-read,public-triage,approver \
 # The inventory is an .xz of a CycloneDX file under the SBOM package's
 # testdata. Adding a variant is adding a line — a second variant of the same
 # product is what exercises decisions carrying across variants (REL-01,
-# REL-09), so the mellanox build of the switch image belongs here once it is
-# saved beside the broadcom one.
+# REL-09), which the two switch-image builds are.
 DEMO_BUILDS ?= internal/sbom/testdata/switch-image.cdx.json.xz,sonic,SONiC,master,broadcom \
                internal/sbom/testdata/switch-image-mellanox.cdx.json.xz,sonic,SONiC,master,mellanox
 # In the tree rather than under $HOME: a command that writes to somebody's home
@@ -82,7 +81,10 @@ DEMO_URL    := http://$(DEMO_HOST):$(DEMO_PORT)
 # configuration nobody deploys.
 DEV_HOST ?= localhost
 DEV_PORT ?= 5173
-DEV_API  ?= 127.0.0.1:8081
+# A port no member of DEMO_CAST publishes: the demo's proxy holds those, and a
+# dev API that cannot bind one would be reported up while its seeding reached
+# the demo instead.
+DEV_API  ?= 127.0.0.1:8090
 DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
@@ -105,11 +107,10 @@ demo: demo-image demo-up demo-seed demo-status
 #
 # The scanner's vulnerability data is a hard requirement of a deployment rather
 # than a packaging consideration (ING-22): without it the application ingests
-# and never scans. An air-gapped install cannot fetch it, and what stood behind
-# that requirement was a configuration variable and a paragraph — instructions
-# somebody follows by hand, which is the kind of requirement that is discovered
-# broken by the operator who most needs it, in the one situation where trying
-# it out first is not available.
+# and never scans. An air-gapped install cannot fetch it, and a configuration
+# variable and a paragraph of instructions somebody follows by hand is the kind
+# of requirement discovered broken by the operator who most needs it, in the
+# one situation where trying it out first is not available.
 #
 # Produced with the scanner the image carries, not with whatever is installed
 # here: the database format is the scanner's, and a bundle built by a different
@@ -121,6 +122,9 @@ demo: demo-image demo-up demo-seed demo-status
 # this target refuses to produce.
 SCANNER_DB_DIR ?= $(CURDIR)/dist
 SCANNER_DB_TAG ?= $(shell date -u +%Y%m%d)
+# Read once. Left recursive, each recipe line asks the date again, and a run
+# crossing midnight verifies and names a bundle that was never written.
+SCANNER_DB_TAG := $(SCANNER_DB_TAG)
 SCANNER_DB     := $(SCANNER_DB_DIR)/openpsirt-scanner-db-$(SCANNER_DB_TAG).tar.gz
 
 scanner-db: demo-image
@@ -312,32 +316,62 @@ demo-down:
 # themselves roles like anybody else, which is also the honest demonstration —
 # the grant is visible in the same record everyone else's is, rather than
 # implied by a flag. Idempotent, so re-seeding is not a special case.
-demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1) %{http_code}\n" \
-	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"public-triage\"},{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
-	  "$(DEMO_URL)/v1/people"
+#
+# One definition for the demo and the dev loop, which differ only in where the
+# API is and how it is reached: through the demo's proxy, which asserts who is
+# asking, or straight to the binary with the identity in a header.
+#   $(1) the API's base URL        $(2) the headers it is reached with
+#   $(3) the origin a browser there sends   $(4) the product
+seed-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(4) %{http_code}\n" \
+	  -X POST $(2) -H "Origin: $(3)" -H 'Content-Type: application/json' \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(4)\",\"role\":\"public-triage\"},{\"product\":\"$(4)\",\"role\":\"private-triage\"},{\"product\":\"$(4)\",\"role\":\"assigner\"},{\"product\":\"$(4)\",\"role\":\"approver\"}]}" \
+	  "$(1)/v1/people"
+demo-grant = $(call seed-grant,$(DEMO_URL),,$(DEMO_URL),$(1))
 
-demo-seed:
-	@command -v xz >/dev/null || { echo "xz is needed to read the fixtures"; exit 1; }
-	@for entry in $(DEMO_BUILDS); do \
+# Every build DEMO_BUILDS names: its product, branch and variant declared, the
+# grant on its product, and its inventory uploaded. The same arguments as
+# seed-grant, with $(4) the directory the inventories are written to.
+seed-builds = for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
-	  xz -dc "$$file" > "$(DEMO_DIR)/$$product-$$stream-$$variant.cdx.json"; \
+	  xz -dc "$$file" > "$(4)/$$product-$$stream-$$variant.cdx.json"; \
 	  for spec in \
 	    "/v1/products|{\"name\":\"$$product\",\"display_name\":\"$$display\"}" \
 	    "/v1/products/$$product/streams|{\"name\":\"$$stream\",\"kind\":\"branch\"}" \
 	    "/v1/products/$$product/variants|{\"name\":\"$$variant\",\"customer_facing\":true}"; do \
-	    path=$${spec%%|*}; body=$${spec#*|}; \
+	    path=$${spec%%|*}; body=$${spec\#*|}; \
 	    curl -sS --noproxy '*' -o /dev/null -w "  $$path %{http_code}\n" \
-	      -X POST -H "Origin: $(DEMO_URL)" \
+	      -X POST $(2) -H "Origin: $(3)" \
 	      -H 'Content-Type: application/json' -d "$$body" \
-	      "$(DEMO_URL)$$path"; \
+	      "$(1)$$path"; \
 	  done; \
-	  $(call demo-grant,$$product); \
+	  $(call seed-grant,$(1),$(2),$(3),$$product); \
 	  curl -sS --noproxy '*' -o /dev/null -w "  upload $$product/$$stream/$$variant %{http_code}\n" \
-	    -X POST -H "Origin: $(DEMO_URL)" \
-	    -F "inventory=@$(DEMO_DIR)/$$product-$$stream-$$variant.cdx.json" \
-	    "$(DEMO_URL)/v1/products/$$product/streams/$$stream/variants/$$variant/scans"; \
+	    -X POST $(2) -H "Origin: $(3)" \
+	    -F "inventory=@$(4)/$$product-$$stream-$$variant.cdx.json" \
+	    "$(1)/v1/products/$$product/streams/$$stream/variants/$$variant/scans"; \
 	done
+
+# Where each build's scan stands and how much is open in it: every build
+# DEMO_BUILDS names, and the product/stream/variant triples in $(3). The API is
+# $(1), reached with the headers in $(2).
+seed-status = builds=""; for entry in $(DEMO_BUILDS); do \
+	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
+	  builds="$$builds $$product:$$stream:$$variant"; \
+	done; \
+	for triple in $$builds $(3); do \
+	  IFS=':' read -r product stream variant <<< "$$triple"; \
+	  build="$$product/streams/$$stream/variants/$$variant"; \
+	  printf "  %-46s scan " "$$build"; curl -sS --noproxy '*' $(2) \
+	    "$(1)/v1/products/$$build/scans" \
+	    | sed -e 's/.*"state":"\([a-z]*\)".*/\1/' -e 's/^{.*/no scans yet/' | tr -d '\n'; \
+	  printf " · open "; curl -sS --noproxy '*' $(2) \
+	    "$(1)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
+	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
+	done
+
+demo-seed:
+	@command -v xz >/dev/null || { echo "xz is needed to read the fixtures"; exit 1; }
+	@$(call seed-builds,$(DEMO_URL),,$(DEMO_URL),$(DEMO_DIR))
 	@# A second product: this deployment itself, from the two inventories the
 	@# image carries. Two products is what makes the cross-product screens mean
 	@# anything, and this one costs nobody a build pipeline.
@@ -431,7 +465,36 @@ DEMO_CSV = { gsub(/"/, "") } \
 # distribution saying "affected, not fixing it here" is not a distribution
 # saying "not affected", and only the second offers a dismissal.
 demo-vex:
-	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); 	rows=$$(curl -sS --noproxy '*' 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none" 	  | awk -F',' '$(DEMO_CSV) { if ($$1 ~ /^CVE-/ && $$at["component"] != "") print $$1 "|" $$at["component"] }');	if [ -z "$$rows" ]; then 	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; 	fi; 	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; 	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; 	  printf '"author":"Debian Security Team","version":1,'; 	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; 	  n=0; 	  while IFS='|' read -r cve name; do 	    [ -n "$$cve" ] || continue; 	    [ $$n -gt 0 ] && printf ','; 	    if [ $$((n % 2)) -eq 0 ]; then 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; 	    else 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; 	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; 	    fi; 	    n=$$((n + 1)); 	  done <<< "$$rows"; 	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" 	  -X POST -H "Origin: $(DEMO_URL)" 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" 	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
+	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); \
+	rows=$$(curl -sS --noproxy '*' \
+	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none" \
+	  | awk -F',' '$(DEMO_CSV) { if ($$1 ~ /^CVE-/ && $$at["component"] != "") print $$1 "|" $$at["component"] }'); \
+	if [ -z "$$rows" ]; then \
+	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; \
+	fi; \
+	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; \
+	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; \
+	  printf '"author":"Debian Security Team","version":1,'; \
+	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; \
+	  n=0; \
+	  while IFS='|' read -r cve name; do \
+	    [ -n "$$cve" ] || continue; \
+	    [ $$n -gt 0 ] && printf ','; \
+	    if [ $$((n % 2)) -eq 0 ]; then \
+	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; \
+	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; \
+	    else \
+	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; \
+	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; \
+	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; \
+	    fi; \
+	    n=$$((n + 1)); \
+	  done <<< "$$rows"; \
+	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; \
+	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" \
+	  -X POST -H "Origin: $(DEMO_URL)" \
+	  -F "statements=@$(DEMO_DIR)/debian.vex.json" \
+	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
 
 # A few judgments, so the screens that report on triage have something to
 # report.
@@ -547,32 +610,27 @@ demo-triage:
 
 # One flaw in what this deployment ships, recorded by hand (MDL-27 to MDL-31).
 #
-# **The demo had none, and a whole path was undemonstrable because of it.** A
-# scanner's report about somebody else's component cannot be closed by a
-# person, cannot carry a reporter, has no builds to correct and is refused an
-# advisory — which is right, and it means the four screens built for a flaw we
-# found ourselves had nothing to draw. An advisory in particular is the one
-# output of this tool that leaves the company, and on the demo it answered 422
-# for every issue there was.
+# **Without one a whole path is undemonstrable.** A scanner's report about
+# somebody else's component cannot be closed by a person, cannot carry a
+# reporter, has no builds to correct and is refused an advisory — which is
+# right, and it leaves the screens built for a flaw we found ourselves nothing
+# to draw. An advisory in particular is the one output of this tool that leaves
+# the company.
 #
 # Undisclosed, which is what a flaw looks like before anybody announces it, and
 # recorded against the container builds because that is what the image is.
 #
-# What comes back is echoed rather than substituted into a pattern. A refusal
-# is JSON carrying a schema address, and the slashes in it ended the s/// it
-# was being pasted into — so the one path with something to say was the one
-# that could not say it.
+# What comes back is echoed rather than substituted into a pattern: a refusal
+# is JSON carrying a schema address, and the slashes in it would end an s///.
 demo-flaw:
 	@command -v curl >/dev/null || { echo "curl is needed"; exit 1; }
 	@# Nothing here refuses a second one: an identifier is minted per record,
 	@# so recording the same flaw twice files two of them. Asked first rather
 	@# than left to the reader to notice they have three.
-	@# `origin=manual` is the parameter the list declares for this. It asked
-	@# `recorded=true`, which the list does not take — and nothing rejects a
-	@# parameter it has not heard of, so it was dropped, the count came back
-	@# as every finding in the product, and the target reported "already
-	@# recorded" on any deployment that had ever been scanned. It had never
-	@# filed one, so the advisory it exists to give a subject had none.
+	@# `origin=manual` is the parameter the list declares for this. Nothing
+	@# rejects a parameter the list has not heard of, so a wrong one is
+	@# dropped, the count comes back as every finding in the product, and the
+	@# target reports "already recorded" on any deployment ever scanned.
 	@held=$$(curl -sS --noproxy '*' \
 	    "$(DEMO_URL)/v1/products/openpsirt/findings?origin=manual&limit=1" \
 	  | sed -e 's/.*"total":\([0-9]*\).*/\1/' -e 's/^{.*/0/'); \
@@ -590,21 +648,7 @@ demo-flaw:
 	fi
 
 demo-status:
-	@builds=""; for entry in $(DEMO_BUILDS); do \
-	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
-	  builds="$$builds $$product:$$stream:$$variant"; \
-	done; \
-	for triple in $$builds openpsirt:main:binary openpsirt:main:container \
-	    openpsirt:v1.0:binary openpsirt:v1.0:container; do \
-	  IFS=':' read -r product stream variant <<< "$$triple"; \
-	  build="$$product/streams/$$stream/variants/$$variant"; \
-	  printf "  %-46s scan " "$$build"; curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/$$build/scans" \
-	    | sed -e 's/.*"state":"\([a-z]*\)".*/\1/' -e 's/^{.*/no scans yet/' | tr -d '\n'; \
-	  printf " · open "; curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
-	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
-	done
+	@$(call seed-status,$(DEMO_URL),,openpsirt:main:binary openpsirt:main:container openpsirt:v1.0:binary openpsirt:v1.0:container)
 	@echo "  open $(DEMO_URL) — you arrive as $(DEMO_USER), no sign-in"
 	@# The rest of the cast, one door each. Two windows is two people, which is
 	@# what it takes to show a claim being agreed to: approving your own is
@@ -625,7 +669,7 @@ demo-status:
 # they are gigabytes, they are not what anybody is resetting, and fetching them
 # again is the slow part.
 demo-reset: demo-down
-	@rm -rf $(DEMO_DIR)/data $(DEMO_DIR)/image.cdx.json
+	@rm -rf $(DEMO_DIR)/data $(DEMO_DIR)/*.cdx.json $(DEMO_DIR)/debian.vex.json $(DEMO_DIR)/proxy.conf
 	@echo "  removed the demo database. The scanner cache in $(DEMO_DIR)/grype and the repository copies in $(DEMO_DIR)/repositories were kept."
 
 # A database a tagged release built and seeded, carried through an upgrade to
@@ -666,19 +710,34 @@ dev-up: dev-down
 	 OPENPSIRT_TRUSTED_SOURCES="127.0.0.0/8" \
 	 OPENPSIRT_ATTACHMENT_DIR="$(DEV_DIR)/attachments" \
 	 OPENPSIRT_BASE_URL="$(DEV_URL)" \
-	 nohup ./$(BIN) > $(DEV_DIR)/api.log 2>&1 & echo $$! > $(DEV_DIR)/api.pid
+	 setsid nohup ./$(BIN) > $(DEV_DIR)/api.log 2>&1 & echo $$! > $(DEV_DIR)/api.pid
 	@OPENPSIRT_DEV_USER="$(DEMO_USER)" \
 	 OPENPSIRT_DEV_HOSTS="$(DEV_HOST)" \
 	 OPENPSIRT_DEV_API="http://$(DEV_API)" \
-	 nohup $(NPM) --prefix web run dev -- --host --port $(DEV_PORT) \
+	 setsid nohup $(NPM) --prefix web run dev -- --host --port $(DEV_PORT) \
 	   > $(DEV_DIR)/web.log 2>&1 & echo $$! > $(DEV_DIR)/web.pid
-	@sleep 6
+	@# Up once it answers, the way the demo is: a binary that could not bind
+	@# its address has exited by now, and saying it is up sends the seeding
+	@# wherever that address does lead.
+	@waited=0; \
+	  until curl -fsS --noproxy '*' "http://$(DEV_API)/readyz" >/dev/null 2>&1; do \
+	    waited=$$((waited + 1)); \
+	    if [ $$waited -gt 60 ]; then \
+	      echo "  the API never answered on $(DEV_API):"; tail -5 $(DEV_DIR)/api.log; exit 1; \
+	    fi; \
+	    sleep 1; \
+	  done
 	@echo "api  $(DEV_API)   log $(DEV_DIR)/api.log"
 	@echo "web  $(DEV_URL)   log $(DEV_DIR)/web.log"
 
+# Stops what dev-up started, by the process groups it recorded, and nothing
+# else: a pattern matched across the machine also stops the demo container's
+# server and another checkout's dev loop. Each was started in a session of its
+# own, so the group takes the dev server's children with it.
 dev-down:
-	@-pkill -f "$(BIN)" 2>/dev/null || true
-	@-pkill -f "vite.*--port $(DEV_PORT)" 2>/dev/null || true
+	@for pid in $(DEV_DIR)/api.pid $(DEV_DIR)/web.pid; do \
+	  if [ -f "$$pid" ]; then kill -- "-$$(cat "$$pid")" 2>/dev/null || true; fi; \
+	done
 	@rm -f $(DEV_DIR)/api.pid $(DEV_DIR)/web.pid
 	@sleep 1
 
@@ -686,40 +745,18 @@ dev-down:
 #
 # Declaring a product is administration; filing a build against it is not
 # (ACC-64), so the bootstrap administrator holds nothing on a product until it
-# is granted. Without this every upload here was refused and the loop seeded a
-# deployment with three declared builds and no inventory in any of them —
-# which reads as the scans being slow rather than as nothing having been taken.
+# is granted. Without this every upload here is refused and the loop seeds
+# declared builds with no inventory in any of them — which reads as the scans
+# being slow rather than as nothing having been taken.
 #
 # Direct to the binary with the identity in a header, where the demo goes
 # through a proxy that asserts it. Idempotent, so re-seeding is not a special
 # case.
-dev-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1) %{http_code}\n" \
-	  -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
-	  -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"public-triage\"},{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
-	  "http://$(DEV_API)/v1/people"
+dev-grant = $(call seed-grant,http://$(DEV_API),-H "X-User: $(DEMO_USER)",$(DEV_URL),$(1))
 
 dev-seed:
 	@command -v xz >/dev/null || { echo "xz is needed to read the fixtures"; exit 1; }
-	@for entry in $(DEMO_BUILDS); do \
-	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
-	  xz -dc "$$file" > "$(DEV_DIR)/$$product-$$stream-$$variant.cdx.json"; \
-	  for spec in \
-	    "/v1/products|{\"name\":\"$$product\",\"display_name\":\"$$display\"}" \
-	    "/v1/products/$$product/streams|{\"name\":\"$$stream\",\"kind\":\"branch\"}" \
-	    "/v1/products/$$product/variants|{\"name\":\"$$variant\",\"customer_facing\":true}"; do \
-	    path=$${spec%%|*}; body=$${spec#*|}; \
-	    curl -sS --noproxy '*' -o /dev/null -w "  $$path %{http_code}\n" \
-	      -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
-	      -H 'Content-Type: application/json' -d "$$body" \
-	      "http://$(DEV_API)$$path"; \
-	  done; \
-	  $(call dev-grant,$$product); \
-	  curl -sS --noproxy '*' -o /dev/null -w "  upload $$product/$$stream/$$variant %{http_code}\n" \
-	    -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
-	    -F "inventory=@$(DEV_DIR)/$$product-$$stream-$$variant.cdx.json" \
-	    "http://$(DEV_API)/v1/products/$$product/streams/$$stream/variants/$$variant/scans"; \
-	done
+	@$(call seed-builds,http://$(DEV_API),-H "X-User: $(DEMO_USER)",$(DEV_URL),$(DEV_DIR))
 	@# A second product: this deployment itself, from its own inventory.
 	@#
 	@# One variant here, not the two the container demo seeds. There is no
@@ -746,20 +783,7 @@ dev-seed:
 	@echo "  the scans run in the background; make dev-status shows when they land"
 
 dev-status:
-	@builds=""; for entry in $(DEMO_BUILDS); do \
-	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
-	  builds="$$builds $$product:$$stream:$$variant"; \
-	done; \
-	for triple in $$builds openpsirt:main:binary; do \
-	  IFS=':' read -r product stream variant <<< "$$triple"; \
-	  build="$$product/streams/$$stream/variants/$$variant"; \
-	  printf "  %-46s scan " "$$build"; curl -sS --noproxy '*' -H "X-User: $(DEMO_USER)" \
-	    "http://$(DEV_API)/v1/products/$$build/scans" \
-	    | sed -e 's/.*"state":"\([a-z]*\)".*/\1/' -e 's/^{.*/no scans yet/' | tr -d '\n'; \
-	  printf " · open "; curl -sS --noproxy '*' -H "X-User: $(DEMO_USER)" \
-	    "http://$(DEV_API)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
-	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
-	done
+	@$(call seed-status,http://$(DEV_API),-H "X-User: $(DEMO_USER)",openpsirt:main:binary)
 	@echo "  open $(DEV_URL) — you arrive as $(DEMO_USER), no sign-in"
 
 

@@ -1794,7 +1794,9 @@ KB) and the renderer (146 KB) fetched only by the screens that use them.
 |---|---|
 | `make demo-status` | Whether the scan has landed and how much it found |
 | `make demo-down` | Stops it |
-| `make demo-reset` | Throws the database away and keeps the scanner's vulnerability database, which is a gigabyte and is not what anybody is resetting |
+| `make demo-reset` | Throws the database and the inventories and documents the seeding wrote away, and keeps the scanner's vulnerability database, which is a gigabyte and is not what anybody is resetting |
+| `make dev` | The binary and the interface's dev server on this machine, for editing the interface and seeing it reload. The API listens on a port no member of the demo's cast holds, and is reported up once it answers |
+| `make dev-down` | Stops what `make dev` started, by the process groups it recorded, and nothing else on the machine |
 
 | Rule | |
 |---|---|
@@ -1802,6 +1804,7 @@ KB) and the renderer (146 KB) fetched only by the screens that use them.
 | It builds the image from the working tree | What comes up is the change being tested. The interface and the binary are built *inside* the image: the Go build embeds the interface, and the directory it embeds is git-ignored, so an image built from a clean checkout would otherwise carry no interface at all |
 | Everything it writes lives in a git-ignored directory in the tree | Deleting the checkout deletes the state. A command run from a checkout that writes to somebody's home directory is a surprise |
 | Seeding is idempotent | It can be run repeatedly without tearing anything down |
+| The demo and the dev loop seed through one definition | They differ only in where the API is and how it is reached, and a change to what is seeded is made once. A test holds the export columns and the queue field they read by name to their spelling |
 | It is the real thing behind a real proxy | The application is authenticated by a trusted header, and the demo runs exactly that — the image, with a small proxy in front adding the header — rather than a development server standing in for one. **No mode in the application trusts anybody**: the alternative was a development switch that assumes an identity, which is a hole nobody should ship |
 | It is a demonstration deployment, not a small production one | It serves plain HTTP and hands administration to whoever the proxy says they are. Both are holes; together they are a machine somebody can click around on |
 

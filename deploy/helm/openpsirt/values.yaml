@@ -35,10 +35,8 @@ image:
   # is private this needs a pull secret your cluster can use; see
   # imagePullSecrets below. The image is single-architecture: `linux/amd64`.
   #
-  # There is no image before the first tag. Until then, build one from the
-  # repository and push it somewhere your cluster can reach, then point this
-  # there — left as it stands with nothing published, you get a pod that
-  # cannot pull.
+  # To run an untagged build, build an image from the repository, push it
+  # somewhere your cluster can reach, and point this there.
   repository: ghcr.io/nexthop-ai/openpsirt
   pullPolicy: IfNotPresent
   # Defaults to the chart's appVersion.
@@ -150,6 +148,30 @@ auth:
     # Where group membership arrives, if the proxy asserts it.
     groupsHeader: ""
     groupsDelimiter: ","
+
+# Who may reach the pods, where sign-in is asserted by a header. The header is
+# believed from auth.trustedHeader.sources by address alone, and those are
+# usually the pod network: without a policy, any pod in the cluster can send
+# the header straight to the Service and be signed in as anybody, the
+# bootstrap administrators included.
+#
+# Rendered whenever auth.trustedHeader.name is set, admitting only the ingress
+# controller and whatever `from` adds. A policy is enforced only by a network
+# plugin that supports it. The kubelet's probes come from the node, which most
+# plugins admit; one that does not needs the node's addresses in `from`.
+networkPolicy:
+  enabled: true
+  # The ingress controller's namespace and pods, by label. Either may be
+  # emptied to admit by the other alone.
+  ingressController:
+    namespaceLabels:
+      kubernetes.io/metadata.name: ingress-nginx
+    podLabels:
+      app.kubernetes.io/name: ingress-nginx
+  # Further peers, in the NetworkPolicy's own form: an ipBlock for a controller
+  # on the host network, or a namespace a metrics scraper runs in. The policy
+  # is refused at render when this and the controller's labels are all empty.
+  from: []
 
 # Mail is how anything leaves the application. Leave server empty and this
 # deployment tells nobody anything outside it, which is a supported way to run:
@@ -276,9 +298,9 @@ podAnnotations: {}
 # are comparable between products rather than being a property of somebody's
 # build image.
 scanner:
-  # Where it keeps its vulnerability data. The image sets the same path, and
-  # changing it here without changing it there leaves the data on the
-  # read-only root filesystem, where it cannot be written.
+  # Where it keeps its vulnerability data: the volume below is mounted here,
+  # and the scanner is told to use it. A GRYPE_DB_CACHE_DIR in extraEnv is
+  # overridden by this.
   cacheDir: /var/cache/openpsirt/grype
   # Keeping the vulnerability database across restarts is the difference
   # between importing it once and importing it on every start. The import is

@@ -42,5 +42,10 @@ jobs:
       - run: mike deploy --push --update-aliases main
       # Without a default the site root serves nothing — every version lives in
       # its own directory. Until there is a release, unreleased work is what a
-      # visitor should land on; once releases exist this becomes "latest".
-      - run: mike set-default --push main
+      # visitor lands on. Once a release carries "latest", the release workflow
+      # owns the default, and a merge setting it back to main would put
+      # unreleased documentation at the root until the next release.
+      - run: |
+          if ! mike list --json | jq -e 'any(.[]; .aliases | index("latest"))' > /dev/null; then
+            mike set-default --push main
+          fi

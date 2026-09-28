@@ -75,11 +75,12 @@ spec:
     metadata:
       labels: {{- include "openpsirt.selectorLabels" . | nindent 8 }}
       annotations:
-        # Rolls the pods when the database credential changes. Without this a
-        # rotation updates the Secret, leaves the pod template byte-identical,
-        # and every running pod keeps using the old credential while the
-        # upgrade reports success.
-        {{- if or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) }}
+        # Rolls the pods when a credential the chart holds changes: the
+        # database's, a sign-in client secret, or the mail password. Without
+        # this a rotation updates the Secret, leaves the pod template
+        # byte-identical, and every running pod keeps using the old credential
+        # while the upgrade reports success.
+        {{- if or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) (and .Values.mail.server .Values.mail.password (not .Values.mail.existingSecret)) }}
         checksum/secrets: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
         {{- with .Values.podAnnotations }}
@@ -114,6 +115,10 @@ spec:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            # The scanner's data where the volume below is mounted. After
+            # extraEnv, so the two cannot name different places.
+            - name: GRYPE_DB_CACHE_DIR
+              value: {{ .Values.scanner.cacheDir | quote }}
             - name: OPENPSIRT_DATABASE_URL
               valueFrom:
                 secretKeyRef:

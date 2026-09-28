@@ -88,9 +88,9 @@ func run(args []string, stdout, stderr *os.File) error {
 
 	ctx := context.Background()
 	// A subcommand this does not know is refused rather than ignored.
-	// Ignored, `openpsirt migrat` started the server — a typo in a job that
-	// was meant to apply migrations and nothing else, answering requests
-	// against whatever schema was there. runMigrate already refuses an
+	// Ignored, `openpsirt migrat` would start the server — a typo in a job
+	// meant to apply migrations and nothing else, answering requests against
+	// whatever schema is there. runMigrate already refuses an
 	// action it does not know, which is the contrast.
 	if fs.NArg() > 0 {
 		if fs.Arg(0) != "migrate" {
@@ -499,9 +499,9 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 		return nil, err
 	}
 	// The transport is logged because both drivers negotiate it
-	// opportunistically and neither says which way it went, so a deployment
-	// that believed the connection to its findings was encrypted had nowhere
-	// to check.
+	// opportunistically and neither says which way it went, and this line is
+	// where a deployment checks whether the connection to its findings is
+	// encrypted.
 	logger.Info("database connected",
 		"engine", db.Server.Engine, "version", db.Server.Version,
 		"transport", db.Server.Transport, "url", target.Redacted)
@@ -688,11 +688,10 @@ type loop struct {
 // A list rather than a run of if statements, so that what a given deployment
 // starts can be read — and held to — without starting any of it.
 func (p passes) loops() []loop {
-	// The ones that always run. Seven of these constructors return a value
+	// The ones that always run. Their constructors return a value
 	// unconditionally; NewUndertaker returns nil only for a nil queue, which
 	// queue.New never produces, and Undertaker.Run answers a nil receiver. So
-	// a guard on any of them is a condition a reader has to go and disprove —
-	// which is what four of them were.
+	// a guard on any of them is a condition a reader has to go and disprove.
 	all := []loop{
 		{"read what arrived", p.reader.Run, readInterval},
 		{"scan what arrived", p.runner.Run, readInterval},
@@ -723,12 +722,19 @@ func (p passes) loops() []loop {
 }
 
 func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside passes) error {
+	return serveBeside(cfg, logger, handler, beside.background)
+}
+
+// serveBeside serves, with whatever start begins running beside the server
+// stopped and waited for on every way out.
+func serveBeside(cfg config.Config, logger *slog.Logger, handler http.Handler,
+	start func(context.Context) *sync.WaitGroup) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// Reading stops when the signal arrives, before the server drains, so a
 	// scan is not picked up during the seconds we are on our way out.
-	workers := beside.background(ctx)
+	workers := start(ctx)
 	srv := &http.Server{
 		Addr:    cfg.Addr,
 		Handler: handler,
@@ -754,11 +760,11 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 	select {
 	case err := <-errs:
 		// The workers are already running, each of them beginning with a
-		// timer that fires at once. Returning here left them mid-query while
-		// the caller's deferred close took the database away — an orderly
-		// failure to listen turned into failed scans and jobs retried for no
-		// reason. Stopping them is what ctx's cancel does; waiting is what
-		// this adds.
+		// timer that fires at once. Returning without waiting would leave
+		// them mid-query while the caller's deferred close takes the database
+		// away, turning an orderly failure to listen into failed scans and
+		// jobs retried for no reason. Stopping them is what ctx's cancel
+		// does; waiting is what this adds.
 		stop()
 		return errors.Join(err, workersStopped(workers, cfg, logger))
 	case <-ctx.Done():
