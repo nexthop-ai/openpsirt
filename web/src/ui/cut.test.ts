@@ -19,4 +19,11 @@ describe("text shortened to fit", () => {
     expect(cut(text, 3)).toBe("ab😀…");
     expect(cut(text, 3).includes("\ud83d…")).toBe(false);
   });
+
+  it("never cuts inside what a reader sees as one character", () => {
+    // A flag is two code points, and an accent written after its letter is a
+    // second one: a cut by code points keeps half of each.
+    expect(cut("ab🇫🇷🇫🇷", 3)).toBe("ab🇫🇷…");
+    expect(cut("café au lait", 4)).toBe("café…");
+  });
 });

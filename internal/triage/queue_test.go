@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -345,6 +346,18 @@ func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
 		}
 		if other := got["a-place-nobody-deferred"]; other != 0 {
 			t.Errorf("a place nobody deferred reads %s", other)
+		}
+
+		// Read as the person asking: somebody who reads nothing here is told
+		// nothing was put off.
+		stranger := access.Subject{Kind: access.Person, ID: -1}
+		theirs, err := f.store.DeferredAt(ctx, stranger, at.ProductID, at.VulnerabilityID,
+			[]string{at.PlaceIdentity})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if seen := theirs[at.PlaceIdentity]; seen != 0 {
+			t.Errorf("somebody who reads nothing was told %s put off", seen)
 		}
 	})
 }

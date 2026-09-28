@@ -937,7 +937,7 @@ several places is one answer with one count.
 |---|---|
 | Issues, not finding rows | A library reachable under three parents is one issue. Counted as rows it reads three times its number, and the order follows the count |
 | Counted in one pass over the build, grouped by component | Counted per matched component, SQLite reads the build's open findings once for each, and a term matching many names takes most of a minute |
-| A hit is marked in the list, not placed in the tree | The search answers with components and carries no chain to the root, so there is no position to open the tree at. The list stays while the term does, and the component's own screen is the control beside each hit |
+| Search hits marked in the list | The search answers with components and carries no chain to the root, so there is no position to open the tree at. The list stays while the term does, and the component's own screen is the control beside each hit |
 
 Measured on the demo's switch image, 6,867 components and 297,881 open
 findings, before and after counting in one pass:
