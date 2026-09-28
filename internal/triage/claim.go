@@ -388,6 +388,15 @@ type ClaimApproved struct {
 // refusing everything and agreeing to everything: the rest is approved as one
 // claim, and the rows set aside go back to the proposer as a claim of their
 // own, carrying the reason the way sending back does.
+//
+// Against one revision, not against the claim. The whole value of a second
+// pair of eyes is that they read particular words; an approval that floats
+// free of the words would still be standing after somebody rewrote them, and
+// nothing would report that.
+//
+// The proposer may never be the approver, with no override. A one-person
+// deployment therefore cannot approve anything, which is the control working
+// rather than a gap in it.
 func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimID int64,
 	batch string, except []int64, because string) (*ClaimApproved, error) {
 

@@ -189,6 +189,7 @@ deployment with one person cannot approve anything.
 | Editing the reasoning takes back the approval | The item returns to the queue marked as previously approved rather than as a fresh proposal |
 | Withdrawing, revising and sending back need no approval | Hiding risk needs a second person; putting it back on the table does not |
 | Undoing works at the size it was done | A bulk approval records what it covered; undoing takes the whole batch back to *proposed*. The claims still stand — it is the agreement that was taken back |
+| Undoing and withdrawing leave an ended row as it ended | Only approved rows return to *proposed*, and only rows still proposed or approved become *withdrawn*. A lapsed row holds no live key, so returned to waiting it is a proposal nothing keeps unique at its place; rewritten as withdrawn it loses when and why it stopped applying |
 | A withdrawn approval stays on the record | It says a second person did once agree, and to which words |
 | A withdrawal records who made it, which is not who gave the agreement | A proposer revising their own claim withdraws every agreement standing on the old words. Read off the withdrawal alone, restating a claim came back to its author as somebody else having undone their agreement |
 | **A carried agreement says it was carried** | A re-affirmation stands on the agreement its predecessor had and states its own reasoning, so the approver named read the earlier words. Written as an ordinary approval it said they had agreed, today, to text they have never seen — and the register, the audit list and the claim's own approvals all reported it that way |
@@ -250,7 +251,7 @@ holds the ones nobody has agreed to yet.
 | Each list carries the reasoning and the names with the row | A list where seeing why means opening every entry is a list nobody reads before acting. A row saying product 4, issue 91 is two more requests to understand, fifty times a page |
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
 | A claim it reaches only part of is left alone whole | The agreement is one row keyed on the claim, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
-| What an undo reports is what returned to waiting | A decision another agreement still stands on is left where it is, so the number of candidates is not the number that moved |
+| What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
 ## The whole claim

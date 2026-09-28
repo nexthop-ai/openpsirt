@@ -18,17 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
-// Approve records a second person agreeing to what a decision currently says.
-//
-// Against one revision, not against the decision. The whole value of a second
-// pair of eyes is that they read particular words; an approval that floats
-// free of the words would still be standing after somebody rewrote them, and
-// nothing would report that.
-//
-// The proposer may never be the approver, with no override. A one-person
-// deployment therefore cannot approve anything, which is the control working
-// rather than a gap in it — and it is better said plainly than quietly
-// relaxed.
 // Revise states the reasoning again, and takes back any approval standing on
 // what it said before.
 //
@@ -203,7 +192,12 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 			// Released, so the places are open to a fresh claim. A withdrawn
 			// claim is history, and history must not stop anybody deciding.
 			Set("live_key = ?", nil).
-			Where("claim_id = ?", claimID).Exec(ctx); err != nil {
+			Where("claim_id = ?", claimID).
+			// A row that has already ended keeps its state and its end
+			// date: a lapse says when and why it stopped applying, and the
+			// claim then reads as partly lapsed rather than withdrawn.
+			Where("state IN (?)", bun.List([]State{Proposed, Approved})).
+			Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a claim: %w", err)
 		}
 		return nil
@@ -317,36 +311,42 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		Where("claim_id IN (?)", bun.List(claims)).Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
-	// Back to proposed rather than withdrawn: the claims still stand, it is
-	// the agreement to them that was taken back.
-	//
-	// Only where nothing else still agrees. A decision may carry more than one
-	// agreement, and undoing a batch is undoing that batch — sending a
-	// decision back to the queue while somebody's standing agreement to it is
-	// still recorded would discard an agreement nobody took back.
-	res, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", Proposed).
-		// Cleared here as well as on a revision. A claim sent back and then
-		// approved under a batch, with the batch later undone, was left
-		// proposed, needing approval, and in no queue at all — visible to
-		// nobody but whoever knew its identifier.
-		Set("sent_back_at = ?", nil).
-		Where("de.claim_id IN (?)", bun.List(claims)).
-		Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "still" ` +
-			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
-		Exec(ctx)
-	if err != nil {
-		return Undone{}, fmt.Errorf("undo an approval: %w", err)
-	}
-	// Counted from the write rather than from the candidates. The condition
-	// above excludes any decision another agreement still stands on, so the
-	// number of candidates is not what returned to waiting — which is what
-	// Rows says it is.
-	rows, err := database.Affected(res)
+	rows, err := s.returnToWaiting(ctx, claims)
 	if err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
 	return Undone{Rows: rows, Told: told}, nil
+}
+
+// returnToWaiting puts the approved rows of these claims back in the queue,
+// once no agreement to them still stands, and says how many it moved.
+//
+// Back to proposed rather than withdrawn: the claims still stand, and it is
+// the agreement to them that was taken back. A decision may carry more than
+// one agreement, so a row another standing agreement holds stays approved.
+//
+// Approved rows only. A lapsed or withdrawn row has ended and holds no live
+// key; returned to proposed it would wait for approval with nothing enforcing
+// that one claim stands at its place.
+//
+// Counted from the write rather than from the candidates, because both
+// conditions exclude rows the caller named.
+func (s *Store) returnToWaiting(ctx context.Context, claims []int64) (int64, error) {
+	res, err := s.db.NewUpdate().Model((*Decision)(nil)).
+		Set("state = ?", Proposed).
+		// A claim sent back and then approved, with the approval later taken
+		// back, would otherwise be proposed, need approval, and sit in no
+		// queue at all.
+		Set("sent_back_at = ?", nil).
+		Where("de.claim_id IN (?)", bun.List(claims)).
+		Where("de.state = ?", Approved).
+		Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "still" ` +
+			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
+		Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return database.Affected(res)
 }
 
 // wholeClaims keeps only the claims every one of whose rows is in reached, and
