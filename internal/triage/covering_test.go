@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -33,9 +34,9 @@ func (f *fixture) build(t *testing.T, productID int64, stream string) build {
 	}
 	// One variant per product, declared the first time a build of it is
 	// asked for.
-	variant, err := cat.VariantByName(ctx, productID, "broadcom")
+	variant, err := cat.VariantByName(ctx, productID, fixtures.CustomerVariant)
 	if err != nil {
-		if variant, err = cat.DeclareVariant(ctx, productID, "broadcom", true); err != nil {
+		if variant, err = cat.DeclareVariant(ctx, productID, fixtures.CustomerVariant, true); err != nil {
 			t.Fatalf("declare the variant: %v", err)
 		}
 	}

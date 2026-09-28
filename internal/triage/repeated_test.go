@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -206,7 +207,8 @@ func TestTwoProductsDisplayedAlikeAreNotOnePattern(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// A second product the catalog displays under the same words.
-		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "sonic-lite", "SONiC")
+		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "sonic-lite",
+			fixtures.ProductDisplayName)
 		if err != nil {
 			t.Fatal(err)
 		}
