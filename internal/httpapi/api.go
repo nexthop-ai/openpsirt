@@ -362,6 +362,8 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerMovements(api, in)
 	registerDue(api, in)
 	registerGraph(api, in)
+	registerMatchCoverage(api, in)
+	registerMatchCoverageExport(api, in)
 	registerSettings(api, in)
 	// Components with no upstream answer, and the reason for each.
 	registerUpstream(api, in)

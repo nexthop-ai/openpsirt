@@ -3,7 +3,7 @@
 The figures this produces and what each is a count of.
 
 Satisfies REQ-25, REQ-33, REQ-35, REQ-50, REQ-51, REQ-52, REQ-53, REQ-54,
-REQ-74, and part of REQ-30.
+REQ-74, REQ-79, and part of REQ-30.
 
 Everything here reads what the findings and decisions already hold. No table in
 this document is its own.
@@ -31,6 +31,7 @@ this document is its own.
 - [One issue across the estate](#one-issue-across-the-estate)
 - [The exception report](#the-exception-report)
 - [Dismissals and scan coverage](#dismissals-and-scan-coverage)
+- [Match coverage](#match-coverage)
 - [The report catalog](#the-report-catalog)
 - [Fix-bundle page cost](#fix-bundle-page-cost)
 - [Exports](#exports)
@@ -554,6 +555,59 @@ emits anything outward. Publication exists — a VEX document per build, an
 advisory recorded when it goes out — and those are documents somebody asks for
 and takes away.
 
+## Match coverage
+
+A component the scanner has no way to match reports no findings, which is what
+a component with none reports too. Each build says which of its components are
+unmatchable and why (REQ-79). The dependency tree's header counts them and
+links to the list, and the catalog carries the list for a whole build.
+
+| Reason | The component |
+|---|---|
+| No package identifier | Has no package identifier. A CPE on its own matches nothing |
+| Nothing published for this kind | Is a container image or a source repository, which no vulnerability data is published against |
+| No version | States no version, or states `UNKNOWN` or `(devel)` |
+| No distribution | Is a Debian, RPM or Alpine package whose identifier names no distribution release, through `distro` or through `os_name` and `os_version` |
+| Generic, no CPE | Is of the generic type and carries no CPE |
+
+| Rule | |
+|---|---|
+| Read from what the scanner is given | The stored component, with the distribution worked out the way the scanner's inventory works it out. A report read from the uploaded document would describe something the scanner never sees |
+| One reason per component, the first it meets in the order above | A component with no version is unmatchable whatever its distribution says, and the counts sum to the total |
+| Worked out when asked | Reading a qualifier means parsing an identifier, which no engine does alike, and a build holds thousands of components |
+| Each reason is a shape the scanner was measured matching nothing for | Nothing is listed on a guess about the scanner |
+| The tree's count and this list are one function | Two definitions of "unmatchable" disagree, and the one on the tree is the one somebody reads first |
+
+Measured with grype 0.119.0 against its database of 2026-09-28, one component
+per inventory:
+
+| Shape | Matches |
+|---|---:|
+| Debian `openssl` with `distro=debian-12` | 44 |
+| The same with no distribution, with or without a CPE, or with `os_name` and `os_version` alone | 0 |
+| A SONiC kernel image with `distro=debian-13&upstream=linux` | 6,613 |
+| The same with `distro` and no `upstream`, or with neither | 0 |
+| RPM or Alpine with no distribution | 0 |
+| Alpine with `distro=alpine-3.18.0` | 19 |
+| Generic `openssl` 1.1.1a with a CPE | 54 |
+| The same with no CPE, with no package identifier and a CPE, or with the version `UNKNOWN` or none | 0 |
+| Go, PyPI, Cargo and npm packages at a version | 17, 5, 12 and 6 |
+| The same with no version, or Go at `(devel)` | 0 |
+| A container image, a GitHub repository | 0 |
+
+The inventory the scanner is given rewrites `os_name` and `os_version` into
+`distro`, so those two count as naming a distribution here.
+
+A real SONiC broadcom inventory of 7,088 components reads as 3,268 the scanner
+can match and 3,820 it cannot:
+
+| Reason | Components |
+|---|---:|
+| No version | 3,581, nearly all kernel modules stated as `UNKNOWN`, which the kernel's own package answers for |
+| No distribution | 174, SONiC's rebuilds of Debian packages that never merged with the installed copy |
+| Nothing published for this kind | 40 |
+| No package identifier | 25 |
+
 ## The report catalog
 
 A report is a question somebody asks often enough to have a name. The catalog is
@@ -577,8 +631,8 @@ holds the files that are reachable nowhere else.
 | The frame does not print | The rail, the tab bar, the floating action and the menu go, and the grid that places them is flattened, so a page carries no empty column where the rail was. The narrow-screen shape applies to a screen and not to a sheet of paper narrower than it |
 | What is about to go out of support is asked for, and comes back as its own list | The day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, with nobody having decided anything. A warning and an exposure are two things: one is a date somebody can still act before. Asked for, because a second population appearing unasked changes what every figure on the report counts |
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
-| An entry may point at a screen rather than owning a page | Eight do: release readiness, upgrade plan status, carried patches, holder workload, embargo and disclosure, the exception report, release comparison, and administrative changes. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
-| An entry that points at a build's screen asks for a whole build | Five screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing, so it says which picker to touch instead |
+| An entry may point at a screen rather than owning a page | Nine do: release readiness, upgrade plan status, match coverage, carried patches, holder workload, embargo and disclosure, the exception report, release comparison, and administrative changes. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
+| An entry that points at a build's screen asks for a whole build | Six screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing, so it says which picker to touch instead |
 | The question with no name is asked on the findings list, not on a panel of the catalog's own | A panel offering the findings list's filter panel and the findings list's query is that screen at a second address, and the copy is the poorer one: it passed an empty tag list, so it offered fewer filters than the screen it copied. The catalog points at the list instead |
 | The catalog offers only the files reachable nowhere else | Two are: what is running out of time, and the VEX document. Every other file is offered on the screen that answers for it and carries that screen's filters, so a second unfiltered link beside it is a worse copy of the same answer |
 
@@ -692,7 +746,8 @@ review queue, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, a comparison of two
 builds' inventories, the fix bundles, the upgrades one build is waiting on,
 what keeps being put off, the backlog over time, what has been changed
-administratively, and the disposition register, which is the one an auditor
+administratively, what a build holds that the scanner cannot match, and the
+disposition register, which is the one an auditor
 asks for first.
 
 The subject travels through the stream. An export is the easiest place to

@@ -4256,6 +4256,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the components a scanner cannot match
+         * @description Returns the components the build holds now that the vulnerability scanner has no way to match, with the reason for each and a count per reason. Such a component reports no findings whatever it contains.
+         *
+         *     Read from the component as the scanner is given it, when this is asked. A component meeting several reasons is listed under the first in the order `reasons` gives.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-match-coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the components a scanner cannot match
+         * @description Every component the match coverage list names, as a file, in the same order, with the reason for each.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-match-coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades": {
         parameters: {
             query?: never;
@@ -9086,6 +9132,33 @@ export interface components {
             /** @description The version that build ships under this name — pass it as ?version= when applying a decision there */
             version?: string;
         };
+        MatchCoverageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MatchCoverageBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The number of components the build holds
+             */
+            components: number;
+            /** @description The unmatched components, narrowed by reason where one was asked for, ordered by reason and then by name */
+            items: components["schemas"]["UnmatchedBody"][] | null;
+            /** @description Every reason with how many components it covers, zero included, in the order a component is tested against them. A component is counted under the first reason it meets */
+            reasons: components["schemas"]["ReasonCountBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of items across every page
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description The number of those the scanner has no way to match
+             */
+            unmatched: number;
+        };
         MeasuredBody: {
             /** @description The build time it describes */
             built_at?: string;
@@ -10277,6 +10350,18 @@ export interface components {
             /** @description Whether a second person has to agree */
             waiting: boolean;
         };
+        ReasonCountBody: {
+            /**
+             * Format: int64
+             * @description The number of the build's components it covers
+             */
+            count: number;
+            /**
+             * @description Why the scanner cannot match them
+             * @enum {string}
+             */
+            reason: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+        };
         ReceiptBody: {
             /** @description The build time the producer states, or the time the upload arrived where it states none */
             built_at?: string;
@@ -10773,9 +10858,9 @@ export interface components {
             term?: string;
             /**
              * Format: int64
-             * @description The number of those components carrying neither a package identifier nor a platform enumeration
+             * @description The number of those components the scanner has no way to match. The match coverage report lists them, with the reason
              */
-            unidentified: number;
+            unmatched: number;
         };
         RowsStandingBody: {
             /**
@@ -11744,6 +11829,23 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             undone: number;
+        };
+        UnmatchedBody: {
+            /** @description The platform enumeration the scanner is given, where there is one */
+            cpe?: string;
+            /** @description The kind of package this is, as its identifier spells it */
+            ecosystem?: string;
+            name: string;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
+            /** @description The package identifier the scanner is given, where there is one */
+            purl?: string;
+            /**
+             * @description Why the scanner cannot match it. no-identifier: no package identifier, and a CPE alone matches nothing. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE
+             * @enum {string}
+             */
+            reason: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+            version: string;
         };
         UpgradeBody: {
             /**
@@ -18967,6 +19069,81 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ResolvedBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-match-coverage": {
+        parameters: {
+            query?: {
+                /** @description One reason alone */
+                reason?: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchCoverageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-match-coverage": {
+        parameters: {
+            query?: {
+                /** @description One reason alone */
+                reason?: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

@@ -114,6 +114,13 @@ export const CATALOG: Report[] = [
     needs: whole,
   },
   {
+    name: "Match coverage",
+    answers:
+      "What a build holds that the scanner has no way to match, and why. Those components report no findings, which looks exactly like having none.",
+    to: (at) => `${buildAt(at)}/match-coverage`,
+    needs: whole,
+  },
+  {
     name: "Carried patches",
     answers:
       "What a distribution fixed without moving the version, which no comparison of versions can see. On the build's inventories screen.",
