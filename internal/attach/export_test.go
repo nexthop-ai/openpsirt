@@ -11,3 +11,7 @@ package attach
 // ordinary case rather than a contrived one. Waiting for it to happen by
 // itself is a test that passes by never racing.
 func AfterPage(s *Store, fn func()) { s.afterPage = fn }
+
+// MintToken is the identifier an attachment is given, for the check that text
+// can refer to one.
+func MintToken() (string, error) { return mintToken() }
