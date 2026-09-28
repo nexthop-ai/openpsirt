@@ -173,6 +173,12 @@ rather than checked at each route, because the leak is the *ordering*. The
 identifier carries no sequence, so the names cannot be walked or counted even
 before a route is asked.
 
+A route taking a list of names — one judgment about many issues, an
+assignment of rows somebody picked — goes through the list form of the same
+resolver, one statement per batch. A name filed only where the caller may not
+read a finding of it in this product is answered in the words a name nobody
+filed gets.
+
 Nobody learns what a build ships either. The graph reads that take a component
 *name* refuse before resolving it, for the same reason and with a sharper edge:
 a name the build does not hold answered one way, a name it holds at two versions

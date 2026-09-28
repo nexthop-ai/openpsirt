@@ -452,6 +452,41 @@ func issueHere(ctx context.Context, in Ingest, subject access.Subject,
 	return issue, nil
 }
 
+// issuesHere is issueHere for a list of names: what each resolves to, and the
+// names, as the caller spelled them, that are filed nowhere or only where the
+// subject may not read a finding of them in this product.
+//
+// The two go into one list because they have to be answered in the same
+// words. A name filed where the caller may not look, answered differently
+// from a name nobody filed, is a lookup that counts what is kept quiet.
+func issuesHere(ctx context.Context, in Ingest, subject access.Subject,
+	productID int64, names []string) (map[string]int64, []string, error) {
+
+	found, err := finding.NewVulnerabilities(in.DB.DB).IDsByName(ctx, names)
+	if err != nil {
+		return nil, nil, wentWrong(in.Logger, "which issues these are could not be read", err)
+	}
+	ids := make([]int64, 0, len(found))
+	for _, id := range found {
+		ids = append(ids, id)
+	}
+	told, err := finding.NewStore(in.DB.DB).ToldOfIn(ctx, subject, productID, ids)
+	if err != nil {
+		return nil, nil, wentWrong(in.Logger, "that could not be looked up", err)
+	}
+	here := make(map[string]int64, len(found))
+	var unknown []string
+	for _, name := range names {
+		id, ok := found[name]
+		if !ok || !told[id] {
+			unknown = append(unknown, name)
+			continue
+		}
+		here[name] = id
+	}
+	return here, unknown, nil
+}
+
 // narrowedTo resolves an optional product name a list narrows by.
 //
 // Empty is every product, which is what a list asks for when nothing is

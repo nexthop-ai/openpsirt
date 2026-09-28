@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // The people who may be told that an issue exists.
@@ -64,6 +65,64 @@ func (s *Store) MayBeToldOfIn(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) (bool, error) {
 
 	return MayBeToldOfWithin(ctx, s.db, subject, productID, vulnerabilityID)
+}
+
+// ToldOfIn is MayBeToldOfIn asked of many issues in one product at once: which
+// of them this subject may be told exist there.
+//
+// For the routes that take a list of names. One statement per batch rather
+// than one per issue, because a list is the case where a question per name is
+// thousands of round trips.
+func (s *Store) ToldOfIn(ctx context.Context, subject access.Subject,
+	productID int64, issues []int64) (map[int64]bool, error) {
+
+	told := map[int64]bool{}
+	if subject.Kind != access.Person || len(issues) == 0 {
+		return told, nil
+	}
+	// A case grant is asked first and alone, for the reason the single form
+	// gives: a collaborator does not see the product at any visibility.
+	var onCase, rest []int64
+	for _, id := range issues {
+		if subject.OnCase(productID, id) {
+			onCase = append(onCase, id)
+		} else {
+			rest = append(rest, id)
+		}
+	}
+	products, all := subject.Products()
+	seen := subject.Sees(productID)
+	read := func(ids []int64, narrowed bool) error {
+		return database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			q := s.db.NewSelect().
+				TableExpr(`"finding" AS "f"`).
+				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+				ColumnExpr("DISTINCT f.vulnerability_id").
+				Where("f.vulnerability_id IN (?)", bun.List(batch)).
+				Where("st.product_id = ?", productID)
+			if narrowed {
+				q = onlyReadable(q, subject, products, all)
+			}
+			var found []int64
+			if err := q.Scan(ctx, &found); err != nil {
+				return fmt.Errorf("read where these issues sit here: %w", err)
+			}
+			for _, id := range found {
+				told[id] = true
+			}
+			return nil
+		})
+	}
+	if err := read(onCase, false); err != nil {
+		return nil, err
+	}
+	if seen {
+		if err := read(rest, true); err != nil {
+			return nil, err
+		}
+	}
+	return told, nil
 }
 
 // MayBeToldOfWithin is MayBeToldOfIn against a handle the caller chooses, so
