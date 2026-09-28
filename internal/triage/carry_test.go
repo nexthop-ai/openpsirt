@@ -74,6 +74,49 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 	})
 }
 
+// Two findings at one place on the new line, each holding its own pair of
+// versions. The component version and the consumer version a carried
+// judgment is keyed on come from the same one of them: a pair drawn half from
+// each is a key no finding holds, and the carried claim would answer nothing.
+func TestACarriedPlaceTakesBothVersionsFromOneFinding(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.agreed(t, f.at())
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "9.0")
+		f.placeAt(t, "202411", next, "2.0", "4.5.6")
+
+		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offered.Moved) != 1 || offered.Moved[0].Now != "1.2.4" {
+			t.Fatalf("the new line was offered %+v, want the judgment moving to 1.2.4", offered.Moved)
+		}
+		if _, err := f.store.Carry(ctx, f.triager, was, next,
+			[]int64{agreed.ID}, triage.DefaultBounds()); err != nil {
+			t.Fatal(err)
+		}
+		var landed triage.Decision
+		if err := f.db.DB.NewSelect().Model(&landed).
+			Where("de.id <> ?", agreed.ID).
+			OrderExpr("de.id DESC").Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		component, consumer := "", ""
+		if landed.ComponentUpstreamVersion != nil {
+			component = *landed.ComponentUpstreamVersion
+		}
+		if landed.ConsumerUpstreamVersion != nil {
+			consumer = *landed.ConsumerUpstreamVersion
+		}
+		if component != "1.2.4" || consumer != "9.0" {
+			t.Errorf("the carried judgment is keyed at %s under %s, want 1.2.4 under 9.0, the pair one finding holds",
+				component, consumer)
+		}
+	})
+}
+
 func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
 	// A patch promise is refused without its date, so a carry that left it
 	// behind could never land.

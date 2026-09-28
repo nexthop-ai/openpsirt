@@ -154,12 +154,10 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	}
 
 	// The need for a second person is decided before this is written, and
-	// recorded on the claim. Without it the claim was stored as needing nobody
-	// — so a re-affirmation sent back for full approval suppressed the finding
-	// the moment it was made and never appeared in the review queue, which is
-	// one person's action producing a live dismissal no second person ever
-	// sees. An agreement to carry at all, asked of the approvals rather than
-	// inferred from the state. A claim lapses from Proposed as well as from
+	// recorded on the claim, so a re-affirmation sent back for full approval
+	// waits in the review queue rather than suppressing the finding on one
+	// person's word. An agreement to carry at all, asked of the approvals
+	// rather than inferred from the state. A claim lapses from Proposed as well as from
 	// Approved (the code moved out from under it either way), so "it lapsed"
 	// says nothing about whether anybody ever agreed to it.
 	carryable, err := s.approvalToCarry(ctx, previous.ClaimID, subject.ID)
@@ -529,8 +527,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// Who to tell is gathered once, over every row that lapsed, so a proposer
 	// whose rows span batches hears once. A batch that fails leaves the ones
 	// before it committed, and those are still reported alongside the error.
+	// A lapsed row is never lapsable again, so each pass reads rows no pass
+	// before it read, and the sweep ends at the pass that marks none.
 	out := Lapsed{}
-	seen := map[int64]bool{}
 	var all []int64
 	var failed error
 	for {
@@ -546,22 +545,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 				return nil
 			}
 			moment := s.now().Truncate(time.Microsecond)
-			result, err := tx.NewUpdate().Model((*Decision)(nil)).
-				Set("state = ?", LapsedState).
-				Set("ended_at = ?", moment).
-				// Released for the same reason a withdrawal is: the code
-				// moved out from under this, so it covers nothing, and
-				// somebody has to be able to decide about what is there now.
-				Set("live_key = ?", nil).
-				Where("de.id IN (?)", bun.List(ids)).
-				// Re-asserted, so a row another sweep took in between is not
-				// counted here as well.
-				Where("de.state IN (?, ?)", Proposed, Approved).
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("mark what the code moved out from under: %w", err)
-			}
-			n, err := database.Affected(result)
+			n, err := markLapsed(ctx, tx, ids, moment)
 			if err != nil {
 				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
@@ -582,28 +566,14 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			failed = err
 			break
 		}
-		if len(lapsed) == 0 && moved == 0 {
+		if moved == 0 {
 			break
 		}
 		out.Rows += moved
-		fresh := 0
-		for _, id := range lapsed {
-			if seen[id] {
-				continue
-			}
-			seen[id] = true
-			all = append(all, id)
-			fresh++
-		}
-		if fresh == 0 {
-			break
-		}
+		all = append(all, lapsed...)
 	}
 	told, err := s.proposersOfAll(ctx, all, database.InBulk.Most)
 	out.Told = told
-	if out.Rows == 0 && len(out.Told) > 0 {
-		out.Rows = int64(len(out.Told))
-	}
 	if failed != nil {
 		return out, failed
 	}
@@ -735,18 +705,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// Both versions, because a decision is keyed on both: a build whose
 		// consumer alone has moved is one the claim does not reach, and the
 		// finding surfaces unanswered.
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
-			JOIN "component" AS "c" ON c.id = f.component_id
-			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
-			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS "now_at"`, toTarget).
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS "f"
-			JOIN "component" AS "c" ON c.id = f.component_id
-			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
-			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS "consumer_now"`, toTarget).
+		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
 		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
@@ -818,6 +777,28 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		carried.Postponed[i].DeferredDays = int(already[postponed[i]].Hours() / 24)
 	}
 	return carried, nil
+}
+
+// markLapsed marks these decisions as lapsed at a moment and answers how many
+// it matched.
+//
+// The live key is released for the same reason a withdrawal releases it: the
+// judgment no longer covers what is there, and somebody has to be able to
+// decide about what is there now. Only a proposed or approved row is marked,
+// so a row another sweep, a withdrawal or an approval moved in between is not
+// counted here as well.
+func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) (int64, error) {
+	result, err := tx.NewUpdate().Model((*Decision)(nil)).
+		Set("state = ?", LapsedState).
+		Set("ended_at = ?", moment).
+		Set("live_key = ?", nil).
+		Where("de.id IN (?)", bun.List(ids)).
+		Where("de.state IN (?, ?)", Proposed, Approved).
+		Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return database.Affected(result)
 }
 
 // at is one place a decision was made about.
@@ -972,13 +953,10 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 	// a bulk judgment and nothing re-checks it. Unbounded it would write as
 	// many rows as it liked, and with the earlier agreement carried on, nobody
 	// would stand between the request and the rows.
-	if plan.unbounded() {
-		if err := permitted(subject, plan.proposals, s.now()); err != nil {
-			return Reaffirmed{}, err
-		}
-	} else if err := permitted(subject, plan.proposals, s.now()); err != nil {
+	if err := permitted(subject, plan.proposals, s.now()); err != nil {
 		return Reaffirmed{}, err
-	} else {
+	}
+	if !plan.unbounded() {
 		limits, err := r.Bounds.within(ctx, s.db)
 		if err != nil {
 			return Reaffirmed{}, err

@@ -205,23 +205,10 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "visibility"`, private, string(access.Private), string(access.Public), toTarget).
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
-			JOIN "component" AS "c" ON c.id = f.component_id
-			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
-			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS "component_now"`, toTarget).
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS "f"
-			JOIN "component" AS "c" ON c.id = f.component_id
-			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
-			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS "consumer_now"`, toTarget).
-		// A line carried onto that was built once. It is a fact
-		// about the target rather than about the decision, and leaving it
-		// off made every carried place read as a branch — so the rule that
-		// refuses a dated judgment on a tag could not fire here however
-		// often it was asked.
+		Apply(versionsOnLine(toTarget, "component_now", "consumer_now")).
+		// A line carried onto that was built once. It is a fact about the
+		// target rather than about the decision, and the rule that refuses a
+		// dated judgment on a tag reads it.
 		ColumnExpr(`(SELECT CASE WHEN st.kind = ? THEN 1 ELSE 0 END
 			FROM "target" AS "tg" JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE tg.id = ?) AS "on_tag"`, catalog.Tag, toTarget).
@@ -237,6 +224,32 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		ComponentUpstream: row.Component, ConsumerUpstream: row.Consumer,
 		OnTag: row.OnTag == 1,
 	}, nil
+}
+
+// versionsOnLine adds the versions a decision's place sits at on a line, as
+// the two named columns: the component's and its consumer's upstream
+// versions, empty where the line holds nothing open there.
+//
+// Both come from one finding, the lowest pair of versions among those open at
+// the place. A decision is keyed on the pair, and a place can hold two
+// findings — one library vendored twice — so a minimum taken of each version
+// alone can pair versions no finding holds together. Ordered on both and
+// taken once, both columns read the same row on every engine.
+func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.SelectQuery) *bun.SelectQuery {
+	lowest := func(expr string) string {
+		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
+			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
+			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL
+			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
+			LIMIT 1), '')`
+	}
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.
+			ColumnExpr(lowest(finding.ComponentUpstreamExpr)+` AS ?`, toTarget, bun.Ident(componentAs)).
+			ColumnExpr(lowest(finding.ConsumerUpstreamExpr)+` AS ?`, toTarget, bun.Ident(consumerAs))
+	}
 }
 
 // oldClaim is what the judgment being carried actually said.

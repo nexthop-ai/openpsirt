@@ -410,8 +410,8 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 
 // coveringEach counts what each of these claims covers right now.
 //
-// One statement for the page rather than three round trips per claim,
-// narrowed per product at the visibility the reader holds in each.
+// One statement for the page, narrowed per product at the visibility the
+// reader holds in each.
 func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	claims []int64) (map[int64]int, error) {
 
@@ -481,8 +481,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // apart is the gate's own verdict, written onto the decision as it was
 // proposed: a deferral past the threshold needed a second person as surely as
 // a dismissal did, and left standing with nobody agreeing it is the same write
-// path got around. Asked as the outcome alone this saw none of them, and said
-// so in a design document.
+// path got around. The outcome alone does not tell them apart.
 //
 // An agreement is asked of the record, never of a flag. No
 // approval from anybody other than the proposer, and none taken back, which is
