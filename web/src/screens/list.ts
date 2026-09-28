@@ -501,15 +501,21 @@ export function identityOf(row: Row): string {
 // that filter prepares. The name rather than the words: the filter is the one
 // place deciding what it says, and a copy in an address is a second one that
 // goes stale the moment somebody saves over the name.
-// The prefix one build's screens live under. Every address under a build
-// shares, written once: four screens spelled it out by hand, and the copies
-// cannot be checked against the router or against each other.
+// The prefix one build's screens live under, which every address under a
+// build shares. Written once, because a copy cannot be checked against the
+// router or against another copy.
 export function buildPath(at: { product: string; stream: string; variant: string }): string {
   return (
     `/products/${encodeURIComponent(at.product)}` +
     `/streams/${encodeURIComponent(at.stream)}` +
     `/variants/${encodeURIComponent(at.variant)}`
   );
+}
+
+// The same prefix under the API, for an address a browser fetches directly: a
+// file to download, a document to open.
+export function apiBuildPath(at: { product: string; stream: string; variant: string }): string {
+  return "/v1" + buildPath(at);
 }
 
 export function pathTo(

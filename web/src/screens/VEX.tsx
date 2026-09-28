@@ -1,7 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { Crumbs } from "../ui/Crumbs";
+import { apiBuildPath } from "./list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -20,10 +22,7 @@ import { on } from "../ui/when";
 export function VEX() {
   const { product = "", stream = "", variant = "" } = useParams();
   const path = { product, stream, variant };
-  const base =
-    `/v1/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}/vex`;
+  const base = apiBuildPath(path) + "/vex";
   const queries = useQueryClient();
 
   const gone = useQuery({
@@ -51,13 +50,7 @@ export function VEX() {
 
   return (
     <>
-      <nav aria-label="Breadcrumb" className="hint" style={{ marginBottom: 8 }}>
-        <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link> /{" "}
-        <Link to={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}`}>
-          {stream}
-        </Link>{" "}
-        / {variant}
-      </nav>
+      <Crumbs product={product} stream={stream} variant={variant} />
       <div className="screen-head">
         <h2>VEX document</h2>
         <p>
