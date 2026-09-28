@@ -12,6 +12,7 @@ import { Loading } from "../../ui/Loading";
 import { Mix, Pace, folded } from "../../ui/Charts";
 import { Empty } from "../../ui/Empty";
 import { Sheet } from "./Sheet";
+import { Segments, boundedAsked } from "./Window";
 import { Wide } from "../../ui/Wide";
 // The ladder, written down once. The columns are fixed rather than read off
 // the data: ones that appear and vanish with the rows are columns nobody can
@@ -33,22 +34,13 @@ import { BANDS } from "../../ui/severities";
 // server answers for.
 const WEEKS = [4, 13, 26, 52, 104] as const;
 
-// weeksAsked is the window the address asks for, checked rather than trusted:
-// it reaches the server, which refuses what it cannot answer, and a value that
-// is not a whole number of weeks in range falls back to a quarter.
-function weeksAsked(params: URLSearchParams, fallback = 13): number {
-  const asked = params.get("weeks");
-  if (asked === null) return fallback;
-  const weeks = Number(asked);
-  if (!Number.isFinite(weeks) || weeks < 1 || weeks > 104) return fallback;
-  return Math.floor(weeks);
-}
-
 export function Backlog() {
   const at = useScope();
   const scope = scopeQuery(at);
-  const [params, setParams] = useSearchParams();
-  const weeks = weeksAsked(params);
+  const [params] = useSearchParams();
+  // A value outside the range falls back to a quarter, and a fraction is cut
+  // to its whole number of weeks.
+  const weeks = boundedAsked(params.get("weeks"), 104, 13);
 
   const trend = useQuery({
     queryKey: ["backlog", scope, weeks],
@@ -71,22 +63,13 @@ export function Backlog() {
       asked={`${weeks} weeks`}
     >
       <div className="controls">
-        <div className="seg" role="group" aria-label="Window">
-          {WEEKS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={weeks === n}
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.set("weeks", String(n));
-                setParams(next);
-              }}
-            >
-              {n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`}
-            </button>
-          ))}
-        </div>
+        <Segments
+          label="Window"
+          param="weeks"
+          offered={WEEKS}
+          chosen={weeks}
+          words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
+        />
         <span style={{ marginLeft: "auto" }} className="noprint">
           <a className="btn quiet" href={file("csv")}>
             CSV

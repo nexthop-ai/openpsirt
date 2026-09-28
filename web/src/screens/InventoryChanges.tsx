@@ -6,17 +6,10 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
-import { Paged } from "../ui/Paged";
-import { KindChips, NamesMoved, type Kind } from "../ui/NamesMoved";
+import { MovedPage, PAGE, type Kind } from "../ui/NamesMoved";
 import { inventoriesAt } from "../app/routes";
-
-// The most one page asks for. Long enough that an ordinary night fits on one
-// page, short enough that a build which replaced everything does not arrive as
-// one screen of two thousand rows.
-const PAGE = 200;
 
 // What one upload changed about a build's inventory.
 //
@@ -72,55 +65,23 @@ export function InventoryChanges() {
         </p>
       </div>
 
-      <KindChips
+      <MovedPage
+        product={product}
         only={only}
         onPick={(kind) => {
           setOnly(kind);
           setOffset(0);
         }}
+        rows={items}
+        total={total}
+        offset={offset}
+        onGo={setOffset}
+        otherwise="This upload changed other things."
+        nothing={{
+          title: "Nothing changed here.",
+          detail: "A build's first upload, or a rebuild that moved nothing.",
+        }}
       />
-
-      {items.length === 0 ? (
-        /* Two different emptinesses. Narrowed to one kind, what is empty is
-           the narrowing; unnarrowed, it is the upload — and the shipped
-           sentence about a first upload is wrong about the first of those. */
-        only ? (
-          <Empty
-            title={`Nothing was ${only === "changed" ? "moved to a new version" : only}.`}
-            detail="This upload changed other things."
-          >
-            {/* The way back, because the chips that produced this are above a
-                screen somebody may have scrolled. */}
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setOnly("");
-                setOffset(0);
-              }}
-            >
-              Show everything
-            </button>
-          </Empty>
-        ) : (
-          <Empty
-            title="Nothing changed here."
-            detail="A build's first upload, or a rebuild that moved nothing."
-          />
-        )
-      ) : (
-        <>
-          <NamesMoved product={product} rows={items} />
-          <Paged
-            shown={items.length}
-            total={total}
-            offset={offset}
-            limit={PAGE}
-            onGo={setOffset}
-            what="listed"
-          />
-        </>
-      )}
     </div>
   );
 }

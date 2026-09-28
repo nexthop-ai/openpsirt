@@ -5,7 +5,9 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { questionIn, untaken, useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
-import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
+import { ByBump, ByComponent, Pager } from "./FindingsViews";
+import { useHandOver } from "./findingsHandover";
+import { useFindingsViews } from "./findingsQueries";
 import {
   ASSIGNED,
   DEADLINES,
@@ -21,10 +23,10 @@ import { FLOORS } from "../ui/severities";
 import { findingsPath } from "../app/scope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { unwrap, whichOf } from "../api/queries";
+import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Icon } from "../ui/Icons";
@@ -302,140 +304,15 @@ export function Findings() {
       unwrap(await api.GET("/v1/products/{product}/tags", { params: { path: { product } } })),
     retry: false,
   });
-  const hand = useMutation({
-    mutationFn: async (to: { row: Row; who: string; team: boolean }) =>
-      unwrap(
-        await api.PUT(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/assignment",
-          {
-            params: {
-              path: {
-                ...buildOf(to.row),
-                vulnerability: to.row.vulnerability ?? "",
-                component: to.row.component ?? "",
-              },
-              query: whichOf(to.row),
-            },
-            body: to.team ? { team: to.who } : { person: to.who },
-          },
-        ),
-      ),
-    // Nothing is invalidated per row. Handing over a selection is a loop of
-    // these, and invalidating on each one interleaves a list refetch between
-    // every write. The loop invalidates once when it is done.
-  });
-
-  // Handing a selection over in one request, where the list is one product's.
-  // The server resolves the rows from the same filter the list is read with,
-  // so "every row matching" is what the count above says rather than what one
-  // page held; picked rows travel as `only`.
-  const handMatching = useMutation({
-    mutationFn: async (to: { who: string; team: boolean; only?: Row[] }) =>
-      unwrap(
-        await api.POST("/v1/products/{product}/findings/assignment", {
-          params: {
-            path: { product },
-            query: Object.fromEntries(
-              Object.entries({ ...query, ...selection }).filter(
-                ([key]) => key !== "limit" && key !== "offset",
-              ),
-            ) as Record<string, never>,
-          },
-          body: {
-            ...(to.team ? { team: to.who } : { person: to.who }),
-            ...(to.only
-              ? {
-                  only: to.only.map((row) => ({
-                    vulnerability: row.vulnerability ?? "",
-                    fold: row.fold ?? "",
-                  })),
-                }
-              : {}),
-          },
-        }),
-      ),
-  });
-
-  const findings = useQuery({
-    queryKey: ["findings", product, stream, variant, query],
-    queryFn: async () =>
-      unwrap(
-        spanning
-          ? await api.GET("/v1/findings", { params: { query: acrossProducts(query) } })
-          : await api.GET("/v1/products/{product}/findings", {
-              params: { path: { product }, query: { ...query, ...selection } },
-            }),
-      ),
-    enabled: view === "issues",
-    // The rows that were on screen stay there while the next answer is read.
-    // Without this the whole screen unmounted on every filter change — the
-    // search box, the chips, the count and the controls with it — so changing
-    // one filter blanked the thing being narrowed and put the cursor nowhere.
-    placeholderData: keepPreviousData,
-  });
-
-  // Each view's own count, on the button that switches to it.
-  //
-  // The three answer the same narrowing at three grains, and the difference
-  // between them is the whole reason to switch: a product whose by-issue list
-  // is 7,455 rows is 341 by component and 284 by upgrade. Without the counts
-  // the list opens on its longest view and reads as the only one.
-  //
-  // Asked with a page of one, because the total is what is wanted. The
-  // by-issue count is the one the screen already holds where the by-issue view
-  // is what is drawn, so it is asked only from the other two. The by-upgrade
-  // count is a fix-bundle aggregate, measured at 2.2 s against a backlog of
-  // 8,376 — held for five minutes rather than asked again as somebody pages.
-  const byIssue = useQuery({
-    queryKey: ["findings", "count", product, stream, variant, query],
-    enabled: view !== "issues",
-    staleTime: 5 * 60_000,
-    queryFn: async () =>
-      unwrap(
-        spanning
-          ? await api.GET("/v1/findings", {
-              params: { query: { ...acrossProducts(query), limit: 1, offset: 0 } },
-            })
-          : await api.GET("/v1/products/{product}/findings", {
-              params: {
-                path: { product },
-                query: { ...query, ...selection, limit: 1, offset: 0 },
-              },
-            }),
-      ),
-  });
-  const byComponent = useQuery({
-    queryKey: ["findings-by-component", "count", product, selection, query],
-    enabled: !spanning,
-    staleTime: 5 * 60_000,
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/findings/components", {
-          params: {
-            path: { product },
-            query: {
-              ...(query as unknown as Record<string, never>),
-              ...selection,
-              limit: 1,
-              offset: 0,
-            },
-          },
-        }),
-      ),
-  });
-  const byUpgrade = useQuery({
-    queryKey: ["fix-bundles", "count", product, selection, query],
-    enabled: !spanning,
-    staleTime: 5 * 60_000,
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/fix-bundles", {
-          params: {
-            path: { product },
-            query: bumpQuery({ product, ...selection }, query, 1, 0) as Record<string, never>,
-          },
-        }),
-      ),
+  const { hand, handMatching } = useHandOver({ product, query, selection, buildOf });
+  const { findings, byIssue, byComponent, byUpgrade } = useFindingsViews({
+    product,
+    stream,
+    variant,
+    spanning,
+    query,
+    selection,
+    view,
   });
 
   // The place somebody was, restored when they come back. This is the screen
@@ -762,7 +639,6 @@ export function Findings() {
         <Filters
           params={asked}
           set={set}
-          setEach={setEach}
           setMany={setMany}
           tags={inUse.data?.items ?? []}
           oneBuild={oneBuild}

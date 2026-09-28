@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSearchParams } from "react-router-dom";
+import { DAY_MS } from "../../ui/when";
 
 // The window a report sheet covers, and the words for it.
 //
@@ -18,26 +19,35 @@ import { useSearchParams } from "react-router-dom";
 // on a number from a query string is one edited address away from a throw.
 const LONGEST = 3650;
 
-// daysAsked is the window the address asks for, checked rather than trusted.
+// boundedAsked is a whole number the address asks for, checked rather than
+// trusted.
 //
-// The value goes into date arithmetic on the render path, so `Number("x")` is
+// A window goes into date arithmetic on the render path, so `Number("x")` is
 // not a wrong figure — it is `new Date(NaN).toISOString()`, which throws and
 // takes the sheet down with it. It also goes to the server, which refuses a
-// window it cannot answer for. So anything that is not a whole number of days
-// inside the range any sheet offers falls back to what the sheet asked for.
-export function daysAsked(params: URLSearchParams, fallback: number): number {
-  const asked = params.get("days");
+// window it cannot answer for. So anything that is not a number from one to
+// the most the sheet offers falls back to what the sheet asked for, and a
+// fraction is cut to its whole number.
+//
+// Handed the parameter's value rather than its name, so each screen's read of
+// the address is written where the route table's check can see it.
+export function boundedAsked(asked: string | null, most: number, fallback: number): number {
   if (asked === null) return fallback;
-  const days = Number(asked);
-  if (!Number.isFinite(days) || days < 1 || days > LONGEST) return fallback;
-  return Math.floor(days);
+  const n = Number(asked);
+  if (!Number.isFinite(n) || n < 1 || n > most) return fallback;
+  return Math.floor(n);
+}
+
+// daysAsked is the window in days the address asks for.
+export function daysAsked(params: URLSearchParams, fallback: number): number {
+  return boundedAsked(params.get("days"), LONGEST, fallback);
 }
 
 // windowStart is when a window began, as the date the lists and the record
 // take. Beside the reader of the number rather than in each sheet, so a figure
 // and the list it opens ask the same question.
 export function windowStart(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return new Date(Date.now() - days * DAY_MS).toISOString().slice(0, 10);
 }
 
 // wordsFor is what one window is called, wherever it is named.
@@ -169,32 +179,62 @@ export function PeriodPicker({ period }: { period: Asked }) {
   );
 }
 
-// WindowPicker is the picker itself. It writes the choice into the address, so
-// a sheet somebody sends carries the window they were looking at.
-export function WindowPicker({ offered, days }: { offered: readonly number[]; days: number }) {
+// Segments offers a few whole numbers as one control and writes the one picked
+// into the address, so a sheet somebody sends carries what they were looking
+// at. Zero is the sheet's own default and leaves the parameter off. What
+// `clears` names goes when a number is picked.
+export function Segments({
+  label,
+  param,
+  offered,
+  chosen,
+  words,
+  clears = [],
+}: {
+  label: string;
+  param: string;
+  offered: readonly number[];
+  chosen: number;
+  words: (n: number) => string;
+  clears?: readonly string[];
+}) {
   const [params, setParams] = useSearchParams();
   return (
+    <div className="seg" role="group" aria-label={label}>
+      {offered.map((n) => (
+        <button
+          key={n}
+          type="button"
+          aria-pressed={chosen === n}
+          onClick={() => {
+            const next = new URLSearchParams(params);
+            if (n === 0) next.delete(param);
+            else next.set(param, String(n));
+            for (const name of clears) next.delete(name);
+            setParams(next);
+          }}
+        >
+          {words(n)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// WindowPicker is the window in days a sheet covers. The two ways of saying
+// when cannot travel together, so naming a window drops the period as naming
+// dates drops the window.
+export function WindowPicker({ offered, days }: { offered: readonly number[]; days: number }) {
+  return (
     <div className="controls">
-      <div className="seg" role="group" aria-label="Window">
-        {offered.map((n) => (
-          <button
-            key={n}
-            type="button"
-            aria-pressed={days === n}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.set("days", String(n));
-              // The two ways of saying when cannot travel together, so naming
-              // a window drops the period as naming dates drops the window.
-              next.delete("from");
-              next.delete("to");
-              setParams(next);
-            }}
-          >
-            {wordsFor(n)}
-          </button>
-        ))}
-      </div>
+      <Segments
+        label="Window"
+        param="days"
+        offered={offered}
+        chosen={days}
+        words={wordsFor}
+        clears={["from", "to"]}
+      />
     </div>
   );
 }

@@ -35,7 +35,7 @@ describe("what the list is asking", () => {
 
   it("is a different question when a filter is added or removed", () => {
     expect(questionIn(new URLSearchParams("state=undecided&offset=50"))).not.toBe(
-      questionIn(new URLSearchParams("state=undecided&only=exploited&offset=50")),
+      questionIn(new URLSearchParams("state=undecided&exploited=1&offset=50")),
     );
   });
 

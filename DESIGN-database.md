@@ -450,6 +450,7 @@ there, are two new tables.
 | A rating claim | Unchanged, with no reason for withdrawal. Every claim v0.4.0 withdrew, a person withdrew |
 | A notification | About no team |
 | A destination | A webhook belonging to the deployment |
+| A saved filter's query | In the words the findings list reads. The single word for known-exploited or fix-version-known becomes that flag, a word that narrowed nothing is dropped, and hidden components joined by commas become one parameter each. Every other parameter is kept as written |
 
 Rolled back, the actor goes and the person refuses a null again. A row
 configuration or a merge wrote goes with it, because v0.4.0 has no place for a
@@ -464,7 +465,10 @@ stay. Each component takes v0.4.0's identity again, each sender is recorded by
 name, and the node columns go. Every chat channel goes, with what was delivered
 to it, because v0.4.0 reaches only a webhook; the two chat tables go, so what
 each person chose about chat is lost and a later upgrade starts them at the
-defaults again. A notification's team and a destination's new columns go.
+defaults again. A notification's team and a destination's new columns go. A
+saved filter stays in v0.5.0's words, which v0.4.0's list reads too, except
+that a hidden name holding a comma is read by v0.4.0 as several names, and
+upgrading again keeps them apart.
 
 Two components v0.4.0 identifies alike refuse the roll back, and the refusal
 names both: a name shaped like a package identifier beside that package, or a
@@ -488,6 +492,7 @@ of what a check costs, so the checks share the build.
 | A v0.4.0 destination | Upgraded, a webhook belonging to the deployment. Rolled back after a chat channel was added, the webhook alone remains |
 | v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it. The scratch tables are dropped before the roll back |
 | A v0.4.0 database holding issues | Upgraded, every issue is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and the issues remain |
+| A v0.4.0 saved filter in the old words, and one in the new | Upgraded, the first reads in the list's words and the second is unchanged. Rolled back, both stay as upgraded |
 
 ### Release records
 

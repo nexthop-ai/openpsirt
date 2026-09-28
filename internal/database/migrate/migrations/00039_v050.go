@@ -88,6 +88,9 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     belonging to the deployment.
 //   - What somebody chose about chat, and what has been carried to them there,
 //     are tables of their own. Nothing v0.4.0 held goes in either.
+//   - A kept findings-list filter is rewritten into the words v0.5.0's list
+//     reads: the two flags "only" named become flags of their own, and hidden
+//     components joined by commas become one parameter each.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -119,6 +122,9 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := reidentified(ctx, tx, identityV050); err != nil {
+		return err
+	}
+	if err := savedFiltersRespelled(ctx, tx); err != nil {
 		return err
 	}
 	if err := sendersQualified(ctx, tx); err != nil {
@@ -182,7 +188,9 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // v0.4.0 reads it. A trail row configuration or a merge wrote has no person,
 // which v0.4.0 has no place for, so it goes with the column that says who
 // acted. Whether a person typed each name an issue answers to goes with its
-// column, and the names stay.
+// column, and the names stay. A kept filter stays in v0.5.0's words, which
+// v0.4.0's list reads too, except that a hidden name holding a comma is read
+// by v0.4.0 as several names, and upgrading again keeps them apart.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err

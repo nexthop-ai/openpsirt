@@ -12,10 +12,10 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because } from "../ui/Outcome";
-import { Exploited, Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { findingAt } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
+import { OutlierRows } from "../ui/OutlierRows";
 
 // The fate of what you proposed.
 //
@@ -154,42 +154,11 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                   Holding them back makes them a claim of yours. Revise it to say what differs.
                 </span>
               </header>
-              <Wide style={{ boxShadow: "none" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ width: 30 }} />
-                      <th>Severity</th>
-                      <th>Issue</th>
-                      <th>Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(outliers.rows ?? []).map((one) => (
-                      <tr key={one.decision_id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label="Hold back"
-                            checked={holding.has(one.decision_id)}
-                            onChange={(event) =>
-                              setHolding(toggled(holding, one, event.target.checked))
-                            }
-                          />
-                        </td>
-                        <td>
-                          <Severity word={one.severity} />
-                        </td>
-                        <td>
-                          <span className="id">{one.vulnerability}</span>{" "}
-                          <Exploited when={one.exploited} />
-                        </td>
-                        <td className="hint">{(one.why ?? []).join(", ")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Wide>
+              <OutlierRows
+                rows={outliers.rows ?? []}
+                holding={holding}
+                onToggle={(one, on) => setHolding(toggled(holding, one, on))}
+              />
               {holding.size > 0 && (
                 <div className="mt-2">
                   {split.error != null && (

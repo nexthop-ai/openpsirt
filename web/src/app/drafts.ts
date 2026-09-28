@@ -107,9 +107,7 @@ function sweep() {
     const going: string[] = [];
     const mine = PREFIX + encodeURIComponent(writer) + ":";
     const now = Date.now();
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (!key || !key.startsWith(PREFIX)) continue;
+    for (const key of keysUnder(PREFIX)) {
       if (!key.startsWith(mine)) {
         going.push(key);
         continue;
@@ -117,11 +115,23 @@ function sweep() {
       const held = read(key);
       if (!held || now - held.at > KEEP_FOR) going.push(key);
     }
-    // Collected first and removed after, for the reason forgetAll does it.
     for (const key of going) window.localStorage.removeItem(key);
   } catch {
     // A browser that refuses storage has nothing to sweep.
   }
+}
+
+// keysUnder is every key in local storage that starts with a prefix.
+//
+// Collected in full before anybody removes one: removing while walking the
+// store renumbers what is left, and every other key shifts under the cursor.
+function keysUnder(prefix: string): string[] {
+  const keys: string[] = [];
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith(prefix)) keys.push(key);
+  }
+  return keys;
 }
 
 // read is one stored draft, or nothing where it is unreadable or shaped the
@@ -315,14 +325,7 @@ export function forgetSession() {
 // one nobody would think to clear.
 export function forgetAll() {
   try {
-    const going: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (key && key.startsWith(PREFIX)) going.push(key);
-    }
-    // Collected first and removed after: removing while walking the store
-    // renumbers what is left, and every other key shifts under the cursor.
-    for (const key of going) window.localStorage.removeItem(key);
+    for (const key of keysUnder(PREFIX)) window.localStorage.removeItem(key);
   } catch {
     // As above.
   }

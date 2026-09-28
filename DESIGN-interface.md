@@ -459,8 +459,9 @@ bound — is a narrowing only somebody editing the address can use.
 
 Exploited and fix-available are two flags, not one parameter holding one of two
 words — otherwise "exploited, and a fix exists", the first population anybody
-assembling a batch wants, could not be asked for. The old word is still read so
-a saved address still opens the list it saved.
+assembling a batch wants, could not be asked for. A kept filter in the old word
+is rewritten by the upgrade; an address kept anywhere else opens the list
+without that narrowing.
 
 Two filters are about the release rather than the row, and are the reason the
 list is a work list rather than an inventory.
@@ -578,6 +579,7 @@ something half-formed.
 |---|---|
 | A saved filter keeps what the list is narrowed by, never where | One list per person, offered on every findings list. The product, the branch, the variant, and anything naming one build or one run are the scope picker's, so they are left out of what is kept. Picking one applies it within the scope on screen: across every product from home, within one product where one is picked. A PSIRT working several products keeps a filter once. Not built: a saved filter belongs to the product it was saved in, and the list across every product offers none |
 | What is kept is the list's own query string, not a column per filter | The filters belong to the list and they move; a table mirroring them would need a migration every time one was added while still being a second place where what a filter means is decided. A saved filter naming something the list no longer offers stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one |
+| A parameter the list renames is rewritten in what is kept | A release that renames one rewrites every saved query in its migration, and the list reads only its current words. Two spellings read side by side are two meanings to keep in step. An address somebody bookmarked or sent is not rewritten, and opens without the renamed narrowing, as a saved filter naming something the list no longer offers does |
 | Saving over a name replaces it | The act is deciding what that name means, and refusing would make somebody delete before they could correct |
 | Two saves of one new name at once keep one filter | Both find nothing to replace and both add it; the unique index refuses the later addition, which is taken again as a lost race and replaces what the other kept |
 | Personal is enforced at the query, not only on the screen | A name somebody else kept is not there, which is the same answer a name nobody kept gives |
@@ -1981,6 +1983,7 @@ the one that made it too long.
 | **The notes thread is on the screen whether or not a claim exists** | It is the one somebody can write in before anybody has decided anything, which is what it is for; the claim's own thread stays gated on a claim. It says in words that it is about this issue in this product, because it is read beside a row that may be one of eleven the same issue sits on — not about this component, and not about other products |
 | **A thread is one component, and the endpoint is what a caller keeps** | The comments on a claim and the notes on an issue are the same conversation: the avatar, the timestamp, the edited mark, the earlier versions behind it, the editor in place and the draft. Written twice they had already begun to diverge, and the timestamp was formatted separately in each copy — so a fix to it would land in whichever file the author had open. What one piece is called and what adding one does not do stay each caller's, so the two are worded apart deliberately rather than together by accident |
 | **The stylesheet splits by position, not by theme** | Order is the mechanism — the last rule wins — so grouping rules by what they are about would silently reorder the cascade. The files are the sections in the order they were already in, with one deliberate exception: the tokens, the frame, what every screen is built from, the charts, what sits over the page, the shapes belonging to one screen, what a narrow screen changes, and what prints |
+| **What a narrow screen changes holds only that** | The base element rules and the exploited tint sit with the tokens, the rail's and the top bar's pieces with the frame, the chart focus ring with the charts, the tab bar's links beside the tab bar, and the remaining components with the parts. Each is earlier in the cascade than the narrow file, so every pair of rules whose order that reversed was checked for an element both reach at equal specificity with a property in common, and none draws differently |
 | **What prints moves to the end, and that is a change** | It sat in the middle of the component file, so a per-screen rule of equal specificity written later won over it. Imported last it wins, which is what a print rule is for and what the file's own name now says. Everything else keeps the position it had, checked selector by selector; this one is the exception and is stated rather than folded into "same order" |
 | **What sits over the page is one file** | The sheet, the floating action, the drawer and the two scrims. It is where every stacking decision in the interface is, and reading them against one scale is the only way to keep them in order |
 | **What prints is imported last** | It wins by being last rather than only by being marked important, so it has a position in the cascade rather than a name that happens to sort |

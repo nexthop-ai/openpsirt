@@ -546,7 +546,7 @@ function Figures({
         <button
           type="button"
           className={`kpi${known(exploited) && (exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
-          onClick={() => navigate(findingsPath(at, true, { only: "exploited" }))}
+          onClick={() => navigate(findingsPath(at, true, { exploited: "1" }))}
         >
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited

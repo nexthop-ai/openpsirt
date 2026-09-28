@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { own } from "../ui/own";
 import { api } from "../api/client";
 import type { Body } from "../api/client";
@@ -15,7 +15,7 @@ import { Outcome } from "../ui/Outcome";
 import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
-import { PickBuild } from "../ui/PickBuild";
+import { PickPair, useBuildPair } from "../ui/PickBuild";
 import { inventoryComparisonAt, runAt, type Build } from "../app/routes";
 
 // The rows of each column shown before it says how many more there are.
@@ -28,27 +28,10 @@ const SHOWN = 8;
 // previous one.
 export function Compare() {
   const { product = "" } = useParams();
-  const [params, setParams] = useSearchParams();
-  const from = params.get("from") ?? "";
-  const fromVariant = params.get("from_variant") ?? "";
-  const to = params.get("to") ?? "";
-  const toVariant = params.get("to_variant") ?? "";
-  const undisclosed = params.get("undisclosed") === "yes";
+  const builds = useBuildPair(product);
+  const { from, fromVariant, to, toVariant, ready, pair, set } = builds;
+  const undisclosed = builds.params.get("undisclosed") === "yes";
 
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const variants = useQuery({
-    queryKey: ["variants", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
-
-  const ready = from !== "" && fromVariant !== "" && to !== "" && toVariant !== "";
-  // The two builds alone, which the component comparison takes.
-  const pair = { from, from_variant: fromVariant, to, to_variant: toVariant };
   // The request the file is asked for with, which is the screen's own. Built
   // once so that a comparison somebody exports is the comparison in front of
   // them rather than one assembled again from parts.
@@ -119,16 +102,6 @@ export function Compare() {
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
   });
 
-  function set(key: string, value: string) {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next);
-  }
-
-  const streamNames = (streams.data?.items ?? []).map((each) => each.name ?? "");
-  const variantNames = (variants.data?.items ?? []).map((each) => each.name ?? "");
-
   return (
     <>
       <div className="screen-head">
@@ -160,31 +133,7 @@ export function Compare() {
           }}
         >
           <h3 style={{ margin: 0 }}>Compare</h3>
-          {(streams.isError || variants.isError) && (
-            <Failed
-              error={streams.isError ? streams.error : variants.error}
-              what="The builds to compare could not be read."
-            />
-          )}
-          <PickBuild
-            label="Earlier build"
-            stream={from}
-            variant={fromVariant}
-            streams={streamNames}
-            variants={variantNames}
-            onStream={(value) => set("from", value)}
-            onVariant={(value) => set("from_variant", value)}
-          />
-          <span style={{ color: "var(--faint)" }}>to</span>
-          <PickBuild
-            label="Later build"
-            stream={to}
-            variant={toVariant}
-            streams={streamNames}
-            variants={variantNames}
-            onStream={(value) => set("to", value)}
-            onVariant={(value) => set("to_variant", value)}
-          />
+          <PickPair builds={builds} />
           <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             {/* The same two builds, compared by what they contain rather
                 than by what is open against them. */}

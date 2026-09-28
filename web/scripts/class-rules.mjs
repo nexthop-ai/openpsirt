@@ -15,20 +15,43 @@
 // it. So the test is the property, not the name.
 const escapes = /(^|[\s;])(position\s*:\s*(fixed|absolute|sticky)|inset\s*:)/;
 
+// cssRules is every rule a stylesheet holds, as its selector and its body, in
+// order. A rule inside an at-rule block is read like any other; the block's
+// own prelude never reaches a selector.
+//
+// A rule nested inside another rule is refused rather than read. The reader
+// takes innermost blocks, so a nested rule would arrive with the outer rule's
+// declarations as its selector and the outer rule would never be seen.
+//
+// A rule is read as the text before its brace, so everything else that can
+// stand before one goes first:
+//
+//   - A comment. A prose paragraph above `.overpane` is otherwise the
+//     selector, and the rule is never seen.
+//   - An at-rule statement ending in a semicolon. `@import
+//     "@fontsource/instrument-sans/400.css";` above a rule otherwise joins its
+//     selector, which then names a class `css` and hides the rule's own.
+export function cssRules(text) {
+  const css = text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/@[\w-]+[^;{}]*;/g, " ");
+  const out = [];
+  for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (selector.includes(";")) {
+      throw new Error(`a rule nested inside another is not read: ${selector.trim()}`);
+    }
+    out.push({ selector: selector.trim(), body });
+  }
+  return out;
+}
+
 // rulesIn reads one stylesheet as two maps: what each bare class declares, and
 // which classes are only ever reached as a modifier beside another.
-//
-// **Comments go first.** A rule is read as the text before its brace, and a
-// comment sitting above one is part of that text — so a prose paragraph above
-// `.overpane` was read as the selector and the rule was never seen.
 //
 // Lifted out of the walk so it can be asked directly: a gate reachable only by
 // running the program over the tree has an exit code for its only evidence,
 // and an exit code cannot tell a check that found nothing from one that looked
 // at nothing.
 export function rulesIn(text, into = { declared: new Map(), modifiers: new Map() }) {
-  const css = text.replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const { selector, body } of cssRules(text)) {
     for (const part of selector.split(",")) {
       const one = part.trim();
       if (!/^(?:\.[-\w]+)+$/.test(one)) continue;

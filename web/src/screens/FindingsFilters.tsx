@@ -239,28 +239,8 @@ export function activeFilters(params: URLSearchParams): Active[] {
     if (at(key)) add(key, label, said(pairs, at(key)));
   };
   if (at("below") === "yes") add("below", "Below the triage line", "included");
-  if (at("exploited") === "1" || at("only") === "exploited") {
-    out.push({
-      key: "exploited",
-      label: "Known exploited",
-      value: "only",
-      clears: [
-        ["exploited", ""],
-        ["only", ""],
-      ],
-    });
-  }
-  if (at("fixable") === "1" || at("only") === "hasFix") {
-    out.push({
-      key: "fixable",
-      label: "Fix version known",
-      value: "only",
-      clears: [
-        ["fixable", ""],
-        ["only", ""],
-      ],
-    });
-  }
+  if (at("exploited") === "1") add("exploited", "Known exploited", "only");
+  if (at("fixable") === "1") add("fixable", "Fix version known", "only");
   add(
     "epss_at_least",
     "Exploit likelihood",
@@ -483,7 +463,6 @@ function Group({ legend, children }: { legend: string; children: React.ReactNode
 export function Filters({
   params,
   set,
-  setEach,
   setMany,
   tags,
   oneBuild,
@@ -492,9 +471,6 @@ export function Filters({
 }: {
   params: URLSearchParams;
   set: (key: string, value: string) => void;
-  // Several filters in one act. Two `set` calls in a row each build their
-  // change from the same parameters, so the second writes over the first.
-  setEach: (changes: Record<string, string>) => void;
   // The filters that take several values at once. Separate from `set` rather
   // than a set taking an array, because the address carries them as a repeated
   // parameter and replacing one word is not the same act as replacing all of
@@ -528,8 +504,8 @@ export function Filters({
         <Flag
           label="Known exploited"
           hint="Somebody is known to be exploiting this"
-          on={at("exploited") === "1" || at("only") === "exploited"}
-          onChange={(on) => setEach({ only: "", exploited: on ? "1" : "" })}
+          on={at("exploited") === "1"}
+          onChange={(on) => flag("exploited", on)}
         />
         <Flag
           label="Include below the triage line"
@@ -550,8 +526,8 @@ export function Filters({
         <Flag
           label="Fix version known"
           hint="An upstream fixed version is recorded"
-          on={at("fixable") === "1" || at("only") === "hasFix"}
-          onChange={(on) => setEach({ only: "", fixable: on ? "1" : "" })}
+          on={at("fixable") === "1"}
+          onChange={(on) => flag("fixable", on)}
         />
         <Flag
           label="Not confirmed by a packager"

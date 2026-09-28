@@ -8,6 +8,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./app/App";
 import { Boundary } from "./app/Boundary";
 import { sessionEnded } from "./app/ended";
+import { statusOf } from "./api/queries";
 import "./index.css";
 
 const queries = new QueryClient({
@@ -23,7 +24,7 @@ const queries = new QueryClient({
   // loop through it.
   queryCache: new QueryCache({
     onError: (error) => {
-      if (isUnauthorized(error)) sessionEnded();
+      if (statusOf(error) === 401) sessionEnded();
     },
   }),
   // A write refused for want of a session is noticed once, here, rather than
@@ -32,7 +33,7 @@ const queries = new QueryClient({
   // pressed and leaves them to work out that their session ended.
   mutationCache: new MutationCache({
     onError: (error) => {
-      if (isUnauthorized(error)) sessionEnded();
+      if (statusOf(error) === 401) sessionEnded();
     },
   }),
   defaultOptions: {
@@ -44,29 +45,14 @@ const queries = new QueryClient({
       // delays the sign-in prompt by three round trips. A 409 is an answer
       // too: "say which one" names the choices, and asking again changes none
       // of them.
-      retry: (count, error) => !isUnauthorized(error) && !isConflict(error) && count < 2,
+      retry: (count, error) => {
+        const status = statusOf(error);
+        return status !== 401 && status !== 409 && count < 2;
+      },
       refetchOnWindowFocus: false,
     },
   },
 });
-
-function isUnauthorized(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    (error as { status: number }).status === 401
-  );
-}
-
-function isConflict(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    (error as { status: number }).status === 409
-  );
-}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

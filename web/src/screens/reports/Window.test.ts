@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   asked as asked2,
+  boundedAsked,
   coveringPeriod,
   coveringWords,
   daysAsked,
@@ -42,6 +43,12 @@ describe("the window a sheet was asked for", () => {
 
   it("takes whole days from a fractional one", () => {
     expect(daysAsked(asked("days=7.9"), 30)).toBe(7);
+  });
+
+  it("reads another parameter against a bound of its own", () => {
+    expect(boundedAsked(asked("weeks=104").get("weeks"), 104, 13)).toBe(104);
+    expect(boundedAsked(asked("weeks=105").get("weeks"), 104, 13)).toBe(13);
+    expect(boundedAsked(asked("days=7").get("weeks"), 104, 13)).toBe(13);
   });
 });
 

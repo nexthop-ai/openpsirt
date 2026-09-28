@@ -193,7 +193,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.exploited ? (
-                          <Link to={buildFindingsAt(build, counted("&only=exploited"))}>
+                          <Link to={buildFindingsAt(build, counted("&exploited=1"))}>
                             {row.exploited.toLocaleString()}
                           </Link>
                         ) : (

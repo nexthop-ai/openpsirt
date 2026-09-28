@@ -116,3 +116,14 @@
 .ringkey .d.down {
   color: var(--ok);
 }
+
+/* Recharts marks its surface focusable; the browser's ring reads as a box
+   drawn on purpose. Ours is shown instead, and only from a keyboard. */
+.recharts-surface {
+  outline: none;
+}
+.recharts-wrapper:focus-visible .recharts-surface {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
