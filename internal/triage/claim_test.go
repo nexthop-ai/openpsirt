@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -100,7 +101,7 @@ func (f *fixture) claimsMany(t *testing.T, places []triage.Place) []*triage.Deci
 			By:            f.proposer, NeedsApproval: true,
 		})
 	}
-	recorded, err := f.store.ProposeMany(t.Context(), f.triager, proposals, triage.DefaultTogetherCap)
+	recorded, err := f.store.ProposeMany(t.Context(), f.triager, proposals)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,8 +109,8 @@ func (f *fixture) claimsMany(t *testing.T, places []triage.Place) []*triage.Deci
 }
 
 func TestOneActionIsOneClaimHoweverManyPlacesItCovers(t *testing.T) {
-	// The queue lists claims, not rows. A finding at sixty-two places is
-	// one argument to read, and it was sixty-two identical cards.
+	// The queue lists claims. A finding at sixty-two places is one argument
+	// to read.
 	each(t, func(t *testing.T, f *fixture) {
 		recorded := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
 		for _, one := range recorded[1:] {
@@ -131,6 +132,50 @@ func TestOneActionIsOneClaimHoweverManyPlacesItCovers(t *testing.T) {
 		}
 		if waiting[0].Claim.Kind != triage.FindingClaim {
 			t.Errorf("a judgment about a finding reads as a %q claim", waiting[0].Claim.Kind)
+		}
+	})
+}
+
+// The limit on one action is the one the deployment holds when the rows are
+// written, read by the write itself rather than handed to it.
+func TestOneActionIsHeldToTheLimitTheDeploymentHasSet(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.TogetherCap, "2"); err != nil {
+			t.Fatal(err)
+		}
+		proposals := make([]triage.Proposal, 0, 3)
+		for _, at := range f.places("under-a", "under-b", "under-c") {
+			proposals = append(proposals, triage.Proposal{
+				Place: at, Outcome: triage.NotApplicable,
+				Justification: triage.CodeNotInExecutePath,
+				Reasoning:     "The parser is never reached: we only call the encoder.",
+				By:            f.proposer, NeedsApproval: true,
+			})
+		}
+		if _, err := f.store.ProposeMany(ctx, f.triager, proposals); err == nil ||
+			!strings.Contains(err.Error(), "the limit here is 2") {
+			t.Errorf("three findings under a limit of two answered %v", err)
+		}
+		recorded, err := f.store.ProposeMany(ctx, f.triager, proposals[:2])
+		if err != nil {
+			t.Fatalf("two findings under a limit of two were refused: %v", err)
+		}
+		if _, err := f.store.ApproveClaim(ctx, f.reviewer, recorded[0].ClaimID, "", nil, ""); err != nil {
+			t.Fatal(err)
+		}
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.TogetherCap, "1"); err != nil {
+			t.Fatal(err)
+		}
+		second := f.secondIssue(t)
+		extending := make([]triage.Proposal, 0, 2)
+		for _, p := range proposals[:2] {
+			p.Place.VulnerabilityID = second
+			extending = append(extending, p)
+		}
+		if _, err := f.store.Extend(ctx, f.triager, recorded[0].ClaimID,
+			extending); err == nil || !strings.Contains(err.Error(), "the limit here is 1") {
+			t.Errorf("an extension over the limit answered %v", err)
 		}
 	})
 }
@@ -272,7 +317,7 @@ func TestAnExtensionCarriesOnlyAnApprovedClaimToTheSamePlaces(t *testing.T) {
 
 		// Not while the source is only proposed.
 		if _, err := f.store.Extend(ctx, f.triager, source[0].ClaimID,
-			[]triage.Proposal{extension}, triage.DefaultTogetherCap); !errors.Is(err, triage.ErrNotExtendable) {
+			[]triage.Proposal{extension}); !errors.Is(err, triage.ErrNotExtendable) {
 			t.Errorf("a claim nobody agreed to was carried: %v", err)
 		}
 		if _, err := f.store.ApproveClaim(ctx, f.reviewer, source[0].ClaimID, "", nil, ""); err != nil {
@@ -283,25 +328,25 @@ func TestAnExtensionCarriesOnlyAnApprovedClaimToTheSamePlaces(t *testing.T) {
 		elsewhere := extension
 		elsewhere.Place.PlaceIdentity = "under-z"
 		if _, err := f.store.Extend(ctx, f.triager, source[0].ClaimID,
-			[]triage.Proposal{elsewhere}, triage.DefaultTogetherCap); !errors.Is(err, triage.ErrNotExtendable) {
+			[]triage.Proposal{elsewhere}); !errors.Is(err, triage.ErrNotExtendable) {
 			t.Errorf("a claim was carried to a place it does not sit at: %v", err)
 		}
 		// Not with a different justification.
 		differently := extension
 		differently.Justification = triage.ComponentNotPresent
 		if _, err := f.store.Extend(ctx, f.triager, source[0].ClaimID,
-			[]triage.Proposal{differently}, triage.DefaultTogetherCap); !errors.Is(err, triage.ErrNotExtendable) {
+			[]triage.Proposal{differently}); !errors.Is(err, triage.ErrNotExtendable) {
 			t.Errorf("a claim was carried with a different justification: %v", err)
 		}
 		// Not to the issue it already covers.
 		same := extension
 		same.Place.VulnerabilityID = f.issue
 		if _, err := f.store.Extend(ctx, f.triager, source[0].ClaimID,
-			[]triage.Proposal{same}, triage.DefaultTogetherCap); !errors.Is(err, triage.ErrNotExtendable) {
+			[]triage.Proposal{same}); !errors.Is(err, triage.ErrNotExtendable) {
 			t.Errorf("a claim was carried to the issue it already covers: %v", err)
 		}
 
-		recorded, err := f.store.Extend(ctx, f.triager, source[0].ClaimID, []triage.Proposal{extension}, triage.DefaultTogetherCap)
+		recorded, err := f.store.Extend(ctx, f.triager, source[0].ClaimID, []triage.Proposal{extension})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -410,7 +455,7 @@ func TestAClaimIsShownOnlyToSomebodyWhoMayActOnAllOfIt(t *testing.T) {
 				Reasoning: "Not worth the change.", By: insider.ID, NeedsApproval: true,
 			})
 		}
-		if _, err := f.store.ProposeMany(ctx, insider, proposals, triage.DefaultTogetherCap); err != nil {
+		if _, err := f.store.ProposeMany(ctx, insider, proposals); err != nil {
 			t.Fatal(err)
 		}
 
@@ -600,7 +645,7 @@ func TestAnActionThatSaysTwoThingsIsRefused(t *testing.T) {
 				By:        f.proposer, NeedsApproval: true,
 			})
 		}
-		_, err := f.store.ProposeMany(t.Context(), f.triager, proposals, triage.DefaultTogetherCap)
+		_, err := f.store.ProposeMany(t.Context(), f.triager, proposals)
 		if err == nil {
 			t.Fatal("an action recording two outcomes was accepted")
 		}
@@ -755,8 +800,7 @@ func TestRecordingAClaimIsABoundedNumberOfStatementsHoweverManyPlacesItCovers(t 
 
 		hook := &counting{}
 		f.db.AddQueryHook(hook)
-		recorded, err := f.store.ProposeMany(t.Context(), f.triager, proposals,
-			triage.DefaultTogetherCap)
+		recorded, err := f.store.ProposeMany(t.Context(), f.triager, proposals)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -845,7 +889,7 @@ func TestThePersonalPageCountsOnlyWhatIsStillReadable(t *testing.T) {
 				Place: hidden, Outcome: triage.WontFix,
 				Reasoning: "Not worth the churn.", By: f.proposer,
 			},
-		}, triage.DefaultTogetherCap); err != nil {
+		}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -884,7 +928,7 @@ func TestAnExtensionMayNotDuplicateAnyIssueItsSourceCovers(t *testing.T) {
 			}
 		}
 		source, err := f.store.ProposeMany(ctx, f.triager,
-			[]triage.Proposal{says(f.at()), says(another)}, triage.DefaultTogetherCap)
+			[]triage.Proposal{says(f.at()), says(another)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -894,7 +938,7 @@ func TestAnExtensionMayNotDuplicateAnyIssueItsSourceCovers(t *testing.T) {
 
 		// The second issue, which the source covers and its first row does not.
 		if _, err := f.store.Extend(ctx, f.triager, source[0].ClaimID,
-			[]triage.Proposal{says(another)}, triage.DefaultTogetherCap); !errors.Is(err, triage.ErrNotExtendable) {
+			[]triage.Proposal{says(another)}); !errors.Is(err, triage.ErrNotExtendable) {
 			t.Errorf("a claim was carried to an issue it already covers: %v", err)
 		}
 	})

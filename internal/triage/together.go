@@ -38,15 +38,19 @@ const DefaultTogetherCap = setting.DefaultTogetherCap
 // these actions exist to avoid — and the bound is on the rows about to be
 // written rather than on what a caller named, since one name expands into as
 // many places as the issue sits at.
-func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Time) error {
-	if cap <= 0 {
-		cap = DefaultTogetherCap
+//
+// Called inside the transaction that writes them, so the limit is the one in
+// force when the rows land and a retry reads it again.
+func (s *Store) allowed(ctx context.Context, subject access.Subject, proposals []Proposal) error {
+	cap, err := setting.NewStore(s.db).Count(ctx, setting.TogetherCap, DefaultTogetherCap)
+	if err != nil {
+		return fmt.Errorf("read how many findings one action may write: %w", err)
 	}
 	if len(proposals) > cap {
 		return fmt.Errorf("that is %d findings and the limit here is %d: narrow it, "+
 			"or raise the limit deliberately", len(proposals), cap)
 	}
-	return permitted(subject, proposals, now)
+	return permitted(subject, proposals, s.now())
 }
 
 // Bounds are the limits on one act that answers many issues at once

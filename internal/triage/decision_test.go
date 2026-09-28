@@ -659,7 +659,7 @@ func TestABatchIsUndoneWholeOrNotAtAll(t *testing.T) {
 				By:            writes.ID, NeedsApproval: true,
 			})
 		}
-		recorded, err := f.store.ProposeMany(ctx, writes, proposals, triage.DefaultTogetherCap)
+		recorded, err := f.store.ProposeMany(ctx, writes, proposals)
 		if err != nil {
 			t.Fatal(err)
 		}

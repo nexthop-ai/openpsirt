@@ -275,18 +275,18 @@ var ErrNotExtendable = errors.New("that claim cannot be extended")
 // Everything it turns on is read inside the transaction that writes: whether
 // the source is approved, and what it was a claim about.
 func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
-	proposals []Proposal, cap int) ([]*Decision, error) {
+	proposals []Proposal) ([]*Decision, error) {
 
 	if len(proposals) == 0 {
 		return nil, nil
-	}
-	if err := allowed(subject, proposals, cap, s.now()); err != nil {
-		return nil, err
 	}
 
 	var recorded []*Decision
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
 
 		source, err := within.extendable(ctx, subject, from, proposals)
 		if err != nil {

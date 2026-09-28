@@ -817,6 +817,7 @@ defect.
 | Read inside the write | What it decides |
 |---|---|
 | The limits on an act answering many issues | Whether the act is refused. A limit a caller left unset is the deployment's setting |
+| How many findings one judgment may write | Whether a judgment across many places, or an extension of an agreed one, is refused |
 | The longest a personal token may last | The ceiling the new token is held to |
 | Whether the writer may write a note about an issue | Whether the note is written |
 | Where each added build holds a recorded flaw's component | Which rows the flaw opens. A build that stopped shipping it is refused |
@@ -830,10 +831,10 @@ PostgreSQL a failed statement aborts the whole transaction: every command after
 it is refused until the block ends, whatever the caller made of the failure. So
 a statement whose failure is the ordinary answer — an insert refused by a
 primary key, where being refused is how a second replica learns the row is
-already there — cannot sit inside a transaction with the work that follows it.
-It runs on its own, and what needs the retry goes in the transaction. Three of
-the four engines carry on after a failed statement, so the quick loop never
-sees this.
+already there — cannot sit bare inside a transaction. It stands on a savepoint
+of its own, rolled back on refusal, and the transaction carries on; SAVEPOINT is
+plain SQL on all four engines. Three of the four engines carry on after a failed
+statement without one, so the quick loop never sees this.
 
 An act is one transaction, and an act is what a person asked for. Recording
 somebody and granting them the roles named, declaring a team and putting people

@@ -295,9 +295,9 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		// nobody can point at afterwards.
 		var recorded []*triage.Decision
 		if input.Body.Extends != 0 {
-			recorded, err = store.Extend(ctx, subject, input.Body.Extends, proposals, limit)
+			recorded, err = store.Extend(ctx, subject, input.Body.Extends, proposals)
 		} else {
-			recorded, err = store.ProposeMany(ctx, subject, proposals, limit)
+			recorded, err = store.ProposeMany(ctx, subject, proposals)
 		}
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)

@@ -63,7 +63,7 @@ func (f *fixture) proposes(t *testing.T, who access.Subject, places ...triage.Pl
 			By:            who.ID, NeedsApproval: true,
 		})
 	}
-	recorded, err := f.store.ProposeMany(t.Context(), who, proposals, triage.DefaultTogetherCap)
+	recorded, err := f.store.ProposeMany(t.Context(), who, proposals)
 	if err != nil {
 		t.Fatal(err)
 	}
