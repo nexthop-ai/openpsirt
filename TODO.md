@@ -78,6 +78,7 @@ Missing or wrong, with no decision needed to fix it.
 | The exploitation clock starts when a scan sees the catalog listing | The catalog's own date for the issue is not read, so the pipeline's lag counts against the window |
 | A weakness outside the screen's common ones shows as a bare number | The server holds the whole CWE catalog and sends no name beside the identifier |
 | Saved filters keep a scope | Each belongs to the product it was saved in, and the list across every product offers none. `DESIGN-interface.md` § Saved filters states the rule: one list per person, applied within whatever scope is on screen. Filters kept under one name in two products need the product added to one of the names when the product comes off |
+| The package-kind filter is a fixed list | A kind outside it is reached only by editing the address, and a kind the scope does not hold is offered and leads to an empty list. The server reports no kinds present |
 
 ## Weak tests
 
@@ -96,7 +97,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Have the server list the package kinds present? | The package-kind filter is a fixed list. A kind missing from it is reachable only by editing the address |
 | Add a gate for tracker references in comments? | The rule is enforced by reading. No existing gate fits it |
 | Alert on the depth of the job queue? | The System screen shows the depth against the bound. An alert needs a threshold and an alert kind |
 | Keep 30 days as the longest a sign-in lasts? | It bounds how long a role a group withdrew can still be held. 90 days is defensible |

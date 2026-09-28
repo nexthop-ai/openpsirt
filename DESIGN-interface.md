@@ -455,7 +455,7 @@ Three filters need defining:
 
 | Filter | |
 |---|---|
-| **Package kind** | Read from the package identifier rather than stored beside it. It is also the closest the data comes to "userland and not the rest": a kernel and its modules are Debian packages and a statically linked service is Go, and somebody triaging one is usually not triaging the other |
+| **Package kind** | Read from the package identifier rather than stored beside it. It is also the closest the data comes to "userland and not the rest": a kernel and its modules are Debian packages and a statically linked service is Go, and somebody triaging one is usually not triaging the other. The kinds offered are the ones present in the scope on screen, as the server reports them under the same visibility as the list, so a kind the build ships is always offered and one it does not is never offered. Not built: the screen offers a fixed list, and a kind outside it is reached only through the address |
 | **What holds it** | The consumer a place records. What the build holds directly has no container to name, so it is asked for separately rather than by typing something |
 | **How far it has been decided** | A group covers places that can be in different states: undecided is no place decided, waiting is a claim standing proposed, agreed is every place answered, lapsed is a decision that stopped applying with nothing replacing it. *Partly answered* is deliberately not one of them — the row already says "12 places · 3 answered" |
 
