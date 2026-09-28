@@ -94,17 +94,29 @@ describe("the route check", () => {
   });
 });
 
+// The whole tree is parsed once, which takes 1.3 s on two cores under the full
+// suite with coverage on and several seconds on a 2-vCPU CI runner. The
+// default five seconds is a limit that runner reaches; this one leaves room
+// for it and still ends a scan that has stopped making progress.
+const WHOLE_TREE_MS = 30_000;
+
 describe("the interface", () => {
-  it("builds no address outside routes.ts, writes none the router does not answer, and looked", () => {
-    const result = sweep();
-    expect(result.files, "no source file was read, so this checked nothing").toBeGreaterThan(0);
-    expect(result.literals, "no string was read, so this checked nothing").toBeGreaterThan(0);
-    expect(result.routes, "the route table is empty, so this checked nothing").toBeGreaterThan(0);
-    expect(
-      result.screens,
-      "no screen was read from the router, so this checked nothing",
-    ).toBeGreaterThan(0);
-    expect(result.found).toEqual([]);
-    expect(result.unread).toEqual([]);
-  });
+  it(
+    "builds no address outside routes.ts, writes none the router does not answer, and looked",
+    {
+      timeout: WHOLE_TREE_MS,
+    },
+    () => {
+      const result = sweep();
+      expect(result.files, "no source file was read, so this checked nothing").toBeGreaterThan(0);
+      expect(result.literals, "no string was read, so this checked nothing").toBeGreaterThan(0);
+      expect(result.routes, "the route table is empty, so this checked nothing").toBeGreaterThan(0);
+      expect(
+        result.screens,
+        "no screen was read from the router, so this checked nothing",
+      ).toBeGreaterThan(0);
+      expect(result.found).toEqual([]);
+      expect(result.unread).toEqual([]);
+    },
+  );
 });

@@ -154,8 +154,11 @@ function isKey(node) {
 // addressesIn reads one source file: every address it writes out whole that
 // the router does not answer, every address it puts together from parts, and
 // how many literals it examined.
-export function addressesIn(routes, text, file = "x.tsx") {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+function parse(text, file) {
+  return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
+export function addressesIn(routes, text, file = "x.tsx", source = parse(text, file)) {
   const found = [];
   let examined = 0;
   const declared = new Map();
@@ -209,8 +212,7 @@ function sources(dir) {
 
 // The query parameters one source file reads: the first argument of every
 // get, getAll or has that is written as a string.
-export function readsIn(text, file = "x.tsx") {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+export function readsIn(text, file = "x.tsx", source = parse(text, file)) {
   const reads = new Set();
   const walk = (node) => {
     if (
@@ -237,22 +239,27 @@ function isFile(at) {
 }
 
 // Every module one module reaches through relative imports, itself included.
-function closure(file) {
+// The modules one module imports by a relative path, by the file each names.
+function importsOf(file, text) {
+  const out = [];
+  for (const m of text.matchAll(/(?:from|import\()\s*"(\.[^"]+)"/g)) {
+    const base = path.resolve(path.dirname(file), m[1]);
+    const found = [base, `${base}.ts`, `${base}.tsx`].find(
+      (candidate) => /\.tsx?$/.test(candidate) && isFile(candidate),
+    );
+    if (found) out.push(found);
+  }
+  return out;
+}
+
+// Every module one module reaches through relative imports, itself included,
+// over a graph read once.
+function closure(file, imports) {
   const seen = new Set();
   const visit = (at) => {
     if (seen.has(at)) return;
     seen.add(at);
-    const text = readFileSync(at, "utf8");
-    const specifiers = [...text.matchAll(/(?:from|import\()\s*"(\.[^"]+)"/g)].map((m) => m[1]);
-    for (const specifier of specifiers) {
-      const base = path.resolve(path.dirname(at), specifier);
-      for (const candidate of [base, `${base}.ts`, `${base}.tsx`]) {
-        if (/\.tsx?$/.test(candidate) && isFile(candidate)) {
-          visit(candidate);
-          break;
-        }
-      }
-    }
+    for (const next of imports.get(at) ?? []) visit(next);
   };
   visit(file);
   return [...seen];
@@ -301,10 +308,17 @@ export function sweep() {
   const found = [];
   let files = 0;
   let literals = 0;
+  // Each file is read and parsed once, and every rule reads that one tree.
+  const imports = new Map();
+  const reads = new Map();
   for (const file of sources(src)) {
+    const text = readFileSync(file, "utf8");
+    const source = parse(text, file);
+    imports.set(file, importsOf(file, text));
+    reads.set(file, readsIn(text, file, source));
     const relative = path.relative(src, file);
     if (relative === BUILDER) continue;
-    const { found: here, examined } = addressesIn(routes, readFileSync(file, "utf8"), file);
+    const { found: here, examined } = addressesIn(routes, text, file, source);
     files++;
     literals += examined;
     for (const each of here) found.push({ file: relative, ...each });
@@ -312,13 +326,13 @@ export function sweep() {
   const app = path.join(src, "app", "App.tsx");
   const screens = screensOf(readFileSync(app, "utf8"));
   const readsOf = (module) => {
-    const reads = new Set();
+    const out = new Set();
     const entry = path.resolve(path.dirname(app), module);
     const file = [`${entry}.tsx`, `${entry}.ts`].find(isFile);
-    for (const each of file ? closure(file) : []) {
-      for (const key of readsIn(readFileSync(each, "utf8"), each)) reads.add(key);
+    for (const each of file ? closure(file, imports) : []) {
+      for (const key of reads.get(each) ?? []) out.add(key);
     }
-    return reads;
+    return out;
   };
   return {
     found,
