@@ -206,6 +206,42 @@ describe("files attached here", () => {
   });
 });
 
+describe("references at the edges of their shape", () => {
+  // The corpus rows that are one reference each. The server's submission
+  // check reads the same rows, so a shape widened on one side and not the
+  // other fails here or there rather than leaving accepted text as a dead
+  // link.
+  const references = shared.payloads.flatMap((one) =>
+    "reference" in one ? [{ ...one, reference: one.reference }] : [],
+  );
+
+  it("are in the corpus on both sides of every edge", () => {
+    for (const kind of ["attachment", "issue"]) {
+      const rows = references.filter((one) => one.reference === kind);
+      expect(
+        rows.some((one) => one.submission === "accepted"),
+        kind,
+      ).toBe(true);
+      expect(
+        rows.some((one) => one.submission === "refused"),
+        kind,
+      ).toBe(true);
+    }
+  });
+
+  it("are linked exactly where the submission check accepts them", () => {
+    for (const one of references) {
+      const html = render(one.text);
+      const target = one.reference === "attachment" ? "/v1/attachments/" : "/issues/";
+      if (one.submission === "accepted") {
+        expect(html, `${one.text} is accepted: ${one.why}`).toContain(`href="${target}`);
+      } else {
+        expect(html, `${one.text} is refused: ${one.why}`).not.toContain(target);
+      }
+    }
+  });
+});
+
 describe("identifiers people paste", () => {
   it("links a CVE to the record that defines it", () => {
     // The record rather than the enrichment most people mean by "look up a

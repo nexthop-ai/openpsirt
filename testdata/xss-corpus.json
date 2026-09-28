@@ -11,7 +11,11 @@
     "'submission' is what internal/markdown.Check must answer. Not every payload",
     "is refusable there and saying so is the point: a fenced block holds whatever",
     "it holds, and escaped text is text. Every payload, refused or not, must",
-    "render inert — that half is asked of the renderer, in web/src/ui."
+    "render inert — that half is asked of the renderer, in web/src/ui.",
+    "",
+    "'reference' marks a row whose text is one reference to something held here,",
+    "an attachment or an issue. The renderer links exactly the ones accepted at",
+    "submission, so the two halves agree on the shape at its edges."
   ],
   "payloads": [
     {
@@ -228,6 +232,60 @@
       "text": "&lt;script&gt;alert(1)&lt;/script&gt;",
       "submission": "accepted",
       "why": "escaped text is text, and a person quoting a tag is writing something true"
+    },
+    {
+      "text": "[f](attachment:0123456789abcdef0123456789abcde)",
+      "submission": "refused",
+      "why": "an attachment identifier one character short of the width this deployment mints",
+      "reference": "attachment"
+    },
+    {
+      "text": "[f](attachment:0123456789abcdef0123456789abcdef)",
+      "submission": "accepted",
+      "why": "an attachment identifier at the width this deployment mints",
+      "reference": "attachment"
+    },
+    {
+      "text": "[f](attachment:0123456789abcdef0123456789abcdef0)",
+      "submission": "refused",
+      "why": "an attachment identifier one character past the width this deployment mints",
+      "reference": "attachment"
+    },
+    {
+      "text": "[f](attachment:0123456789ABCDEF0123456789ABCDEF)",
+      "submission": "refused",
+      "why": "an attachment identifier in capitals, which this deployment never mints",
+      "reference": "attachment"
+    },
+    {
+      "text": "[x](issue:AB)",
+      "submission": "refused",
+      "why": "an issue identifier one character short of the shortest",
+      "reference": "issue"
+    },
+    {
+      "text": "[x](issue:ABC)",
+      "submission": "accepted",
+      "why": "an issue identifier at the shortest",
+      "reference": "issue"
+    },
+    {
+      "text": "[x](issue:Abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)",
+      "submission": "accepted",
+      "why": "an issue identifier at the longest",
+      "reference": "issue"
+    },
+    {
+      "text": "[x](issue:Abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)",
+      "submission": "refused",
+      "why": "an issue identifier one character past the longest",
+      "reference": "issue"
+    },
+    {
+      "text": "[x](issue:1BC)",
+      "submission": "refused",
+      "why": "an issue identifier that does not begin with a letter",
+      "reference": "issue"
     }
   ]
 }
