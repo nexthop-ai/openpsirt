@@ -96,7 +96,8 @@ func TestAKeptDatabaseIsRecognizedAndAnOlderSchemaDropped(t *testing.T) {
 // fails every test in the package until somebody drops it by hand.
 //
 // Verified by making whole answer true for any database: the half-built one is
-// then handed back at the version it stopped at.
+// then handed back at the version it stopped at. And by skipping the drop: the
+// database is then migrated forward and keeps the table no migration made.
 func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
@@ -122,6 +123,12 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 		if err := migrate.UpTo(ctx, half, slog.New(slog.NewTextHandler(io.Discard, nil)), 1); err != nil {
 			t.Fatalf("apply the first migration: %v", err)
 		}
+		// What an interrupted schema statement leaves on MySQL and MariaDB:
+		// something no recorded version accounts for. Migrating forward
+		// keeps it; only the drop removes it.
+		if _, err := half.ExecContext(ctx, `CREATE TABLE "dbtest_leftover" ("id" INT)`); err != nil {
+			t.Fatalf("leave a table no migration made: %v", err)
+		}
 		if err := half.Close(); err != nil {
 			t.Fatal(err)
 		}
@@ -141,6 +148,12 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 		}
 		if applied != expected {
 			t.Errorf("the database was handed back at version %d, want %d", applied, expected)
+		}
+		var leftover int
+		if err := db.NewSelect().TableExpr(`"dbtest_leftover"`).ColumnExpr("COUNT(*)").
+			Scan(ctx, &leftover); err == nil {
+			t.Errorf("a table no migration made survived: the database was migrated " +
+				"forward rather than built again")
 		}
 		// The first test's clear reads every declared table, so a schema
 		// missing one fails here rather than in the package's tests.

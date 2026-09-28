@@ -580,15 +580,13 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 // statement commits on its own, so a migration interrupted part way leaves
 // statements applied that no recorded version accounts for.
 func prepareServer(ctx context.Context, engine database.Engine, base, name string) (string, error) {
-	// Parsed by the database package first: its refusal never repeats the
-	// URL, and the plain parser's quotes it, password included.
-	target, err := database.ParseURL(base)
+	own, err := databaseURL(base, engine, name)
 	if err != nil {
 		return "", err
 	}
-	own, err := databaseURL(base, engine, name)
+	target, err := database.ParseURL(base)
 	if err != nil {
-		return "", fmt.Errorf("parse the %s URL at %s", engine, target.Redacted)
+		return "", err
 	}
 	admin, err := database.Open(ctx, target)
 	if err != nil {
@@ -616,10 +614,17 @@ func prepareServer(ctx context.Context, engine database.Engine, base, name strin
 
 // databaseURL is the URL of the database called name on the server base
 // names.
+//
+// Parsed by the database package first: its refusal never repeats the URL,
+// and the plain parser's quotes it, password included.
 func databaseURL(base string, engine database.Engine, name string) (string, error) {
-	parsed, err := url.Parse(base)
+	target, err := database.ParseURL(base)
 	if err != nil {
 		return "", err
+	}
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "", fmt.Errorf("parse the %s URL at %s", engine, target.Redacted)
 	}
 	parsed.Path = "/" + name
 	if engine == database.Postgres {
