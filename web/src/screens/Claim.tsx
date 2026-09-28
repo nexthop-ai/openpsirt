@@ -392,10 +392,9 @@ function Reaffirm({
 // Not the author's alone. The server asks whether the subject may decide
 // about each row of the claim and nothing about who wrote it, which is what
 // the act-and-needs table says: propose, revise and withdraw all ask for
-// triage on the product at the finding's visibility. Gated on authorship
-// here, a triager reading a colleague's stale claim had no way to revise or
-// withdraw it on this screen and every way to do it from the finding — the
-// same person, the same claim, two answers.
+// triage on the product at the finding's visibility. Gated on authorship,
+// this screen would refuse a triager what the finding allows them: the same
+// person, the same claim, two answers.
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
@@ -530,8 +529,8 @@ function Answer({
 // look like the rest, and they become a claim of their own carrying the
 // argument they were made under.
 //
-// The same signals an approver is shown, for the same reason — whoever wrote a
-// bulk claim faces the same choice, and had nothing to choose with.
+// The same signals an approver is shown, for the same reason: whoever wrote a
+// bulk claim faces the same choice.
 function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHeld: () => void }) {
   const split = useSplitClaim();
   const [holding, setHolding] = useState<Set<number>>(new Set());

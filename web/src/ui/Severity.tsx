@@ -25,8 +25,8 @@ export function Severity({ word }: { word?: string }) {
   // somebody looked at and dismissed.
   const band = bandOf(word);
   const said = ratedAs(word);
-  // The class is the band, so an unrated row is drawn and counted as unrated
-  // everywhere, beside the chart and in the card view alike.
+  // The class is the band, so an unrated row is drawn as unrated here and in
+  // the card view alike.
   return (
     <span
       className={`sev ${band}`}

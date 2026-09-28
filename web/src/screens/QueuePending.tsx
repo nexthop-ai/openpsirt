@@ -160,8 +160,8 @@ export function Embargoes({
 // where a product has said what it considers worth triaging at all, a rating
 // that crosses that line does something different in kind: the findings stop
 // being work rather than becoming later work, and they carry no deadline at
-// all. Those are two different things to agree to, and an approver was shown
-// neither.
+// all. Those are two different things to agree to, and an approver is shown
+// which one it is.
 //
 // Each row names its product, because a rating belongs to one and two
 // products may rate the same issue differently. A row saying only "CVE-… low"

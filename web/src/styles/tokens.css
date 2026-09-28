@@ -16,8 +16,9 @@
    "clickable" must never read as the same thing. */
 
 /* ============================================================
-   The app. A look is a token set. Every component below reads only
-   these tokens, so switching a look is a token swap.
+   The app. A look is a token set, and a component reads these tokens, so
+   switching a look is a token swap. A rule written for one look alone is
+   the exception, and says so where it stands.
    ============================================================ */
 
 :root {
@@ -111,9 +112,8 @@
   --step-2: 19px;
   --step-3: 25px;
 
-  /* The spacing scale: the six values that carry the weight, at the numbers
-     the screens use. A new spacing value is one of these or deliberately
-     not. */
+  /* The spacing scale, at the numbers the screens use. A new spacing value
+     is one of these or deliberately not. */
   --gap-hair: 4px;
   --gap-tight: 6px;
   --gap: 8px;

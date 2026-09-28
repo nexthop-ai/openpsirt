@@ -5,8 +5,8 @@
 //
 // The thread that is here whether or not anybody has decided anything. The
 // comments beside it hang off a claim, and the box for one appears only where
-// a claim already exists — so the first person to say anything had to record a
-// judgment in order to say it.
+// a claim already exists, so this is where the first person says anything
+// without recording a judgment.
 //
 // It says what it is about, in words, above the thread. It is read beside
 // a row that may be one of eleven the same issue sits on, so "this issue in

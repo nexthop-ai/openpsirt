@@ -67,9 +67,9 @@ export const BELOW_LOW = ["negligible", "none"] as const;
 
 // bandOf is the band a rating is drawn in: one of the four, or "unrated".
 //
-// One answer for every screen, so a finding whose vulnerability carries no
-// severity is unrated on the chart, the badge, the card and the tree strip
-// alike.
+// One answer for the badge, the card and the tree strip, so a finding whose
+// vulnerability carries no severity is unrated on all three. The chart folds
+// it into medium, the way the server ranks it.
 //
 // Rated negligible is not unrated: the server ranks both of the words below
 // low inside the low band, and "unrated" would tell a reader nobody had looked

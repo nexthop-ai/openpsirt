@@ -156,8 +156,8 @@ function Shape({
   // what is open.
   to?: string;
 }) {
-  // Read off the ladder rather than listed here. Written out, a rung added
-  // to it was a row this strip never drew.
+  // Read off the ladder rather than listed here, so a rung added to it is a
+  // row this strip draws.
   const bands: [string, number][] = BANDS.map((word) => [word, changed?.[word] ?? 0]);
   const total = changed?.total ?? 0;
   return (

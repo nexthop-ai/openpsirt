@@ -20,9 +20,8 @@ import { BANDS } from "../../ui/severities";
 
 // The direction of the backlog, and the kind of thing making it move.
 //
-// The first question a manager asks, and it was a panel on the home screen
-// at a fixed twelve weeks — no name, no window, no file, and no way to ask
-// it of anything but the selection the shell happened to be on.
+// The first question a manager asks, with a name, a window, a file, and the
+// scope it is asked of.
 //
 // The two flows are what a backlog is read for. Ten arriving and ten answered
 // is a team keeping pace where both are low, and a team losing ground where

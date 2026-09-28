@@ -323,8 +323,9 @@ A modifier whose bare rule draws a box. A class reached as a modifier —
 `.state.warn` — that also has a rule of its own setting a display, a margin, a
 padding, a border or a background hands that rule to every element carrying the
 modifier, at the same specificity. The later rule wins, so a chip in a table cell
-draws as a block-level callout. A modifier's bare rule may set a font and a
-color and nothing that shapes the box. A web test reads every stylesheet for it.
+draws as a block-level callout. A modifier's bare rule sets no display, margin,
+padding, border or background, longhands included. A web test reads every
+stylesheet for it.
 
 An export of the interface that nothing else names. A web test reads every
 module and fails on an export no other file mentions, which is the interface's

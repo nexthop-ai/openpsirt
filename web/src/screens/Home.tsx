@@ -482,9 +482,8 @@ function Figures({
   const allPoints = allOpen.data?.items ?? [];
   // A page in hand that is the whole list. The two tiles below split one
   // read into overdue and due-soon, so neither half can be compared against
-  // the cap on its own — a page that is entirely overdue would have to be a
-  // full page before the test fired, and the due-soon half had no test at all.
-  // The server says how many rows the question has; that is the test.
+  // the cap on its own. The server says how many rows the question has; that
+  // is the test.
   const cut = (late.data?.total ?? running.length) > running.length;
   const cutEverywhere = (allLate.data?.total ?? allRunning.length) > allRunning.length;
 
@@ -984,7 +983,7 @@ function Status() {
   const quietTotal = scanning.data?.quiet ?? 0;
   // The most recent arrival across every build, which is what the line says.
   // The first row that has one is not it: this list is ordered longest-silent
-  // first, so the first match was among the oldest.
+  // first, so the first match is among the oldest.
   const last = builds.reduce<string>(
     (newest, build) =>
       build.last_received_at && build.last_received_at > newest ? build.last_received_at : newest,

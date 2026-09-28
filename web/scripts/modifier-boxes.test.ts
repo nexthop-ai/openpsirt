@@ -13,7 +13,7 @@ import { stylesheets } from "./source.mjs";
 // replaces the display, spacing, border and background of the thing it
 // modifies: a chip in a table cell draws as a block-level callout.
 const box =
-  /(^|[\s;])(display|margin(-[a-z]+)?|padding(-[a-z]+)?|border(-[a-z]+)?|background(-[a-z]+)?)\s*:/;
+  /(^|[\s;])(display|margin(-[a-z]+)*|padding(-[a-z]+)*|border(-[a-z]+)*|background(-[a-z]+)*)\s*:/;
 
 function boxedModifiers(declared: Map<string, string>, modifiers: Map<string, string>): string[] {
   return [...modifiers.keys()].filter((name) => box.test(declared.get(name) ?? "")).sort();

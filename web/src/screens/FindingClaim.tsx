@@ -497,10 +497,8 @@ export function Comments({
         placeholder="A question, a note, something worth knowing later."
         draftKey={`comment:${claimId}`}
         notNotified={comment.data?.not_notified ?? []}
-        // A failed read drew an empty thread with a live composer above it, so
-        // a claim waiting on a second approver read as one nobody had objected
-        // to. The note thread one file over already said this; this is the
-        // half the extraction left behind.
+        // Said, as the note thread says it: an empty thread with a live
+        // composer above it reads as a claim nobody has objected to.
         unread={
           comments.isError && !notYours(comments.error) ? (
             <Failed error={comments.error} what="The comments on this claim could not be read." />

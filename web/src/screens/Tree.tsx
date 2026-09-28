@@ -86,7 +86,7 @@ const fetchAround =
 
 // The rows under one node, in whichever of the three states the read is in:
 // nothing yet, refused, or the rows themselves. Two of them are not the same
-// answer, and drawn alike a refused node spins for ever.
+// answer, and drawn alike a refused node spins forever.
 type Under = { kids?: Node[]; error?: unknown };
 
 // The dependency graph, drawn as a tree and expanded a node at a time.
