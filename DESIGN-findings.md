@@ -688,9 +688,11 @@ A flaw recorded here already has its report, so a second claim about it is a
 duplicate. Accepting a report as an existing issue reaches the issues a scan
 reported.
 
-Half of that is not built. A claim from outside ruled a duplicate of a flaw
-found here starts no disclosure date, although its reporter may be counting
-down to a publication.
+A claim from outside ruled a duplicate of a flaw found here gives the flaw a
+disclosure date, counted from when the report was received as for any outside
+report, because its reporter is counting down to a publication whoever found
+the flaw first (REQ-37). A flaw that already carries a date keeps the earlier
+one. Not built: the ruling starts no date.
 
 | Refusal | Reason |
 |---|---|
