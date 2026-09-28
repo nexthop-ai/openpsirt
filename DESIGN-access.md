@@ -1087,7 +1087,7 @@ that is neither.
 | | |
 |---|---|
 | **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group bindings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
-| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue |
+| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because
 absorbing a route that should leave a row is the failure the walk exists to

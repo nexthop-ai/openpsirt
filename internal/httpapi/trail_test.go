@@ -561,7 +561,10 @@ var outsideTheTrail = map[string]string{
 	"sign-out":                      "their own session",
 
 	// The catalog says what exists. Declaring something new changes nothing
-	// about what the record already says of what was there.
+	// about what the record already says of what was there. Bringing back
+	// something retired, or filling in what a tag was cut from, does leave a
+	// row, which TestBringingBackWhatWasRetiredIsRecordedLikeRetiringIt and
+	// TestFillingInWhatATagWasCutFromIsRecorded drive.
 	"declare-product": "the catalog",
 	"declare-stream":  "the catalog",
 	"declare-variant": "the catalog",

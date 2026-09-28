@@ -306,15 +306,18 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 // A parent is a branch and nothing is its own parent. Both are refused rather
 // than stored: a cycle here is a comparison that never returns, and a tag
 // under a tag is a line that does not exist.
-func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error {
+//
+// It reports whether it filled one in, so the act can be recorded where it
+// happened and nowhere else.
+func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool, error) {
 	var child Stream
 	if err := s.db.NewSelect().Model(&child).Column("kind", "product_id").
 		Where("id = ?", streamID).Scan(ctx); err != nil {
-		return missingOr(err, fmt.Sprintf("release %d", streamID),
+		return false, missingOr(err, fmt.Sprintf("release %d", streamID),
 			fmt.Sprintf("look up what release %d is", streamID))
 	}
 	if err := s.validParent(ctx, child.Kind, streamID, child.ProductID, parent); err != nil {
-		return err
+		return false, err
 	}
 	// Only where nothing stands, asked in the write rather than before it: a
 	// check and a write that are two statements are two moments, and what is
@@ -325,26 +328,26 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 		Where("parent_id IS NULL").
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("record what this release was cut from: %w", err)
+		return false, fmt.Errorf("record what this release was cut from: %w", err)
 	}
 	n, err := database.Affected(res)
 	if err != nil {
-		return fmt.Errorf("record what this release was cut from: %w", err)
+		return false, fmt.Errorf("record what this release was cut from: %w", err)
 	}
 	if n == 0 {
 		var stood *int64
 		if err := s.db.NewSelect().Model((*Stream)(nil)).Column("parent_id").
 			Where("id = ?", streamID).Scan(ctx, &stood); err != nil {
-			return missingOr(err, fmt.Sprintf("release %d", streamID),
+			return false, missingOr(err, fmt.Sprintf("release %d", streamID),
 				fmt.Sprintf("read what release %d was cut from", streamID))
 		}
 		if stood != nil && *stood == parent {
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("%w: this release already says what it was cut from, and a "+
+		return false, fmt.Errorf("%w: this release already says what it was cut from, and a "+
 			"release came from wherever it came from", ErrDiffers)
 	}
-	return nil
+	return true, nil
 }
 
 // validParent refuses a parent a release cannot have: one for anything but a

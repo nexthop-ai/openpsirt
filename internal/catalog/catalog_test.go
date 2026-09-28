@@ -354,7 +354,7 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		// Declared without saying where it came from, which is what a pipeline
 		// that does not know will do.
 		tag, created, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, nil)
-		if err != nil || !created {
+		if err != nil || !created.Created {
 			t.Fatalf("declaring the tag: created=%v %v", created, err)
 		}
 		if tag.ParentID != nil {
@@ -366,8 +366,8 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		if err != nil {
 			t.Fatalf("filling in what it was cut from: %v", err)
 		}
-		if created {
-			t.Error("filling one in declared a second tag")
+		if created.Changed() || !created.FilledIn {
+			t.Errorf("filling one in answered %+v, want it filled in and nothing made", created)
 		}
 		if filled.ParentID == nil || *filled.ParentID != branch.ID {
 			t.Errorf("it was cut from %v, want the branch %d", filled.ParentID, branch.ID)
@@ -445,7 +445,7 @@ func TestAReleaseIsCutOnlyFromABranchOfItsOwnProduct(t *testing.T) {
 		if _, _, err := store.EnsureStream(ctx, product.ID, "v2.0", catalog.Tag, &tag.ID); err == nil {
 			t.Error("a tag was filled in as cut from a tag")
 		}
-		if err := store.FillInParent(ctx, bare.ID, foreign.ID); err == nil {
+		if _, err := store.FillInParent(ctx, bare.ID, foreign.ID); err == nil {
 			t.Error("a tag was filled in as cut from another product's branch")
 		}
 	})

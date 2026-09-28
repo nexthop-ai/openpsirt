@@ -301,6 +301,9 @@ func answer[T any](created bool, item T) *declaredOutput[T] {
 // declineDeclaration turns a refusal into the answer that describes it.
 func declineDeclaration(err error) error {
 	switch {
+	case errors.Is(err, database.ErrGoAgain):
+		// A lost race, which the transaction around the act takes again.
+		return err
 	case errors.Is(err, catalog.ErrDiffers):
 		// Declared before, meaning something else. Answering with success
 		// would let a pipeline quietly redefine what a name refers to.

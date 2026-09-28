@@ -121,7 +121,7 @@ func TestDeclaringARetiredVariantBringsItBack(t *testing.T) {
 		if back.ID != variant.ID {
 			t.Errorf("a second variant was made: %d beside %d", back.ID, variant.ID)
 		}
-		if !made {
+		if !made.Restored {
 			t.Error("bringing one back is reported as having found it already in use")
 		}
 		if back.Retired() {
@@ -311,7 +311,7 @@ func TestRetiringAProductLeavesItsReleasesAlone(t *testing.T) {
 		if err != nil {
 			t.Fatalf("declaring a retired product: %v", err)
 		}
-		if back.ID != product.ID || !made || back.Retired() {
+		if back.ID != product.ID || !made.Restored || back.Retired() {
 			t.Fatalf("it did not come back as itself: %+v made=%v", back, made)
 		}
 
@@ -346,7 +346,7 @@ func TestDeclaringARetiredReleaseBringsItBack(t *testing.T) {
 		if err != nil {
 			t.Fatalf("declaring a retired release: %v", err)
 		}
-		if back.ID != stream.ID || !made || back.Retired() {
+		if back.ID != stream.ID || !made.Restored || back.Retired() {
 			t.Fatalf("it did not come back as itself: %+v made=%v", back, made)
 		}
 	})
