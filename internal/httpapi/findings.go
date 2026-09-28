@@ -704,8 +704,9 @@ type SittingBody struct {
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
 	// DeferredDays is what a deferral asked for here is added to before it is
 	// measured against the threshold, so the form can say which side of it a
-	// date falls on before it is sent.
-	DeferredDays int `json:"deferred_days,omitempty" doc:"The total this place has been put off for, in days, across every deferral recorded about it, taken back ones included for the span they stood"`
+	// date falls on before it is sent. Fractional, because the threshold is
+	// compared with exact durations and a whole number of days moves the line.
+	DeferredDays float64 `json:"deferred_days,omitempty" doc:"The total this place has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood"`
 	// Chain is display rather than identity. A decision is keyed on the direct
 	// consumer and nothing else, which is what keeps one judgment from
 	// multiplying by every route through the graph.
@@ -1117,7 +1118,7 @@ func putOff(ctx context.Context, in Ingest, subject access.Subject, productID,
 		return err
 	}
 	for i := range places {
-		places[i].DeferredDays = int(totals[places[i].Place].Hours() / 24)
+		places[i].DeferredDays = totals[places[i].Place].Hours() / 24
 	}
 	return nil
 }

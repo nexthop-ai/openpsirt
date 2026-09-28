@@ -21,11 +21,11 @@ func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
 
 		type places struct {
 			Places []struct {
-				Place        string `json:"place"`
-				DeferredDays int    `json:"deferred_days"`
+				Place        string  `json:"place"`
+				DeferredDays float64 `json:"deferred_days"`
 			} `json:"places"`
 		}
-		putOff := func(t *testing.T) int {
+		putOff := func(t *testing.T) float64 {
 			t.Helper()
 			var got places
 			read(t, r, "triager", finding+"/components/libnl-3-200", &got)
@@ -39,7 +39,7 @@ func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
 		}
 
 		if days := putOff(t); days != 0 {
-			t.Fatalf("a place nobody deferred reads %d days put off", days)
+			t.Fatalf("a place nobody deferred reads %g days put off", days)
 		}
 		until := time.Now().UTC().AddDate(0, 0, 10).Format(time.DateOnly)
 		if made := asPerson(t, r, "triager", http.MethodPost,
@@ -48,8 +48,12 @@ func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
 				`","reasoning":"Not this sprint."}`); made.Code != http.StatusCreated {
 			t.Fatalf("deferring answered %d: %s", made.Code, made.Body.String())
 		}
-		if days := putOff(t); days < 9 || days > 10 {
-			t.Errorf("a place deferred for ten days reads %d days put off", days)
+		// Measured to the moment rather than in whole days, because the
+		// threshold is: a deferral to a date ten days out, asked after
+		// midnight, is short of ten days by the part of today already gone.
+		days := putOff(t)
+		if days <= 9 || days >= 10 {
+			t.Errorf("a place deferred to a date ten days out reads %g days put off", days)
 		}
 	})
 }

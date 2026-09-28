@@ -187,12 +187,14 @@ function rememberUsed(said: Same) {
   }
 }
 
-// The distance out to a date, in whole days from today. Rounded up, the way a
-// person reads a calendar: a date tomorrow is one day out.
+// The distance from now to the start of a date, in days and parts of a day.
+// Exact rather than rounded, because the server measures a deferral from its
+// own clock to that moment and compares the sum with the threshold as a
+// duration: a date thirty days out, asked after midnight, is short of thirty.
 function deferredDays(until: string): number {
   const then = Date.parse(until + "T00:00:00Z");
   if (Number.isNaN(then)) return 0;
-  return Math.max(0, Math.ceil((then - Date.now()) / 86_400_000));
+  return Math.max(0, (then - Date.now()) / 86_400_000);
 }
 
 // Whether a claim stands on its own or waits for a second person, said before
@@ -210,12 +212,16 @@ export function forecast(
 ): string {
   if (outcome === "affected") return "No approval needed. Goes to remediation.";
   if (outcome === "deferred") {
-    const before = soFar > 0 ? ` Already put off ${soFar} days, which counts toward it.` : "";
+    const before =
+      soFar > 0 ? ` Already put off ${Math.floor(soFar)} days, which counts toward it.` : "";
     if (threshold === null || until === "") {
       return `Under the threshold this stands alone. Over it, a second person.${before}`;
     }
     const total = deferredDays(until) + soFar;
-    const counted = soFar > 0 ? `${total} days with what was put off before` : `${total} days`;
+    // Said in whole days, rounded down, so a total short of the threshold
+    // never reads as reaching it.
+    const whole = Math.floor(total);
+    const counted = soFar > 0 ? `${whole} days with what was put off before` : `${whole} days`;
     return total >= threshold
       ? `${counted} reaches the ${threshold}-day threshold, so a second person has to agree.`
       : `${counted} is inside the ${threshold}-day threshold, so this stands on its own.`;

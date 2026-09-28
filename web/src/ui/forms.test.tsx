@@ -30,8 +30,19 @@ describe("what the decision form says about a second person", () => {
     expect(forecast("deferred", 30, out(10), 25)).toContain("a second person has to agree");
   });
 
-  it("gates a deferral that reaches the threshold exactly", () => {
-    expect(forecast("deferred", 30, out(30))).toContain("a second person has to agree");
+  it("measures to the moment, the way the server does", () => {
+    // Thirty days out, asked at noon, is twenty-nine and a half days: short
+    // of the threshold, and the server lets it stand alone.
+    vi.useFakeTimers({ now: new Date("2026-03-01T12:00:00Z"), toFake: ["Date"] });
+    try {
+      expect(forecast("deferred", 30, "2026-03-31")).toContain("29 days is inside");
+      expect(forecast("deferred", 30, "2026-04-01")).toContain("a second person has to agree");
+      expect(forecast("deferred", 30, "2026-03-31", 0.5)).toContain(
+        "a second person has to agree",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not call a promise to act by a date a dismissal", () => {

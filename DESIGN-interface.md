@@ -820,7 +820,7 @@ collects the answer it suggested.
 | Rule | |
 |---|---|
 | The deferral threshold is a number on the form, not a sentence about a threshold | Which side of it a date falls on decides whether a second person has to agree, and reading that off the response is reading it after the choice was made |
-| A deferral is forecast against what its places were put off for already | The server adds a deferral to everything the place was put off for before, so the finding carries each place's total and the form adds the largest of those it covers. A deferral reaching the threshold exactly waits for a second person, as it does on the server |
+| A deferral is forecast against what its places were put off for already | The server adds a deferral to everything the place was put off for before, so the finding carries each place's total and the form adds the largest of those it covers. Both halves are measured to the moment, in days and parts of a day, because the server compares durations: a date thirty days out, picked after midnight, is short of a thirty-day threshold. A total reaching the threshold exactly waits for a second person, as it does on the server |
 | A promise to act by a date is forecast against the earliest deadline it covers | By that deadline it stands on its own, and later it waits for a second person. It is not called a dismissal |
 | Ctrl+Enter asks what the button asks | Nothing is sent while a submission is in flight or the review sheet is open, so a second press does not post the decision twice |
 | It names the next missing answer, beside the button | A disabled button says something is missing and never what, and Ctrl+Enter does nothing until the same answer is given. One rule decides both the sentence and the refusal |
