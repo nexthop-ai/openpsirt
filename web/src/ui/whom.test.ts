@@ -33,6 +33,21 @@ describe("offering a person in a picker", () => {
     expect(whoIs("  ", people)).toBe("");
   });
 
+  it("matches an identity exactly before ignoring capitals", () => {
+    // A provider's identity is matched exactly, so two that differ only in
+    // capitals are two people and each resolves to itself. Capitals are
+    // ignored only where that leaves one person.
+    const cased = [
+      { identity: "Abc", name: "Abc" },
+      { identity: "abc", name: "abc" },
+      { identity: "Dee", name: "Dee" },
+    ];
+    expect(whoIs("abc", cased)).toBe("abc");
+    expect(whoIs("Abc", cased)).toBe("Abc");
+    expect(whoIs("ABC", cased)).toBe("");
+    expect(whoIs("dee", cased)).toBe("Dee");
+  });
+
   it("narrows on either half, ignoring capitals", () => {
     // The same rule the server matches on, so a list narrowed here and one
     // narrowed there hold the same people.

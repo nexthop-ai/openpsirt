@@ -1475,6 +1475,7 @@ has always taken and never received.
 | Rule | |
 |---|---|
 | An offer carries the identity beside the name where they differ | Two colleagues can share a display name, and a picker offering only that would resolve to whichever of them the list held first |
+| What is typed matches an identity exactly before capitals are ignored | A provider's identity is matched exactly, so two that differ only in capitals are two people. Ignoring capitals resolves only where it leaves one person |
 | The button stays disabled until what is typed resolves to somebody offered | Which is the guarantee the select gave for free. Neither picker can bring anybody into the deployment, so a name matching nobody is refused by the server either way, and being refused after typing is a worse way to learn that than not being offered it |
 | The list opens on focus | Somebody adding to a team is looking for a name rather than recalling one, so waiting for two characters would leave it reading as a plain text box |
 

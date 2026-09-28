@@ -24,15 +24,29 @@ export function offeredAs(person: Person): string {
 // into the deployment, so a name matching nobody is refused by the server —
 // and being refused after typing is a worse way to learn that than not being
 // offered it in the first place.
+//
+// An identity is what a provider handed over and is matched exactly first:
+// two identities may differ only in capitals and be two people. Capitals are
+// ignored only after that, and only where they leave one person, so a match
+// that could be either of two resolves to nobody.
 export function whoIs(typed: string, people: Person[]): string {
-  const asked = typed.trim().toLowerCase();
-  if (asked === "") return "";
+  const exact = typed.trim();
+  if (exact === "") return "";
   for (const person of people) {
-    if (offeredAs(person).toLowerCase() === asked) return person.identity ?? "";
+    if (offeredAs(person) === exact) return person.identity ?? "";
   }
   // The identity on its own, for somebody who knows it and typed it.
   for (const person of people) {
-    if ((person.identity ?? "").toLowerCase() === asked) return person.identity ?? "";
+    if ((person.identity ?? "") === exact) return person.identity ?? "";
+  }
+  const asked = exact.toLowerCase();
+  for (const same of [
+    (person: Person) => offeredAs(person).toLowerCase() === asked,
+    (person: Person) => (person.identity ?? "").toLowerCase() === asked,
+  ]) {
+    const found = people.filter(same);
+    if (found.length === 1) return found[0]?.identity ?? "";
+    if (found.length > 1) return "";
   }
   return "";
 }
