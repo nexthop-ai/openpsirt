@@ -48,14 +48,8 @@ type Went struct {
 func (s *Store) Published(ctx context.Context, subject access.Subject,
 	productIDs []int64, since, until time.Time) ([]Went, error) {
 
-	// Not merely empty: "here is nothing" and "you cannot ask" are
-	// different statements, and this is the second. A person holding
-	// nothing is the first, and is answered below.
-	if subject.Kind != access.Person {
-		return nil, access.Denied("read what advisories have gone out")
-	}
-	if products, all := subject.Products(); !all && len(products) == 0 {
-		return nil, nil
+	if proceed, err := readsIssuances(subject); !proceed {
+		return nil, err
 	}
 
 	q := s.db.NewSelect().
@@ -177,11 +171,8 @@ type Sent struct {
 // Narrowed the way every other read of an issuance is, which for the
 // deployment looking at itself narrows to everything.
 func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error) {
-	if subject.Kind != access.Person {
-		return nil, access.Denied("read what advisories have gone out")
-	}
-	if products, all := subject.Products(); !all && len(products) == 0 {
-		return nil, nil
+	if proceed, err := readsIssuances(subject); !proceed {
+		return nil, err
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"advisory_issuance" AS "ai"`).
@@ -258,4 +249,19 @@ func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, 
 		return false, fmt.Errorf("read whether an advisory has gone out for this release: %w", err)
 	}
 	return issued, nil
+}
+
+// readsIssuances says whether a read of what has gone out has anything to ask.
+//
+// Not merely empty: "here is nothing" and "you cannot ask" are different
+// statements. Anything but a person is refused; a person holding nothing
+// anywhere is answered with nothing, and the read is not made.
+func readsIssuances(subject access.Subject) (proceed bool, err error) {
+	if subject.Kind != access.Person {
+		return false, access.Denied("read what advisories have gone out")
+	}
+	if products, all := subject.Products(); !all && len(products) == 0 {
+		return false, nil
+	}
+	return true, nil
 }
