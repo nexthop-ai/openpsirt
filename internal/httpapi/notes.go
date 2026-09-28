@@ -274,7 +274,7 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 	visibility, err := store.NoteVisibility(ctx, note.ProductID, note.VulnerabilityID)
 	if err != nil {
 		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
-		return nil
+		return markdown.Mentions(note.Body)
 	}
 	dropped, err := mentioned(ctx, in, subject, mentionTarget{
 		ProductID: note.ProductID, VulnerabilityID: note.VulnerabilityID,

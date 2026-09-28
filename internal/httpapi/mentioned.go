@@ -59,7 +59,8 @@ type MentionsBody struct {
 //
 // Failing to tell somebody never fails the write. The words are on record by
 // the time this runs, and losing a comment because a notification could not be
-// stored would be sacrificing the wrong half.
+// stored would be sacrificing the wrong half. A failure reports every name as
+// reaching nobody, because none of them was told.
 func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 	store *triage.Store, claimID int64, body string) []string {
 
@@ -73,7 +74,7 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 	_, rows, err := store.ReadClaim(ctx, subject, claimID)
 	if err != nil || len(rows) == 0 {
 		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
-		return nil
+		return markdown.Mentions(body)
 	}
 	dropped, err := mentioned(ctx, in, subject, mentionTarget{
 		ProductID:       rows[0].ProductID,
@@ -144,15 +145,40 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject,
 		about.ProductID, about.Visibility, names)
 	if err != nil {
-		return nil, fmt.Errorf("read who may be told: %w", err)
+		return append(dropped, names...), fmt.Errorf("read who may be told: %w", err)
 	}
 	byName := make(map[string]int64, len(readers))
 	for _, reader := range readers {
 		byName[strings.ToLower(reader.Identity)] = reader.ID
 	}
 
-	told := map[int64]bool{subject.ID: true}
-	for _, name := range names {
+	return tellEach(names, byName, subject.ID, dropped, func(who int64) error {
+		return notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
+			PersonID: who, Kind: notify.Mentioned,
+			Body: fmt.Sprintf("%s named you in a note on %s.",
+				whoever(subject), about.About),
+			Link:     link,
+			Private:  about.Visibility == access.Private,
+			Concerns: notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
+			// The same two as columns. Concerns is a string a digest
+			// matches on; these are what a read narrows by, and a
+			// narrowing cannot rest on a shape another pass invented.
+			ProductID:       &about.ProductID,
+			VulnerabilityID: &about.VulnerabilityID,
+		})
+	})
+}
+
+// tellEach tells each name that reaches somebody, once per person and never
+// the author, and answers the names that reached nobody.
+//
+// A tell that fails stops the walk, and the name it failed on and every name
+// after it are reported as reaching nobody, because none of them was told.
+func tellEach(names []string, byName map[string]int64, author int64, dropped []string,
+	tell func(who int64) error) ([]string, error) {
+
+	told := map[int64]bool{author: true}
+	for i, name := range names {
 		who, known := byName[strings.ToLower(name)]
 		// A name nobody holds, and a name held by somebody who may not read
 		// this, are both simply not told — and they are not told apart. A
@@ -165,22 +191,15 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 		if told[who] {
 			continue
 		}
-		told[who] = true
-		if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
-			PersonID: who, Kind: notify.Mentioned,
-			Body: fmt.Sprintf("%s named you in a note on %s.",
-				whoever(subject), about.About),
-			Link:     link,
-			Private:  about.Visibility == access.Private,
-			Concerns: notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
-			// The same two as columns. Concerns is a string a digest
-			// matches on; these are what a read narrows by, and a
-			// narrowing cannot rest on a shape another pass invented.
-			ProductID:       &about.ProductID,
-			VulnerabilityID: &about.VulnerabilityID,
-		}); err != nil {
+		if err := tell(who); err != nil {
+			for _, rest := range names[i:] {
+				if !told[byName[strings.ToLower(rest)]] {
+					dropped = append(dropped, rest)
+				}
+			}
 			return dropped, fmt.Errorf("tell %d they were named: %w", who, err)
 		}
+		told[who] = true
 	}
 	return dropped, nil
 }
