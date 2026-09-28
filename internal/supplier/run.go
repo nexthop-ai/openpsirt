@@ -190,12 +190,16 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 	took, err := p.fetch.From(ctx, recordedAs(source), source)
 	store := NewStore(p.db)
+	// A pass cut short by shutdown is neither finished nor a failure of the
+	// publisher: the mark moves and the supplier stays due, the way it does
+	// for a pass that filled its bound.
+	cut := ctx.Err() != nil
 	// Written even where the pass was cut short by shutdown, so the documents
 	// already recorded are not fetched again on the next start. Bounded, so a
 	// shutdown waits for one small write and no more.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), progressWrite)
 	defer cancel()
-	if took.Filled && err == nil {
+	if cut || (took.Filled && err == nil) {
 		if marked := store.CaughtUp(ctx, source.ID, took.CaughtUpTo, took.Mark); marked != nil {
 			p.logger.Error("recording how far a supplier was read",
 				"supplier", source.Display, "error", marked)

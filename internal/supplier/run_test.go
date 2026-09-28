@@ -226,6 +226,42 @@ func TestAPassCutShortKeepsHowFarItReached(t *testing.T) {
 		if len(rows) != 1 || rows[0].CaughtUpTo == nil || !rows[0].CaughtUpTo.UTC().Equal(want) {
 			t.Fatalf("the supplier reads as %+v after a pass cut short, want its mark at %v", rows, want)
 		}
+		// Cut short is not finished, and not a failure of the publisher.
+		if rows[0].Failed != "" {
+			t.Errorf("a pass cut short by shutdown recorded the supplier as failing: %q", rows[0].Failed)
+		}
+		due, err := store.Due(t.Context(), access.Everything("the test"), time.Now().UTC().Add(-time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 1 {
+			t.Errorf("a pass cut short by shutdown left the supplier read for the day, " +
+				"so what it did not reach waits a day")
+		}
+	})
+}
+
+// A shutdown while the listing is read is not the publisher failing.
+func TestAPassCutShortWhileListingRecordsNoFailure(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		p := serving(t)
+		p.publishes("/2026/EL-40.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0040", "libnl-3-200", "3.7.1", "CVE-2026-9540"))
+		// Stopped as the provider's directory is asked for, before any feed.
+		p.asking = func(string) { stop() }
+		store, _, pass := passOver(t, f, p, "test")
+		if _, err := pass.Once(ctx); err != nil && ctx.Err() == nil {
+			t.Fatal(err)
+		}
+		rows, err := store.For(t.Context(), f.by, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].Failed != "" || rows[0].FetchedAt != nil {
+			t.Errorf("a pass cut short while listing recorded %+v, want nothing recorded", rows)
+		}
 	})
 }
 
