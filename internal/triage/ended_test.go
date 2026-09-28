@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -164,6 +165,54 @@ func TestAWithdrawnClaimIsNotOfferedForReaffirming(t *testing.T) {
 		}
 		if len(listed) != 0 || total != 0 {
 			t.Errorf("a withdrawn claim is listed to re-affirm: %d rows, total %d", len(listed), total)
+		}
+	})
+}
+
+func TestASweepLapsingMoreThanOneBatchTellsEachProposerOnce(t *testing.T) {
+	// A sweep lapses a bounded batch at a time. One proposer whose rows span
+	// batches is one entry, counting every row.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		in := f.build(t, f.product, "2026.03")
+		moved := f.component(t, "libfoo", "1.2.4")
+		made := f.claims(t, f.at())
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		size := database.InBulk.Most + 1
+		findings := make([]finding.Finding, 0, size)
+		rows := make([]triage.Decision, 0, size)
+		for i := range size {
+			place := fmt.Sprintf("place-%04d", i)
+			findings = append(findings, finding.Finding{
+				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+				Visibility: access.Public, ComponentID: moved, PlaceIdentity: place,
+				LastChangedAt: now, OpenedAt: now, OpenedRunID: &in.run,
+			})
+			key := fmt.Sprintf("bulk-%04d", i)
+			version := "1.2.3"
+			rows = append(rows, triage.Decision{
+				ClaimID: made.ClaimID, ProductID: f.product, VulnerabilityID: f.issue,
+				PlaceIdentity: place, Visibility: access.Public,
+				ComponentUpstreamVersion: &version, State: triage.Proposed,
+				NeedsApproval: true, ProposedBy: made.ProposedBy, ProposedAt: now, LiveKey: &key,
+			})
+		}
+		if _, err := f.db.DB.NewInsert().Model(&findings).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewInsert().Model(&rows).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		lapsed, err := f.store.Lapse(ctx, in.target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if lapsed.Rows != int64(size) {
+			t.Errorf("the sweep lapsed %d rows, want %d", lapsed.Rows, size)
+		}
+		if len(lapsed.Told) != 1 || lapsed.Told[0].Rows != size {
+			t.Errorf("the sweep tells %+v, want one proposer told of %d rows", lapsed.Told, size)
 		}
 	})
 }
