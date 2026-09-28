@@ -140,7 +140,7 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 			f.products["sonic"], "kernel", "component=linux", saved.Filter{}, 0); err != nil {
 			t.Fatal(err)
 		}
-		mine, err := f.store.SavedFilters(t.Context(), person.ID, f.products["sonic"], 0)
+		mine, _, err := f.store.SavedFilters(t.Context(), person.ID, f.products["sonic"], 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,13 +238,18 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 			t.Errorf("replacing a filter they already keep was refused: %v", err)
 		}
 
-		// And the read is bounded by the same number.
-		kept, err := f.store.SavedFilters(t.Context(), person.ID, product, 1)
+		// And the read is bounded by the same number, and says how many it
+		// left out: a lowered ceiling leaves somebody keeping more than it
+		// shows, and the write refuses them until they forget enough.
+		kept, total, err := f.store.SavedFilters(t.Context(), person.ID, product, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(kept) != 1 {
 			t.Errorf("the list returned %d rows against a ceiling of one", len(kept))
+		}
+		if total != 2 {
+			t.Errorf("the list says %d are kept, want the 2 there are", total)
 		}
 	})
 }

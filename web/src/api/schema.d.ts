@@ -3565,6 +3565,8 @@ export interface paths {
          *
          *     A saved filter naming something the list no longer offers simply stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one.
          *
+         *     At most as many as the per-person limit, in name order. `total` is how many you keep, which is more than the list holds where the limit was lowered after they were saved.
+         *
          *     Kept per product. A filter narrows one product's findings list and its query names branches and variants that usually exist in no other, so one offered everywhere would be offered where it matches nothing.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers your own and nobody else's.

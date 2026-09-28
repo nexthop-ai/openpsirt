@@ -58,6 +58,9 @@ func registerSaved(api huma.API, in Ingest) {
 			"A saved filter naming something the list no longer offers simply stops narrowing " +
 			"by it, which is a way back to a slightly wider list rather than a refusal to open " +
 			"one.\n\n" +
+			"At most as many as the per-person limit, in name order. `total` is how many you " +
+			"keep, which is more than the list holds where the limit was lowered after they " +
+			"were saved.\n\n" +
 			"Kept per product. A filter narrows one product's findings list and its query " +
 			"names branches and variants that usually exist in no other, so one offered " +
 			"everywhere would be offered where it matches nothing.",
@@ -79,11 +82,12 @@ func registerSaved(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, wentWrong(in.Logger, "what you have kept could not be read", err)
 			}
-			kept, err := store.SavedFilters(ctx, who.ID, product, cap)
+			kept, total, err := store.SavedFilters(ctx, who.ID, product, cap)
 			if err != nil {
 				return nil, wentWrong(in.Logger, "what you have kept could not be read", err)
 			}
 			out := &listOutput[SavedBody]{}
+			out.Body.Total = total
 			out.Body.Items = make([]SavedBody, 0, len(kept))
 			for _, one := range kept {
 				body := SavedBody{Name: one.Called(), Query: one.Query}

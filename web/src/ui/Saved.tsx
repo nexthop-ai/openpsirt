@@ -166,6 +166,7 @@ export function Saved({
   });
 
   const mine = kept.data?.items ?? [];
+  const unshown = Math.max(0, (kept.data?.total ?? 0) - mine.length);
   const open = ruleIn(mine, params);
 
   function pick(called: string) {
@@ -193,6 +194,11 @@ export function Saved({
               {one.prepares ? " ·  prepares a claim" : ""}
             </option>
           ))}
+          {unshown > 0 && (
+            <option value="" disabled>
+              {unshown.toLocaleString()} more over the limit, not shown
+            </option>
+          )}
         </select>
         {open ? (
           <button

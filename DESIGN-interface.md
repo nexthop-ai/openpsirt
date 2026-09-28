@@ -543,6 +543,7 @@ something half-formed.
 | Saving over a name replaces it | The act is deciding what that name means, and refusing would make somebody delete before they could correct |
 | Personal is enforced at the query, not only on the screen | A name somebody else kept is not there, which is the same answer a name nobody kept gives |
 | Opening one goes back to exactly the list that was on screen | The saved address wins outright rather than merging. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
+| The list is bounded by the per-person limit and says how many are kept in all | A limit lowered after filters were saved leaves somebody keeping more than it shows, and saving is refused until they are under it. The picker says how many it left out rather than reading as the whole of what they keep |
 
 A saved filter can prepare a claim, and proposes nothing (REQ-27). Where it
 carries an outcome and the words, picking it fills the decision form and says so
