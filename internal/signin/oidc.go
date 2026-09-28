@@ -61,19 +61,15 @@ type OIDCConfig struct {
 	// assigning roles directly and the wrong one for a deployment about to
 	// switch to group-bound roles: every claim set then reads as having no
 	// groups, and nobody derives anything.
-	//
-	// Stated here because the GitHub adapter states the same choice about its
-	// organization and this did not, so the two adapters read as though they
-	// disagreed about whether empty was a choice or an omission.
+	// The GitHub adapter makes the same choice about its organization.
 	GroupsClaim   string
 	UsernameClaim string
 	// client is what discovery and every fetch after it go through.
 	//
 	// Unexported, so only this package can supply one: the guard refuses plain
 	// HTTP, refuses any host but the issuer's, and refuses to connect inside
-	// this network — all three of which describe a test server exactly, and
-	// every method of this type was unexecuted for want of one. The guard has
-	// its own tests, against the layers rather than through them.
+	// this network — all three of which describe a test server exactly. The
+	// guard has its own tests, against the layers rather than through them.
 	client *http.Client
 }
 
@@ -95,14 +91,37 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		return nil, fmt.Errorf("the %q provider needs a client identifier and secret", cfg.Name)
 	}
 	// The name becomes a path segment and a route parameter, so it has to be
-	// one. Unchecked, a name carrying a slash or a space produced a deployment
-	// that started, logged "sign-in configured", and could not complete a
-	// sign-in for anybody.
+	// one. A name carrying a slash or a space makes a deployment that starts
+	// and completes a sign-in for nobody.
 	name := strings.TrimSpace(cfg.Name)
 	if name == "" || len(name) > 64 || url.PathEscape(name) != name {
 		return nil, fmt.Errorf(
 			"the provider name %q cannot be part of an address: set %sOIDC_NAME to a short "+
 				"name made only of characters a URL path segment carries as written",
+			cfg.Name, "OPENPSIRT_")
+	}
+
+	// Stated by the operator, never defaulted.
+	//
+	// This is not the identity. The subject is, and it is what a first
+	// sign-in pins and what decides from then on. This claim does one job:
+	// match an authorization an administrator wrote for somebody who has not
+	// arrived yet, which has to be a name a person can type.
+	//
+	// So the property it needs is that an end user cannot set it to a name an
+	// administrator might have authorized. OpenID Connect permits a provider
+	// to let people choose their own preferred_username and says a relying
+	// party may not rely on it being unique, and whether a given deployment's
+	// provider does that is a question only its operator can answer — which
+	// is why there is no default rather than a different default.
+	username := strings.TrimSpace(cfg.UsernameClaim)
+	if username == "" {
+		return nil, fmt.Errorf(
+			"the %q provider needs a username claim: set %sOIDC_USERNAME_CLAIM to a claim "+
+				"whose value an end user cannot choose, because it is what redeems an "+
+				"authorization written for somebody who has not signed in yet. Which claim "+
+				"that is depends on the provider, so there is no default; the configuration "+
+				"reference names the usual answer for each",
 			cfg.Name, "OPENPSIRT_")
 	}
 
@@ -113,7 +132,11 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		guarded = outward.Guarded(issuer.Hostname())
 	}
 	ctx = oidc.ClientContext(ctx, guarded)
-	provider, err := oidc.NewProvider(ctx, strings.TrimSuffix(cfg.Issuer, "/"))
+	// Asked as the operator wrote it. The provider's own discovery document
+	// is compared with it exactly, and some providers publish their issuer
+	// with a trailing slash; the well-known path is built without it either
+	// way.
+	provider, err := oidc.NewProvider(ctx, strings.TrimSpace(cfg.Issuer))
 	if err != nil {
 		return nil, fmt.Errorf("discover the %q provider: %w", cfg.Name, err)
 	}
@@ -130,9 +153,9 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	// would do this stops the process instead of producing a deployment that
 	// misdirects the first person to sign in.
 	// The keys are fetched from a third endpoint, which the discovery document
-	// names and the library does not expose — so it was the one address this
-	// process fetches that nothing checked. A provider naming it elsewhere
-	// produces a deployment that starts and verifies no token for anybody.
+	// names and the library does not expose, so it is read here to be checked
+	// with the other two. A provider naming it elsewhere produces a deployment
+	// that starts and verifies no token for anybody.
 	var document struct {
 		JWKSURL string `json:"jwks_uri"`
 	}
@@ -164,29 +187,6 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	if len(scopes) == 0 {
 		scopes = []string{oidc.ScopeOpenID, "profile", "email"}
 	}
-	// Stated by the operator, never defaulted.
-	//
-	// This is not the identity. The subject is, and it is what a first
-	// sign-in pins and what decides from then on. This claim does one job:
-	// match an authorization an administrator wrote for somebody who has not
-	// arrived yet, which has to be a name a person can type.
-	//
-	// So the property it needs is that an end user cannot set it to a name an
-	// administrator might have authorized. OpenID Connect permits a provider
-	// to let people choose their own preferred_username and says a relying
-	// party may not rely on it being unique, and whether a given deployment's
-	// provider does that is a question only its operator can answer — which
-	// is why there is no default rather than a different default.
-	username := strings.TrimSpace(cfg.UsernameClaim)
-	if username == "" {
-		return nil, fmt.Errorf(
-			"the %q provider needs a username claim: set %sOIDC_USERNAME_CLAIM to a claim "+
-				"whose value an end user cannot choose, because it is what redeems an "+
-				"authorization written for somebody who has not signed in yet. Which claim "+
-				"that is depends on the provider, so there is no default; the configuration "+
-				"reference names the usual answer for each",
-			cfg.Name, "OPENPSIRT_")
-	}
 
 	return &OIDC{
 		name:   name,
@@ -196,7 +196,7 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 			Endpoint: endpoint, Scopes: scopes,
 		},
 		verifier:      provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}),
-		groupsClaim:   cfg.GroupsClaim,
+		groupsClaim:   strings.TrimSpace(cfg.GroupsClaim),
 		usernameClaim: username,
 		client:        guarded,
 	}, nil
@@ -211,11 +211,9 @@ func (o *OIDC) Name() string { return o.name }
 // GroupsSource reports whether a claim carrying group membership was named.
 //
 // Empty means groups are never read: the lookup is of a claim nobody sets, so
-// every claim set reads as having none. The GitHub adapter stated that as a
-// deliberate choice about its organization and this said nothing, so the two
-// adapters read as though they disagreed about whether empty was a choice or
-// an omission.
-func (o *OIDC) GroupsSource() bool { return strings.TrimSpace(o.groupsClaim) != "" }
+// every claim set reads as having none. The name is trimmed where it is
+// stored, so the claim reported here is the claim a sign-in reads.
+func (o *OIDC) GroupsSource() bool { return o.groupsClaim != "" }
 
 // Begin returns where to send the browser.
 func (o *OIDC) Begin(_ context.Context, redirectURI string) (string, Pending, error) {

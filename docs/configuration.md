@@ -566,7 +566,7 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
 | `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
-| `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
+| `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored | unset |
 
 ### The username claim
 

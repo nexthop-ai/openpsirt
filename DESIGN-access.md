@@ -703,6 +703,11 @@ miss the case this exists for and refuse the one it does not care about.
 
 | Rule | Reason |
 |---|---|
+| Discovery asks for the issuer exactly as the operator wrote it | A provider's discovery document is compared with it character for character, and some providers publish their issuer with a trailing slash. Trimmed first, such a provider can never be configured |
+| The issuer is recorded without a trailing slash | Identities stay attributed to one provider whichever spelling an operator writes |
+
+| Rule | Reason |
+|---|---|
 | An identifier is read only as the issuer that minted it meant it | Two providers issue into their own namespaces and neither knows the other's. The same string names different people at each, so reading one as the other hands somebody the roles of whoever held that string before |
 | An arrival that names no provider is refused | An identifier with no issuer names nobody, and binding one records a subject a later sign-in cannot tell apart from another provider's |
 | A bound identity whose issuer is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
@@ -751,6 +756,8 @@ is no default.
 | The property required is that an end user cannot choose the value | Narrower than immutable, and deliberately. The claim is not the identity — the subject is, and a rename after binding is followed as a label — so what matters is only that nobody can arrive holding a name an administrator wrote for somebody else |
 | The subject cannot serve as the claim | An authorization is written before anybody has arrived, so the name it is written for has to be one a person can type. The subject is not knowable then |
 | There is no safe default rather than a different default | OpenID Connect permits a provider to let people choose their own `preferred_username`; whether a given one does is a question only its operator can answer. On a provider where the login is assigned by an administrator it is the right answer, and on one with self-registration it is the attack |
+| A missing claim is refused before discovery | Like every other refusal of what configuration supplies, it names the setting to fix and needs no provider to be reachable |
+| The groups claim is named with surrounding spaces ignored, once | Whether a provider reports groups decides whether roles may be switched to group-bound, so the claim reported is the claim read. A name read with its spaces reports a source of groups that yields none, and every arrival is then refused |
 
 ## Sessions and request forgery
 
