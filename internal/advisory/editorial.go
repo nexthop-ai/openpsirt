@@ -329,7 +329,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		taken, err = result.RowsAffected()
+		taken, err = database.Affected(result)
 		return err
 	})
 	if err != nil {

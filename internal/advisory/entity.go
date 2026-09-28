@@ -437,8 +437,13 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 		// An affected-row count means rows matched. Nothing matched is an
 		// issue the advisory did not cover, which is the caller's to fix
 		// rather than a quiet success — and the edition below must not open
-		// for a change that did not happen.
-		if n, err := res.RowsAffected(); err == nil && n == 0 {
+		// for a change that did not happen, nor for one whose count could
+		// not be read.
+		n, err := database.Affected(res)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
 			return ErrNoSuchIssue
 		}
 		return reopen(ctx, tx, row, subject.ID, removed)
