@@ -766,7 +766,7 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 	// carried a deadline.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		tag := f.anotherBuild(t, "v2.4.1")
+		tag := f.release(t)
 		branch := f.anotherBranch(t, "release-2.5")
 
 		for _, target := range []int64{tag, branch} {

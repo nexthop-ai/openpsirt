@@ -22,7 +22,6 @@ func TestEachGenerationAReportRatesAnIssueUnderIsKept(t *testing.T) {
 	// first stated in each is kept whole, and a re-scan writes nothing.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		issues := finding.NewVulnerabilities(db.DB)
 
 		first := finding.Named{
@@ -94,7 +93,6 @@ func TestAPublishedScoreIsStoredAsTheHundredthsItStates(t *testing.T) {
 	// published.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		issues := finding.NewVulnerabilities(db.DB)
 		filed, err := issues.Intern(ctx, []finding.Named{{
 			Identifier: "CVE-2026-6101", Severity: "high", Score: 8.2, Vector: ratedThree,
@@ -133,7 +131,6 @@ func TestTheIssuesNumberIsTheNewestRatingWhole(t *testing.T) {
 	// vector. It is one rating, the newest generation's, copied whole.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
 		issues := finding.NewVulnerabilities(db.DB)
 		read := func() finding.Vulnerability {
 			t.Helper()

@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -37,13 +37,7 @@ const claimed = 95_139
 func TestMeasureRecordingOneRealAdvisory(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+		product := world.New(t, db).Product
 		// A real row, because the statement records who uploaded it and the
 		// schema says that has to be a person.
 		person, err := access.NewStore(db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
