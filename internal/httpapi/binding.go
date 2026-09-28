@@ -264,6 +264,13 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			}
 
 			if over, deployment := overTheDeployment(in.Role); deployment {
+				// Refused as binding refuses it: a product named here asks
+				// about a grant on that product, which this is not.
+				if in.Product != "" {
+					return huma.Error422UnprocessableEntity(
+						"that is held over the deployment rather than against a product, " +
+							"so a group bound to it names none")
+				}
 				// Administration is refused where it would leave nobody able
 				// to administer, for the same reason the mode change is — and
 				// decided inside the write, so a refusal rolls the delete back

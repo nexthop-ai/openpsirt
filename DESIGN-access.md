@@ -321,6 +321,7 @@ Its own column beside administration, not a role.
 | Derived and stamped like administration | Only what a group gave is taken back by a group, and the stamp is what bounds the flag for a credential that never signs in. Without it somebody a group made an auditor, who minted a year-long token and then left, would go on auditing through it |
 | No bootstrap arm | Configuration names an administrator, which is the documented way back into a deployment nobody can administer. Nobody is locked out by holding no audit permission |
 | Unbinding it counts nothing | Administration is refused where it would leave nobody able to administer. Nothing else held over the deployment can lock anybody out |
+| Binding or unbinding it names no product | A product named asks about a grant on that product, and one held over the deployment is not. Both refuse it rather than acting on the deployment-wide grant |
 
 ## Somebody who has left
 
