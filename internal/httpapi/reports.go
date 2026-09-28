@@ -468,6 +468,7 @@ type CarriedBody struct {
 	Moved     []InheritedBody `json:"moved" doc:"The version differs, so each needs a fresh answer"`
 	Postponed []InheritedBody `json:"postponed" doc:"Deferrals, offered separately and never carried by default"`
 	Expired   int             `json:"expired" doc:"Deferrals and promises at a place this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer"`
+	Upgrades  int             `json:"upgrades" doc:"Promised upgrades at a version this line does not have. They cannot be carried: plan the upgrade from the component, naming this line"`
 	Absent    int             `json:"absent" doc:"Cover nothing in the new line"`
 }
 
@@ -479,7 +480,7 @@ func registerCarry(api huma.API, in Ingest) {
 		Description: "Returns what an existing line's decisions would mean for this one, " +
 			"without changing anything. Ask before creating a line: the answer is what " +
 			"somebody is agreeing to.\n\n" +
-			"Five groups, because they need different things:\n\n" +
+			"Six groups, because they need different things:\n\n" +
 			"`applying` reach this line by matching, and there is nothing to choose.\n\n" +
 			"`moved` held a claim at a version this line does not have. Each would come " +
 			"across as a proposal carrying the old reasoning, never as a decision.\n\n" +
@@ -488,6 +489,8 @@ func registerCarry(api huma.API, in Ingest) {
 			"again agrees to.\n\n" +
 			"`expired` are deferrals and promises at a place this line still holds whose " +
 			"date has passed. A carried judgment keeps its date, so these cannot be carried.\n\n" +
+			"`upgrades` are promised upgrades that moved. Plan the upgrade from the component, " +
+			"naming this line, rather than carrying it.\n\n" +
 			"`absent` cover nothing here and are left behind.",
 		Tags: []string{"Triage"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -515,7 +518,8 @@ func registerCarry(api huma.API, in Ingest) {
 			return nil, refusedDecision(in.Logger, err)
 		}
 		body := CarriedBody{
-			Applying: carried.Applying, Expired: carried.Expired, Absent: carried.Absent,
+			Applying: carried.Applying, Expired: carried.Expired,
+			Upgrades: carried.Upgrades, Absent: carried.Absent,
 			Moved:     inherited(carried.Moved),
 			Postponed: inherited(carried.Postponed),
 		}

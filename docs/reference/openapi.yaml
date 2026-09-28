@@ -1298,11 +1298,16 @@ components:
           type:
             - array
             - "null"
+        upgrades:
+          description: "Promised upgrades at a version this line does not have. They cannot be carried: plan the upgrade from the component, naming this line"
+          format: int64
+          type: integer
       required:
         - applying
         - moved
         - postponed
         - expired
+        - upgrades
         - absent
       type: object
     CarriedClaimBody:
@@ -22079,7 +22084,7 @@ paths:
       description: |-
         Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
 
-        Five groups, because they need different things:
+        Six groups, because they need different things:
 
         `applying` reach this line by matching, and there is nothing to choose.
 
@@ -22088,6 +22093,8 @@ paths:
         `postponed` were deferrals. Each says how long it has already been put off across every line it has come through, which is the total that carrying it again agrees to.
 
         `expired` are deferrals and promises at a place this line still holds whose date has passed. A carried judgment keeps its date, so these cannot be carried.
+
+        `upgrades` are promised upgrades that moved. Plan the upgrade from the component, naming this line, rather than carrying it.
 
         `absent` cover nothing here and are left behind.
 

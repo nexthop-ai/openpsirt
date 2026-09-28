@@ -605,12 +605,13 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 
 // Carried is what a new line would inherit from an existing one.
 //
-// Five buckets, because they need different things from a person. What
+// Six buckets, because they need different things from a person. What
 // already applies needs nothing. What moved needs a fresh answer, and gets the
 // old reasoning to start from. A postponement is a scheduling judgment about a
 // release rather than a claim about code, so it is offered separately. A
 // judgment whose date has gone by sits at a place the new line still has and
-// cannot be carried. And what covers nothing there is left behind.
+// cannot be carried. A promised upgrade is planned from its component. And
+// what covers nothing there is left behind.
 type Carried struct {
 	// Applying reach the new line by matching. Nothing to choose.
 	Applying int
@@ -627,6 +628,11 @@ type Carried struct {
 	// so none of them can be carried, and each leaves a finding there with
 	// no answer.
 	Expired int
+	// Upgrades is how many promised upgrades moved. An upgrade covers a
+	// component in the releases it names and records what each of them is
+	// waiting on, which a claim carried onto one place cannot write, so each
+	// is planned again from the component.
+	Upgrades int
 	// Absent is how many cover nothing in the new line at all.
 	Absent int
 }
@@ -779,6 +785,10 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// something the act behind the button turns down.
 		if row.RanOut {
 			carried.Expired++
+			continue
+		}
+		if Outcome(row.Outcome) == UpgradeNeeded {
+			carried.Upgrades++
 			continue
 		}
 		if Outcome(row.Outcome) == Deferred {

@@ -3765,7 +3765,7 @@ export interface paths {
          * Show what triage a new line would inherit
          * @description Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
          *
-         *     Five groups, because they need different things:
+         *     Six groups, because they need different things:
          *
          *     `applying` reach this line by matching, and there is nothing to choose.
          *
@@ -3774,6 +3774,8 @@ export interface paths {
          *     `postponed` were deferrals. Each says how long it has already been put off across every line it has come through, which is the total that carrying it again agrees to.
          *
          *     `expired` are deferrals and promises at a place this line still holds whose date has passed. A carried judgment keeps its date, so these cannot be carried.
+         *
+         *     `upgrades` are promised upgrades that moved. Plan the upgrade from the component, naming this line, rather than carrying it.
          *
          *     `absent` cover nothing here and are left behind.
          *
@@ -6540,6 +6542,11 @@ export interface components {
             moved: components["schemas"]["InheritedBody"][] | null;
             /** @description Deferrals, offered separately and never carried by default */
             postponed: components["schemas"]["InheritedBody"][] | null;
+            /**
+             * Format: int64
+             * @description Promised upgrades at a version this line does not have. They cannot be carried: plan the upgrade from the component, naming this line
+             */
+            upgrades: number;
         };
         CarriedClaimBody: {
             justification?: string;

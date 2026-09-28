@@ -1396,9 +1396,10 @@ What a new line would inherit is shown before anything happens, and what moved i
 chosen rather than taken (REQ-25). Four groups, because they need four different
 things: what already applies has nothing to agree to, what covers nothing here
 has nothing to apply to, what moved is a question, and what was postponed is a
-question that carries its own history. What has run out at a place the new line
-holds is counted apart, since it cannot be carried and leaves a finding there
-unanswered.
+question that carries its own history. Two more are counted apart, since
+neither can be carried: what has run out at a place the new line holds, which
+leaves a finding there unanswered, and a promised upgrade whose version moved,
+which is planned again from its component.
 
 Reasoning travels and conclusions do not. Everything carried arrives as a claim
 waiting for a second person, however confident whoever carried it was: the
@@ -1410,8 +1411,9 @@ reasoning at all.
 |---|---|
 | Only what was offered may be carried | Naming a judgment the preview classified as already applying, or as covering nothing here, is refused rather than skipped: a caller that got the set wrong should hear so |
 | The place is read from the new line, never copied from the old claim | The versions are what a decision is keyed on and they are the thing that moved |
-| A dated judgment carries what it said | A deferral keeps its date, and a promise keeps its date and the version it moves to. Quietly moving a date forward would be the tool making the judgment it is asking for, and a promise without its date is refused on every write path. The total a deferral has already run for is shown beside it, because that is what agreeing to it again agrees to |
+| A dated judgment carries what it said | A deferral keeps its date, and a patch promise keeps its date. Quietly moving a date forward would be the tool making the judgment it is asking for, and a promise without its date is refused on every write path. The total a deferral has already run for is shown beside it, because that is what agreeing to it again agrees to |
 | **A judgment whose date has gone by is not offered** | It carries its date rather than having it moved forward, so carrying one that has run out writes a claim finished the moment it lands. Offering it is offering something the act behind the button turns down |
+| **A promised upgrade is not carried** | An upgrade covers a component in the releases it names and records what each release is waiting on. A claim carried onto one place writes neither, so the new line would hold a promise its own list of pending upgrades never shows. Planned from the component, naming the new line, it writes both |
 | What is carried is checked like anything else written | The place it builds records whether the new line is a tag, so a dated judgment carried onto a release built once is refused as it is when proposed there |
 | Bounded, and written in one transaction | Carrying six judgments is one act, and half of it landing is a line nobody can tell from one somebody chose that way |
 
