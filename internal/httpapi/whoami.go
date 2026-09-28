@@ -139,10 +139,15 @@ func registerWhoAmI(api huma.API, in Ingest) {
 			case !errors.Is(err, access.ErrNoSuchPerson):
 				return nil, wentWrong(in.Logger, "who you are could not be read", err)
 			}
+			// A read that fails fails the answer. Left out, the chat field
+			// tells an administrator no platform is configured, which sends
+			// them to fix the wrong thing.
 			if len(in.Chats) > 0 {
-				if chose, err := notify.NewStore(in.DB.DB).ChatChoicesOf(ctx, subject); err == nil {
-					body.Chat = &ChatBody{Platforms: in.Chats, Direct: chose.Direct, Shared: chose.Shared}
+				chose, err := notify.NewStore(in.DB.DB).ChatChoicesOf(ctx, subject)
+				if err != nil {
+					return nil, wentWrong(in.Logger, "what you chose about chat could not be read", err)
 				}
+				body.Chat = &ChatBody{Platforms: in.Chats, Direct: chose.Direct, Shared: chose.Shared}
 			}
 		}
 

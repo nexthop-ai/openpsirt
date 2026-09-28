@@ -56,6 +56,12 @@
 {{- if or (and .Values.mail.server (not .Values.mail.from)) (and .Values.mail.from (not .Values.mail.server)) }}
 {{- fail "set mail.server and mail.from together, or neither: a server with nobody to send as sends nothing, and nothing is what an operator who configured half of it would never find out" }}
 {{- end }}
+{{- if and .Values.chat.slack.token .Values.chat.slack.existingSecret }}
+{{- fail "set chat.slack.token or chat.slack.existingSecret, not both: the value here would be silently ignored" }}
+{{- end }}
+{{- if and .Values.chat.zulip.key .Values.chat.zulip.existingSecret }}
+{{- fail "set chat.zulip.key or chat.zulip.existingSecret, not both: the value here would be silently ignored" }}
+{{- end }}
 {{- $zulip := .Values.chat.zulip }}
 {{- if and (or $zulip.site $zulip.email $zulip.key $zulip.existingSecret) (not (and $zulip.site $zulip.email (or $zulip.key $zulip.existingSecret))) }}
 {{- fail "set chat.zulip.site, chat.zulip.email and chat.zulip.key (or existingSecret) together, or none: a bot is its server, its address and its key" }}

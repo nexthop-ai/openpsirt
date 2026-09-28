@@ -2,7 +2,7 @@
 
 What a person is told, through which channel, and when.
 
-Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-79, REQ-80.
+Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 
 ## Contents
 
@@ -539,7 +539,7 @@ request-forgery primitive unless governed:
 
 Slack and Zulip, each through a bot whose credential is deployment
 configuration. A bot posts to the channels an administrator names and sends
-people direct messages. Chat carries every notification as it happens (REQ-79),
+people direct messages. Chat carries every notification as it happens (REQ-80),
 which is where it differs from mail: mail stays quiet and leaves the rest to the
 digest (REQ-47).
 
@@ -601,7 +601,7 @@ one. A notification covered by a channel is not also sent directly to the
 people it names, unless they asked for what the channels carry.
 
 A channel narrower than the deployment says nothing about undisclosed work
-(REQ-80). Nothing here can see who sits in a chat channel, and a team is built
+(REQ-81). Nothing here can see who sits in a chat channel, and a team is built
 to hold people of mixed clearance, so even "something undisclosed arrived" tells
 the uncleared members an embargo exists. Undisclosed work reaches the people
 cleared for it directly. The deployment's channel is the one an administrator
@@ -622,12 +622,14 @@ a team channel says nothing about it until the last undisclosed place leaves.
 ## Grouped chat messages
 
 A cycle runs each minute. What one person or one channel has to be told in a
-cycle arrives as one message (REQ-79).
+cycle arrives as one message (REQ-80). A destination takes one kind or every
+kind, so a channel set up for two kinds is two destinations, and what both
+take is composed into the one message, each thing once.
 
 | Content | How it is said |
 |---|---|
 | One thing | Its subject as the heading, its sentence, and its link |
-| Several things | A count as the heading, then a line per kind and product: one thing is its subject and first sentence; several are the subject, the product and how many |
+| Several things | A count as the heading, then a line per kind and product: one thing is its subject and the first line of what it says; several are the subject, the product and how many |
 | Anything undisclosed among several | One line with how many, and the way in. Nothing names what they are |
 | More lines than a message lists | Twelve lines, and how many more were left out. The rest is in the application |
 

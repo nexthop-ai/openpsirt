@@ -9413,10 +9413,10 @@ components:
           readOnly: true
           type: string
         direct:
-          description: Send direct messages
+          description: Whether you are sent direct messages
           type: boolean
         shared:
-          description: Send what a channel carries directly as well
+          description: Whether what a channel carries is sent to you directly as well
           type: boolean
       required:
         - direct

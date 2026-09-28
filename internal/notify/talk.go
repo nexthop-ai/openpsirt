@@ -37,9 +37,9 @@ const ChatLease = "notification.chat"
 // peoplePerSweep is how many people one cycle sends to directly, on each
 // platform.
 //
-// Each is two requests at most, finding them and sending to them, and the
-// lease is sized from the batch: half of it is people, and the rest is left for
-// the channels.
+// Each is two requests at most, finding them and sending to them. The lease is
+// sized from the batch once per platform: half of each platform's share is
+// people, and the rest is left for its channels.
 const peoplePerSweep = sweepBatch / 4
 
 // atMostComposed bounds what one message is composed from, to a person or to
@@ -56,7 +56,7 @@ const atMostComposed = 1000
 // signed requests, because it answers a different question: what one
 // recipient has been told since the last cycle, as one message. A cycle's
 // worth of things to say to one person or one channel is grouped, so a night
-// of scans is a message rather than a flood (REQ-79).
+// of scans is a message rather than a flood (REQ-80).
 type Talk struct {
 	db      *bun.DB
 	chats   []Chat
@@ -109,7 +109,10 @@ func (t *Talk) Once(ctx context.Context) (sent, failed int, err error) {
 		for _, chat := range t.chats {
 			slowest = max(slowest, chat.Timeout())
 		}
-		mine, err := t.leases.Take(ctx, ChatLease, t.replica, heldFor(slowest))
+		// Every platform's work runs under the one lease, so it covers each
+		// of them at the pace of the slowest.
+		mine, err := t.leases.Take(ctx, ChatLease, t.replica,
+			heldFor(slowest*time.Duration(len(t.chats))))
 		if err != nil || !mine {
 			return 0, 0, err
 		}
@@ -132,6 +135,10 @@ func (t *Talk) Once(ctx context.Context) (sent, failed int, err error) {
 
 // channels posts one note to each channel on a platform, of what it has not
 // yet been told.
+//
+// A channel is one message whatever number of destinations name it: one row
+// per kind is how a destination is recorded, and a channel set up for two
+// kinds is still one place somebody reads.
 func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent, failed int, err error) {
 	var destinations []Outbound
 	if err := t.db.NewSelect().Model(&destinations).
@@ -139,49 +146,74 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 		OrderExpr("id ASC").Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read which channels there are: %w", err)
 	}
+	type place struct{ channel, topic string }
+	var order []place
+	named := map[place][]Outbound{}
 	for _, to := range destinations {
-		var rows []noting
-		q := unsettled(t.db.NewSelect().Model(&rows), to).
-			ColumnExpr("nt.*").
-			ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."name", '') AS "product"`).
-			Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`)
-		q = forChannel(q, to, offered, t.now().Add(-chatHorizon)).
-			OrderExpr("nt.created_at ASC, nt.id ASC").
-			Limit(atMostComposed)
-		if err := q.Scan(ctx, &rows); err != nil {
-			return sent, failed, fmt.Errorf("read what a channel has to be told: %w", err)
+		at := place{deref(to.Channel), deref(to.Topic)}
+		if _, seen := named[at]; !seen {
+			order = append(order, at)
 		}
+		named[at] = append(named[at], to)
+	}
 
-		// One claim per thing said. A condition held by six people is six
-		// rows and one thing, and claiming it a second time in the same
-		// cycle would read as trying it again.
+	for _, at := range order {
+		// One claim per thing said and destination. A condition held by six
+		// people is six rows and one thing, and claiming it a second time in
+		// the same cycle would read as trying it again. The note says each
+		// thing once, however many of the channel's destinations take it.
 		var carried []noting
-		var claimed []int64
-		said := map[string]bool{}
-		for _, row := range rows {
-			if key := about(row.Notification); !said[key] {
+		claims := map[int64][]int64{}
+		shown := map[string]bool{}
+		for _, to := range named[at] {
+			var rows []noting
+			q := unsettled(t.db.NewSelect().Model(&rows), to).
+				ColumnExpr("nt.*").
+				ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."name", '') AS "product"`).
+				Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`)
+			q = forChannel(q, to, offered, t.now().Add(-chatHorizon)).
+				OrderExpr("nt.created_at ASC, nt.id ASC").
+				Limit(atMostComposed)
+			if err := q.Scan(ctx, &rows); err != nil {
+				return sent, failed, fmt.Errorf("read what a channel has to be told: %w", err)
+			}
+			said := map[string]bool{}
+			for _, row := range rows {
+				key := about(row.Notification)
+				if said[key] {
+					continue
+				}
 				said[key] = true
 				id, err := t.signal.claim(ctx, to, row.Notification)
 				if err != nil {
 					return sent, failed, err
 				}
-				if id != 0 {
+				if id == 0 {
+					continue
+				}
+				claims[to.ID] = append(claims[to.ID], id)
+				if !shown[key] {
+					shown[key] = true
 					carried = append(carried, row)
-					claimed = append(claimed, id)
 				}
 			}
 		}
-		if len(claimed) == 0 {
+		if len(carried) == 0 {
 			continue
 		}
-		postErr := chat.Post(ctx, deref(to.Channel), deref(to.Topic), noteOf(carried, t.baseURL))
-		if err := t.signal.settle(ctx, to, claimed, postErr); err != nil {
-			return sent, failed, err
+		postErr := chat.Post(ctx, at.channel, at.topic, noteOf(carried, t.baseURL))
+		for _, to := range named[at] {
+			if len(claims[to.ID]) == 0 {
+				continue
+			}
+			if err := t.signal.settle(ctx, to, claims[to.ID], postErr); err != nil {
+				return sent, failed, err
+			}
 		}
 		if postErr != nil {
 			failed++
 			t.logger.Warn("a chat channel refused a note",
-				"platform", chat.Platform(), "destination", to.Name, "error", postErr)
+				"platform", chat.Platform(), "channel", at.channel, "error", postErr)
 			continue
 		}
 		sent++
@@ -195,7 +227,7 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 // to one person goes to that person. Of that, the most specific channel
 // covering it: a team's before its product's, and a product's before the
 // deployment's. A channel narrower than the deployment carries nothing
-// undisclosed, because nobody here can see who sits in it (REQ-80); the
+// undisclosed, because nobody here can see who sits in it (REQ-81); the
 // deployment's carries that there is something, and the way in.
 func forChannel(q *bun.SelectQuery, to Outbound, offered []string,
 	since time.Time) *bun.SelectQuery {
@@ -310,7 +342,7 @@ var errNotThere = errors.New("nobody on the platform is registered to their addr
 //
 // What is somebody's own always does. What is about a product, a team or the
 // deployment does where it is undisclosed, because a channel narrower than the
-// deployment says nothing about that (REQ-80) and the deployment's says only
+// deployment says nothing about that (REQ-81) and the deployment's says only
 // that there is something; where no channel on a platform offered here covers
 // it; and where the person asked for it as well as the channel.
 func direct(q *bun.SelectQuery, platform string, offered []string,

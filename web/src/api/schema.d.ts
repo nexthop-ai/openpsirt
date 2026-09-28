@@ -11265,9 +11265,9 @@ export interface components {
              * @example https://example.com/schemas/Set-chatRequest.json
              */
             readonly $schema?: string;
-            /** @description Send direct messages */
+            /** @description Whether you are sent direct messages */
             direct: boolean;
-            /** @description Send what a channel carries directly as well */
+            /** @description Whether what a channel carries is sent to you directly as well */
             shared?: boolean;
         };
         "Set-digestRequest": {

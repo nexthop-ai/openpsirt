@@ -187,7 +187,7 @@ worked.
 |---|---|
 | Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
 | Equal | Served, and the two versions are logged |
-| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migrations 37 and 39 are the exceptions. 37 reshapes what v0.1.0 reads, and 39 re-identifies every component v0.4.0 matches by and records senders in a form v0.4.0 does not read. Going back to either release is rolling its migration back with the newer binary first |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migrations 37 and 39 are the exceptions. 37 reshapes what v0.1.0 reads, and 39 re-identifies every component v0.4.0 matches by, records senders in a form v0.4.0 does not read, and gives a destination a platform v0.4.0 does not write. Going back to either release is rolling its migration back with the newer binary first |
 
 What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
@@ -427,7 +427,11 @@ MySQL and MariaDB alter the table where it stands; SQLite rebuilds it from the
 release's declaration. Each name an issue answers to gains whether a person
 typed it, a column added with its default on all four engines. A graph node
 gains two columns that hold a null, which every engine adds where the table
-stands.
+stands. A notification gains the team it is about, and a destination its
+platform, channel, topic and the product or team it belongs to, with a
+reference for each; SQLite rebuilds both tables from the release's
+declarations. What a person chose about chat, and what has been carried to them
+there, are two new tables.
 
 | In v0.4.0 | After the upgrade |
 |---|---|
@@ -442,18 +446,23 @@ stands.
 | An issue | Read as itself: it states its own identifier as the issue it is read as. v0.4.0 merged nothing |
 | Merges | Two new tables, empty: the record of an issue merged into another, and of a decision a merge superseded. v0.4.0 refused the report that would have merged two issues |
 | A rating claim | Unchanged, with no reason for withdrawal. Every claim v0.4.0 withdrew, a person withdrew |
+| A notification | About no team |
+| A destination | A webhook belonging to the deployment |
 
 Rolled back, the actor goes and the person refuses a null again. A row
 configuration or a merge wrote goes with it, because v0.4.0 has no place for a
 change no person made. The merge tables, the issue each row is read as and the
 reason a merge withdrew a rating claim go with their columns and tables. The
-findings a merge moved stay with the issue they moved to, which v0.4.0 reads
-as holding them, and what was decided under an absorbed issue stays filed under
+findings a merge moved stay with the issue they moved to, which v0.4.0 reads as
+holding them, and what was decided under an absorbed issue stays filed under
 it, which v0.4.0 reads as an issue with no findings. Every named
-administrator's administration granted here is set again, which is where
-v0.4.0 reads the name. Which names a person typed goes with its column, and
-the names stay. Each component takes v0.4.0's identity again, each sender is
-recorded by name, and the node columns go.
+administrator's administration granted here is set again, which is where v0.4.0
+reads the name. Which names a person typed goes with its column, and the names
+stay. Each component takes v0.4.0's identity again, each sender is recorded by
+name, and the node columns go. Every chat channel goes, with what was delivered
+to it, because v0.4.0 reaches only a webhook; the two chat tables go, so what
+each person chose about chat is lost and a later upgrade starts them at the
+defaults again. A notification's team and a destination's new columns go.
 
 Two components v0.4.0 identifies alike refuse the roll back, and the refusal
 names both: a name shaped like a package identifier beside that package, or a
@@ -468,6 +477,7 @@ database is left as v0.5.0 left it on every engine.
 | A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
 | A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was. Rolled back, the column is gone and the names remain |
 | A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person. With a name shaped like a package's identifier beside it, the roll back is refused naming it and changes nothing. Without, rolled back, each is what v0.4.0 held |
+| A v0.4.0 destination | Upgraded, a webhook belonging to the deployment. Rolled back after a chat channel was added, the webhook alone remains |
 | v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it |
 | A v0.4.0 database holding two issues | Upgraded, each is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and both issues remain |
 

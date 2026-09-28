@@ -163,8 +163,8 @@ inputs.
 | REQ-47 | Immediate mail only for something a person must act on. Everything else is an opt-in digest | A tool that mails on every scan is a tool people filter to a folder |
 | REQ-48 | Nothing leaving this deployment about an undisclosed finding carries detail — not the identifier, not the component, not the summary. That there is something, and a link | The channel is somebody else's infrastructure |
 | REQ-49 | Operational alerts are their own category: condition-based ones clear themselves, event-based ones are acknowledged, and each goes to somebody who may read what it names | An alert nobody can clear is an alert everybody ignores, and a notification is a read of the thing it names |
-| REQ-79 | Chat carries every notification as it happens, and what one act produced arrives as one message | Chat is read as it arrives and mail is not, and a nightly scan sent one finding at a time is a channel people mute |
-| REQ-80 | A channel narrower than the deployment says nothing about undisclosed work. That reaches a person directly, and only somebody who may read it | Nobody here can see who is in a chat channel, and a team is built to hold people of mixed clearance |
+| REQ-80 | Chat carries every notification as it happens, and what one act produced arrives as one message | Chat is read as it arrives and mail is not, and a nightly scan sent one finding at a time is a channel people mute |
+| REQ-81 | A channel narrower than the deployment says nothing about undisclosed work. That reaches a person directly, and only somebody who may read it | Nobody here can see who is in a chat channel, and a team is built to hold people of mixed clearance |
 
 ### 3.12 Reporting
 

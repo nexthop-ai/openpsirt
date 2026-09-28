@@ -263,20 +263,30 @@ func TestTheMostSpecificChannelCarriesIt(t *testing.T) {
 	})
 }
 
-// REQ-80.
+// REQ-81.
 func TestANarrowChannelSaysNothingUndisclosed(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
+		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		if err != nil {
+			t.Fatal(err)
+		}
 		w.channel(t, "psirt", notify.Destination{})
 		w.channel(t, "kernel", notify.Destination{ProductID: &w.kernel})
+		w.channel(t, "kernel-team", notify.Destination{TeamID: &kernelTeam.ID})
 		w.hold(t, notify.DisclosureNear, notify.Holds{
 			About: "embargo-1", Body: "CVE-2026-9 in the kernel lifts its embargo on Friday",
 			Private: true, ProductID: &w.kernel,
 		})
+		w.hold(t, notify.QueueUntaken, notify.Holds{
+			About: "queue-1", Body: "Kernel team has CVE-2026-9 waiting in kernel",
+			Private: true, ProductID: &w.kernel, TeamID: &kernelTeam.ID,
+		})
 		w.sweep(t)
 
-		if len(w.chat.posts["kernel"]) != 0 {
-			t.Errorf("a product's channel was told something undisclosed: %q",
-				said(w.chat.posts["kernel"]))
+		for _, narrow := range []string{"kernel", "kernel-team"} {
+			if len(w.chat.posts[narrow]) != 0 {
+				t.Errorf("%s was told something undisclosed: %q", narrow, said(w.chat.posts[narrow]))
+			}
 		}
 		deployment, direct := said(w.chat.posts["psirt"]), said(w.chat.directs["U-ANA"])
 		for where, got := range map[string]string{"the deployment's channel": deployment, "Ana": direct} {
@@ -290,7 +300,7 @@ func TestANarrowChannelSaysNothingUndisclosed(t *testing.T) {
 	})
 }
 
-// REQ-79.
+// REQ-80.
 func TestManyThingsForOnePersonAreOneMessage(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
 		for i := 0; i < 30; i++ {
@@ -456,6 +466,103 @@ func TestAChannelIsToldAConditionHeldByManyOnce(t *testing.T) {
 		posts := w.chat.posts["psirt"]
 		if len(posts) != 1 || posts[0].Heading != "A build has stopped being scanned" {
 			t.Errorf("one condition held by two people reached the channel as %q", said(posts))
+		}
+	})
+}
+
+// Several things at once are composed as a group, and an undisclosed one
+// among them is still only a count.
+func TestAGroupedNoteSaysNothingUndisclosed(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		w.channel(t, "psirt", notify.Destination{})
+		w.hold(t, notify.DisclosureNear, notify.Holds{About: "embargo-1",
+			Body:    "CVE-2026-9 in the kernel lifts its embargo on Friday",
+			Private: true, ProductID: &w.kernel})
+		w.hold(t, notify.BuildQuiet, notify.Holds{About: "quiet-1",
+			Body: "kernel main has not been scanned", ProductID: &w.kernel})
+		w.tell(t, notify.Telling{Kind: notify.Assigned, Body: "yours", Link: "/f"})
+		w.sweep(t)
+		for where, got := range map[string]string{
+			"the channel": said(w.chat.posts["psirt"]), "Ana": said(w.chat.directs["U-ANA"]),
+		} {
+			if !strings.Contains(got, "not been disclosed") ||
+				strings.Contains(got, "CVE-2026-9") || strings.Contains(got, "Friday") {
+				t.Errorf("%s was told what the embargo is: %q", where, got)
+			}
+		}
+	})
+}
+
+func TestAChannelIsNotToldWhatIsOld(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		w.channel(t, "psirt", notify.Destination{})
+		w.hold(t, notify.BuildQuiet, notify.Holds{About: "quiet-1",
+			Body: "kernel main has not been scanned", ProductID: &w.kernel})
+		if _, err := w.db.DB.NewUpdate().Model((*notify.Notification)(nil)).
+			Set("created_at = ?", time.Now().UTC().Add(-7*24*time.Hour)).
+			Where("about = ?", "quiet-1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		w.sweep(t)
+		if len(w.chat.posts["psirt"]) != 0 {
+			t.Errorf("a channel was told what opened a week ago: %q", said(w.chat.posts["psirt"]))
+		}
+	})
+}
+
+func TestATeamsChannelKeepsItsQueueFromTheDeployments(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.channel(t, "psirt", notify.Destination{})
+		w.channel(t, "kernel-team", notify.Destination{TeamID: &kernelTeam.ID})
+		w.hold(t, notify.QueueUntaken, notify.Holds{About: "queue-1",
+			Body: "Kernel team has 3 waiting in kernel", ProductID: &w.kernel, TeamID: &kernelTeam.ID})
+		w.sweep(t)
+		if strings.Contains(said(w.chat.posts["psirt"]), "3 waiting") {
+			t.Errorf("the deployment's channel was told what the team's carries")
+		}
+		if !strings.Contains(said(w.chat.posts["kernel-team"]), "3 waiting") {
+			t.Errorf("the team's channel was not told its queue")
+		}
+	})
+}
+
+func TestANarrowChannelKeepsWhatItCarriesFromADirectMessage(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.channel(t, "kernel", notify.Destination{ProductID: &w.kernel})
+		w.channel(t, "firmware-team", notify.Destination{TeamID: &kernelTeam.ID})
+		w.hold(t, notify.BuildQuiet, notify.Holds{About: "quiet-1",
+			Body: "kernel main has not been scanned", ProductID: &w.kernel})
+		w.hold(t, notify.QueueUntaken, notify.Holds{About: "queue-1",
+			Body: "Kernel team has 3 waiting in firmware", ProductID: &w.firmware, TeamID: &kernelTeam.ID})
+		w.sweep(t)
+		if got := said(w.chat.directs["U-ANA"]); strings.Contains(got, "kernel main") ||
+			strings.Contains(got, "3 waiting") {
+			t.Errorf("Ana was told directly what a channel carries: %q", got)
+		}
+	})
+}
+
+func TestAChannelTakingTwoKindsIsOneMessage(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		w.channel(t, "psirt", notify.Destination{Kind: string(notify.BuildQuiet)})
+		w.channel(t, "psirt", notify.Destination{Kind: string(notify.InventoryMoved)})
+		w.hold(t, notify.BuildQuiet, notify.Holds{About: "quiet-1",
+			Body: "kernel main has not been scanned", ProductID: &w.kernel})
+		w.tell(t, notify.Telling{Kind: notify.InventoryMoved, Body: "kernel main moved sharply",
+			Link: "/i", ProductID: &w.kernel, Together: "upload-1"})
+		w.sweep(t)
+		posts := w.chat.posts["psirt"]
+		if len(posts) != 1 || !strings.Contains(said(posts), "moved sharply") ||
+			!strings.Contains(said(posts), "not been scanned") {
+			t.Errorf("a channel taking two kinds was sent %q", said(posts))
 		}
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -134,11 +135,16 @@ func (b *SlackBot) ask(request *http.Request) (*slackAnswer, error) {
 		return nil, fmt.Errorf("slack answered %d", response.StatusCode)
 	}
 	answer := new(slackAnswer)
-	if err := json.NewDecoder(response.Body).Decode(answer); err != nil {
+	if err := json.NewDecoder(io.LimitReader(response.Body, mostOfAnAnswer)).Decode(answer); err != nil {
 		return nil, fmt.Errorf("read slack's answer: %w", err)
 	}
 	return answer, nil
 }
+
+// mostOfAnAnswer bounds what is read of a platform's answer. Every answer
+// read here is a line of JSON, and a server that streams without end would
+// otherwise grow the sweep until the process dies.
+const mostOfAnAnswer = 1 << 16
 
 // slackMarkup is the three characters Slack reads as its own markup: a link,
 // a mention of a person, and a ping for a whole channel all open with `<`.

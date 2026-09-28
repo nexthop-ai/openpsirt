@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -140,7 +141,7 @@ func (b *ZulipBot) ask(request *http.Request) (*zulipAnswer, int, error) {
 			response.Header.Get("Retry-After"))
 	}
 	answer := new(zulipAnswer)
-	if err := json.NewDecoder(response.Body).Decode(answer); err != nil {
+	if err := json.NewDecoder(io.LimitReader(response.Body, mostOfAnAnswer)).Decode(answer); err != nil {
 		return nil, 0, fmt.Errorf("zulip answered %d: %w", response.StatusCode, err)
 	}
 	return answer, response.StatusCode, nil

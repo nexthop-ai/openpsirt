@@ -79,26 +79,23 @@ export function ChatChannels({ platforms }: { platforms: string[] }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["outbound"] }),
   });
 
-  if (platforms.length === 0) {
-    return (
-      <div className="card" style={{ marginBottom: 14 }}>
-        <h3>Chat channels</h3>
-        <Empty
-          title="No chat platform is configured."
-          detail="Set OPENPSIRT_SLACK_TOKEN, or the three OPENPSIRT_ZULIP_ settings, and restart."
-        />
-      </div>
-    );
-  }
-
+  // With no platform configured the channels still stored are listed, so
+  // they can be retired rather than posting again when a token returns.
+  const offered = platforms.length > 0;
   const rows = (listed.data?.items ?? []).filter((row) => row.platform !== "webhook");
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div className="screen-head">
         <h3>Chat channels</h3>
-        <AddButton label="Add channel" onClick={() => setAdding(true)} />
+        {offered && <AddButton label="Add channel" onClick={() => setAdding(true)} />}
       </div>
+      {!offered && (
+        <p className="alert" style={{ marginTop: 0 }}>
+          <strong>No chat platform is configured.</strong>
+          <span>Set OPENPSIRT_SLACK_TOKEN or the Zulip settings, and restart.</span>
+        </p>
+      )}
       <p className="hint" style={{ marginTop: 0 }}>
         Each notification goes to the narrowest channel that takes it. A product or team channel
         never hears about undisclosed work.
@@ -111,10 +108,12 @@ export function ChatChannels({ platforms }: { platforms: string[] }) {
       ) : listed.isError ? (
         <Failed error={listed.error} what="The chat channels could not be read." />
       ) : rows.length === 0 ? (
-        <Empty
-          title="No chat channels."
-          detail="People still get direct messages about their own work."
-        />
+        offered && (
+          <Empty
+            title="No chat channels."
+            detail="People still get direct messages about their own work."
+          />
+        )
       ) : (
         <Wide>
           <table>

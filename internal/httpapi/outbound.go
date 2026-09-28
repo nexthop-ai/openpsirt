@@ -142,6 +142,9 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 			address = parsed.String()
 		}
 		var row *notify.Outbound
+		// The names the product and the team resolved to, which is what the
+		// listing answers with.
+		var productName, teamName string
 		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			if _, _, err := administerable(ctx, a, tx); err != nil {
 				return err
@@ -160,7 +163,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 				} else if err != nil {
 					return wentWrong(a.Logger, "the product could not be read", err)
 				}
-				want.ProductID = &product.ID
+				want.ProductID, productName = &product.ID, product.Name
 			}
 			if name := strings.TrimSpace(input.Body.Team); name != "" {
 				team, err := a.Access(tx).TeamByName(ctx, name)
@@ -169,7 +172,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 				} else if err != nil {
 					return wentWrong(a.Logger, "the team could not be read", err)
 				}
-				want.TeamID = &team.ID
+				want.TeamID, teamName = &team.ID, team.Name
 			}
 			if want.Platform == "" || want.Platform == notify.Webhook {
 				if n := len([]rune(want.Secret)); n < 16 {
@@ -207,7 +210,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		}{Status: http.StatusCreated, Body: OutboundBody{
 			Name: row.Name, Kind: row.Kind, Platform: row.Platform, Host: hostOf(row.URL),
 			Channel: deref(row.Channel), Topic: deref(row.Topic),
-			Product: strings.TrimSpace(input.Body.Product), Team: strings.TrimSpace(input.Body.Team),
+			Product: productName, Team: teamName,
 		}}, nil
 	})
 

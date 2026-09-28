@@ -203,8 +203,8 @@ func registerChatChoices(api huma.API, in Ingest) {
 		Tags: []string{"Notifications"}, DefaultStatus: http.StatusNoContent,
 	}, ownSubject, ""), func(ctx context.Context, input *struct {
 		Body struct {
-			Direct bool `json:"direct" doc:"Send direct messages"`
-			Shared bool `json:"shared,omitempty" doc:"Send what a channel carries directly as well"`
+			Direct bool `json:"direct" doc:"Whether you are sent direct messages"`
+			Shared bool `json:"shared,omitempty" doc:"Whether what a channel carries is sent to you directly as well"`
 		}
 	}) (*struct{}, error) {
 		subject, err := reading(ctx)
