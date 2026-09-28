@@ -68,7 +68,7 @@ inferred from a rule, so adding a route never adds an exception.
 | `/healthz`, `/readyz` | Whether the process is up and whether it can reach its database |
 | `/v1/sign-in` | The providers an operator configured. A sign-in page draws a button per provider and cannot ask for that list while holding nothing |
 | `/v1/sign-in/…` | Redirects to a provider, or refuses. What it reads and writes is its own: the sign-in key, the session, and the account a first arrival needs. A route added here is checked against that rather than assumed harmless |
-| The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential |
+| The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential. A path naming a directory of them is answered with the page, never a listing |
 
 ## Operation descriptions
 
