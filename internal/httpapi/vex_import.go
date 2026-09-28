@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -208,7 +209,7 @@ func registerVexImport(api huma.API, in Ingest) {
 		if publisher == "" {
 			publisher = strings.TrimSpace(file.Filename)
 		}
-		if len(publisher) > finding.MostPublisher {
+		if utf8.RuneCountInString(publisher) > finding.MostPublisher {
 			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records; "+
 					"name it with ?publisher=", finding.MostPublisher))
