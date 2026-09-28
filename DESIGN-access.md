@@ -743,6 +743,7 @@ it. That window ends.
 | The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing |
 | Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
 | A group mapping does not reopen it | A group-bound sign-in adopts an account an administrator recorded only while its authorization is redeemable. Adopting a lapsed one would renew the window for whoever arrived holding the name |
+| A group mapping adopts only an authorization waiting under the name | An account whose holder's name moved away at the provider has none, and whoever holds the name next is somebody new. Direct mode refuses the same arrival |
 | A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |
 
 ### The username claim

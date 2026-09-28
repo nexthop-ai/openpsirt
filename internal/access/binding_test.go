@@ -90,8 +90,13 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 	// cannot be a way in behind the groups' back.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
+		// Recorded the way an administrator records somebody: with the
+		// authorization their first sign-in redeems.
 		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Claim(ctx, person.ID, "someone"); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
@@ -185,6 +190,47 @@ func TestAGroupDoesNotRedeemALapsedAuthorization(t *testing.T) {
 			}
 			if door.ClaimableUntil == nil || door.ClaimableUntil.After(time.Now()) {
 				t.Error("the lapsed window was renewed")
+			}
+		}
+	})
+}
+
+func TestAGroupDoesNotHandOverAnAccountWithNoAuthorizationWaiting(t *testing.T) {
+	// An account whose name has moved away has nothing waiting under that
+	// name. Somebody who arrives holding the name next, in a mapped group, is
+	// somebody new rather than the account's holder, as they are in direct
+	// mode.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		alice, err := f.store.Ensure(ctx, "alice", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Claim(ctx, alice.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "https://idp.example", "S1", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		// Renamed at the provider, which moves the name her identity carries.
+		if _, err := f.store.MatchProvider(ctx, "https://idp.example", "S1", "robert"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		arrival := access.Arrival{Provider: "https://idp.example", Subject: "S2", Username: "alice"}
+		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"platform"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a new arrival under a name that moved away took the account: %v", err)
+		}
+		doors, err := f.store.Identities(ctx, alice.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, door := range doors {
+			if door.Subject == nil || *door.Subject != "S1" {
+				t.Errorf("the account gained a door it never had: %+v", door)
 			}
 		}
 	})

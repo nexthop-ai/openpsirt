@@ -375,9 +375,14 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		// another identifier, and a group does not reopen either: the window
 		// holds on every path, and renewing it here would hand the account to
 		// whoever arrived holding the name.
+		//
+		// An account with no authorization waiting under the name is refused
+		// too. Its holder's name moved away at the provider, which moved the
+		// name their identity carries, and whoever holds the name now is
+		// somebody else.
 		if waiting, err := s.ByIdentity(ctx, who.handle()); err == nil {
-			if claimed, err := s.claimedBy(ctx, who.handle()); err == nil &&
-				(claimed.Subject != nil || lapsed(claimed, s.now())) {
+			claimed, err := s.claimedBy(ctx, who.handle())
+			if err != nil || claimed.Subject != nil || lapsed(claimed, s.now()) {
 				return nil, ErrDenied
 			}
 			person = waiting
