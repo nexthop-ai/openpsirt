@@ -153,7 +153,7 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 		byName[strings.ToLower(reader.Identity)] = reader.ID
 	}
 
-	return TellEach(names, byName, subject.ID, dropped, func(who int64) error {
+	return tellEach(names, byName, subject.ID, dropped, func(who int64) error {
 		return notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
 			PersonID: who, Kind: notify.Mentioned,
 			Body: fmt.Sprintf("%s named you in a note on %s.",
@@ -170,12 +170,12 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 	})
 }
 
-// TellEach tells each name that reaches somebody, once per person and never
+// tellEach tells each name that reaches somebody, once per person and never
 // the author, and answers the names that reached nobody.
 //
 // A tell that fails stops the walk, and the name it failed on and every name
 // after it are reported as reaching nobody, because none of them was told.
-func TellEach(names []string, byName map[string]int64, author int64, dropped []string,
+func tellEach(names []string, byName map[string]int64, author int64, dropped []string,
 	tell func(who int64) error) ([]string, error) {
 
 	told := map[int64]bool{author: true}

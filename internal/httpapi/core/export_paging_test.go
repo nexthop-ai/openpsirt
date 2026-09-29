@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package reportsapi
+package core
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // An export writes every row even where its reader's own page is smaller than
@@ -30,10 +29,10 @@ import (
 // which is the failure the whole export path is written to avoid. Watched
 // failing against the stepping loop.
 func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
-	for _, readerPage := range []int{1, 3, core.ExportPage - 1, core.ExportPage, core.ExportPage + 7} {
+	for _, readerPage := range []int{1, 3, exportPage - 1, exportPage, exportPage + 7} {
 		t.Run(fmt.Sprint(readerPage), func(t *testing.T) {
 			const rows = 250
-			out := core.Exporting{
+			out := Exporting{
 				Header: []string{"n"},
 				Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 					// A store's own ceiling, applied the way every store here
@@ -49,7 +48,7 @@ func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
 				},
 			}
 			var written [][]string
-			if err := core.EachPage(t.Context(), out, func(page [][]string) {
+			if err := eachPage(t.Context(), out, func(page [][]string) {
 				written = append(written, page...)
 			}, func() {}); err != nil {
 				t.Fatal(err)
@@ -75,7 +74,7 @@ func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
 // does not.
 func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	const rows = 250
-	out := core.Exporting{
+	out := Exporting{
 		Header: []string{"n"},
 		Stream: func(_ context.Context, each func([]string) error) error {
 			for i := 0; i < rows; i++ {
@@ -88,7 +87,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	}
 	var written [][]string
 	flushes := 0
-	if err := core.EachPage(t.Context(), out, func(page [][]string) {
+	if err := eachPage(t.Context(), out, func(page [][]string) {
 		written = append(written, page...)
 	}, func() { flushes++ }); err != nil {
 		t.Fatal(err)
@@ -110,7 +109,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 
 	// A walk that fails partway is a file that stops, and the caller has to
 	// hear about it: that is what puts the "incomplete" marker in.
-	broken := core.Exporting{
+	broken := Exporting{
 		Header: []string{"n"},
 		Stream: func(_ context.Context, each func([]string) error) error {
 			if err := each([]string{"0"}); err != nil {
@@ -119,7 +118,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 			return fmt.Errorf("the database went away")
 		},
 	}
-	if err := core.EachPage(t.Context(), broken, func([][]string) {}, func() {}); err == nil {
+	if err := eachPage(t.Context(), broken, func([][]string) {}, func() {}); err == nil {
 		t.Error("a walk that failed was reported as a clean end")
 	}
 }
@@ -127,7 +126,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 // And it stops rather than writing a file that trails off, where the reader
 // fails partway.
 func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
-	out := core.Exporting{
+	out := Exporting{
 		Header: []string{"n"},
 		Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 			if offset > 0 {
@@ -141,11 +140,11 @@ func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
 		},
 	}
 	written := 0
-	err := core.EachPage(t.Context(), out, func(page [][]string) { written += len(page) }, func() {})
+	err := eachPage(t.Context(), out, func(page [][]string) { written += len(page) }, func() {})
 	if err == nil {
 		t.Fatal("a reader that failed was walked to a clean end")
 	}
-	if written != core.ExportPage {
+	if written != exportPage {
 		t.Errorf("%d rows were written before it failed, want the one page", written)
 	}
 }
@@ -169,7 +168,7 @@ func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
 			// A reader that answers one page and then fails, which is what a
 			// connection lost part way through a large export looks like.
 			pages := 0
-			out := core.Exporting{
+			out := Exporting{
 				Header: []string{"n"},
 				Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 					pages++
@@ -187,7 +186,7 @@ func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
 			rec := httptest.NewRecorder()
 			ctx := humatest.NewContext(nil,
 				httptest.NewRequest(http.MethodGet, "/export", nil).WithContext(t.Context()), rec)
-			core.WriteExport(ctx, c.format, "mine", out)
+			WriteExport(ctx, c.format, "mine", out)
 
 			body := rec.Body.String()
 			if !strings.Contains(body, c.marker) {
@@ -222,7 +221,7 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		blocked := make(chan struct{})
 		unblock := make(chan struct{})
-		out := core.Exporting{
+		out := Exporting{
 			Header: []string{"n"},
 			Stream: func(ctx context.Context, each func([]string) error) error {
 				rows, err := db.DB.DB.QueryContext(ctx, "WITH RECURSIVE n(i) AS "+
@@ -246,7 +245,7 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 		written := 0
 		done := make(chan error, 1)
 		go func() {
-			done <- core.Streamed(t.Context(), out, func([][]string) {
+			done <- streamed(t.Context(), out, func([][]string) {
 				written++
 				if written == 2 {
 					close(blocked)
@@ -266,36 +265,6 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 		close(unblock)
 		if err := <-done; err == nil {
 			t.Error("an export cut at the ceiling was reported as complete")
-		}
-	})
-}
-
-// Streamed exports past the slots are refused rather than queued for a
-// connection.
-func TestStreamedExportsPastTheSlotsAreRefused(t *testing.T) {
-	slots := make(streamSlots, 1)
-	release, err := slots.take()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := slots.take(); err == nil {
-		t.Error("a second stream was let through a single slot")
-	}
-	release()
-	again, err := slots.take()
-	if err != nil {
-		t.Errorf("a released slot was not given back: %v", err)
-	} else {
-		again()
-	}
-}
-
-// SQLite's pool is one connection, so a streamed export is given one slot
-// there: a second would wait for the connection the first holds.
-func TestSQLiteGivesStreamedExportsOneSlot(t *testing.T) {
-	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
-		if got := cap(newStreamSlots(db)); got != 1 {
-			t.Errorf("SQLite's one connection is shared by %d streamed exports", got)
 		}
 	})
 }

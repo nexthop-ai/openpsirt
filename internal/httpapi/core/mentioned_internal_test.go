@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package findingsapi
+package core
 
 import (
 	"errors"
@@ -11,7 +11,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // A mention whose notification failed is reported as reaching nobody, along
@@ -30,7 +29,7 @@ func TestAMentionThatWasNotToldIsReportedAsNotTold(t *testing.T) {
 		return nil
 	}
 
-	dropped, err := core.TellEach([]string{"alice", "Bob", "carol", "ghost"}, byName, 9, nil, tell)
+	dropped, err := tellEach([]string{"alice", "Bob", "carol", "ghost"}, byName, 9, nil, tell)
 	if err == nil {
 		t.Error("a failed notification was reported as none failing")
 	}
@@ -40,14 +39,14 @@ func TestAMentionThatWasNotToldIsReportedAsNotTold(t *testing.T) {
 
 	// A name repeated after it was told is not reported for the failure that
 	// came later.
-	dropped, _ = core.TellEach([]string{"alice", "bob", "alice"}, byName, 9, nil, tell)
+	dropped, _ = tellEach([]string{"alice", "bob", "alice"}, byName, 9, nil, tell)
 	if want := []string{"bob"}; !slices.Equal(dropped, want) {
 		t.Errorf("reported %v as not told, want %v", dropped, want)
 	}
 
 	// Nothing failing: only the name nobody holds, and never the author.
 	failOn = 0
-	dropped, err = core.TellEach([]string{"alice", "ghost", "me"}, map[string]int64{"alice": 1, "me": 9},
+	dropped, err = tellEach([]string{"alice", "ghost", "me"}, map[string]int64{"alice": 1, "me": 9},
 		9, nil, tell)
 	if err != nil || !slices.Equal(dropped, []string{"ghost"}) {
 		t.Errorf("reported %v, %v as not told, want only the name nobody holds", dropped, err)
@@ -60,9 +59,9 @@ func TestMentionsAreAllNotToldWhenTheReadersCannotBeRead(t *testing.T) {
 		if err := db.DB.DB.Close(); err != nil {
 			t.Fatal(err)
 		}
-		dropped, err := core.Mentioned(t.Context(), core.Deps{DB: db},
+		dropped, err := Mentioned(t.Context(), Deps{DB: db},
 			access.Everything("a test asking who may be told"),
-			core.MentionTarget{ProductID: 1, VulnerabilityID: 1, Visibility: access.Public},
+			MentionTarget{ProductID: 1, VulnerabilityID: 1, Visibility: access.Public},
 			"@alice and @bob, look", "/claims/1")
 		if err == nil {
 			t.Error("a failed read of who may be told was reported as none failing")

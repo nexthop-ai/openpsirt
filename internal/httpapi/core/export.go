@@ -115,9 +115,9 @@ func preamble(out Exporting, now time.Time, asked string) []Stated {
 	return said
 }
 
-// ExportPage is how much is read at a time. The list's own maximum, so the
+// exportPage is how much is read at a time. The list's own maximum, so the
 // export and the screen ask the same question.
-const ExportPage = 200
+const exportPage = 200
 
 // exportStall is how long an export may go without writing anything before
 // the connection is closed under it.
@@ -218,7 +218,7 @@ func WriteExport(ctx huma.Context, format, name string, out Exporting) {
 		`attachment; filename="`+DownloadName(name)+"."+kind.extension+`"`)
 	going := writing(ctx)
 	write := kind.open(ctx, out)
-	if EachPage(ctx.Context(), out, func(rows [][]string) {
+	if eachPage(ctx.Context(), out, func(rows [][]string) {
 		for _, row := range rows {
 			write.row(row)
 		}
@@ -325,24 +325,24 @@ var asJSON = exportFormat{
 	},
 }
 
-// EachPage walks an export's rows, a page at a time, until there are none.
+// eachPage walks an export's rows, a page at a time, until there are none.
 //
 // Stepping by what came back, and stopping when nothing does. Stepping by the
-// page size and stopping on a short page reads ExportPage as the truth about a
+// page size and stopping on a short page reads exportPage as the truth about a
 // store's own page, and it is a guess: a reader whose ceiling is lower returns
 // a short page every time, so the export ends after one of them, having
 // written a fraction of the file and said nothing — which is the silent
 // truncation these files exist not to do. Every reader here allows 200
 // or more today. This costs one query at the end and stops that being
 // something anybody has to keep true.
-func EachPage(ctx context.Context, out Exporting,
+func eachPage(ctx context.Context, out Exporting,
 	page func(rows [][]string), between func()) error {
 
 	if out.Stream != nil {
-		return Streamed(ctx, out, page, between, exportCeiling)
+		return streamed(ctx, out, page, between, exportCeiling)
 	}
 	for offset := 0; ; {
-		rows, err := out.Rows(ctx, ExportPage, offset)
+		rows, err := out.Rows(ctx, exportPage, offset)
 		if err != nil {
 			return err
 		}
@@ -355,7 +355,7 @@ func EachPage(ctx context.Context, out Exporting,
 	}
 }
 
-// Streamed walks a streamed export, closing its cursor at the ceiling.
+// streamed walks a streamed export, closing its cursor at the ceiling.
 //
 // Written one at a time, and flushed every so often rather than every row: a
 // flush is a write to the socket, and a quarter of a million of them costs
@@ -364,7 +364,7 @@ func EachPage(ctx context.Context, out Exporting,
 // The ceiling is a deadline on the context the cursor was opened with, so the
 // driver closes the cursor and returns its connection when it passes, even
 // while a write to a slow reader is still blocked.
-func Streamed(ctx context.Context, out Exporting,
+func streamed(ctx context.Context, out Exporting,
 	page func(rows [][]string), between func(), ceiling time.Duration) error {
 
 	ctx, cancel := context.WithTimeout(ctx, ceiling)
@@ -376,7 +376,7 @@ func Streamed(ctx context.Context, out Exporting,
 		}
 		page([][]string{row})
 		written++
-		if written%ExportPage == 0 {
+		if written%exportPage == 0 {
 			between()
 		}
 		return nil
