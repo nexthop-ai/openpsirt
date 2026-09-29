@@ -251,7 +251,7 @@ says what turns each on.
 
 - A flaw recorded here starts undisclosed. One reported from outside carries a
   disclosure date, 90 days from when the report arrived by default. One found
-  here carries none until a report from outside is ruled a duplicate of it,
+  here carries none unless a report from outside is ruled a duplicate of it,
   which dates it from that report. Reaching the date escalates and publishes
   nothing
 - A disclosure date moves either way, as two separate acts. Each takes a
