@@ -3642,64 +3642,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/saved-filters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List your saved filters
-         * @description The narrowings you have kept, by name.
-         *
-         *     Personal, and nothing is shared. No ownership, no permissions and no arguing about whose filter is authoritative — which is also what lets somebody keep one that is half-formed. Yours are the only ones this answers with, whoever asks.
-         *
-         *     A saved filter naming something the list no longer offers simply stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one.
-         *
-         *     At most as many as the per-person limit, in name order. `total` is how many you keep, which is more than the list holds where the limit was lowered after they were saved.
-         *
-         *     Kept per product. A filter narrows one product's findings list and its query names branches and variants that usually exist in no other, so one offered everywhere would be offered where it matches nothing.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers your own and nobody else's.
-         */
-        get: operations["list-saved-filters"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/saved-filters/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Keep a filter under a name
-         * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Yours alone.
-         */
-        put: operations["save-filter"];
-        post?: never;
-        /**
-         * Forget a saved filter
-         * @description Drops one of your own. A name you have not kept is not there, which is the same answer as somebody else's — the filters are personal, and the query says so rather than only the screen.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Yours alone.
-         */
-        delete: operations["forget-filter"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/streams": {
         parameters: {
             query?: never;
@@ -5423,6 +5365,68 @@ export interface paths {
         put: operations["set-digest"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/session/me/saved-filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List your saved filters
+         * @description The narrowings you have kept, by name.
+         *
+         *     Personal, and nothing is shared. No ownership, no permissions and no arguing about whose filter is authoritative — which is also what lets somebody keep one that is half-formed. Yours are the only ones this answers with, whoever asks.
+         *
+         *     A saved filter naming something the list no longer offers simply stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one.
+         *
+         *     At most as many as the per-person limit, in name order. `total` is how many you keep, which is more than the list holds where the limit was lowered after they were saved.
+         *
+         *     One list per person, for every findings list. A filter applies within whichever product, branch and variant the list is scoped to.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers your own and nobody else's.
+         */
+        get: operations["list-saved-filters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/session/me/saved-filters/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Keep a filter under a name
+         * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
+         *
+         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath` and its three qualifiers, `differs`, `variants`, `opened_by_run` and `view`. Every other parameter is kept as sent.
+         *
+         *     Refused with 422 where adding the name would take you past the per-person limit.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Yours alone.
+         */
+        put: operations["save-filter"];
+        post?: never;
+        /**
+         * Forget a saved filter
+         * @description Drops one of your own. A name you have not kept is not there, which is the same answer as somebody else's — the filters are personal, and the query says so rather than only the screen.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Yours alone.
+         */
+        delete: operations["forget-filter"];
         options?: never;
         head?: never;
         patch?: never;
@@ -11273,7 +11277,7 @@ export interface components {
             readonly $schema?: string;
             /** @description The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to */
             prepares?: components["schemas"]["PreparedBody"];
-            /** @description The list's query string, without a leading ? */
+            /** @description The list's query string, without a leading ?. Its scope is left out of what is kept */
             query: string;
         };
         SavedBody: {
@@ -11281,7 +11285,7 @@ export interface components {
             name: string;
             /** @description The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them */
             prepares?: components["schemas"]["PreparedBody"];
-            /** @description The findings list's query string, without a leading ? */
+            /** @description The findings list's query string, without a leading ?, and without the branch, the variant or anything naming one build or one run */
             query: string;
         };
         Score: {
@@ -18376,101 +18380,6 @@ export interface operations {
             };
         };
     };
-    "list-saved-filters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodySavedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "save-filter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Save-filterRequest"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "forget-filter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "list-streams": {
         parameters: {
             query?: {
@@ -21082,6 +20991,97 @@ export interface operations {
                 "application/json": components["schemas"]["Set-digestRequest"];
             };
         };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-saved-filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodySavedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "save-filter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Save-filterRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "forget-filter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description No Content */
             204: {

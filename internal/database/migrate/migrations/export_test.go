@@ -34,8 +34,13 @@ func StatementsV050(engine database.Engine) map[string][]string {
 		"chat_delivery":       {chatV050(t)[1]},
 		"suppression":         suppressionV050(t),
 		"disclosure_movement": disclosureMovementV050(t),
+		"saved_filter":        savedFilterV050(t),
 	}
 }
 
 // Respelled is one kept findings-list query in v0.5.0's words.
 var Respelled = respelled
+
+// Unscoped is one kept findings-list query without its scope, as v0.5.0's
+// upgrade leaves it.
+var Unscoped = unscopedV050

@@ -128,7 +128,7 @@ export function Finding() {
   // so anything below that belongs to one finding has to say which.
   const oneFinding = `${vulnerability}|${component}|${version}`;
   const rule = params.get("rule") ?? "";
-  const prefill = useDecisionPrefill(product, oneFinding, rule);
+  const prefill = useDecisionPrefill(oneFinding, rule);
   const { startFrom } = prefill;
   const [reclassifying, setReclassifying] = useState(false);
   // The rating just recorded, confirmed on the line the form opened from.

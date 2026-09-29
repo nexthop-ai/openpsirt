@@ -1412,7 +1412,8 @@ approves it (REQ-27).
 | A deferral is prepared as a length, never a date | Required where the outcome is a deferral and refused where it is not: a deferral with no length fills a form that cannot be submitted, and a length beside any other outcome is a value nothing reads. `DESIGN-interface.md` says how the length becomes a date |
 | What a filter prepares passes the rules a decision passes | The same submission gate, called rather than restated: an outcome that is recognized, a reason where the outcome takes one and none where it does not, and the markdown policy on the reasoning. A prefill the decision store refuses is a refusal that lands when somebody presses the button rather than when they saved the thing that fills it in |
 | A prefill cannot claim that mitigations already exist | That reason asks what stops it, in words, and a filter carries no such text. Refused where it is prepared rather than accepted and then refused on submission |
-| How many filters one person keeps is capped, and the list is bounded by the same number | Many acts writing one row each fill a table the way one act writing many does, and the panel reads every row it finds on every open. `saved.max-per-person` is the setting |
+| How many filters one person keeps is capped, and the list is bounded by the same number | Many acts writing one row each fill a table the way one act writing many does, and the panel reads every row it finds on every open. `saved.max-per-person` is the setting, and it counts every filter the person keeps |
+| A rule applies in every product | A filter is one per person, so what it prepares fills the form on a finding in any product. A person still reviews and submits, a claim that hides risk still waits for approval, and the form names the filter that prepared it |
 
 The wider form — a rule proposing a pending claim of its own, marked as proposed
 by that rule — leaves the approver as the only human judgment on the claim, and

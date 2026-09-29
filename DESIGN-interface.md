@@ -432,8 +432,7 @@ reasons it does not show. "Only this variant" is likewise offered and sent only
 where the selection names a variant, because it is a question about that one.
 Deciding from the list and the export are a product's own and come back the
 moment a product is picked. Saved filters are offered here as on every list,
-because a saved filter keeps no scope. Not built: they are a product's own, and
-come back only when a product is picked.
+because a saved filter keeps no scope.
 
 The product becomes a column where it varies, and the row links to that product's
 list.
@@ -577,18 +576,28 @@ something half-formed.
 
 | Rule | |
 |---|---|
-| A saved filter keeps what the list is narrowed by, never where | One list per person, offered on every findings list. The product, the branch, the variant, and anything naming one build or one run are the scope picker's, so they are left out of what is kept. Picking one applies it within the scope on screen: across every product from home, within one product where one is picked. A PSIRT working several products keeps a filter once. Not built: a saved filter belongs to the product it was saved in, and the list across every product offers none |
+| A saved filter keeps what the list is narrowed by, never where | One list per person, offered on every findings list, including the one across every product. The product, the branch, the variant, and anything naming one build or one run are the scope picker's, so they are left out of what is kept. Picking one applies it within the scope on screen: across every product from home, within one product where one is picked. A PSIRT working several products keeps a filter once |
+| The scope left out is these words of the list's address | The branch and the variant; a subtree of one build and its version, ecosystem and namespace; what differs between the builds of a selection; what is spread over the variants of one branch; and the run that opened it. The grouping is left out with them, because the list across every product groups by issue alone. The server leaves them out of what it keeps, and the list leaves them out when it compares its address with what is kept |
+| The open filter is named in the address | Picking one writes its name as `rule`, the same word a finding reads the filter's name from, and the open marker, Forget and the prepared claim follow that name. Two filters can keep one query, and only the name tells them apart |
+| Changing a filter on screen drops the name | The list is then no longer that saved filter. Paging, the page size, the branch and the variant leave it, because none of those is a filter |
+| An address without a name is matched by its query | An address typed, bookmarked or kept from before names no filter. The first kept one, by name, whose query is the address's reads as open |
+| A filter that keeps nothing is never open by its query | A filter saved or upgraded with nothing but scope keeps an empty query. Matched by query it reads as open on no list, so the claim it prepares fills no form until it is picked by name |
+| Saving leaves the scope out and says so | Saved on one build, or with any of those words but the grouping in the address, the confirmation reads "Saved. Applies to whatever branch and variant you're viewing." Otherwise it reads "Saved." |
+| A name is one per person | Matched without regard to capitals, across every product |
 | What is kept is the list's own query string, not a column per filter | The filters belong to the list and they move; a table mirroring them would need a migration every time one was added while still being a second place where what a filter means is decided. A saved filter naming something the list no longer offers stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one |
 | A parameter the list renames is rewritten in what is kept | A release that renames one rewrites every saved query in its migration, and the list reads only its current words. Two spellings read side by side are two meanings to keep in step. An address somebody bookmarked or sent is not rewritten, and opens without the renamed narrowing, as a saved filter naming something the list no longer offers does |
 | Saving over a name replaces it | The act is deciding what that name means, and refusing would make somebody delete before they could correct |
 | Two saves of one new name at once keep one filter | Both find nothing to replace and both add it; the unique index refuses the later addition, which is taken again as a lost race and replaces what the other kept |
 | Personal is enforced at the query, not only on the screen | A name somebody else kept is not there, which is the same answer a name nobody kept gives |
-| Opening one replaces the filters on screen and keeps the scope | The saved filters win outright rather than merging. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
+| Opening one replaces the filters on screen and keeps the scope | The saved filters win outright rather than merging. The scope and the grouping on screen stay. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
 | The list is bounded by the per-person limit and says how many are kept in all | A limit lowered after filters were saved leaves somebody keeping more than it shows, and saving is refused until they are under it. The picker says how many it left out rather than reading as the whole of what they keep |
 
 A saved filter can prepare a claim, and proposes nothing (REQ-27). Where it
 carries an outcome and the words, picking it fills the decision form and says so
 above the list. Submitting is a person's act, and the record carries their name.
+It applies in every product, because the filter is one per person: a person
+still reviews and submits, a claim that hides risk still waits for a second
+person's approval, and the form names the filter that prepared it.
 
 What a filter prepares carries its own length rather than a date. A rule saved
 in March means "put this off for a quarter", not "until 3 March", so a deferral
@@ -596,9 +605,9 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
-What the list is narrowed by is what prepares a claim, read off the address
+The filter the address names is what prepares a claim, read off the address
 rather than remembered from the act of picking. Narrowing further asks a
-different question and drops it; coming back to the list finds it again. A rule
+different question and drops the name; coming back to the list finds it again. A rule
 that outlived the narrowing it was picked for would fill a form on a finding it
 never drew, with somebody's name about to go on the claim.
 

@@ -266,8 +266,7 @@ const (
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
 	RoutingBatch = "routing.batch"
-	// SavedPerPerson is how many filters one person may keep for one
-	// product.
+	// SavedPerPerson is how many filters one person may keep.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
 	// neighboring case to a bulk judgment and is bounded for the same reason:
@@ -358,8 +357,8 @@ const (
 // is a suspicious number.
 const DefaultRoutingBatch = 2000
 
-// DefaultSavedPerPerson is how many filters one person may keep for one
-// product where nobody has said.
+// DefaultSavedPerPerson is how many filters one person may keep where
+// nobody has said.
 //
 // A hundred: past anything somebody curates by hand, and low enough that a
 // list of them is still a list. The bound is there because an unbounded number

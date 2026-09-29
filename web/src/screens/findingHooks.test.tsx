@@ -69,12 +69,12 @@ describe("what the decision form starts from", () => {
   function Prefill({ rule }: { rule: string }) {
     const [finding, setFinding] = useState("one");
     walkTo = setFinding;
-    seen = useDecisionPrefill("sonic", finding, rule);
+    seen = useDecisionPrefill(finding, rule);
     return null;
   }
   function kept(prepares: Record<string, unknown>) {
     serve((path) =>
-      path === "/v1/products/{product}/saved-filters"
+      path === "/v1/session/me/saved-filters"
         ? { data: { items: [{ name: "kept", query: "", prepares }] } }
         : undefined,
     );
@@ -114,9 +114,7 @@ describe("what the decision form starts from", () => {
   });
 
   it("says a rule that could not be read was not read", async () => {
-    serve((path) =>
-      path === "/v1/products/{product}/saved-filters" ? { status: 503 } : undefined,
-    );
+    serve((path) => (path === "/v1/session/me/saved-filters" ? { status: 503 } : undefined));
     mount.render(screen(<Prefill rule="kept" />));
     await settle();
     expect(seen?.ruleUnread).toBe(true);

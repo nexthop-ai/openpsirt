@@ -194,6 +194,8 @@ going back to v0.4.0.
 | A filter taking words from a set refuses a word named twice with a 422, and a filter of product names takes at most 200. A saved filter repeating a word opens as a 422 | Save the filter again without the repeat |
 | What somebody was told, read from their page by an administrator or an auditor, holds only lines about products the reader holds a role on. In v0.4.0 it also held the disclosed lines about every other product | Grant the reader the product where they investigate a person's notices |
 | Another name for an issue is recorded only on a flaw recorded here, and only as a CVE or a GitHub advisory. In v0.4.0 any text was taken on any issue | Nothing. A scanner's issue takes its other names from the scans |
+| Saved filters are read and kept at `/v1/session/me/saved-filters`. In v0.4.0 they were kept per product, under `/v1/products/{product}/saved-filters` | Point a script that keeps filters at the new address |
+| `saved.max-per-person` counts every saved filter one person keeps. In v0.4.0 it counted each product's | Nothing, unless somebody keeps more than it after the upgrade: they are refused a new filter until they forget enough, or it is raised under Settings, Limits |
 
 | After the upgrade from v0.4.0 | |
 |---|---|
@@ -208,7 +210,9 @@ going back to v0.4.0.
 | An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
 | An exploited issue | Has no day it was listed in the known-exploited catalog. The first scan stating one moves every open exploited finding of the issue to count from that day, and some become overdue at once |
 | A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
-| Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made |
+| A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it |
+| One person's saved filters of one name in several products | The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
+| Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it |
 
 ## Serving
 

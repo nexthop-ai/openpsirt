@@ -27,7 +27,7 @@ type Prefill = {
 //
 // `oneFinding` names the finding the screen is on. A params-only change does
 // not remount the screen, so what belongs to one finding has to say which.
-export function useDecisionPrefill(product: string, oneFinding: string, rule: string) {
+export function useDecisionPrefill(oneFinding: string, rule: string) {
   // The starting point, and how many times it has been given one. Starting
   // from something is a fresh form rather than an edit to the one on screen,
   // so the count is what the form is mounted against — two prefills carrying
@@ -51,8 +51,9 @@ export function useDecisionPrefill(product: string, oneFinding: string, rule: st
   // rather than repeating what it says, so what a rule prepares is decided in
   // one place — and a link somebody sends prepares nothing for the person who
   // opens it, because the filters are personal and a name they have not kept
-  // is a name that is not there.
-  const rules = useKept(product, rule !== "");
+  // is a name that is not there. The filters are one list per person, so the
+  // same rule applies in every product.
+  const rules = useKept(rule !== "");
   // The claim that filter prepares, in the words the form takes, and whether it
   // prepares something no form can be submitted from. A rule prepares a claim
   // and a person proposes it: this fills the form in and nothing else.

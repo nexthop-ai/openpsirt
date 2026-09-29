@@ -310,15 +310,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Send outbound requests through a configured proxy, starting with patch branch clones |
 | Waits on | The owner. REQ-69 and REQ-78 refuse any address inside the network, checked on the address a name resolved to. Through a proxy, the proxy resolves the name. Resolving locally, checking the address and asking the proxy to connect to that address keeps the check, and is a change to a security rule that needs agreeing first |
 
-### TODO-35 Saved filters across products
-
-| | |
-|---|---|
-| Today | A saved filter belongs to the product it was saved in. The same person sees none of their filters in another product, and the list across every product has no saved filters at all. A saved filter also keeps the release and build it was saved on, which the design says it drops |
-| Problem | Anybody working in several products saves each filter once per product. Prefill rules are built on saved filters, so the duplication multiplies |
-| Work | Keep one list per person, applied within whatever scope is on screen (`DESIGN-interface.md` § Saved filters). Leave release and build out of what is kept. Where one person kept one name in two products, add the product to one of the names |
-| Waits on | The owner: whether a filter that prefills a decision applies in every product or only its own; the rename format; whether saving drops the build silently or says so. The schema change goes in migration 39 |
-
 ### TODO-37 Full-queue upload refusals
 
 | | |
