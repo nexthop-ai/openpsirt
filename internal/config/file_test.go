@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -341,5 +342,31 @@ func TestARefusalNamesTheKeyAndKeepsWhatItWraps(t *testing.T) {
 	}
 	if InFile(nil) != nil {
 		t.Error("no refusal became one")
+	}
+}
+
+// Every configuration file the documentation shows is one the loader reads.
+func TestTheDocumentedFilesAreRead(t *testing.T) {
+	block := regexp.MustCompile("(?s)```toml\n(.*?)```")
+	shown := 0
+	for _, page := range []string{"../../docs/configuration.md", "../../docs/running.md"} {
+		text, err := os.ReadFile(page) //nolint:gosec // G304: this repository's own documents
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, found := range block.FindAllStringSubmatch(string(text), -1) {
+			shown++
+			given, err := parseFile(found[1])
+			if err != nil {
+				t.Errorf("%s shows a file that is refused: %v\n%s", page, err, found[1])
+				continue
+			}
+			if _, err := load(given); err != nil {
+				t.Errorf("%s shows a file whose values are refused: %v\n%s", page, err, found[1])
+			}
+		}
+	}
+	if shown == 0 {
+		t.Fatal("no configuration file was found in the documentation, so this checked nothing")
 	}
 }

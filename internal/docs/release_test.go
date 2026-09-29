@@ -141,6 +141,39 @@ func TestPublishedPagesNameNoReleaseByHand(t *testing.T) {
 	}
 }
 
+// A page names the scanner the image carries as {{ scanner }}, which the
+// documentation build fills in from the one line of the Dockerfile that pins
+// it. A placeholder the build does not know is published as written.
+func TestEveryPlaceholderIsOneTheBuildFills(t *testing.T) {
+	known := map[string]bool{"release": true, "scanner": true}
+	// A workflow expression, ${{ … }}, is a pipeline example rather than a
+	// placeholder.
+	placeholder := regexp.MustCompile(`(?:^|[^$])\{\{\s*([a-z_-]+)\s*\}\}`)
+	seen := map[string]bool{}
+	for name, text := range publishedPages(t) {
+		for _, found := range placeholder.FindAllStringSubmatch(text, -1) {
+			seen[found[1]] = true
+			if !known[found[1]] {
+				t.Errorf("%s writes {{ %s }}, which the documentation build does not fill in", name, found[1])
+			}
+		}
+	}
+	for name := range known {
+		if !seen[name] {
+			t.Errorf("no page writes {{ %s }}, so this checked less than it says", name)
+		}
+	}
+
+	dockerfile, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pins := regexp.MustCompile(`(?m)^ARG GRYPE_VERSION=\d+\.\d+\.\d+\s*$`).FindAll(dockerfile, -1)
+	if len(pins) != 1 {
+		t.Errorf("the Dockerfile pins the scanner %d times, and {{ scanner }} needs exactly one", len(pins))
+	}
+}
+
 func TestReleaseLiteralsAreToldFromWhatIsNotARelease(t *testing.T) {
 	reported := []struct{ name, text, want string }{
 		{"docs/trying.md", "  ghcr.io/nexthop-ai/openpsirt:0.2.0\n", "0.2.0"},

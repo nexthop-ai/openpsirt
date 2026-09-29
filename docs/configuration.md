@@ -1,16 +1,18 @@
 # Configuration
 
-Every setting comes from the environment, and every name starts with
-`OPENPSIRT_`. Each one has a working default, so the process starts with
-nothing set but a database — and a value that is set and cannot be read stops
-the process with the variable named, rather than falling back to the default.
-A switch spelled wrongly that silently reads as its opposite is worse than a
-refusal to start.
+A deployment is configured by environment variables or by a
+[configuration file](#configuration-file), never both. Every setting has a
+name in each, side by side in the tables below: the variable, which starts
+`OPENPSIRT_`, and the key in the file. Each one has a working default, so the
+process starts with nothing set but a database — and a value that is set and
+cannot be read stops the process with the setting named, rather than falling
+back to the default. A switch spelled wrongly that silently reads as its
+opposite is worse than a refusal to start.
 
-A switch takes `true` or `false` (also `1`, `0`, `t`, `f`, in any case). A
-duration is written as Go reads it: `30s`, `5m`, `12h`. A number is a positive
-whole number; zero reads as unset everywhere, so it is refused rather than
-taken.
+In the environment, a switch takes `true` or `false` (also `1`, `0`, `t`, `f`,
+in any case). A duration is written as Go reads it: `30s`, `5m`, `12h`. A
+number is a positive whole number; zero reads as unset everywhere, so it is
+refused rather than taken.
 
 ## Features
 
@@ -33,6 +35,79 @@ Everything marked off does nothing until the thing in the last column is set.
 
 A sign-in method is not in this list because one is required: the process
 refuses to start without one. [Sign-in](#sign-in) says which.
+
+## Configuration file
+
+A TOML file, named on the command line. The Helm chart configures through the
+environment and takes no file.
+
+```
+openpsirt serve --config /etc/openpsirt/openpsirt.toml
+openpsirt migrate up --config /etc/openpsirt/openpsirt.toml
+```
+
+| | |
+|---|---|
+| Naming it | `--config <path>`, before the command or after it. No environment variable names it |
+| Keys | The File key column in each table below. `database.url` is `url` under `[database]`, and `signin.oidc.issuer` is `issuer` under `[signin.oidc]` |
+| Types | A switch is `true` or `false`. A number is a whole number, unquoted. A duration is a string, such as `"30s"`. A list is an array of strings, such as `["ana", "ben"]`, where the variable joins them with commas |
+| The environment | Any variable starting `OPENPSIRT_` set beside the file is refused at startup, naming every one, even when it is empty. Unset them |
+| Permissions | Readable and writable by its owner alone, `chmod 600`, owned by the user the process runs as. A file anybody else may read or write is refused at startup: it holds the database password and every secret below |
+| Refused at startup | A key that is not a setting, a value of the wrong type, a list entry holding a comma, and a file that is not TOML. Each refusal names the key, or the line |
+| Refusals | Name the key, as `database.max_open`, rather than the variable. A log line written while running names the variable, which the tables pair with the key |
+
+Every rule in the tables applies to a value from the file exactly as to one
+from the environment: the defaults, the zero read as unset, and every value
+refused at startup.
+
+```toml
+[server]
+address = "127.0.0.1:8080"
+base_url = "https://psirt.example.com"
+
+[database]
+url = "postgres://openpsirt:secret@db.example.com:5432/openpsirt?sslmode=verify-full"
+require_encryption = true
+
+[signin]
+bootstrap_admins = ["ana"]
+
+[signin.oidc]
+issuer = "https://id.example.com"
+client_id = "openpsirt"
+client_secret = "secret"
+username_claim = "preferred_username"
+groups_claim = "groups"
+
+[mail]
+from = "psirt@example.com"
+server = "smtp.example.com:587"
+username = "psirt"
+password = "secret"
+
+[attachments]
+bucket = "openpsirt-attachments"
+region = "eu-west-1"
+
+[outbound]
+excluded = ["corp.example.com", "10.0.0.0/8"]
+```
+
+### Variables in both modes
+
+These are not settings of this deployment. The libraries and the programs it
+starts read them, so they stay in the environment beside a file.
+
+| Variable | Read by |
+|---|---|
+| `PATH`, `HOME` | The process, the scanner and git |
+| `TMPDIR` | Where uploads and the scanner's scratch files are written |
+| `TZ` | The time zone logs and the scanner use |
+| `SSL_CERT_FILE`, `SSL_CERT_DIR` | The certificate authorities outbound TLS trusts |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, in either case | The scanner, fetching its vulnerability data |
+| `PGSSLMODE` and the PostgreSQL driver's other `PG` variables | The PostgreSQL connection, where the URL does not say. [Database connection encryption](#database-connection-encryption) says how `PGSSLMODE` is judged |
+| `AWS_` variables | The object store client, for a role, a region or a profile where the settings name no key |
+| `GRYPE_` variables | The scanner. [Scanning](#scanning) lists the ones that matter here |
 
 ## Upgrading
 
@@ -206,7 +281,9 @@ read.
 The scanner is given only part of this process's environment: `PATH`, `HOME`,
 `TMPDIR`, `TZ`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, the proxy variables in either
 case, and every `GRYPE_` variable. None of the `OPENPSIRT_` settings reaches it,
-so a credential the scanner needs has to be given under a name of its own.
+so a credential the scanner needs has to be given under a name of its own. The
+`GRYPE_` variables have no key in a configuration file: they are the scanner's,
+and stay in the environment in both modes.
 
 ### An air-gapped install
 

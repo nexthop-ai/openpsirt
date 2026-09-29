@@ -867,6 +867,18 @@ kept, and that one a release candidate built is recreated, because a
 candidate's migration can be fixed before the release (`DESIGN-database.md`
 § Migrations).
 
+### Scanner version
+
+A page names the scanner version the image carries as `{{ scanner }}`, and the
+build writes in the version the Dockerfile's one scanner pin names. A
+Dockerfile pinning the scanner on no line, or on more than one, fails the
+build. A written-out scanner version is a release-shaped literal, so the same
+test reports it.
+
+A test in `internal/docs` fails on a placeholder the build does not fill in,
+and on a Dockerfile without exactly one pin. A workflow expression, `${{ … }}`,
+in a pipeline example is not a placeholder.
+
 ### The settings reference
 
 The configuration page lists every setting the process reads, with its

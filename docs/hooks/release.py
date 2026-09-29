@@ -9,6 +9,10 @@ from DOCS_RELEASE when that is set, which is how both workflows pass it, and
 otherwise from the newest release tag reachable from the checkout. A build
 that can resolve neither fails: a page naming no version, or a default one,
 tells somebody to deploy something that is not a release.
+
+A page writes {{ scanner }} wherever it names the scanner version the image
+carries, and the build replaces it with the version the Dockerfile pins. A
+build that cannot find the pin fails, for the same reason.
 """
 
 import os
@@ -22,8 +26,26 @@ from mkdocs.exceptions import PluginError
 # between tags is read as one.
 RELEASE = re.compile(r"^v?(\d+\.\d+\.\d+(?:-rc\.\d+)?)$")
 PLACEHOLDER = re.compile(r"\{\{\s*release\s*\}\}")
+SCANNER = re.compile(r"\{\{\s*scanner\s*\}\}")
+# The one line in the Dockerfile that pins the scanner the image carries.
+SCANNER_PIN = re.compile(r"^ARG GRYPE_VERSION=(\d+\.\d+\.\d+)\s*$", re.MULTILINE)
 
 _release = None
+_scanner = None
+
+
+def _scanner_pin(root):
+    path = os.path.join(root, "Dockerfile")
+    try:
+        with open(path, encoding="utf-8") as f:
+            found = SCANNER_PIN.findall(f.read())
+    except OSError as err:
+        raise PluginError(f"cannot read the scanner version from {path}: {err}") from err
+    if len(found) != 1:
+        raise PluginError(
+            f"{path} pins the scanner {len(found)} times, where the pages need exactly one"
+        )
+    return found[0]
 
 
 def _from_git(root):
@@ -45,13 +67,15 @@ def _from_git(root):
 
 
 def on_config(config):
-    global _release
+    global _release, _scanner
+    # mike hands over the configuration's path as given, relative when it
+    # was, and the directory of a bare file name is empty.
+    root = os.path.dirname(os.path.abspath(config.config_file_path))
+    _scanner = _scanner_pin(root)
     given = os.environ.get("DOCS_RELEASE", "").strip()
     source = "DOCS_RELEASE"
     if not given:
-        # mike hands over the configuration's path as given, relative when it
-        # was, and the directory of a bare file name is empty.
-        given = _from_git(os.path.dirname(os.path.abspath(config.config_file_path)))
+        given = _from_git(root)
         source = "the newest release tag"
     match = RELEASE.match(given)
     if not match:
@@ -61,4 +85,4 @@ def on_config(config):
 
 
 def on_page_markdown(markdown, page, config, files):
-    return PLACEHOLDER.sub(_release, markdown)
+    return SCANNER.sub(_scanner, PLACEHOLDER.sub(_release, markdown))

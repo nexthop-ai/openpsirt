@@ -52,6 +52,7 @@ nav:
   - Evaluation: trying.md
   - Build pipelines: pipeline.md
   - Configuration: configuration.md
+  - Running the binary: running.md
   - API reference: reference/api.md
   - Privileges: reference/privileges.md
 
