@@ -18,7 +18,7 @@ build is recreated.
 | Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default |
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles per product or across every product, public and private as separate grants, enforced in the data layer |
-| Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections and the review queue |
+| Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections, and a review queue listed by the reason each claim waits |
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
@@ -41,7 +41,6 @@ build is recreated.
 | Advisories | Sending one anywhere, signing the provider directory, the VEX profile of the CSAF document, a CVSS 4.0 score in the document, and prose of the deployment's own beyond the title |
 | Remediation | Opening or updating an item in an external tracker; a link somebody typed is stored. One view of a promise to upgrade across every build it names |
 | Notifications | Microsoft Teams and Google Chat, and an HTML part in mail |
-| Interface | Narrowing the review queue by what kind of thing is waiting |
 | Database | Purging old rows and partitioning tables |
 | Packaging | Images for any architecture but `amd64` |
 

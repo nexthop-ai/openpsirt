@@ -169,6 +169,10 @@ says what turns each on.
   deployment sets; a bulk promise to upgrade takes no cap
 - An approver approves, sends back or undoes a batch as one act. An approval
   points at one revision of the reason, and editing the text withdraws it
+- The review queue lists each reason for waiting apart: claims awaiting
+  approval, deferrals past their date, and promised fixes past their date. A
+  decision the code moved out from under goes back to its author to reaffirm
+- Each act is confirmed where it was taken, with a link to what comes next
 - A rating that disagrees with the published one, or a note for whoever
   decides, belongs to one product and applies to every build of it
 - A third party's word is evidence. A supplier's VEX and a supplier's advisory
