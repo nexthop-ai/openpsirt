@@ -275,7 +275,7 @@ var settable = []struct {
 		"On a large estate a pass can be too big to hold a connection through, or too small to drain the backlog.",
 		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
 	{setting.SavedPerPerson, "Saved filters per person", "limits",
-		"How many saved filters one person may keep for one product",
+		"How many saved filters one person may keep",
 		"The panel that lists them reads every one on every open.",
 		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultSavedPerPerson) }, false},
 	{setting.AttachmentShare, "Attachment storage per person", "limits",

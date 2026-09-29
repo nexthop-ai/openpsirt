@@ -20,19 +20,17 @@ import (
 // fixture is the seeded world with a place to keep filters against.
 type fixture struct {
 	*fixtures.World
-	rights   *access.Store
-	store    *saved.Store
-	products map[string]int64
+	rights *access.Store
+	store  *saved.Store
 }
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		fn(t, &fixture{
-			World:    w,
-			rights:   w.Access,
-			store:    saved.NewStore(w.DB.DB),
-			products: map[string]int64{fixtures.ProductName: w.Product.ID},
+			World:  w,
+			rights: w.Access,
+			store:  saved.NewStore(w.DB.DB),
 		})
 	})
 }
@@ -52,7 +50,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 
 		// Without a length, the form opens with the outcome chosen and no
 		// date, which cannot be submitted — a prefill that half-fires.
-		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "someday",
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, "someday",
 			"component=linux", saved.Filter{Outcome: "deferred", Reasoning: "Not this quarter."}, 0)
 		if err == nil {
 			t.Fatal("a deferral with no length was kept")
@@ -65,7 +63,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 		// reads, and it is refused rather than dropped — which is the answer a
 		// decision itself gives to a date beside an outcome that is not a
 		// deferral.
-		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"],
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID,
 			"gone", "component=linux", saved.Filter{Outcome: "wont-fix",
 				Reasoning: "Not built into this image.", DeferDays: 90}, 0)
 		if err == nil {
@@ -76,7 +74,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 		}
 
 		// With both, it is kept and read back.
-		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"],
+		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
 			"quarter", "component=linux", saved.Filter{Outcome: "deferred",
 				Reasoning: "Waiting on the next kernel bump.", DeferDays: 90}, 0)
 		if err != nil {
@@ -104,7 +102,7 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		// An outcome with nothing to say is a button that proposes a
 		// dismissal saying nothing, and the person who submits it is the one
 		// putting their name to it.
-		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "kernel", "component=linux",
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel", "component=linux",
 			saved.Filter{Outcome: "not-applicable", Justification: "vulnerable_code_not_present"}, 0)
 		if err == nil {
 			t.Fatal("a prefill with no reasoning was kept")
@@ -114,7 +112,7 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		}
 
 		// With the words, it is kept and read back.
-		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "kernel",
+		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel",
 			"component=linux", saved.Filter{
 				Outcome: "deferred", Reasoning: "Waiting on the next kernel bump.",
 				DeferDays: 90,
@@ -128,7 +126,7 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 
 		// A justification or a deferral beside no outcome is a prefill that
 		// half-fires, so nothing prepared is nothing carried.
-		half, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "plain",
+		half, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "plain",
 			"component=linux", saved.Filter{Justification: "vulnerable_code_not_present",
 				DeferDays: 30}, 0)
 		if err != nil {
@@ -142,10 +140,10 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		// prefill goes with it, or one fires on a filter somebody had made
 		// ordinary.
 		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-			f.products["sonic"], "kernel", "component=linux", saved.Filter{}, 0); err != nil {
+			"kernel", "component=linux", saved.Filter{}, 0); err != nil {
 			t.Fatal(err)
 		}
-		mine, _, err := f.store.SavedFilters(t.Context(), person.ID, f.products["sonic"], 0)
+		mine, _, err := f.store.SavedFilters(t.Context(), person.ID, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,8 +168,7 @@ func TestAFilterMayNotPrepareAClaimTheDecisionStoreWouldRefuse(t *testing.T) {
 			t.Fatal(err)
 		}
 		keeps := func(name string, prepares saved.Filter) error {
-			_, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-				f.products[fixtures.ProductName], name, "component=linux", prepares, 0)
+			_, err := f.store.SaveFilterPreparing(t.Context(), person.ID, name, "component=linux", prepares, 0)
 			return err
 		}
 
@@ -226,19 +223,18 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		product := f.products[fixtures.ProductName]
 		for _, name := range []string{"first", "second"} {
-			if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID, product,
+			if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
 				name, "component=linux", saved.Filter{}, 2); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID, product,
+		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
 			"third", "component=linux", saved.Filter{}, 2); err == nil {
 			t.Error("a filter past the limit was kept")
 		}
 		// Replacing one of their own is not how a table fills up.
-		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID, product,
+		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
 			"first", "component=busybox", saved.Filter{}, 2); err != nil {
 			t.Errorf("replacing a filter they already keep was refused: %v", err)
 		}
@@ -246,7 +242,7 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 		// And the read is bounded by the same number, and says how many it
 		// left out: a lowered ceiling leaves somebody keeping more than it
 		// shows, and the write refuses them until they forget enough.
-		kept, total, err := f.store.SavedFilters(t.Context(), person.ID, product, 1)
+		kept, total, err := f.store.SavedFilters(t.Context(), person.ID, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -301,28 +297,57 @@ func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		product := f.products[fixtures.ProductName]
 		hook := &insertsFilter{done: make(chan error, 1), rival: func() error {
-			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID, product,
+			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID,
 				"Kernel", "component=linux", saved.Filter{}, 10)
 			return err
 		}}
 		hooked := bun.NewDB(f.DB.DB.DB, f.DB.Dialect())
 		hooked.AddQueryHook(hook)
 
-		if _, err := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID, product,
+		if _, err := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID,
 			"kernel", "component=linux-image", saved.Filter{}, 10); err != nil {
 			t.Errorf("one of two saves of one name answered %v", err)
 		}
 		if err := <-hook.done; err != nil {
 			t.Errorf("the other of two saves of one name answered %v", err)
 		}
-		kept, _, err := f.store.SavedFilters(t.Context(), person.ID, product, 10)
+		kept, _, err := f.store.SavedFilters(t.Context(), person.ID, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(kept) != 1 {
 			t.Errorf("the person keeps %+v, want one filter", kept)
+		}
+	})
+}
+
+// A kept filter holds what the list is narrowed by and never where: the
+// branch, the variant and anything naming one build or one run are left out,
+// and every other parameter is kept as it was sent, since the list recognizes
+// an open filter by its query byte for byte.
+func TestAKeptFilterHoldsNoScope(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel",
+			"?stream=main&exploited=1&variant=x86&beneath=zlib&beneath_version=1.2"+
+				"&differs=1&variants=only&opened_by_run=4&hide=a%7Eb&q=open+ssl",
+			saved.Filter{}, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := "exploited=1&hide=a%7Eb&q=open+ssl"; kept.Query != want {
+			t.Errorf("kept %q, want %q", kept.Query, want)
+		}
+		mine, _, err := f.store.SavedFilters(t.Context(), person.ID, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(mine) != 1 || mine[0].Query != kept.Query {
+			t.Errorf("read back %+v, want the one kept as %q", mine, kept.Query)
 		}
 	})
 }

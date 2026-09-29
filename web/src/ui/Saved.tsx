@@ -38,23 +38,39 @@ export type Kept = Body<"SavedBody">;
 // copy rather than three.
 const DEFER_DAYS = { min: 1, max: 3650 };
 
-// The filters somebody has kept for a product. One reader rather than one per
-// screen:
-// the list, the dropdown and a finding opened under a rule all ask the same
-// question, and a second spelling of the key is a second cache.
-export function useKept(product: string, when = true) {
+// The filters somebody has kept: one list per person, offered on every findings
+// list. One reader rather than one per screen: the list, the dropdown and a
+// finding opened under a rule all ask the same question, and a second spelling
+// of the key is a second cache.
+export function useKept(when = true) {
   return useQuery({
-    queryKey: ["saved-filters", product],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/saved-filters", {
-          params: { path: { product } },
-        }),
-      ),
+    queryKey: ["saved-filters"],
+    queryFn: async () => unwrap(await api.GET("/v1/session/me/saved-filters")),
     enabled: when,
     retry: false,
   });
 }
+
+// The words of the list's address that say where it is rather than what it is
+// narrowed by: the branch, the variant, a subtree of one build, what differs
+// between the builds of a selection, what is spread over the variants of one
+// branch, and the run that opened it. A saved filter keeps none of them, so one
+// filter applies within whatever scope is on screen. The server drops the same
+// words from what it keeps.
+const SCOPE = [
+  "stream",
+  "variant",
+  "beneath",
+  "beneath_version",
+  "beneath_ecosystem",
+  "beneath_namespace",
+  "differs",
+  "variants",
+  "opened_by_run",
+];
+
+// The selection a picked filter is applied within, which picking keeps.
+const SELECTION = ["stream", "variant"];
 
 // The filter a list is currently narrowed by, where its address is exactly one
 // somebody kept. Derived rather than remembered, so narrowing further drops it
@@ -82,13 +98,12 @@ export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined 
 // approve. It proposes nothing by itself — the wider form was refused because
 // it leaves the approver as the only human judgment on the claim.
 export function Saved({
-  product,
+  onBuild,
   onPicked,
 }: {
-  // Whose list these narrow. A filter's query names branches and variants
-  // belonging to one product, so it is kept and offered there rather than
-  // everywhere.
-  product: string;
+  // Whether the list is scoped to a branch or a variant, which saving leaves
+  // out and the confirmation says so.
+  onBuild: boolean;
   // Told that a filter was picked, which replaces the list wholesale. What
   // the picked one prepares is not passed: the list reads that off its own
   // address, so it is dropped by narrowing further and found again by coming
@@ -107,6 +122,8 @@ export function Saved({
   // a date, because a rule saved in March means "put this off for a quarter"
   // and a date would be wrong the week after it was saved.
   const [days, setDays] = useState("");
+  // What the last save said, until the next act.
+  const [said, setSaid] = useState("");
   // The two outcomes whose claim is which recognized reason applies, and the
   // reasons each may state. A correction carries past every version bump, so
   // the three reasons a bump can change are not among the ones it offers.
@@ -118,12 +135,12 @@ export function Saved({
   // rather than when they saved the thing that fills it in.
   const reason = reasonOffered(outcome, justification);
 
-  const kept = useKept(product);
+  const kept = useKept();
   const save = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.PUT("/v1/products/{product}/saved-filters/{name}", {
-          params: { path: { product, name: name.trim() } },
+        await api.PUT("/v1/session/me/saved-filters/{name}", {
+          params: { path: { name: name.trim() } },
           body: {
             query: here(params),
             ...(rule && outcome
@@ -147,6 +164,11 @@ export function Saved({
         }),
       ),
     onSuccess: () => {
+      setSaid(
+        onBuild || scoped(params)
+          ? "Saved. Applies to whatever branch and variant you're viewing."
+          : "Saved.",
+      );
       setSaving(false);
       setName("");
       setRule(false);
@@ -154,14 +176,14 @@ export function Saved({
       setJustification("");
       setReasoning("");
       setDays("");
-      void queries.invalidateQueries({ queryKey: ["saved-filters", product] });
+      void queries.invalidateQueries({ queryKey: ["saved-filters"] });
     },
   });
   const forget = useMutation({
     mutationFn: async (called: string) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/saved-filters/{name}", {
-          params: { path: { product, name: called } },
+        await api.DELETE("/v1/session/me/saved-filters/{name}", {
+          params: { path: { name: called } },
         }),
       ),
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["saved-filters"] }),
@@ -176,8 +198,15 @@ export function Saved({
     if (!one) return;
     // The saved address wins outright rather than being merged into what is
     // on screen: opening a saved filter means "show me that list", and a
-    // merge would answer a question nobody saved.
-    setParams(new URLSearchParams(one.query));
+    // merge would answer a question nobody saved. The branch and variant on
+    // screen stay, because the filter applies within them.
+    const next = new URLSearchParams(one.query);
+    for (const key of SELECTION) {
+      const value = params.get(key);
+      if (value) next.set(key, value);
+    }
+    setSaid("");
+    setParams(next);
     onPicked();
   }
 
@@ -213,9 +242,21 @@ export function Saved({
             Forget
           </button>
         ) : (
-          <button type="button" className="linkish" onClick={() => setSaving(!saving)}>
+          <button
+            type="button"
+            className="linkish"
+            onClick={() => {
+              setSaid("");
+              setSaving(!saving);
+            }}
+          >
             {saving ? "Cancel" : "Save this"}
           </button>
+        )}
+        {said && (
+          <span className="hint" role="status">
+            {said}
+          </span>
         )}
       </span>
 
@@ -349,11 +390,17 @@ function whole(days: string): boolean {
   return Number.isInteger(n) && n >= DEFER_DAYS.min && n <= DEFER_DAYS.max;
 }
 
-// The list's current address, without a leading "?" and without the page it
-// happens to be on: a saved filter is a narrowing rather than a position in
-// one.
+// The list's current address as a saved filter keeps it: without a leading
+// "?", without the page it happens to be on, and without its scope. A saved
+// filter is a narrowing rather than a position in one or a place.
 export function here(params: URLSearchParams): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
+  for (const key of SCOPE) asked.delete(key);
   return asked.toString();
+}
+
+// Whether the address carries scope that saving leaves out.
+function scoped(params: URLSearchParams): boolean {
+  return SCOPE.some((key) => params.has(key));
 }

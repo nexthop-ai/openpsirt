@@ -292,7 +292,7 @@ export function Findings() {
   // Offered and never applied: a named person submits the claim as their own.
   // The filter's name travels with every row, which is how a finding opened
   // from here knows to fill its form in.
-  const kept = useKept(product, !spanning);
+  const kept = useKept();
   const prepared = useMemo(() => {
     if (declined === here(params)) return null;
     const one = ruleIn(kept.data?.items ?? [], params);
@@ -644,15 +644,13 @@ export function Findings() {
           the population a selection was made out of. Keeping the selection
           across that would carry rows chosen under one question into an act
           taken under another. */}
-        {!spanning && (
-          <Saved
-            product={product}
-            onPicked={() => {
-              ask(new URLSearchParams(asked));
-              setDeclined(null);
-            }}
-          />
-        )}
+        <Saved
+          onBuild={Boolean(stream || variant)}
+          onPicked={() => {
+            ask(new URLSearchParams(asked));
+            setDeclined(null);
+          }}
+        />
       </div>
 
       {/* What is narrowing the list, whether or not the panel is open, and

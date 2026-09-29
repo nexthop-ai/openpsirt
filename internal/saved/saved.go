@@ -15,6 +15,7 @@ package saved
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -37,10 +38,6 @@ type Filter struct {
 
 	ID       int64 `bun:"id,pk,autoincrement"`
 	PersonID int64 `bun:"person_id,notnull"`
-	// ProductID is whose list it narrows. A filter's query names branches and
-	// variants, which belong to one product and usually exist in no other, so
-	// a filter offered everywhere is offered where it matches nothing.
-	ProductID int64 `bun:"product_id,notnull"`
 	// Name is what is matched, stored normalized, and DisplayName is the
 	// spelling they used, which is what is shown back.
 	Name        string `bun:"name,notnull"`
@@ -48,7 +45,8 @@ type Filter struct {
 	// Query is the list's own query string, without a leading "?". Kept as
 	// text rather than as a column per filter: the filters belong to the list
 	// and they move, and a second place deciding what one means is a second
-	// place to be wrong.
+	// place to be wrong. It holds what the list is narrowed by and never
+	// where, so one filter applies within whatever scope is on screen.
 	Query     string    `bun:"query,notnull"`
 	CreatedAt time.Time `bun:"created_at,notnull"`
 
@@ -99,6 +97,35 @@ func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
+// scopeWords is every word of the findings list's address that says where the
+// list is rather than what it is narrowed by: the branch, the variant, a
+// subtree of one build, what differs between the builds of a selection, what
+// is spread over the variants of one branch, and the run that opened it. The
+// product is in the list's path and never in its query.
+var scopeWords = map[string]bool{
+	"stream": true, "variant": true,
+	"beneath": true, "beneath_version": true, "beneath_ecosystem": true, "beneath_namespace": true,
+	"differs": true, "variants": true, "opened_by_run": true,
+}
+
+// unscoped is a query without its scope. Every other parameter is kept exactly
+// as written, because the list recognizes a kept filter as open by comparing
+// its query with the address byte for byte.
+func unscoped(query string) string {
+	if query == "" {
+		return query
+	}
+	var out []string
+	for _, pair := range strings.Split(query, "&") {
+		rawKey, _, _ := strings.Cut(pair, "=")
+		if key, err := url.QueryUnescape(rawKey); err == nil && scopeWords[key] {
+			continue
+		}
+		out = append(out, pair)
+	}
+	return strings.Join(out, "&")
+}
+
 // ErrNoSuchFilter is returned when somebody has kept no filter by that name.
 var ErrNoSuchFilter = refusal.New("you have kept no filter by that name")
 
@@ -117,7 +144,11 @@ var ErrNoSuchFilter = refusal.New("you have kept no filter by that name")
 // A deferral carries the length it defers for, never a date. The date is
 // worked out from the length whenever somebody submits it, so a rule saved in
 // March means "put this off for a quarter" rather than "until 3 March".
-func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int64,
+//
+// The query is kept without its scope. The branch, the variant and anything
+// naming one build or one run belong to the list on screen, and one filter per
+// person is applied within whichever that is.
+func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 	name, query string, prepares Filter, cap int) (*Filter, error) {
 
 	if cap <= 0 {
@@ -177,9 +208,9 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		prepares = Filter{}
 	}
 	kept := &Filter{
-		PersonID: personID, ProductID: productID,
-		Name: matched, DisplayName: strings.TrimSpace(name),
-		Query:     strings.TrimPrefix(strings.TrimSpace(query), "?"),
+		PersonID: personID,
+		Name:     matched, DisplayName: strings.TrimSpace(name),
+		Query:     unscoped(strings.TrimPrefix(strings.TrimSpace(query), "?")),
 		CreatedAt: s.now().Truncate(time.Microsecond),
 		Outcome:   prepares.Outcome, Justification: prepares.Justification,
 		Reasoning: prepares.Reasoning, DeferDays: prepares.DeferDays,
@@ -200,7 +231,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 			Set("justification = ?", kept.Justification).
 			Set("reasoning = ?", kept.Reasoning).
 			Set("defer_days = ?", kept.DeferDays).
-			Where("person_id = ?", personID).Where("product_id = ?", productID).
+			Where("person_id = ?", personID).
 			Where("name = ?", matched).
 			Exec(ctx)
 		if err != nil {
@@ -212,7 +243,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		}
 		if n > 0 {
 			return db.NewSelect().Model(kept).
-				Where("person_id = ?", personID).Where("product_id = ?", productID).
+				Where("person_id = ?", personID).
 				Where("name = ?", matched).
 				Limit(1).Scan(ctx)
 		}
@@ -220,13 +251,13 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		// only on the path that adds a row: replacing one of your own is not
 		// how a table fills up.
 		held, err := db.NewSelect().Model((*Filter)(nil)).
-			Where("person_id = ?", personID).Where("product_id = ?", productID).
+			Where("person_id = ?", personID).
 			Count(ctx)
 		if err != nil {
 			return err
 		}
 		if held >= cap {
-			return refusal.Errorf("you are keeping %d filters for this product, which is the "+
+			return refusal.Errorf("you are keeping %d saved filters, which is the "+
 				"limit: forget one before keeping another", held)
 		}
 		// Two saves of one new name both find nothing to update and both
@@ -247,19 +278,14 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	return kept, nil
 }
 
-// SavedFilters lists what one person has kept for one product, by name.
-//
-// Narrowed by product as well as by person. A filter is a narrowing of one
-// product's findings list and its query names branches and variants that
-// usually exist in no other, so offering it elsewhere offers something that
-// matches nothing and says nothing about why — and picking it replaces what is
-// on screen with a narrowing built for somewhere else.
+// SavedFilters lists what one person has kept, by name: one list, offered on
+// every findings list and applied within the scope on screen.
 //
 // Bounded by the same number the write is, and it says how many there are in
 // all. Lowering the number leaves somebody keeping more than it shows, and the
 // write refuses them until they forget enough to be under it, so the list
 // says how many it left out.
-func (s *Store) SavedFilters(ctx context.Context, personID, productID int64,
+func (s *Store) SavedFilters(ctx context.Context, personID int64,
 	cap int) ([]Filter, int, error) {
 
 	if cap <= 0 {
@@ -268,7 +294,6 @@ func (s *Store) SavedFilters(ctx context.Context, personID, productID int64,
 	var kept []Filter
 	total, err := s.db.NewSelect().Model(&kept).
 		Where("person_id = ?", personID).
-		Where("product_id = ?", productID).
 		Order("name").Limit(cap).ScanAndCount(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read what you have kept: %w", err)
@@ -281,10 +306,9 @@ func (s *Store) SavedFilters(ctx context.Context, personID, productID int64,
 // Narrowed by the person as well as by the name, so that an identifier is not
 // a way to reach somebody else's — the filters are personal, and personal has
 // to mean it at the query rather than only on the screen.
-func (s *Store) ForgetFilter(ctx context.Context, personID, productID int64, name string) error {
+func (s *Store) ForgetFilter(ctx context.Context, personID int64, name string) error {
 	res, err := s.db.NewDelete().Model((*Filter)(nil)).
 		Where("person_id = ?", personID).
-		Where("product_id = ?", productID).
 		Where("name = ?", matching(name)).
 		Exec(ctx)
 	if err != nil {

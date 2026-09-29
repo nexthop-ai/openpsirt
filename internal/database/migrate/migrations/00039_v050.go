@@ -90,6 +90,9 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //   - A kept findings-list filter is rewritten into the words v0.5.0's list
 //     reads: the two flags "only" named become flags of their own, and hidden
 //     components joined by commas become one parameter each.
+//   - A saved filter belongs to its person rather than to a product, and
+//     keeps no scope. Where one person kept one name in several products,
+//     the oldest keeps it and the others are renamed after their product.
 //   - A key's name and a personal token's are stored folded, the way a
 //     username is: a key's unique across the deployment, a token's to its
 //     owner. v0.4.0 stored them as typed, so two names it held apart can fold
@@ -144,6 +147,9 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := savedFiltersRespelled(ctx, tx); err != nil {
+		return err
+	}
+	if err := savedFiltersPersonal(ctx, tx); err != nil {
 		return err
 	}
 	if err := sendersQualified(ctx, tx); err != nil {
@@ -226,7 +232,8 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // acted. Whether a person typed each name an issue answers to goes with its
 // column, and the names stay. A kept filter stays in v0.5.0's words, which
 // v0.4.0's list reads too, except that a hidden name holding a comma is read
-// by v0.4.0 as several names, and upgrading again keeps them apart. A claim's
+// by v0.4.0 as several names, and upgrading again keeps them apart. Each
+// saved filter is kept in every product, where v0.5.0 offered it. A claim's
 // folded subject goes with its column. A key or token keeps the name it was
 // folded or numbered to, which v0.4.0 matches as typed, and one the upgrade
 // withdrew stays withdrawn: nothing says it would still be wanted. The trail
@@ -238,6 +245,9 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := sendersNamed(ctx, tx); err != nil {
+		return err
+	}
+	if err := savedFiltersProductsBack(ctx, tx); err != nil {
 		return err
 	}
 	// A chat channel is a destination v0.4.0 cannot reach, so it goes with

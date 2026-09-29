@@ -42,6 +42,12 @@ describe("the filter a list is narrowed by", () => {
     expect(here(at)).toBe("component=firmware");
   });
 
+  it("is the same one in any scope, which a saved filter does not keep", () => {
+    const at = new URLSearchParams("stream=main&component=firmware&variant=x86&beneath=zlib");
+    expect(ruleIn(kept, at)?.name).toBe("put off drivers");
+    expect(here(at)).toBe("component=firmware");
+  });
+
   it("is none of them on a list nobody kept", () => {
     expect(ruleIn(kept, new URLSearchParams("component=openssl"))).toBeUndefined();
   });

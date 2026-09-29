@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -20,7 +18,7 @@ func TestASavedFilterIsPersonalAndReplacesItsOwnName(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		keep := func(t *testing.T, who, name, query string) int {
 			t.Helper()
-			return httpapitest.AsPerson(t, r, who, http.MethodPut, "/v1/products/mine/saved-filters/"+name,
+			return httpapitest.AsPerson(t, r, who, http.MethodPut, "/v1/session/me/saved-filters/"+name,
 				`{"query":"`+query+`"}`).Code
 		}
 		if code := keep(t, "triager", "overdue-kernel", "overdue=true&component=linux"); code != http.StatusNoContent {
@@ -41,7 +39,7 @@ func TestASavedFilterIsPersonalAndReplacesItsOwnName(t *testing.T) {
 					Query string `json:"query"`
 				} `json:"items"`
 			}
-			httpapitest.Read(t, r, who, "/v1/products/mine/saved-filters", &out)
+			httpapitest.Read(t, r, who, "/v1/session/me/saved-filters", &out)
 			return out.Items
 		}
 
@@ -68,14 +66,14 @@ func TestASavedFilterIsPersonalAndReplacesItsOwnName(t *testing.T) {
 		// And forgetting reaches only your own: somebody else's name is not
 		// there, which is what a name nobody kept answers too.
 		if got := httpapitest.AsPerson(t, r, "reader", http.MethodDelete,
-			"/v1/products/mine/saved-filters/overdue-kernel", ""); got.Code != http.StatusNoContent {
+			"/v1/session/me/saved-filters/overdue-kernel", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("forgetting your own answered %d", got.Code)
 		}
 		if len(mine(t, "triager")) != 1 {
 			t.Error("forgetting their own took somebody else's")
 		}
 		if got := httpapitest.AsPerson(t, r, "reader", http.MethodDelete,
-			"/v1/products/mine/saved-filters/overdue-kernel", ""); got.Code != http.StatusNotFound {
+			"/v1/session/me/saved-filters/overdue-kernel", ""); got.Code != http.StatusNotFound {
 			t.Errorf("forgetting a name nobody kept answered %d", got.Code)
 		}
 	})
@@ -94,7 +92,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 
 		keep := func(t *testing.T, name, body string) (int, string) {
 			t.Helper()
-			got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, "/v1/products/mine/saved-filters/"+name, body)
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, "/v1/session/me/saved-filters/"+name, body)
 			return got.Code, got.Body.String()
 		}
 		type prepared struct {
@@ -116,7 +114,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 					Prepares *prepared `json:"prepares"`
 				} `json:"items"`
 			}
-			httpapitest.Read(t, r, "triager", "/v1/products/mine/saved-filters", &out)
+			httpapitest.Read(t, r, "triager", "/v1/session/me/saved-filters", &out)
 			return out.Items
 		}
 
@@ -168,55 +166,26 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 	})
 }
 
-func TestASavedFilterBelongsToTheProductItNarrows(t *testing.T) {
-	// A filter's query names branches and variants, which belong to one
-	// product and usually exist in no other. Offered everywhere, one saved on
-	// a product with a branch called master narrowed a product that has none
-	// — a filter that matches nothing, chosen from a list that gave no reason
-	// why. Picking it also replaces what is on screen, so the wrong narrowing
-	// is applied rather than merely offered.
+// A saved filter is one list per person and keeps what the list is narrowed
+// by, never where: a query sent with a branch and a variant comes back
+// without them, so the filter applies within whatever scope is on screen.
+func TestASavedFilterIsOneListPerPersonAndKeepsNoScope(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		// The same person can see a second product, so what is being measured
-		// is the filter's scope rather than what they may reach.
-		person, err := r.Rights.Ensure(t.Context(), "triager", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(t.Context(), "theirs")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := r.Rights.GrantRole(t.Context(), person.ID, theirs.ID,
-			access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-
 		if kept := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			"/v1/products/mine/saved-filters/overdue-kernel",
-			`{"query":"stream=master&severity=critical"}`); kept.Code != http.StatusNoContent {
+			"/v1/session/me/saved-filters/overdue-kernel",
+			`{"query":"stream=master&severity=critical&variant=x86"}`); kept.Code != http.StatusNoContent {
 			t.Fatalf("keeping a filter answered %d: %s", kept.Code, kept.Body.String())
 		}
-
-		named := func(t *testing.T, product string) []string {
-			t.Helper()
-			var out struct {
-				Items []struct {
-					Name string `json:"name"`
-				} `json:"items"`
-			}
-			httpapitest.Read(t, r, "triager", "/v1/products/"+product+"/saved-filters", &out)
-			names := make([]string, 0, len(out.Items))
-			for _, one := range out.Items {
-				names = append(names, one.Name)
-			}
-			return names
+		var out struct {
+			Total int `json:"total"`
+			Items []struct {
+				Name  string `json:"name"`
+				Query string `json:"query"`
+			} `json:"items"`
 		}
-
-		if got := named(t, "mine"); len(got) != 1 || got[0] != "overdue-kernel" {
-			t.Errorf("the product it was saved on lists %v", got)
-		}
-		if got := named(t, "theirs"); len(got) != 0 {
-			t.Errorf("a filter saved on one product is offered on another: %v", got)
+		httpapitest.Read(t, r, "triager", "/v1/session/me/saved-filters", &out)
+		if out.Total != 1 || len(out.Items) != 1 || out.Items[0].Query != "severity=critical" {
+			t.Errorf("the person's filters read %+v, want one kept as severity=critical", out)
 		}
 	})
 }

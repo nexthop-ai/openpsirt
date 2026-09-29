@@ -22,7 +22,7 @@ type SavedBody struct {
 	// Query is the list's own query string, without a leading "?". Kept as
 	// text because the filters belong to the list: a saved filter is a way
 	// back to one, and the list is what knows how to read it.
-	Query string `json:"query" maxLength:"2000" doc:"The findings list's query string, without a leading ?"`
+	Query string `json:"query" maxLength:"2000" doc:"The findings list's query string, without a leading ?, and without the branch, the variant or anything naming one build or one run"`
 	// Prepares is the claim this filter offers, where it offers one.
 	Prepares *PreparedBody `json:"prepares,omitempty" doc:"The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them"`
 }
@@ -50,7 +50,7 @@ type PreparedBody struct {
 func registerSaved(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-saved-filters", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/saved-filters",
+		Path:    "/v1/session/me/saved-filters",
 		Summary: "List your saved filters",
 		Description: "The narrowings you have kept, by name.\n\n" +
 			"Personal, and nothing is shared. No ownership, no permissions and no arguing " +
@@ -62,19 +62,12 @@ func registerSaved(api huma.API, in core.Deps) {
 			"At most as many as the per-person limit, in name order. `total` is how many you " +
 			"keep, which is more than the list holds where the limit was lowered after they " +
 			"were saved.\n\n" +
-			"Kept per product. A filter narrows one product's findings list and its query " +
-			"names branches and variants that usually exist in no other, so one offered " +
-			"everywhere would be offered where it matches nothing.",
+			"One list per person, for every findings list. A filter applies within whichever " +
+			"product, branch and variant the list is scoped to.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers your own and nobody else's."),
-		func(ctx context.Context, input *struct {
-			Product string `path:"product"`
-		}) (*core.ListOutput[SavedBody], error) {
+		func(ctx context.Context, _ *struct{}) (*core.ListOutput[SavedBody], error) {
 			who, store, err := keeping(ctx, in)
-			if err != nil {
-				return nil, err
-			}
-			product, err := filtersFor(ctx, in, input.Product)
 			if err != nil {
 				return nil, err
 			}
@@ -83,7 +76,7 @@ func registerSaved(api huma.API, in core.Deps) {
 			if err != nil {
 				return nil, core.WentWrong(in.Logger, "what you have kept could not be read", err)
 			}
-			kept, total, err := store.SavedFilters(ctx, who.ID, product, cap)
+			kept, total, err := store.SavedFilters(ctx, who.ID, cap)
 			if err != nil {
 				return nil, core.WentWrong(in.Logger, "what you have kept could not be read", err)
 			}
@@ -105,17 +98,20 @@ func registerSaved(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "save-filter", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/saved-filters/{name}",
+		Path:    "/v1/session/me/saved-filters/{name}",
 		Summary: "Keep a filter under a name",
 		Description: "Keeps the findings list's current narrowing so it can be opened again. " +
 			"Saving under a name you already use replaces it: the act is deciding what that " +
-			"name means, and refusing would make somebody delete before they could correct.",
+			"name means, and refusing would make somebody delete before they could correct.\n\n" +
+			"The branch, the variant and anything naming one build or one run are left out of " +
+			"what is kept: `stream`, `variant`, `beneath` and its three qualifiers, `differs`, " +
+			"`variants` and `opened_by_run`. Every other parameter is kept as sent.\n\n" +
+			"Refused with 422 where adding the name would take you past the per-person limit.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.AnyPerson, "Yours alone."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Name    string `path:"name" maxLength:"120"`
-		Body    struct {
-			Query string `json:"query" maxLength:"2000" doc:"The list's query string, without a leading ?"`
+		Name string `path:"name" maxLength:"120"`
+		Body struct {
+			Query string `json:"query" maxLength:"2000" doc:"The list's query string, without a leading ?. Its scope is left out of what is kept"`
 			// Prepares is what the filter should offer to claim
 			// about what it catches. Left out, it prepares nothing
 			// — and left out on a filter that prepares something
@@ -137,16 +133,12 @@ func registerSaved(api huma.API, in core.Deps) {
 				DeferDays:     input.Body.Prepares.DeferDays,
 			}
 		}
-		product, err := filtersFor(ctx, in, input.Product)
-		if err != nil {
-			return nil, err
-		}
 		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.SavedPerPerson,
 			setting.DefaultSavedPerPerson)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "that filter could not be kept", err)
 		}
-		if _, err := store.SaveFilterPreparing(ctx, who.ID, product, input.Name,
+		if _, err := store.SaveFilterPreparing(ctx, who.ID, input.Name,
 			input.Body.Query, prepares, cap); err != nil {
 			return nil, core.Asked(in.Logger, err)
 		}
@@ -155,25 +147,20 @@ func registerSaved(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "forget-filter", Method: http.MethodDelete,
-		Path:    "/v1/products/{product}/saved-filters/{name}",
+		Path:    "/v1/session/me/saved-filters/{name}",
 		Summary: "Forget a saved filter",
 		Description: "Drops one of your own. A name you have not kept is not there, which is " +
 			"the same answer as somebody else's — the filters are personal, and the query " +
 			"says so rather than only the screen.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.AnyPerson, "Yours alone."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Name    string `path:"name" maxLength:"120"`
+		Name string `path:"name" maxLength:"120"`
 	}) (*struct{}, error) {
 		who, store, err := keeping(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		product, err := filtersFor(ctx, in, input.Product)
-		if err != nil {
-			return nil, err
-		}
-		if err := store.ForgetFilter(ctx, who.ID, product, input.Name); err != nil {
+		if err := store.ForgetFilter(ctx, who.ID, input.Name); err != nil {
 			if errors.Is(err, saved.ErrNoSuchFilter) {
 				return nil, huma.Error404NotFound(saved.ErrNoSuchFilter.Error())
 			}
@@ -201,24 +188,4 @@ func keeping(ctx context.Context, in core.Deps) (access.Subject, *saved.Store, e
 		return access.Subject{}, nil, core.NoDatabase(in.Logger)
 	}
 	return who, saved.NewStore(in.DB.DB), nil
-}
-
-// filtersFor resolves which product's filters these are.
-//
-// Visible rather than merely declared, like every other product a name in a
-// path resolves to: a product somebody holds nothing on is one that was never
-// declared as far as they are concerned. Nothing here is about what the
-// product holds — the filters are personal — but the address still names one,
-// and an address that answers differently for a name somebody holds nothing on
-// is a way to read the product list.
-func filtersFor(ctx context.Context, in core.Deps, name string) (int64, error) {
-	subject, err := core.Reading(ctx)
-	if err != nil {
-		return 0, err
-	}
-	product, err := core.ProductNamedVisibly(ctx, in, subject, name)
-	if err != nil {
-		return 0, err
-	}
-	return product.ID, nil
 }
