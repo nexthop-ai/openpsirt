@@ -26,7 +26,7 @@ import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
 import { mayOf, useWho } from "../app/session";
 import type { Who } from "../app/session";
-import { allFindingsAt, findingAt } from "../app/routes";
+import { allFindingsAt, claimAt, findingAt } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
 import { OutlierRows } from "../ui/OutlierRows";
 
@@ -327,6 +327,8 @@ function Reaffirm({
 }) {
   const [reasoning, setReasoning] = useState("");
   const [waiting, setWaiting] = useState<boolean | null>(null);
+  // The claim the act re-made, which is where the decision now stands.
+  const [remade, setRemade] = useState(0);
   const again = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -337,11 +339,31 @@ function Reaffirm({
       ),
     onSuccess: (made) => {
       setWaiting(!!made?.waiting);
+      setRemade(made?.claim_id ?? 0);
       setReasoning("");
       onDone();
     },
   });
 
+  // The answer outlives the card: once re-made, this claim is no longer one
+  // to re-affirm, and the confirmation stays where the button was.
+  if (waiting !== null) {
+    return (
+      <div className="alert info" role="status">
+        <strong>Re-affirmed</strong>
+        <span>
+          {waiting
+            ? "Waiting for a second person: it is rated worse now, or was never agreed. "
+            : "Standing, with the earlier agreement carried onto it. "}
+          {remade > 0 && (
+            <Link to={claimAt(remade)} className="linkish">
+              Open the re-made claim →
+            </Link>
+          )}
+        </span>
+      </div>
+    );
+  }
   if (!mine || !claim.reaffirmable) return null;
   return (
     <div className="card">
@@ -366,13 +388,6 @@ function Reaffirm({
         >
           Re-affirm all {claim.places > 1 ? `${claim.places} places` : ""}
         </button>
-        {waiting !== null && (
-          <span className="hint" style={{ marginLeft: 10 }}>
-            {waiting
-              ? "Waiting for a second person: it is rated worse now, or was never agreed."
-              : "Standing, with the earlier agreement carried onto it."}
-          </span>
-        )}
       </div>
       {again.isError && <Failed error={again.error} what="It could not be re-affirmed." />}
     </div>

@@ -3,7 +3,7 @@
 
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { questionIn, untaken, useSelection } from "./useSelection";
-import { FindingsTable } from "./FindingsTable";
+import { DecidedNotice, FindingsTable, type Decided } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager } from "./FindingsViews";
 import { useHandOver } from "./findingsHandover";
@@ -169,6 +169,11 @@ export function Findings() {
   // whenever the question changes, since a cursor pointing at row nine of a
   // list that has been re-read is pointing at a different finding.
   const [cursor, setCursor] = useState(-1);
+  // A decision just recorded from a row's preview, confirmed where the row sat.
+  const [decided, setDecided] = useState<Decided | null>(null);
+  // The rows the cursor was last moved on after a decision, so it moves once
+  // per reading of the list rather than on every render.
+  const [landedOn, setLandedOn] = useState<unknown>(null);
   // The selection, by what a row *is* rather than by where it sits: the
   // list is read again after every decision and after every page, and an index
   // would select a different row each time. Selection is a prerequisite rather
@@ -365,6 +370,7 @@ export function Findings() {
     // answer is a different finding from row nine of the last one.
     setCursor(-1);
     setPeeking(null);
+    setDecided(null);
     setParams(asking(next));
   }
 
@@ -388,6 +394,32 @@ export function Findings() {
   // Memoized because the fallback is a fresh array each render, which made
   // the effect that lands the cursor depend on something that always changed.
   const rows = useMemo(() => findings.data?.items ?? [], [findings.data]);
+
+  // After a decision the cursor is on the row that followed the decided one,
+  // found by what it is: read again, the list may no longer hold the decided
+  // row, and every row after it moves up by one.
+  if (decided?.next && rows !== landedOn) {
+    setLandedOn(rows);
+    const to = rows.findIndex((row) => identityOf(row) === decided.next);
+    if (to >= 0 && to !== cursor) setCursor(to);
+  }
+
+  // A decision recorded from a row's preview. The preview closes, the
+  // confirmation takes its place and the list is read again.
+  function decidedHere(key: string, recorded: Decided["recorded"]) {
+    const i = rows.findIndex((row) => identityOf(row) === key);
+    const row = rows[i];
+    const after = rows[i + 1];
+    setDecided({
+      key,
+      next: i >= 0 && after ? identityOf(after) : null,
+      recorded,
+      issue: row?.vulnerability ?? "",
+    });
+    setLandedOn(null);
+    setPeeking(null);
+    reread();
+  }
 
   // The other rows on this page that are the same issue at another binary of
   // the same source package. Counted over the page rather than the list,
@@ -972,6 +1004,11 @@ export function Findings() {
           replaced while the next answer is read: the list somebody is
           narrowing is the thing they are looking at. */}
       <div className="listing" aria-busy={findings.isPlaceholderData || undefined}>
+        {/* A decision that emptied the page: the table that would carry its
+            confirmation is not drawn. */}
+        {!findings.isPending && rows.length === 0 && decided && (
+          <DecidedNotice decided={decided} onDismiss={() => setDecided(null)} />
+        )}
         {findings.isPending ? (
           <Loading />
         ) : rows.length === 0 ? (
@@ -997,7 +1034,9 @@ export function Findings() {
           <FindingsTable
             rows={rows}
             cursor={cursor}
-            onDecided={reread}
+            onDecided={decidedHere}
+            decided={decided}
+            onDismiss={() => setDecided(null)}
             shownKeys={shownKeys}
             picked={picked}
             pick={pick}

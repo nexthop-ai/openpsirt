@@ -913,7 +913,7 @@ running to 2,800.
 | The walk does not stop at a page boundary the reader never chose | The window asked for is the list's page widened by one row at each end, and a neighbor is handed the list at the page *it* sits on. At the largest page there is no room to widen, so the window is the page itself and the walk ends at its edge rather than asking twice. **Unmoved**: widening backward alone put the page's last row outside its own window, and the row found nothing to walk from |
 | The row is found by what it is, not by where it sat | The list is read afresh, and under a state filter the row may have moved or gone. Where it cannot be found there is no walk, which is the same answer as arriving from somewhere that was not a list |
 | A list that asked for everything is still a list | Present-and-empty and absent are different: the first has a row before and after like any other |
-| After submitting, the next finding is offered first, and the review queue second | The queue is where the claim went rather than where the person is going |
+| After submitting, the next finding is offered first, and a decision that waits links to its own page second | That page is where its approval lands. A decision in force at once offers nothing more |
 
 ## The dependency tree
 
@@ -997,18 +997,33 @@ wrote. The card carries the reasoning as it stands, how many records the claim
 wrote, how many locations and builds it reaches, whether it was approved before
 and came back, and how long the finding has been put off.
 
-`DESIGN-triage.md` says what the queue holds and on what terms. What the screen
-adds:
+`DESIGN-triage.md` says what the queue holds and on what terms. The screen has
+a tab per list, and two about the reader's own claims:
+
+| Tab | Holds | A card offers |
+|---|---|---|
+| To approve | Claims waiting for a second person | Approve and Reject |
+| Expired deferrals | Deferrals whose date has passed | Decide again |
+| Missed fix dates | Promised upgrades and patches whose date has passed | Change the version or the date, or decide again |
+| Mine, recent | What the reader proposed and what became of it | Reading, and the claim one link away |
+| To reaffirm | The reader's own lapsed claims | Reaffirm, one or many |
+
+Every tab carries its count, read from its own list without the filters.
 
 | | |
 |---|---|
+| **A card names its reason** | The state mark on an expired deferral or a missed fix date says which, and the outcome is drawn as what was promised: "Upgrade to 3.0.15 by 2026-09-01", "Patch by 2026-09-01", "Deferred until 2026-09-01" |
+| **A card offers only the acts that answer its reason** | Approving is refused on anything but an approval, so the two dated lists carry no Approve, no selection and no batch |
+| **Deciding again opens the finding** | Where its decision form is. A claim over many issues opens the claim page instead |
+| **Changing a promise is done on the card** | The version for an upgrade, the date, and the reason, which is required. The confirmation stays on the card until put away, because the promise leaves the list once its date moves |
+| **The two dated lists narrow to the reader's own** | A Mine only box beside the filters, because both lists show everybody's claims |
 | **Approving and rejecting** | Work on the claim, and rejecting needs a reason. Selecting several and naming a batch approves them together, so they can be undone together |
 | **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M", both counted in issues. An extension says which claim it rests on |
 | **An outlier is one issue, set aside or held back at every place it sits** | One row stands for the issue, and ticking it takes every decision the claim holds about the issue, one per place. A part of the issue left in the claim is agreed to with it. The author holding rows back and the approver setting them aside take the same set |
-| **A To reaffirm tab lists the reader's own lapsed claims** | Work handed back, which the lapse message links to. One row per claim with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many places and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every claim shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like the other two |
-| **Lapsed decisions and deferrals that ran out sit underneath** | Everybody's, where the To reaffirm tab is the reader's own. The row carries the decision and not the build it was made in, so a single place is reaffirmed on the finding, where its locations are, and a whole claim from the tab or the claim's page. One list, because a deferral that ran out on code that then moved is both — asked as two, the section merged them by hand and the count over it added the two totals |
+| **A To reaffirm tab lists the reader's own lapsed claims** | Work handed back, which the lapse message links to. One row per claim with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many places and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every claim shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like every other tab |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 | **Rulings on vulnerability reports waiting for approval sit underneath, with the rating and date-movement sections** | A ruling rejecting a report or declaring it out of scope waits for a second person, and this is where somebody goes to be one. Its own section, because a ruling is about claims somebody sent rather than about code. Listed across the products the reader may read reports in, and narrowed with the rest where the address names a product |
+| **A section named in the address is brought into view** | The ratings, the disclosure dates and the rulings each carry a name, and a link to one of them lands on it |
 
 The queue narrows to one product, which is what a figure on the home screen
 counts: the address carries the product it was counted for, and the line under
@@ -1019,12 +1034,13 @@ age of seven, thirty or ninety days, a severity, an outcome and a release
 (`DESIGN-triage.md` § Queue filters). Each rides in the address, so a link
 somebody sends is the same list, and changing one clears the selection. The
 exports carry the same filters, so a file taken from a narrowed screen is the
-narrowed backlog. The filters sit on the queue proper and not on the two tabs
-about the reader's own claims. The To reaffirm tab has no file of its own, so it
-offers none rather than the queue under its heading.
+narrowed backlog, and carry the list and the Mine only box too. The filters sit
+on the three lists and not on the two tabs about the reader's own claims. The To
+reaffirm tab has no file of its own, so it offers none.
 
 The count beside the queue on the rail, and the home screen's figure for what is
-pending your approval, add the rulings on vulnerability reports the reader may
+pending your approval, count the To approve list and add the rulings on
+vulnerability reports the reader may
 agree to — waiting, proposed by somebody else, in a product where they may
 approve a ruling — because those sit in the same queue. Rating downgrades and
 disclosure-date movements waiting on somebody are not in that count; they are
@@ -1168,7 +1184,7 @@ something is going.
 
 | Rule | |
 |---|---|
-| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves. The claims waiting on a second person open the review queue narrowed to the product |
+| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves. The claims waiting on a second person open the review queue narrowed to the product. On home, the findings with a lapsed decision open the findings list narrowed to lapsed, and the expired deferrals open that list of the review queue, each counted from the list it opens |
 | Counted as issues at components | The unit the findings list counts, so the page and the list it opens agree. Counting rows would report how much the dependency graph shares |
 | The product's totals are not the sum of its builds | A library carrying one issue in two builds is one thing to decide about and two build rows. The totals are counted again over the product — a sum put 15,231 at the top of a page whose own list said 7,629 |
 | "Undecided" and "agreed" are the findings list's own words | By the same definition and from the same expression. Two screens with two definitions of "decided" is how they come to disagree in front of somebody |
@@ -1401,13 +1417,25 @@ application never makes one.
 
 ### Answer placement
 
-A confirmation belongs where the button that produced it was pressed. The
-decision form's submit sits at the foot of a long form and the confirmation is
-drawn at the head of the screen, so somebody pressing it was left looking at
-the form they had just sent, with the answer a page and a half above them and
-nothing saying anything had happened. The page is brought to it, smoothly, so
-that the movement is something they watch rather than a jump they have to
-re-find themselves after.
+Each act confirms where it happened and offers its next act as a link. The
+confirmation is never a toast and nothing navigates away.
+
+| Act | Where it is confirmed | What it offers |
+|---|---|---|
+| Deciding on the finding screen | Directly above the decision card it produced, brought into view once the card is drawn | The next finding in the list, and the decision's own page where it waits |
+| Deciding from a row's preview on the findings list | Where the row was: under it while it is listed, in its place once the list read again does not hold it, and at the end of the page, or over the empty list, where neither it nor the row after it is listed. The cursor moves to the row that followed it | The decision's own page where it waits |
+| Deciding several issues together | Above the submit button | The decision's own page |
+| Promising an upgrade on the component screen | In place of the form | The decision's own page where it waits; each build's pending upgrades for three builds or fewer, and above three one link to the release they share, or to the product's releases where they span several |
+| Moving a disclosure date or disclosing | On the row or in the notice the act was taken from, and above the list where the act took the row off it | The review queue's disclosure dates where it waits |
+| Rating an issue | On the rating line the form opened from | The review queue's ratings where it waits |
+| Reaffirming | On the card or the tab it was done from | The re-made claim's own page where it waits; from the tab, each waiting claim's page for three or fewer, and Mine, recent above three |
+| Changing a missed promise | On its queue card | The decision's own page |
+
+| Rule | |
+|---|---|
+| Waiting for a second person is said only where one is needed | A claim in force at once reads as in force |
+| A decision's own page is the claim page | A decision's address resolves to the claim it is one row of |
+| The finding screen's confirmation follows the card | Submitting hides the form and the publisher statements, and the page shortens by about 900 pixels under whoever pressed the button. A confirmation at the head of the screen lands out of view |
 
 ## Reachable from a keyboard
 
@@ -1896,7 +1924,7 @@ than inherited.
 |---|---|
 | A known-exploited tile at every scope | It needs a product: nothing counts exploited findings without one to narrow inside, and a tile that guessed would be worse than one that is not there |
 | A finding sample carrying builds already past the fix, shown and not offered | The reach endpoint does not say whether a build's version sits past the fixing version — there is no version ordering here — so every build at another version is offered and the "not offered" card is empty |
-| Reaffirms a lapsed decision inline on the queue card | The card for everybody's lapsed decisions carries no build, and reaffirming one place is a claim about one place in one build, so that happens on the finding. Whole claims are reaffirmed from the To reaffirm tab |
+| Reaffirms a lapsed decision inline on the queue card | A lapsed decision is on no queue card. Reaffirming one place is a claim about one place in one build, so that happens on the finding. Whole claims are reaffirmed from the To reaffirm tab |
 | Variants and branches screens carry a product select of their own | The scope picker is that control, and the screens follow it |
 | The queue card draws "matching automatically" and "ticked deliberately" apart | The record does not keep which builds were reached by lookup and which by an applied decision, and the number an approval keeps is one |
 | The users table lists user, identity, last sign-in, roles and assigned | User, identity, roles and a grant control on the row. Granting is what an administrator opens the screen to do; last sign-in and assigned work are read from the person's own row |
@@ -1950,7 +1978,6 @@ Coverage of the interface is measured and reported by the gate.
 | | |
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
-| **Narrowing the review queue by what kind of thing is waiting** | A claim awaiting agreement, a lapsed decision, a deferral that ran out and a promise past its date share one list |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
 ## Gaps the checks left
@@ -1978,7 +2005,7 @@ the one that made it too long.
 | **The list screen gives up the parts that take rows and draw them** | Expanded in place, by component, by bump, the pager, and the table itself. What is left holds the filters, the page and the question being asked — the table takes what it draws and holds none of it, which is what stops the path's product being read on the list that spans every product, where there is none |
 | **What is selected is a hook, not several pieces of state in a render function** | The rule that a changed question clears the selection was written at some call sites and missing at others, and it held only by a property of another file: every chip either drops its key or puts the wider default back, so removing one only ever widens. Inside the hook there is no call site left that could bypass it |
 | **What an address means lives beside the list rather than inside the screen** | Setting one filter, setting several values of one, and hiding a component are pure functions of the parameters. Two screens spelled the build prefix by hand and the finding address twice, and the copies dropped the parameter the finding reads to walk the list it came from |
-| **The queue screen splits by which queue** | Five lists lived there. What became of what you proposed is a whole tab with its own endpoint, sharing nothing with the claims but the offset in the address; a disclosure-date movement and a severity rating are two things waiting for a second person that are not claims, and share neither the card nor the selection nor the batch. What is left is the claim queue, which is one thing |
+| **The queue screen splits by which queue** | Five lists lived there. What became of what you proposed is a whole tab with its own endpoint, sharing nothing with the claims but the offset in the address; a disclosure-date movement and a severity rating are two things waiting for a second person that are not claims, and share neither the card nor the selection nor the batch. What is left is the claims, one list per reason a claim waits, drawn from one card for approvals and one for the two dated lists |
 | **The dependency tree gives up the panel** | Walking the graph and asking what is known about one node are two questions, and the second took a third of the page while the first was on screen |
 | **The finding screen gives up the one form among its readings** | Rating the issue is a claim about the issue in this product, made from a screen that is otherwise four readings of what the record already says |
 | **The notes thread is on the screen whether or not a claim exists** | It is the one somebody can write in before anybody has decided anything, which is what it is for; the claim's own thread stays gated on a claim. It says in words that it is about this issue in this product, because it is read beside a row that may be one of eleven the same issue sits on — not about this component, and not about other products |

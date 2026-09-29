@@ -120,6 +120,64 @@ describe("approving a selection", () => {
   });
 });
 
+// The list a request to the queue asked for.
+const reasonOf = (init: unknown) =>
+  (init as { params?: { query?: { reason?: string } } })?.params?.query?.reason;
+
+describe("the review queue by reason", () => {
+  it("counts each tab from its own list", async () => {
+    const totals: Record<string, number> = {
+      approval: 2,
+      "expired-deferral": 3,
+      "missed-fix-date": 4,
+    };
+    serve((path, init) =>
+      path === "/v1/review-queue"
+        ? { data: { items: [], total: totals[reasonOf(init) ?? ""] ?? 0 } }
+        : { data: { items: [], total: 0 } },
+    );
+    mount.render(screen(<Queue />, "/review-queue"));
+    await settle();
+    const tabs = Array.from(mount.host().querySelectorAll("button.tab2")).map((each) =>
+      each.textContent?.replace(/\s+/g, " ").trim(),
+    );
+    expect(tabs.slice(0, 3)).toEqual(["To approve 2", "Expired deferrals 3", "Missed fix dates 4"]);
+  });
+
+  it("names a missed promise and offers changing it or deciding again, never approving", async () => {
+    const promise = {
+      ...waiting(7),
+      decision: {
+        id: 70,
+        outcome: "upgrade-needed",
+        upgrade_to: "3.0.15",
+        committed_to: "2026-09-01",
+        reasoning: "moving",
+      },
+    };
+    serve((path, init) =>
+      path === "/v1/review-queue" && reasonOf(init) === "missed-fix-date"
+        ? { data: { items: [promise], total: 1 } }
+        : { data: { items: [], total: 0 } },
+    );
+    mount.render(screen(<Queue />, "/review-queue?reason=missed-fix-date"));
+    await settle();
+    const host = mount.host();
+    expect(host.textContent).toContain("Upgrade to 3.0.15 by 2026-09-01");
+    expect(host.textContent).toContain("Fix date missed");
+    const buttons = Array.from(host.querySelectorAll("button")).map((each) => each.textContent);
+    expect(buttons).toContain("Change the version or date");
+    expect(buttons.some((text) => text?.startsWith("Approve"))).toBe(false);
+    expect(Array.from(host.querySelectorAll("a")).map((each) => each.textContent)).toContain(
+      "Decide again →",
+    );
+    expect(exports().map((each) => each.getAttribute("href"))).toEqual([
+      "/v1/review-queue.csv?reason=missed-fix-date",
+      "/v1/review-queue.json?reason=missed-fix-date",
+    ]);
+  });
+});
+
 describe("the selection an approval loop leaves", () => {
   it("keeps what was ticked while it ran, and what was refused", () => {
     const now = new Map([

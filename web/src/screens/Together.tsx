@@ -27,7 +27,7 @@ import {
 import { needsJustification as statesReason } from "../ui/outcomes";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
-import { decisionAt, issueAt } from "../app/routes";
+import { claimAt, decisionAt, issueAt } from "../app/routes";
 
 // A page of issues at one component. A kernel carries thousands, and a list
 // drawn as if it were all of them says "select all" against a number that is
@@ -396,6 +396,7 @@ export function Together() {
             pending={decide.isPending}
             error={decide.error}
             recorded={decide.data?.recorded}
+            claimId={decide.data?.claim_id}
             skipped={decide.data?.skipped ?? []}
             draftKey={draftKey}
             mentions={{ product }}
@@ -413,6 +414,7 @@ function Claim({
   pending,
   error,
   recorded,
+  claimId,
   skipped,
   draftKey,
   mentions,
@@ -423,6 +425,7 @@ function Claim({
   pending: boolean;
   error: unknown;
   recorded?: number;
+  claimId?: number;
   skipped: Skipped[];
   draftKey: string;
   mentions: { product: string };
@@ -569,7 +572,14 @@ function Claim({
         {typeof recorded === "number" && recorded > 0 && (
           <p className="alert info" role="status">
             <strong>{recorded.toLocaleString()} records written — one per issue, per place.</strong>
-            <span>One claim, pending a second person; each record expires on its own.</span>
+            <span>
+              One claim, waiting for a second person.{" "}
+              {claimId ? (
+                <Link to={claimAt(claimId)} className="linkish">
+                  Open the decision →
+                </Link>
+              ) : null}
+            </span>
           </p>
         )}
         {typeof recorded === "number" && skipped.length > 0 && (

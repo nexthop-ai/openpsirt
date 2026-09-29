@@ -44,12 +44,15 @@ export function Assess({
   published,
   assessed,
   onClose,
+  onDone,
 }: {
   product: string;
   vulnerability: string;
   published: string;
   assessed?: string;
   onClose: () => void;
+  // What was recorded, for the confirmation drawn where the form was.
+  onDone: (rated: { severity: string; waiting: boolean }) => void;
 }) {
   const queries = useQueryClient();
   // The rating standing, where one is. Somebody opening this to reword the
@@ -66,8 +69,8 @@ export function Assess({
           body: { severity: severity as (typeof RATINGS)[number], reasoning },
         }),
       ),
-    onSuccess: () => {
-      onClose();
+    onSuccess: (rated) => {
+      onDone({ severity: rated.severity, waiting: !!rated.needs_approval });
       setReasoning("");
       void queries.invalidateQueries({ queryKey: ["finding"] });
     },

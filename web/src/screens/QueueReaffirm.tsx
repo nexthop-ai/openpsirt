@@ -13,7 +13,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because, Outcome } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
-import { claimAt, findingAt } from "../app/routes";
+import { claimAt, findingAt, reviewQueueAt } from "../app/routes";
 
 type Row = Body<"ToReaffirmBody">;
 
@@ -57,6 +57,9 @@ export function ToReaffirm({
   const [open, setOpen] = useState(false);
   const [reasoning, setReasoning] = useState("");
   const [made, setMade] = useState<Reaffirmed | null>(null);
+  // The re-made claims that wait for a second person, each followed on its
+  // own page.
+  const [waitingOn, setWaitingOn] = useState<number[]>([]);
   const again = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -67,6 +70,7 @@ export function ToReaffirm({
     onSuccess: (answer) => {
       const claims = answer?.claims ?? [];
       setMade({ claims: claims.length, waiting: claims.filter((one) => one.waiting).length });
+      setWaitingOn(claims.filter((one) => one.waiting).map((one) => one.claim_id));
       setPicked(new Set());
       setReasoning("");
       setOpen(false);
@@ -94,7 +98,20 @@ export function ToReaffirm({
     <>
       {made !== null && (
         <p className="hint" role="status">
-          {reaffirmedNotice(made)}
+          {reaffirmedNotice(made)}{" "}
+          {waitingOn.length > 3 ? (
+            <Link to={reviewQueueAt({ mine: true })} className="linkish">
+              Mine, recent →
+            </Link>
+          ) : (
+            waitingOn.map((id) => (
+              <span key={id}>
+                <Link to={claimAt(id)} className="linkish">
+                  Open claim {id} →
+                </Link>{" "}
+              </span>
+            ))
+          )}
         </p>
       )}
       {rows.length === 0 ? (

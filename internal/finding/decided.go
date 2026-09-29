@@ -36,11 +36,17 @@ type decisionState struct {
 // claim still stands, because a lapse is what happened to it; the other three
 // require the live key, because a claim that no longer stands is not waiting,
 // is not agreed, and is not with its author.
+//
+// Waiting is a proposal that needs a second person. A proposal that needs
+// nobody is in force, and counts with the agreed ones.
 var (
 	claimWaiting = decisionState{"waiting_here",
-		" AND de.state = ? AND de.live_key IS NOT NULL", []any{"proposed"}}
-	claimApproved = decisionState{"approved_here",
-		" AND de.state = ? AND de.live_key IS NOT NULL", []any{"approved"}}
+		" AND de.state = ? AND de.needs_approval = ? AND de.live_key IS NOT NULL",
+		[]any{"proposed", true}}
+	claimApproved = func() decisionState {
+		inForce, args := InForce()
+		return decisionState{"approved_here", " AND " + inForce + " AND de.live_key IS NOT NULL", args}
+	}()
 	claimLapsed = decisionState{"lapsed_here",
 		" AND de.state = ?", []any{"lapsed"}}
 	claimSentBack = decisionState{"sent_back_here",

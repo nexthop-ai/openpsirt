@@ -187,13 +187,25 @@ export const advisoryAt = (advisory: string | number) => at("advisory", { adviso
 export const reportAt = (report: string) => at("report", { report });
 export const settingsAt = (section: string) => at("settingsSection", { section });
 
-// The review queue, for one product, or opened on the claims somebody made
-// themselves.
-export const reviewQueueAt = (which: { product?: string; mine?: boolean } = {}) =>
+// The review queue, for one product, on one of its lists, or opened on the
+// claims somebody made themselves or has to re-affirm.
+export const reviewQueueAt = (
+  which: {
+    product?: string;
+    mine?: boolean;
+    reaffirm?: boolean;
+    reason?: "expired-deferral" | "missed-fix-date";
+  } = {},
+) =>
   at(
     "reviewQueue",
     {},
-    { product: which.product || undefined, mine: which.mine ? "1" : undefined },
+    {
+      product: which.product || undefined,
+      mine: which.mine ? "1" : undefined,
+      reaffirm: which.reaffirm ? "1" : undefined,
+      reason: which.reason,
+    },
   );
 
 // The form that records a flaw in a product, started from a report where one

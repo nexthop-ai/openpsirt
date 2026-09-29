@@ -14,7 +14,7 @@ import { ROLLED } from "../ui/severities";
 
 import { Loading } from "../ui/Loading";
 import { useQuery } from "@tanstack/react-query";
-import { Decide } from "../ui/Decide";
+import { Decide, type Recorded } from "../ui/Decide";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap, whichOf } from "../api/queries";
@@ -532,9 +532,9 @@ export function Peek({
   ecosystem?: string;
   namespace?: string;
   to: string;
-  // The list's own act once something has been recorded here: read itself
-  // again, because the row's state has moved.
-  onDecided: () => void;
+  // The list's own act once something has been recorded here: say so where
+  // the row sits and read itself again, because the row's state has moved.
+  onDecided: (recorded: Recorded) => void;
 }) {
   const detail = useQuery({
     queryKey: ["finding", at, vulnerability, component, version, ecosystem, namespace],
@@ -589,9 +589,9 @@ export function Peek({
         at={{ ...at, vulnerability, component, version, ecosystem, namespace }}
         places={it?.places ?? []}
         undisclosed={!!it?.undisclosed}
-        onDone={() => {
+        onDone={(recorded) => {
           void detail.refetch();
-          onDecided();
+          onDecided(recorded);
         }}
       />
       <Link to={link} className="linkish">

@@ -10,34 +10,35 @@ import { Became } from "./QueueMine";
 import { ToReaffirm } from "./QueueReaffirm";
 import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
-import { api, type Body } from "../api/client";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { api } from "../api/client";
 import { UNOWNED_LIST, usePaging } from "./list";
 import { claimAt, decisionAt, findingAt, issueAt } from "../app/routes";
 import { unwrap } from "../api/queries";
-import { claimOf, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
+import { claimOf, useAfterClaim, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
-import { Because, called, labeled } from "../ui/Outcome";
+import { called, labeled } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
 import { Count } from "../ui/Count";
 import { QueueFilters, queueNarrowing } from "./QueueFilters";
 import { issuesIn, toggled } from "./outliers";
+import { promised, queueReason, REASONS, wordsFor, type Reason } from "./queueReasons";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
 const PAGE = 50;
 
 // The review queue at the grain of a claim: one card per proposer's action,
-// however many records it wrote. The approver reads one argument and its
-// reach, and approving, rejecting and undoing all work at that size. A bulk
-// claim carries its outliers; an extension says what it rests on. Lapsed
-// decisions and deferrals that ran out sit underneath: nobody has to agree to
-// those again, but each needs a fresh reason.
+// however many records it wrote. Three lists, one per reason a claim waits:
+// for approval, where approving, rejecting and undoing all work at the size of
+// the claim; a deferral whose date passed; and a promise whose date passed with
+// the finding still open. The last two ask for a new decision rather than an
+// agreement, and each card offers only the acts that answer its reason.
 export function Queue() {
   const [params, setParams] = useSearchParams();
   const { offset, go } = usePaging();
@@ -86,6 +87,10 @@ export function Queue() {
   // Either of the two tabs about your own claims, where the queue proper is
   // only counted.
   const aside = mine || reaffirm;
+  // Which of the three lists, where the reader is on one of them.
+  const reason = queueReason(params);
+  // Only the reader's own claims, on the two lists that show everybody's.
+  const own = params.get("own") === "1";
   // The product, where the address names one. The figure on the home screen
   // is narrowed by the scope picker and links here with it, so a queue that
   // ignored it answered a different question from the number that was clicked.
@@ -94,27 +99,45 @@ export function Queue() {
   // What else the queue is narrowed by: who proposed a claim, its age, the
   // severity it covers, its outcome and the release it covers.
   const narrowing = queueNarrowing(params);
-  const queue = useQuery({
-    queryKey: ["queue", aside ? 0 : offset, aside, product, aside ? {} : narrowing],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/review-queue", {
-          // A page when it is the list being read, one row when it is only
-          // the tab's count: both sides are asked for on every visit so a tab
-          // carries its number without being opened.
-          params: {
-            query: {
-              limit: aside ? 1 : PAGE,
-              offset: aside ? 0 : offset,
-              ...within,
-              // Only where the filters are on screen: the tab count on the
-              // other two tabs reads the whole queue.
-              ...(aside ? {} : narrowing),
+  // One list per reason. A page when it is the list being read, one row when
+  // it is only a tab's count: every list is asked for on every visit so each
+  // tab carries its number without being opened. The filters apply only to the
+  // list on screen, so a tab's count is the whole of its list.
+  const listing = (which: Reason) => {
+    const reading = !aside && reason === which;
+    const yours = reading && own && which !== "approval";
+    return {
+      queryKey: [
+        "queue",
+        which,
+        reading ? offset : 0,
+        reading,
+        product,
+        reading ? narrowing : {},
+        yours,
+      ],
+      queryFn: async () =>
+        unwrap(
+          await api.GET("/v1/review-queue", {
+            params: {
+              query: {
+                reason: which,
+                limit: reading ? PAGE : 1,
+                offset: reading ? offset : 0,
+                ...within,
+                ...(reading ? narrowing : {}),
+                ...(yours ? { mine: true } : {}),
+              },
             },
-          },
-        }),
-      ),
-  });
+          }),
+        ),
+    };
+  };
+  const approvals = useQuery(listing("approval"));
+  const expired = useQuery(listing("expired-deferral"));
+  const missed = useQuery(listing("missed-fix-date"));
+  const counted = { approval: approvals, "expired-deferral": expired, "missed-fix-date": missed };
+  const queue = counted[reason];
   // The lapsed claims that are this person's to re-affirm, narrowed to the
   // product the address names like the queue beside it.
   const lapsedMine = useQuery({
@@ -147,16 +170,26 @@ export function Queue() {
     if (!found) return;
     document.getElementById(`claim-${wanted}`)?.scrollIntoView({ block: "center" });
   }, [found, wanted]);
-  // Lapsed and expired asked as one list. They overlap — a deferral that ran
-  // out on code that then moved is both — so two lists had to be merged and
-  // deduplicated here while the figure over them added the two totals and
-  // counted the overlap twice. One question answers both, and the number it
-  // comes back with is the number of rows.
-  const stopped = useQuery({
-    queryKey: ["queue", "stopped"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions", { params: { query: { stopped: true, limit: 50 } } })),
-  });
+  // A section somebody was sent to by name — the ratings, the disclosure
+  // dates, the rulings — brought into view once it is drawn. A link inside the
+  // interface changes the address without loading a page, so the browser does
+  // not do it. Each section is drawn when its own read lands, which may be
+  // after the queue's, so the page is watched until the section appears.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const land = () => {
+      const section = document.getElementById(hash.slice(1));
+      section?.scrollIntoView({ block: "start" });
+      return !!section;
+    };
+    if (land()) return;
+    const watch = new MutationObserver(() => {
+      if (land()) watch.disconnect();
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    return () => watch.disconnect();
+  }, [hash]);
   // A milder rating of an issue waits for a second person the same way a
   // dismissal does, and so does a request to keep something hidden longer.
   // Both are listed here, where a request is otherwise read only on the
@@ -198,7 +231,8 @@ export function Queue() {
   // The request the export links make, so a file matches the screen it was
   // taken from rather than being the whole backlog under a narrowed heading.
   const exporting = new URLSearchParams();
-  if (mine) exporting.set("mine", "true");
+  if (!aside && reason !== "approval") exporting.set("reason", reason);
+  if (mine || (!aside && own && reason !== "approval")) exporting.set("mine", "true");
   if (product) exporting.set("product", product);
   if (!aside) {
     for (const [key, value] of Object.entries(narrowing)) {
@@ -210,7 +244,8 @@ export function Queue() {
   const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
-  const rows = stopped.data?.items ?? [];
+  const words = wordsFor(reason);
+  const approving = !aside && reason === "approval";
 
   async function approvePicked() {
     // Sequential rather than parallel: each is a separate claim and a refusal
@@ -267,7 +302,7 @@ export function Queue() {
             </>
           ) : (
             <>
-              {(queue.data?.total ?? claims.length).toLocaleString()} pending
+              {(queue.data?.total ?? claims.length).toLocaleString()} {words.tab.toLowerCase()}
               {records > claims.length && (
                 <> · {records.toLocaleString()} records between those shown</>
               )}{" "}
@@ -276,8 +311,10 @@ export function Queue() {
                   {" "}
                   · in <b>{product}</b>
                 </>
-              ) : (
+              ) : approving ? (
                 <> · across every product you may approve on</>
+              ) : (
+                <> · across every product you may decide in</>
               )}
             </>
           )}
@@ -299,23 +336,32 @@ export function Queue() {
       </div>
 
       <div className="tabs2">
-        <button
-          type="button"
-          className="tab2"
-          aria-selected={!mine && !reaffirm}
-          onClick={() => {
-            const now = new URLSearchParams(params);
-            now.delete("mine");
-            now.delete("reaffirm");
-            now.delete("offset");
-            setParams(now);
-          }}
-        >
-          Waiting on me{" "}
-          <span className="n">
-            <Count of={queue}>{() => (queue.data?.total ?? 0).toLocaleString()}</Count>
-          </span>
-        </button>
+        {REASONS.map((each) => (
+          <button
+            key={each.reason}
+            type="button"
+            className="tab2"
+            aria-selected={!aside && reason === each.reason}
+            onClick={() => {
+              const now = new URLSearchParams(params);
+              now.delete("mine");
+              now.delete("reaffirm");
+              now.delete("offset");
+              if (each.reason === "approval") now.delete("reason");
+              else now.set("reason", each.reason);
+              if (each.reason !== reason) now.delete("own");
+              setPicked(new Map());
+              setParams(now);
+            }}
+          >
+            {each.tab}{" "}
+            <span className="n">
+              <Count of={counted[each.reason]}>
+                {() => (counted[each.reason].data?.total ?? 0).toLocaleString()}
+              </Count>
+            </span>
+          </button>
+        ))}
         <button
           type="button"
           className="tab2"
@@ -324,6 +370,8 @@ export function Queue() {
             const now = new URLSearchParams(params);
             now.set("mine", "1");
             now.delete("reaffirm");
+            now.delete("reason");
+            now.delete("own");
             now.delete("offset");
             setParams(now);
           }}
@@ -341,6 +389,8 @@ export function Queue() {
             const now = new URLSearchParams(params);
             now.set("reaffirm", "1");
             now.delete("mine");
+            now.delete("reason");
+            now.delete("own");
             now.delete("offset");
             setParams(now);
           }}
@@ -363,6 +413,24 @@ export function Queue() {
           }}
         />
       )}
+      {/* The two lists that show everybody's claims, narrowed to the
+          reader's own. The approvals never hold the reader's own. */}
+      {!aside && !approving && (
+        <label className="check" style={{ marginBottom: 10 }}>
+          <input
+            type="checkbox"
+            checked={own}
+            onChange={(event) => {
+              const now = new URLSearchParams(params);
+              if (event.target.checked) now.set("own", "1");
+              else now.delete("own");
+              now.delete("offset");
+              setParams(now);
+            }}
+          />
+          Mine only
+        </label>
+      )}
 
       {wanted > 0 && !found && (
         <div className="alert" style={{ marginBottom: 10 }}>
@@ -376,7 +444,7 @@ export function Queue() {
         </div>
       )}
 
-      {!aside && claims.length > 0 && (
+      {approving && claims.length > 0 && (
         <div className="batchbar">
           <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
             <input
@@ -478,10 +546,13 @@ export function Queue() {
       ) : mine ? (
         <Became rows={became.data?.items ?? []} query={became} />
       ) : claims.length === 0 ? (
-        <Empty
-          title="Nothing is pending."
-          detail="A claim needing a second person would appear here."
-        />
+        <Empty title="Nothing is waiting here." detail={words.empty} />
+      ) : !approving ? (
+        <div className="queue">
+          {claims.map((claim) => (
+            <Dated key={claim.key} claim={claim} reason={reason} marked={claim.id === wanted} />
+          ))}
+        </div>
       ) : (
         <div className="queue">
           {claims.map((claim) => (
@@ -537,100 +608,167 @@ export function Queue() {
           dismissal does, and this is where somebody goes to be one. Narrowed
           to the products the reader may work reports in. */}
       <WaitingRulings product={product || undefined} />
-
-      <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
-        <h2>Lapsed decisions</h2>
-        <p>
-          <Count of={stopped}>{() => (stopped.data?.total ?? 0).toLocaleString()}</Count> · the code
-          moved; each needs a fresh reason, not a new approval.
-        </p>
-      </div>
-      {/* A read that did not happen is not a list of nothing. Without this the
-          section drew "0 ·" over "Nothing has lapsed." on a failed read, which
-          is the defect this whole change is about, one screen along from where
-          it was fixed. */}
-      <Paged shown={rows.length} total={stopped.data?.total} limit={50} />
-      {stopped.isError ? (
-        <Failed error={stopped.error} what="Lapsed decisions could not be read." />
-      ) : rows.length === 0 ? (
-        <Empty
-          title="Nothing has lapsed."
-          detail="A decision the code moved out from under, or a deferral whose date has passed, would appear here."
-        />
-      ) : (
-        <div className="queue">
-          {rows.map((row) => (
-            <Stopped key={row.decision?.id} row={row} />
-          ))}
-        </div>
-      )}
     </>
   );
 }
 
-type Standing = NonNullable<Body<"DecisionsOutputBody">["items"]>[number];
-
-// A decision the code moved out from under, or a deferral whose date passed.
+// A claim waiting for a new decision rather than an agreement: a deferral
+// whose date passed, or a promise whose date passed with the finding open.
 //
-// A lapsed row points at the claim it belonged to, because re-affirming is an
-// act on the claim: one act re-makes every place it covered. Pointed at the
-// finding, a claim over forty five places drew forty five cards each offering
-// the one-place-at-a-time workflow the whole-claim act exists to replace.
-function Stopped({ row }: { row: Standing }) {
-  const it = row.decision;
-  const lapsed = it?.state === "lapsed";
+// It says which promise it was and offers the acts that answer it. Both lists
+// are anybody's in the product to act on, the proposer included, so there is
+// no approving here. A missed promise can be moved to a new version or date,
+// which puts it in front of a second person again where the new date needs
+// one; either can be decided again on the finding.
+function Dated({ claim, reason, marked }: { claim: Claim; reason: Reason; marked: boolean }) {
+  const f = claim.finding;
+  const [moving, setMoving] = useState(false);
+  const upgrade = claim.outcome === "upgrade-needed";
+  const [to, setTo] = useState(claim.upgradeTo);
+  const [by, setBy] = useState("");
+  const [because, setBecause] = useState("");
+  const [moved, setMoved] = useState(false);
+  const queries = useQueryClient();
+  const after = useAfterClaim();
+  // The queue is read again only once the confirmation is put away. The
+  // promise leaves this list when its date moves, and the card carrying the
+  // answer would leave with it.
+  const repromise = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PUT("/v1/claims/{id}/promise", {
+          params: { path: { id: claim.id } },
+          body: { ...(upgrade ? { to: to.trim() } : {}), by, reasoning: because },
+        }),
+      ),
+    onSuccess: () => {
+      setMoving(false);
+      setMoved(true);
+      for (const key of [["claim"], ["decision"], ["finding"], ["findings"], ["my-claims"]]) {
+        void queries.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+  const decideAgain = f ? findingPath(f) : claimAt(claim.id);
+  const words = wordsFor(reason);
+
   return (
-    <article className="qcard lapsedcard">
+    <article
+      id={`claim-${claim.id}`}
+      className="qcard lapsedcard"
+      style={marked ? { outline: "2px solid var(--accent)", outlineOffset: 2 } : undefined}
+    >
       <header>
-        <Link to={decisionAt(it?.id ?? 0)} className="id linkish">
-          {row.place?.vulnerability}
+        {f?.severity && <Severity word={f.severity} />}
+        {f?.exploited && <Exploited when />}
+        <Link to={decideAgain} className="linkish id">
+          {claim.title}
         </Link>
+        <span className={`claimed ${claim.outcome}`}>
+          <b>{promised(claim) || labeled(claim.outcome)}</b>
+        </span>
         <span style={{ color: "var(--muted)" }}>
-          {row.place?.product_name || row.place?.product} · {labeled(it?.outcome ?? "")}
-          {it?.justification && (
-            <>
-              {" "}
-              · <Because code={it.justification} />
-            </>
-          )}
+          {f
+            ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
+            : claim.product}
+          {claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
         </span>
         <span className="state lapsed" style={{ marginLeft: "auto" }}>
-          {lapsed ? "Lapsed" : "Deferral ran out"}
+          {words.stated}
         </span>
       </header>
-      {row.reasoning && (
+      {claim.reasoning && (
         <div className="why">
-          <Markdown source={row.reasoning} />
+          <Markdown source={claim.reasoning} />
         </div>
       )}
       <div className="qmeta">
-        <span>
-          Proposed by <b>{row.proposed_by_name || row.proposed_by}</b>
-        </span>
-        <span>
-          Stood <b>{row.age_days} days</b>
-        </span>
-        {it?.deferred_until && (
+        {claim.proposedBy && (
           <span>
-            Put off until <b>{it.deferred_until}</b>
+            Proposed by <b>{claim.proposedBy}</b>
+          </span>
+        )}
+        <span>
+          Standing <b>{claim.ageDays === 0 ? "today" : `${claim.ageDays} days`}</b>
+        </span>
+        {claim.builds.length > 0 && (
+          <span>
+            Covers <b>{claim.builds.join(", ")}</b>
           </span>
         )}
       </div>
-      <p className="hint" style={{ margin: 0 }}>
-        {lapsed
-          ? "The code moved. Re-affirm the whole claim, with a fresh reason."
-          : "The deferral has expired."}
-      </p>
-      <div className="actions">
-        {/* The claim, where the whole-act control is, rather than the row.
-            A lapsed claim is re-made once however many places it covered. */}
-        <Link
-          to={lapsed && it?.claim_id ? claimAt(it.claim_id) : decisionAt(it?.id ?? 0)}
-          className="btn ghost"
-        >
-          {lapsed && it?.claim_id ? "Open the claim →" : "Open the decision →"}
-        </Link>
-      </div>
+
+      {repromise.error != null && (
+        <Failed error={repromise.error} what="The promise could not be changed." />
+      )}
+      {moved ? (
+        <div className="alert info" role="status" style={{ margin: 0 }}>
+          <strong>Promise changed</strong>
+          <span>
+            Any earlier approval was withdrawn.{" "}
+            <Link to={claimAt(claim.id)} className="linkish">
+              Open the decision →
+            </Link>
+          </span>
+          <button type="button" className="linkish" style={{ marginLeft: "auto" }} onClick={after}>
+            Done
+          </button>
+        </div>
+      ) : moving ? (
+        <div>
+          <div className="filters" style={{ marginBottom: 8 }}>
+            {upgrade && (
+              <label className="field">
+                <span>Version</span>
+                <input
+                  {...notACredential}
+                  type="text"
+                  value={to}
+                  onChange={(event) => setTo(event.target.value)}
+                  style={{ width: 130 }}
+                />
+              </label>
+            )}
+            <label className="field">
+              <span>By</span>
+              <input type="date" value={by} onChange={(event) => setBy(event.target.value)} />
+            </label>
+          </div>
+          <Editor
+            value={because}
+            onChange={setBecause}
+            draftKey={`repromise:${claim.key}`}
+            rows={3}
+            label="Reason for the change"
+            placeholder="Why the date or the version is moving."
+          />
+          <div className="actions" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn"
+              disabled={!by || !because.trim() || (upgrade && !to.trim()) || repromise.isPending}
+              onClick={() => repromise.mutate()}
+            >
+              Change the promise
+            </button>
+            <button type="button" className="btn quiet" onClick={() => setMoving(false)}>
+              Cancel
+            </button>
+            <span className="consequence">Withdraws any approval it had</span>
+          </div>
+        </div>
+      ) : (
+        <div className="actions">
+          {reason === "missed-fix-date" && (
+            <button type="button" className="btn" onClick={() => setMoving(true)}>
+              {upgrade ? "Change the version or date" : "Change the date"}
+            </button>
+          )}
+          <Link to={decideAgain} className="btn ghost">
+            Decide again →
+          </Link>
+        </div>
+      )}
     </article>
   );
 }

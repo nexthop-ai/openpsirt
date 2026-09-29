@@ -1100,8 +1100,8 @@ filter takes and by the same definition:
 | State | Condition |
 |---|---|
 | Undecided | Nothing stands, waits or has lapsed at any place |
-| Waiting | A claim stands proposed and nobody has agreed |
-| Agreed | Every place is answered by a standing decision |
+| Waiting | A claim that needs a second person stands proposed and nobody has agreed |
+| Agreed | Every place is answered by a decision in force: agreed to, or proposed and needing nobody |
 | Lapsed | A decision here stopped applying and nothing replaced it |
 
 Some places approved and the rest never decided, with nothing waiting or lapsed,
@@ -1452,7 +1452,7 @@ the list itself pages through.
 | It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
 | The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source count as two where the page draws one, and the figure changes with the page being read |
 | A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
-| Two overlapping lists are one question | The lapsed queue asked for lapsed decisions and for expired deferrals and added the totals. A deferral that ran out on code that then moved is both, so the figure was larger than the list beneath it and the list itself had to be deduplicated to draw at all. One filter answers both, and the number it comes back with is the number of rows |
+| Two overlapping lists are one question | The decision list asks for lapsed decisions and expired deferrals in one filter. A deferral that ran out on code that then moved is both, and the number it comes back with is the number of rows |
 
 ## The severity ladder
 

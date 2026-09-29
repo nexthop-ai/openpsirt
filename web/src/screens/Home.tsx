@@ -18,7 +18,13 @@ import { claimOf } from "../api/claims";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
-import { comparisonAt, inventoriesAt, reviewQueueAt } from "../app/routes";
+import {
+  allFindingsAt,
+  comparisonAt,
+  inventoriesAt,
+  productFindingsAt,
+  reviewQueueAt,
+} from "../app/routes";
 
 // The most of the deadline list the tiles read. The response carries the
 // whole-answer count beside it, so the figures say when they are a floor
@@ -856,22 +862,29 @@ function Lapsed() {
   });
   // The two halves, for the two lines that name them. Their totals overlap and
   // are never added: each says how many of its own kind there are, and the
-  // figure over the panel comes from the query above.
+  // figure over the panel comes from the query above. Each is counted from the
+  // list its line opens, so the number and the list cannot disagree: the
+  // findings a lapsed decision left behind, and the expired deferrals the
+  // review queue holds for the reader.
   const lapsed = useQuery({
     queryKey: ["home", "lapsed", product],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/decisions", {
-          params: { query: { state: "lapsed", limit: 1, ...product } },
-        }),
+        at.product
+          ? await api.GET("/v1/products/{product}/findings", {
+              params: { path: { product: at.product }, query: { state: ["lapsed"], limit: 1 } },
+            })
+          : await api.GET("/v1/findings", {
+              params: { query: { state: ["lapsed"], limit: 1 } },
+            }),
       ),
   });
   const expired = useQuery({
-    queryKey: ["home", "expired", product],
+    queryKey: ["queue", "home", "expired", product],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/decisions", {
-          params: { query: { expired: true, limit: 1, ...product } },
+        await api.GET("/v1/review-queue", {
+          params: { query: { reason: "expired-deferral", limit: 1, ...product } },
         }),
       ),
   });
@@ -924,7 +937,16 @@ function Lapsed() {
       {known(lapsed) && lapsedTotal > 0 && (
         <div className="alert">
           <strong>
-            {lapsedTotal.toLocaleString()} {lapsedTotal === 1 ? "decision" : "decisions"} lapsed
+            <Link
+              to={
+                at.product
+                  ? productFindingsAt(at.product, { state: "lapsed" })
+                  : allFindingsAt({ state: "lapsed" })
+              }
+            >
+              {lapsedTotal.toLocaleString()} {lapsedTotal === 1 ? "finding" : "findings"} with a
+              lapsed decision
+            </Link>
           </strong>
           <span>The versions they were claims about have moved.</span>
         </div>
@@ -932,7 +954,10 @@ function Lapsed() {
       {known(expired) && expiredTotal > 0 && (
         <div className="alert">
           <strong>
-            {expiredTotal.toLocaleString()} {expiredTotal === 1 ? "deferral" : "deferrals"} ran out
+            <Link to={reviewQueueAt({ product: at.product, reason: "expired-deferral" })}>
+              {expiredTotal.toLocaleString()} expired{" "}
+              {expiredTotal === 1 ? "deferral" : "deferrals"}
+            </Link>
           </strong>
           <span>The date they were put off until has passed.</span>
         </div>
@@ -941,8 +966,10 @@ function Lapsed() {
         <p className="reading">Nothing has lapsed.</p>
       )}
       <footer>
-        <Link to="/review-queue#lapsed" className="linkish">
-          Lapsed decisions →
+        {/* A lapsed claim is its author's to re-affirm, and this is where the
+            reader's own are. */}
+        <Link to={reviewQueueAt({ reaffirm: true })} className="linkish">
+          Yours to reaffirm →
         </Link>
       </footer>
     </div>

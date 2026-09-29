@@ -46,7 +46,8 @@ export function Disclosing() {
   const [act, setAct] = useState<"extension" | "shortening" | "disclosure">("extension");
   const [until, setUntil] = useState("");
   const [because, setBecause] = useState("");
-  const [said, setSaid] = useState<string | null>(null);
+  // What the last act answered, on the row it was taken from.
+  const [said, setSaid] = useState<{ key: string; text: string; waiting: boolean } | null>(null);
   const [offset, setOffset] = useState(0);
 
   const rows = useQuery({
@@ -80,14 +81,16 @@ export function Disclosing() {
                 body: { until, reason: because },
               }),
       ),
-    onSuccess: (asked) => {
-      setSaid(
-        asked.in_force
+    onSuccess: (asked, at) => {
+      setSaid({
+        key: `${at.product} ${at.vulnerability}`,
+        text: asked.in_force
           ? act === "disclosure"
             ? "Disclosed. The findings and everything on them are public."
             : `The date moved to ${until}.`
           : "Recorded. Nothing changes until a second person agrees.",
-      );
+        waiting: !asked.in_force,
+      });
       setAsking(null);
       setUntil("");
       setBecause("");
@@ -135,10 +138,19 @@ export function Disclosing() {
         </label>
       </div>
 
-      {said && (
-        <div className="alert info" style={{ marginBottom: 12 }}>
+      {/* Where the row the act was taken from has left the list: a
+          disclosure in force at once, or a date moved past the window. */}
+      {said && !items.some((row) => `${row.product} ${row.vulnerability}` === said.key) && (
+        <div className="alert info" role="status" style={{ marginBottom: 12 }}>
           <strong>Asked</strong>
-          <span>{said}</span>
+          <span>
+            {said.text}{" "}
+            {said.waiting && (
+              <Link to="/review-queue#embargoes" className="linkish">
+                Waiting in the review queue →
+              </Link>
+            )}
+          </span>
         </div>
       )}
       {past > 0 && (
@@ -220,6 +232,22 @@ export function Disclosing() {
                         >
                           Move or disclose
                         </button>
+                      )}
+                      {/* The answer on the row the act was taken from. A
+                          movement that waits is agreed to on the review
+                          queue, in the section beside the ratings. */}
+                      {said?.key === key && (
+                        <div className="alert info" role="status" style={{ marginTop: 8 }}>
+                          <strong>Asked</strong>
+                          <span>
+                            {said.text}{" "}
+                            {said.waiting && (
+                              <Link to="/review-queue#embargoes" className="linkish">
+                                Waiting in the review queue →
+                              </Link>
+                            )}
+                          </span>
+                        </div>
                       )}
                       {asking === key && (
                         <div style={{ marginTop: 8 }}>

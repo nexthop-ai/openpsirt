@@ -781,7 +781,7 @@ stops is one somebody reads as whole.
 | The comparison is one file with a column naming which of the three parts a row belongs to | Three files are three things to keep together by hand. It is read whole rather than paged, because a comparison is a single answer computed from two builds at once |
 | The inventory comparison is read whole, like the findings comparison | It is one answer computed from two builds at once. A name held at several versions has them joined in one cell per side, so a row is still one name |
 | A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
-| The queue's file is what is waiting on you | Your own claims are not in it |
+| The queue's file is one of its lists, the one the screen shows | The approvals leave out your own claims; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
 
 ## Settings

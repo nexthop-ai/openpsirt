@@ -247,15 +247,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Let the advisory screen take document notes, each with a category from the standard (summary, legal disclaimer, general and so on), possibly with a deployment-wide default disclaimer |
 | Waits on | Nothing. The notes are what the company says, so editing them opens a new edition and withdraws its approval, as retitling does (REQ-24, REQ-28), and they go through the text policy for typed markdown |
 
-### TODO-24 Review queue by reason
-
-| | |
-|---|---|
-| Today | The "Waiting on me" tab of the review queue mixes four kinds of item: a decision awaiting a second person's approval, a decision that lapsed, a deferral whose date has passed, and a promise to upgrade whose date has passed. Every card looks the same and offers Approve and Reject |
-| Problem | Only the first kind can be approved. Approve on the others is refused with a message that does not explain why, and a lapsed decision can be reaffirmed only by the person who proposed it, who never sees it in this list. The sidebar count labeled "waiting for your approval" counts all four. A "Lapsed decisions" section below the queue lists some of the same items a second time, ignores the queue's filters, stops at 50 and leaves out promises past their date |
-| Work | Let the queue be narrowed by the reason an item is waiting, name the reason on each card, and offer on each card only the actions that work for it. Describe it in `DESIGN-triage.md` § Queue filters |
-| Waits on | The owner: whether lapsed and past-date items belong in an approver's queue at all or move to the person who proposed them; whether the sidebar counts approvals only; whether the "Lapsed decisions" section goes; filter or tabs |
-
 ### TODO-25 Promise status across builds
 
 | | |
@@ -288,18 +279,9 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | | |
 |---|---|
 | Today | A test runs handlers nothing else runs. Nothing compares the API document with what the web client calls |
-| Problem | An endpoint can exist with no way to use it from a screen, found only by reading. Candidates found by a search: changing what a promise moves to, listing unassigned findings, removing a person's identifier, and one finding's reach at one place |
+| Problem | An endpoint can exist with no way to use it from a screen, found only by reading. Candidates found by a search: listing unassigned findings, removing a person's identifier, and one finding's reach at one place |
 | Work | Add a check that walks every operation in the API document, finds where the web client calls it, and fails on one with no caller unless it is on a list of operations meant for pipelines, each with a reason. Make it fail when it examines nothing, and show it reporting one input and passing another |
 | Waits on | Nothing |
-
-### TODO-29 Next step after a submission
-
-| | |
-|---|---|
-| Today | Recording a decision on a finding ends with "Go to the review queue". The link opens "Waiting on me", which never contains the person's own proposals, and it shows even when the decision took effect at once. Five other flows end with text and no link: deciding several findings together, promising an upgrade, requesting or moving a disclosure date, proposing a milder rating (which closes with no confirmation at all), and reaffirming a decision |
-| Problem | Each of these waits on a second person or leads to another screen, and the person who just acted is not shown where that happens. A step with no visible control goes unused |
-| Work | End each flow with a link to where its result now is: the decision's own page when it waits, the pending upgrades of each build a promise names, the queue section where a disclosure date or rating waits. Show "pending a second person" only when one is needed |
-| Waits on | The owner: for a waiting decision, its own page or the "Mine" tab; for a promise across several builds, one link per build or one to the release; whether "each act offers its next act as a visible control" becomes a written rule in `DESIGN-interface.md` |
 
 ### TODO-30 A real SPDX 3 fixture
 

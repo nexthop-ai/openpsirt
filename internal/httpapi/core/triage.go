@@ -117,11 +117,12 @@ type PlaceBody struct {
 
 // QueueNarrowing is the filters the review queue and its export both take.
 type QueueNarrowing struct {
-	ProposedBy string    `query:"proposed_by" maxLength:"191" doc:"Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
-	OlderThan  int       `query:"older_than" minimum:"1" doc:"Keep only claims at least this many days old"`
-	Severity   Rating    `query:"severity" doc:"Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
-	Outcome    []Outcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep only claims of these outcomes. Any of them, not all"`
-	Release    string    `query:"release" maxLength:"191" doc:"Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
+	Reason     QueueReason `query:"reason" default:"approval" doc:"Which list: claims waiting for your approval, deferrals whose date has passed, or promised upgrades and patches whose date has passed with the finding still open"`
+	ProposedBy string      `query:"proposed_by" maxLength:"191" doc:"Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
+	OlderThan  int         `query:"older_than" minimum:"1" doc:"Keep only claims at least this many days old"`
+	Severity   Rating      `query:"severity" doc:"Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
+	Outcome    []Outcome   `query:"outcome,explode" uniqueItems:"true" doc:"Keep only claims of these outcomes. Any of them, not all"`
+	Release    string      `query:"release" maxLength:"191" doc:"Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
 }
 
 // Filter turns the queue's parameters into the store's narrowing.
@@ -138,7 +139,7 @@ func (n QueueNarrowing) Filter(ctx context.Context, in Deps, subject access.Subj
 		return triage.QueueFilter{}, err
 	}
 	filter := triage.QueueFilter{
-		Mine: mine, ProductID: within,
+		Reason: triage.QueueReason(n.Reason), Mine: mine, ProductID: within,
 		Severities: finding.AtLeast(string(n.Severity)),
 		Release:    n.Release,
 	}
