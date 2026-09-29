@@ -65,6 +65,8 @@ func advisoryRefused(in core.Deps, err error, what string) error {
 		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, advisory.ErrNoSuchAdvisory):
 		return huma.Error404NotFound(advisory.ErrNoSuchAdvisory.Error())
+	case errors.Is(err, advisory.ErrNoSuchRelease):
+		return huma.Error404NotFound(advisory.ErrNoSuchRelease.Error())
 	case errors.Is(err, advisory.ErrNoSuchIssue), errors.Is(err, catalog.ErrNotFound):
 		// The same answer for a product nobody holds and an issue that is not
 		// there. Telling them apart turns a lookup into a directory of what
@@ -328,7 +330,11 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Path:    "/v1/advisories/{advisory}/document",
 		Summary: "Generate a CSAF document for an advisory",
 		Description: "Returns a CSAF 2.0 document for this advisory: what it covers, and " +
-			"which releases hold each issue and which no longer do.\n\n" +
+			"which releases hold each issue, which no longer do, and which are known not " +
+			"affected because approved decisions cover every open place of the issue there.\n\n" +
+			"A release known not affected carries the decision's reason as a flag and its " +
+			"mitigation as the impact. The document is a security advisory whatever it states. " +
+			"A release marked affected on the advisory is stated as known affected.\n\n" +
 			"One entry per issue and one product branch per product, so several flaws " +
 			"released together are one document on one date.\n\n" +
 			"The document is generated, not published. Nothing is sent anywhere. Recording " +

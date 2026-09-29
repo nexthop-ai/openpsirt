@@ -590,10 +590,16 @@ its own name or in a header saying what it fixes.
 | A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
 | A claim is matched at every place its component sits | The fan-out is ours either way |
 
-A claim attached to a scan is stored with the package identifier and the name
-it states, and no version stated outside the identifier. A claim that names no
-package and states its version only as a branch therefore covers every version
-of that name once stored.
+A claim attached to a scan is stored with the package identifier, the name and
+the version it states outside the identifier. A claim that names no package and
+states its version only as a branch covers that version of the name and no
+other: a statement that acme-fw 4.2 is not affected leaves a finding on acme-fw
+5.0 open, however many scans send the same file.
+
+| Stored version | |
+|---|---|
+| The version is part of the claim's identity where one is stated outside the package identifier | A claim about 4.2 and one about 5.0 are two claims. A version inside the identifier is already part of the identity through it and is not stored again. A claim stating no version keys as it did before a version was stored. A claim stating its version only as a branch has a new identity, so each such claim closes and reopens once, on the first scan after the upgrade |
+| The carried patches read names the version beside the subject | "acme-fw 4.2". A status shown without the version reads as a claim about whatever ships |
 
 A claim that matched nothing is reported, not dropped. A build's judgment that
 went nowhere means a finding it already answered comes back as noise. The

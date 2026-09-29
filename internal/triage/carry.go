@@ -125,6 +125,8 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				// travels and conclusions do not.
 				NeedsApproval: true,
 				SelectedBy:    "carried from another line",
+				// The line it is carried to is the build somebody chose.
+				MadeOn: []int64{toTarget},
 			}
 			if old.Justification != nil {
 				proposal.Justification = Justification(*old.Justification)

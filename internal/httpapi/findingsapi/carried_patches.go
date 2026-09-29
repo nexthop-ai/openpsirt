@@ -19,6 +19,7 @@ import (
 type CarriedClaimBody struct {
 	Vulnerability string `json:"vulnerability" doc:"The identifier the build argued about, as it wrote it"`
 	Subject       string `json:"subject" doc:"The claim's subject — a package name, or its identifier where it named no name"`
+	Version       string `json:"version,omitempty" doc:"The version of the subject the claim was made about, where the document stated one outside the package identifier. The claim covers that version alone"`
 	Status        string `json:"status" doc:"The claim, in the exchange format's own vocabulary"`
 	Justification string `json:"justification,omitempty"`
 	Statement     string `json:"statement,omitempty" doc:"The build's own reasoning, shown as written and never rendered"`
@@ -94,7 +95,7 @@ func registerCarried(api huma.API, in core.Deps) {
 		out.Body.Items = make([]CarriedClaimBody, 0, len(rows))
 		for _, row := range rows {
 			body := CarriedClaimBody{
-				Vulnerability: row.Vulnerability, Subject: row.Subject,
+				Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 				Status: row.Status, Justification: row.Justification,
 				Statement: row.Statement, Pedigree: row.Pedigree,
 				Suppresses: row.Suppresses,

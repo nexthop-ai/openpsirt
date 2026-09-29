@@ -7,8 +7,10 @@ import {
   type Covered,
   useAdvisory,
   useAdvisoryDocument,
+  useAdvisoryReleases,
   useAgree,
   useIssuances,
+  useMarkRelease,
   useNameAFlaw,
   useRecordIssued,
   useRetitle,
@@ -22,9 +24,18 @@ import { notACredential } from "../ui/noautofill";
 import { useReseed } from "../ui/reseed";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { agreeing, missing, standing, statusLabel } from "./advisory";
+import {
+  agreeing,
+  madeOnLabel,
+  markable,
+  missing,
+  releaseStatus,
+  standing,
+  statusLabel,
+} from "./advisory";
 import { FlawPicker } from "./FlawPicker";
-import { issueAt } from "../app/routes";
+import { decisionAt, issueAt } from "../app/routes";
+import { Because, Outcome } from "../ui/Outcome";
 
 // One advisory, whole: what it is called, what it covers, the document it
 // generates, who agrees to it, and what has gone out.
@@ -43,6 +54,7 @@ export function Advisory() {
   const one = useAdvisory(advisory);
   const covers = one.data?.covers ?? [];
   const document = useAdvisoryDocument(advisory, covers.length);
+  const releases = useAdvisoryReleases(advisory, covers.length);
   const issuances = useIssuances(advisory);
 
   if (one.isPending) return <Loading />;
@@ -89,6 +101,7 @@ export function Advisory() {
       )}
 
       <Says advisory={advisory} title={it?.title ?? ""} covers={covers} />
+      {covers.length > 0 && <Releases advisory={advisory} read={releases} />}
       <Document advisory={advisory} covers={covers.length} read={document} />
       <Agreement advisory={advisory} agreed={agreed} by={it?.agreed_by ?? []} />
       <Issued advisory={advisory} read={issuances} agreed={agreed} changed={it?.changed} />
@@ -232,6 +245,143 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
       {name.isError && (
         <Failed error={name.error} what="That flaw was not named on this advisory." />
       )}
+    </div>
+  );
+}
+
+// What the document states about each release, the decision behind it, and
+// where that decision was made. A decision reaches every variant whose
+// versions match, so the variant it was made on is shown beside each release
+// it reaches, and a release can be marked affected anyway.
+function Releases({
+  advisory,
+  read,
+}: {
+  advisory: string;
+  read: ReturnType<typeof useAdvisoryReleases>;
+}) {
+  const mark = useMarkRelease();
+  const rows = read.data?.items ?? [];
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <h3>Releases</h3>
+      {read.isPending ? (
+        <Loading inline />
+      ) : read.isError ? (
+        <Failed error={read.error} what="The releases could not be read." />
+      ) : rows.length === 0 ? (
+        <p className="hint">No release holds the flaws it names.</p>
+      ) : (
+        <Wide>
+          <table>
+            <thead>
+              <tr>
+                <th>Flaw</th>
+                <th>Release</th>
+                <th>States</th>
+                <th>Decision</th>
+                <th>Made on</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const status = releaseStatus(row.status);
+                return (
+                  <tr
+                    key={`${row.product} ${row.vulnerability} ${row.stream} ${row.variant}`}
+                    className="row"
+                  >
+                    <td className="id">{row.vulnerability}</td>
+                    <td>
+                      {row.product_name || row.product} {row.stream} ({row.variant})
+                    </td>
+                    <td>
+                      <span className={`state ${status.tone}`}>{status.label}</span>
+                      {row.marked && (
+                        <span className="hint" title="Marked affected whatever its decisions say">
+                          {" "}
+                          · marked
+                        </span>
+                      )}
+                      {row.changed && (
+                        <div>
+                          <span
+                            className="state waiting"
+                            title="The agreement stands. What it agreed to said something else here"
+                          >
+                            Changed since approval
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {row.covered ? (
+                        <>
+                          <Link to={decisionAt(row.covered.decision)}>
+                            <Outcome outcome={row.covered.outcome} />
+                          </Link>
+                          {row.covered.reason && (
+                            <div className="hint">
+                              <Because code={row.covered.reason} />
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="hint">None covers every place</span>
+                      )}
+                    </td>
+                    <td>
+                      {row.covered && (
+                        <span className={row.covered.made_on?.length ? "" : "hint"}>
+                          {madeOnLabel(row.covered.made_on)}
+                        </span>
+                      )}
+                      {row.elsewhere && (
+                        <div>
+                          <span
+                            className="state waiting"
+                            title="Made on another variant. It reaches this one because the versions match"
+                          >
+                            Another variant
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {(row.marked || markable(row)) && (
+                        <button
+                          type="button"
+                          className="linkish"
+                          title="Takes back every agreement standing"
+                          disabled={mark.isPending}
+                          onClick={() =>
+                            mark.mutate({
+                              advisory,
+                              product: row.product,
+                              vulnerability: row.vulnerability,
+                              stream: row.stream,
+                              variant: row.variant,
+                              affected: !row.marked,
+                            })
+                          }
+                        >
+                          {row.marked ? "Clear mark" : "Mark affected"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Wide>
+      )}
+      <p className="hint">
+        Marking a release, or clearing a mark, takes back every agreement standing.
+      </p>
+      {mark.isError && <Failed error={mark.error} what="The release was not marked." />}
     </div>
   );
 }

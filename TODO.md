@@ -95,15 +95,6 @@ The owner has chosen to wait on each of these.
 | Work | Let a product set its own windows, falling back to the deployment's when cleared, the way the triage floor override works. Rewrite the deadlines of the product's open findings when its windows change (REQ-33) |
 | Waits on | The owner's go-ahead only |
 
-### TODO-08 CSAF VEX profile
-
-| | |
-|---|---|
-| Today | An advisory's CSAF document lists each release (a branch or tag built as one variant) as known affected when any finding of the flaw is open there, and fixed otherwise. It reads no triage decisions. The per-build OpenVEX document on the VEX screen does: a build's issue is not affected when every open place is covered by an approved, still-valid decision with one outcome |
-| Problem | A release covered by an approved not-applicable decision is published as known affected, with a remediation telling customers to update. The advisory has no way to say "known not affected, because…" |
-| Work | Move the VEX screen's coverage rule into one shared query and use it for the advisory. List each fully covered release as known not affected, with the decision's reason as the CSAF flag (the five reasons are the CSAF flag names) and its mitigation, never its reasoning, as the impact statement. Leave a partly covered release known affected. Keep not-affected releases out of remediations and scores, and emit the VEX profile when any release is not affected |
-| Waits on | A decision reaches every variant whose versions match, because a place is identified without its root. A not-applicable decision made for a variant where the code is compiled out also covers a variant where it is compiled in, in the OpenVEX document today and in the advisory once this is built. Limiting a decision to a variant changes REQ-26 and is a separate decision |
-
 ### TODO-09 Microsoft Teams and Google Chat
 
 | | |
@@ -291,15 +282,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Problem | What real producers emit (which way relationships point, scopes, identifiers) is untested. One specification example already has its relationships backwards. A Yocto build uploading SPDX 3 could lose its dependency tree and no test would notice |
 | Work | Add at least one real producer's document, such as Yocto's `create-spdx-3.0` output, under a license the repository may carry and named in `NOTICE`, with a test pinning its component, edge and unplaced counts |
 | Waits on | Finding a document with a usable license. |
-
-### TODO-31 Version on build VEX claims
-
-| | |
-|---|---|
-| Today | A build may upload its own CSAF VEX beside its inventory. A statement about a product named by a version branch, with no package identifier, is matched with its version as the document is read, and stored without it |
-| Problem | The stored statement covers every version of that name. A build ships `acme-fw` 4.2 with a statement that CVE-Y does not affect 4.2, moves to 5.0, which is affected, and keeps sending the same file: CVE-Y is suppressed on 5.0 with nothing saying why. The carried patches screen shows "acme-fw" with no version, so nobody can see the mismatch. VEX uploaded for a product keeps the version |
-| Work | Store the statement's version, match only that version, and show it |
-| Waits on | The owner: the next upload of a moving branch closes and reopens each such statement once, which is acceptable or is avoided by leaving versionless statements' identity alone; and whether statements already stored for tags are re-read from their kept documents |
 
 ### TODO-32 Outbound HTTP proxy
 

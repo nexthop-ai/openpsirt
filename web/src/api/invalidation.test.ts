@@ -37,9 +37,12 @@ function after(hook: () => () => void): string[] {
 // back still drawn as standing, which is the state the second-person control
 // exists to make visible.
 describe("what an act invalidates", () => {
-  it("a change to a claim reaches the queue, its decisions, its findings and its own blocks", () => {
+  it("a change to a claim reaches the queue, its decisions, its findings, its own blocks and advisories", () => {
     expect(after(useAfterClaim)).toEqual(
       [
+        "advisory",
+        "advisory-document",
+        "advisory-releases",
         "claim",
         "comments",
         "decided",
@@ -53,9 +56,15 @@ describe("what an act invalidates", () => {
     );
   });
 
-  it("a change to an advisory reaches the list, the advisory, its document and what went out", () => {
+  it("a change to an advisory reaches the list, the advisory, its document, its releases and what went out", () => {
     expect(after(useAfterAdvisory)).toEqual(
-      ["advisories", "advisory", "advisory-document", "advisory-issuances"].sort(),
+      [
+        "advisories",
+        "advisory",
+        "advisory-document",
+        "advisory-issuances",
+        "advisory-releases",
+      ].sort(),
     );
   });
 

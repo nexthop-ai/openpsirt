@@ -87,6 +87,9 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     belonging to the deployment.
 //   - What somebody chose about chat, and what has been carried to them there,
 //     are tables of their own. Nothing v0.4.0 held goes in either.
+//   - A release an advisory marks affected, and what an agreement to an
+//     advisory saw about each release, are tables of their own. v0.4.0 stated
+//     no release known not affected, so both start empty.
 //   - A kept findings-list filter is rewritten into the words v0.5.0's list
 //     reads: the two flags "only" named become flags of their own, and hidden
 //     components joined by commas become one parameter each.
@@ -113,6 +116,13 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     recorded here that v0.4.0 left undated under a duplicate ruling from
 //     outside is dated, and each such date recorded as a movement from its
 //     ruling.
+//   - A claim records the builds it was made on, in a table of its own.
+//     v0.4.0 recorded none, so every claim it holds says nothing about where
+//     it was made.
+//   - A build's claim records the version it was made about, where the
+//     document stated one outside the package identifier. Every claim v0.4.0
+//     holds takes none, and covers what it covered before: v0.4.0 kept no
+//     version beside a claim.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -163,7 +173,7 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := u.change(suppressionV050(t), change{table: "suppression",
-		add: []added{{column: "subject_folded"}}}); err != nil {
+		add: []added{{column: "subject_folded"}, {column: "subject_version"}}}); err != nil {
 		return err
 	}
 	if err := subjectsFolded(ctx, tx); err != nil {
@@ -200,6 +210,12 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 			{column: "product_id"}, {column: "team_id"},
 		},
 		constraints: []string{"outbound_product_fk", "outbound_team_fk"}}); err != nil {
+		return err
+	}
+	if err := u.create(advisoryV050(t), "advisory_override", "advisory_agreed_status"); err != nil {
+		return err
+	}
+	if err := u.create(claimBuildV050(t), "claim_build"); err != nil {
 		return err
 	}
 	return u.create(chatV050(t), "chat_preference", "chat_delivery")
@@ -240,6 +256,10 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // rows recording those withdrawals go, because v0.4.0 has no place for a
 // change no person made. The day an issue was listed as exploited goes with
 // its column. A movement a ruling recorded goes, and the date it set stays.
+//
+// A claim's version goes with its column, the builds each claim was made on
+// go with their table, and the two advisory tables go:
+// v0.4.0 states every release holding a flaw as known affected.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err
@@ -264,6 +284,10 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := dropTables(ctx, tx.Tx, "chat_delivery", "chat_preference"); err != nil {
 		return err
 	}
+	if err := dropTables(ctx, tx.Tx, "claim_build", "advisory_agreed_status",
+		"advisory_override"); err != nil {
+		return err
+	}
 	if err := dropTables(ctx, tx.Tx, "decision_superseded", "vulnerability_merge"); err != nil {
 		return err
 	}
@@ -272,6 +296,7 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	}
 	if err := apply(ctx, tx.Tx, []string{
 		`ALTER TABLE "suppression" DROP COLUMN "subject_folded"`,
+		`ALTER TABLE "suppression" DROP COLUMN "subject_version"`,
 		`ALTER TABLE "assessment" DROP COLUMN "withdrawn_because"`,
 		`ALTER TABLE "vulnerability" DROP COLUMN "issue_id"`,
 		`ALTER TABLE "vulnerability" DROP COLUMN "exploited_on"`,

@@ -23,6 +23,9 @@ afterEach(() => vi.restoreAllMocks());
 // it before the request lands — fails here, where the set alone is pinned
 // beside the other acts' sets.
 const EVERY_CLAIM_KEY = [
+  "advisory",
+  "advisory-document",
+  "advisory-releases",
   "claim",
   "comments",
   "decided",

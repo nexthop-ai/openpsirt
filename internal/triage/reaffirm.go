@@ -185,6 +185,8 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 		Reasoning:     r.Reasoning, By: r.By,
 		SeverityCenti: severityNow,
 		NeedsApproval: full,
+		// The same judgment re-made, so it keeps the builds it was made on.
+		MadeAs: previous.ClaimID,
 	}
 	// The same checks Propose makes, made here because the write is already
 	// inside a transaction and Propose opens its own.

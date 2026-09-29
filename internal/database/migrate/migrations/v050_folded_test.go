@@ -310,8 +310,8 @@ func tokenNamesAreFoldedAndClashesWithdrawn() upgradeCheck {
 }
 
 // Upgraded, each claim a build made records the name it is about folded,
-// beside the name as the producer spelled it. Rolled back, the column is gone
-// and the names are as they were.
+// beside the name as the producer spelled it, and no version. Rolled back, the
+// columns are gone and the names are as they were.
 func claimSubjectsAreFolded() upgradeCheck {
 	var built []string
 	var target int64
@@ -369,10 +369,12 @@ func claimSubjectsAreFolded() upgradeCheck {
 		},
 		upgraded: func(t *testing.T, ctx context.Context, db *database.DB) {
 			var rows []struct {
-				Name   *string `bun:"subject_name"`
-				Folded *string `bun:"subject_folded"`
+				Name    *string `bun:"subject_name"`
+				Folded  *string `bun:"subject_folded"`
+				Version *string `bun:"subject_version"`
 			}
-			if err := db.DB.NewRaw(`SELECT "subject_name", "subject_folded" FROM "suppression" WHERE "target_id" = ?`,
+			if err := db.DB.NewRaw(`SELECT "subject_name", "subject_folded", "subject_version"
+				FROM "suppression" WHERE "target_id" = ?`,
 				target).Scan(ctx, &rows); err != nil {
 				t.Fatal(err)
 			}
@@ -380,6 +382,11 @@ func claimSubjectsAreFolded() upgradeCheck {
 				t.Fatalf("upgraded, %d claims remain, want 3", len(rows))
 			}
 			for _, row := range rows {
+				// v0.4.0 kept no version beside a claim, so each covers what it
+				// covered before.
+				if row.Version != nil {
+					t.Errorf("upgraded, a claim states the version %q, which v0.4.0 never kept", *row.Version)
+				}
 				switch {
 				case row.Name == nil:
 					if row.Folded != nil {

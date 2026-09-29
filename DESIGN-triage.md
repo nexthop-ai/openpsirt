@@ -66,6 +66,7 @@ made in is not part of the key.
 |---|---|
 | A later release inherits by lookup, not by copy | Nothing to synchronize, so nothing drifts |
 | A variant inherits exactly when its code matches | A variant whose chain differs computes a different key and fails to match. No extra test |
+| The builds a claim was made on are recorded beside it, outside the key | The build on screen when it was proposed, and every build the person chose beside it on the reach sheet. A build the claim reaches by lookup is never recorded: telling that build apart from the ones it was made on is what the record is for. An advisory flags a release of a variant its covering decision was not made on, and whoever prepares one marks it affected where the code differs there (`DESIGN-remediation.md` § The CSAF document) |
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they
@@ -319,6 +320,17 @@ underneath carry where it lands and when it stops applying.
 | The version an already-fixed claim names | How bad it was judged to be, which is read from the place |
 | The reasoning, every revision of it, and which revision stands | The VEX statement the argument was started from, where one was |
 | The approvals given for it, and the comments about it | |
+| The builds it was made on | |
+
+| Act | Builds it records as made on |
+|---|---|
+| A judgment on a finding, from its screen or the findings list panel | The build in the path, and every build named beside it |
+| A judgment about one place | The build in the path |
+| Deciding several issues together | The build the selection was made in |
+| A promise to upgrade | Every build the promise names |
+| Carrying a judgment to a new line | The line it is carried to |
+| Re-affirming, one claim or many, and the rows an approver or the proposer set aside | The builds the claim it re-makes recorded: it is the same judgment |
+| A claim recorded before the builds were kept | None. Nothing is guessed |
 
 This was on the row. A judgment reaching forty-four places was forty-four copies
 of one sentence, each revisable on its own — so revising one returned that row

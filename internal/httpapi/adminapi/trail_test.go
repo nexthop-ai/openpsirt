@@ -535,6 +535,7 @@ var outsideTheTrail = map[string]string{
 	"add-advisory-issue":           "the decision record",
 	"approve-advisory":             "the decision record",
 	"drop-advisory-issue":          "the decision record",
+	"mark-advisory-release":        "the decision record",
 	"record-advisory-issued":       "the decision record",
 	"retitle-advisory":             "the decision record",
 	"record-finding":               "the decision record",

@@ -900,6 +900,8 @@ var tables = []string{
 	"decision",
 	// After the rows that point at it, and before the claim it hangs off.
 	"claim_revision",
+	// Before claim and target, both of which it points at.
+	"claim_build",
 	// Before person, which it points at, and after everything above, which
 	// points at it.
 	"claim",
@@ -953,6 +955,12 @@ var tables = []string{
 	// Before advisory, product, vulnerability and person, all of which it
 	// points at.
 	"advisory_issue",
+	// Before advisory, product, vulnerability, stream, variant and person,
+	// all of which it points at.
+	"advisory_override",
+	// Before advisory_approval, product, vulnerability, stream and variant,
+	// all of which it points at.
+	"advisory_agreed_status",
 	// Before advisory_edition, advisory and person, all of which it points
 	// at.
 	"advisory_approval",

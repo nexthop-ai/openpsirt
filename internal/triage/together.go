@@ -322,8 +322,11 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 			return err
 		}
 
+		// Made on the build the selection was made in.
+		claimed := p
+		claimed.MadeOn = []int64{at.TargetID}
 		claim, err := within.newClaimNarrowed(ctx, TogetherClaim, subject.ID, nil,
-			p.SelectedBy, &narrowing, p)
+			p.SelectedBy, &narrowing, claimed)
 		if err != nil {
 			return err
 		}

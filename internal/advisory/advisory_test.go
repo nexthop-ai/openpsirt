@@ -50,6 +50,10 @@ type fixture struct {
 	// the only product it had would read alike.
 	otherProduct int64
 	other        int64
+	// The branch built as a second variant of the first product, so a
+	// decision can reach a build other than the one it was made on. Nothing
+	// is shipped against it until a test does.
+	otherVariant int64
 	// A second person, so an authorization test writes as somebody the
 	// database knows. A subject invented in a test fails the foreign key on
 	// whoever did it, which passes a refusal test for the wrong reason.
@@ -129,12 +133,14 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		secondVariant := w.DeclareVariant(second, "mellanox", true)
 		secondTarget := w.TargetFor(secondBranch, secondVariant)
 		another := w.DeclarePerson("reader", "A Reader", false)
+		mellanox := w.TargetFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true))
 		f := &fixture{
 			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
 			graph: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB),
 			product: w.Product.ID, master: w.Target.ID, tagged: tagged.ID,
 			older:        older.ID,
 			otherProduct: second.ID, other: secondTarget.ID, second: another,
+			otherVariant: mellanox.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 				second.ID:    {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
@@ -837,7 +843,7 @@ func required(t *testing.T, doc *advisory.Document) {
 		"/vulnerabilities/0/product_status",
 	}
 	wanted := generic
-	if doc.Document.Category == "csaf_security_advisory" {
+	if profiled(doc) {
 		wanted = append(slices.Clone(generic), profile...)
 	}
 
@@ -874,7 +880,7 @@ func required(t *testing.T, doc *advisory.Document) {
 	// The notes are the one element with a condition beyond being present:
 	// the categories a reader of a note can act on.
 	for _, pointer := range []string{"/vulnerabilities/0/notes"} {
-		if doc.Document.Category != "csaf_security_advisory" {
+		if !profiled(doc) {
 			continue
 		}
 		notes, found := at(tree, pointer)
@@ -892,6 +898,12 @@ func required(t *testing.T, doc *advisory.Document) {
 			t.Errorf("%s carries no note a reader can act on", pointer)
 		}
 	}
+}
+
+// profiled says the document declares the security-advisory profile, which
+// asks for vulnerabilities with notes and a status.
+func profiled(doc *advisory.Document) bool {
+	return doc.Document.Category == "csaf_security_advisory"
 }
 
 // at resolves a JSON pointer against a decoded document.

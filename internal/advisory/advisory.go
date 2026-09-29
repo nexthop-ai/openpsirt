@@ -24,7 +24,6 @@ package advisory
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -139,7 +138,7 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	}
 
 	now := s.now().UTC()
-	assembled := &assembly{who: who, seen: map[string]bool{}}
+	assembled := &assembly{who: who, advisory: row.ID, seen: map[string]bool{}}
 	for _, one := range held {
 		if err := s.cover(ctx, subject, assembled, one); err != nil {
 			return nil, nil, err
@@ -223,6 +222,9 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 // addresses, which two issues may both point at.
 type assembly struct {
 	who publisher.Named
+	// advisory is the one being assembled, whose marks of a release as
+	// affected are part of what it says.
+	advisory int64
 	// products is one branch per product, in the order the issues were added,
 	// each holding the releases any of its issues named. A release named by
 	// two issues is one branch that both statuses point at.
@@ -255,29 +257,6 @@ func titleOf(row *Advisory, a *assembly) string {
 		return a.vulnerabilities[0].Title
 	}
 	return fmt.Sprintf("%s: %d issues", row.Identifier, len(a.vulnerabilities))
-}
-
-// Release is one build of the product and where it stands on the issue.
-type Release struct {
-	Stream  string
-	Variant string
-	// Holds says the issue is open there. False is a release that held it and
-	// no longer does, which is the one that was fixed.
-	Holds bool
-	// Identifier is what this build's own inventory called the thing it is
-	// about, and empty where that document named no component of its own.
-	Identifier string
-}
-
-// Name is how the release is written in the document.
-func (r Release) Name() string { return r.Stream + " (" + r.Variant + ")" }
-
-// ProductID is the identifier statements refer to it by. A release is named by
-// its stream and its variant together, never by one of them: the same branch
-// built two ways is two builds, and naming only the branch would claim
-// something about hardware nobody built for.
-func (r Release) ProductID(product string) string {
-	return product + ":" + r.Stream + ":" + r.Variant
 }
 
 // ours reads the issue and the finding this deployment recorded for it, and
@@ -359,67 +338,6 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 		return false, fmt.Errorf("count where issue %d sits here: %w", issueID, err)
 	}
 	return count > 0, nil
-}
-
-// releases reports every build of the product that holds this issue or once
-// did, which is what an advisory states something about.
-func (s *Store) releases(ctx context.Context, subject access.Subject,
-	productID, issueID int64) ([]Release, error) {
-
-	var rows []struct {
-		Stream  string `bun:"stream"`
-		Variant string `bun:"variant"`
-		Open    int    `bun:"open"`
-		Root    string `bun:"root_identifier"`
-	}
-	// One statement rather than one per build: a product with thirty tags
-	// would otherwise be thirty round trips to write one document, and the
-	// answer would be assembled from thirty moments rather than one.
-	err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
-		// This build's own name for itself, from the scan that
-		// inventory arrived on. Joined on the target's current scan, which is
-		// one row by key, so it cannot multiply the findings counted below.
-		Join(`LEFT JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
-		// Counted rather than filtered, so a release that held the flaw and no
-		// longer does is still a row — that is the release somebody upgrades
-		// to, and dropping it would leave finished work indistinguishable
-		// from a release that never shipped the thing.
-		ColumnExpr(`COUNT(CASE WHEN f.closed_at IS NULL THEN 1 END) AS "open"`).
-		// One value per build, aggregated because the grouping is on the
-		// build's names rather than on its key.
-		ColumnExpr(`MIN(COALESCE(sc.root_identifier, '')) AS "root_identifier"`).
-		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", issueID).
-		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
-		GroupExpr("st.name, va.name").
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("read which releases this is in: %w", err)
-	}
-
-	releases := make([]Release, 0, len(rows))
-	for _, row := range rows {
-		releases = append(releases, Release{
-			Stream: row.Stream, Variant: row.Variant, Holds: row.Open > 0,
-			Identifier: row.Root,
-		})
-	}
-	// Ordered here rather than by the engine, so the document is byte-for-byte
-	// the same whatever it was generated against — which is what lets somebody
-	// diff two of them and see a real change.
-	sort.Slice(releases, func(i, j int) bool {
-		if releases[i].Stream != releases[j].Stream {
-			return releases[i].Stream < releases[j].Stream
-		}
-		return releases[i].Variant < releases[j].Variant
-	})
-	return releases, nil
 }
 
 func categoryOf(p publisher.Named) string {

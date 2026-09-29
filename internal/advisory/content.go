@@ -313,29 +313,82 @@ func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []
 // inside this deployment; the same sentence in a published advisory is a
 // promise to a customer about a date, and whether to make one is the
 // publisher's.
-func remediationsFor(fixed []Named, affected []string) []Remediation {
-	// Nothing to remediate where nothing carries it: a document about a flaw
-	// every release has left behind is a record rather than a warning.
-	if len(affected) == 0 {
-		return nil
-	}
-	if len(fixed) > 0 {
+//
+// A release a decision says will not be fixed is told so, and never told a fix
+// is coming or merely unavailable: it takes a remediation saying no fix is
+// planned, and one carrying what stops the flaw where the decision named it —
+// the mitigation, never the reasoning. It is not offered the releases that
+// are fixed. A fix in another release beside "no fix is planned" for the same
+// product reads as the two contradicting each other, and moving to another
+// line is the reader's decision rather than a remediation of this one.
+func remediationsFor(fixed []Named, affected []string, unfixed *noFix) []Remediation {
+	var out []Remediation
+	switch {
+	case len(affected) == 0:
+		// Nothing to remediate where nothing the fix is for carries it: a
+		// document about a flaw every release has left behind is a record
+		// rather than a warning.
+	case len(fixed) > 0:
 		names := make([]string, 0, len(fixed))
 		for _, one := range fixed {
 			names = append(names, one.Name)
 		}
-		return []Remediation{{
+		out = append(out, Remediation{
 			Category: "vendor_fix",
 			Details: "Update to a release in which this flaw is fixed: " +
 				strings.Join(names, ", ") + ".",
 			ProductIDs: affected,
-		}}
+		})
+	default:
+		out = append(out, Remediation{
+			Category:   "none_available",
+			Details:    "No release fixing this is available.",
+			ProductIDs: affected,
+		})
 	}
-	return []Remediation{{
-		Category:   "none_available",
-		Details:    "No release fixing this is available.",
-		ProductIDs: affected,
-	}}
+	if len(unfixed.releases) == 0 {
+		return out
+	}
+	out = append(out, Remediation{
+		Category:   "no_fix_planned",
+		Details:    "No fix is planned for this release.",
+		ProductIDs: unfixed.releases,
+	})
+	for _, one := range unfixed.mitigations {
+		out = append(out, Remediation{
+			Category: "mitigation", Details: one.text, ProductIDs: one.releases,
+		})
+	}
+	return out
+}
+
+// noFix is the affected releases a decision says will not be fixed, and
+// what stops the flaw in them, one entry per mitigation in the order the
+// releases are named.
+type noFix struct {
+	releases    []string
+	mitigations []mitigated
+}
+
+// mitigated is one mitigation and the releases it is stated for.
+type mitigated struct {
+	text     string
+	releases []string
+}
+
+// add records one release, and its mitigation where the decision named one.
+func (s *noFix) add(release, mitigation string) {
+	s.releases = append(s.releases, release)
+	if mitigation == "" {
+		return
+	}
+	for i := range s.mitigations {
+		if s.mitigations[i].text == mitigation {
+			s.mitigations[i].releases = append(s.mitigations[i].releases, release)
+			return
+		}
+	}
+	s.mitigations = append(s.mitigations, mitigated{text: mitigation, releases: []string{release}})
 }
 
 // weaknessOf is what kind of flaw this is, where the catalog knows the name.
@@ -421,8 +474,12 @@ func distributionFor(undisclosed bool) *Distribution {
 // every flaw of our own before a feed carries it — declared the base profile,
 // and a customer's tooling filtering for security advisories skipped it.
 //
-// The VEX profile is a separate question and is not assembled here: its point
-// is the not-affected justification.
+// Never § 4.5's VEX profile, whatever the document states. A release known not
+// affected, its flag and its impact are information inside a security
+// advisory, which the standard allows. An advisory that switched category
+// between editions by what it contains would drop out of every reader that
+// filters on the category, this deployment's own supplier reader included;
+// VEX is the separate per-build document.
 func profileOf(doc *Document) string {
 	return Categorized(doc)
 }
@@ -432,6 +489,9 @@ func profileOf(doc *Document) string {
 // Exported so the rule can be watched to fail: the arm that refuses is
 // unreachable through the store, because every document it assembles carries a
 // product tree and one vulnerability.
+//
+// A document whose only status is known not affected still states a status for
+// every release it names, so it is a complete security advisory.
 func Categorized(doc *Document) string {
 	if len(doc.ProductTree.Branches) == 0 || len(doc.Vulnerabilities) == 0 {
 		return "csaf_base"
@@ -440,7 +500,8 @@ func Categorized(doc *Document) string {
 		if len(one.Notes) == 0 {
 			return "csaf_base"
 		}
-		if len(one.Status.KnownAffected) == 0 && len(one.Status.Fixed) == 0 {
+		if len(one.Status.KnownAffected) == 0 && len(one.Status.Fixed) == 0 &&
+			len(one.Status.KnownNotAffected) == 0 {
 			return "csaf_base"
 		}
 	}

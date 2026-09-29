@@ -113,6 +113,11 @@ export function useAfterClaim() {
     // And the list the work came from. A claim answers findings, so agreeing
     // to one moves what the list says about every place it covers.
     void queries.invalidateQueries({ queryKey: ["findings"] });
+    // And what an advisory states about a release, which follows the
+    // decisions covering it.
+    void queries.invalidateQueries({ queryKey: ["advisory"] });
+    void queries.invalidateQueries({ queryKey: ["advisory-document"] });
+    void queries.invalidateQueries({ queryKey: ["advisory-releases"] });
   };
 }
 

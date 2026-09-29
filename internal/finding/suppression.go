@@ -47,16 +47,22 @@ type Claim struct {
 	// somebody types is matched against. The name itself is the producer's
 	// spelling and is what a screen shows.
 	SubjectFolded string `bun:"subject_folded,nullzero"`
-	OpenedScanID  int64  `bun:"opened_scan_id,notnull"`
-	ClosedScanID  *int64 `bun:"closed_scan_id"`
+	// SubjectVersion is the version the claim was made about, where the
+	// document stated one outside the package identifier. A publisher naming
+	// no package states it as the branch its product sits in.
+	SubjectVersion string `bun:"subject_version,nullzero"`
+	OpenedScanID   int64  `bun:"opened_scan_id,notnull"`
+	ClosedScanID   *int64 `bun:"closed_scan_id"`
 }
 
 // covers reports whether this claim is about the component described.
 //
-// A stored claim carries no version stated outside its identifier, so a claim
-// that names no package identifier covers every version of the name it states.
+// At the version the claim was made about, where it names one: a statement
+// that acme-fw 4.2 is not affected says nothing about acme-fw 5.0. A claim
+// naming no version, in its identifier or beside it, covers every version of
+// the name it states.
 func (c Claim) covers(d graph.Described) bool {
-	return sbom.Target{Purl: c.SubjectPurl, Name: c.SubjectName}.Covers(d)
+	return sbom.Target{Purl: c.SubjectPurl, Name: c.SubjectName, Version: c.SubjectVersion}.Covers(d)
 }
 
 // suppresses reports whether the claim removes a finding from what somebody
@@ -70,14 +76,32 @@ func (c Claim) fixes() bool { return sbom.Status(c.Status).Fixes() }
 // claimIdentity derives a stable key from what a claim says.
 //
 // Everything that makes the claim a different claim is in it, so re-sending
-// the same argument writes nothing and changing the reasoning is a change.
+// the same argument writes nothing and changing the reasoning is a change. The
+// version is part of it where one is stated, so a claim about 4.2 and one about
+// 5.0 are two claims; a claim stating none outside its package identifier
+// keys as it did before a version could be stored.
 func claimIdentity(c Claim) string {
-	basis := strings.Join([]string{
+	parts := []string{
 		strings.ToUpper(strings.TrimSpace(c.Vulnerability)),
 		c.Status, c.Justification, c.Origin, c.SubjectPurl, c.SubjectName,
-	}, "\x00")
+	}
+	if c.SubjectVersion != "" {
+		parts = append(parts, c.SubjectVersion)
+	}
+	basis := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:])
+}
+
+// statedBeside is the version a claim states outside its package identifier,
+// and nothing where the identifier carries one: that version is already part of
+// the claim through the identifier, and storing it twice would give every claim
+// about a versioned identifier a new identity.
+func statedBeside(subject sbom.Target) string {
+	if _, inside := graph.PackageOf(subject.Purl); inside != "" {
+		return ""
+	}
+	return strings.TrimSpace(subject.Version)
 }
 
 // ClaimsApplied describes what recording a build's claims changed.
@@ -136,8 +160,9 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 					Status: string(claim.Status), Justification: claim.Justification,
 					Statement: claim.Statement, Origin: string(claim.Origin),
 					SubjectPurl: subject.Purl, SubjectName: subject.Name,
-					SubjectFolded: graph.Folded(subject.Name),
-					OpenedScanID:  scanID,
+					SubjectFolded:  graph.Folded(subject.Name),
+					SubjectVersion: statedBeside(subject),
+					OpenedScanID:   scanID,
 				}
 				row.Identity = claimIdentity(row)
 				wanted[row.Identity] = row
@@ -221,6 +246,10 @@ type Carried struct {
 	// and Subject what it said the claim was about.
 	Vulnerability string
 	Subject       string
+	// Version is the version of the subject the claim was made about, where
+	// the document stated one outside the package identifier, and empty
+	// otherwise.
+	Version string
 	// Status is what the build claimed in the exchange format's own
 	// vocabulary, Justification the term it gave, and Statement the reasoning.
 	Status        string
@@ -286,6 +315,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 	var rows []struct {
 		Vulnerability string     `bun:"vulnerability"`
 		Subject       string     `bun:"subject"`
+		Version       string     `bun:"version"`
 		Status        string     `bun:"status"`
 		Justification string     `bun:"justification"`
 		Statement     string     `bun:"statement"`
@@ -301,6 +331,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
 		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
 		ColumnExpr(`COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS "subject"`).
+		ColumnExpr(`COALESCE(sup.subject_version, '') AS "version"`).
 		ColumnExpr(`sup.status AS "status"`).
 		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
 		ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
@@ -318,7 +349,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 	out := make([]Carried, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, Carried{
-			Vulnerability: row.Vulnerability, Subject: row.Subject,
+			Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 			Status: row.Status, Justification: row.Justification,
 			Statement: row.Statement,
 			Pedigree:  sbom.Origin(row.Origin) == sbom.FromPedigree,

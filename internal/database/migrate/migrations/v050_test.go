@@ -58,6 +58,7 @@ func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
 		claimSubjectsAreFolded(),
 		duplicatesDateTheirFlaws(),
 		savedFiltersBecomeTheirPersons(),
+		claimsRecordNoBuildTheyWereMadeOn(),
 		theV050DeclarationsAreTheTablesTheMigrationsBuild(),
 	}
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
