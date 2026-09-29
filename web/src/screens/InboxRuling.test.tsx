@@ -43,11 +43,11 @@ describe("ruling a report a duplicate", () => {
     await duplicateOf("OPENPSIRT-2026-0001");
     expect(mount.host().textContent).toContain("This starts a disclosure date of");
     expect(mount.host().textContent).toContain("on OPENPSIRT-2026-0001.");
-    const previews = asked.mock.calls.filter(
+    const previews = (asked.mock.calls as unknown as [string, unknown][]).filter(
       ([path]) => path === "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure",
     );
     expect(previews).toHaveLength(1);
-    expect(previews[0][1]).toMatchObject({
+    expect(previews[0]?.[1]).toMatchObject({
       params: {
         path: { product: "sonic", vulnerability: "OPENPSIRT-2026-0001" },
         query: { report: ["sonic-R-2026-1"] },

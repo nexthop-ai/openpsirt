@@ -67,6 +67,12 @@ func registerRulings(api huma.API, in core.Deps) {
 			"on a duplicate and refused on anything else, and names an issue open in this " +
 			"product. A duplicate of an issue that is not open here is refused: reject the " +
 			"report instead.\n\n" +
+			"A duplicate of a flaw recorded here, covering a report from outside, gives the " +
+			"flaw's undisclosed places in this product a disclosure date, or brings theirs " +
+			"earlier: when the earliest such report arrived, plus `disclosure.after`. " +
+			"Withdrawing the ruling puts the date back where it set it. " +
+			"`GET /v1/products/{product}/issues/{vulnerability}/duplicate-disclosure` says the " +
+			"date first.\n\n" +
 			"Every report named has to be in this product, not accepted as an issue, and " +
 			"under no ruling, or nothing is " +
 			"written. The number of reports is bounded by `triage.together-cap`.",
