@@ -257,6 +257,13 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	}
 	lapsed.Rows += worse.Rows
 
+	// A scan is the write that moves the tables furthest, so it is where the
+	// planner's statistics fall behind. Not fatal: what was found is recorded,
+	// and stale statistics make a query slow rather than wrong.
+	if err := database.RefreshStatistics(ctx, r.db); err != nil {
+		r.logger.Error("could not refresh the planner's statistics", "target", targetID, "error", err)
+	}
+
 	return &Outcome{
 		TargetID: targetID, RunID: runID,
 		Components: len(components), Applied: applied, Lapsed: lapsed.Rows,
