@@ -3416,7 +3416,7 @@ components:
             - array
             - "null"
         standing:
-          description: Live claims covering any of this finding's places, newest first. A proposed one is waiting for a second person
+          description: Live claims covering any of this finding's places, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force
           items:
             $ref: "#/components/schemas/StandingClaimBody"
           type:

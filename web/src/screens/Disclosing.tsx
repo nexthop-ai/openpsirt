@@ -138,6 +138,21 @@ export function Disclosing() {
         </label>
       </div>
 
+      {/* Where the row the act was taken from has left the list: a
+          disclosure in force at once, or a date moved past the window. */}
+      {said && !items.some((row) => `${row.product} ${row.vulnerability}` === said.key) && (
+        <div className="alert info" role="status" style={{ marginBottom: 12 }}>
+          <strong>Asked</strong>
+          <span>
+            {said.text}{" "}
+            {said.waiting && (
+              <Link to="/review-queue#embargoes" className="linkish">
+                Waiting in the review queue →
+              </Link>
+            )}
+          </span>
+        </div>
+      )}
       {past > 0 && (
         <div className="alert" style={{ marginBottom: 12 }}>
           <strong>

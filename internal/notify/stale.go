@@ -329,7 +329,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		// Standing only. A deferral that has been withdrawn or has lapsed is
 		// not one whose end anybody is waiting for — a lapsed one is already
-		// back in the queue, which is the thing this exists to give notice of.
+		// its author's to re-affirm, and they were told when it lapsed.
 		// Nor is one still waiting for a second person: every clause of the
 		// notice would be false, and it would arrive beside the message saying
 		// the claim applies to nothing until somebody agrees.

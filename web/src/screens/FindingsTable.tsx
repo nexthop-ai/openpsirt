@@ -33,6 +33,30 @@ export type Decided = {
   issue: string;
 };
 
+// The confirmation of a decision recorded from a row's preview, with the
+// decision's own page where it waits.
+export function DecidedNotice({ decided, onDismiss }: { decided: Decided; onDismiss: () => void }) {
+  return (
+    <div className="alert info" role="status" style={{ margin: 0 }}>
+      <strong>Submitted</strong>
+      <span>
+        <span className="id">{decided.issue}</span>:{" "}
+        {decided.recorded.needsApproval
+          ? `the ${said(decided.recorded.outcome)} takes effect once a second person approves it.`
+          : "in force now."}{" "}
+        {decided.recorded.needsApproval && (
+          <Link to={claimAt(decided.recorded.claimId)} className="linkish">
+            Open the decision →
+          </Link>
+        )}
+      </span>
+      <button type="button" className="linkish" style={{ marginLeft: "auto" }} onClick={onDismiss}>
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 // The age of this finding here.
 //
 // The finding's own age, not the year in the identifier: an issue assigned in
@@ -155,32 +179,14 @@ export function FindingsTable({
   const columns = spanning ? 11 : 10;
   // Where the confirmation goes: under the decided row while it is listed, and
   // in its place, above the row that followed it, once it is not.
+  // At the end of the page where neither is listed: the decided row was the
+  // last one, or the row after it left the list too.
   const listed = !!decided && rows.some((row) => identityOf(row) === decided.key);
+  const nextListed = !!decided?.next && rows.some((row) => identityOf(row) === decided.next);
   const answer = decided && (
     <tr className="places">
       <td colSpan={columns}>
-        <div className="alert info" role="status" style={{ margin: 0 }}>
-          <strong>Submitted</strong>
-          <span>
-            <span className="id">{decided.issue}</span>:{" "}
-            {decided.recorded.needsApproval
-              ? `the ${said(decided.recorded.outcome)} takes effect once a second person approves it.`
-              : "in force now."}{" "}
-            {decided.recorded.needsApproval && (
-              <Link to={claimAt(decided.recorded.claimId)} className="linkish">
-                Open the decision →
-              </Link>
-            )}
-          </span>
-          <button
-            type="button"
-            className="linkish"
-            style={{ marginLeft: "auto" }}
-            onClick={onDismiss}
-          >
-            Dismiss
-          </button>
-        </div>
+        <DecidedNotice decided={decided} onDismiss={onDismiss} />
       </td>
     </tr>
   );
@@ -557,6 +563,7 @@ export function FindingsTable({
                 </Fragment>
               );
             })}
+            {!listed && !nextListed && answer}
           </tbody>
         </table>
       </Wide>

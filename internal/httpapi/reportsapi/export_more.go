@@ -402,6 +402,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 			What: "the review queue",
 			Header: []string{
 				"claim", "proposed", "proposed by", "proposed by name", "age days", "outcome",
+				"deferred until", "committed to", "upgrade to",
 				"issue", "product", "product name", "component", "decisions", "issues",
 				"places", "builds",
 				"previously approved", "deferred days", "reasoning",
@@ -427,6 +428,8 @@ func registerQueueExport(api huma.API, in core.Deps) {
 				}
 				rows := make([][]string, 0, len(waiting))
 				for i, row := range waiting {
+					// The dates and the version as the screen's card reads them.
+					promised := core.ClaimArgument(row.Claim, "")
 					where := named[i].Finding
 					product, productName, component, version := "", "", "", ""
 					if where != nil {
@@ -439,6 +442,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 						named[i].ProposedBy, named[i].ProposedByName,
 						strconv.Itoa(int(store.Age(&row.Decision).Hours() / 24)),
 						string(row.Claim.Outcome),
+						promised.DeferredUntil, promised.CommittedTo, promised.UpgradeTo,
 						named[i].Place.Vulnerability,
 						product, productName, component + " " + version,
 						strconv.Itoa(row.Decisions), strconv.Itoa(row.Issues),

@@ -586,7 +586,7 @@ type EvidenceBody struct {
 	// claims covering any of its places, the decisions that stopped
 	// applying with their reasoning offered back, and approved claims
 	// about other issues at the same places that may reach this one.
-	Standing []core.StandingClaimBody `json:"standing" doc:"Live claims covering any of this finding's places, newest first. A proposed one is waiting for a second person"`
+	Standing []core.StandingClaimBody `json:"standing" doc:"Live claims covering any of this finding's places, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force"`
 	Previous []core.EarlierBody       `json:"previous" doc:"Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning"`
 	Similar  []core.SimilarBody       `json:"similar" doc:"Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five"`
 	// Elsewhere is another product's decision about this same issue at this

@@ -7872,7 +7872,7 @@ export interface components {
             severity?: string;
             /** @description Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five */
             similar: components["schemas"]["SimilarBody"][] | null;
-            /** @description Live claims covering any of this finding's places, newest first. A proposed one is waiting for a second person */
+            /** @description Live claims covering any of this finding's places, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force */
             standing: components["schemas"]["StandingClaimBody"][] | null;
             /** @description Words somebody put on this. Free text, no fixed vocabulary */
             tags?: string[] | null;

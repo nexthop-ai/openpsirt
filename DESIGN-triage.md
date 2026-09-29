@@ -1092,13 +1092,16 @@ decision stands in its place, and the lapse is written in the transaction that
 applies the report. `DESIGN-findings.md` § Merged issues holds the rule, and
 `DESIGN-notifications.md` § Claim outcomes says who is told.
 
-What has **stopped standing** is one question, not two. A lapsed decision and a
-deferral whose date has passed are separate mechanisms — a version bump does not
-change a judgment about priority, and a calendar does not change one about
-applicability — but a deferral that ran out on code that then moved is both.
-Asked as two lists, the queue had to merge and deduplicate them to draw at all,
-while the figure over them added the two totals and counted the overlap twice.
-One filter answers both.
+What has **stopped standing** is one question to the decision list, and two to
+the review queue. A lapsed decision and a deferral whose date has passed are
+separate mechanisms — a version bump does not change a judgment about priority,
+and a calendar does not change one about applicability — but a deferral that ran
+out on code that then moved is both.
+
+| Where | Answer |
+|---|---|
+| The decision list | One filter answers both, and a row in both is counted once |
+| The review queue | An expired deferral is in the Expired deferrals list while it stands. Once it lapses it is in none of the queue's lists, and only in its author's To reaffirm |
 
 ## Re-affirmation
 

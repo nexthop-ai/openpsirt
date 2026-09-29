@@ -171,15 +171,25 @@ export function Queue() {
     document.getElementById(`claim-${wanted}`)?.scrollIntoView({ block: "center" });
   }, [found, wanted]);
   // A section somebody was sent to by name — the ratings, the disclosure
-  // dates, the rulings — brought into view once the page is drawn. A link
-  // inside the interface changes the address without loading a page, so the
-  // browser does not do it.
+  // dates, the rulings — brought into view once it is drawn. A link inside the
+  // interface changes the address without loading a page, so the browser does
+  // not do it. Each section is drawn when its own read lands, which may be
+  // after the queue's, so the page is watched until the section appears.
   const { hash } = useLocation();
-  const drawn = !queue.isPending;
   useEffect(() => {
-    if (!hash || !drawn) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
-  }, [hash, drawn]);
+    if (!hash) return;
+    const land = () => {
+      const section = document.getElementById(hash.slice(1));
+      section?.scrollIntoView({ block: "start" });
+      return !!section;
+    };
+    if (land()) return;
+    const watch = new MutationObserver(() => {
+      if (land()) watch.disconnect();
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    return () => watch.disconnect();
+  }, [hash]);
   // A milder rating of an issue waits for a second person the same way a
   // dismissal does, and so does a request to keep something hidden longer.
   // Both are listed here, where a request is otherwise read only on the

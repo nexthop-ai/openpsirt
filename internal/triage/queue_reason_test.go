@@ -8,19 +8,54 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
+// shipping is a build holding the fixture's issue in libfoo 1.2.3, for a claim
+// that covers an open finding.
+type shipping struct {
+	in      build
+	libfoo  int64
+	opened  map[string]int64
+	fixture *fixture
+}
+
+func (f *fixture) shipping(t *testing.T) *shipping {
+	t.Helper()
+	return &shipping{
+		in: f.build(t, f.product, "2026.03"), libfoo: f.component(t, "libfoo", "1.2.3"),
+		opened: map[string]int64{}, fixture: f,
+	}
+}
+
+// closes closes the finding opened at a place, which is what a kept promise
+// does to what it covers.
+func (s *shipping) closes(t *testing.T, identity string) {
+	t.Helper()
+	if _, err := s.fixture.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+		Set("closed_at = ?", time.Now().UTC()).
+		Where("id = ?", s.opened[identity]).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // datedPast proposes a claim with a date still to come at one place, needing
 // nobody, and then moves its date into the past: a date already gone is
-// refused when written, and the date arriving is what the test is about.
-func (f *fixture) datedPast(t *testing.T, identity string, outcome triage.Outcome) *triage.Decision {
+// refused when written, and the date arriving is what the test is about. The
+// place holds an open finding the claim covers.
+func (f *fixture) datedPast(t *testing.T, ships *shipping, identity string,
+	outcome triage.Outcome) *triage.Decision {
+
 	t.Helper()
 	ctx := t.Context()
 	soon := time.Now().UTC().Add(24 * time.Hour)
 	past := time.Now().UTC().Add(-time.Hour)
 	at := f.at()
 	at.PlaceIdentity = identity
+	// The finding has no consumer, so the claim is written against none.
+	at.ConsumerUpstream = ""
+	ships.opened[identity] = f.finds(t, ships.in, ships.libfoo, identity, access.Public)
 	p := triage.Proposal{Place: at, Outcome: outcome, Reasoning: "Not this sprint.", By: f.proposer}
 	column := "deferred_until"
 	if outcome.Commits() {
@@ -71,12 +106,13 @@ func (f *fixture) listed(t *testing.T, who access.Subject, filter triage.QueueFi
 
 func TestEachQueueReasonListsOnlyItsOwnKind(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
+		ships := f.shipping(t)
 		approval := f.at()
 		approval.PlaceIdentity = "waiting-for-a-second-person"
 		asked := f.claims(t, approval)
-		expired := f.datedPast(t, "deferral-ran-out", triage.Deferred)
-		upgrade := f.datedPast(t, "upgrade-date-passed", triage.UpgradeNeeded)
-		patch := f.datedPast(t, "patch-date-passed", triage.PatchNeeded)
+		expired := f.datedPast(t, ships, "deferral-ran-out", triage.Deferred)
+		upgrade := f.datedPast(t, ships, "upgrade-date-passed", triage.UpgradeNeeded)
+		patch := f.datedPast(t, ships, "patch-date-passed", triage.PatchNeeded)
 		// A decision the code moved out from under is its author's to
 		// re-affirm, and is in none of these lists.
 		moved := f.at()
@@ -114,8 +150,9 @@ func TestEachQueueReasonListsOnlyItsOwnKind(t *testing.T) {
 
 func TestAPassedDateIsShownToEverybodyWhoMayDecideIncludingItsProposer(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		expired := f.datedPast(t, "deferral-ran-out", triage.Deferred)
-		missed := f.datedPast(t, "patch-date-passed", triage.PatchNeeded)
+		ships := f.shipping(t)
+		expired := f.datedPast(t, ships, "deferral-ran-out", triage.Deferred)
+		missed := f.datedPast(t, ships, "patch-date-passed", triage.PatchNeeded)
 		approving := f.holding(t, "approves-only", map[int64][]access.Role{
 			f.product: {access.PublicRead, access.Approver},
 		})
@@ -152,7 +189,8 @@ func TestAPassedDateIsShownToEverybodyWhoMayDecideIncludingItsProposer(t *testin
 func TestAPromisedPatchMovesByItsDateAlone(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		patch := f.datedPast(t, "patch-date-passed", triage.PatchNeeded)
+		ships := f.shipping(t)
+		patch := f.datedPast(t, ships, "patch-date-passed", triage.PatchNeeded)
 		later := time.Now().UTC().AddDate(0, 0, 30).Truncate(time.Second)
 
 		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "3.0", later,
@@ -167,10 +205,77 @@ func TestAPromisedPatchMovesByItsDateAlone(t *testing.T) {
 			t.Errorf("a patch promised for a date still to come is listed as missed: %v", got)
 		}
 
-		upgrade := f.datedPast(t, "upgrade-date-passed", triage.UpgradeNeeded)
+		upgrade := f.datedPast(t, ships, "upgrade-date-passed", triage.UpgradeNeeded)
 		if _, _, err := f.store.Repromise(ctx, f.triager, upgrade.ClaimID, "", later,
 			"The release slipped."); err == nil {
 			t.Error("a promised upgrade was left with no version to move to")
+		}
+	})
+}
+
+func TestAKeptPromiseIsNotAMissedOne(t *testing.T) {
+	// A kept promise closes the findings it covers and leaves its date and its
+	// decision as they were, so its date passing says nothing about it.
+	each(t, func(t *testing.T, f *fixture) {
+		ships := f.shipping(t)
+		kept := f.datedPast(t, ships, "patch-landed", triage.PatchNeeded)
+		missed := f.datedPast(t, ships, "patch-still-open", triage.PatchNeeded)
+		ships.closes(t, "patch-landed")
+
+		got := f.listed(t, f.reviewer, triage.QueueFilter{Reason: triage.FixDateMissed})
+		if len(got) != 1 || got[0] != missed.ClaimID {
+			t.Errorf("missed fix dates list %v, want only claim %d and never the kept %d",
+				got, missed.ClaimID, kept.ClaimID)
+		}
+	})
+}
+
+func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
+	// A patch records no builds of its own, so the deadline it is gated by is
+	// read from the builds holding what it covers now.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		ships := f.shipping(t)
+		patch := f.datedPast(t, ships, "patch-with-a-deadline", triage.PatchNeeded)
+		due := time.Now().UTC().AddDate(0, 0, 30).Truncate(time.Second)
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("due_at = ?", due).
+			Where("id = ?", ships.opened["patch-with-a-deadline"]).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		needs := func(t *testing.T) bool {
+			t.Helper()
+			var rows []triage.Decision
+			if err := f.db.DB.NewSelect().Model(&rows).
+				Where("de.claim_id = ?", patch.ClaimID).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) == 0 {
+				t.Fatal("the claim wrote no rows")
+			}
+			return rows[0].NeedsApproval
+		}
+
+		inside := due.AddDate(0, 0, -10)
+		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "", inside,
+			"The backport lands sooner."); err != nil {
+			t.Fatal(err)
+		}
+		if needs(t) {
+			t.Error("a patch moved to a date inside its deadline waits for a second person")
+		}
+
+		beyond := due.AddDate(0, 0, 30)
+		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "", beyond,
+			"The backport slipped."); err != nil {
+			t.Fatal(err)
+		}
+		if !needs(t) {
+			t.Error("a patch moved past its deadline stands with nobody agreeing")
+		}
+		got := f.listed(t, f.reviewer, triage.QueueFilter{})
+		if len(got) != 1 || got[0] != patch.ClaimID {
+			t.Errorf("the approval list holds %v, want the moved patch %d", got, patch.ClaimID)
 		}
 	})
 }

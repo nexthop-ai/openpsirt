@@ -3,7 +3,7 @@
 
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { questionIn, untaken, useSelection } from "./useSelection";
-import { FindingsTable, type Decided } from "./FindingsTable";
+import { DecidedNotice, FindingsTable, type Decided } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager } from "./FindingsViews";
 import { useHandOver } from "./findingsHandover";
@@ -1004,6 +1004,11 @@ export function Findings() {
           replaced while the next answer is read: the list somebody is
           narrowing is the thing they are looking at. */}
       <div className="listing" aria-busy={findings.isPlaceholderData || undefined}>
+        {/* A decision that emptied the page: the table that would carry its
+            confirmation is not drawn. */}
+        {!findings.isPending && rows.length === 0 && decided && (
+          <DecidedNotice decided={decided} onDismiss={() => setDecided(null)} />
+        )}
         {findings.isPending ? (
           <Loading />
         ) : rows.length === 0 ? (

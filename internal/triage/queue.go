@@ -134,6 +134,12 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 		ColumnExpr(`MAX(de.id) AS "newest"`).
 		GroupExpr("de.claim_id")
 	q = waiting(q, filter.Reason, s.now())
+	if filter.Reason == FixDateMissed {
+		// A promise is missed only while a finding it covers is still open
+		// where the reader may see it. A kept promise closes its findings and
+		// leaves its date and its decision as they were.
+		q = q.Where("EXISTS (?)", readableFindings(openUnder(q), subject, "f", "st.product_id"))
+	}
 	// One product where the caller named one, and whatever else the reader
 	// narrowed by. A claim is decided in a product, so this narrows the same
 	// way every other list does — and zero is every product, which is what the
@@ -245,24 +251,28 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 				Where("qc.outcome IN (?)", bun.List(f.Outcomes)))
 	}
 	if release := strings.ToLower(strings.TrimSpace(f.Release)); release != "" {
-		// The match buildsCovered makes, asked as a condition: an open
-		// finding at the row's place, at the versions the row was written
-		// against, in a build of the named release the reader may see.
-		covers := q.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("1").
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Where(finding.SameIssue("f.vulnerability_id", "de.vulnerability_id")).
-			Where("f.place_identity = de.place_identity").
-			Where("f.closed_at IS NULL").
-			Where("st.product_id = de.product_id").
-			Where("st.name = ?", release).
-			Where(finding.KeyMatches)
+		// An open finding the row covers, in a build of the named release.
+		covers := openUnder(q).Where("st.name = ?", release)
 		q = q.Where("EXISTS (?)", readableFindings(covers, subject, "f", "st.product_id"))
 	}
 	return q
+}
+
+// openUnder selects the open findings a row of decision AS de covers: at the
+// row's place, at the versions the row was written against, in the row's
+// product. The match buildsCovered makes, asked as a condition.
+func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("1").
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Where(finding.SameIssue("f.vulnerability_id", "de.vulnerability_id")).
+		Where("f.place_identity = de.place_identity").
+		Where("f.closed_at IS NULL").
+		Where("st.product_id = de.product_id").
+		Where(finding.KeyMatches)
 }
 
 // Queue returns what is waiting for somebody, newest first, one entry per

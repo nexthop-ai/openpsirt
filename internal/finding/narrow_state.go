@@ -194,10 +194,12 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// and this did not, so a claim proposed and then withdrawn put its
 		// group in the waiting bucket while the row drew no state word at
 		// all. Both are the same question and have to be the same condition.
-		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "waiting"`,
-			proposed).
-		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "approved"`,
-			approved).
+		// A proposal that needs nobody is in force rather than waiting, and
+		// counts with the agreed ones, as the row's own counts do.
+		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.needs_approval = ? AND de.live_key IS NOT NULL`+
+			` THEN 1 ELSE 0 END) AS "waiting"`, proposed, true).
+		ColumnExpr(`MAX(CASE WHEN `+standingHere+` AND de.live_key IS NOT NULL`+
+			` THEN 1 ELSE 0 END) AS "approved"`, inForce...).
 		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
 		// A promise to upgrade standing over this place. Counted only for the
 		// claim that currently stands, like "approved" above: a promise that

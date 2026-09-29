@@ -195,14 +195,13 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		}
 
 		// Everything it reached now carries a claim, and the one nothing has
-		// fixed does not. "Waiting" rather than "agreed": every decision here
-		// is written as proposed and this outcome simply needs nobody to agree
-		// to it, which is the state an ordinary affected decision lands in
-		// too.
+		// fixed does not. "Agreed" rather than "waiting": a promise inside
+		// the deadline needs nobody to agree to it, so it is in force, which
+		// is the state an ordinary affected decision lands in too.
 		var decided struct {
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings?state=waiting", &decided)
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings?state=agreed", &decided)
 		if decided.Total != 3 {
 			t.Errorf("%d rows carry a claim after the upgrade, want the three it covered",
 				decided.Total)
