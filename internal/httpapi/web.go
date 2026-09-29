@@ -8,19 +8,9 @@ import (
 	"net/http"
 	"path"
 	"strings"
-)
 
-// Interface serves the built web interface.
-//
-// Embedded into the binary by whoever builds it and handed in here, rather
-// than embedded in this package: a build that has not run the frontend still
-// has to compile and serve the API, and //go:embed of a missing directory is a
-// compile error rather than an empty filesystem.
-type Interface struct {
-	// Files is the built output — index.html at its root. Nil serves nothing,
-	// which is what a development build or an API-only deployment gets.
-	Files fs.FS
-}
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+)
 
 // reserved reports whether a path belongs to this server rather than to the
 // page, whether or not anything is currently routed there.
@@ -56,7 +46,7 @@ func reserved(path string) bool {
 // endpoint still answers as an endpoint rather than as a page.
 func mountInterface(router interface {
 	NotFound(http.HandlerFunc)
-}, ui Interface) {
+}, ui core.Interface) {
 	if ui.Files == nil {
 		return
 	}

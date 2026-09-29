@@ -83,6 +83,11 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 			api,
 		},
 		{
+			"any go in a route package beneath it",
+			write("internal/httpapi/core/shape.go", "package core\n\ntype X struct{ A int }\n"),
+			api,
+		},
+		{
 			"plain go",
 			write("plain.go", "package p\n\nfunc add(a, b int) int { return a + b }\n"),
 			code,

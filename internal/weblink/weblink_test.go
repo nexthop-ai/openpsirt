@@ -355,7 +355,10 @@ func TestNoAddressIsSpelledOutsideThisPackage(t *testing.T) {
 				return err
 			}
 			if entry.IsDir() {
-				if filepath.Base(path) == "weblink" {
+				// The API's shared test harness is test code in a package of
+				// its own, read here as test files are not: the paths it
+				// sends are the API's, never an address into the interface.
+				if base := filepath.Base(path); base == "weblink" || base == "httpapitest" {
 					return filepath.SkipDir
 				}
 				return nil

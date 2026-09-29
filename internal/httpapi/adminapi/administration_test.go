@@ -1,0 +1,517 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package adminapi_test
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+// TestRecordingARoleReadsTheModeThroughTheWritesOwnConnection pins that where
+// roles come from is read through the transaction's own handle.
+//
+// A read through the root handle waits on SQLite's single connection, which
+// the transaction already holds, so the request never answers; the deadline
+// turns that hang into a failure. The other engines answer through a second
+// connection and would pass either way.
+//
+// Both arms of the mode are exercised, since this package wires the mode
+// nowhere else.
+func TestRecordingARoleReadsTheModeThroughTheWritesOwnConnection(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for _, c := range []struct {
+			what   string
+			groups bool
+			want   int
+		}{
+			{"assigned directly", false, http.StatusCreated},
+			{"derived from groups", true, http.StatusConflict},
+		} {
+			t.Run(c.what, func(t *testing.T) {
+				on := httpapitest.Deriving(t, r, c.groups)
+				body := `{"identity":"` + strings.ReplaceAll(c.what, " ", "-") + `",` +
+					`"holds":[{"product":"mine","role":"public-read"}]}`
+
+				// The request carries a deadline, because the failure this
+				// pins is one that never answers. A caller giving up is what
+				// releases it — the read inside the write fails, the write
+				// rolls back, and the connection comes back — so a deadline
+				// here is what a browser or a seeding script does, and it
+				// turns a suite that hangs until the binary panics into one
+				// failing line. Without it the goroutine holding the
+				// transaction outlives the test and blocks the fixture's own
+				// cleanup.
+				ctx, stop := context.WithTimeout(t.Context(), 10*time.Second)
+				defer stop()
+				req := httptest.NewRequest(http.MethodPost, "/v1/people",
+					strings.NewReader(body)).WithContext(ctx)
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set(httpapitest.TestHeader, "admin")
+				httpapitest.FromOurOwnPage(req)
+				rec := httptest.NewRecorder()
+				on.Handler.ServeHTTP(rec, req)
+
+				if ctx.Err() != nil {
+					t.Fatalf("recording somebody with a role, %s, never answered: "+
+						"the write is holding the connection something inside it is waiting for",
+						c.what)
+				}
+				if rec.Code != c.want {
+					t.Errorf("recording somebody with a role, %s, answered %d, wanted %d: %s",
+						c.what, rec.Code, c.want, rec.Body.String())
+				}
+			})
+		}
+	})
+}
+
+// TestGrantingARoleDoesNotAskWhetherItWorks holds the line that a grant is
+// written with what the caller decides and read back with what the server
+// knows.
+//
+// "effective" is the server's answer: an assignment set aside by a change of
+// role-assignment mode is kept so the change can be undone, and it grants
+// nothing while it sits there. Required on the way in, it made granting a role
+// mean stating whether the role you are granting works — so everything that
+// granted one sent "effective": true to be allowed to, and a caller that told
+// the truth and left it out was refused with "expected required property
+// effective to be present".
+func TestGrantingARoleDoesNotAskWhetherItWorks(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		recorded := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ana","display_name":"Ana",`+
+				`"holds":[{"product":"mine","role":"public-read"}]}`)
+		if recorded.Code != http.StatusCreated {
+			t.Fatalf("recording somebody with a role answered %d: %s",
+				recorded.Code, recorded.Body.String())
+		}
+
+		// And the reply describes the record rather than the request. Handed
+		// the request back, whatever the caller says about a grant comes back
+		// as though the deployment had confirmed it.
+		var made struct {
+			Item struct {
+				Holds []struct {
+					Effective bool   `json:"effective"`
+					Source    string `json:"source"`
+				} `json:"holds"`
+				SignsInBy []struct {
+					Username string `json:"username"`
+				} `json:"signs_in_by"`
+			} `json:"item"`
+		}
+		if err := json.Unmarshal(recorded.Body.Bytes(), &made); err != nil {
+			t.Fatalf("decode: %v (%s)", err, recorded.Body.String())
+		}
+		if len(made.Item.Holds) != 1 {
+			t.Fatalf("recording answered with %d roles, not the one granted: %s",
+				len(made.Item.Holds), recorded.Body.String())
+		}
+		if !made.Item.Holds[0].Effective || made.Item.Holds[0].Source != "assigned" {
+			t.Errorf("the reply describes the grant as %+v, which is not what was recorded",
+				made.Item.Holds[0])
+		}
+		// Recording somebody records the way they arrive, without being asked
+		// for it: an identity is the username, whichever path it comes down.
+		if len(made.Item.SignsInBy) != 1 || made.Item.SignsInBy[0].Username != "ana" {
+			t.Errorf("the reply does not say how she can arrive: %s", recorded.Body.String())
+		}
+
+		// And the role is a real one, not a body that merely parsed: she can
+		// reach the product it was held against, and nothing else.
+		if got := r.As(t, "ana", http.MethodGet, "/v1/products/mine/streams"); got != http.StatusOK {
+			t.Fatalf("the person just granted a role on mine reads it as %d", got)
+		}
+		if got := r.As(t, "ana", http.MethodGet, "/v1/products/theirs/streams"); got != http.StatusNotFound {
+			t.Fatalf("she reads a product she holds nothing on as %d, not 404", got)
+		}
+
+		// Read back, the answer the request did not have to state is there.
+		listed := httpapitest.AsPerson(t, r, "admin", http.MethodGet, "/v1/people", "")
+		if listed.Code != http.StatusOK {
+			t.Fatalf("listing people answered %d: %s", listed.Code, listed.Body.String())
+		}
+		var out struct {
+			Items []struct {
+				Identity string `json:"identity"`
+				Holds    []struct {
+					Product   string `json:"product"`
+					Role      string `json:"role"`
+					Effective bool   `json:"effective"`
+					Source    string `json:"source"`
+				} `json:"holds"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(listed.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v (%s)", err, listed.Body.String())
+		}
+		var found bool
+		for _, person := range out.Items {
+			if person.Identity != "ana" {
+				continue
+			}
+			for _, hold := range person.Holds {
+				if hold.Role != "public-read" {
+					continue
+				}
+				found = true
+				if !hold.Effective {
+					t.Errorf("the role she was granted is read back as granting nothing")
+				}
+				if hold.Source != "assigned" {
+					t.Errorf("a role an administrator granted came back sourced %q", hold.Source)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("the role recorded with her is not read back: %s", listed.Body.String())
+		}
+	})
+}
+
+func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
+	// "A credential cannot mint another" held for a token issuing a
+	// token, and was got around by what an administrator's token could make
+	// instead: a person — an administrator, even — and a pipeline key. Both
+	// outlive the token and neither is bounded by it, so the narrow credential
+	// could always ask for a wide one.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// A personal token belonging to somebody who administers this
+		// deployment, which is the credential the escalation used.
+		person, err := r.Rights.ByIdentity(t.Context(), "admin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, secret, err := r.Rights.NewToken(t.Context(), person.ID, "theirs", nil, nil, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, act := range []struct {
+			what string
+			path string
+			body string
+		}{
+			{"record a person", "/v1/people",
+				`{"identity":"made-by-token","display_name":"Made","admin":true}`},
+			{"create a key", "/v1/keys",
+				`{"name":"made-by-token","product":"mine"}`},
+		} {
+			req := httptest.NewRequest(http.MethodPost, act.path, strings.NewReader(act.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+secret)
+			got := httptest.NewRecorder()
+			r.Handler.ServeHTTP(got, req)
+			if got.Code != http.StatusForbidden {
+				t.Errorf("a token could %s: %d %s", act.what, got.Code, got.Body.String())
+			}
+		}
+
+		// The same acts still work for the same person when they have signed
+		// in, so what is refused is the credential rather than the right.
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"made-by-session","display_name":"Made"}`); got.Code != http.StatusCreated {
+			t.Errorf("an administrator signing in could not record a person: %d %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+// TestRecordingSomebodyAgainLeavesAdministrationAlone pins what an omitted
+// field means.
+//
+// Administration was decided from a read taken before the write: a request
+// that said nothing about it passed back whatever the read had returned. Two
+// requests at once, one granting it and one adding a role, and the second
+// wrote back the value it saw before the first — and because the request
+// stated nothing, no trail row said anybody had done it.
+//
+// The read failing was the same shape and worse: it answered "nobody is
+// recorded as this", so the handler took an existing administrator to be new
+// and recorded them without it.
+func TestRecordingSomebodyAgainLeavesAdministrationAlone(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"deputy","admin":true}`); got.Code >= 300 {
+			t.Fatalf("recording an administrator answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// A request about something else entirely, saying nothing about
+		// administration.
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"deputy","holds":[{"product":"mine","role":"public-read"}]}`,
+		); got.Code >= 300 {
+			t.Fatalf("granting them a role answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var person struct {
+			Admin bool `json:"admin"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/people/deputy", &person)
+		if !person.Admin {
+			t.Error("granting a role withdrew administration from somebody who held it")
+		}
+
+		// And nothing claimed it moved. A row per request would make the
+		// trail say administration changed on every edit to somebody's roles.
+		var trail httpapitest.Changed
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
+		for _, row := range trail.Items {
+			if row.About == "deputy" && row.Became == "administrator" {
+				t.Errorf("a request saying nothing about administration recorded %+v", row)
+			}
+		}
+	})
+}
+
+// Administration has two sources, and a person is read with both. The one
+// granted here is what the request changes, so somebody named in
+// configuration reads as not granted here until somebody grants it, and a
+// grant made here is what keeps them an administrator once the name goes.
+func TestAPersonIsReadWithBothSourcesOfAdministration(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if _, err := r.Rights.NameBootstrapAdmins(t.Context(), []string{"operator"}); err != nil {
+			t.Fatal(err)
+		}
+		type sources struct {
+			Identity             string `json:"identity"`
+			Admin                bool   `json:"admin"`
+			AdminByConfiguration bool   `json:"admin_by_configuration"`
+		}
+		listed := func() sources {
+			t.Helper()
+			var out struct {
+				Items []sources `json:"items"`
+			}
+			httpapitest.Read(t, r, "admin", "/v1/people", &out)
+			for _, person := range out.Items {
+				if person.Identity == "operator" {
+					return person
+				}
+			}
+			t.Fatal("the operator is not in the list of people")
+			return sources{}
+		}
+		one := func() sources {
+			t.Helper()
+			var person sources
+			httpapitest.Read(t, r, "admin", "/v1/people/operator", &person)
+			return person
+		}
+
+		for what, got := range map[string]sources{"the list": listed(), "their page": one()} {
+			if got.Admin || !got.AdminByConfiguration {
+				t.Errorf("named in configuration, %s reads granted here %v, by configuration %v",
+					what, got.Admin, got.AdminByConfiguration)
+			}
+		}
+
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"operator","admin":true}`); got.Code >= 300 {
+			t.Fatalf("granting administration answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := one(); !got.Admin || !got.AdminByConfiguration {
+			t.Errorf("granted here as well, their page reads %+v", got)
+		}
+
+		if _, err := r.Rights.NameBootstrapAdmins(t.Context(), nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := listed(); !got.Admin || got.AdminByConfiguration {
+			t.Errorf("with the name gone, the list reads %+v", got)
+		}
+	})
+}
+
+func TestWithdrawingSomethingNobodyHoldsRecordsNothingAndReleasesNothing(t *testing.T) {
+	// The write bound only the error from its statement and never read how
+	// many rows it matched, so a role somebody does not hold — or a word that
+	// is not a role at all — answered as withdrawn. The caller then wrote a
+	// trail row saying the role was withdrawn, and asked whether the person
+	// still held anything there: for a role they never had the answer was no,
+	// and everything they were dealing with in that product went back to the
+	// unassigned list.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+
+		// A role this person does not hold on a product that exists.
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/triager/roles/mine/private-read", "")
+		if got.Code != http.StatusNotFound {
+			t.Errorf("withdrawing a role nobody holds answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		// A word that is not a role at all.
+		got = httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/triager/roles/mine/not-a-role", "")
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("withdrawing a word that is not a role answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		// And nothing was recorded as having happened.
+		var trail httpapitest.Changed
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=role&limit=200", &trail)
+		for _, row := range trail.Items {
+			if strings.Contains(row.About, "triager") {
+				t.Errorf("a withdrawal that withdrew nothing recorded %+v", row)
+			}
+		}
+	})
+}
+
+// TestTheUserListNarrowsToWhoHoldsWhat pins the question an access review
+// asks.
+//
+// "Who approves on this product" was answerable only by reading the grid
+// sideways off a list of everybody, and a deployment with two hundred people
+// in it is one where that is not answered at all.
+func TestTheUserListNarrowsToWhoHoldsWhat(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		held := func(query string) []string {
+			t.Helper()
+			var out struct {
+				Items []struct {
+					Identity string `json:"identity"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, "admin", "/v1/people"+query, &out)
+			names := make([]string, 0, len(out.Items))
+			for _, item := range out.Items {
+				names = append(names, item.Identity)
+			}
+			return names
+		}
+
+		everybody := held("")
+		approvers := held("?product=mine&role=approver")
+		if len(approvers) == 0 {
+			t.Fatal("nobody approves on the product, so this narrowing was not exercised")
+		}
+		if len(approvers) >= len(everybody) {
+			t.Errorf("narrowing to approvers on one product kept %d of %d people",
+				len(approvers), len(everybody))
+		}
+		for _, who := range approvers {
+			if who == "triager" || who == "reader" {
+				t.Errorf("%q holds no approval here and is in the narrowed list", who)
+			}
+		}
+
+		// A role nobody holds on a product answers empty rather than
+		// everybody: a narrowing that silently does nothing is the one that
+		// makes a review report the wrong population.
+		if narrowed := held("?product=mine&role=assigner"); len(narrowed) >= len(everybody) {
+			t.Errorf("narrowing to assigners kept %d of %d people", len(narrowed), len(everybody))
+		}
+
+		// And a product nobody declared is said, rather than answered with an
+		// empty list — which reads as "nobody holds anything there".
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodGet,
+			"/v1/people?product=no-such-product", ""); got.Code != http.StatusNotFound {
+			t.Errorf("narrowing to a product nobody declared answered %d, want 404", got.Code)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodGet,
+			"/v1/people?role=nonsense", ""), http.StatusUnprocessableEntity)
+	})
+}
+
+// TestTheUserListSaysWhereSomebodyIsReached pins the column against the write
+// that fills it.
+//
+// The address and the display name are recorded from this screen, and the list
+// is the screen — so a column drawing "none" over an address somebody had just
+// typed reads as the write having been refused.
+func TestTheUserListSaysWhereSomebodyIsReached(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ada","display_name":"Ada","email":"ada@example.test"}`); got.Code >= 300 {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Items []struct {
+				Identity    string `json:"identity"`
+				DisplayName string `json:"display_name"`
+				Email       string `json:"email"`
+				EmailSource string `json:"email_source"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/people", &out)
+		for _, person := range out.Items {
+			if person.Identity != "ada" {
+				continue
+			}
+			if person.Email != "ada@example.test" {
+				t.Errorf("the list says ada is reached at %q", person.Email)
+			}
+			if person.DisplayName != "Ada" {
+				t.Errorf("the list calls ada %q", person.DisplayName)
+			}
+			// The source that said so, because a provider's may be replaced
+			// by a later sign-in and one recorded here never is.
+			if person.EmailSource != "recorded" {
+				t.Errorf("the list says ada's address came from %q", person.EmailSource)
+			}
+			return
+		}
+		t.Error("ada is not in the list of people")
+	})
+}
+
+// The trail keys an administrative change on the names as stored, whatever
+// capitals the request typed them in, and records a membership only where it
+// changed.
+//
+// A person's history is read by their stored identity, compared exactly on
+// PostgreSQL, so a row keyed on "Ana" is missing from the history of "ana".
+// And putting somebody on a team they are already on recorded a second time
+// that they joined.
+func TestTheTrailNamesWhatWasChangedAsItIsStored(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"Ana","holds":[{"product":"MINE","role":"public-read"}]}`); got.Code != http.StatusCreated {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"platform"}`); got.Code >= 300 {
+			t.Fatalf("declaring a team answered %d: %s", got.Code, got.Body.String())
+		}
+		for _, typed := range []string{"ANA", "ana"} {
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+				"/v1/teams/platform/members/"+typed, ""); got.Code != http.StatusNoContent {
+				t.Fatalf("putting %s on the team answered %d: %s", typed, got.Code, got.Body.String())
+			}
+		}
+
+		var trail struct {
+			Items []struct {
+				About string `json:"about"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=role", &trail)
+		if len(trail.Items) != 1 || trail.Items[0].About != "ana on mine" {
+			t.Errorf("the role granted is recorded as %+v, want \"ana on mine\"", trail.Items)
+		}
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=team", &trail)
+		members := 0
+		for _, row := range trail.Items {
+			if strings.Contains(row.About, " · ") {
+				members++
+				if row.About != "platform · ana" {
+					t.Errorf("the membership is recorded as %q, want \"platform · ana\"", row.About)
+				}
+			}
+		}
+		if members != 1 {
+			t.Errorf("putting somebody on a team twice recorded %d memberships", members)
+		}
+	})
+}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 func TestEveryLimitOfferedIsOneTheStoresKnow(t *testing.T) {
@@ -32,9 +33,9 @@ func TestEveryLimitOfferedIsOneTheStoresKnow(t *testing.T) {
 		known[[2]int{page.ByDefault, page.Most}] = name
 	}
 
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		var checked int
-		for path, item := range r.api.OpenAPI().Paths {
+		for path, item := range r.API.OpenAPI().Paths {
 			if item.Get == nil {
 				continue
 			}

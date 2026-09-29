@@ -203,9 +203,10 @@ var query = regexp.MustCompile(`(?i)\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|CRE
 // route, so a doc tag anywhere is read the same way.
 var operation = regexp.MustCompile(`huma\.(Register|Operation)|Summary:|OperationID:|\bdoc:"`)
 
-// apiPackage is the package the API document is generated from. Every file in it
-// takes the tier, whatever it holds: a type an operation answers with, its
-// field names and its tags, are the document as much as the operation is.
+// apiPackage is the package the API document is generated from, with the route
+// packages beneath it. Every file in them takes the tier, whatever it holds: a
+// type an operation answers with, its field names and its tags, are the
+// document as much as the operation is.
 const apiPackage = "internal/httpapi/"
 
 func classify(file string) tier {

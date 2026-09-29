@@ -27,6 +27,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
@@ -77,7 +78,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Generating the document from the running registrations is what keeps it
 	// from drifting away from the server. It needs no database.
 	if *dumpSpec {
-		_, api := httpapi.New(logger, nil, httpapi.Deps{})
+		_, api := httpapi.New(logger, nil, core.Deps{})
 		doc, err := api.OpenAPI().YAML()
 		if err != nil {
 			return fmt.Errorf("render OpenAPI document: %w", err)
@@ -285,9 +286,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// The chat platforms this deployment holds a credential for, which a
 	// destination and a person's own settings are checked against.
 	chats := chatPlatforms(cfg, logger)
-	handler, _ := httpapi.New(logger, db.Validate, httpapi.Deps{
+	handler, _ := httpapi.New(logger, db.Validate, core.Deps{
 		DB: db, Queue: work, Replica: name,
-		Interface: httpapi.Interface{Files: pages},
+		Interface: core.Interface{Files: pages},
 		// The resolver reads through a store that bounds a derived grant to
 		// the session lifetime. A browser re-derives its roles at every
 		// sign-in; a personal token never signs in, so without a bound a

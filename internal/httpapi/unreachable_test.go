@@ -17,6 +17,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
@@ -37,7 +39,7 @@ import (
 // its server behaves: every statement returns a driver error, and none of them
 // is "no rows".
 func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		logged := &counting{}
 		handler := overAClosedDatabase(t, r, logged)
 
@@ -78,8 +80,8 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 				"/v1/products/mine/streams/master/variants/broadcom/components/mine"},
 		} {
 			req := httptest.NewRequest(http.MethodGet, c.path, nil)
-			req.Header.Set(testHeader, "reader")
-			fromOurOwnPage(req)
+			req.Header.Set(httpapitest.TestHeader, "reader")
+			httpapitest.FromOurOwnPage(req)
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
 
@@ -116,7 +118,7 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 //
 // Closed rather than never opened: the handlers refuse a nil database with an
 // answer of their own, which is a different arm and not this one.
-func overAClosedDatabase(t *testing.T, r *reach, logged slog.Handler) http.Handler {
+func overAClosedDatabase(t *testing.T, r *httpapitest.Reach, logged slog.Handler) http.Handler {
 	t.Helper()
 	return overAClosedDatabaseAs(t, r, logged,
 		publisher.Named{Name: "Example Networks", Namespace: "https://example.test"})
@@ -124,7 +126,7 @@ func overAClosedDatabase(t *testing.T, r *reach, logged slog.Handler) http.Handl
 
 // overAClosedDatabaseAs is overAClosedDatabase for a deployment publishing as
 // somebody else, or as nobody.
-func overAClosedDatabaseAs(t *testing.T, r *reach, logged slog.Handler,
+func overAClosedDatabaseAs(t *testing.T, r *httpapitest.Reach, logged slog.Handler,
 	who publisher.Named) http.Handler {
 
 	t.Helper()
@@ -152,9 +154,9 @@ func overAClosedDatabaseAs(t *testing.T, r *reach, logged slog.Handler,
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Deps{
+	handler, _ := httpapi.New(slog.New(logged), nil, core.Deps{
 		DB: gone, Queue: queue.New(gone, queue.DefaultOptions()), Files: files,
-		Access:    access.NewResolver(r.rights, access.Trust{Header: testHeader, From: sources}),
+		Access:    access.NewResolver(r.Rights, access.Trust{Header: httpapitest.TestHeader, From: sources}),
 		Publisher: who,
 	})
 	return handler
@@ -164,12 +166,12 @@ func overAClosedDatabaseAs(t *testing.T, r *reach, logged slog.Handler,
 // fault. The missing publisher is a refusal of its own, and answering every
 // other failure with it hands the caller the error's text as a conflict.
 func TestAFailedReadWithNoPublisherIsAFault(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		handler := overAClosedDatabaseAs(t, r, &counting{}, publisher.Named{})
 		req := httptest.NewRequest(http.MethodGet,
 			"/v1/products/mine/streams/master/variants/broadcom/vex/issuance", nil)
-		req.Header.Set(testHeader, "reader")
-		fromOurOwnPage(req)
+		req.Header.Set(httpapitest.TestHeader, "reader")
+		httpapitest.FromOurOwnPage(req)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -203,7 +205,7 @@ func (c *counting) WithGroup(string) slog.Handler      { return c }
 // which cannot help, and nothing is logged. Here the resolver itself reads the
 // database nobody can reach.
 func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		path := filepath.Join(t.TempDir(), "gone.db")
 		if err := os.WriteFile(path, nil, 0o600); err != nil {
 			t.Fatal(err)
@@ -224,14 +226,14 @@ func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
 			t.Fatal(err)
 		}
 		logged := &counting{}
-		handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Deps{
+		handler, _ := httpapi.New(slog.New(logged), nil, core.Deps{
 			DB: gone, Queue: queue.New(gone, queue.DefaultOptions()),
 			Access: access.NewResolver(access.NewStore(gone.DB),
-				access.Trust{Header: testHeader, From: sources}),
+				access.Trust{Header: httpapitest.TestHeader, From: sources}),
 		})
 		req := httptest.NewRequest(http.MethodGet, "/v1/session/me", nil)
-		req.Header.Set(testHeader, "reader")
-		fromOurOwnPage(req)
+		req.Header.Set(httpapitest.TestHeader, "reader")
+		httpapitest.FromOurOwnPage(req)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusServiceUnavailable {

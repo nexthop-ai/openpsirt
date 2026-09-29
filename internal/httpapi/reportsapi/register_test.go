@@ -1,0 +1,414 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package reportsapi_test
+
+import (
+	"encoding/csv"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
+	// The audit list says what was decided; an auditor's first question is
+	// what was *known*, decided or not. A register of only what somebody
+	// answered is the report they already have.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		var register struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+				State         string `json:"state"`
+				Outcome       string `json:"outcome"`
+				ProposedBy    string `json:"proposed_by"`
+				ApprovedBy    string `json:"approved_by"`
+				Opened        string `json:"opened"`
+				Due           string `json:"due"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", at, &register)
+		if register.Total == 0 || len(register.Items) == 0 {
+			t.Fatal("the register is empty for a build that holds a finding")
+		}
+		// The row the other reports leave out.
+		one := register.Items[0]
+		if one.State != "undecided" {
+			t.Errorf("nobody has decided anything and the register says %q", one.State)
+		}
+		if one.Opened == "" {
+			t.Error("the register does not say when this was known")
+		}
+		if one.ProposedBy != "" || one.ApprovedBy != "" {
+			t.Errorf("a row nobody decided names %q and %q", one.ProposedBy, one.ApprovedBy)
+		}
+
+		// And once somebody decides, the row carries who and when — both
+		// names, because two different people is the whole of the control.
+		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			`{"outcome":"wont-fix","reasoning":"Not worth it here."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
+		}
+		httpapitest.Read(t, r, "triager", at, &register)
+		after := register.Items[0]
+		if after.State != "waiting" || after.Outcome != "wont-fix" {
+			t.Errorf("after a claim the register says %q/%q", after.State, after.Outcome)
+		}
+		if after.ProposedBy == "" {
+			t.Error("the register does not say who claimed it")
+		}
+		if after.ApprovedBy != "" {
+			t.Errorf("nobody has agreed and the register names %q", after.ApprovedBy)
+		}
+	})
+}
+
+func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/register.csv", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("exporting the register answered %d: %s", got.Code, got.Body.String())
+		}
+		// It states no triage line, because it applies none. The register is
+		// every place in the build with what stands there, which is what makes
+		// it answerable to an auditor — and a header saying things were left
+		// out above a file that left nothing out is worse than saying nothing,
+		// because it reads as complete about what remains.
+		if httpapitest.Contains(got.Body.String(), "# triaged at or above") {
+			t.Error("the register export claims a triage line it does not apply")
+		}
+		if !httpapitest.Contains(got.Body.String(), "CVE-2026-9999") {
+			t.Error("the register export holds no rows")
+		}
+		// Somebody who holds nothing on the product gets nothing at all.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "approver", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/register.csv",
+			""), http.StatusNotFound)
+	})
+}
+
+// Register exports held open by slow readers take the slots, and the next one
+// is refused with a time to ask again rather than queued for a connection.
+// The slots are a fifth of the pool and at least one, so on SQLite, whose pool
+// is one connection, one export takes the only slot.
+func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register.csv"
+		ask := func() *http.Request {
+			req := httptest.NewRequest(http.MethodGet, at, nil)
+			req.Header.Set(httpapitest.TestHeader, "triager")
+			httpapitest.FromOurOwnPage(req)
+			return req
+		}
+
+		var held []*heldOpen
+		var finishing []chan struct{}
+		defer func() {
+			for i, w := range held {
+				close(w.release)
+				<-finishing[i]
+			}
+		}()
+		var refused *heldOpen
+		for range 64 {
+			w := &heldOpen{header: http.Header{}, started: make(chan struct{}),
+				release: make(chan struct{})}
+			finished := make(chan struct{})
+			go func() {
+				defer close(finished)
+				r.Handler.ServeHTTP(w, ask())
+			}()
+			select {
+			case <-w.started:
+				held = append(held, w)
+				finishing = append(finishing, finished)
+				continue
+			case <-finished:
+				refused = w
+			}
+			break
+		}
+		if refused == nil {
+			t.Fatal("64 exports held open at once, and none was refused")
+		}
+		if refused.code != http.StatusServiceUnavailable {
+			t.Fatalf("an export past the slots answered %d", refused.code)
+		}
+		if refused.header.Get("Retry-After") == "" {
+			t.Error("an export past the slots was not told when to ask again")
+		}
+		// A fifth of the pool, and at least one: SQLite's pool is one
+		// connection, so there it is one.
+		if open := r.DB.DB.DB.Stats().MaxOpenConnections; open > 0 && len(held) != max(1, open/5) {
+			t.Errorf("%d exports held open at once over a pool of %d", len(held), open)
+		}
+
+		// A slot given back is taken by the next export, which is written whole.
+		close(held[0].release)
+		<-finishing[0]
+		held, finishing = held[1:], finishing[1:]
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
+		if got.Code != http.StatusOK || !httpapitest.Contains(got.Body.String(), "CVE-2026-9999") {
+			t.Errorf("an export after a slot was given back answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+// heldOpen is a response whose reader stops at the first byte of a successful
+// body until it is released, as a slow client's socket does.
+type heldOpen struct {
+	header  http.Header
+	code    int
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (h *heldOpen) Header() http.Header { return h.header }
+func (h *heldOpen) WriteHeader(code int) {
+	if h.code == 0 {
+		h.code = code
+	}
+}
+func (h *heldOpen) Write(b []byte) (int, error) {
+	if h.code == 0 {
+		h.code = http.StatusOK
+	}
+	if h.code == http.StatusOK {
+		h.once.Do(func() { close(h.started) })
+		<-h.release
+	}
+	return len(b), nil
+}
+
+func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
+	// Nothing makes an approval unique per decision — a second approver adds a
+	// row — and it was joined, so each extra one multiplied its finding into
+	// two rows on a page whose total counts findings. The page then held one
+	// row fewer than it said, and every later offset skipped one, so an
+	// auditor paging a register never saw some of it and nothing said so.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		claim, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, claim)
+		// A second agreement on the same claim, which is what the schema
+		// allows and what multiplied the row. Written directly, because a
+		// second approver going through the endpoint is a different subject
+		// and this is about the shape of the row rather than about who may
+		// add one.
+		if _, err := r.DB.DB.NewRaw(
+			`INSERT INTO "claim_approval"
+				("claim_id", "revision_id", "approved_by", "approved_at")
+			 SELECT "claim_id", "revision_id", "approved_by", "approved_at"
+			 FROM "claim_approval"
+			 WHERE "claim_id" = (SELECT "claim_id" FROM "decision" WHERE "id" = ?)`,
+			ids[0]).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		at := "/v1/products/mine/streams/master/variants/broadcom/register"
+		var whole struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+				PlaceIdentity string `json:"place_identity"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", at+"?limit=200", &whole)
+		if len(whole.Items) != whole.Total {
+			t.Errorf("the register lists %d rows of %d, which do not agree",
+				len(whole.Items), whole.Total)
+		}
+		seen := map[string]bool{}
+		for _, row := range whole.Items {
+			key := row.Vulnerability + " " + row.PlaceIdentity
+			if seen[key] {
+				t.Errorf("the register lists %q twice", key)
+			}
+			seen[key] = true
+		}
+	})
+}
+
+// TestTheRegisterNamesWhatItWasMeasuredWith is the auditor's chain.
+//
+// Shipped artifact, inventory, run, scanner and database, disposition. The
+// register is the last link and named none of the first four, so what it said
+// stood on nothing a reader could check — while every one of them was already
+// recorded, and the route that hands back the inventory it names already
+// existed and was reachable from nothing.
+func TestTheRegisterNamesWhatItWasMeasuredWith(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		document := r.InventoryOf(t, "the inventory this build shipped")
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		var register struct {
+			Measured struct {
+				Scan            int64  `json:"scan"`
+				ScanHash        string `json:"scan_hash"`
+				BuiltAt         string `json:"built_at"`
+				Run             int64  `json:"run"`
+				Scanner         string `json:"scanner"`
+				ScannerVersion  string `json:"scanner_version"`
+				DatabaseVersion string `json:"database_version"`
+				RanAt           string `json:"ran_at"`
+				Document        int64  `json:"document"`
+				DocumentHash    string `json:"document_hash"`
+				DocumentHeld    *bool  `json:"document_held"`
+				DocumentAt      string `json:"document_at"`
+			} `json:"measured"`
+		}
+		httpapitest.Read(t, r, "triager", at, &register)
+		measured := register.Measured
+
+		if measured.Scan == 0 || measured.ScanHash == "" || measured.BuiltAt == "" {
+			t.Errorf("the register does not name the upload it describes: %+v", measured)
+		}
+		if measured.Run == 0 || measured.Scanner == "" || measured.ScannerVersion == "" ||
+			measured.DatabaseVersion == "" || measured.RanAt == "" {
+			t.Errorf("the register does not name the run it came from: %+v", measured)
+		}
+		if measured.Document != document || measured.DocumentHash == "" {
+			t.Errorf("the register does not name the inventory that was read: %+v", measured)
+		}
+		if measured.DocumentHeld == nil || !*measured.DocumentHeld {
+			t.Fatalf("the inventory is here and the register says otherwise: %+v", measured)
+		}
+
+		// And the link is one somebody can follow, which is the difference
+		// between evidence and a claim: the hash comes back over the bytes
+		// this hands over.
+		fetched := httpapitest.AsPerson(t, r, "triager", http.MethodGet, measured.DocumentAt, "")
+		if fetched.Code != http.StatusOK {
+			t.Fatalf("the inventory the register names answered %d: %s",
+				fetched.Code, fetched.Body.String())
+		}
+		if fetched.Body.String() != "the inventory this build shipped" {
+			t.Errorf("the link hands back %q", fetched.Body.String())
+		}
+
+		// The file says the same, because a spreadsheet is where this is read
+		// six months later and it has nowhere else to carry it.
+		file := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+".csv", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d", file.Code)
+		}
+		rows, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatalf("the register is not a spreadsheet: %v", err)
+		}
+		says := states(rows)
+		if says["scan"] == "" || says["inventory hash"] == "" || says["scanner"] == "" ||
+			says["vulnerability data"] == "" || says["measured at"] == "" {
+			t.Errorf("the file does not say what it was measured with: %v", says)
+		}
+	})
+}
+
+// TestTheRegisterNarrows is what an auditor does with it.
+//
+// It took no filters at all, so "show me what nobody decided" on a build of a
+// quarter of a million rows was a spreadsheet and a search box.
+func TestTheRegisterNarrows(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
+		r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		rows := func(t *testing.T, query string) []struct {
+			Vulnerability string `json:"vulnerability"`
+			State         string `json:"state"`
+			Outcome       string `json:"outcome"`
+		} {
+			t.Helper()
+			var out struct {
+				Items []struct {
+					Vulnerability string `json:"vulnerability"`
+					State         string `json:"state"`
+					Outcome       string `json:"outcome"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			httpapitest.Read(t, r, "private-triage", at+query, &out)
+			// The count is of the narrowed list, not of the build: counted
+			// over the build, a filtered page says how many rows the build
+			// holds and every later offset is a page of a different list.
+			if out.Total != len(out.Items) {
+				t.Errorf("%q says %d rows and carries %d", query, out.Total, len(out.Items))
+			}
+			return out.Items
+		}
+
+		if whole := rows(t, ""); len(whole) != 2 {
+			t.Fatalf("the whole register holds %d rows, want both issues", len(whole))
+		}
+		// The row every other report leaves out, which is what an auditor is
+		// looking for.
+		undecided := rows(t, "?state=undecided")
+		if len(undecided) != 1 || undecided[0].Vulnerability != "CVE-2026-1000" {
+			t.Errorf("narrowed to undecided the register holds %+v", undecided)
+		}
+		waiting := rows(t, "?state=waiting")
+		if len(waiting) != 1 || waiting[0].Vulnerability != "CVE-2026-9999" {
+			t.Errorf("narrowed to waiting the register holds %+v", waiting)
+		}
+		// Two words is either of them, which is how "anything nobody has
+		// agreed to" is asked.
+		if both := rows(t, "?state=undecided&state=waiting"); len(both) != 2 {
+			t.Errorf("two words kept %d rows", len(both))
+		}
+		if dismissals := rows(t, "?outcome=not-applicable"); len(dismissals) != 1 {
+			t.Errorf("narrowed to a dismissal the register holds %+v", dismissals)
+		}
+		if named := rows(t, "?component=linux-image"); len(named) != 2 {
+			t.Errorf("narrowed to the component both sit on, %d rows", len(named))
+		}
+		// A component name somebody types is matched without regard to
+		// capitals.
+		if named := rows(t, "?component=Linux-Image"); len(named) != 2 {
+			t.Errorf("narrowed to the component typed in capitals, %d rows", len(named))
+		}
+		if elsewhere := rows(t, "?component=nothing-is-called-this"); len(elsewhere) != 0 {
+			t.Errorf("a component the build does not hold kept %d rows", len(elsewhere))
+		}
+		if open := rows(t, "?standing=open"); len(open) != 2 {
+			t.Errorf("both are open and %d came back", len(open))
+		}
+		if closed := rows(t, "?standing=closed"); len(closed) != 0 {
+			t.Errorf("nothing is closed and %d came back", len(closed))
+		}
+
+		// And the file takes the same filters, so a spreadsheet taken from a
+		// narrowed screen is that narrowing rather than the whole build.
+		file := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+			at+".csv?state=undecided", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d", file.Code)
+		}
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body := httpapitest.RowsUnder(lines); len(body) != 2 {
+			t.Errorf("the narrowed file holds %d rows under its header", len(body)-1)
+		}
+		if !strings.Contains(file.Body.String(), "CVE-2026-1000") {
+			t.Error("the narrowed file does not hold the undecided row")
+		}
+	})
+}

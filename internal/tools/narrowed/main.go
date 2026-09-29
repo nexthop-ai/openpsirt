@@ -50,7 +50,7 @@ import (
 // and the handler helper that wraps it.
 var permissive = map[string]bool{
 	"LocateVisible":  true,
-	"locatedVisibly": true,
+	"LocatedVisibly": true,
 }
 
 // subjectNamed is what the subject is called wherever it is carried. One name
@@ -63,7 +63,7 @@ const subjectNamed = "subject"
 var resolving = map[string]string{
 	"TargetFor":      "the build a release and a variant name",
 	"ExistingTarget": "the same, refusing one nothing has been filed against",
-	"targetRow":      "the same, with the refusal a route answers",
+	"TargetRow":      "the same, with the refusal a route answers",
 	"Describe":       "how a build is spelled on screen",
 	"ComponentAs":    "which component in that build a name stands for, at a stated version",
 	"ComponentAsIn":  "the same, refused where the name is held twice",

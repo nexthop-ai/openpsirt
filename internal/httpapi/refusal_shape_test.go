@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 func TestTheRefusalEverybodyMeetsFirstHasTheDocumentedShape(t *testing.T) {
@@ -16,10 +18,10 @@ func TestTheRefusalEverybodyMeetsFirstHasTheDocumentedShape(t *testing.T) {
 	// written against the error model meets. It was a string literal beside
 	// the model rather than the model, so it carried neither the schema link
 	// nor the fields every other refusal has.
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		request := httptest.NewRequest(http.MethodGet, "/v1/products", nil)
 		got := httptest.NewRecorder()
-		r.handler.ServeHTTP(got, request)
+		r.Handler.ServeHTTP(got, request)
 		if got.Code != http.StatusUnauthorized {
 			t.Fatalf("a request with no credential answered %d", got.Code)
 		}
@@ -32,8 +34,8 @@ func TestTheRefusalEverybodyMeetsFirstHasTheDocumentedShape(t *testing.T) {
 		}
 		// The same fields a refusal from any operation carries.
 		var named map[string]any
-		read(t, r, "triager", "/v1/products", &named)
-		bad := asPerson(t, r, "triager", http.MethodGet, "/v1/products/nosuch/streams", "")
+		httpapitest.Read(t, r, "triager", "/v1/products", &named)
+		bad := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/products/nosuch/streams", "")
 		var other map[string]any
 		if err := json.Unmarshal(bad.Body.Bytes(), &other); err != nil {
 			t.Fatal(err)

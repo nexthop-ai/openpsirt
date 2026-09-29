@@ -1,0 +1,257 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package triageapi_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+func TestTheReviewQueueIsReadableAndNarrowed(t *testing.T) {
+	// The queue is the screen somebody works down. A claim waiting in one
+	// product is on the queue of whoever may agree to it there, and absent
+	// from the queue of somebody who reads only another product.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.DecidedAt(t, r.Scanned(t))
+		waiting := func(who string) int {
+			t.Helper()
+			got := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/review-queue", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s reading the queue answered %d: %s", who, got.Code, got.Body.String())
+			}
+			var out struct {
+				Items []map[string]any `json:"items"`
+				Total int              `json:"total"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+				t.Fatalf("decode: %v (%s)", err, got.Body.String())
+			}
+			if out.Total != len(out.Items) {
+				t.Errorf("%s's queue says %d and lists %d", who, out.Total, len(out.Items))
+			}
+			return out.Total
+		}
+		if got := waiting("reviewer"); got != 1 {
+			t.Errorf("the one claim waiting is %d rows on the queue of somebody who may agree to it", got)
+		}
+		if got := waiting("outsider"); got != 0 {
+			t.Errorf("somebody who reads only another product sees %d waiting here", got)
+		}
+	})
+}
+
+func TestDecidingAboutSomethingNobodyScannedIsNotThere(t *testing.T) {
+	// A decision is about a finding. Naming a place freely would be choosing
+	// which decisions apply where, so the names are resolved against what was
+	// actually scanned.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		const body = `{"outcome":"wont-fix","reasoning":"Not worth it."}`
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-1/places/nowhere/decision", body)
+		if got.Code != http.StatusNotFound {
+			t.Errorf("deciding about an unscanned build answered %d, want 404: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestDecidingIsRefusedToSomebodyWhoOnlyReads(t *testing.T) {
+	// Against a finding that is there, which a triager then decides on the
+	// same path, so the refusal is the role's rather than the finding's
+	// absence. The act a reader may not take answers as a finding not there.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		const body = `{"outcome":"wont-fix","reasoning":"Not worth it."}`
+		at := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999/places/" +
+			place + "/decision"
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPost, at, body), http.StatusNotFound)
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at, body); got.Code != http.StatusCreated {
+			t.Fatalf("a triager deciding the same finding answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestApprovingSomethingThatIsNotThereSaysSo(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/claims/999999/approval", `{}`)
+		if got.Code != http.StatusNotFound {
+			t.Errorf("approving a decision that does not exist answered %d", got.Code)
+		}
+	})
+}
+
+func TestARefusalOfTypedTextSaysWhereToLook(t *testing.T) {
+	// A justification runs to dozens of lines, and a refusal naming only a
+	// category means somebody hunting for the offending line by eye. The
+	// answer carries the position because an interface can only point at the
+	// problem if it is told where the problem is.
+	//
+	// Against a decision that exists. The first version of this ran against an
+	// identifier nothing had ever created, so it was asserting that a missing
+	// decision is not found — which it would have done just as well with the
+	// text check removed altogether.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		id, claim := r.DecidedAt(t, place)
+
+		body := `{"reasoning":"This is fine.\n\nBut see ![proof](https://evil.example/x.png)"}`
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", claim), body)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a remote image answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var refusal struct {
+			Detail string `json:"detail"`
+			Errors []struct {
+				Message  string `json:"message"`
+				Location string `json:"location"`
+				Value    any    `json:"value"`
+			} `json:"errors"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &refusal); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if len(refusal.Errors) == 0 {
+			t.Fatalf("the refusal carries nothing to point at: %s", got.Body.String())
+		}
+		one := refusal.Errors[0]
+		if one.Location != "line 3" {
+			t.Errorf("the fault is reported at %q, want the line it is on", one.Location)
+		}
+		if fmt.Sprint(one.Value) != "https://evil.example/x.png" {
+			t.Errorf("the refusal does not name what was wrong: %v", one.Value)
+		}
+		if !strings.Contains(one.Message, "image") {
+			t.Errorf("the reason reads as %q", one.Message)
+		}
+
+		// And nothing was stored: the reasoning still says what it said.
+		var detail struct {
+			Reasoning string `json:"reasoning"`
+		}
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", id), &detail)
+		if strings.Contains(detail.Reasoning, "evil.example") {
+			t.Error("refused text was stored anyway")
+		}
+	})
+}
+
+func TestAPipelineHasNoJudgment(t *testing.T) {
+	// A build server has no business deciding anything about what it uploaded.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.AsKey(t, http.MethodGet, "/v1/review-queue"); got != http.StatusForbidden {
+			t.Errorf("a pipeline read the review queue: %d", got)
+		}
+	})
+}
+
+func TestATokenDecidesOnlyWhatItsOwnerCould(t *testing.T) {
+	// A personal token is a live reference to its owner, so it reaches the
+	// queue exactly when they do.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		person, err := r.Rights.ByIdentity(ctx, "triager")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, secret, err := r.Rights.NewToken(ctx, person.ID, "scripting", nil, nil, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := r.WithKey(t, secret, http.MethodGet, "/v1/review-queue").Code; got != http.StatusOK {
+			t.Errorf("a token could not read what its owner reads: %d", got)
+		}
+
+		reader, err := r.Rights.ByIdentity(ctx, "assigner-only")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, weak, err := r.Rights.NewToken(ctx, reader.ID, "dispatching", nil, nil, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Holding a capability and no read role, this person sees no products
+		// at all — so their token sees no queue.
+		got := r.WithKey(t, weak, http.MethodGet, "/v1/review-queue")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading the queue answered %d", got.Code)
+		}
+		if !strings.Contains(got.Text, `"total":0`) {
+			t.Errorf("somebody holding only a capability was shown work: %s", got.Text)
+		}
+	})
+}
+
+var _ = access.PublicTriage
+
+func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing.T) {
+	// the outcomes that promise work at the issue grain. A backport is the
+	// answer a version comparison cannot see: the fix is carried in and
+	// the version stays where it was, so unless somebody can say so, the
+	// row sits open with nothing true to say about it. It needs the date,
+	// because "we will deal with this" is what leaving it alone already
+	// says.
+	//
+	// And the other half: the same vocabulary at the wrong grain. An
+	// upgrade answers a component and everything open on it, so recorded
+	// from one finding it would be a promise covering one row of what it
+	// is about.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		at := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/places/%s/decision", place)
+
+		// No date: refused, because there is nothing to gate against and
+		// nothing to lapse.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"patch-needed",`+
+				`"reasoning":"Taking the upstream commit as a distro patch."}`),
+			http.StatusUnprocessableEntity)
+		// A version: refused, because a backport moves none — that is the
+		// whole difference between the two outcomes.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"patch-needed","committed_to":"`+httpapitest.AheadOfUs+`","upgrade_to":"3.9.0",`+
+				`"reasoning":"Taking the upstream commit as a distro patch."}`),
+			http.StatusUnprocessableEntity)
+		// The grain, not the word: an upgrade is right, and this is the wrong
+		// place for it.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"upgrade-needed","committed_to":"`+httpapitest.AheadOfUs+`","upgrade_to":"3.9.0",`+
+				`"reasoning":"Moving to 3.9.0."}`),
+			http.StatusUnprocessableEntity)
+
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"patch-needed","committed_to":"`+httpapitest.AheadOfUs+`",`+
+				`"reasoning":"Taking the upstream commit as a distro patch in the next build."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording a backport answered %d: %s", got.Code, got.Body.String())
+		}
+		var wrote struct {
+			Outcome     string `json:"outcome"`
+			CommittedTo string `json:"committed_to"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &wrote); err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Outcome != "patch-needed" || wrote.CommittedTo != httpapitest.AheadOfUs {
+			t.Errorf("the claim reads back as %+v", wrote)
+		}
+
+		// And it is findable as itself, which is what makes "what are we
+		// backporting" a question with an answer.
+		var page struct {
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings?outcome=patch-needed", &page)
+		if page.Total != 1 {
+			t.Errorf("asking for what is being backported found %d rows", page.Total)
+		}
+	})
+}

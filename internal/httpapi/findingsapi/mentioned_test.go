@@ -1,0 +1,207 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package findingsapi_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
+	// and the rule that makes it safe. On an undisclosed finding the
+	// notification itself would say a finding exists, so whoever is told
+	// is exactly whoever the editor would have offered — from the same
+	// query, so the two cannot come to disagree.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+
+		// A claim to hang comments off.
+		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
+				`"reasoning":"The parser is never reached."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("proposing answered %d: %s", made.Code, made.Body.String())
+		}
+		var claimed struct {
+			ID      int64 `json:"id"`
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &claimed); err != nil {
+			t.Fatal(err)
+		}
+
+		// A comment naming a colleague who reads this product, and one naming
+		// somebody who does not exist at all.
+		said := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/claims/"+httpapitest.Itoa(claimed.ClaimID)+"/comments",
+			`{"body":"@reader could you look at this? @nobody-at-all too, and @triager wrote it."}`)
+		if said.Code >= 400 {
+			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
+		}
+
+		// The colleague hears about it.
+		var theirs struct {
+			Items []struct {
+				Kind string `json:"kind"`
+				Body string `json:"body"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "reader", "/v1/notifications", &theirs)
+		var named int
+		for _, item := range theirs.Items {
+			if item.Kind == "mentioned" {
+				named++
+			}
+		}
+		if named != 1 {
+			t.Errorf("the person named was told %d times, want once: %+v", named, theirs.Items)
+		}
+
+		// Whoever wrote it named themselves and is not told about it: a tool
+		// that reports back what you have just typed is one people stop
+		// reading. A name nobody holds simply reaches nobody, with no error —
+		// the comment is on record by then and refusing it helps nobody.
+		var mine struct {
+			Items []struct {
+				Kind string `json:"kind"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/notifications", &mine)
+		for _, item := range mine.Items {
+			if item.Kind == "mentioned" {
+				t.Error("the author was told they named somebody")
+			}
+		}
+	})
+}
+
+func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
+	// The disclosure this rule exists to prevent: being told you were named on
+	// a finding is being told the finding exists.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+				`"summary":"The management socket answers before anyone authenticated.",`+
+				`"severity":"critical"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+
+		// A comment on the undisclosed finding's decision would be the place
+		// to name somebody; what matters here is that the public reader is
+		// never told anything about it however it is written.
+		var theirs struct {
+			Items []struct {
+				Kind string `json:"kind"`
+				Body string `json:"body"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "reader", "/v1/notifications", &theirs)
+		for _, item := range theirs.Items {
+			if strings.Contains(item.Body, "management socket") {
+				t.Errorf("somebody who may not read undisclosed work was told: %q", item.Body)
+			}
+		}
+	})
+}
+
+func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
+	// mentions reaching only readers says mentioning somebody who cannot
+	// see the finding is refused while composing, and only the candidate
+	// list enforced it. Writing the name anyway was accepted, nobody was
+	// told, and the author had no way to know — so a question was asked of
+	// somebody who never heard it.
+	//
+	// Reported rather than refused: the words are worth keeping either
+	// way, and a comment rejected because one name in it was wrong loses
+	// the paragraph to fix a word.
+	//
+	// And reported without saying why. A name nobody holds and a name
+	// held by somebody who may not read this are one answer here, because
+	// telling them apart would answer "can this person see undisclosed
+	// work" one comment at a time.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		_, claim := r.DecidedAt(t, place)
+
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			`{"body":"@private-triage and @nobody-is-called-this, what do you think?"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
+		}
+		var said struct {
+			NotNotified []string `json:"not_notified"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &said); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if len(said.NotNotified) != 1 || said.NotNotified[0] != "nobody-is-called-this" {
+			t.Errorf("the answer says %v reached nobody, want the one unknown name",
+				said.NotNotified)
+		}
+
+		// A comment naming only people who can read it says nothing, so the
+		// report is a report rather than noise on every write.
+		quiet := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			`{"body":"@private-triage one more thing."}`)
+		if quiet.Code != http.StatusCreated {
+			t.Fatalf("commenting answered %d: %s", quiet.Code, quiet.Body.String())
+		}
+		var second struct {
+			NotNotified []string `json:"not_notified"`
+		}
+		_ = json.Unmarshal(quiet.Body.Bytes(), &second)
+		if len(second.NotNotified) != 0 {
+			t.Errorf("a comment naming only readers reported %v", second.NotNotified)
+		}
+	})
+}
+
+func TestNamesPastTheMentionCapAreReportedRatherThanDiscarded(t *testing.T) {
+	// The cap is generous enough that nobody meets it writing normally, which
+	// is what made the silence hard to notice: past it the tail of the list
+	// was cut away before anything looked at it, so those names were told
+	// nothing and did not appear among the ones that reached nobody. On a
+	// finding nobody has announced, that notification is the only signal the
+	// people named get that they were called into it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		_, claim := r.DecidedAt(t, place)
+
+		var named strings.Builder
+		named.WriteString("@private-triage")
+		for i := range 30 {
+			fmt.Fprintf(&named, " @nobody-%d", i)
+		}
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			`{"body":"`+named.String()+` what do you think?"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
+		}
+		var said struct {
+			NotNotified []string `json:"not_notified"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &said); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		// Every name but the one person who could be told. The author asked
+		// thirty people a question and none of them heard it.
+		if len(said.NotNotified) != 30 {
+			t.Errorf("%d names were reported as reaching nobody, want the thirty that did not",
+				len(said.NotNotified))
+		}
+	})
+}

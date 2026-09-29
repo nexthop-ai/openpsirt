@@ -1,0 +1,615 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package reportsapi
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
+)
+
+// PointBody is the state of the backlog at one moment.
+type PointBody struct {
+	At         string         `json:"at" doc:"The end of this step, as a date"`
+	Open       int            `json:"open"`
+	Opened     int            `json:"opened" doc:"Findings that appeared during this step"`
+	Resolved   int            `json:"resolved" doc:"Findings that went away during this step"`
+	BySeverity map[string]int `json:"by_severity"`
+	// The two flows, split the same way. Arrivals against departures is what
+	// a backlog is read for: ten in and ten out is a team
+	// keeping pace where both are low, and a team losing ground where what
+	// arrives is critical and what leaves is not.
+	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"Everything that appeared, split by severity"`
+	ResolvedBySeverity map[string]int `json:"resolved_by_severity" doc:"Everything that went away, split by the severity it held while it was open"`
+}
+
+// ComparisonBody is what changed between two builds.
+//
+// Two lists leave the affected list, not one. A bump that carried the issue
+// with it, a record taken back and a closure nothing explains are not fixes,
+// and a caller reading one list quotes scanner faults as work done.
+type ComparisonBody struct {
+	Fixed  []ChangedBody `json:"fixed"`
+	Closed []ChangedBody `json:"closed_not_fixed" doc:"Left the affected list without being fixed"`
+	Newly  []ChangedBody `json:"newly_present"`
+	Still  []ChangedBody `json:"still_present"`
+}
+
+// ChangedBody is one issue that differs between two builds.
+type ChangedBody struct {
+	Vulnerability string `json:"vulnerability"`
+	Component     string `json:"component"`
+	Severity      string `json:"severity,omitempty"`
+	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,patched,superseded,unexplained" doc:"The reason it went. Only on fixed entries"`
+	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
+	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
+	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
+	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
+	// State is the decision standing on it, on a still-present entry and
+	// nowhere else. It turns a list of what is still there into something
+	// somebody can sign a release off against: an approved
+	// not-applicable and a row nobody has looked at are opposite answers
+	// and read alike without it.
+	State         core.Standing      `json:"state,omitempty" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
+	Outcome       core.Outcome       `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
+	Justification core.Justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
+	Due           string             `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
+}
+
+func registerReports(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "get-trend", Method: http.MethodGet, Path: "/v1/trend",
+		Summary: "Show new, resolved and open over time",
+		Description: "Returns the three counts per step, with open split by severity, across " +
+			"every product you can see.\n\n" +
+			"Narrowable to part of a tree. `component` keeps one package at any version; " +
+			"`beneath` keeps a component and everything under it, which needs a branch and a " +
+			"variant naming exactly one build. A team that owns one area asks for its own " +
+			"three lines this way.\n\n" +
+			"Worked out when it is asked for.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		core.ScopeQuery
+		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
+		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
+		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
+		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
+		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+	}) (*core.ListOutput[PointBody], error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		const week = 7 * 24 * time.Hour
+		since := time.Now().UTC().Add(-time.Duration(input.Weeks) * week)
+
+		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
+		if err != nil {
+			return nil, err
+		}
+		points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope, since, week, input.Weeks,
+			finding.Within{
+				Component: input.Component, Beneath: input.Beneath,
+				BeneathVersion: input.Version, BeneathEcosystem: input.Ecosystem,
+				BeneathNamespace: input.Namespace,
+			})
+		if err != nil {
+			// A name meaning two components is the caller's question and not a
+			// fault here: every other endpoint that resolves one answers with
+			// the choices, and a 500 here has the panel that draws a
+			// subtree's history say the trend cannot be worked out, about a
+			// component the reader could have picked.
+			var several *graph.Ambiguous
+			if errors.As(err, &several) {
+				return nil, core.SeveralComponents(several,
+					"?beneath_version= and, where two share a version, &beneath_ecosystem= and &beneath_namespace=")
+			}
+			return nil, core.WentWrong(in.Logger, "the trend could not be worked out", err)
+		}
+		out := &core.ListOutput[PointBody]{}
+		out.Body.Items = make([]PointBody, 0, len(points))
+		for _, p := range points {
+			out.Body.Items = append(out.Body.Items, PointBody{
+				At: p.At.Format(time.DateOnly), Open: p.Open,
+				Opened: p.Opened, Resolved: p.Resolved, BySeverity: p.BySeverity,
+				OpenedBySeverity: p.OpenedBySeverity, ResolvedBySeverity: p.ResolvedBySeverity,
+			})
+		}
+		return out, nil
+	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-releases", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/releases",
+		Summary: "Report what is open in each build of a product",
+		Description: "One number per build, which is what a release-over-release chart is " +
+			"drawn from. The comparison endpoint says what changed between two builds; " +
+			"this says whether the estate is getting better or worse across all of them.\n\n" +
+			"Counted before any triage line is applied, so it agrees with the findings list " +
+			"rather than with whatever a product has decided is worth working on — a line is " +
+			"about what to spend an afternoon on, not about what exists.\n\n" +
+			"Severities are folded the same four ways everything else here ranks by, through " +
+			"the one expression the working list and the deadline also read, so a chart cannot " +
+			"disagree with a list about what counts as high.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+	}) (*core.ListOutput[ReleaseBody], error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// The visible lookup, so a product somebody may not see answers the
+		// same way as one that was never declared. Resolving the name first
+		// and authorizing afterwards is how the difference gets out: 200 with
+		// an empty list for a product held by somebody else and 404 for a name
+		// nobody has hands anyone holding one product the name of every other
+		// by guessing.
+		named, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
+		}
+		releases, err := finding.NewStore(in.DB.DB).Releases(ctx, subject, named.ID)
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			// A product somebody sees and reads nothing in answers as one
+			// they cannot see, for the reason the lookup above does.
+			return nil, core.NoSuchProduct()
+		case err != nil:
+			return nil, core.WentWrong(in.Logger, "what is open per build could not be read", err)
+		}
+		out := &core.ListOutput[ReleaseBody]{}
+		out.Body.Items = make([]ReleaseBody, 0, len(releases))
+		for _, r := range releases {
+			out.Body.Items = append(out.Body.Items, ReleaseBody{
+				Stream: r.Stream, Kind: r.Kind, Variant: r.Variant,
+				Open: r.Open, BySeverity: r.BySeverity,
+			})
+		}
+		return out, nil
+	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "compare-releases", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/comparison",
+		Summary: "Compare two builds",
+		Description: "Returns what was fixed, what is newly present, and what is still there " +
+			"between two builds of one product.\n\n" +
+			"Between any two, not only adjacent ones: what a release note has to answer is " +
+			"usually about the last release a customer has, which is rarely the previous one.\n\n" +
+			"Each fixed entry says why it went, because \"fixed by upgrading\" and \"fixed by a " +
+			"carried patch\" are different sentences to a reader. `superseded` is the one to " +
+			"read carefully — it means the version moved and the issue came with it, so it was " +
+			"not fixed at all.\n\n" +
+			"A still-present entry carrying `arrived_from` is the same failure seen from the " +
+			"other side: somebody moved that version since the earlier build and the issue came " +
+			"with it, so the upgrade did not reach the fix.\n\n" +
+			"Public findings only unless you ask otherwise. Its destination is usually a " +
+			"public document, so including something undisclosed should be deliberate rather " +
+			"than something pasted in without noticing.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		TwoBuilds
+		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
+	}) (*struct{ Body ComparisonBody }, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		from, to, err := input.targets(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
+		}
+
+		comparison, err := finding.NewStore(in.DB.DB).Compare(ctx, subject, from, to,
+			input.IncludePrivate)
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+
+		out := &struct{ Body ComparisonBody }{}
+		out.Body.Fixed = changed(comparison.Fixed, true, false)
+		// The other half of what left, kept apart from it. A bump that carried
+		// the issue along and a closure nothing explains are not fixes, and a
+		// release coordinator quoting one number for both quotes scanner
+		// faults as work done.
+		out.Body.Closed = changed(comparison.Closed, true, false)
+		out.Body.Newly = changed(comparison.Newly, false, false)
+		// Only the still-present column says what a place was bumped from. On
+		// a fixed entry the closure already says what happened, and on a new
+		// one there was nothing to bump.
+		out.Body.Still = changed(comparison.Still, false, true)
+		return out, nil
+	})
+}
+
+// TwoBuilds names the two builds of one product a comparison is between, for
+// every comparison: of findings, as release notes, and of inventories.
+type TwoBuilds struct {
+	From        string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
+	FromVariant string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
+	To          string `query:"to" required:"true" doc:"The later build's stream"`
+	ToVariant   string `query:"to_variant" required:"true" doc:"The later build's variant"`
+}
+
+// targets resolves the two builds. Either one out of reach answers as never
+// scanned.
+func (pair TwoBuilds) targets(ctx context.Context, in core.Deps, subject access.Subject,
+	product string) (from, to int64, err error) {
+
+	if from, err = core.TargetIDOf(ctx, in, subject, product, pair.From, pair.FromVariant); err != nil {
+		return 0, 0, err
+	}
+	to, err = core.TargetIDOf(ctx, in, subject, product, pair.To, pair.ToVariant)
+	return from, to, err
+}
+
+// ReleasePointBody is the state one release shipped with.
+type ReleasePointBody struct {
+	Stream     string         `json:"stream"`
+	StreamName string         `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
+	Open       int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
+	BySeverity map[string]int `json:"by_severity,omitempty"`
+}
+
+// registerReleaseTrend offers the trend on the other axis.
+func registerReleaseTrend(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "get-release-trend", Method: http.MethodGet, Path: "/v1/trend/releases",
+		Summary: "Show what each release shipped with",
+		Description: "One point per tagged release of one product, oldest first, with what is " +
+			"open against it now.\n\n" +
+			"The axis is the sequence of releases, not the calendar.\n\n" +
+			"Answered against today's vulnerability data, not as of the day each was cut.\n\n" +
+			"No rates here; the calendar trend has them. A product must be named.",
+		Tags: []string{"Reports"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		core.ScopeQuery
+		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"The number of releases, most recent kept"`
+	}) (*struct {
+		Body struct {
+			Items []ReleasePointBody `json:"items"`
+		}
+	}, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, core.NoDatabase(in.Logger)
+		}
+		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
+		if err != nil {
+			return nil, err
+		}
+		points, err := finding.NewStore(in.DB.DB).ReleaseTrend(ctx, subject, scope, input.Limit)
+		switch {
+		case errors.Is(err, finding.ErrNoProductNamed):
+			// The description says a product must be named, and answering 200
+			// with an empty list is what a product with no releases looks
+			// like, so a dashboard polling it without one reads as a product
+			// that has never cut a release.
+			return nil, huma.Error422UnprocessableEntity(
+				"a product must be named: two products' tags interleave by date and mean " +
+					"nothing side by side")
+		case err != nil:
+			return nil, core.Refused(in.Logger, err, "cannot read what each release shipped with")
+		}
+		out := &struct {
+			Body struct {
+				Items []ReleasePointBody `json:"items"`
+			}
+		}{}
+		out.Body.Items = make([]ReleasePointBody, 0, len(points))
+		for _, point := range points {
+			out.Body.Items = append(out.Body.Items, ReleasePointBody{
+				Stream: point.Stream, Cut: point.Cut.UTC().Format(time.RFC3339),
+				StreamName: point.StreamName,
+				Open:       point.Open, BySeverity: point.BySeverity,
+			})
+		}
+		return out, nil
+	})
+}
+
+// registerNotes offers the comparison as prose.
+func registerNotes(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "get-release-notes", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/comparison/notes",
+		Summary: "Render a comparison as release notes",
+		Description: "The same comparison as markdown, in the form somebody pastes into a " +
+			"release note. Returned as `text/markdown` rather than as a string in a JSON " +
+			"field, because the point of it is that it goes straight in.\n\n" +
+			"It carries what was fixed and nothing else. Not what is still present, not " +
+			"what newly appeared, and not an upgrade that carried the issue with it — those are " +
+			"statements about what a build contains, and the document for them is a VEX, " +
+			"which a customer's own scanner reads. The comparison itself still answers all " +
+			"three.\n\n" +
+			"Worst first and stably ordered, so two runs over the same pair of builds produce " +
+			"the same document. A lead line names both builds, the day, and the scanner and " +
+			"vulnerability-database versions the later build was last measured with.\n\n" +
+			"Public findings only unless you ask otherwise, as the comparison itself is. " +
+			"Where fixes are left out for not having been disclosed, the note says how many " +
+			"and never which.\n\n" +
+			"A release that fixed nothing answers with a sentence saying so, not with an " +
+			"empty body: zero bytes is also what a truncated response and the wrong pair of " +
+			"builds look like.",
+		Tags: []string{"Reports"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		TwoBuilds
+		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, core.NoDatabase(in.Logger)
+		}
+		names := catalog.NewStore(in.DB.DB)
+		from, to, err := input.targets(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
+		}
+		findings := finding.NewStore(in.DB.DB)
+		comparison, err := findings.Compare(ctx, subject, from, to, input.IncludePrivate)
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+		about := finding.Note{
+			From: describing(ctx, names, from, input.From, input.FromVariant),
+			To:   describing(ctx, names, to, input.To, input.ToVariant),
+		}
+		// The tooling the later build was last measured with, and when. A note
+		// somebody kept for a year is re-checkable only if it says what
+		// produced it — a vulnerability database ships bad data and is
+		// corrected, and "which data said so" is then the question. A run that
+		// has not finished is not an answer.
+		last, err := findings.LatestRun(ctx, subject, to)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "what the later build was measured with could not be read", err)
+		}
+		if last != nil {
+			about.Scanner = strings.TrimSpace(last.Scanner + " " + last.ScannerVersion)
+			about.Database = last.DatabaseVersion
+			if last.FinishedAt != nil {
+				about.At = *last.FinishedAt
+			}
+		}
+		// A note that cannot say how much was left out is not one to hand a
+		// customer: without the count it reads as leaving nothing out.
+		if !input.IncludePrivate {
+			left, err := findings.OmittedFixes(ctx, subject, from, to)
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "what was left out could not be counted", err)
+			}
+			about.Omitted = left
+		}
+		notes := finding.Notes(about, comparison)
+		return &huma.StreamResponse{Body: func(hc huma.Context) {
+			hc.SetHeader("Content-Type", "text/markdown; charset=utf-8")
+			hc.SetStatus(http.StatusOK)
+			_, _ = hc.BodyWriter().Write([]byte(notes))
+		}}, nil
+	})
+}
+
+// describing names a build the way whoever reads a release note knows it,
+// falling back to what the request called it.
+//
+// A heading naming the stream and variant this deployment files a build under
+// is our internals on the first line of a document going to a customer.
+func describing(ctx context.Context, names *catalog.Store, targetID int64, stream, variant string) string {
+	placed, err := names.Describe(ctx, targetID)
+	if err != nil || placed == nil {
+		return strings.TrimSpace(stream + " " + variant)
+	}
+	return strings.TrimSpace(placed.Stream + " " + placed.Variant)
+}
+
+func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
+	out := make([]ChangedBody, 0, len(rows))
+	for _, row := range rows {
+		body := ChangedBody{
+			Vulnerability: row.Vulnerability, Component: row.Component, Severity: row.Severity,
+		}
+		if why {
+			body.Because = string(row.Because)
+			body.FromVersion, body.MovedTo = row.FromVersion, row.MovedTo
+			body.ClosedRun = row.ClosedRun
+		}
+		// The sign-off half travels with the bump flag: both are about what
+		// is still there, which is the only list either means anything on.
+		if bumped {
+			body.ArrivedFrom = row.ArrivedFrom
+			body.State = core.Standing(row.State)
+			body.Outcome, body.Justification = core.Outcome(row.Outcome), core.Justification(row.Justification)
+			if row.Due != nil {
+				body.Due = row.Due.Format(time.DateOnly)
+			}
+		}
+		out = append(out, body)
+	}
+	return out
+}
+
+// InheritedBody is one claim a new line could take on.
+type InheritedBody struct {
+	Decision      int64        `json:"decision"`
+	Vulnerability string       `json:"vulnerability"`
+	Component     string       `json:"component"`
+	Outcome       core.Outcome `json:"outcome"`
+	Was           string       `json:"was" doc:"The version the claim was made against"`
+	Now           string       `json:"now" doc:"The new line's contents"`
+	Reasoning     string       `json:"reasoning" doc:"The old words, to start from rather than start without"`
+	DeferredDays  int          `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
+}
+
+// CarriedBody is the set a new line inherits.
+type CarriedBody struct {
+	Applying  int             `json:"applying" doc:"Reach it by matching. Nothing to choose"`
+	Moved     []InheritedBody `json:"moved" doc:"The version differs, so each needs a fresh answer"`
+	Postponed []InheritedBody `json:"postponed" doc:"Deferrals, offered separately and never carried by default"`
+	Expired   int             `json:"expired" doc:"Deferrals and promises at a place this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer"`
+	Upgrades  int             `json:"upgrades" doc:"Promised upgrades at a version this line does not have. They cannot be carried: plan the upgrade from the component, naming this line"`
+	Absent    int             `json:"absent" doc:"Cover nothing in the new line"`
+}
+
+func registerCarry(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "preview-carried-decisions", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried",
+		Summary: "Show what triage a new line would inherit",
+		Description: "Returns what an existing line's decisions would mean for this one, " +
+			"without changing anything. Ask before creating a line: the answer is what " +
+			"somebody is agreeing to.\n\n" +
+			"Six groups, because they need different things:\n\n" +
+			"`applying` reach this line by matching, and there is nothing to choose.\n\n" +
+			"`moved` held a claim at a version this line does not have. Each would come " +
+			"across as a proposal carrying the old reasoning, never as a decision.\n\n" +
+			"`postponed` were deferrals. Each says how long it has already been put off " +
+			"across every line it has come through, which is the total that carrying it " +
+			"again agrees to.\n\n" +
+			"`expired` are deferrals and promises at a place this line still holds whose " +
+			"date has passed. A carried judgment keeps its date, so these cannot be carried.\n\n" +
+			"`upgrades` are promised upgrades that moved. Plan the upgrade from the component, " +
+			"naming this line, rather than carrying it.\n\n" +
+			"`absent` cover nothing here and are left behind.",
+		Tags: []string{"Triage"},
+	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+		Product     string `path:"product"`
+		Stream      string `path:"stream"`
+		Variant     string `path:"variant"`
+		From        string `query:"from" required:"true" doc:"The stream to inherit from"`
+		FromVariant string `query:"from_variant" required:"true" doc:"That stream's variant"`
+	}) (*struct{ Body CarriedBody }, error) {
+		subject, store, err := core.Triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		_, to, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		if err != nil {
+			return nil, err
+		}
+		_, from, err := core.Browsing(ctx, in, input.Product, input.From, input.FromVariant)
+		if err != nil {
+			return nil, err
+		}
+
+		carried, err := store.WouldCarry(ctx, subject, from, to)
+		if err != nil {
+			return nil, core.RefusedDecision(in.Logger, err)
+		}
+		body := CarriedBody{
+			Applying: carried.Applying, Expired: carried.Expired,
+			Upgrades: carried.Upgrades, Absent: carried.Absent,
+			Moved:     inherited(carried.Moved),
+			Postponed: inherited(carried.Postponed),
+		}
+		return &struct{ Body CarriedBody }{Body: body}, nil
+	})
+}
+
+// registerCarrying takes the chosen judgments onto the new line.
+func registerCarrying(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "carry-decisions", Method: http.MethodPost,
+		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried",
+		Summary: "Carry chosen triage onto a new line",
+		Description: "Takes the judgments named onto this build as claims waiting for " +
+			"agreement, each carrying the words from the line it came from.\n\n" +
+			"Reasoning travels and conclusions do not. Every one arrives needing approval, " +
+			"however confident whoever carried it was: a version moved, which is exactly what " +
+			"made the old judgment stop applying, so somebody has to look at the new code. " +
+			"What is inherited is the thinking rather than the answer.\n\n" +
+			"Only what the preview offered. A judgment that already applies here has " +
+			"nothing to agree to, and one covering nothing here has nothing to apply to; " +
+			"naming either is refused rather than skipped, because a caller that got the set " +
+			"wrong should hear so.\n\n" +
+			"A deferral is carried with the date it had, not with a fresh one. Bounded by how " +
+			"many issues it covers, set under `triage.review-issues`, and by how many findings " +
+			"it writes, set under `triage.write-ceiling`.",
+		Tags:          []string{"Triage"},
+		DefaultStatus: http.StatusCreated,
+	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Stream  string `path:"stream"`
+		Variant string `path:"variant"`
+		From    string `query:"from" required:"true" doc:"The line to carry from — a branch or a tag"`
+		// The same pair the preview takes, so the two cannot come to disagree
+		// about which build is being carried from.
+		FromVariant string `query:"from_variant" required:"true" doc:"That line's variant"`
+		Body        struct {
+			Decisions []int64 `json:"decisions" minItems:"1" doc:"The offered judgments to carry"`
+		}
+	}) (*struct {
+		Body struct {
+			Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
+		}
+	}, error) {
+		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		if err != nil {
+			return nil, err
+		}
+		from, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.From, input.FromVariant)
+		if err != nil {
+			return nil, err
+		}
+		fromTarget, err := core.TargetRow(ctx, in, from.StreamID, from.VariantID)
+		if err != nil {
+			return nil, err
+		}
+
+		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
+			fromTarget.ID, targetID, input.Body.Decisions, triage.Bounds{})
+		if err != nil {
+			return nil, core.RefusedDecision(in.Logger, err)
+		}
+		out := &struct {
+			Body struct {
+				Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
+			}
+		}{}
+		out.Body.Carried = carried
+		return out, nil
+	})
+}
+
+func inherited(rows []triage.Inherited) []InheritedBody {
+	out := make([]InheritedBody, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, InheritedBody{
+			Decision: row.DecisionID, Vulnerability: row.Vulnerability,
+			Component: row.Component, Outcome: core.Outcome(row.Outcome),
+			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
+			DeferredDays: row.DeferredDays,
+		})
+	}
+	return out
+}
+
+// ReleaseBody is one build and how much stands open against it.
+type ReleaseBody struct {
+	Stream     string         `json:"stream" doc:"The branch or tag"`
+	Kind       string         `json:"kind" doc:"The kind of stream: a branch or a tag"`
+	Variant    string         `json:"variant"`
+	Open       int            `json:"open" doc:"Every open finding at this build"`
+	BySeverity map[string]int `json:"by_severity,omitempty" doc:"That total split by the rating in force"`
+}

@@ -7,8 +7,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"maps"
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -118,26 +118,28 @@ func trailKindConstants(t *testing.T) map[string]string {
 	return found
 }
 
-// trailKindEnums reads every enum tag on a field named Kind in this package,
-// keyed by where it was found.
+// trailKindEnums reads every enum tag on a field named Kind in this package and
+// the route packages beneath it, keyed by where it was found.
 //
 // Read from the source rather than from a value, because most of them sit on a
-// struct declared inside a function and no type of this package's own reaches
-// them.
+// struct declared inside a function and no type reaches them.
 func trailKindEnums(t *testing.T) map[string][]string {
 	t.Helper()
 
 	found := map[string][]string{}
 	fset := token.NewFileSet()
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatalf("read this package: %v", err)
-	}
-	for _, entry := range entries {
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+	var names []string
+	err := filepath.WalkDir(".", func(name string, entry fs.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() && strings.HasSuffix(name, ".go") &&
+			!strings.HasSuffix(name, "_test.go") {
+			names = append(names, name)
 		}
+		return err
+	})
+	if err != nil {
+		t.Fatalf("read this package and the ones beneath it: %v", err)
+	}
+	for _, name := range names {
 		file, err := parser.ParseFile(fset, name, nil, 0)
 		if err != nil {
 			t.Fatalf("parse %s: %v", name, err)

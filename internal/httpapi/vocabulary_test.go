@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -40,7 +41,7 @@ func words[T ~string](all []T) []string {
 // became of an upload, which is a different vocabulary and not this one's to
 // police.
 func TestEveryVocabularyTheDocumentOffersIsOneTheDomainStates(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		named := [][]string{
 			words(triage.Outcomes()),
 			words(triage.OutcomesOneAtATime()),
@@ -61,7 +62,7 @@ func TestEveryVocabularyTheDocumentOffersIsOneTheDomainStates(t *testing.T) {
 		// Read out of the document the server builds rather than out of the
 		// source, so a field added anywhere is examined without this being
 		// edited.
-		document, err := json.Marshal(r.api.OpenAPI())
+		document, err := json.Marshal(r.API.OpenAPI())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,9 +131,9 @@ func TestEveryVocabularyTheDocumentOffersIsOneTheDomainStates(t *testing.T) {
 // justification beside a producer's own status is their word for it, and not
 // ours to close.
 func TestAJustificationBesideOurOutcomeCarriesOurReasons(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		open, seen := []string{}, 0
-		for name, schema := range r.api.OpenAPI().Components.Schemas.Map() {
+		for name, schema := range r.API.OpenAPI().Components.Schemas.Map() {
 			if schema == nil {
 				continue
 			}
@@ -163,9 +164,9 @@ func TestAJustificationBesideOurOutcomeCarriesOurReasons(t *testing.T) {
 
 // enumsIn is every closed vocabulary the document the server builds offers,
 // by where it sits.
-func enumsIn(t *testing.T, r *reach) map[string][]string {
+func enumsIn(t *testing.T, r *httpapitest.Reach) map[string][]string {
 	t.Helper()
-	document, err := json.Marshal(r.api.OpenAPI())
+	document, err := json.Marshal(r.API.OpenAPI())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +251,7 @@ func TestEveryEnumOfADomainVocabularyIsOneTheDomainNames(t *testing.T) {
 		}},
 	}
 
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		checked := 0
 		for at, offered := range enumsIn(t, r) {
 			var of []string

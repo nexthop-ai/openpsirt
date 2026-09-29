@@ -6,15 +6,17 @@ package httpapi_test
 import (
 	"net/http"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 // Somebody working private reports holds the undisclosed half alone, and is
 // not handed the disclosed stream with it. Each visibility is its own grant,
 // and this is the identity the two private-only roles exist for.
 func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
-		place := r.scanned(t)
-		hidden := r.embargoed(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		hidden := r.Embargoed(t)
 
 		// The product's own list, and the two that span products, which
 		// narrow through a different path.
@@ -26,7 +28,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 					Vulnerability string `json:"vulnerability"`
 				} `json:"items"`
 			}
-			read(t, r, who, path, &out)
+			httpapitest.Read(t, r, who, path, &out)
 			seen := map[string]bool{}
 			for _, item := range out.Items {
 				seen[item.Vulnerability] = true
@@ -62,7 +64,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 				MayHide       bool   `json:"may_hide"`
 			} `json:"reach"`
 		}
-		read(t, r, "embargo-triager", "/v1/session/me", &who)
+		httpapitest.Read(t, r, "embargo-triager", "/v1/session/me", &who)
 		if len(who.Reach) != 1 {
 			t.Fatalf("the session reaches %d products, want the one granted", len(who.Reach))
 		}
@@ -73,16 +75,16 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 
 		// Arguing about the disclosed finding is refused: the product is one
 		// they triage in, and the finding is not one they may read.
-		made := asPerson(t, r, "embargo-triager", http.MethodPost,
+		made := httpapitest.AsPerson(t, r, "embargo-triager", http.MethodPost,
 			"/v1/products/mine/streams/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/places/"+place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The parser is never reached."}`)
-		refusedWith(t, made, http.StatusNotFound)
+		httpapitest.RefusedWith(t, made, http.StatusNotFound)
 
 		// Handed a disclosed finding, they see it: an assignment carries a
 		// disclosed row to whoever holds it, whatever they read.
-		if got := asPerson(t, r, "assigner", http.MethodPut, findingAt("CVE-2026-9999")+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, httpapitest.FindingAt("CVE-2026-9999")+"/assignment",
 			`{"person":"embargo-reader"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
 		}
@@ -92,7 +94,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 		}
 
 		// Recording a flaw that is already public asks for the public half.
-		if got := asPerson(t, r, "embargo-triager", http.MethodPost, "/v1/products/mine/findings",
+		if got := httpapitest.AsPerson(t, r, "embargo-triager", http.MethodPost, "/v1/products/mine/findings",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"disclosed":true,`+
 				`"summary":"A flaw somebody announced last week.",`+
 				`"severity":"high","component":"libnl-3-200"}`); got.Code != http.StatusNotFound {

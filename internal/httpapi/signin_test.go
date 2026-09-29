@@ -24,63 +24,18 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
-// stubProvider stands in for a real one, so the paths that decide who gets in
-// can be tested without an identity provider to sign in to.
-type stubProvider struct {
-	says   *signin.Identity
-	fail   error
-	issuer string
-	// groups says whether this provider is configured to hand over group
-	// membership, which is what decides whether roles may be switched to
-	// group-bound at all.
-	groups bool
-}
-
-func (s *stubProvider) GroupsSource() bool { return s.groups }
-
-func (s *stubProvider) Name() string { return "stub" }
-
-// Issuer is who mints the identifiers, which is what an identity is recorded
-// against. Distinct from the name here on purpose: the two being the same
-// string is what hid a provider change from the startup check.
-func (s *stubProvider) Issuer() string {
-	if s.issuer != "" {
-		return s.issuer
-	}
-	return "https://stub.example"
-}
-
-func (s *stubProvider) Begin(_ context.Context, _ string) (string, signin.Pending, error) {
-	return "https://provider.example/authorize", signin.Pending{
-		State: "the-state", Nonce: "the-nonce", Verifier: "the-verifier",
-	}, nil
-}
-
-func (s *stubProvider) Complete(_ context.Context, _ string, _ signin.Pending, _ string) (*signin.Identity, error) {
-	if s.fail != nil {
-		return nil, s.fail
-	}
-	// Stamped here the way both real adapters stamp it, so a test standing on
-	// this double stands on something that behaves like the boundary. An
-	// identifier travels with the provider that issued it, because one
-	// provider's identifier names somebody else at another.
-	said := *s.says
-	if said.Provider == "" {
-		said.Provider = s.Issuer()
-	}
-	return &said, nil
-}
-
 // signInReach is a server with one provider and one person who was granted
 // something.
 type signInReach struct {
 	handler  http.Handler
-	provider *stubProvider
+	provider *httpapitest.StubProvider
 	rights   *access.Store
 	// db is the same database the handler reads, so a test can change a
 	// setting the sign-in path is supposed to obey.
@@ -105,7 +60,7 @@ func twoSignIn(t *testing.T, fn func(t *testing.T, r *signInReach)) {
 	signInOn(t, dbtest.Two, fn)
 }
 
-func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
+func signInOn(t *testing.T, on httpapitest.Engines, fn func(t *testing.T, r *signInReach)) {
 	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -145,12 +100,12 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 			t.Fatal(err)
 		}
 
-		provider := &stubProvider{says: &signin.Identity{Subject: "1", Username: "granted"}}
+		provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
 		reach := &signInReach{
 			provider: provider, rights: rights, db: db,
 			product: product.ID, mode: access.Direct,
 		}
-		handler, _ := httpapi.New(quiet, nil, httpapi.Deps{
+		handler, _ := httpapi.New(quiet, nil, core.Deps{
 			Mode: func(context.Context) access.Mode { return reach.mode },
 			DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
 			// Plain HTTP, so the cookies keep their bare names: a browser
@@ -267,7 +222,7 @@ func TestSomebodyWhoAuthenticatesButWasGrantedNothingGetsInNowhere(t *testing.T)
 		// stranger path was never reached and the test quietly demonstrated
 		// identity mutation while claiming to test refusal.
 		for i, who := range []string{"ungranted", "a-stranger"} {
-			r.provider.says = &signin.Identity{Subject: fmt.Sprintf("subject-%d", i+2), Username: who}
+			r.provider.Says = &signin.Identity{Subject: fmt.Sprintf("subject-%d", i+2), Username: who}
 			rec := callback(t, r, "the-state", "a-code", true)
 			if rec.Code != http.StatusUnauthorized {
 				t.Errorf("%q answered %d, want 401", who, rec.Code)
@@ -283,7 +238,7 @@ func TestAuthenticatingCreatesNobodyOnASignInPath(t *testing.T) {
 	// Access is granted in advance or not at all. A sign-in path that records
 	// somebody is a sign-in path that admits whoever the provider vouches for.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
-		r.provider.says = &signin.Identity{Subject: "3", Username: "a-stranger"}
+		r.provider.Says = &signin.Identity{Subject: "3", Username: "a-stranger"}
 		callback(t, r, "the-state", "a-code", true)
 
 		if _, err := r.rights.ByIdentity(t.Context(), "a-stranger"); err == nil {
@@ -333,7 +288,7 @@ func TestAProviderThatFailedSaysNothingAboutWhy(t *testing.T) {
 	// A fault between us and a provider is an operator's problem.
 	// Describing it to whoever is at the browser describes our configuration.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
-		r.provider.fail = errClientSecretRejected
+		r.provider.Fail = errClientSecretRejected
 		rec := callback(t, r, "the-state", "a-code", true)
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("a failed exchange answered %d, want 401", rec.Code)
@@ -363,19 +318,19 @@ func TestAnIdentifierAlreadyPinnedIsNotRedeemableByAnotherName(t *testing.T) {
 	// provider now reports, and a different identifier reporting a pinned
 	// name is somebody else.
 	eachSignIn(t, func(t *testing.T, r *signInReach) {
-		r.provider.says = &signin.Identity{Subject: "1001", Username: "granted"}
+		r.provider.Says = &signin.Identity{Subject: "1001", Username: "granted"}
 		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusFound {
 			t.Fatalf("the authorized person could not sign in: %d", rec.Code)
 		}
 
 		// Somebody else, presenting the name that person signs in under.
-		r.provider.says = &signin.Identity{Subject: "2002", Username: "granted"}
+		r.provider.Says = &signin.Identity{Subject: "2002", Username: "granted"}
 		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusUnauthorized {
 			t.Errorf("somebody else redeemed a pinned name: %d", rec.Code)
 		}
 
 		// And the original, renamed, is still themselves.
-		r.provider.says = &signin.Identity{Subject: "1001", Username: "granted-elsewhere"}
+		r.provider.Says = &signin.Identity{Subject: "1001", Username: "granted-elsewhere"}
 		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusFound {
 			t.Errorf("a rename locked somebody out of their own account: %d", rec.Code)
 		}
@@ -387,7 +342,7 @@ func TestAnIdentityTokenNamingNobodyIsRefused(t *testing.T) {
 	// match on, which would quietly reduce this deployment to matching by
 	// name — the thing the pinning exists to replace.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
-		r.provider.says = &signin.Identity{Subject: "", Username: "granted"}
+		r.provider.Says = &signin.Identity{Subject: "", Username: "granted"}
 		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusUnauthorized {
 			t.Errorf("a sign-in naming no subject answered %d, want 401", rec.Code)
 		}
@@ -639,7 +594,7 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 		// they started this sign-in. The stub answers with a fixed one.
 		const state = "the-state"
 
-		r.provider.says = &signin.Identity{Subject: "2", Username: "other"}
+		r.provider.Says = &signin.Identity{Subject: "2", Username: "other"}
 
 		// The person the provider names as signed in: the attacker, because
 		// this is the attacker's sign-in. The victim is somebody else
@@ -788,7 +743,7 @@ func TestAVerifiedAddressIsRecordedInEitherMode(t *testing.T) {
 						}
 						r.mode = access.GroupBound
 					}
-					r.provider.says = &signin.Identity{
+					r.provider.Says = &signin.Identity{
 						Subject: "1", Username: "granted", Groups: []string{"platform"},
 						Email: "granted@example.com", EmailVerified: verified,
 					}
