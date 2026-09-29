@@ -915,8 +915,8 @@ func TestTheRatingsListIsPagedAndSaysHowManyThereAre(t *testing.T) {
 // Both read the claim as waiting and the withdrawal commits first. An
 // agreement matching on the key alone would put the claim in force over it:
 // the rating changed, and the record saying it was withdrawn. The servers
-// only, because SQLite's one connection cannot hold the two transactions open
-// at once.
+// only, because the one connection the harness holds SQLite to cannot hold the
+// two transactions open at once.
 func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 	servers(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())

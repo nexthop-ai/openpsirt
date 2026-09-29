@@ -101,8 +101,8 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 
 // Register exports held open by slow readers take the slots, and the next one
 // is refused with a time to ask again rather than queued for a connection.
-// The slots are a fifth of the pool and at least one, so on SQLite, whose pool
-// is one connection, one export takes the only slot.
+// The slots are a fifth of the pool and at least one, so on SQLite, which the
+// harness holds to one connection, one export takes the only slot.
 func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)

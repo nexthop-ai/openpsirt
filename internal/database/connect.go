@@ -111,7 +111,7 @@ func OpenWithPool(ctx context.Context, target Target, pool Pool) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	pool.apply(db)
+	pool.apply(db, target)
 	return db, nil
 }
 
@@ -157,7 +157,7 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 	// bun's dialect is chosen from the URL's scheme, which is right even when
 	// the server turns out to be MariaDB: the two share a dialect.
 	db := &DB{DB: bun.NewDB(sqldb, dialect()), Server: server}
-	DefaultPool().apply(db)
+	DefaultPool().apply(db, target)
 	return db, nil
 }
 

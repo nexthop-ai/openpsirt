@@ -18,10 +18,10 @@ import (
 // TestRecordingARoleReadsTheModeThroughTheWritesOwnConnection pins that where
 // roles come from is read through the transaction's own handle.
 //
-// A read through the root handle waits on SQLite's single connection, which
-// the transaction already holds, so the request never answers; the deadline
-// turns that hang into a failure. The other engines answer through a second
-// connection and would pass either way.
+// A read through the root handle waits on the single connection the harness
+// holds SQLite to, which the transaction already holds, so the request never
+// answers; the deadline turns that hang into a failure. The other engines
+// answer through a second connection and would pass either way.
 //
 // Both arms of the mode are exercised, since this package wires the mode
 // nowhere else.

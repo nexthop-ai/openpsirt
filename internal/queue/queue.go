@@ -539,7 +539,7 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 			}
 			// Bounded by the interval: a renewal still waiting when the next
 			// one is due has already failed, and on SQLite it is waiting for
-			// the single connection the work itself is holding.
+			// the write lock the work's own transaction is holding.
 			//
 			// On that engine it cannot succeed while the work runs, so
 			// the claim timeout is the whole of the protection there rather

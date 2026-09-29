@@ -61,9 +61,9 @@ func claimableID(ctx context.Context, tx bun.Tx, engine database.Engine, locking
 		}
 
 	case database.SQLite:
-		// No row locking, and none needed. SQLite is used by one process with
-		// a single connection, so the surrounding transaction already excludes
-		// every other claim.
+		// No row locking, and none needed. Every SQLite transaction takes the
+		// file's write lock as it begins, so the surrounding transaction
+		// already excludes every other claim.
 
 	default:
 		return 0, fmt.Errorf("no claim strategy for %s", engine)

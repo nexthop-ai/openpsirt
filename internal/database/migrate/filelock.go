@@ -14,8 +14,8 @@ import (
 // sqliteLock excludes another process migrating the same SQLite file.
 //
 // The other three engines take a lock in the database and this one cannot.
-// A SQLite handle is capped at one connection, because the file has one writer
-// and more connections add contention rather than concurrency — so a lock held
+// A SQLite handle migrates on one connection, because a migration's
+// connection settings have to reach the transaction it opens — so a lock held
 // on a pinned connection would be holding the only connection the migration
 // itself needs. Every in-database spelling of this deadlocks against that.
 //

@@ -458,3 +458,36 @@ func TestAFailedUpgradeNamesTheRecoveryItsEngineNeeds(t *testing.T) {
 		}
 	}
 }
+
+func TestSQLiteMigratesOnOneConnectionAndGetsItsPoolBack(t *testing.T) {
+	// A migration's connection settings have to reach the transaction it
+	// opens, which on a wider pool they need not.
+	target, err := database.ParseURL("sqlite://" + t.TempDir() + "/pool.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.OpenWithPool(t.Context(), target, database.DefaultPool())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	width := db.Stats().MaxOpenConnections
+	if width < 2 {
+		t.Fatalf("a deployment's SQLite pool is %d wide, which proves nothing here", width)
+	}
+
+	quiet := slog.New(slog.DiscardHandler)
+	var during int
+	if err := withLock(t.Context(), db, quiet, func(context.Context) error {
+		during = db.Stats().MaxOpenConnections
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if during != 1 {
+		t.Errorf("SQLite migrated on a pool of %d connections, want 1", during)
+	}
+	if after := db.Stats().MaxOpenConnections; after != width {
+		t.Errorf("the pool was %d wide after migrating, want %d as before", after, width)
+	}
+}

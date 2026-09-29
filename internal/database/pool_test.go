@@ -7,9 +7,12 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -84,17 +87,164 @@ func TestIdleConnectionsAreReaped(t *testing.T) {
 
 func TestPoolIsBounded(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		if db.Server.Engine == database.SQLite {
+			t.Skip("the harness holds SQLite to one connection; TestSQLitePoolIsAsWideAsConfigured covers it")
+		}
 		got := db.Stats().MaxOpenConnections
 		want := database.DefaultPool().MaxOpen
-		if db.Server.Engine == database.SQLite {
-			// One writer, so more connections add contention rather than
-			// concurrency.
-			want = 1
-		}
 		if got != want {
 			t.Errorf("%s: max open connections is %d, want %d", db.Server.Engine, got, want)
 		}
 	})
+}
+
+// sqliteFile opens a SQLite database in a file of the test's own, with the
+// pool a deployment gets rather than the harness's single connection.
+func sqliteFile(t *testing.T) *database.DB {
+	t.Helper()
+	target, err := database.ParseURL("sqlite://" + filepath.Join(t.TempDir(), "pool.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.OpenWithPool(t.Context(), target, database.DefaultPool())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.ExecContext(t.Context(),
+		`CREATE TABLE "counter" ("id" INTEGER PRIMARY KEY, "n" INTEGER NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), `INSERT INTO "counter" ("id", "n") VALUES (1, 0)`); err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
+func TestSQLitePoolIsAsWideAsConfigured(t *testing.T) {
+	if got, want := sqliteFile(t).Stats().MaxOpenConnections, database.DefaultPool().MaxOpen; got != want {
+		t.Errorf("a SQLite file has %d connections at most, want %d", got, want)
+	}
+
+	target, err := database.ParseURL("sqlite://:memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	memory, err := database.OpenWithPool(t.Context(), target, database.DefaultPool())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = memory.Close() }()
+	if got := memory.Stats().MaxOpenConnections; got != 1 {
+		t.Errorf("an in-memory SQLite database has %d connections at most, want 1: "+
+			"every connection to one opens a database of its own", got)
+	}
+}
+
+func TestSQLiteReadsWhileAWriteTransactionIsOpen(t *testing.T) {
+	db := sqliteFile(t)
+	ctx := t.Context()
+
+	holding := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
+			if _, err := tx.ExecContext(ctx, `UPDATE "counter" SET "n" = 1 WHERE "id" = 1`); err != nil {
+				return err
+			}
+			close(holding)
+			<-release
+			return nil
+		})
+	}()
+	<-holding
+
+	read, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	var n int
+	err := db.QueryRowContext(read, `SELECT "n" FROM "counter" WHERE "id" = 1`).Scan(&n)
+	close(release)
+	if err != nil {
+		t.Fatalf("a read waited on an open write transaction: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("a read saw %d, a write that had not committed", n)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLiteWriteTransactionsTakeTurns(t *testing.T) {
+	// Two transactions each read the counter and write it back one higher.
+	// Both are begun directly rather than through the retrying helper, which
+	// would hide the failure this pins: a second transaction begun deferred
+	// reads while the first is open, finds its snapshot stale once the first
+	// commits, and fails at once instead of waiting.
+	db := sqliteFile(t)
+	ctx := t.Context()
+	increment := func(tx bun.Tx) error {
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT "n" FROM "counter" WHERE "id" = 1`).Scan(&n); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE "counter" SET "n" = ? WHERE "id" = 1`, n+1)
+		return err
+	}
+
+	first, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := first.QueryRowContext(ctx, `SELECT "n" FROM "counter" WHERE "id" = 1`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+
+	begun := make(chan struct{})
+	second := make(chan error, 1)
+	go func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			second <- err
+			return
+		}
+		var seen int
+		if err := tx.QueryRowContext(ctx, `SELECT "n" FROM "counter" WHERE "id" = 1`).Scan(&seen); err != nil {
+			_ = tx.Rollback()
+			second <- err
+			return
+		}
+		close(begun)
+		if err := increment(tx); err != nil {
+			_ = tx.Rollback()
+			second <- err
+			return
+		}
+		second <- tx.Commit()
+	}()
+
+	// Long enough for a second transaction that does not wait to have read.
+	select {
+	case <-begun:
+	case <-time.After(200 * time.Millisecond):
+	}
+	if _, err := first.ExecContext(ctx, `UPDATE "counter" SET "n" = ? WHERE "id" = 1`, n+1); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-second; err != nil {
+		t.Fatalf("a second write transaction failed rather than waiting its turn: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT "n" FROM "counter" WHERE "id" = 1`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("the counter reached %d after two increments", n)
+	}
 }
 
 func TestValidateAnswersQuickly(t *testing.T) {

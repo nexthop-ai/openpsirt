@@ -19,8 +19,9 @@ import (
 // streamSlots bounds how many streamed exports hold a connection at once.
 //
 // A fifth of the pool, and at least one: the rest of the pool is left for
-// every other request. SQLite's pool is one connection, so its one slot is the
-// whole of it for as long as the stream runs, which exportCeiling bounds.
+// every other request. A pool of one connection has one slot, and it is the
+// whole of the pool for as long as the stream runs, which exportCeiling
+// bounds.
 type streamSlots chan struct{}
 
 // exportStreams is the number of slots where the pool states no size.

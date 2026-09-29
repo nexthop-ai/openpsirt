@@ -209,6 +209,17 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 	}
 	ctx = WithEngine(ctx, db.Server.Engine, logger)
 
+	// SQLite migrates on one connection. A migration that changes a table's
+	// shape turns foreign keys off on a connection and then opens its
+	// transaction, and on a wider pool the transaction can land on a
+	// connection where they are still on — and the one it turned off goes back
+	// into the pool that way. The pool is put back as it was afterwards.
+	if db.Server.Engine == database.SQLite {
+		width := db.Stats().MaxOpenConnections
+		db.SetMaxOpenConns(1)
+		defer db.SetMaxOpenConns(width)
+	}
+
 	release, err := acquire(ctx, db)
 	if err != nil {
 		return err

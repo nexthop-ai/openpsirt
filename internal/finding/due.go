@@ -535,13 +535,10 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	}
 
 	// Written in slices of the identifier range rather than as one statement
-	// per band. SQLite is held to a single connection on purpose — it has one
-	// writer, and more connections add contention rather than concurrency — so
-	// a statement rewriting four hundred thousand rows is not merely slow, it
-	// is the whole process answering nothing until it finishes. Measured at
-	// nineteen seconds, which is the outage this project already diagnosed
-	// once. A slice at a time takes the same total and gives the connection
-	// back between them.
+	// per band. SQLite has one writer, so a statement rewriting four hundred
+	// thousand rows holds the write lock until it finishes, and every other
+	// write waits behind it. Measured at nineteen seconds. A slice at a time
+	// takes the same total and gives the lock back between them.
 	var highest int64
 	if err := s.db.NewSelect().Model((*Finding)(nil)).
 		ColumnExpr("COALESCE(MAX(id), 0)").Scan(ctx, &highest); err != nil {
