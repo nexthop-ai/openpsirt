@@ -175,7 +175,7 @@ left alone deliberately. An item filed as an issue leaves it.
 | Rule | |
 |---|---|
 | Every item carries an identifier, `TODO-` and a number, never changed or reused | Conversation and pull request descriptions cite an item by it |
-| An item says what exists today, what is missing or wrong, what done looks like, and what it waits on, in plain words | A reader who has not seen the code knows what the work is |
+| An item says what exists today, what is missing or wrong, the work to do as an instruction, and what it waits on, in plain words | A reader who has not seen the code knows what the work is |
 | Code, comments, commit messages and design documents do not cite the file or its identifiers | It is a work list, not a record, and an identifier dies with its item |
 
 Anything durable moves to `REQUIREMENTS.md` or a `DESIGN-*.md` before an item
