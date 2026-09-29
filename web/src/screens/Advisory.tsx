@@ -342,9 +342,9 @@ function Releases({
                         <div>
                           <span
                             className="state waiting"
-                            title="Made on another build. It reaches this one because the versions match"
+                            title="Made on another variant. It reaches this one because the versions match"
                           >
-                            Another build
+                            Another variant
                           </span>
                         </div>
                       )}

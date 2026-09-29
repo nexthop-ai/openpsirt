@@ -66,7 +66,7 @@ made in is not part of the key.
 |---|---|
 | A later release inherits by lookup, not by copy | Nothing to synchronize, so nothing drifts |
 | A variant inherits exactly when its code matches | A variant whose chain differs computes a different key and fails to match. No extra test |
-| The builds a claim was made on are recorded beside it, outside the key | The build on screen when it was proposed, and every build the person chose beside it on the reach sheet. A build the claim reaches by lookup is never recorded: telling that build apart from the ones it was made on is what the record is for. An advisory flags a release its covering decision reaches only by lookup, and whoever prepares one marks it affected where the code differs there (`DESIGN-remediation.md` § The CSAF document) |
+| The builds a claim was made on are recorded beside it, outside the key | The build on screen when it was proposed, and every build the person chose beside it on the reach sheet. A build the claim reaches by lookup is never recorded: telling that build apart from the ones it was made on is what the record is for. An advisory flags a release of a variant its covering decision was not made on, and whoever prepares one marks it affected where the code differs there (`DESIGN-remediation.md` § The CSAF document) |
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they

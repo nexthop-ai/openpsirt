@@ -363,7 +363,7 @@ export interface paths {
          * List what an advisory states about each release
          * @description Every release of every issue this advisory covers, with the status its document states and the decision behind it.
          *
-         *     A release whose every open place is covered by approved, live decisions with one outcome names the earliest of them, with the builds it was made on. `elsewhere` is true where that decision records the builds it was made on and this release is not one of them. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
+         *     A release whose every open place is covered by approved, live decisions with one outcome names the earliest of them, with the builds it was made on. `elsewhere` is true where that decision records the builds it was made on and none of them is of this release's variant. Another branch or tag of a variant it was made on is not flagged. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
          *
          *     An advisory covering a product you hold nothing on answers as one that does not exist.
          *
@@ -6207,7 +6207,7 @@ export interface components {
              * @enum {string}
              */
             decided: "known_affected" | "known_not_affected" | "fixed";
-            /** @description Whether the covering decision records the builds it was made on and this release is not one of them */
+            /** @description Whether the covering decision records the builds it was made on and none of them is of this release's variant */
             elsewhere: boolean;
             /** @description Whether the release is marked affected whatever its decisions say */
             marked: boolean;

@@ -560,13 +560,15 @@ func TestADecisionAgreedAfterTheAdvisoryMovesItsStatusAndTheAgreementStands(t *t
 func TestAReleaseADecisionReachesByLookupIsFlaggedAsMadeElsewhere(t *testing.T) {
 	// The same kernel at the same versions in two variants, with an option
 	// compiled out of one. Both hold the place when the decision is made on
-	// broadcom, and it reaches mellanox because the versions match. What it
-	// was made on is what was recorded, so mellanox is flagged and broadcom
-	// is not.
+	// master for broadcom, and it reaches mellanox because the versions
+	// match. What it was made on is what was recorded, so mellanox is
+	// flagged. The tag built for broadcom, reached by lookup too, is the same
+	// configuration and is not.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, f.otherVariant)
 		identifier := f.recorded(t, f.master)
 		f.alsoIn(t, identifier, f.otherVariant)
+		f.alsoIn(t, identifier, f.tagged)
 		f.dismissed(t, f.master, identifier)
 		named := f.covering(t, [2]string{"sonic", identifier})
 
@@ -583,6 +585,11 @@ func TestAReleaseADecisionReachesByLookupIsFlaggedAsMadeElsewhere(t *testing.T) 
 		}
 		if f.placedAt(t, named, master).MadeElsewhere() {
 			t.Error("broadcom, the build it was made on, is flagged")
+		}
+		tag := f.placedAt(t, named, tagged)
+		if tag.Grounds == nil || tag.MadeElsewhere() {
+			t.Errorf("the broadcom tag, reached by lookup, reads %+v flagged %v, want covered "+
+				"and not flagged", tag.Grounds, tag.MadeElsewhere())
 		}
 	})
 }
@@ -602,6 +609,9 @@ func TestABuildChosenBesideTheOneOnScreenCountsAsMadeOn(t *testing.T) {
 		row := f.placedAt(t, named, mellanox)
 		if row.Grounds == nil || row.MadeElsewhere() {
 			t.Errorf("a build chosen beside the one on screen reads %+v", row.Grounds)
+		}
+		if f.placedAt(t, named, master).MadeElsewhere() {
+			t.Error("the build on screen is flagged")
 		}
 		if got := variantsOf(row.Grounds.MadeOn); !slices.Equal(got, []string{"broadcom", "mellanox"}) {
 			t.Errorf("the decision reads as made on %v, want both", got)

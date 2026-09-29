@@ -30,7 +30,7 @@ type AdvisoryReleaseBody struct {
 	Covered *ReleaseCoveringBody `json:"covered,omitempty" doc:"The decision every open place of the issue in the release stands under. Absent where no one outcome covers them all"`
 	// Elsewhere is the release the covering decision reaches only because the
 	// versions match.
-	Elsewhere bool `json:"elsewhere" doc:"Whether the covering decision records the builds it was made on and this release is not one of them"`
+	Elsewhere bool `json:"elsewhere" doc:"Whether the covering decision records the builds it was made on and none of them is of this release's variant"`
 }
 
 // ReleaseCoveringBody is the decision a release stands under.
@@ -58,7 +58,8 @@ func registerReleases(api huma.API, in core.Deps) {
 			"A release whose every open place is covered by approved, live decisions with " +
 			"one outcome names the earliest of them, with the builds it was made on. " +
 			"`elsewhere` is true where that decision records the builds it was made on and " +
-			"this release is not one of them. " +
+			"none of them is of this release's variant. Another branch or tag of a variant " +
+			"it was made on is not flagged. " +
 			"`changed` is true where the status differs from what an agreement standing on " +
 			"what the advisory says now saw; the agreement stands.\n\n" +
 			"An advisory covering a product you hold nothing on answers as one that does " +

@@ -80,14 +80,16 @@ type Built struct {
 }
 
 // MadeElsewhere says the covering decision records the builds it was made on
-// and this release is not one of them: the decision reaches it only because
-// the versions match. A decision recording nothing says nothing either way.
+// and none of them is of this release's variant: the decision reaches it only
+// because the versions match, in a build configured another way. Another
+// branch or tag of a variant it was made on is the same configuration, and is
+// not flagged. A decision recording nothing says nothing either way.
 func (r Release) MadeElsewhere() bool {
 	if r.Grounds == nil || len(r.Grounds.MadeOn) == 0 {
 		return false
 	}
 	for _, one := range r.Grounds.MadeOn {
-		if one.StreamID == r.StreamID && one.VariantID == r.VariantID {
+		if one.VariantID == r.VariantID {
 			return false
 		}
 	}
