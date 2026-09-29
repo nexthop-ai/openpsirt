@@ -99,8 +99,8 @@ func TestPackageKindsAreCountedOverWhatTheReaderMaySee(t *testing.T) {
 	})
 }
 
-func TestPackageKindsCountEachIssueAtAComponentOnceAcrossBuilds(t *testing.T) {
-	// The list counts one issue at one component as one row however many
+func TestPackageKindsCountEachRowOnceAcrossBuilds(t *testing.T) {
+	// The list counts one issue at one fold as one row however many
 	// builds of the selection hold it, and a count beside a kind that said
 	// otherwise would promise rows the list does not have.
 	each(t, func(t *testing.T, f *fixture) {
@@ -124,6 +124,66 @@ func TestPackageKindsCountEachIssueAtAComponentOnceAcrossBuilds(t *testing.T) {
 			t.Errorf("across two builds holding the same two rows: %q", said(got))
 		}
 	})
+}
+
+func TestAPackageKindCountsTheRowsTheFilterFinds(t *testing.T) {
+	// The list's row is an issue at a fold, so two binaries of one source
+	// carrying one issue are one row, and a count of two beside the kind would
+	// promise a row the list does not have.
+	each(t, func(t *testing.T, f *fixture) {
+		lib := libnl
+		lib.UpstreamName, lib.UpstreamVersion = "libnl3", "3.7.0"
+		route := at("libnl-route-3-200", "3.7.0")
+		route.UpstreamName, route.UpstreamVersion = "libnl3", "3.7.0"
+		snap := kinded()
+		snap.Components = []graph.Described{swss, teamd, lib, route, gomod, unnamed}
+		snap.Dependencies = []graph.Dependency{
+			{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: route},
+			{Parent: swss, Child: gomod}, {Parent: root, Child: teamd}, {Parent: teamd, Child: unnamed},
+		}
+		f.shipped(t, snap)
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", lib), found("CVE-2026-1", route), found("CVE-2026-2", gomod),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		kinds, err := f.store.PackageKinds(t.Context(), who, f.scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if said(kinds) != "deb=1 golang=1 " {
+			t.Errorf("two binaries of one source with one issue: %q", said(kinds))
+		}
+		for _, kind := range kinds {
+			_, total, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
+				finding.Filter{Ecosystems: []string{kind.Kind}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != kind.Open {
+				t.Errorf("%s is offered as %d rows and the filter finds %d", kind.Kind, kind.Open, total)
+			}
+		}
+	})
+}
+
+func TestAPackageKindIsReadAsTheFilterReadsIt(t *testing.T) {
+	// The filter matches the stored identifier, without regard to capitals,
+	// against "pkg:", the kind and a slash. An identifier it can find under no
+	// kind is offered as none, and one it finds is offered as what it finds.
+	for purl, want := range map[string]string{
+		"pkg:deb/debian/libnl-3-200@3.7.0":  "deb",
+		"PKG:Deb/debian/libnl-3-200@3.7.0":  "deb",
+		" pkg:deb/debian/libnl-3-200@3.7.0": "",
+		"pkg:generic@1.0":                   "",
+		"libnl-3-200":                       "",
+		"":                                  "",
+	} {
+		if got := finding.KindAsked(purl); got != want {
+			t.Errorf("%q is read as kind %q, want %q", purl, got, want)
+		}
+	}
 }
 
 func TestPackageKindsLeaveOutWhatHasClosed(t *testing.T) {

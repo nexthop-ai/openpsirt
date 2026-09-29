@@ -22,9 +22,9 @@ describe("the outcomes that close a question", () => {
   });
 
   it("follow an outcome the server moves to another class", () => {
-    // A deferral published without its date is a dismissal here too.
+    // A deferral the server calls a dismissal is one here too.
     const moved = PUBLISHED.map((each) =>
-      each.outcome === "deferred" ? { ...each, dated: false } : each,
+      each.outcome === "deferred" ? { ...each, dismisses: true } : each,
     );
     expect(classesOf(moved).dismisses("deferred")).toBe(true);
   });

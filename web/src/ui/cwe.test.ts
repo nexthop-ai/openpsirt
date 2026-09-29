@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { asWeakness } from "./cwe";
+import { asWeakness, identifiersIn } from "./cwe";
 
 describe("a typed weakness", () => {
   it("is taken in the shape the server records", () => {
@@ -16,5 +16,11 @@ describe("a typed weakness", () => {
     for (const typed of ["CWE-0", "CWE-1234567", "NVD-CWE-Other", "buffer overflow", ""]) {
       expect(asWeakness(typed)).toBeNull();
     }
+  });
+});
+
+describe("what a weakness filter narrows by", () => {
+  it("is the identifiers typed, and never a word typed to search", () => {
+    expect(identifiersIn(["CWE-79", "race", "415", "cwe-79"])).toEqual(["CWE-79", "CWE-415"]);
   });
 });

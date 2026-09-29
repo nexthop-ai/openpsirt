@@ -39,7 +39,7 @@ func registerWeaknesses(api huma.API) {
 			"catalog name and short name together hold each of them, without regard to " +
 			"capitals. Nothing typed answers the common weaknesses. Matches come most common " +
 			"first: the common ones in their own order, then the rest by number.\n\n" +
-			"A request carrying both `id` and `q` is refused. Reads no finding.",
+			"A request carrying both `id` and `q` is refused.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers from the catalog, and reads no finding."), func(ctx context.Context, input *struct {
 		IDs   []string `query:"id,explode" maxItems:"200" doc:"Identifiers to name, such as CWE-787"`

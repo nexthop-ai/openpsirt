@@ -61,7 +61,7 @@ export type Who = {
   bulk_cap?: number;
   // Every triage outcome with what it claims, which is how a screen tells a
   // dismissal from a deferral and knows which outcomes state a reason.
-  outcomes?: Body<"OutcomeBody">[];
+  outcomes: Body<"WhoBody">["outcomes"];
 };
 
 // The caller, and their reach. Asked once and shared, because every

@@ -33,21 +33,27 @@ type Judged = Body<"JudgedBody">;
 // empty set rather than a value somebody picks.
 //
 // Keyed by every outcome the server records, so one it adds is a compile error
-// here until the filter offers it. A wrong match hides risk and nothing expires
-// it; an already-fixed claim is checkable against the packager's own record;
-// the two promises hide risk until the date they named. Each is one an auditor
-// lists on its own.
+// here until the filter offers it. Each is one an auditor lists on its own.
+// Which of them are dismissals is the server's, and the label says so where
+// it publishes one.
 const OUTCOME_SAID: Record<Outcome, string> = {
-  "not-applicable": "dismissed — not applicable",
-  mismatched: "dismissed — wrong match",
-  "wont-fix": "dismissed — will not fix",
-  "already-fixed": "dismissed — already fixed here",
+  "not-applicable": "not applicable",
+  mismatched: "wrong match",
+  "wont-fix": "will not fix",
+  "already-fixed": "already fixed here",
   deferred: "deferred",
   "upgrade-needed": "upgrade planned",
   "patch-needed": "backport planned",
   affected: "affected",
 };
-const OUTCOMES = Object.entries(OUTCOME_SAID) as [Outcome, string][];
+
+// The outcomes as the filter offers them, a dismissal named as one.
+export function outcomesSaid(dismisses: (outcome?: string) => boolean): [Outcome, string][] {
+  return (Object.entries(OUTCOME_SAID) as [Outcome, string][]).map(([outcome, words]) => [
+    outcome,
+    dismisses(outcome) ? `dismissed — ${words}` : words,
+  ]);
+}
 
 const STATES = [
   ["approved", "agreed"],
@@ -76,6 +82,7 @@ export function Audit() {
   const products = params.getAll("product").filter(Boolean);
   const outcomes = params.getAll("outcome").filter(Boolean);
   const classes = useOutcomes();
+  const OUTCOMES = outcomesSaid(classes.dismisses);
   const states = params.getAll("state").filter(Boolean);
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";

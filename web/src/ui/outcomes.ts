@@ -19,7 +19,7 @@ export type Claims = Body<"OutcomeBody">;
 // | Field | Means |
 // |---|---|
 // | known | the server's answer has arrived; until it has, nothing is in any class |
-// | dismissing | hides risk and stores no date, so nothing later re-opens it |
+// | dismissing | the server calls it a dismissal: it hides risk and stores no date |
 // | hidesRisk | recording it takes the issue out of the working queue |
 // | dated | it stores a date: a review date, or when promised work lands |
 // | needsJustification | it states which recognized reason applies |
@@ -34,13 +34,11 @@ export type Classes = {
 
 // The classes over one published list. A word the list does not hold is in
 // none of them, and the server is the one to refuse it.
-export function classesOf(published: readonly Claims[] | undefined): Classes {
+export function classesOf(published: readonly Claims[] | null | undefined): Classes {
   const by = new Map((published ?? []).map((each) => [each.outcome as string, each]));
   const has = (field: "hides_risk" | "dated" | "needs_justification") => (outcome?: string) =>
     by.get(outcome ?? "")?.[field] ?? false;
-  const dismissing = (published ?? [])
-    .filter((each) => each.hides_risk && !each.dated)
-    .map((each) => each.outcome);
+  const dismissing = (published ?? []).filter((each) => each.dismisses).map((each) => each.outcome);
   return {
     known: by.size > 0,
     dismissing,

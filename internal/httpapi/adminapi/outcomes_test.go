@@ -4,6 +4,7 @@
 package adminapi_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -21,6 +22,7 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 				HidesRisk          bool   `json:"hides_risk"`
 				Dated              bool   `json:"dated"`
 				NeedsJustification bool   `json:"needs_justification"`
+				Dismisses          bool   `json:"dismisses"`
 			} `json:"outcomes"`
 		}
 		httpapitest.Read(t, r, "reader", "/v1/session/me", &who)
@@ -36,7 +38,8 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 				continue
 			}
 			if got.HidesRisk != want.HidesRisk() || got.Dated != want.Dated() ||
-				got.NeedsJustification != want.NeedsJustification() {
+				got.NeedsJustification != want.NeedsJustification() ||
+				got.Dismisses != slices.Contains(triage.OutcomesDismissing(), want) {
 				t.Errorf("%s is published as %+v, which is not the rule the server applies", want, got)
 			}
 		}

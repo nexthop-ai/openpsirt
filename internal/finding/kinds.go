@@ -7,11 +7,11 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -20,13 +20,13 @@ import (
 type PackageKind struct {
 	// Kind is the type the package identifier spells: deb, golang, pypi.
 	Kind string
-	// Open counts issues at components, which is what the findings list
-	// counts, so ticking a kind asks for about this many rows.
+	// Open counts issues at folds, which are the findings list's rows, so
+	// ticking a kind asks for this many rows.
 	Open int
 }
 
-// PackageKinds is the kinds of package that what is open in a selection sits at, most
-// open first.
+// PackageKinds is the kinds of package that what is open in a selection sits
+// at, most open first.
 //
 // Over the whole selection. None of the list's other filters narrows it,
 // because it answers what the filter can offer, and a kind offered only while
@@ -59,13 +59,13 @@ func (s *Store) PackageKinds(ctx context.Context, subject access.Subject, scope 
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible))
-	return s.kindsOf(ctx, pairs)
+	return s.kindsOf(ctx, pairs, `"pairs"."vulnerability_id", `+FoldedOn)
 }
 
 // PackageKindsAnywhere is PackageKinds across every product the reader may see.
 //
-// An issue at a component in two products is counted in each, because the
-// list across products holds it as two rows.
+// An issue at a fold in two products is counted in each, because the list
+// across products holds it as two rows.
 func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject) ([]PackageKind, error) {
 	if subject.Kind != access.Person {
 		return nil, access.Denied("read package kinds across products")
@@ -83,41 +83,45 @@ func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("f.closed_at IS NULL")
-	return s.kindsOf(ctx, onlyReadable(pairs, subject, products, all))
+	return s.kindsOf(ctx, onlyReadable(pairs, subject, products, all),
+		`"pairs"."product_id", "pairs"."vulnerability_id", `+FoldedOn)
 }
 
-// kindsOf counts the issue-at-component pairs a query selects by the kind of
-// package each component is.
+// kindsOf counts the list's rows by the kind of package each is at.
 //
-// The kind is read out of each distinct package identifier here rather than in
-// the statement, because reading a part of a string is spelled differently on
-// every engine. The statement returns one row per component, and a switch
-// image holds a few thousand of them.
-func (s *Store) kindsOf(ctx context.Context, pairs *bun.SelectQuery) ([]PackageKind, error) {
-	perComponent := s.db.NewSelect().
+// pairs selects the distinct issues at components open in the scope, and
+// grain is what folds them into the list's rows, over those pairs joined to
+// their component as "c". Distinct pairs first, because they are a few
+// thousand where the findings they come from are hundreds of thousands, and
+// the component is joined to those alone.
+//
+// Every package in a fold is of one kind, so the fold's lowest identifier
+// speaks for it. The rows are counted per identifier in the statement and the
+// kind read out of each distinct identifier here, because reading a part of a
+// string is spelled differently on every engine.
+func (s *Store) kindsOf(ctx context.Context, pairs *bun.SelectQuery, grain string) ([]PackageKind, error) {
+	perRow := s.db.NewSelect().
 		TableExpr(`(?) AS "pairs"`, pairs).
-		ColumnExpr(`"pairs"."component_id" AS "component_id"`).
-		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr(`"pairs"."component_id"`)
+		Join(`JOIN "component" AS "c" ON c.id = "pairs"."component_id"`).
+		ColumnExpr(`MIN(c.purl) AS "purl"`).
+		GroupExpr(grain)
 	var rows []struct {
 		Purl string `bun:"purl"`
 		Open int    `bun:"open"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`(?) AS "held"`, perComponent).
-		Join(`JOIN "component" AS "c" ON c.id = "held"."component_id"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`"held"."open" AS "open"`).
-		Where("c.purl IS NOT NULL").
+		TableExpr(`(?) AS "listed"`, perRow).
+		ColumnExpr(`"listed"."purl" AS "purl"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
+		Where(`"listed"."purl" IS NOT NULL`).
+		GroupExpr(`"listed"."purl"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the kinds of package open here: %w", err)
 	}
 
 	counted := map[string]int{}
 	for _, row := range rows {
-		// A component with no package identifier has no kind the filter can
-		// ask for, so it is not offered as one.
-		if kind := graph.EcosystemOf(row.Purl); kind != "" {
+		if kind := kindAsked(row.Purl); kind != "" {
 			counted[kind] += row.Open
 		}
 	}
@@ -132,4 +136,23 @@ func (s *Store) kindsOf(ctx context.Context, pairs *bun.SelectQuery) ([]PackageK
 		return out[i].Kind < out[j].Kind
 	})
 	return out, nil
+}
+
+// kindAsked is the kind the list's filter finds a package identifier by, or
+// nothing where the filter cannot find it.
+//
+// Read the way the filter reads it: the identifier as stored, without regard
+// to capitals, beginning "pkg:", the kind and a slash. An identifier the filter
+// matches under no kind is not offered as one, because ticking it would empty
+// the list.
+func kindAsked(purl string) string {
+	rest, found := strings.CutPrefix(strings.ToLower(purl), "pkg:")
+	if !found {
+		return ""
+	}
+	kind, _, slashed := strings.Cut(rest, "/")
+	if !slashed {
+		return ""
+	}
+	return kind
 }

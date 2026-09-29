@@ -47,3 +47,8 @@ func (s *Store) JudgingAfter(fn func()) { s.afterReadingReport = fn }
 // they were minted in, so a test asserting the year has to fix the moment the
 // store reads rather than the one the suite happens to run at.
 func (s *Store) Clock(now func() time.Time) { s.now = now }
+
+// KindAsked is the kind the list's filter finds a package identifier by, for
+// the test: identifiers a producer spells oddly are too many shapes to route
+// each through a scan.
+func KindAsked(purl string) string { return kindAsked(purl) }

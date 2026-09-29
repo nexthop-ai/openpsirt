@@ -1291,9 +1291,9 @@ export interface paths {
         };
         /**
          * List package kinds with open findings across every product
-         * @description Returns each kind of package that open findings sit at, across every product you may see, with how many. An issue at a component in two products counts in each, as it is two rows on the findings list across products.
+         * @description Returns each kind of package that open findings sit at, across every product you may see, with how many. The same issue at the same package in two products counts in each, as it is two rows on the findings list across products.
          *
-         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A component with no package identifier has no kind and is not counted. Ordered by the count, largest first.
+         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -2609,7 +2609,7 @@ export interface paths {
          * List package kinds with open findings
          * @description Returns each kind of package that open findings in the product sit at, with how many.
          *
-         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A component with no package identifier has no kind and is not counted. Ordered by the count, largest first.
+         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list.
          *
@@ -5895,7 +5895,7 @@ export interface paths {
          *
          *     `q` searches. Digits, with or without `CWE-`, find every identifier whose number begins with them, the one typed exactly first. Words find every weakness whose catalog name and short name together hold each of them, without regard to capitals. Nothing typed answers the common weaknesses. Matches come most common first: the common ones in their own order, then the rest by number.
          *
-         *     A request carrying both `id` and `q` is refused. Reads no finding.
+         *     A request carrying both `id` and `q` is refused.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers from the catalog, and reads no finding.
          */
@@ -9749,6 +9749,8 @@ export interface components {
         OutcomeBody: {
             /** @description Whether it stores a date: when somebody looks again, or when promised work lands */
             dated: boolean;
+            /** @description Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count */
+            dismisses: boolean;
             /** @description Whether recording it takes the issue out of the working queue */
             hides_risk: boolean;
             /** @description Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one */
@@ -9882,7 +9884,7 @@ export interface components {
             kind: string;
             /**
              * Format: int64
-             * @description The number of issues open at components of this kind, counted as the findings list counts rows
+             * @description The number of findings list rows open at packages of this kind: one per issue at a source package and version, however many builds and binaries hold it
              */
             open: number;
         };
@@ -12388,7 +12390,7 @@ export interface components {
             kind: "person" | "key";
             /** @description The display name, where one is recorded */
             name: string;
-            /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims. A dismissal is an outcome that hides risk and stores no date */
+            /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims */
             outcomes: components["schemas"]["OutcomeBody"][] | null;
             /** @description The products they can reach, and what they may do in each */
             reach: components["schemas"]["CanBody"][] | null;

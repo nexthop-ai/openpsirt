@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 
@@ -63,6 +64,7 @@ type OutcomeBody struct {
 	HidesRisk          bool         `json:"hides_risk" doc:"Whether recording it takes the issue out of the working queue"`
 	Dated              bool         `json:"dated" doc:"Whether it stores a date: when somebody looks again, or when promised work lands"`
 	NeedsJustification bool         `json:"needs_justification" doc:"Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one"`
+	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count"`
 }
 
 // WhoBody is the caller, as the caller.
@@ -100,7 +102,7 @@ type WhoBody struct {
 	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
 	// Outcomes is the same for everybody and is answered here because every
 	// screen that records or reads a decision needs it before it draws.
-	Outcomes []OutcomeBody `json:"outcomes" doc:"Every triage outcome, in the order the vocabulary lists them, with what each claims. A dismissal is an outcome that hides risk and stores no date"`
+	Outcomes []OutcomeBody `json:"outcomes" doc:"Every triage outcome, in the order the vocabulary lists them, with what each claims"`
 }
 
 func registerWhoAmI(api huma.API, in core.Deps) {
@@ -243,6 +245,7 @@ func outcomeBodies() []OutcomeBody {
 		out = append(out, OutcomeBody{
 			Outcome: core.Outcome(each), HidesRisk: each.HidesRisk(), Dated: each.Dated(),
 			NeedsJustification: each.NeedsJustification(),
+			Dismisses:          slices.Contains(triage.OutcomesDismissing(), each),
 		})
 	}
 	return out

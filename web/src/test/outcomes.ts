@@ -7,12 +7,60 @@ import type { Claims } from "../ui/outcomes";
 // it, for a test standing in for the server. The server's own test holds the
 // rule itself.
 export const PUBLISHED: Claims[] = [
-  { outcome: "affected", hides_risk: false, dated: false, needs_justification: false },
-  { outcome: "not-applicable", hides_risk: true, dated: false, needs_justification: true },
-  { outcome: "mismatched", hides_risk: true, dated: false, needs_justification: true },
-  { outcome: "deferred", hides_risk: true, dated: true, needs_justification: false },
-  { outcome: "wont-fix", hides_risk: true, dated: false, needs_justification: false },
-  { outcome: "already-fixed", hides_risk: true, dated: false, needs_justification: false },
-  { outcome: "upgrade-needed", hides_risk: true, dated: true, needs_justification: false },
-  { outcome: "patch-needed", hides_risk: true, dated: true, needs_justification: false },
+  {
+    outcome: "affected",
+    hides_risk: false,
+    dated: false,
+    needs_justification: false,
+    dismisses: false,
+  },
+  {
+    outcome: "not-applicable",
+    hides_risk: true,
+    dated: false,
+    needs_justification: true,
+    dismisses: true,
+  },
+  {
+    outcome: "mismatched",
+    hides_risk: true,
+    dated: false,
+    needs_justification: true,
+    dismisses: true,
+  },
+  {
+    outcome: "deferred",
+    hides_risk: true,
+    dated: true,
+    needs_justification: false,
+    dismisses: false,
+  },
+  {
+    outcome: "wont-fix",
+    hides_risk: true,
+    dated: false,
+    needs_justification: false,
+    dismisses: true,
+  },
+  {
+    outcome: "already-fixed",
+    hides_risk: true,
+    dated: false,
+    needs_justification: false,
+    dismisses: true,
+  },
+  {
+    outcome: "upgrade-needed",
+    hides_risk: true,
+    dated: true,
+    needs_justification: false,
+    dismisses: false,
+  },
+  {
+    outcome: "patch-needed",
+    hides_risk: true,
+    dated: true,
+    needs_justification: false,
+    dismisses: false,
+  },
 ];

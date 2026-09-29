@@ -6,9 +6,9 @@
 // What reading the kinds of package present costs on a real image.
 //
 // The kind is read out of each distinct package identifier in Go, after the
-// statement has counted what is open per component. The alternative is
-// reading it in the statement, which is spelled once per engine, and the
-// choice between the two waits on this number.
+// statement has counted the list's rows per identifier. Reading it in the
+// statement is spelled once per engine, and this number is why the kind is
+// read in Go.
 //
 // Behind a build tag because it is a measurement and not a gate. `make
 // measure` runs it.
@@ -152,7 +152,7 @@ func TestMeasurePackageKindsOnARealImage(t *testing.T) {
 		for _, kind := range kinds {
 			open += kind.Open
 		}
-		t.Logf("package kinds: %d kinds over %d pairs, read in %v", len(kinds), open, took[1:])
+		t.Logf("package kinds: %d kinds over %d rows, read in %v", len(kinds), open, took[1:])
 
 		// Beside it, the list's first page, which is what the panel is opened
 		// over.

@@ -16,7 +16,7 @@ import (
 // PackageKindBody is one kind of package open findings sit at.
 type PackageKindBody struct {
 	Kind string `json:"kind" doc:"The package type as the package identifier spells it, such as deb, golang or pypi. What the findings list's ecosystem filter takes"`
-	Open int    `json:"open" doc:"The number of issues open at components of this kind, counted as the findings list counts rows"`
+	Open int    `json:"open" doc:"The number of findings list rows open at packages of this kind: one per issue at a source package and version, however many builds and binaries hold it"`
 }
 
 // PackageKindsOutput is the kinds of package present in a selection.
@@ -28,8 +28,9 @@ type PackageKindsOutput struct {
 
 const kindsSaid = "Counted over every open finding in the selection you may read. The " +
 	"findings list's other filters and the triage line do not narrow it. A kind present only " +
-	"on findings you may not read is absent. A component with no package identifier has no " +
-	"kind and is not counted. Ordered by the count, largest first."
+	"on findings you may not read is absent. A package identifier the ecosystem filter cannot " +
+	"find by a kind is not counted, and neither is a component with none. Ordered by the " +
+	"count, largest first."
 
 // registerKinds is the package kinds present, per product and across products.
 func registerKinds(api huma.API, in core.Deps) {
@@ -69,8 +70,8 @@ func registerKinds(api huma.API, in core.Deps) {
 		Path:    "/v1/findings/package-kinds",
 		Summary: "List package kinds with open findings across every product",
 		Description: "Returns each kind of package that open findings sit at, across every " +
-			"product you may see, with how many. An issue at a component in two products counts " +
-			"in each, as it is two rows on the findings list across products.\n\n" + kindsSaid,
+			"product you may see, with how many. The same issue at the same package in two products " +
+			"counts in each, as it is two rows on the findings list across products.\n\n" + kindsSaid,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, _ *struct{}) (*PackageKindsOutput, error) {
 		subject, err := core.Reading(ctx)

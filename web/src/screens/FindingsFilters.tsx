@@ -7,7 +7,7 @@ import type { Outcome } from "../ui/outcomes";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
-import { called, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
+import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
 import { useState } from "react";
 // The findings list's filters, apart from the list itself.
 //
@@ -749,7 +749,7 @@ export function Filters({
           hint="Kinds of flaw, by CWE number or name. A class is usually several"
           placeholder="CWE-79, or words to search"
           words={all("weakness")}
-          onChange={(words) => setMany("weakness", words)}
+          onChange={(words) => setMany("weakness", identifiersIn(words))}
           offered={weaknessOffers.map((each) => each.id)}
           listId="findings-weaknesses"
           named={weaknessNamed}

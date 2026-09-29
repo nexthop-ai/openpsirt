@@ -57,6 +57,18 @@ export function asWeakness(typed: string): string | null {
   return shaped ? `CWE-${shaped[1]}` : null;
 }
 
+// The identifiers among what was typed into a filter, as the server records
+// them. Words search, and only an identifier narrows: the server matches the
+// identifier as written, so a word kept as a filter would empty the list.
+export function identifiersIn(typed: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const word of typed) {
+    const id = asWeakness(word);
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 // The weaknesses a search finds, most common first. Nothing typed is the
 // common ones, which is what a picker offers before anybody types.
 export function useWeaknessSearch(typed: string, enabled = true) {
@@ -65,7 +77,10 @@ export function useWeaknessSearch(typed: string, enabled = true) {
     enabled,
     queryKey: ["weaknesses", "search", q],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/weaknesses", { params: { query: q ? { q } : {} } })).items ?? [],
+      // Nothing typed asks for the whole common list, which is shorter than
+      // the most a lookup answers.
+      unwrap(await api.GET("/v1/weaknesses", { params: { query: q ? { q } : { limit: 100 } } }))
+        .items ?? [],
     staleTime: Infinity,
     retry: false,
   });

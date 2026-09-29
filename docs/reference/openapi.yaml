@@ -6718,6 +6718,9 @@ components:
         dated:
           description: "Whether it stores a date: when somebody looks again, or when promised work lands"
           type: boolean
+        dismisses:
+          description: "Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count"
+          type: boolean
         hides_risk:
           description: Whether recording it takes the issue out of the working queue
           type: boolean
@@ -6740,6 +6743,7 @@ components:
         - hides_risk
         - dated
         - needs_justification
+        - dismisses
       type: object
     OutlierBody:
       additionalProperties: false
@@ -6965,7 +6969,7 @@ components:
           description: The package type as the package identifier spells it, such as deb, golang or pypi. What the findings list's ecosystem filter takes
           type: string
         open:
-          description: The number of issues open at components of this kind, counted as the findings list counts rows
+          description: "The number of findings list rows open at packages of this kind: one per issue at a source package and version, however many builds and binaries hold it"
           format: int64
           type: integer
       required:
@@ -11177,7 +11181,7 @@ components:
           description: The display name, where one is recorded
           type: string
         outcomes:
-          description: Every triage outcome, in the order the vocabulary lists them, with what each claims. A dismissal is an outcome that hides risk and stores no date
+          description: Every triage outcome, in the order the vocabulary lists them, with what each claims
           items:
             $ref: "#/components/schemas/OutcomeBody"
           type:
@@ -15061,9 +15065,9 @@ paths:
   /v1/findings/package-kinds:
     get:
       description: |-
-        Returns each kind of package that open findings sit at, across every product you may see, with how many. An issue at a component in two products counts in each, as it is two rows on the findings list across products.
+        Returns each kind of package that open findings sit at, across every product you may see, with how many. The same issue at the same package in two products counts in each, as it is two rows on the findings list across products.
 
-        Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A component with no package identifier has no kind and is not counted. Ordered by the count, largest first.
+        Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-package-kinds-anywhere
@@ -20054,7 +20058,7 @@ paths:
       description: |-
         Returns each kind of package that open findings in the product sit at, with how many.
 
-        Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A component with no package identifier has no kind and is not counted. Ordered by the count, largest first.
+        Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
 
         `stream` and `variant` are optional and independent, as they are on the findings list.
 
@@ -27740,7 +27744,7 @@ paths:
 
         `q` searches. Digits, with or without `CWE-`, find every identifier whose number begins with them, the one typed exactly first. Words find every weakness whose catalog name and short name together hold each of them, without regard to capitals. Nothing typed answers the common weaknesses. Matches come most common first: the common ones in their own order, then the rest by number.
 
-        A request carrying both `id` and `q` is refused. Reads no finding.
+        A request carrying both `id` and `q` is refused.
 
         Requires: any signed-in person, and not a pipeline key. Answers from the catalog, and reads no finding.
       operationId: list-weaknesses
