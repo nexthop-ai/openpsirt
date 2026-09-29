@@ -114,7 +114,9 @@ export function CarriedPatches({
                     {rows.map((row, i) => (
                       <tr key={`${row.vulnerability} ${row.subject} ${i}`}>
                         <td className="id">{row.vulnerability}</td>
-                        <td className="id">{row.subject}</td>
+                        <td className="id">
+                          {row.version ? `${row.subject} ${row.version}` : row.subject}
+                        </td>
                         <td>
                           {row.pedigree ? (
                             <span className="state agreed" title="A patch carried in the package">

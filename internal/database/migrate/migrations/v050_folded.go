@@ -22,7 +22,7 @@ import (
 // index.
 //
 // v0.2.0's, which v0.3.0 and v0.4.0 left as it was, with the subject's name
-// folded.
+// folded and the version the claim was made about.
 func suppressionV050(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "suppression" (
@@ -43,6 +43,11 @@ func suppressionV050(t *columnTypes) []string {
 			-- matched against, for the reason a component's is. The name
 			-- beside it is the producer's spelling, which is what is shown.
 			"subject_folded" ` + t.name + ` NULL,
+			-- The version the claim was made about, where the document stated
+			-- one outside the package identifier. A publisher naming no
+			-- package states it as the branch its product sits in, and a
+			-- claim stored without it covers every version of the name.
+			"subject_version" ` + t.free + ` NULL,
 			"opened_scan_id" ` + t.ref + ` NOT NULL,
 			"closed_scan_id" ` + t.refNull + ` NULL,
 			CONSTRAINT "suppression_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),

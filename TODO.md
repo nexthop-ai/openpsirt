@@ -292,15 +292,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Add at least one real producer's document, such as Yocto's `create-spdx-3.0` output, under a license the repository may carry and named in `NOTICE`, with a test pinning its component, edge and unplaced counts |
 | Waits on | Finding a document with a usable license. |
 
-### TODO-31 Version on build VEX claims
-
-| | |
-|---|---|
-| Today | A build may upload its own CSAF VEX beside its inventory. A statement about a product named by a version branch, with no package identifier, is matched with its version as the document is read, and stored without it |
-| Problem | The stored statement covers every version of that name. A build ships `acme-fw` 4.2 with a statement that CVE-Y does not affect 4.2, moves to 5.0, which is affected, and keeps sending the same file: CVE-Y is suppressed on 5.0 with nothing saying why. The carried patches screen shows "acme-fw" with no version, so nobody can see the mismatch. VEX uploaded for a product keeps the version |
-| Work | Store the statement's version, match only that version, and show it |
-| Waits on | The owner: the next upload of a moving branch closes and reopens each such statement once, which is acceptable or is avoided by leaving versionless statements' identity alone; and whether statements already stored for tags are re-read from their kept documents |
-
 ### TODO-32 Outbound HTTP proxy
 
 | | |

@@ -113,6 +113,10 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     recorded here that v0.4.0 left undated under a duplicate ruling from
 //     outside is dated, and each such date recorded as a movement from its
 //     ruling.
+//   - A build's claim records the version it was made about, where the
+//     document stated one outside the package identifier. Every claim v0.4.0
+//     holds takes none, and covers what it covered before: v0.4.0 kept no
+//     version beside a claim.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -163,7 +167,7 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := u.change(suppressionV050(t), change{table: "suppression",
-		add: []added{{column: "subject_folded"}}}); err != nil {
+		add: []added{{column: "subject_folded"}, {column: "subject_version"}}}); err != nil {
 		return err
 	}
 	if err := subjectsFolded(ctx, tx); err != nil {
@@ -240,6 +244,8 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // rows recording those withdrawals go, because v0.4.0 has no place for a
 // change no person made. The day an issue was listed as exploited goes with
 // its column. A movement a ruling recorded goes, and the date it set stays.
+//
+// A claim's version goes with its column.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err
@@ -272,6 +278,7 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	}
 	if err := apply(ctx, tx.Tx, []string{
 		`ALTER TABLE "suppression" DROP COLUMN "subject_folded"`,
+		`ALTER TABLE "suppression" DROP COLUMN "subject_version"`,
 		`ALTER TABLE "assessment" DROP COLUMN "withdrawn_because"`,
 		`ALTER TABLE "vulnerability" DROP COLUMN "issue_id"`,
 		`ALTER TABLE "vulnerability" DROP COLUMN "exploited_on"`,

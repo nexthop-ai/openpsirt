@@ -429,7 +429,8 @@ MySQL and MariaDB alter the table where it stands; SQLite rebuilds it from the
 release's declaration. Each name an issue answers to gains whether a person
 typed it, a column added with its default on all four engines. A graph node
 gains two columns that hold a null, and a build's claim gains its subject's
-name folded, which every engine adds where the table stands. A notification
+name folded and the version it was made about, which every engine adds where
+the table stands. A notification
 gains the team it is about, and a destination its platform, channel, topic and
 the product or team it belongs to, with a reference for each; SQLite rebuilds
 both tables from the release's declarations. What a person chose about chat,
@@ -469,6 +470,7 @@ it from the release's declaration.
 | An issue | Listed in the known-exploited catalog on no day: v0.4.0 read none. The first scan stating one re-clocks the issue's open exploited findings, as `DESIGN-remediation.md` § Deadlines describes |
 | A movement of an embargo | A person's, naming no ruling |
 | A flaw recorded here, undisclosed and open in a product with no disclosure date there, under a duplicate ruling in force covering a claim from outside | Dated by each such ruling in the order they took effect, where it brings the date earlier: the earliest claim from outside the ruling covers, by arrival or else by recording, plus the disclosure window. The first gives the date; a later one bringing it in past the movement threshold is recorded waiting for a second person and moves nothing. Each is a movement from its ruling, asked by its proposer when it took effect. A claim found here, a withdrawn ruling and a flaw with a date on any place there contribute nothing, unless every place holds exactly the date its rulings give, which is a flaw an earlier upgrade dated and a roll back kept |
+| A build's claim | Gains the version it was made about, holding nothing. v0.4.0 kept no version beside a claim, so each covers what it covered before, and its identity is unchanged |
 
 A username is the rule a key's and a token's name follow: the first to hold a
 name keeps it, and a later one folding to it is refused. An upgrade cannot
@@ -498,8 +500,8 @@ that a hidden name holding a comma is read by v0.4.0 as several names, and
 upgrading again keeps them apart. Each saved filter is kept in every product,
 because nothing records the one it was kept in and v0.5.0 offered it in all of
 them, under the name the upgrade left it; a deployment with no product keeps
-none. The scope it lost stays lost. A claim's folded subject goes with its
-column. A key or token keeps the name it was folded or numbered to, which
+none. The scope it lost stays lost. A claim's folded subject and its version go
+with their columns. A key or token keeps the name it was folded or numbered to, which
 v0.4.0 matches as typed, and one the upgrade withdrew stays withdrawn. The
 trail rows recording those withdrawals go, because v0.4.0 has no place for a
 change no person made. The day an issue was listed goes with its column. A
@@ -532,7 +534,7 @@ of what a check costs, so the checks share the build.
 | A v0.4.0 database with two people's saved filters: one name in several products with the oldest written after a younger one, a name the rename would take already held, a twin of the oldest once its branch goes, a product named longer than a filter may be, a filter named as long as one may be, a name held once with a scope and a grouping, a filter preparing a claim, and the other person's filter of the same name | Upgraded, the oldest keeps the name, one is renamed after its product and one is numbered past the name already held; the twin is dropped; both long renames fit the width the endpoints take; the name held once keeps its name and loses its scope and grouping; the claim is unchanged; the other person's is untouched; no filter names a product, and a second filter of one name for one person is refused. Rolled back, each is kept once in every product under the name the upgrade left it, and the claim is in every copy. Upgraded again, every copy the roll back made is a twin and goes, and the person keeps what the first upgrade left them |
 | A v0.4.0 database with keys named in mixed capitals, three pairs folding to one name | Upgraded, every name is folded, and the key in force and then the older keeps a shared name and authenticates, including one moving onto a name a withdrawn key still holds. The other in force is withdrawn and refused, with one trail row by the upgrade; those withdrawn already keep their withdrawal time. Each is numbered, past a key already named like the number. A spaces-only key is numbered and stays in force, and a scan sent under a mixed-case name reads as that key. Rolled back, the names and withdrawals stay and the trail row goes |
 | A v0.4.0 database with two people's tokens named in mixed capitals, three of one person's pairs folding to one name | Upgraded, as for keys, per person: the kept tokens authenticate, the duplicate in force is withdrawn and refused with one trail row naming its owner, those withdrawn already keep their withdrawal time, a spaces-only name and a name shaped like a number are handled as for keys, and the other person's token of the same name is untouched. Rolled back, the names and withdrawals stay and the trail row goes |
-| A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing. Rolled back, the table is described as v0.4.0 built it and the producer's spelling remains |
+| A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing, and none states a version. Rolled back, the table is described as v0.4.0 built it and the producer's spelling remains |
 | A v0.4.0 database with an undated flaw and a dated one under duplicate rulings — one covering a claim found here beside one from outside, one withdrawn, one bringing the date in within the threshold and one past it — and an exploited issue | Upgraded, the undated flaw is dated by the first and moved by the one within the threshold, the one past it waits, each is a movement naming its ruling and proposer, the dated flaw keeps its date, and the issue is listed on no day. Rolled back, the movements go, the date stays and the listing day's column is gone. Upgraded again, the same movements are recorded and the date is the same |
 
 ### Release records

@@ -6792,6 +6792,8 @@ export interface components {
             suppresses: boolean;
             /** @description The moment it stopped saying it. Absent while it is still being said */
             until?: string;
+            /** @description The version of the subject the claim was made about, where the document stated one outside the package identifier. The claim covers that version alone */
+            version?: string;
             /** @description The identifier the build argued about, as it wrote it */
             vulnerability: string;
         };
