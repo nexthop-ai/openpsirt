@@ -93,3 +93,32 @@ export function nameable(
   }
   return out;
 }
+
+// What a document states about a release, in words and a tone. The standard's
+// three statuses.
+const stated: Record<string, { label: string; tone: string }> = {
+  known_affected: { label: "Affected", tone: "bad" },
+  known_not_affected: { label: "Not affected", tone: "agreed" },
+  fixed: { label: "Fixed", tone: "agreed" },
+};
+
+// The status as a reader sees it, or the word as it arrived.
+export function releaseStatus(status?: string): { label: string; tone: string } {
+  return own(stated, status) ?? { label: status ?? "", tone: "" };
+}
+
+// Whether a release's decisions move it off affected, which is what marking it
+// affected anyway is offered against.
+export function markable(row: { covered?: unknown; decided?: string }): boolean {
+  return row.covered !== undefined && row.covered !== null && row.decided !== "known_affected";
+}
+
+// Whether the decision covering a release was made on another variant, and
+// reaches this one only by matching versions.
+export function madeElsewhere(row: {
+  variant?: string;
+  covered?: { decided_in?: string[] | null } | null;
+}): boolean {
+  const made = row.covered?.decided_in ?? [];
+  return made.length > 0 && !made.includes(row.variant ?? "");
+}

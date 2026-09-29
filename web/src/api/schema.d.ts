@@ -211,7 +211,9 @@ export interface paths {
         };
         /**
          * Generate a CSAF document for an advisory
-         * @description Returns a CSAF 2.0 document for this advisory: what it covers, and which releases hold each issue and which no longer do.
+         * @description Returns a CSAF 2.0 document for this advisory: what it covers, and which releases hold each issue, which no longer do, and which are known not affected because approved decisions cover every open place of the issue there.
+         *
+         *     A release known not affected carries the decision's reason as a flag and its mitigation as the impact, and the document is categorized under the VEX profile. A release marked affected on the advisory is stated as known affected.
          *
          *     One entry per issue and one product branch per product, so several flaws released together are one document on one date.
          *
@@ -317,6 +319,60 @@ export interface paths {
          *     Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
          */
         delete: operations["drop-advisory-issue"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/marked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark a release affected
+         * @description Marks one release of one issue this advisory covers as affected whatever its decisions say, or clears the mark where `affected` is false.
+         *
+         *     A decision reaches every build whose versions match, so one made on another variant can cover a release it was never about. The document states a marked release as known affected.
+         *
+         *     A change opens a new edition and takes back every agreement standing, as retitling does. Asking for what already stands changes nothing.
+         *
+         *     A release the issue is not in answers 404.
+         *
+         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+         */
+        put: operations["mark-advisory-release"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what an advisory states about each release
+         * @description Every release of every issue this advisory covers, with the status its document states and the decision behind it.
+         *
+         *     A release whose every open place is covered by approved, live decisions with one outcome names the earliest of them, with the variants it was made on. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
+         *
+         *     An advisory covering a product you hold nothing on answers as one that does not exist.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-advisory-releases"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6141,6 +6197,30 @@ export interface components {
             status: "draft" | "final" | "interim";
             title?: string;
         };
+        AdvisoryReleaseBody: {
+            /** @description Whether the status differs from what an agreement standing on what the advisory says now saw. The agreement stands */
+            changed: boolean;
+            /** @description The decision every open place of the issue in the release stands under. Absent where no one outcome covers them all */
+            covered?: components["schemas"]["ReleaseCoveringBody"];
+            /**
+             * @description Where the release's decisions put it, before any mark
+             * @enum {string}
+             */
+            decided: "known_affected" | "known_not_affected" | "fixed";
+            /** @description Whether the release is marked affected whatever its decisions say */
+            marked: boolean;
+            product: string;
+            /** @description The product's display name, or its name where it has none */
+            product_name?: string;
+            /**
+             * @description What the document states about the release
+             * @enum {string}
+             */
+            status: "known_affected" | "known_not_affected" | "fixed";
+            stream: string;
+            variant: string;
+            vulnerability: string;
+        };
         AdvisorySourceBody: {
             /**
              * Format: uri
@@ -8274,6 +8354,10 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        Flag: {
+            label: string;
+            product_ids: string[] | null;
+        };
         FoldPackageBody: {
             /**
              * Format: int64
@@ -8845,6 +8929,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyAdvisoryReleaseBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyAdvisoryReleaseBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdvisoryReleaseBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyAdvisorySourceBody: {
             /**
              * Format: uri
@@ -9284,6 +9379,21 @@ export interface components {
             items: components["schemas"]["WasSaidBody"][] | null;
             /** Format: int64 */
             total?: number;
+        };
+        "Mark-advisory-releaseRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Mark-advisory-releaseRequest.json
+             */
+            readonly $schema?: string;
+            /** @description True marks the release affected, false clears the mark */
+            affected: boolean;
+            product: string;
+            stream: string;
+            variant: string;
+            /** @description The identifier the issue is filed under */
+            vulnerability: string;
         };
         MatchBody: {
             /** @description This is another version in the same build, not another build */
@@ -10782,6 +10892,20 @@ export interface components {
             stream: string;
             variant: string;
         };
+        ReleaseCoveringBody: {
+            /** @description The variants the decision's place was open in when it was proposed. A release in another variant is one the decision reached by matching versions */
+            decided_in: string[] | null;
+            /**
+             * Format: int64
+             * @description The earliest decision covering the release
+             */
+            decision: number;
+            /** @description What stops the flaw, where the decision named it. The document states it as the impact */
+            mitigation?: string;
+            outcome: string;
+            /** @description The decision's justification, which the document states as the reason the release is not affected */
+            reason?: string;
+        };
         ReleasePointBody: {
             by_severity?: {
                 [key: string]: number;
@@ -11802,6 +11926,7 @@ export interface components {
         Status: {
             fixed?: string[] | null;
             known_affected?: string[] | null;
+            known_not_affected?: string[] | null;
         };
         StepBody: {
             component: string;
@@ -11868,6 +11993,11 @@ export interface components {
             members?: string[] | null;
             /** @description The team's name */
             name: string;
+        };
+        Threat: {
+            category: string;
+            details: string;
+            product_ids: string[] | null;
         };
         ToReaffirmBody: {
             claim: components["schemas"]["ClaimBody"];
@@ -12232,11 +12362,13 @@ export interface components {
             cve?: string;
             cwe?: components["schemas"]["Weakness"];
             discovery_date?: string;
+            flags?: components["schemas"]["Flag"][] | null;
             ids?: components["schemas"]["Issued"][] | null;
             notes?: components["schemas"]["Note"][] | null;
             product_status: components["schemas"]["Status"];
             remediations?: components["schemas"]["Remediation"][] | null;
             scores?: components["schemas"]["Score"][] | null;
+            threats?: components["schemas"]["Threat"][] | null;
             title?: string;
         };
         VulnerabilityDataBody: {
@@ -12976,6 +13108,71 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "mark-advisory-release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Mark-advisory-releaseRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-advisory-releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The identifier the advisory is tracked by */
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyAdvisoryReleaseBody"];
+                };
             };
             /** @description Error */
             default: {

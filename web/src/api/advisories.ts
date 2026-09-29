@@ -18,6 +18,7 @@ type Listed = Body<"AdvisoryListedBody">;
 export type Advisory = Body<"AdvisoryBody">;
 export type Covered = Body<"CoveredBody">;
 type Issuance = Body<"IssuanceBody">;
+type AdvisoryRelease = Body<"AdvisoryReleaseBody">;
 
 // Everything an act against an advisory can move.
 //
@@ -35,6 +36,7 @@ export function useAfterAdvisory() {
     void queries.invalidateQueries({ queryKey: ["advisory"] });
     void queries.invalidateQueries({ queryKey: ["advisory-document"] });
     void queries.invalidateQueries({ queryKey: ["advisory-issuances"] });
+    void queries.invalidateQueries({ queryKey: ["advisory-releases"] });
   };
 }
 
@@ -75,6 +77,46 @@ export function useAdvisoryDocument(advisory: string, covers: number) {
         await api.GET("/v1/advisories/{advisory}/document", { params: { path: { advisory } } }),
       ),
     retry: false,
+  });
+}
+
+// What the document states about each release, and the decision behind it.
+export function useAdvisoryReleases(
+  advisory: string,
+  covers: number,
+): UseQueryResult<{ items: AdvisoryRelease[] | null }> {
+  return useQuery({
+    enabled: covers > 0,
+    queryKey: ["advisory-releases", advisory],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/advisories/{advisory}/releases", { params: { path: { advisory } } }),
+      ),
+  });
+}
+
+// Marking a release affected whatever its decisions say, or clearing the mark.
+// Either opens an edition, so every read an act moves is asked again.
+export function useMarkRelease() {
+  const done = useAfterAdvisory();
+  return useMutation({
+    mutationFn: async (body: {
+      advisory: string;
+      product: string;
+      vulnerability: string;
+      stream: string;
+      variant: string;
+      affected: boolean;
+    }) => {
+      const { advisory, ...rest } = body;
+      return unwrap(
+        await api.PUT("/v1/advisories/{advisory}/marked", {
+          params: { path: { advisory } },
+          body: rest,
+        }),
+      );
+    },
+    onSuccess: done,
   });
 }
 

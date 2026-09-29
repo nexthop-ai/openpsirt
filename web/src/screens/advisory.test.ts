@@ -2,7 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { agreeing, missing, nameable, standing, statusLabel } from "./advisory";
+import {
+  agreeing,
+  madeElsewhere,
+  markable,
+  missing,
+  nameable,
+  releaseStatus,
+  standing,
+  statusLabel,
+} from "./advisory";
 
 describe("an editorial status the interface does not know", () => {
   it("is shown as it arrived rather than crashing the render", () => {
@@ -134,5 +143,49 @@ describe("the flaws offered for an advisory", () => {
     expect(
       nameable(rows, [{ product: "switch" }], "switch").map((one) => one.vulnerability),
     ).toEqual(["CVE-2026-1", "CVE-2026-2"]);
+  });
+});
+
+describe("what a document states about a release", () => {
+  it("is each of the three statuses in words", () => {
+    expect(releaseStatus("known_affected").label).toBe("Affected");
+    expect(releaseStatus("known_not_affected").label).toBe("Not affected");
+    expect(releaseStatus("fixed").label).toBe("Fixed");
+  });
+
+  it("is a word the interface does not know, shown as it arrived", () => {
+    expect(releaseStatus("under_investigation").label).toBe("under_investigation");
+    expect(releaseStatus("constructor").label).toBe("constructor");
+  });
+});
+
+describe("marking a release affected", () => {
+  const covered = { decision: 1, outcome: "not-applicable", decided_in: ["broadcom"] };
+
+  it("is offered where a decision moves the release off affected", () => {
+    expect(markable({ covered, decided: "known_not_affected" })).toBe(true);
+    expect(markable({ covered, decided: "fixed" })).toBe(true);
+  });
+
+  it("is not offered where the decisions leave it affected, or where none covers it", () => {
+    expect(markable({ covered, decided: "known_affected" })).toBe(false);
+    expect(markable({ decided: "fixed" })).toBe(false);
+    expect(markable({ covered: null, decided: "fixed" })).toBe(false);
+  });
+});
+
+describe("a decision made on another variant", () => {
+  it("is said where the release's variant is not one it was made on", () => {
+    expect(madeElsewhere({ variant: "mellanox", covered: { decided_in: ["broadcom"] } })).toBe(
+      true,
+    );
+  });
+
+  it("is not said where it was made on this variant, or nothing says where", () => {
+    expect(
+      madeElsewhere({ variant: "broadcom", covered: { decided_in: ["broadcom", "mellanox"] } }),
+    ).toBe(false);
+    expect(madeElsewhere({ variant: "broadcom", covered: { decided_in: [] } })).toBe(false);
+    expect(madeElsewhere({ variant: "broadcom" })).toBe(false);
   });
 });

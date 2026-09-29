@@ -311,6 +311,53 @@ components:
         - agreed
         - minted_at
       type: object
+    AdvisoryReleaseBody:
+      additionalProperties: false
+      properties:
+        changed:
+          description: Whether the status differs from what an agreement standing on what the advisory says now saw. The agreement stands
+          type: boolean
+        covered:
+          $ref: "#/components/schemas/ReleaseCoveringBody"
+          description: The decision every open place of the issue in the release stands under. Absent where no one outcome covers them all
+        decided:
+          description: Where the release's decisions put it, before any mark
+          enum:
+            - known_affected
+            - known_not_affected
+            - fixed
+          type: string
+        marked:
+          description: Whether the release is marked affected whatever its decisions say
+          type: boolean
+        product:
+          type: string
+        product_name:
+          description: The product's display name, or its name where it has none
+          type: string
+        status:
+          description: What the document states about the release
+          enum:
+            - known_affected
+            - known_not_affected
+            - fixed
+          type: string
+        stream:
+          type: string
+        variant:
+          type: string
+        vulnerability:
+          type: string
+      required:
+        - product
+        - vulnerability
+        - stream
+        - variant
+        - status
+        - decided
+        - marked
+        - changed
+      type: object
     AdvisorySourceBody:
       additionalProperties: false
       properties:
@@ -3931,6 +3978,21 @@ components:
         - items
         - total
       type: object
+    Flag:
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+        product_ids:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - label
+        - product_ids
+      type: object
     FoldPackageBody:
       additionalProperties: false
       properties:
@@ -5037,6 +5099,28 @@ components:
       required:
         - items
       type: object
+    ListBodyAdvisoryReleaseBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyAdvisoryReleaseBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/AdvisoryReleaseBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyAdvisorySourceBody:
       additionalProperties: false
       properties:
@@ -5916,6 +6000,39 @@ components:
           type: integer
       required:
         - items
+      type: object
+    Mark-advisory-releaseRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Mark-advisory-releaseRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        affected:
+          description: True marks the release affected, false clears the mark
+          type: boolean
+        product:
+          minLength: 1
+          type: string
+        stream:
+          minLength: 1
+          type: string
+        variant:
+          minLength: 1
+          type: string
+        vulnerability:
+          description: The identifier the issue is filed under
+          minLength: 1
+          type: string
+      required:
+        - product
+        - vulnerability
+        - stream
+        - variant
+        - affected
       type: object
     MatchBody:
       additionalProperties: false
@@ -8399,6 +8516,33 @@ components:
         - variant
         - open
       type: object
+    ReleaseCoveringBody:
+      additionalProperties: false
+      properties:
+        decided_in:
+          description: The variants the decision's place was open in when it was proposed. A release in another variant is one the decision reached by matching versions
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        decision:
+          description: The earliest decision covering the release
+          format: int64
+          type: integer
+        mitigation:
+          description: What stops the flaw, where the decision named it. The document states it as the impact
+          type: string
+        outcome:
+          type: string
+        reason:
+          description: The decision's justification, which the document states as the reason the release is not affected
+          type: string
+      required:
+        - decision
+        - outcome
+        - decided_in
+      type: object
     ReleasePointBody:
       additionalProperties: false
       properties:
@@ -10147,6 +10291,12 @@ components:
           type:
             - array
             - "null"
+        known_not_affected:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       type: object
     StepBody:
       additionalProperties: false
@@ -10268,6 +10418,24 @@ components:
           type: string
       required:
         - name
+      type: object
+    Threat:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        details:
+          type: string
+        product_ids:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - category
+        - details
+        - product_ids
       type: object
     ToReaffirmBody:
       additionalProperties: false
@@ -10911,6 +11079,12 @@ components:
           $ref: "#/components/schemas/Weakness"
         discovery_date:
           type: string
+        flags:
+          items:
+            $ref: "#/components/schemas/Flag"
+          type:
+            - array
+            - "null"
         ids:
           items:
             $ref: "#/components/schemas/Issued"
@@ -10934,6 +11108,12 @@ components:
         scores:
           items:
             $ref: "#/components/schemas/Score"
+          type:
+            - array
+            - "null"
+        threats:
+          items:
+            $ref: "#/components/schemas/Threat"
           type:
             - array
             - "null"
@@ -11878,7 +12058,9 @@ paths:
   /v1/advisories/{advisory}/document:
     get:
       description: |-
-        Returns a CSAF 2.0 document for this advisory: what it covers, and which releases hold each issue and which no longer do.
+        Returns a CSAF 2.0 document for this advisory: what it covers, and which releases hold each issue, which no longer do, and which are known not affected because approved decisions cover every open place of the issue there.
+
+        A release known not affected carries the decision's reason as a flag and its mitigation as the impact, and the document is categorized under the VEX profile. A release marked affected on the advisory is stated as known affected.
 
         One entry per issue and one product branch per product, so several flaws released together are one document on one date.
 
@@ -12087,6 +12269,87 @@ paths:
           - public-triage
           - private-triage
         note: A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
+  /v1/advisories/{advisory}/marked:
+    put:
+      description: |-
+        Marks one release of one issue this advisory covers as affected whatever its decisions say, or clears the mark where `affected` is false.
+
+        A decision reaches every build whose versions match, so one made on another variant can cover a release it was never about. The document states a marked release as known affected.
+
+        A change opens a new edition and takes back every agreement standing, as retitling does. Asking for what already stands changes nothing.
+
+        A release the issue is not in answers 404.
+
+        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+      operationId: mark-advisory-release
+      parameters:
+        - in: path
+          name: advisory
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Mark-advisory-releaseRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Mark a release affected
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
+        note: A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+  /v1/advisories/{advisory}/releases:
+    get:
+      description: |-
+        Every release of every issue this advisory covers, with the status its document states and the decision behind it.
+
+        A release whose every open place is covered by approved, live decisions with one outcome names the earliest of them, with the variants it was made on. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
+
+        An advisory covering a product you hold nothing on answers as one that does not exist.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-advisory-releases
+      parameters:
+        - description: The identifier the advisory is tracked by
+          in: path
+          name: advisory
+          required: true
+          schema:
+            description: The identifier the advisory is tracked by
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyAdvisoryReleaseBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what an advisory states about each release
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
   /v1/approval-batches/{batch}:
     delete:
       description: |-

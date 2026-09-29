@@ -95,15 +95,6 @@ The owner has chosen to wait on each of these.
 | Work | Let a product set its own windows, falling back to the deployment's when cleared, the way the triage floor override works. Rewrite the deadlines of the product's open findings when its windows change (REQ-33) |
 | Waits on | The owner's go-ahead only |
 
-### TODO-08 CSAF VEX profile
-
-| | |
-|---|---|
-| Today | An advisory's CSAF document lists each release (a branch or tag built as one variant) as known affected when any finding of the flaw is open there, and fixed otherwise. It reads no triage decisions. The per-build OpenVEX document on the VEX screen does: a build's issue is not affected when every open place is covered by an approved, still-valid decision with one outcome |
-| Problem | A release covered by an approved not-applicable decision is published as known affected, with a remediation telling customers to update. The advisory has no way to say "known not affected, because…" |
-| Work | Move the VEX screen's coverage rule into one shared query and use it for the advisory. List each fully covered release as known not affected, with the decision's reason as the CSAF flag (the five reasons are the CSAF flag names) and its mitigation, never its reasoning, as the impact statement. Leave a partly covered release known affected. Keep not-affected releases out of remediations and scores, and emit the VEX profile when any release is not affected |
-| Waits on | A decision reaches every variant whose versions match, because a place is identified without its root. A not-applicable decision made for a variant where the code is compiled out also covers a variant where it is compiled in, in the OpenVEX document today and in the advisory once this is built. Limiting a decision to a variant changes REQ-26 and is a separate decision |
-
 ### TODO-09 Microsoft Teams and Google Chat
 
 | | |

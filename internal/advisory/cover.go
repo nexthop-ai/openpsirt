@@ -29,7 +29,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	releases, err := s.releases(ctx, subject, one.ProductID, issue.ID)
+	releases, err := releases(ctx, s.db, subject, a.advisory, one.ProductID, issue.ID)
 	if err != nil {
 		return err
 	}
@@ -111,15 +111,33 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
 		}
 		a.release(one, release, leaf)
-		if release.Holds {
-			vulnerability.Status.KnownAffected = append(
-				vulnerability.Status.KnownAffected, leaf.ID)
-		} else {
+		switch release.Status() {
+		case KnownNotAffected:
+			// Why, beside the status: the decision's reason as the flag a
+			// machine reads, and what stops the flaw as the impact a person
+			// reads, where the decision named it. Never the reasoning, which
+			// is the argument a triager put to a second person here.
+			vulnerability.Status.KnownNotAffected = append(
+				vulnerability.Status.KnownNotAffected, leaf.ID)
+			vulnerability.Flags = flagged(vulnerability.Flags, release.Grounds.Reason, leaf.ID)
+			if release.Grounds.Mitigation != "" {
+				vulnerability.Threats = threatened(vulnerability.Threats,
+					release.Grounds.Mitigation, leaf.ID)
+			}
+			// Neither scored nor remediated: a rating is stated for a
+			// release the flaw is in, and a remediation for a release that
+			// has to act.
+			continue
+		case Fixed:
 			vulnerability.Status.Fixed = append(vulnerability.Status.Fixed, leaf.ID)
 			fixed = append(fixed, leaf)
+		default:
+			vulnerability.Status.KnownAffected = append(
+				vulnerability.Status.KnownAffected, leaf.ID)
 		}
-		// Every release the entry names, which is what a rating is stated for:
-		// the score is the flaw's, and the flaw is the same flaw in each.
+		// Every release the flaw is or was in, which is what a rating is
+		// stated for: the score is the flaw's, and the flaw is the same flaw
+		// in each.
 		rated = append(rated, leaf.ID)
 	}
 	ratings, err := finding.NewVulnerabilities(s.db).Ratings(ctx, issue.ID)
@@ -171,4 +189,30 @@ func (a *assembly) point(pointers []Reference) {
 		a.pointed[one.URL] = true
 		a.pointers = append(a.pointers, one)
 	}
+}
+
+// flagged adds a release to the flag for its reason, opening one where no
+// release before it gave that reason. One flag per reason, in the order the
+// releases are named.
+func flagged(flags []Flag, reason, release string) []Flag {
+	for i := range flags {
+		if flags[i].Label == reason {
+			flags[i].ProductIDs = append(flags[i].ProductIDs, release)
+			return flags
+		}
+	}
+	return append(flags, Flag{Label: reason, ProductIDs: []string{release}})
+}
+
+// threatened adds a release to the impact statement carrying its
+// mitigation, opening one where no release before it named that mitigation.
+func threatened(threats []Threat, mitigation, release string) []Threat {
+	for i := range threats {
+		if threats[i].Details == mitigation {
+			threats[i].ProductIDs = append(threats[i].ProductIDs, release)
+			return threats
+		}
+	}
+	return append(threats, Threat{Category: "impact", Details: mitigation,
+		ProductIDs: []string{release}})
 }

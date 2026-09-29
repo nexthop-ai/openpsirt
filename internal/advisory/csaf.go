@@ -51,10 +51,10 @@ func (d Document) MarshalJSON() ([]byte, error) {
 // Meta is the document's own description.
 type Meta struct {
 	// Category is what kind of document this is, and it follows what the
-	// document can actually support rather than what would sound better. The
-	// security-advisory profile's own tests are what decides it; the VEX
-	// profile is the one that carries "not affected, and here is why", and
-	// those justifications are not assembled here.
+	// document can actually support rather than what would sound better: the
+	// VEX profile where any release is stated known not affected, which is
+	// the profile that carries "not affected, and here is why", and the
+	// security-advisory profile otherwise.
 	Category     string        `json:"category"`
 	CSAFVersion  string        `json:"csaf_version"`
 	Title        string        `json:"title"`
@@ -169,6 +169,14 @@ type Vulnerability struct {
 	Notes []Note   `json:"notes,omitempty"`
 	// Status is which releases the flaw is in and which it is out of.
 	Status Status `json:"product_status"`
+	// Flags carry the reason for every release stated known not affected,
+	// one per reason. The five reasons a decision records are the standard's
+	// five flag labels.
+	Flags []Flag `json:"flags,omitempty"`
+	// Threats carry what stops the flaw in a release stated known not
+	// affected, where the decision named it. The decision's reasoning is never
+	// read into a document.
+	Threats []Threat `json:"threats,omitempty"`
 	// CWE is what kind of flaw this is, where the catalog knows the name.
 	CWE *Weakness `json:"cwe,omitempty"`
 	// Scores is what is held about the flaw beyond which releases carry
@@ -214,9 +222,24 @@ type Issued struct {
 // never shipped the thing at all — and those are opposite answers, one of them
 // the one a reader is hoping for.
 //
-// A person's own decision about a release — not affected, and the reason why —
-// is the VEX half, and is not assembled here.
+// A release whose every open place is covered by an approved decision that
+// the flaw does not apply is known not affected, with the reason on a flag.
 type Status struct {
-	KnownAffected []string `json:"known_affected,omitempty"`
-	Fixed         []string `json:"fixed,omitempty"`
+	KnownAffected    []string `json:"known_affected,omitempty"`
+	KnownNotAffected []string `json:"known_not_affected,omitempty"`
+	Fixed            []string `json:"fixed,omitempty"`
+}
+
+// Flag is a machine-readable reason some releases are not affected.
+type Flag struct {
+	Label      string   `json:"label"`
+	ProductIDs []string `json:"product_ids"`
+}
+
+// Threat is a statement about the flaw in some releases. The only category
+// written is the impact statement a known-not-affected release carries.
+type Threat struct {
+	Category   string   `json:"category"`
+	Details    string   `json:"details"`
+	ProductIDs []string `json:"product_ids"`
 }

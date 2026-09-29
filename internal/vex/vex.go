@@ -274,73 +274,32 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	target *catalog.Target, visible []access.Visibility) (*Statements, error) {
 
 	var rows []struct {
-		VulnerabilityID int64     `bun:"vulnerability_id"`
-		Identifier      string    `bun:"identifier"`
-		Component       string    `bun:"component"`
-		Purl            string    `bun:"purl"`
-		Outcome         string    `bun:"outcome"`
-		DecidedBy       int64     `bun:"decided_by"`
-		Justification   string    `bun:"-"`
-		Mitigation      string    `bun:"-"`
-		DecidedAt       time.Time `bun:"-"`
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Identifier      string `bun:"identifier"`
+		Component       string `bun:"component"`
+		Purl            string `bun:"purl"`
+		finding.Covering
+		Justification string    `bun:"-"`
+		Mitigation    string    `bun:"-"`
+		DecidedAt     time.Time `bun:"-"`
 	}
 	// One statement per issue and component, from the claims that stand and
 	// have been agreed to. Joined from the findings this build actually holds:
 	// a decision is a claim about a product's code and reaches every build
 	// whose versions match it, so what belongs in this document is what this
 	// build ships rather than everything the product has ever decided.
-	err := s.db.NewSelect().
+	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(nodeJoin).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`LEFT JOIN (`+finding.Decisions+`) ON `+finding.DecisionAt("?")+`
-			AND de.state = 'approved'
-			AND de.live_key IS NOT NULL
-			AND (EXISTS (SELECT 1 FROM "claim" AS "mc"
-					WHERE mc.id = de.claim_id AND mc.outcome = 'mismatched')
-				OR (COALESCE(de.component_upstream_version, '') =
-					COALESCE(NULLIF(c.upstream_version, ''), c.version, '')
-				AND COALESCE(de.consumer_upstream_version, '') =
-					COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')))`, named.ProductID).
-		// The argument, which is where the outcome lives. The outcome test is
-		// part of the join rather than a filter, as it was on the decision:
-		// what the counting below asks is whether *every* open place is
-		// dismissed, and a filter would drop the places that are not.
-		// A claim that will not be fixed joins only where it says what a
-		// holder can do instead. The format requires an action on an affected
-		// statement, so one without a mitigation has nothing to publish — and
-		// left out it falls through to silence, which already reads as
-		// affected and is the honest answer.
-		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			AND (cl.outcome IN ('not-applicable', 'mismatched', 'already-fixed')
-				OR (cl.outcome = 'wont-fix' AND COALESCE(cl.mitigation, '') <> ''))`).
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
-		// Safe as an aggregate, because the grouping below refuses a component
-		// whose places disagree about the outcome.
-		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
-		// The decision the words come from, rather than the words.
-		//
-		// The earliest of them, which is the claim that has stood longest
-		// about this component: where several places were decided separately
-		// the document has one thing to say and has to choose which, and the
-		// first is the one a reader can check against the record. A decision's
-		// identifier is assigned when it is written, so the lowest is the
-		// first written.
-		//
-		// Read off one decision rather than taken column by column. Three
-		// independent minima are three answers from three claims: a category
-		// from one, the prose explaining a different reason from another, and
-		// a timestamp from a third — published, machine-readable, to every
-		// customer running a scanner.
-		ColumnExpr(`MIN(de.id) AS "decided_by"`).
 		Where("f.target_id = ?", target.ID).
-		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		// The issue's key is grouped alongside its name so the aliases can be
 		// looked up per issue. Selecting it without grouping it is accepted by
@@ -355,18 +314,11 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		// outcomes differed, two statements contradicting each other about one
 		// component.
 		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
-		// Every open place agreed, and agreed the same way. The join is left,
-		// so a place nobody has dismissed contributes a row with no decision:
-		// counting them is how "all of them" is asked. Without it, one
-		// dismissal at one place speaks for a component open at forty-four
-		// others — a machine-readable "not affected" about something that is
-		// affected, published to every customer running a scanner.
-		Having("COUNT(cl.id) = COUNT(*)").
-		Having("COUNT(DISTINCT cl.outcome) = 1").
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
-		Limit(s.carrying()+1).
-		Scan(ctx, &rows)
+		Limit(s.carrying() + 1)
+	// Every open place agreed, and agreed the same way.
+	err := finding.WhollyCovered(q, named.ProductID, visible).Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
 	}
@@ -399,14 +351,14 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	for _, row := range rows {
 		decided = append(decided, row.DecidedBy)
 	}
-	said, err := s.wordsOf(ctx, decided)
+	said, err := finding.StatedBy(ctx, s.db, decided)
 	if err != nil {
 		return nil, err
 	}
 	for i := range rows {
-		rows[i].Justification = said[rows[i].DecidedBy].justification
-		rows[i].Mitigation = said[rows[i].DecidedBy].mitigation
-		rows[i].DecidedAt = said[rows[i].DecidedBy].proposedAt
+		rows[i].Justification = said[rows[i].DecidedBy].Justification
+		rows[i].Mitigation = said[rows[i].DecidedBy].Mitigation
+		rows[i].DecidedAt = said[rows[i].DecidedBy].ProposedAt
 	}
 
 	// Which revision this is, read from what has gone out for this build.
@@ -691,55 +643,6 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 	}
 	for _, row := range rows {
 		out[row.VulnerabilityID] = append(out[row.VulnerabilityID], row.Identifier)
-	}
-	return out, nil
-}
-
-// words are what one decision claimed, as a statement repeats it.
-type words struct {
-	justification string
-	mitigation    string
-	proposedAt    time.Time
-}
-
-// wordsOf reads what each of these decisions states for publication.
-//
-// One statement for the document rather than one per component, and one row per
-// decision rather than a column at a time: the category, the mitigation and the
-// moment have to come from the same claim, or the document says one thing in
-// the field a machine reads and another in the field a person does.
-//
-// The reasoning is not read here at all. It is written for a second person
-// inside this deployment, and the surest way for it not to be published is for
-// the query that builds the document never to fetch it.
-func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words, error) {
-	out := map[int64]words{}
-	if len(decisions) == 0 {
-		return out, nil
-	}
-	var rows []struct {
-		ID            int64     `bun:"id"`
-		Justification string    `bun:"justification"`
-		Mitigation    string    `bun:"mitigation"`
-		ProposedAt    time.Time `bun:"proposed_at"`
-	}
-	where, args := database.InAnyOf("de.id", decisions)
-	if err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`de.id AS "id"`).
-		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(cl.mitigation, '') AS "mitigation"`).
-		ColumnExpr(`de.proposed_at AS "proposed_at"`).
-		Where(where, args...).
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what these claims say: %w", err)
-	}
-	for _, row := range rows {
-		out[row.ID] = words{
-			justification: row.Justification, mitigation: row.Mitigation,
-			proposedAt: row.ProposedAt,
-		}
 	}
 	return out, nil
 }

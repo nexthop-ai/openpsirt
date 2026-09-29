@@ -87,6 +87,9 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     belonging to the deployment.
 //   - What somebody chose about chat, and what has been carried to them there,
 //     are tables of their own. Nothing v0.4.0 held goes in either.
+//   - A release an advisory marks affected, and what an agreement to an
+//     advisory saw about each release, are tables of their own. v0.4.0 stated
+//     no release known not affected, so both start empty.
 //   - A kept findings-list filter is rewritten into the words v0.5.0's list
 //     reads: the two flags "only" named become flags of their own, and hidden
 //     components joined by commas become one parameter each.
@@ -206,6 +209,9 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 		constraints: []string{"outbound_product_fk", "outbound_team_fk"}}); err != nil {
 		return err
 	}
+	if err := u.create(advisoryV050(t), "advisory_override", "advisory_agreed_status"); err != nil {
+		return err
+	}
 	return u.create(chatV050(t), "chat_preference", "chat_delivery")
 }
 
@@ -245,7 +251,8 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // change no person made. The day an issue was listed as exploited goes with
 // its column. A movement a ruling recorded goes, and the date it set stays.
 //
-// A claim's version goes with its column.
+// A claim's version goes with its column, and the two advisory tables go:
+// v0.4.0 states every release holding a flaw as known affected.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err
@@ -268,6 +275,9 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		}
 	}
 	if err := dropTables(ctx, tx.Tx, "chat_delivery", "chat_preference"); err != nil {
+		return err
+	}
+	if err := dropTables(ctx, tx.Tx, "advisory_agreed_status", "advisory_override"); err != nil {
 		return err
 	}
 	if err := dropTables(ctx, tx.Tx, "decision_superseded", "vulnerability_merge"); err != nil {

@@ -281,11 +281,18 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		if already > 0 {
 			return ErrAlreadyAgreed
 		}
-		_, err := tx.NewInsert().Model(&Approval{
+		approval := &Approval{
 			AdvisoryID: row.ID, EditionID: edition.ID,
 			ApprovedBy: subject.ID, ApprovedAt: now,
-		}).Exec(ctx)
-		if err != nil {
+		}
+		if _, err := tx.NewInsert().Model(approval).Exec(ctx); err != nil {
+			return err
+		}
+		// What each release stands at as this person agrees, read in the
+		// same transaction. A decision approved or lapsing afterwards moves a
+		// release without withdrawing the agreement, and this is what says
+		// it moved since.
+		if err := recordSeen(ctx, tx, subject, row.ID, approval.ID); err != nil {
 			return err
 		}
 		given = &Agreement{Edition: edition.Ordinal, AgreedAt: now}

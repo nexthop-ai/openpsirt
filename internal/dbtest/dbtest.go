@@ -953,6 +953,12 @@ var tables = []string{
 	// Before advisory, product, vulnerability and person, all of which it
 	// points at.
 	"advisory_issue",
+	// Before advisory, product, vulnerability, stream, variant and person,
+	// all of which it points at.
+	"advisory_override",
+	// Before advisory_approval, product, vulnerability, stream and variant,
+	// all of which it points at.
+	"advisory_agreed_status",
 	// Before advisory_edition, advisory and person, all of which it points
 	// at.
 	"advisory_approval",

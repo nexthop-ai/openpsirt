@@ -502,8 +502,14 @@ func (s *Store) Covers(ctx context.Context, subject access.Subject,
 // narrows, and Mint, which just made it and covers nothing. A caller holding
 // an identifier cannot reach this without going through one of them.
 func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
+	return coveredBy(ctx, s.db, row.ID)
+}
+
+// coveredBy is what one advisory covers, read through the handle given, for a
+// caller that has already narrowed and may be inside a transaction.
+func coveredBy(ctx context.Context, db bun.IDB, advisoryID int64) ([]Covered, error) {
 	var rows []Covered
-	err := s.db.NewSelect().
+	err := db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
 		Join(`JOIN "product" AS "pd" ON pd.id = ac.product_id`).
 		// Read as the issue the covered row stands for: a cover filed under
@@ -518,7 +524,7 @@ func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
 		ColumnExpr(`v.id AS "issue_id"`).
 		ColumnExpr(`COALESCE(v.description, '') AS "summary"`).
 		ColumnExpr(`ac.added_at AS "added_at"`).
-		Where("ac.advisory_id = ?", row.ID).
+		Where("ac.advisory_id = ?", advisoryID).
 		Where("ac.removed_at IS NULL").
 		// The order it was assembled in, which is the order somebody chose.
 		// Left to the engine, two documents generated from the same facts are

@@ -66,6 +66,7 @@ made in is not part of the key.
 |---|---|
 | A later release inherits by lookup, not by copy | Nothing to synchronize, so nothing drifts |
 | A variant inherits exactly when its code matches | A variant whose chain differs computes a different key and fails to match. No extra test |
+| Nothing records the build a decision was made on | Where a screen names it, it is read from which variants held the place when the decision was proposed. An advisory shows it beside each release a decision reaches, and whoever prepares one marks a release affected where the decision was about another variant (`DESIGN-remediation.md` § The CSAF document) |
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they

@@ -15,6 +15,8 @@ import (
 // supplier's, and the suppliers read on a schedule.
 func Register(api huma.API, in core.Deps) {
 	registerAdvisory(api, in)
+	// What an advisory states about each release, and marking one affected.
+	registerReleases(api, in)
 	registerVexImport(api, in)
 	registerAdvisoryImport(api, in)
 	// The suppliers whose published advisories are read on a schedule, which
