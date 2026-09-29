@@ -16,7 +16,7 @@ func trailV050(t *columnTypes) []string {
 			"id"       ` + t.id + `,
 			"at"       ` + t.timestamp + ` NOT NULL,
 			-- Who, where a person made it. Null where the actor is
-			-- configuration or a merge, which are no person.
+			-- configuration, a merge or an upgrade, which are no person.
 			"by"       ` + t.ref + ` NULL,
 			-- What kind of thing moved, and which one of them. The kind is
 			-- what a reader filters by; the name is what they search for.
@@ -31,10 +31,11 @@ func trailV050(t *columnTypes) []string {
 			-- set it; null after means it was cleared.
 			"was"      ` + t.text + ` NULL,
 			"became"   ` + t.text + ` NULL,
-			-- Who acted: a person, named in "by", or the deployment's startup
-			-- configuration, which names administrators and is the one
-			-- change made with no person behind it. Never absent: a change
-			-- nobody made is a change nothing records.
+			-- Who acted: a person, named in "by"; the deployment's startup
+			-- configuration, which names administrators; a scan merging two
+			-- issues; or an upgrade withdrawing a key or a token whose name
+			-- another holds. Never absent: a change nobody made is a change nothing
+			-- records.
 			"actor"    ` + t.kind + ` NOT NULL,
 			CONSTRAINT "admin_change_by_fk" FOREIGN KEY ("by") REFERENCES "person"("id")
 		)` + t.suffix,

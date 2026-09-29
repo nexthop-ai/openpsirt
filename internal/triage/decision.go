@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Decision is one claim about one combination of code.
@@ -168,11 +169,11 @@ type Place struct {
 }
 
 // ErrSamePerson is returned when somebody tries to approve their own claim.
-var ErrSamePerson = errors.New("the person who proposed a decision may not approve it")
+var ErrSamePerson = refusal.New("the person who proposed a decision may not approve it")
 
 // ErrNothingToApprove is returned when there is no current reasoning to
 // approve, which means the decision is not in a state anybody can agree to.
-var ErrNothingToApprove = errors.New("that decision has no reasoning to approve")
+var ErrNothingToApprove = refusal.New("that decision has no reasoning to approve")
 
 // Store reads and writes decisions.
 type Store struct {
@@ -319,7 +320,7 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 		// A claim is somebody's, and recording it under another name would
 		// make the second-person rule meaningless: anybody could propose as
 		// somebody else and then agree with themselves.
-		return nil, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return nil, refusal.Errorf("a decision is recorded as made by whoever made it")
 	}
 
 	var recorded *Decision
@@ -518,22 +519,22 @@ func oneArgument(proposals []Proposal) error {
 	for _, p := range proposals[1:] {
 		switch {
 		case p.Outcome != first.Outcome:
-			return fmt.Errorf("one action records one outcome: %q and %q were both given",
+			return refusal.Errorf("one action records one outcome: %q and %q were both given",
 				first.Outcome, p.Outcome)
 		case p.Justification != first.Justification:
-			return errors.New("one action records one justification")
+			return refusal.New("one action records one justification")
 		case strings.TrimSpace(p.Mitigation) != strings.TrimSpace(first.Mitigation):
-			return errors.New("one action records one mitigation")
+			return refusal.New("one action records one mitigation")
 		case version(p.FixedVersion) != version(first.FixedVersion):
-			return errors.New("one action records one fixed version")
+			return refusal.New("one action records one fixed version")
 		case version(p.UpgradeTo) != version(first.UpgradeTo):
-			return errors.New("one action records one version to upgrade to")
+			return refusal.New("one action records one version to upgrade to")
 		case !sameDay(p.DeferredUntil, first.DeferredUntil):
-			return errors.New("one action records one date to look again")
+			return refusal.New("one action records one date to look again")
 		case !sameDay(p.CommittedTo, first.CommittedTo):
-			return errors.New("one action records one date to act by")
+			return refusal.New("one action records one date to act by")
 		case strings.TrimSpace(p.Reasoning) != strings.TrimSpace(first.Reasoning):
-			return errors.New("one action records one piece of reasoning")
+			return refusal.New("one action records one piece of reasoning")
 		}
 	}
 	return nil
@@ -579,7 +580,7 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 	switch {
 	case outcome.NeedsJustification():
 		if !justification.Valid() {
-			return fmt.Errorf("%q is not a recognized reason for something not applying", justification)
+			return refusal.Errorf("%q is not a recognized reason for something not applying", justification)
 		}
 		// A correction keeps applying however far the code moves, so the
 		// reason behind one has to be a reason no version bump can answer.
@@ -588,7 +589,7 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 		// which a bump changes all the time — accepted here it would put a
 		// judgment about risk beyond the rule that re-examines it.
 		if outcome.StandsAtAnyVersion() && !justification.AboutIdentity() {
-			return fmt.Errorf(
+			return refusal.Errorf(
 				"%q says how the code is reached or what stops it, which a version bump "+
 					"changes. A claim that the match is wrong states that something is not "+
 					"there: %v", justification, JustificationsCorrecting())
@@ -598,20 +599,20 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 		// code moves; this one is a claim about configuration, which
 		// can be removed with nothing moving at all.
 		if justification == MitigationsExist && strings.TrimSpace(mitigation) == "" {
-			return errors.New(
+			return refusal.New(
 				"say what stops it — a claim that mitigations already exist is about " +
 					"configuration rather than code, so nothing here will notice it being " +
 					"removed and the next person needs to know what to go and check")
 		}
 	default:
 		if justification != "" {
-			return fmt.Errorf("%q states why something does not apply, which %q does not claim",
+			return refusal.Errorf("%q states why something does not apply, which %q does not claim",
 				justification, outcome)
 		}
 	}
 	if justification != MitigationsExist && outcome != WontFix &&
 		strings.TrimSpace(mitigation) != "" {
-		return fmt.Errorf("naming what stops it belongs to %q and to %q, and no other reason",
+		return refusal.Errorf("naming what stops it belongs to %q and to %q, and no other reason",
 			MitigationsExist, WontFix)
 	}
 	return nil
@@ -624,7 +625,7 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 // of the package would be a rule no test could pin.
 func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
-		return fmt.Errorf("%q is not an outcome", p.Outcome)
+		return refusal.Errorf("%q is not an outcome", p.Outcome)
 	}
 	// A tag cannot be fixed. It was built once and is what somebody
 	// received, so an outcome that names a date is a statement about a thing
@@ -641,12 +642,12 @@ func (p Proposal) valid(now time.Time) error {
 	// applicable, will not fix, already fixed here — which is the whole point
 	// of triaging one.
 	if p.Place.OnTag && p.Outcome.Dated() {
-		return fmt.Errorf(
+		return refusal.Errorf(
 			"%q names a date, and this release was built once: it cannot change, so nothing "+
 				"can be promised about it. Say what is true of it instead", p.Outcome)
 	}
 	if strings.TrimSpace(p.Reasoning) == "" {
-		return errors.New("a decision needs reasoning, because somebody else has to agree with it")
+		return refusal.New("a decision needs reasoning, because somebody else has to agree with it")
 	}
 	// The same policy every other typed field goes through, run before the
 	// text is stored rather than when it is read back. Stored text is then
@@ -655,7 +656,7 @@ func (p Proposal) valid(now time.Time) error {
 		return err
 	}
 	if p.By == 0 {
-		return errors.New("a decision needs somebody to have made it")
+		return refusal.New("a decision needs somebody to have made it")
 	}
 	if err := keyable(p.Place); err != nil {
 		return err
@@ -664,10 +665,10 @@ func (p Proposal) valid(now time.Time) error {
 		return err
 	}
 	if p.Outcome == Deferred && p.DeferredUntil == nil {
-		return errors.New("a deferral needs a date it returns on, or it is a decision never to look again")
+		return refusal.New("a deferral needs a date it returns on, or it is a decision never to look again")
 	}
 	if p.Outcome != Deferred && p.DeferredUntil != nil {
-		return fmt.Errorf("%q does not return on a date", p.Outcome)
+		return refusal.Errorf("%q does not return on a date", p.Outcome)
 	}
 	// The version the fix arrived in is what makes this claim checkable
 	// against whoever packages it. Without it the claim is "trust me",
@@ -678,21 +679,21 @@ func (p Proposal) valid(now time.Time) error {
 	// ecosystem — Debian epochs, RPM release segments, and the ecosystems
 	// that follow neither — which is a different project entirely.
 	if p.Outcome == AlreadyFixed && strings.TrimSpace(p.FixedVersion) == "" {
-		return errors.New("a claim that the fix is already here needs the version it arrived in, so somebody can check it")
+		return refusal.New("a claim that the fix is already here needs the version it arrived in, so somebody can check it")
 	}
 	if p.Outcome != AlreadyFixed && strings.TrimSpace(p.FixedVersion) != "" {
-		return fmt.Errorf("%q does not claim a fix has arrived", p.Outcome)
+		return refusal.Errorf("%q does not claim a fix has arrived", p.Outcome)
 	}
 	// The two outcomes that promise work need the date the work lands .
 	// Without it there is nothing to gate against and nothing to lapse —
 	// the claim would be "we will deal with this", which is what leaving a
 	// finding undecided already says.
 	if p.Outcome.Commits() && p.CommittedTo == nil {
-		return fmt.Errorf("%q promises work and needs the date it will be done, "+
+		return refusal.Errorf("%q promises work and needs the date it will be done, "+
 			"or it says nothing a finding left alone does not", p.Outcome)
 	}
 	if !p.Outcome.Commits() && p.CommittedTo != nil {
-		return fmt.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
+		return refusal.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
 	}
 	// A date already past is not a date. Nothing here checked, and the two
 	// dates fail in opposite directions: a deferral until last year takes the
@@ -702,12 +703,12 @@ func (p Proposal) valid(now time.Time) error {
 	// gate asks whether the date is past the deadline the work has and a date
 	// in the past never is, so the promise stands on one signature.
 	if p.DeferredUntil != nil && !p.DeferredUntil.After(now) {
-		return fmt.Errorf(
+		return refusal.Errorf(
 			"a deferral returns on a date still to come: %s has passed",
 			p.DeferredUntil.Format(time.DateOnly))
 	}
 	if p.CommittedTo != nil && !p.CommittedTo.After(now) {
-		return fmt.Errorf(
+		return refusal.Errorf(
 			"promised work lands on a date still to come: %s has passed",
 			p.CommittedTo.Format(time.DateOnly))
 	}
@@ -715,10 +716,10 @@ func (p Proposal) valid(now time.Time) error {
 	// two: naming one here would record an upgrade under the outcome
 	// that exists for the case where there is not going to be one.
 	if p.Outcome != UpgradeNeeded && strings.TrimSpace(p.UpgradeTo) != "" {
-		return fmt.Errorf("%q moves no version", p.Outcome)
+		return refusal.Errorf("%q moves no version", p.Outcome)
 	}
 	if p.Outcome == UpgradeNeeded && strings.TrimSpace(p.UpgradeTo) == "" {
-		return errors.New("an upgrade needs the version it moves to")
+		return refusal.New("an upgrade needs the version it moves to")
 	}
 	return nil
 }
@@ -762,7 +763,7 @@ func keyable(at Place) error {
 	} {
 		// Counted in characters, which is what the columns hold.
 		if n := utf8.RuneCountInString(version(held)); n > versionLimit {
-			return fmt.Errorf(
+			return refusal.Errorf(
 				"the %s's upstream version is %d characters and a decision is keyed on at most "+
 					"%d, so this cannot be matched to a finding later — a version that long is "+
 					"usually a producer putting something else in the field",
@@ -823,7 +824,7 @@ func liveKeysFor(at Place) []string {
 // The answer is to revise that claim rather than to make a second one beside
 // it: two claims about one finding are a disagreement, and a disagreement
 // belongs in one place where both sides are readable.
-var ErrAlreadyDecided = errors.New("a decision already stands here")
+var ErrAlreadyDecided = refusal.New("a decision already stands here")
 
 // placesOf is the places a set of proposals is about, for a refusal that has
 // to name one of them.
@@ -874,7 +875,7 @@ func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) e
 // Its own error because it is not a refusal and not a fault in what was
 // written: whatever was selected has since been fixed, closed or renamed, and
 // what the caller should do about it is look again.
-var ErrNothingOpen = errors.New("nothing named here is open")
+var ErrNothingOpen = refusal.New("nothing named here is open")
 
 // orEmpty reads a stored version back as the string a place states. The
 // inverse of text, which is why neither is named for what it does to a value.

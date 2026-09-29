@@ -5,7 +5,6 @@ package triage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -47,7 +47,7 @@ func (s *Store) allowed(ctx context.Context, subject access.Subject, proposals [
 		return fmt.Errorf("read how many findings one action may write: %w", err)
 	}
 	if len(proposals) > cap {
-		return fmt.Errorf("that is %d findings and the limit here is %d: narrow it, "+
+		return refusal.Errorf("that is %d findings and the limit here is %d: narrow it, "+
 			"or raise the limit deliberately", len(proposals), cap)
 	}
 	return permitted(subject, proposals, s.now())
@@ -143,15 +143,15 @@ func (b Bounds) check(proposals []Proposal) error {
 func (b Bounds) counted(issues, places int, review bool) error {
 	b = b.orDefaults()
 	if places > b.Places {
-		return fmt.Errorf("that is %d findings and one action here writes at most %d: narrow "+
+		return refusal.Errorf("that is %d findings and one action here writes at most %d: narrow "+
 			"the selection, or raise the limit deliberately", places, b.Places)
 	}
 	if review && issues > b.Review {
-		return fmt.Errorf("that is %d issues and a second person is asked to read at most %d "+
+		return refusal.Errorf("that is %d issues and a second person is asked to read at most %d "+
 			"in one action: split it, or raise the limit deliberately", issues, b.Review)
 	}
 	if !review && issues > b.Agreed {
-		return fmt.Errorf("that is %d issues and one action here re-confirms at most %d: "+
+		return refusal.Errorf("that is %d issues and one action here re-confirms at most %d: "+
 			"split it, or raise the limit deliberately", issues, b.Agreed)
 	}
 	return nil
@@ -175,7 +175,7 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 			return err
 		}
 		if p.By != subject.ID {
-			return fmt.Errorf("a decision is recorded as made by whoever made it")
+			return refusal.Errorf("a decision is recorded as made by whoever made it")
 		}
 	}
 	return nil
@@ -257,10 +257,10 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 	p Proposal, bounds Bounds) (claimID int64, recorded []int64, skipped []Skipped, err error) {
 
 	if len(at.VulnerabilityIDs) == 0 {
-		return 0, nil, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
+		return 0, nil, nil, refusal.Errorf("nothing was selected, so there is nothing to claim")
 	}
 	if p.By != subject.ID {
-		return 0, nil, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
+		return 0, nil, nil, refusal.Errorf("a decision is recorded as made by whoever made it")
 	}
 
 	// attempted is what the write was about, kept so a refusal can be read
@@ -366,7 +366,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 
 // ErrAllDecided says a bulk judgment asked to skip what is decided found
 // nothing else to claim.
-var ErrAllDecided = errors.New("a live decision already covers every place selected")
+var ErrAllDecided = refusal.New("a live decision already covers every place selected")
 
 // leavingDecided splits the places into those nothing stands at and those a
 // live decision covers, naming the decision.

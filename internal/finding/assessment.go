@@ -6,7 +6,6 @@ package finding
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Assessment is what one product thinks of an issue, as against what was
@@ -75,12 +75,12 @@ const (
 
 // ErrAlreadyAssessed is returned where a claim already stands about an issue
 // in this product. Another product's claim is not in the way of one.
-var ErrAlreadyAssessed = errors.New("this issue is already assessed in this product")
+var ErrAlreadyAssessed = refusal.New("this issue is already assessed in this product")
 
 // ErrNoSuchAssessment is returned where a claim is missing or is about an
 // issue this subject may not be told about. One error for both, because
 // telling them apart is what turns a claim identifier into a directory.
-var ErrNoSuchAssessment = errors.New("no assessment is recorded there")
+var ErrNoSuchAssessment = refusal.New("no assessment is recorded there")
 
 // Assess records what one product thinks of an issue.
 //
@@ -102,7 +102,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64, severity, reasoning string) (*Assessment, error) {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return nil, errors.New("an assessment is recorded as made by whoever made it")
+		return nil, refusal.New("an assessment is recorded as made by whoever made it")
 	}
 	// Triage on this product, rather than triage somewhere. Asked before
 	// anything in the request is resolved, so a product somebody holds
@@ -112,11 +112,11 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 	}
 	severity = strings.TrimSpace(strings.ToLower(severity))
 	if Band(severity) != severity || severity == "" {
-		return nil, fmt.Errorf("%q is not a rating — write one of %s",
+		return nil, refusal.Errorf("%q is not a rating — write one of %s",
 			severity, strings.Join(ranked, ", "))
 	}
 	if strings.TrimSpace(reasoning) == "" {
-		return nil, errors.New(
+		return nil, refusal.New(
 			"say why. An assessment outlives the version it was made about and reaches " +
 				"every build of this product, so the next person needs the argument")
 	}
@@ -221,7 +221,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 // deadlines and its triage line, and a role held elsewhere buys nothing here.
 func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return nil, errors.New("agreeing is something a person does")
+		return nil, refusal.New("agreeing is something a person does")
 	}
 	// Asked before the identifier is resolved, so somebody holding nothing
 	// anywhere cannot walk claim identifiers. The narrower question — the
@@ -253,10 +253,10 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 			return ErrNoSuchAssessment
 		}
 		if claim.State != AssessmentProposed {
-			return fmt.Errorf("this claim is %s rather than waiting", claim.State)
+			return refusal.Errorf("this claim is %s rather than waiting", claim.State)
 		}
 		if claim.ProposedBy == subject.ID {
-			return errors.New(
+			return refusal.New(
 				"somebody else has to agree — a control one person completes alone is not one")
 		}
 		now := s.now().UTC().Truncate(time.Microsecond)
@@ -291,7 +291,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 // reading it follows.
 func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return nil, errors.New("withdrawing is something a person does")
+		return nil, refusal.New("withdrawing is something a person does")
 	}
 	// Before the identifier is resolved, for the reason Agree gives.
 	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {

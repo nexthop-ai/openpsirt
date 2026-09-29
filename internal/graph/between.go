@@ -5,20 +5,20 @@ package graph
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrNoInventory says a build has never had an inventory read for it.
 //
 // Compared against one, every name the other build holds would read as added
 // or removed, which is a claim about two builds made from one of them.
-var ErrNoInventory = errors.New("no inventory has been read for that build")
+var ErrNoInventory = refusal.New("no inventory has been read for that build")
 
 // Between is every name two builds' inventories differ on, as each stands now.
 //

@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrSamePerson says work was handed from somebody to themselves.
@@ -22,12 +22,12 @@ import (
 // rather than about what went wrong. Everything else this returns is a
 // database that could not answer, and reporting those to a caller as though
 // they were its fault is how a driver's error text ends up on a screen.
-var ErrSamePerson = errors.New("that would hand their work to themselves")
+var ErrSamePerson = refusal.New("that would hand their work to themselves")
 
 // ErrRecipientMayNotRead says work was handed to somebody not cleared to read
 // all of it: some of it is undisclosed in a product where they may read only
 // what has been disclosed. The hand-over would be the disclosure.
-var ErrRecipientMayNotRead = errors.New("some of this has not been disclosed and they may " +
+var ErrRecipientMayNotRead = refusal.New("some of this has not been disclosed and they may " +
 	"not read undisclosed work there, so handing it to them would be the disclosure")
 
 // moveWork is the write itself, apart from the answering: which rows move, and

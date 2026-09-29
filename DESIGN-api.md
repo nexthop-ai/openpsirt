@@ -142,18 +142,28 @@ the line and the offending text. This is an API shape decision rather than a
 presentation one: an interface can only point at the problem if the answer says
 where it is.
 
-A store's own sentence and a failed query are distinguished by the engine's
-error types, asked in one place, rather than by the message text. Answered
-alike as a 422 with the message in it, a broken database reaches the caller as
-a bad request carrying the statement text and, for a connection failure, the
-address and user it tried. A connection that could not be made or was cut
-short is read from the network's and each driver's own error for it. The
-document parser states a file ending inside a value in its own words, because
-the error it would otherwise return is the one a driver returns for a
-connection cut short, and a truncated upload is the sender's to fix. Every
-mapper from a store's error to an answer asks this before publishing a
-message, and a failed upload's receipt carries a fixed sentence in place of
-one. Where the type cannot decide, the error is treated as a refusal.
+A message is published only when it is a refusal. Every sentence a store, the
+catalog or the document parser writes for a caller is typed as one, and a
+sentinel matched by identity stays matched through it. An error type carrying
+fields a caller reads — a fault in a piece of writing, a name reaching more than
+one component, the references a ruling could not find, a reason left out —
+declares itself one. Everything else is a fault: logged with its cause and
+answered 500 in fixed words.
+
+| Error | Answer |
+|---|---|
+| A refusal, alone or wrapped in a caller's context | Its own sentence, at the status its mapper gives |
+| A sentinel a mapper has an arm for | That arm's answer |
+| A lost race or a failed query, told apart by the engine's error types | 500 in fixed words, with the cause carried to the retry helper |
+| Anything else, including a connection failure and an object store's answer | 500 in fixed words |
+
+A connection that could not be made or was cut short is read from the
+network's and each driver's own error for it. The document parser states a
+file ending inside a value in its own words, because the error it would
+otherwise return is the one a driver returns for a connection cut short, and a
+truncated upload is the sender's to fix. A failed upload's receipt carries the
+refusal's sentence where its cause is a refusal, and a fixed sentence
+otherwise, including where the job reading it died before it could say why.
 
 A 404 is never built from an error's own text. It asserts that a name reaches
 nothing, and the body then publishes whatever the error carried — for a store

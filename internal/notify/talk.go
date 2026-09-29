@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ChatDelivery is what has gone to one person directly on one platform.
@@ -477,7 +478,7 @@ func (s *Store) SetChatChoices(ctx context.Context, subject access.Subject, c Ch
 	// What a channel carries, sent directly, with direct messages off, is a
 	// setting that changes nothing.
 	if c.Shared && !c.Direct {
-		return errors.New("what a channel carries is sent as a direct message: " +
+		return refusal.New("what a channel carries is sent as a direct message: " +
 			"turn direct messages on to have it")
 	}
 	now := s.now().Truncate(time.Microsecond)

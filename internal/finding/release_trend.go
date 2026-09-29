@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ReleasePoint is one frozen point on a trend that follows releases.
@@ -42,7 +42,7 @@ type ReleasePoint struct {
 //
 // Its own answer rather than an empty list, because an empty list is what a
 // product with no releases looks like and the two are not the same statement.
-var ErrNoProductNamed = errors.New("release over release is a question about one product")
+var ErrNoProductNamed = refusal.New("release over release is a question about one product")
 
 // ReleaseTrend reports what is open against each tagged release of a product.
 //

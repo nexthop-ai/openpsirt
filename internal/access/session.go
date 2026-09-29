@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Session is somebody's signed-in state.
@@ -81,7 +82,7 @@ func (s *Store) StartSession(ctx context.Context, personID int64, lifetime time.
 	// Refused rather than quietly clamped, so an administrator who asked for a
 	// year is told the limit instead of discovering it at the next sign-in.
 	if lifetime > MaxSessionLifetime {
-		return nil, fmt.Errorf("a sign-in may last at most %s, and this asks for %s",
+		return nil, refusal.Errorf("a sign-in may last at most %s, and this asks for %s",
 			MaxSessionLifetime, lifetime)
 	}
 	token, err := secret()

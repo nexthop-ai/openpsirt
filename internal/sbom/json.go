@@ -6,12 +6,13 @@ package sbom
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // errTooLarge is returned when a document runs past the size it is allowed.
-var errTooLarge = errors.New("document is larger than the configured limit")
+var errTooLarge = refusal.New("document is larger than the configured limit")
 
 // capped stops a reader at a byte count.
 //
@@ -67,7 +68,7 @@ func newBounded(r io.Reader, maxDepth int) *bounded {
 func (b *bounded) token() (json.Token, error) {
 	tok, err := b.dec.Token()
 	if errors.Is(err, io.ErrUnexpectedEOF) {
-		return nil, errors.New("the document ends partway through a value")
+		return nil, refusal.New("the document ends partway through a value")
 	}
 	return tok, err
 }
@@ -75,7 +76,7 @@ func (b *bounded) token() (json.Token, error) {
 func (b *bounded) enter() error {
 	b.depth++
 	if b.depth > b.maxDepth {
-		return fmt.Errorf("document nests deeper than the %d level limit", b.maxDepth)
+		return refusal.Errorf("document nests deeper than the %d level limit", b.maxDepth)
 	}
 	return nil
 }
@@ -96,7 +97,7 @@ func (b *bounded) object(fn func(key string) error) error {
 		}
 		key, ok := tok.(string)
 		if !ok {
-			return fmt.Errorf("object key is %v, not a string", tok)
+			return refusal.Errorf("object key is %v, not a string", tok)
 		}
 		if err := fn(key); err != nil {
 			return err
@@ -126,7 +127,7 @@ func (b *bounded) open(want json.Delim) error {
 		return err
 	}
 	if tok != want {
-		return fmt.Errorf("want %v, got %v", want, tok)
+		return refusal.Errorf("want %v, got %v", want, tok)
 	}
 	return b.enter()
 }
@@ -150,7 +151,7 @@ func (b *bounded) str() (string, error) {
 	case nil:
 		return "", nil
 	default:
-		return "", fmt.Errorf("want a string, got %v", v)
+		return "", refusal.Errorf("want a string, got %v", v)
 	}
 }
 
@@ -172,10 +173,10 @@ func (b *bounded) stringOrObject(fn func(key string) error) (string, error) {
 		return "", nil
 	case json.Delim:
 		if v != '{' {
-			return "", fmt.Errorf("want a string or an object, got %v", v)
+			return "", refusal.Errorf("want a string or an object, got %v", v)
 		}
 	default:
-		return "", fmt.Errorf("want a string or an object, got %v", v)
+		return "", refusal.Errorf("want a string or an object, got %v", v)
 	}
 	if err := b.enter(); err != nil {
 		return "", err
@@ -188,7 +189,7 @@ func (b *bounded) stringOrObject(fn func(key string) error) (string, error) {
 		}
 		name, ok := key.(string)
 		if !ok {
-			return "", fmt.Errorf("object key is %v, not a string", key)
+			return "", refusal.Errorf("object key is %v, not a string", key)
 		}
 		if err := fn(name); err != nil {
 			return "", err
@@ -264,10 +265,10 @@ func (b *bounded) each(fn func(string) error) error {
 			return b.close()
 		}
 		if v != '[' {
-			return fmt.Errorf("want a string or an array, got %v", v)
+			return refusal.Errorf("want a string or an array, got %v", v)
 		}
 	default:
-		return fmt.Errorf("want a string or an array, got %v", v)
+		return refusal.Errorf("want a string or an array, got %v", v)
 	}
 	if err := b.enter(); err != nil {
 		return err

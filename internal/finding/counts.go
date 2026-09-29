@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Level is what a count of what is open is grouped by.
@@ -54,7 +55,7 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 	level Level) (map[int64]int, error) {
 	column, ok := level.column()
 	if !ok {
-		return nil, fmt.Errorf("no such grouping")
+		return nil, refusal.Errorf("no such grouping")
 	}
 	products, all := subject.Products()
 	if subject.Kind != access.Person || (!all && len(products) == 0) {

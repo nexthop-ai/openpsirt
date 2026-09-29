@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The page a person reads.
@@ -269,7 +270,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 		// Every list here correlates a decision by product and a place
 		// identity carries none, so a selection without one would reach
 		// decisions made in every product in the deployment.
-		return 0, nil, nil, fmt.Errorf("read findings: the selection names no product")
+		return 0, nil, nil, refusal.Errorf("read findings: the selection names no product")
 	}
 	productID := *scope.ProductID
 	visible, err := access.Readable(subject, productID)
@@ -310,7 +311,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	case len(targets) == 1:
 		filter.TargetID = targets[0]
 	case filter.Beneath != nil:
-		return 0, nil, nil, fmt.Errorf("read findings beneath a component: a subtree is a walk"+
+		return 0, nil, nil, refusal.Errorf("read findings beneath a component: a subtree is a walk"+
 			" over one build's edges, and %d builds are in scope", len(targets))
 	}
 	return productID, visible, targets, nil

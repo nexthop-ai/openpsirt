@@ -280,7 +280,7 @@ type HeldBody struct {
 
 // KeyBody is a pipeline credential, without its secret.
 type KeyBody struct {
-	Name    string `json:"name" minLength:"1" maxLength:"191" doc:"The credential's purpose"`
+	Name    string `json:"name" minLength:"1" maxLength:"191" doc:"The credential's purpose, stored in lower case and matched without regard to capitals"`
 	Product string `json:"product" minLength:"1" doc:"The product it may send scans for, by the name that addresses it. Always required"`
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: this field is what create-key resolves, and a display

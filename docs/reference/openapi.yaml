@@ -1471,18 +1471,19 @@ components:
         about:
           type: string
         actor:
-          description: "What made the change: a person in the application, the deployment's startup configuration, which names administrators, or a scan merging two issues its report named together"
+          description: "What made the change: a person in the application, the deployment's startup configuration, which names administrators, a scan merging two issues its report named together, or an upgrade, which withdraws a key or a token whose name another holds"
           enum:
             - person
             - configuration
             - merge
+            - upgrade
           type: string
         at:
           type: string
         became:
           type: string
         by:
-          description: The person who made the change, by sign-in identity. Absent where configuration made it
+          description: The person who made the change, by sign-in identity. Absent where no person made it
           type: string
         by_name:
           description: Their display name, where it differs from their identity
@@ -4656,7 +4657,7 @@ components:
           description: The last time it sent something
           type: string
         name:
-          description: The credential's purpose
+          description: The credential's purpose, stored in lower case and matched without regard to capitals
           maxLength: 191
           minLength: 1
           type: string
@@ -10288,7 +10289,7 @@ components:
           description: The lifetime, such as "720h". There is a configured maximum
           type: string
         name:
-          description: The owner's name for it
+          description: The owner's name for it, stored in lower case and matched without regard to capitals
           maxLength: 191
           minLength: 1
           type: string

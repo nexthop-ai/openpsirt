@@ -563,6 +563,11 @@ stops meaning anything at all.
 Both are read into one shape with the origin recorded, because the second can
 point at something that cannot be resolved and the first cannot.
 
+A claim keeps the name of what it is about as the producer spelled it, which is
+what a screen shows, and beside it the name folded. A name somebody types to
+narrow what a build carries is folded the same way and compared exactly, so it
+matches in any capitals on every engine, a capital outside ASCII included.
+
 The vocabulary is kept rather than translated. A build saying "we carry the fix"
 and one saying "the vulnerable code is never reached" make different claims. Two
 of the four statuses remove a finding from what somebody has to look at; the
@@ -769,7 +774,7 @@ done, or refused with the reason. A key sees the uploads it sent itself
 |---|---|
 | A sender is recorded as a key or a person, and its identifier | A key's name is unique among keys and a person's identity among people, so one name can be both. Recorded as a name, a key named like a person reads that person's uploads back as its own |
 | Which sender a key is narrowed to is decided in the store, from the subject | A narrowing a handler passes in is one the next handler forgets, and a pipeline sees its whole product, so the product check alone does not stop it |
-| A read whose job died is failed on the receipt | The job's last error is the reason, and a fixed sentence where it recorded none. The scan row is not always marked: marking it can be what failed |
+| A read whose job died is failed on the receipt, in fixed words | The scan row is not always marked: marking it can be what failed. The job's last error is whatever failed, a dropped connection's address included, and a refusal reaches the receipt through the scan row |
 
 The four states are this deployment's, not the queue's. Reading and scanning are
 two jobs with different rhythms, and a producer has no business knowing which

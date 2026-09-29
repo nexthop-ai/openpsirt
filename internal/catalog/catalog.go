@@ -23,6 +23,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Kind distinguishes a moving line of development from a frozen point.
@@ -42,10 +43,10 @@ func (k Kind) Valid() bool { return k == Branch || k == Tag }
 func Kinds() []Kind { return []Kind{Branch, Tag} }
 
 // ErrNotFound is returned when something named has not been declared.
-var ErrNotFound = errors.New("not declared")
+var ErrNotFound = refusal.New("not declared")
 
 // ErrExists is returned when a declaration would duplicate one already made.
-var ErrExists = errors.New("already declared")
+var ErrExists = refusal.New("already declared")
 
 // missingOr says which of the two a failed read was: a row that is not there,
 // or a read that could not be made.
@@ -163,11 +164,11 @@ func validName(what, name string) error {
 	trimmed := strings.TrimSpace(name)
 	switch {
 	case trimmed == "":
-		return fmt.Errorf("%s name is empty", what)
+		return refusal.Errorf("%s name is empty", what)
 	case trimmed != name:
-		return fmt.Errorf("%s name %q has leading or trailing spaces", what, name)
+		return refusal.Errorf("%s name %q has leading or trailing spaces", what, name)
 	case utf8.RuneCountInString(name) > maxNameLength:
-		return fmt.Errorf("%s name is %d characters; the limit is %d",
+		return refusal.Errorf("%s name is %d characters; the limit is %d",
 			what, utf8.RuneCountInString(name), maxNameLength)
 	}
 	// A name travels into places that are not this database: a path, a header,
@@ -178,7 +179,7 @@ func validName(what, name string) error {
 	// as well, because a name declared before this check is still in here.
 	for _, r := range name {
 		if r < 0x20 || r == 0x7f || r == '"' || r == '\\' {
-			return fmt.Errorf("%s name %q contains a character that cannot travel "+
+			return refusal.Errorf("%s name %q contains a character that cannot travel "+
 				"in a path or a header", what, name)
 		}
 	}
@@ -350,10 +351,10 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool,
 // is never recorded by the first.
 func (s *Store) validParent(ctx context.Context, childKind Kind, childID, productID, parent int64) error {
 	if childKind != Tag {
-		return fmt.Errorf("only a tag is cut from a branch, and this is a %s", childKind)
+		return refusal.Errorf("only a tag is cut from a branch, and this is a %s", childKind)
 	}
 	if parent == childID {
-		return fmt.Errorf("a release cannot be cut from itself")
+		return refusal.Errorf("a release cannot be cut from itself")
 	}
 	var from Stream
 	if err := s.db.NewSelect().Model(&from).Column("kind", "product_id").
@@ -362,10 +363,10 @@ func (s *Store) validParent(ctx context.Context, childKind Kind, childID, produc
 			fmt.Sprintf("look up what release %d is", parent))
 	}
 	if from.Kind != Branch {
-		return fmt.Errorf("a release is cut from a branch, and that is a %s", from.Kind)
+		return refusal.Errorf("a release is cut from a branch, and that is a %s", from.Kind)
 	}
 	if from.ProductID != productID {
-		return fmt.Errorf("a release is cut from a branch of its own product")
+		return refusal.Errorf("a release is cut from a branch of its own product")
 	}
 	return nil
 }
@@ -677,7 +678,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 		return nil, err
 	}
 	if !kind.Valid() {
-		return nil, fmt.Errorf("stream kind %q: want %q or %q", kind, Branch, Tag)
+		return nil, refusal.Errorf("stream kind %q: want %q or %q", kind, Branch, Tag)
 	}
 	if _, err := s.StreamByName(ctx, productID, name); err == nil {
 		return nil, fmt.Errorf("stream %q: %w", name, ErrExists)

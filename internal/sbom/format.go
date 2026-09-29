@@ -4,10 +4,11 @@
 package sbom
 
 import (
-	"fmt"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // vocabulary is one format's reading of a document's top-level keys.
@@ -102,7 +103,7 @@ func (c *reader) read() error {
 		return c.b.skip()
 	})
 	if err != nil {
-		return fmt.Errorf("reading scan file: %w", err)
+		return refusal.Errorf("reading scan file: %w", err)
 	}
 	if err := c.checkFormat(); err != nil {
 		return err
@@ -112,7 +113,7 @@ func (c *reader) read() error {
 	// nor can a fault in it be reported where the other two report theirs.
 	c.spdx3Settle()
 	if c.settleErr != nil {
-		return fmt.Errorf("reading scan file: %w", c.settleErr)
+		return refusal.Errorf("reading scan file: %w", c.settleErr)
 	}
 	return nil
 }
@@ -135,11 +136,11 @@ func (c *reader) checkFormat() error {
 				named = append(named, v.name)
 			}
 		}
-		return fmt.Errorf("scan file states both %s, so which format it is cannot be settled",
+		return refusal.Errorf("scan file states both %s, so which format it is cannot be settled",
 			strings.Join(named, " and "))
 	}
 	if c.declared == "" {
-		return fmt.Errorf("scan file does not say what format it is: it is neither %s nor %s",
+		return refusal.Errorf("scan file does not say what format it is: it is neither %s nor %s",
 			CycloneDX, SPDX)
 	}
 	// Half a declaration is not a declaration. Either key alone leaves the
@@ -152,7 +153,7 @@ func (c *reader) checkFormat() error {
 		if !c.named {
 			missing = "bomFormat"
 		}
-		return fmt.Errorf("scan file states only half of what %s is: %s is missing",
+		return refusal.Errorf("scan file states only half of what %s is: %s is missing",
 			CycloneDX, missing)
 	}
 	c.doc.Format = c.declared
@@ -183,7 +184,7 @@ func buildTime(raw string) (time.Time, error) {
 	}
 	built, err := time.Parse(time.RFC3339, raw)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("build time %q is not a time: %w", trim(raw), err)
+		return time.Time{}, refusal.Errorf("build time %q is not a time: %w", trim(raw), err)
 	}
 	return built.UTC(), nil
 }

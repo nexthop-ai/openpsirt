@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
@@ -99,11 +100,11 @@ var travels = map[string]bool{"WHITE": true, "CLEAR": true}
 func Reachable(address string) error {
 	parsed, err := url.Parse(strings.TrimSpace(address))
 	if err == nil && parsed.User != nil {
-		return fmt.Errorf("an address here carries no name or password in it: a " +
+		return refusal.Errorf("an address here carries no name or password in it: a " +
 			"publisher's directory is what they publish to everybody")
 	}
 	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
-		return fmt.Errorf("a supplier is an https address: what comes back is read as " +
+		return refusal.Errorf("a supplier is an https address: what comes back is read as " +
 			"a publisher's own judgment, and over anything else it is read as whoever " +
 			"is between us and them")
 	}
@@ -217,7 +218,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		return took, err
 	}
 	if len(listed) == 0 {
-		return took, fmt.Errorf("that publisher's directory names nothing to read: it " +
+		return took, refusal.Errorf("that publisher's directory names nothing to read: it " +
 			"describes neither a feed of advisories nor a directory of them")
 	}
 
@@ -359,7 +360,7 @@ func (f *Fetcher) listings(ctx context.Context, client *http.Client,
 		}
 	}
 	if len(out) > MostFeeds {
-		return nil, fmt.Errorf("that publisher lists %d places to read from, past the %d "+
+		return nil, refusal.Errorf("that publisher lists %d places to read from, past the %d "+
 			"this reads", len(out), MostFeeds)
 	}
 	return out, nil
@@ -616,7 +617,7 @@ func documentIn(one feedEntry) string {
 }
 
 // errWithdrawn says the supplier stopped being configured while a pass ran.
-var errWithdrawn = errors.New("that supplier is no longer read from")
+var errWithdrawn = refusal.New("that supplier is no longer read from")
 
 // document reads one advisory and records what it says about a component this
 // product ships, answering how many claims it left and whether a digest the
@@ -829,7 +830,7 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 // errMismatched says a document did not match the digest its publisher serves
 // beside it. Stepped over like any unreadable document, and counted apart so a
 // publisher whose digests keep disagreeing is said to be one.
-var errMismatched = unreadable{errors.New(
+var errMismatched = unreadable{refusal.New(
 	"that document does not match the digest its publisher serves beside it")}
 
 // stated is the digest a digest file holds, and whether it holds one.
@@ -881,11 +882,11 @@ func recording(document []byte, kept []finding.Statement) string {
 // of one would set aside claims it has nothing to do with.
 func shaped(advisory sbom.Advisory) error {
 	if len([]rune(advisory.Publisher)) > finding.MostPublisher {
-		return fmt.Errorf("who published it is longer than the %d characters this records",
+		return refusal.Errorf("who published it is longer than the %d characters this records",
 			finding.MostPublisher)
 	}
 	if len([]rune(advisory.Identifier)) > finding.MostDocumentName {
-		return fmt.Errorf("the name the publisher gave it is longer than the %d "+
+		return refusal.Errorf("the name the publisher gave it is longer than the %d "+
 			"characters this records", finding.MostDocumentName)
 	}
 	return nil
@@ -970,7 +971,7 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 		// publisher's listing still naming a withdrawn advisory is the
 		// ordinary case, and a server having a bad day answers 5xx, which is
 		// about reaching them.
-		answered := fmt.Errorf("that publisher answered %s", res.Status)
+		answered := refusal.Errorf("that publisher answered %s", res.Status)
 		if res.StatusCode >= 400 && res.StatusCode < 500 {
 			return nil, unreadable{answered}
 		}
@@ -981,7 +982,7 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 		return nil, err
 	}
 	if int64(len(body)) > most {
-		return nil, unreadable{fmt.Errorf(
+		return nil, unreadable{refusal.Errorf(
 			"that document is larger than the %d bytes this reads", most)}
 	}
 	return body, nil

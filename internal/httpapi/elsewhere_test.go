@@ -6,6 +6,7 @@ package httpapi_test
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -39,5 +40,21 @@ func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
 		refusedWith(t, asPerson(t, r, "reader", http.MethodPut,
 			fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
 			`{"elsewhere":"https://elsewhere.example/1"}`), http.StatusNotFound)
+
+		// An address nobody should be handed as a link is refused in words
+		// naming it, and is not a fault here.
+		for _, address := range []string{"ms-msdt:calc", "//evil.example/x"} {
+			got := asPerson(t, r, "triager", http.MethodPut,
+				fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
+				fmt.Sprintf(`{"elsewhere":%q}`, address))
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("pointing the claim at %s answered %d: %s", address, got.Code, got.Body.String())
+			}
+		}
+		if got := asPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
+			`{"elsewhere":"ms-msdt:calc"}`); !strings.Contains(got.Body.String(), "ms-msdt") {
+			t.Errorf("the refusal does not name the scheme: %s", got.Body.String())
+		}
 	})
 }

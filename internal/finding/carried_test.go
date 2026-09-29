@@ -110,3 +110,31 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 		}
 	})
 }
+
+// A package name typed to narrow what a build carries is matched without
+// regard to capitals on every engine, including a capital outside ASCII,
+// which SQLite's own LOWER leaves alone.
+func TestWhatABuildCarriesIsNarrowedByANameInAnyCapitals(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		eclair := at("Éclair-Lib", "1.0")
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+			[]sbom.Suppression{
+				aClaim("CVE-2026-1", sbom.AlreadyFixed, eclair, sbom.FromPedigree),
+				aClaim("CVE-2026-2", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
+			}, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		for _, typed := range []string{"Éclair-Lib", "éclair-lib", " ÉCLAIR-LIB "} {
+			got, total, err := f.store.CarriedPatches(t.Context(), who, f.target, typed, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != 1 || len(got) != 1 || got[0].Subject != "Éclair-Lib" {
+				t.Errorf("narrowing to %q found %+v of %d, want the one claim in the producer's spelling",
+					typed, got, total)
+			}
+		}
+	})
+}

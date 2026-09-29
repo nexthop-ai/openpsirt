@@ -500,6 +500,13 @@ function Administered() {
                     >
                       merge
                     </span>
+                  ) : row.actor === "upgrade" ? (
+                    <span
+                      className="hint"
+                      title="The upgrade, withdrawing a key or token whose name another holds"
+                    >
+                      upgrade
+                    </span>
                   ) : (
                     row.by_name || row.by
                   )}

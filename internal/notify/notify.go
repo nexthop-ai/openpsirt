@@ -15,7 +15,6 @@ package notify
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Lifetime is how long a notification is worth showing.
@@ -381,10 +381,10 @@ type Telling struct {
 // the one the person has not seen.
 func (s *Store) Tell(ctx context.Context, t Telling) error {
 	if t.PersonID == 0 || t.Kind == "" || t.Body == "" {
-		return errors.New("a notification needs somebody, a kind and something to say")
+		return refusal.New("a notification needs somebody, a kind and something to say")
 	}
 	if t.About != "" {
-		return fmt.Errorf("%s: an event is about a moment rather than a state, "+
+		return refusal.Errorf("%s: an event is about a moment rather than a state, "+
 			"so it takes no subject to clear against", t.Kind)
 	}
 	if err := attributable(t.Kind, t.Private, t.ProductID); err != nil {
@@ -437,7 +437,7 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 	holding []Holds) (opened, cleared int, err error) {
 
 	if personID == 0 || kind == "" {
-		return 0, 0, errors.New("a condition needs somebody and a kind")
+		return 0, 0, refusal.New("a condition needs somebody and a kind")
 	}
 	for _, h := range holding {
 		if err := attributable(kind, h.Private, h.ProductID); err != nil {
@@ -447,7 +447,7 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 	wanted := make(map[string]Holds, len(holding))
 	for _, h := range holding {
 		if h.About == "" {
-			return 0, 0, fmt.Errorf("%s: a condition has to say what it is about", kind)
+			return 0, 0, refusal.Errorf("%s: a condition has to say what it is about", kind)
 		}
 		wanted[h.About] = h
 	}
@@ -581,7 +581,7 @@ func sameID(a, b *int64) bool {
 // disappearance, where it is read.
 func attributable(kind Kind, private bool, productID *int64) error {
 	if private && (productID == nil || *productID == 0) {
-		return fmt.Errorf("%s: a notification about something undisclosed says "+
+		return refusal.Errorf("%s: a notification about something undisclosed says "+
 			"which product it is about, because that is what its readers are "+
 			"narrowed by", kind)
 	}

@@ -318,6 +318,10 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 		if _, _, err := f.store.NewKey(ctx, "nightly", access.Scope{ProductID: f.products["onie"]}); err == nil {
 			t.Error("two keys were given one name")
 		}
+		// A name an administrator types is one name in any capitals.
+		if _, _, err := f.store.NewKey(ctx, " Nightly ", access.Scope{ProductID: f.products["onie"]}); err == nil {
+			t.Error("two keys were given one name in different capitals")
+		}
 
 		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
 		if err != nil {
@@ -328,6 +332,64 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 		}
 		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0); err == nil {
 			t.Error("one person was given two tokens with one name")
+		}
+	})
+}
+
+// A token's name is stored folded and found in any capitals, and its owner may
+// not hold two that fold alike. Another person may hold the same name.
+func TestATokenNameIsStoredFoldedAndUniqueToItsOwner(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, err := f.store.Ensure(ctx, "someone-else", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		token, _, err := f.store.NewToken(ctx, person.ID, "  Laptop ", nil, nil, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if token.Name != "laptop" {
+			t.Errorf("the token is named %q, want it folded", token.Name)
+		}
+		if _, _, err := f.store.NewToken(ctx, person.ID, "LAPTOP", nil, nil, time.Hour, 0); !errors.Is(err, access.ErrTokenNamed) {
+			t.Errorf("a second token in other capitals answered %v", err)
+		}
+		if _, _, err := f.store.NewToken(ctx, other.ID, "Laptop", nil, nil, time.Hour, 0); err != nil {
+			t.Errorf("another person could not use the name: %v", err)
+		}
+		found, err := f.store.TokenByName(ctx, person.ID, "LapTop")
+		if err != nil || found.ID != token.ID {
+			t.Errorf("looking it up in other capitals found %+v (%v)", found, err)
+		}
+	})
+}
+
+// A key's name is stored folded, the way a username is, and a name that is
+// only spaces names nothing.
+func TestAKeyNameIsStoredFolded(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		key, _, err := f.store.NewKey(ctx, "  Release-CI ", access.Scope{ProductID: f.products["sonic"]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if key.Name != "release-ci" {
+			t.Errorf("the key is named %q, want it folded", key.Name)
+		}
+		keys, err := f.store.Keys(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(keys) != 1 || keys[0].Name != "release-ci" {
+			t.Errorf("the keys read back as %+v", keys)
+		}
+		if _, _, err := f.store.NewKey(ctx, "   ", access.Scope{ProductID: f.products["sonic"]}); !errors.Is(err, access.ErrNoKeyName) {
+			t.Errorf("a name of spaces answered %v", err)
 		}
 	})
 }

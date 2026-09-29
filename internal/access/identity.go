@@ -5,7 +5,6 @@ package access
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Identity is how a person signs in.
@@ -86,7 +86,7 @@ func (s *Store) ClaimingWithin(window time.Duration) *Store {
 }
 
 // ErrNameTaken says a username is already another person's way in.
-var ErrNameTaken = errors.New("already somebody else here")
+var ErrNameTaken = refusal.New("already somebody else here")
 
 // Claim authorizes somebody to sign in, before any provider has been asked
 // about them.
@@ -98,7 +98,7 @@ var ErrNameTaken = errors.New("already somebody else here")
 func (s *Store) Claim(ctx context.Context, personID int64, username string) error {
 	username = folded(username)
 	if username == "" {
-		return fmt.Errorf("a way to sign in needs a username")
+		return refusal.Errorf("a way to sign in needs a username")
 	}
 
 	at := s.now().Truncate(time.Microsecond)

@@ -6,10 +6,11 @@
 package cvss
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrNotAVector is what an unusable vector answers with.
@@ -18,7 +19,7 @@ import (
 // wrong here, and the difference has to survive the trip up to the handler: a
 // vector from a scheme this does not implement answered with "something went
 // wrong" tells somebody to report a fault instead of to fix their input.
-var ErrNotAVector = errors.New("that is not a vector this can score")
+var ErrNotAVector = refusal.New("that is not a vector this can score")
 
 // A severity as a vector and the number derived from it.
 //

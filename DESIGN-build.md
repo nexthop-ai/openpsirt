@@ -66,6 +66,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes or characters without splitting a character |
+| `internal/refusal/` | A sentence a caller may read, told apart from a fault whose text is withheld. See `DESIGN-api.md` |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
 | `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `DESIGN-remediation.md` |
 | `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the commands the makefile runs: the gates that are not linters, and the release, rehearsal and image-inventory tools |

@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -108,7 +109,7 @@ type Entering struct {
 // ErrToldTwice is a flaw recorded from a report that also says who told us.
 // The report already says it, and two answers would leave nothing saying
 // which is the record.
-var ErrToldTwice = errors.New("a flaw recorded from a report takes who told us from the report")
+var ErrToldTwice = refusal.New("a flaw recorded from a report takes who told us from the report")
 
 // rated is the severity words somebody may record. The same set a report may
 // carry, so that a finding a person entered ranks and expires beside the ones a
@@ -122,21 +123,21 @@ var rated = func() map[string]bool {
 }()
 
 // ErrNoSuchComponent says the build holds nothing by that name.
-var ErrNoSuchComponent = errors.New("this build holds nothing by that name")
+var ErrNoSuchComponent = refusal.New("this build holds nothing by that name")
 
 // ErrNothingSaid says a recorded finding arrived without a summary.
 //
 // A sentinel because it is the caller's to fix. Whitespace passes a minimum
 // length and is not a summary, so this is reachable from a request rather than
 // only from a caller inside this process.
-var ErrNothingSaid = errors.New("a recorded finding has to say what the flaw is")
+var ErrNothingSaid = refusal.New("a recorded finding has to say what the flaw is")
 
 // MostWeaknesses is how many weaknesses one recorded flaw states.
 const MostWeaknesses = 16
 
 // ErrNotAWeakness refuses a weakness that is not a weakness identifier, or
 // more of them than one flaw states.
-var ErrNotAWeakness = fmt.Errorf("a flaw states at most %d weaknesses, each written as CWE- "+
+var ErrNotAWeakness = refusal.Errorf("a flaw states at most %d weaknesses, each written as CWE- "+
 	"and a number, such as CWE-125", MostWeaknesses)
 
 // weaknessID is the shape of a weakness identifier: CWE- and a number from one.
@@ -150,10 +151,10 @@ var weaknessID = regexp.MustCompile(`^CWE-[1-9][0-9]{0,5}$`)
 // a large write from a small request, which is the shape REQ-27 bounds: what
 // is written rather than what was asked for. The same cap the bulk triage
 // action is held to, because it is the same question about the same table.
-var ErrTooManyPlaces = errors.New("that would open more findings than one action may")
+var ErrTooManyPlaces = refusal.New("that would open more findings than one action may")
 
 // ErrNothingScanned says the build holds no contents to record against.
-var ErrNothingScanned = errors.New(
+var ErrNothingScanned = refusal.New(
 	"nothing has been scanned into this build, so there is nothing to record against")
 
 // Enter records a flaw in what a build ships, and returns the finding and the
@@ -271,7 +272,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// silent, and silence is not a claim that something is mild. A person
 		// typing "urgent" is not silent — they are wrong, and folding it would
 		// replace their judgment with one nobody made.
-		return nil, "", fmt.Errorf("%q is not a severity", in.Severity)
+		return nil, "", refusal.Errorf("%q is not a severity", in.Severity)
 	}
 
 	type at struct {
@@ -385,7 +386,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if still, err := productOf(ctx, tx, in.TargetIDs[0]); err != nil {
 			return err
 		} else if still != productID {
-			return fmt.Errorf("the builds changed products while this was being written; try again")
+			return refusal.Errorf("the builds changed products while this was being written; try again")
 		}
 
 		product, err := productNameOf(ctx, tx, productID)
@@ -565,8 +566,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 // wrong, and they are told apart because the answers differ: one is "say where
 // this is" and the other is "that is two records, not one".
 var (
-	ErrNoBuild         = errors.New("say which builds ship it")
-	ErrSeveralProducts = errors.New(
+	ErrNoBuild         = refusal.New("say which builds ship it")
+	ErrSeveralProducts = refusal.New(
 		"those builds are of different products, and an identifier is minted per product — " +
 			"record it once for each")
 )
@@ -686,7 +687,7 @@ type naming struct {
 func drawNamed(ctx context.Context, tx bun.IDB, product string, year int, n naming) (string, error) {
 	prefix := strings.ToUpper(strings.TrimSpace(product))
 	if prefix == "" {
-		return "", fmt.Errorf("a product with no name cannot issue %s %s", n.an, n.what)
+		return "", refusal.Errorf("a product with no name cannot issue %s %s", n.an, n.what)
 	}
 	return drawIdentifier(ctx, fmt.Sprintf(n.pool, prefix, year),
 		func(number int64) string {
@@ -738,7 +739,7 @@ func drawIdentifier(ctx context.Context, issuer string, name func(number int64) 
 			return candidate, nil
 		}
 	}
-	return "", fmt.Errorf(
+	return "", refusal.Errorf(
 		"no identifier could be drawn for %s — the ones it issues are nearly all taken",
 		issuer)
 }

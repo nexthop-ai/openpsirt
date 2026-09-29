@@ -5,13 +5,13 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The people who may be told that an issue exists.
@@ -28,7 +28,7 @@ import (
 
 // ErrUnknownIssue is returned where an issue is not one this subject may be
 // told about, and is answered exactly as a name nobody has ever used.
-var ErrUnknownIssue = errors.New("no issue is known by that name")
+var ErrUnknownIssue = refusal.New("no issue is known by that name")
 
 // MayBeToldOfIn reports whether this subject may be told an issue exists in
 // one product.

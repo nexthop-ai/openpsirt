@@ -428,12 +428,12 @@ person beside it takes a null where the actor is configuration. PostgreSQL,
 MySQL and MariaDB alter the table where it stands; SQLite rebuilds it from the
 release's declaration. Each name an issue answers to gains whether a person
 typed it, a column added with its default on all four engines. A graph node
-gains two columns that hold a null, which every engine adds where the table
-stands. A notification gains the team it is about, and a destination its
-platform, channel, topic and the product or team it belongs to, with a
-reference for each; SQLite rebuilds both tables from the release's
-declarations. What a person chose about chat, and what has been carried to them
-there, are two new tables.
+gains two columns that hold a null, and a build's claim gains its subject's
+name folded, which every engine adds where the table stands. A notification
+gains the team it is about, and a destination its platform, channel, topic and
+the product or team it belongs to, with a reference for each; SQLite rebuilds
+both tables from the release's declarations. What a person chose about chat,
+and what has been carried to them there, are two new tables.
 
 | In v0.4.0 | After the upgrade |
 |---|---|
@@ -451,6 +451,19 @@ there, are two new tables.
 | A notification | About no team |
 | A destination | A webhook belonging to the deployment |
 | A saved filter's query | In the words the findings list reads. The single word for known-exploited or fix-version-known becomes that flag, a word that narrowed nothing is dropped, and hidden components joined by commas become one parameter each. Every other parameter is kept as written |
+| A key's or a personal token's name, stored as typed | Stored folded, as a username is. A key's name is unique across the deployment and a token's to the person holding it. Senders are read by the names v0.4.0 recorded before this |
+| Two or more keys, or two or more of one person's tokens, whose names fold to one | The first keeps the folded name and stays as it was: one in force before a withdrawn one, then the oldest. Each other still in force is withdrawn at the moment of the upgrade, and a trail row records it with the upgrade as the actor, naming a token's owner as a withdrawal by a person does. One withdrawn already is left as it was. Each other is named by the folded name and its number, as `ci #7`, because the name is unique across withdrawn ones too. Every first holder is reserved before any is numbered, so one already named like a number keeps that name and the number moves past it, as `ci #7.2` |
+| A key or token whose name is only spaces | Named `key #7` or `token #7` by its number, and left in force: it clashes with nothing |
+| A build's claim about a named subject | Gains the subject's name folded, beside the producer's spelling. A claim naming only a package identifier gains nothing |
+
+A username is the rule a key's and a token's name follow: the first to hold a
+name keeps it, and a later one folding to it is refused. An upgrade cannot
+refuse a credential that already exists, so the later one is withdrawn where a
+person would be refused. A pipeline or script sending with it is refused from
+the upgrade on and needs a new one; the key list or the owner's token list shows
+it withdrawn under its numbered name, and the trail row says when. The names
+move through placeholders nothing holds, so no step writes a name another row
+still has.
 
 Rolled back, the actor goes and the person refuses a null again. A row
 configuration or a merge wrote goes with it, because v0.4.0 has no place for a
@@ -468,7 +481,11 @@ each person chose about chat is lost and a later upgrade starts them at the
 defaults again. A notification's team and a destination's new columns go. A
 saved filter stays in v0.5.0's words, which v0.4.0's list reads too, except
 that a hidden name holding a comma is read by v0.4.0 as several names, and
-upgrading again keeps them apart.
+upgrading again keeps them apart. A claim's folded subject goes with its
+column. A key or token keeps the name it was folded or numbered to, which
+v0.4.0 matches as typed, and one the upgrade withdrew stays withdrawn. The
+trail rows recording those withdrawals go, because v0.4.0 has no place for a
+change no person made.
 
 Two components v0.4.0 identifies alike refuse the roll back, and the refusal
 names both: a name shaped like a package identifier beside that package, or a
@@ -493,6 +510,9 @@ of what a check costs, so the checks share the build.
 | v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it. The scratch tables are dropped before the roll back |
 | A v0.4.0 database holding issues | Upgraded, every issue is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and the issues remain |
 | A v0.4.0 saved filter in the old words, and one in the new | Upgraded, the first reads in the list's words and the second is unchanged. Rolled back, both stay as upgraded |
+| A v0.4.0 database with keys named in mixed capitals, three pairs folding to one name | Upgraded, every name is folded, and the key in force and then the older keeps a shared name and authenticates, including one moving onto a name a withdrawn key still holds. The other in force is withdrawn and refused, with one trail row by the upgrade; those withdrawn already keep their withdrawal time. Each is numbered, past a key already named like the number. A spaces-only key is numbered and stays in force, and a scan sent under a mixed-case name reads as that key. Rolled back, the names and withdrawals stay and the trail row goes |
+| A v0.4.0 database with two people's tokens named in mixed capitals, three of one person's pairs folding to one name | Upgraded, as for keys, per person: the kept tokens authenticate, the duplicate in force is withdrawn and refused with one trail row naming its owner, those withdrawn already keep their withdrawal time, a spaces-only name and a name shaped like a number are handled as for keys, and the other person's token of the same name is untouched. Rolled back, the names and withdrawals stay and the trail row goes |
+| A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing. Rolled back, the table is described as v0.4.0 built it and the producer's spelling remains |
 
 ### Release records
 
@@ -744,8 +764,9 @@ request.
 
 Folding happens in Go. `LOWER()` on SQLite is ASCII-only, so a term carrying a
 non-ASCII capital compared against `LOWER()` of a column is found on three
-engines and missed on the fourth. The component-name search compares against a
-folded copy made on the way in. Issue identifiers, package identifiers,
+engines and missed on the fourth. The component-name search, and the name a
+build's claim is about, compare against a folded copy made on the way in. A
+key's name and a personal token's are themselves stored folded. Issue identifiers, package identifiers,
 descriptions and the person picker compare against `LOWER()` of the column,
 which differs only outside ASCII.
 

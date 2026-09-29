@@ -31,6 +31,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -549,10 +550,10 @@ func (c carried) Unwrap() []error { return []error{c.said, c.cause} }
 // way, as a 422 with the message in it, a lost connection reaches whoever
 // asked as a bad request carrying the address the driver tried.
 //
-// The engine's own error types decide which it is, rather than the message,
-// and where it cannot tell it errs toward treating it as a refusal — the
-// direction that is already safe, because a store's own sentences are the only
-// thing that reaches the caller.
+// A store's sentences are refusals, and only a refusal's text is published.
+// Everything else is a fault, logged and answered in fixed words, so a failure
+// nobody classified — a connection that dropped, an object store that did not
+// answer — never reaches the caller as text.
 func asked(logger *slog.Logger, err error) error {
 	// An authorization refusal is not somebody having asked for the
 	// impossible. Without this arm it falls to the sentence below and comes
@@ -576,7 +577,10 @@ func asked(logger *slog.Logger, err error) error {
 	if errors.As(err, &faults) {
 		return refusedText(faults)
 	}
-	return huma.Error422UnprocessableEntity(err.Error())
+	if refusal.In(err) {
+		return huma.Error422UnprocessableEntity(err.Error())
+	}
+	return wentWrong(logger, "that could not be recorded", err)
 }
 
 // noDatabase is the answer when this process has no database behind it.

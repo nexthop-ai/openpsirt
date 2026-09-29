@@ -125,6 +125,11 @@ going back to v0.4.0.
 | An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
 | Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
 | A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
+| API keys whose names differ only in capitals or surrounding spaces, as `CI` and `ci` | One keeps the name in lower case and goes on working: a key in force before a withdrawn one, then the oldest. Every other key in force is withdrawn, so a pipeline sending with it is refused from the upgrade on and needs a new key. The key list shows each one as withdrawn under a numbered name, as `ci #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it and the moment it ran |
+| An API key's name | Stored in lower case. Withdraw it by that name in any capitals |
+| One person's API tokens whose names differ only in capitals or surrounding spaces | One keeps the name in lower case and goes on working: a token in force before a withdrawn one, then the oldest. Every other token in force is withdrawn, so a script using it is refused from the upgrade on and its owner needs to mint a new one. The owner's token list shows each one as withdrawn under a numbered name, as `laptop #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it |
+| An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
+| Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made |
 
 ## Serving
 

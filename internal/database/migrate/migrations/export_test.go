@@ -32,6 +32,7 @@ func StatementsV050(engine database.Engine) map[string][]string {
 		"outbound":            outboundV050(t),
 		"chat_preference":     {chatV050(t)[0]},
 		"chat_delivery":       {chatV050(t)[1]},
+		"suppression":         suppressionV050(t),
 	}
 }
 

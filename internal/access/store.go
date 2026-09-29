@@ -16,7 +16,9 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Account is somebody who has been granted access.
@@ -330,7 +332,7 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string,
 }
 
 // ErrNoIdentity is a person asked for with no name to record them under.
-var ErrNoIdentity = errors.New("a person needs an identity to be granted anything")
+var ErrNoIdentity = refusal.New("a person needs an identity to be granted anything")
 
 // Restate is Ensure, answering what was stored before the write beside what
 // is stored after it. Before is nil where they were not recorded.
@@ -439,7 +441,7 @@ const (
 func (s *Store) SetEmail(ctx context.Context, personID int64, address string, from EmailSource) error {
 	address = strings.TrimSpace(address)
 	if personID == 0 {
-		return errors.New("an address needs somebody to belong to")
+		return refusal.New("an address needs somebody to belong to")
 	}
 	if from == FromProvider && address == "" {
 		return nil
@@ -469,12 +471,12 @@ func (s *Store) SetEmail(ctx context.Context, personID int64, address string, fr
 // turn off is one they route to a folder.
 func (s *Store) SetDigest(ctx context.Context, personID int64, wanted, unowned bool) error {
 	if personID == 0 {
-		return errors.New("a preference needs somebody to belong to")
+		return refusal.New("a preference needs somebody to belong to")
 	}
 	// A request for what nobody owns, without a digest at all, is a
 	// setting that changes nothing, which is worse than not offering it.
 	if unowned && !wanted {
-		return errors.New("a digest listing what nobody owns is still a digest: ask for one")
+		return refusal.New("a digest listing what nobody owns is still a digest: ask for one")
 	}
 	if _, err := s.db.NewUpdate().Model((*Account)(nil)).
 		Set("digest = ?", wanted).
@@ -508,7 +510,7 @@ func Stated(admin bool) *bool { return &admin }
 //
 // A sentinel rather than a sentence, because whoever asked has to tell it from
 // a read that could not be made: the first is a 404 and the second is a fault.
-var ErrNoSuchPerson = errors.New("nobody here is called that")
+var ErrNoSuchPerson = refusal.New("nobody here is called that")
 
 // Resolve turns an identity into the subject it stands for.
 //
@@ -714,7 +716,7 @@ func (s *Store) insertOnce(ctx context.Context, what string, row any,
 		if there {
 			return false, nil
 		}
-		return false, fmt.Errorf("%s: it is already recorded and is not in force, so it "+
+		return false, refusal.Errorf("%s: it is already recorded and is not in force, so it "+
 			"cannot be granted again from here", what)
 	}
 	if err := sp.Commit(); err != nil {
@@ -726,7 +728,7 @@ func (s *Store) insertOnce(ctx context.Context, what string, row any,
 // GrantRole gives somebody a role on a product.
 func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role Role) error {
 	if !role.Valid() {
-		return fmt.Errorf("%q is not a role", role)
+		return refusal.Errorf("%q is not a role", role)
 	}
 	grant := &Grant{
 		PersonID: personID, ProductID: productID, Role: role,
@@ -759,12 +761,32 @@ func (s *Store) holds(ctx context.Context, personID, productID int64, role Role)
 // slow hash — there is nothing to slow down when there is nothing to guess.
 const secretBytes = 32
 
+// KeyName is how a key's name is stored and how it is matched.
+//
+// An administrator types it to make a key and again to withdraw one, so it
+// follows the rule for a name people type: stored folded, compared exactly,
+// the same way a username is.
+func KeyName(typed string) string { return credentialNamed(typed) }
+
+// credentialNamed is a key's or a token's name as stored: folded, and cut to
+// the width of the column that holds it, on a character.
+func credentialNamed(typed string) string {
+	return bound.HeadRunes(folded(typed), database.NameWidth)
+}
+
+// ErrNoKeyName refuses a key whose name is only spaces.
+var ErrNoKeyName = refusal.New("a key needs a name, so it can be told from the others")
+
 // NewKey creates a pipeline credential, returning the secret once.
 //
 // Once is the whole point. A credential store that can hand back what it holds
 // is a credential store that hands over every pipeline's key along with a copy
 // of the database.
 func (s *Store) NewKey(ctx context.Context, name string, scope Scope) (*Key, string, error) {
+	name = KeyName(name)
+	if name == "" {
+		return nil, "", ErrNoKeyName
+	}
 	raw := make([]byte, secretBytes)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, "", fmt.Errorf("generate a key: %w", err)

@@ -14,7 +14,6 @@ package obligation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -118,10 +118,10 @@ func (w Window) EndsAt(knownAt time.Time) time.Time { return knownAt.Add(w.Lengt
 const LongestHours = 24 * 366
 
 // ErrNoSuchWindow is returned where a window is missing or retired.
-var ErrNoSuchWindow = errors.New("no window in force goes by that")
+var ErrNoSuchWindow = refusal.New("no window in force goes by that")
 
 // ErrWindowNamed is returned where a window in force already has the name.
-var ErrWindowNamed = errors.New("a window in force already has that name")
+var ErrWindowNamed = refusal.New("a window in force already has that name")
 
 // Store reads and writes obligations.
 type Store struct {
@@ -139,7 +139,7 @@ func NewStore(db bun.IDB) *Store {
 func folded(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
 // ErrNoSuchProduct is returned where a window names a product nobody declared.
-var ErrNoSuchProduct = errors.New("no product goes by that name")
+var ErrNoSuchProduct = refusal.New("no product goes by that name")
 
 // windowSaid checks what a window states before any of it is stored.
 func windowSaid(said WindowSaid) (WindowSaid, error) {
@@ -152,12 +152,12 @@ func windowSaid(said WindowSaid) (WindowSaid, error) {
 		// Zero reads as unset everywhere, so a lead of none is written by
 		// leaving it out rather than stored as a notice at the end itself.
 		if *said.LeadHours <= 0 {
-			return said, errors.New("a warning comes at least an hour before the end")
+			return said, refusal.New("a warning comes at least an hour before the end")
 		}
 		// A warning at or before the moment the window opens says nothing the
 		// notice raised when the record stands has not already said.
 		if *said.LeadHours >= said.Hours {
-			return said, errors.New("a warning comes before the end and after the window opens")
+			return said, refusal.New("a warning comes before the end and after the window opens")
 		}
 	}
 	return said, nil
@@ -167,18 +167,18 @@ func windowSaid(said WindowSaid) (WindowSaid, error) {
 func nameSaid(name string, hours int) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", errors.New("a window needs a name")
+		return "", refusal.New("a window needs a name")
 	}
 	if utf8.RuneCountInString(name) > database.NameWidth {
-		return "", fmt.Errorf("a window's name is at most %d characters", database.NameWidth)
+		return "", refusal.Errorf("a window's name is at most %d characters", database.NameWidth)
 	}
 	// Zero reads as unset everywhere, so it is refused rather than stored as
 	// a window that closes the moment it opens.
 	if hours <= 0 {
-		return "", errors.New("a window runs for at least an hour")
+		return "", refusal.New("a window runs for at least an hour")
 	}
 	if hours > LongestHours {
-		return "", fmt.Errorf("a window runs for at most %d hours", LongestHours)
+		return "", refusal.Errorf("a window runs for at most %d hours", LongestHours)
 	}
 	return name, nil
 }

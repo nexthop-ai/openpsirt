@@ -21,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Declaring carries what the catalog endpoints run on.
@@ -349,9 +350,9 @@ func answer[T any](created bool, item T) *declaredOutput[T] {
 
 // declineDeclaration turns a refusal into the answer that describes it.
 //
-// A database that broke is logged and answered as a fault, whose words name
-// nothing about it. What remains is a sentence the catalog wrote for the
-// caller: a name that is empty, too long or malformed.
+// A sentence the catalog wrote for the caller — a name that is empty, too long
+// or malformed — is the answer. Anything else is a fault, logged and answered
+// in words that name nothing about it.
 func declineDeclaration(logger *slog.Logger, err error) error {
 	switch {
 	case errors.Is(err, database.ErrGoAgain):
@@ -368,8 +369,10 @@ func declineDeclaration(logger *slog.Logger, err error) error {
 		// is what makes it safe to publish: an administrator declaring under
 		// a product that does not exist needs to know which name was wrong.
 		return undeclared(nil, err, "")
-	default:
+	case refusal.In(err):
 		return huma.Error400BadRequest(err.Error())
+	default:
+		return wentWrong(logger, "that could not be declared", err)
 	}
 }
 

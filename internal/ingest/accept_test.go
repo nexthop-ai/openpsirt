@@ -23,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // each gives every engine the default world, whose build scans are filed
@@ -357,7 +358,7 @@ func TestAFailureQuotingAProducersOwnTextIsStoredAsText(t *testing.T) {
 		// than between two characters. An even offset is the case that
 		// happens to be safe, which is why the input matters as much as the
 		// length.
-		cause := errors.New("x" + strings.Repeat("é", 1500))
+		cause := refusal.New("x" + strings.Repeat("é", 1500))
 		if err := s.MarkFailed(ctx, scan.ID, cause); err != nil {
 			t.Fatalf("record that the scan failed: %v", err)
 		}
@@ -401,6 +402,43 @@ func TestAReceiptSaysNothingOfTheDatabaseAScanFailedOn(t *testing.T) {
 		}
 		if stored.Failure != "the scan could not be applied" {
 			t.Errorf("the receipt says %q", stored.Failure)
+		}
+	})
+}
+
+// A receipt carries what is wrong with the document in the reader's own words,
+// and nothing any other failure says. An object store's answer names the
+// endpoint and the credential it signed with, and no engine's error types
+// recognize it.
+func TestAReceiptCarriesOnlyARefusalsOwnWords(t *testing.T) {
+	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+		ctx := t.Context()
+		for _, c := range []struct {
+			name  string
+			cause error
+			want  string
+		}{
+			{"refused", fmt.Errorf("scan 7: %w",
+				refusal.New("the document ends partway through a value")),
+				"scan 7: the document ends partway through a value"},
+			{"unclassified", fmt.Errorf("read the stored document: %w", errors.New(
+				"GET https://objects.internal.example:9000/scans/7: AccessDenied for AKIAEXAMPLE")),
+				"the scan could not be applied"},
+		} {
+			scan, _, err := s.Record(ctx, arriving(targetID, "receipt-"+c.name, time.Now().UTC()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := s.MarkFailed(ctx, scan.ID, c.cause); err != nil {
+				t.Fatalf("record that the scan failed: %v", err)
+			}
+			stored, err := s.ByID(ctx, scan.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if stored.Failure != c.want {
+				t.Errorf("%s: the receipt says %q, want %q", c.name, stored.Failure, c.want)
+			}
 		}
 	})
 }

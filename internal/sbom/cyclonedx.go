@@ -4,10 +4,10 @@
 package sbom
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Only the first major version exists, and every field read here has been in
@@ -63,7 +63,7 @@ func (c *reader) cyclonedxFormatName() error {
 		return err
 	}
 	if !strings.EqualFold(name, string(CycloneDX)) {
-		return fmt.Errorf("scan file is not %s: it says %q", CycloneDX, trim(name))
+		return refusal.Errorf("scan file is not %s: it says %q", CycloneDX, trim(name))
 	}
 	c.declared, c.named = CycloneDX, true
 	return nil
@@ -77,7 +77,7 @@ func (c *reader) cyclonedxFormatVersion() error {
 		return err
 	}
 	if major, _, _ := strings.Cut(spec, "."); major != cyclonedxMajor {
-		return fmt.Errorf("%s version %q is not one this reads", CycloneDX, trim(spec))
+		return refusal.Errorf("%s version %q is not one this reads", CycloneDX, trim(spec))
 	}
 	c.declared, c.versioned = CycloneDX, true
 	return nil
@@ -246,7 +246,7 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		return graph.Described{}, "", nil, err
 	}
 	if err := described.Valid(); err != nil {
-		return graph.Described{}, "", nil, fmt.Errorf("%w, so it cannot be tracked", err)
+		return graph.Described{}, "", nil, refusal.Errorf("%w, so it cannot be tracked", err)
 	}
 
 	// The supplier where a producer stated one, whatever order it wrote the two

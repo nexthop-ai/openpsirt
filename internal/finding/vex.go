@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Statement is what a third party's document says about a component we ship.
@@ -196,27 +197,27 @@ func (from Supplied) valid() error {
 	switch from.Source {
 	case FromVex:
 		if from.Identifier != "" {
-			return fmt.Errorf("a statement set is a publisher's whole answer and is " +
+			return refusal.Errorf("a statement set is a publisher's whole answer and is " +
 				"replaced as one, so it is not identified by a document name")
 		}
 	case FromAdvisory:
 		if strings.TrimSpace(from.Identifier) == "" {
-			return fmt.Errorf("an advisory is replaced by the name its publisher gave " +
+			return refusal.Errorf("an advisory is replaced by the name its publisher gave " +
 				"it, and this one carries none")
 		}
 		if utf8.RuneCountInString(from.Identifier) > MostDocumentName {
-			return fmt.Errorf("the name the publisher gave it is longer than the %d "+
+			return refusal.Errorf("the name the publisher gave it is longer than the %d "+
 				"characters this records", MostDocumentName)
 		}
 	default:
-		return fmt.Errorf("a document of kind %q, which is not one this records",
+		return refusal.Errorf("a document of kind %q, which is not one this records",
 			from.Source)
 	}
 	if strings.TrimSpace(from.Publisher) == "" {
-		return fmt.Errorf("a statement is somebody's, and this document names nobody")
+		return refusal.Errorf("a statement is somebody's, and this document names nobody")
 	}
 	if utf8.RuneCountInString(from.Publisher) > MostPublisher {
-		return fmt.Errorf("who published it is longer than the %d characters this records",
+		return refusal.Errorf("who published it is longer than the %d characters this records",
 			MostPublisher)
 	}
 	return nil

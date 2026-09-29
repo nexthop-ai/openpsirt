@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Upgrade is a promise to move a component, in the builds named, by a date.
@@ -68,13 +69,13 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 	up Upgrade) (Declared, error) {
 
 	if strings.TrimSpace(up.Reasoning) == "" {
-		return Declared{}, fmt.Errorf("say why this is being upgraded")
+		return Declared{}, refusal.Errorf("say why this is being upgraded")
 	}
 	if strings.TrimSpace(up.To) == "" {
-		return Declared{}, fmt.Errorf("say which version this moves to")
+		return Declared{}, refusal.Errorf("say which version this moves to")
 	}
 	if up.By.IsZero() {
-		return Declared{}, fmt.Errorf("say when this will be done")
+		return Declared{}, refusal.Errorf("say when this will be done")
 	}
 	// Asked of the one predicate rather than written out: the same question
 	// every other write here asks, and a second spelling of it is a second
@@ -100,7 +101,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			return err
 		}
 		if len(wanted) == 0 {
-			return fmt.Errorf("name at least one release this is promised for")
+			return refusal.Errorf("name at least one release this is promised for")
 		}
 		retired, err := findings.RetiredWithin(ctx, tx, up.Builds)
 		if err != nil {
@@ -269,10 +270,10 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 	to string, by time.Time, reasoning string) ([]ForPerson, bool, error) {
 
 	if strings.TrimSpace(to) == "" {
-		return nil, false, fmt.Errorf("say which version this is moving to")
+		return nil, false, refusal.Errorf("say which version this is moving to")
 	}
 	if strings.TrimSpace(reasoning) == "" {
-		return nil, false, fmt.Errorf("say why the promise is changing: a date moved with no reason " +
+		return nil, false, refusal.Errorf("say why the promise is changing: a date moved with no reason " +
 			"is one nobody can agree to again")
 	}
 	db, err := s.pool()
@@ -291,7 +292,7 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 			return err
 		}
 		if claim.Outcome != UpgradeNeeded {
-			return fmt.Errorf("that claim is %s, and only a promised upgrade has a version to move",
+			return refusal.Errorf("that claim is %s, and only a promised upgrade has a version to move",
 				claim.Outcome)
 		}
 		for _, row := range rows {
@@ -302,7 +303,7 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		moving := strings.TrimSpace(to)
 		when := by.UTC()
 		if !when.After(s.now()) {
-			return fmt.Errorf("a promise lands on a date still to come: %s has passed",
+			return refusal.Errorf("a promise lands on a date still to come: %s has passed",
 				when.Format(time.DateOnly))
 		}
 

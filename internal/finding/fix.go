@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Upgrade is one build's commitment to move a fold.
@@ -117,7 +118,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 			// covered. The caller may triage here and asked for something
 			// that cannot be done, so this is a sentence for them to act on
 			// rather than an authorization refusal.
-			return 0, fmt.Errorf("release %s is retired", release)
+			return 0, refusal.Errorf("release %s is retired", release)
 		}
 		// Committing what is already committed keeps the first commitment.
 		// The moment somebody said they would do this is a fact, and
@@ -335,7 +336,7 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 	// A commitment made by the same claim is that claim writing its own
 	// promise again, which is what revising it does.
 	if standing.ClaimID != nil && (claimID == nil || *claimID != *standing.ClaimID) {
-		return fmt.Errorf(
+		return refusal.Errorf(
 			"this release is committed to %s under claim %d: revise that claim rather than "+
 				"recording a second promise about the same package",
 			standing.ToVersion, *standing.ClaimID)

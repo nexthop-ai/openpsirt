@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Delta is what one scan made of a build's inventory.
@@ -399,7 +400,7 @@ func paged(changes []Change, only ChangeKind, limit, offset int) ([]Change, int,
 		// reads as a comparison that found nothing rather than as a question
 		// nobody can answer.
 		if only != Added && only != Removed && only != Changed {
-			return nil, 0, fmt.Errorf("%q is not a kind of change", only)
+			return nil, 0, refusal.Errorf("%q is not a kind of change", only)
 		}
 		kept := changes[:0]
 		for _, change := range changes {

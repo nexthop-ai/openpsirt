@@ -20,7 +20,6 @@
 package outward
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -28,6 +27,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Timeout bounds a call out.
@@ -159,14 +160,14 @@ func client(within time.Duration, reachable func(string) error,
 // a scheme other than https, a host nobody configured, or a host an
 // administrator excluded. Nothing was asked of
 // the address, so a caller can tell this from a provider that did not answer.
-var ErrRefused = errors.New("refused")
+var ErrRefused = refusal.New("refused")
 
 // ErrInside says an address a name resolved to lies inside this network. It
 // comes wrapped with ErrRefused. Unlike the other refusals it is about what a
 // name resolves to today, which a resolver answering differently tomorrow
 // changes, so a caller stepping over what the client refuses holds on to
 // this one.
-var ErrInside = errors.New("a provider is not reached inside this network")
+var ErrInside = refusal.New("a provider is not reached inside this network")
 
 // guard refuses a request to a host the client does not permit.
 //

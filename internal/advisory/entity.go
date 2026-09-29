@@ -19,13 +19,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrNoPrefix says no prefix is configured to mint an identifier from.
 //
 // A configuration gap rather than a bad request, the way a missing publisher
 // is: whoever is asking cannot fix it, and an operator can.
-var ErrNoPrefix = errors.New(
+var ErrNoPrefix = refusal.New(
 	"no advisory identifier prefix is configured: set OPENPSIRT_ADVISORY_PREFIX")
 
 // ErrNoSuchAdvisory says there is no advisory by that name that this reader
@@ -33,14 +34,14 @@ var ErrNoPrefix = errors.New(
 //
 // One answer for an advisory that does not exist and one that covers an issue
 // the reader may not see. Told apart, the pair says what exists.
-var ErrNoSuchAdvisory = errors.New("there is no advisory by that name")
+var ErrNoSuchAdvisory = refusal.New("there is no advisory by that name")
 
 // ErrAlreadyCovered says the advisory already names that issue in that
 // product.
-var ErrAlreadyCovered = errors.New("this advisory already covers that issue in that product")
+var ErrAlreadyCovered = refusal.New("this advisory already covers that issue in that product")
 
 // ErrNothingToSay says the advisory covers no issue.
-var ErrNothingToSay = errors.New("an advisory with no issues states nothing")
+var ErrNothingToSay = refusal.New("an advisory with no issues states nothing")
 
 // Advisory is a document this deployment writes, under a name it minted.
 //

@@ -15,10 +15,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ErrNotAgreed says nobody has agreed to what the advisory says as it stands.
-var ErrNotAgreed = errors.New(
+var ErrNotAgreed = refusal.New(
 	"an advisory goes out once a second person has agreed to what it says")
 
 // ErrSamePerson says the one person cannot be both halves of the control.
@@ -26,14 +27,14 @@ var ErrNotAgreed = errors.New(
 // A one-person deployment therefore cannot issue an advisory. That is the
 // control working rather than a gap in it, and it is better said plainly than
 // quietly relaxed.
-var ErrSamePerson = errors.New(
+var ErrSamePerson = refusal.New(
 	"whoever wrote what an advisory says may not be the person who agrees to it")
 
 // ErrAlreadyAgreed says this person has already agreed to this edition.
-var ErrAlreadyAgreed = errors.New("you have already agreed to what this advisory says")
+var ErrAlreadyAgreed = refusal.New("you have already agreed to what this advisory says")
 
 // ErrNothingAgreed says there is no agreement standing to take back.
-var ErrNothingAgreed = errors.New("no agreement is standing on what this advisory says")
+var ErrNothingAgreed = refusal.New("no agreement is standing on what this advisory says")
 
 // Edition is what an advisory says at a point.
 //

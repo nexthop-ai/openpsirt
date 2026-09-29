@@ -4,9 +4,10 @@
 package sbom
 
 import (
-	"fmt"
 	"io"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Reading a supplier's CSAF security advisory, the third document a third
@@ -65,18 +66,18 @@ func ReadAdvisory(r io.Reader, lim Limits) (Advisory, error) {
 		}
 	})
 	if err != nil {
-		return Advisory{}, fmt.Errorf("reading an advisory: %w", err)
+		return Advisory{}, refusal.Errorf("reading an advisory: %w", err)
 	}
 	claims, err := read.finish()
 	if err != nil {
-		return Advisory{}, fmt.Errorf("reading an advisory: %w", err)
+		return Advisory{}, refusal.Errorf("reading an advisory: %w", err)
 	}
 	if strings.TrimSpace(read.publisher) == "" {
-		return Advisory{}, fmt.Errorf("reading an advisory: it names no publisher, and " +
+		return Advisory{}, refusal.Errorf("reading an advisory: it names no publisher, and " +
 			"whose judgment it is decides what it supersedes and whose name stands beside it")
 	}
 	if strings.TrimSpace(read.identifier) == "" {
-		return Advisory{}, fmt.Errorf("reading an advisory: it carries no tracking " +
+		return Advisory{}, refusal.Errorf("reading an advisory: it carries no tracking " +
 			"identifier, which is the name a later revision of it replaces")
 	}
 	return Advisory{

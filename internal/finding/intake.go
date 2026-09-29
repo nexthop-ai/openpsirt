@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Claimed is a claim that arrived, as somebody types it in.
@@ -30,15 +31,15 @@ type Claimed struct {
 
 // ErrNoSuchReport is the one answer for a report that is not here, one
 // nobody may see, and a product that is neither.
-var ErrNoSuchReport = errors.New("no report here goes by that name")
+var ErrNoSuchReport = refusal.New("no report here goes by that name")
 
 // ErrAlreadyJudged, ErrIssueReported and ErrNothingClaimed are the three ways
 // recording or judging a claim is refused.
 var (
-	ErrAlreadyJudged = errors.New(
+	ErrAlreadyJudged = refusal.New(
 		"that report has already been judged, or a ruling on it is waiting for a second person")
-	ErrIssueReported  = errors.New("another report is already the record of that issue")
-	ErrNothingClaimed = errors.New(
+	ErrIssueReported  = refusal.New("another report is already the record of that issue")
+	ErrNothingClaimed = refusal.New(
 		"say what was claimed — a report with nothing in it records only that a mail arrived")
 )
 
@@ -342,7 +343,7 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 
 // ErrNoSuchIssueHere is the one answer for an issue that is not in this
 // product and one the subject may not be told of.
-var ErrNoSuchIssueHere = errors.New("no issue here goes by that name")
+var ErrNoSuchIssueHere = refusal.New("no issue here goes by that name")
 
 // mintReference issues the name a report is reached by.
 //

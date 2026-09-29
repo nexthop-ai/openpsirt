@@ -8,7 +8,6 @@ package triage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // IssueNote is something written about an issue in a product.
@@ -62,7 +62,7 @@ type WasNoted struct {
 // ErrNoSuchNote is returned where a note is missing or is about an issue in a
 // product this subject may not be told about. One error for both, because
 // telling them apart is what turns a note identifier into a directory.
-var ErrNoSuchNote = errors.New("no note is recorded there")
+var ErrNoSuchNote = refusal.New("no note is recorded there")
 
 // NoteOn writes a note about an issue in a product.
 //
@@ -74,10 +74,10 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64, body string) (*IssueNote, error) {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return nil, errors.New("a note is recorded as written by whoever wrote it")
+		return nil, refusal.New("a note is recorded as written by whoever wrote it")
 	}
 	if strings.TrimSpace(body) == "" {
-		return nil, errors.New("a note has to say something")
+		return nil, refusal.New("a note has to say something")
 	}
 	if err := markdown.Check(body); err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 		return nil, ErrNoSuchNote
 	}
 	if strings.TrimSpace(body) == "" {
-		return nil, errors.New("a note has to say something")
+		return nil, refusal.New("a note has to say something")
 	}
 	if err := markdown.Check(body); err != nil {
 		return nil, err
@@ -169,7 +169,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 			return access.Denied("change a note about an issue here")
 		}
 		if note.WrittenBy != subject.ID {
-			return errors.New("only the person who wrote a note may change it")
+			return refusal.New("only the person who wrote a note may change it")
 		}
 		// The ordinal is read inside the transaction, so two edits at once
 		// cannot be handed the same number: the unique index refuses the

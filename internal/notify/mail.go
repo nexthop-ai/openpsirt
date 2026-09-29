@@ -6,13 +6,14 @@ package notify
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"mime"
 	"net"
 	"net/smtp"
 	"strings"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // defaultMailTimeout bounds the whole conversation with a mail server where
@@ -84,7 +85,7 @@ func (m *Mail) Name() string { return "mail" }
 func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 	to = strings.TrimSpace(to)
 	if to == "" {
-		return errors.New("no address to send to")
+		return refusal.New("no address to send to")
 	}
 
 	dialer := &net.Dialer{Timeout: m.timeout}
@@ -118,7 +119,7 @@ func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 	}
 	if m.username != "" {
 		if !secured {
-			return errors.New("the mail server offered no STARTTLS, and a password " +
+			return refusal.New("the mail server offered no STARTTLS, and a password " +
 				"sent in the clear is a password given away")
 		}
 		if err := client.Auth(smtp.PlainAuth("", m.username, m.password, host)); err != nil {

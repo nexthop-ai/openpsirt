@@ -8,6 +8,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Excluded is where an administrator said nothing is ever fetched from.
@@ -43,7 +45,7 @@ func ParseExcluded(list string) (Excluded, error) {
 		if strings.Contains(entry, "/") {
 			_, network, err := net.ParseCIDR(entry)
 			if err != nil {
-				return Excluded{}, fmt.Errorf("%q is not a network — write it as 10.0.0.0/8", entry)
+				return Excluded{}, refusal.Errorf("%q is not a network — write it as 10.0.0.0/8", entry)
 			}
 			out.networks = append(out.networks, network)
 			continue
@@ -58,7 +60,7 @@ func ParseExcluded(list string) (Excluded, error) {
 		}
 		name := strings.TrimPrefix(entry, ".")
 		if !hostName.MatchString(name) {
-			return Excluded{}, fmt.Errorf("%q is neither a host name nor a network", entry)
+			return Excluded{}, refusal.Errorf("%q is neither a host name nor a network", entry)
 		}
 		out.names = append(out.names, name)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Comment is discussion on a decision.
@@ -67,7 +68,7 @@ func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, 
 		return nil, err
 	}
 	if strings.TrimSpace(body) == "" {
-		return nil, fmt.Errorf("a comment has to say something")
+		return nil, refusal.Errorf("a comment has to say something")
 	}
 	if err := markdown.Check(body); err != nil {
 		return nil, err
@@ -124,10 +125,10 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 		return 0, err
 	}
 	if comment.WrittenBy != subject.ID {
-		return 0, fmt.Errorf("only the person who wrote a comment may change it")
+		return 0, refusal.Errorf("only the person who wrote a comment may change it")
 	}
 	if strings.TrimSpace(body) == "" {
-		return 0, fmt.Errorf("a comment has to say something")
+		return 0, refusal.Errorf("a comment has to say something")
 	}
 	if err := markdown.Check(body); err != nil {
 		return 0, err

@@ -239,11 +239,11 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 	switch job.State {
 	case queue.Dead:
 		// The scan row is marked too, but a job that died before it could mark
-		// anything would otherwise read as still being worked on.
-		if job.LastError != nil {
-			return Refused, *job.LastError, "", nil
-		}
-		return Refused, "the upload could not be read", "", nil
+		// anything would otherwise read as still being worked on. Fixed words:
+		// the job's last error is whatever failed, a dropped connection's
+		// address included, and a refusal reaches the receipt through the
+		// scan row instead.
+		return Refused, "the scan could not be applied", "", nil
 	case queue.Pending, queue.Running:
 		return Reading, "", "", nil
 	}

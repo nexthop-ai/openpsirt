@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -115,23 +115,23 @@ type Ruled struct {
 
 // The ways proposing, approving or withdrawing a ruling is refused.
 var (
-	ErrNotRulable = errors.New("a ruling says a report is a duplicate, not reproducible, " +
+	ErrNotRulable = refusal.New("a ruling says a report is a duplicate, not reproducible, " +
 		"out of scope or rejected; one accepted as an issue is pointed at that issue")
-	ErrNoReports   = errors.New("name the reports this rules on")
-	ErrNoReasoning = errors.New("say why — a ruling nobody explained cannot be reviewed " +
+	ErrNoReports   = refusal.New("name the reports this rules on")
+	ErrNoReasoning = refusal.New("say why — a ruling nobody explained cannot be reviewed " +
 		"or answered")
-	ErrNoDuplicateTarget = errors.New("name the open issue it duplicates")
-	ErrNotADuplicate     = errors.New("only a duplicate names an issue")
+	ErrNoDuplicateTarget = refusal.New("name the open issue it duplicates")
+	ErrNotADuplicate     = refusal.New("only a duplicate names an issue")
 	// ErrDuplicateOfClosed is a duplicate of work that is no longer open. It
 	// would bury the report, because nothing is left to work on.
-	ErrDuplicateOfClosed = errors.New("that issue is closed, dismissed or suppressed at " +
+	ErrDuplicateOfClosed = refusal.New("that issue is closed, dismissed or suppressed at " +
 		"every place here, so a duplicate of it leaves nothing to work on; reject it " +
 		"instead, which a second person agrees to")
-	ErrTooManyReports = errors.New("that would rule on more reports than one action may")
-	ErrNoSuchRuling   = errors.New("no ruling here goes by that number")
-	ErrOwnRuling      = errors.New("the person who proposed a ruling may not approve it")
-	ErrNotWaiting     = errors.New("that ruling is not waiting for anybody")
-	ErrWithdrawn      = errors.New("that ruling has already been withdrawn")
+	ErrTooManyReports = refusal.New("that would rule on more reports than one action may")
+	ErrNoSuchRuling   = refusal.New("no ruling here goes by that number")
+	ErrOwnRuling      = refusal.New("the person who proposed a ruling may not approve it")
+	ErrNotWaiting     = refusal.New("that ruling is not waiting for anybody")
+	ErrWithdrawn      = refusal.New("that ruling has already been withdrawn")
 )
 
 // NotHere is a ruling naming references this product does not hold, or holds
@@ -146,6 +146,9 @@ func (e *NotHere) Error() string {
 
 // Is makes it ErrNoSuchReport to errors.Is.
 func (e *NotHere) Is(target error) bool { return target == ErrNoSuchReport }
+
+// Refused marks it as a sentence for the caller, who sent the references.
+func (e *NotHere) Refused() {}
 
 // Rule proposes a ruling on one or more reports.
 //

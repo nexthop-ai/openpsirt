@@ -14,7 +14,6 @@ package saved
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -100,7 +100,7 @@ func NewStore(db bun.IDB) *Store {
 }
 
 // ErrNoSuchFilter is returned when somebody has kept no filter by that name.
-var ErrNoSuchFilter = errors.New("you have kept no filter by that name")
+var ErrNoSuchFilter = refusal.New("you have kept no filter by that name")
 
 // SaveFilterPreparing keeps a narrowing under a name, replacing one of the
 // same name, along with what the filter prepares.
@@ -125,7 +125,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	}
 	matched := matching(name)
 	if matched == "" {
-		return nil, fmt.Errorf("a saved filter needs a name")
+		return nil, refusal.Errorf("a saved filter needs a name")
 	}
 	prepares.Outcome = strings.TrimSpace(prepares.Outcome)
 	prepares.Justification = strings.TrimSpace(prepares.Justification)
@@ -138,7 +138,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		return nil, err
 	}
 	if prepares.Prepares() && prepares.Reasoning == "" {
-		return nil, fmt.Errorf("a filter that prepares a claim has to carry the reasoning " +
+		return nil, refusal.Errorf("a filter that prepares a claim has to carry the reasoning " +
 			"somebody will be proposing, because they are the one putting their name to it")
 	}
 	if prepares.Prepares() {
@@ -148,7 +148,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		// fills it in — and a filter carries no mitigation text, so the one
 		// reason that asks for it cannot be prepared at all.
 		if !triage.Outcome(prepares.Outcome).Valid() {
-			return nil, fmt.Errorf("%q is not an outcome", prepares.Outcome)
+			return nil, refusal.Errorf("%q is not an outcome", prepares.Outcome)
 		}
 		if err := triage.Reasons(triage.Outcome(prepares.Outcome),
 			triage.Justification(prepares.Justification), ""); err != nil {
@@ -164,11 +164,11 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	// a stray value beside no outcome is dropped below, because nothing
 	// prepared is nothing carried.
 	if prepares.Outcome == string(triage.Deferred) && prepares.DeferDays <= 0 {
-		return nil, fmt.Errorf("a filter that prepares a deferral has to carry how long it " +
+		return nil, refusal.Errorf("a filter that prepares a deferral has to carry how long it " +
 			"defers for, because the date is worked out from it whenever somebody submits it")
 	}
 	if prepares.Prepares() && prepares.Outcome != string(triage.Deferred) && prepares.DeferDays != 0 {
-		return nil, fmt.Errorf("how long to defer for only means something where the outcome "+
+		return nil, refusal.Errorf("how long to defer for only means something where the outcome "+
 			"is a deferral, and %q is not one", prepares.Outcome)
 	}
 	if !prepares.Prepares() {
@@ -226,7 +226,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 			return err
 		}
 		if held >= cap {
-			return fmt.Errorf("you are keeping %d filters for this product, which is the "+
+			return refusal.Errorf("you are keeping %d filters for this product, which is the "+
 				"limit: forget one before keeping another", held)
 		}
 		// Two saves of one new name both find nothing to update and both
