@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // SignOutOutput carries nothing but the cookie it clears.
@@ -26,8 +27,8 @@ type SignOutOutput struct {
 	Status    int
 }
 
-func registerSession(api huma.API, in Ingest) {
-	huma.Register(api, requiring(huma.Operation{
+func registerSession(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "sign-out", Method: http.MethodDelete, Path: "/v1/session",
 		Summary: "Sign out",
 		Description: "Ends the session the request arrived on, everywhere rather than in this " +
@@ -35,7 +36,7 @@ func registerSession(api huma.API, in Ingest) {
 			"application answers next.",
 		Tags:          []string{"Access"},
 		DefaultStatus: http.StatusNoContent,
-	}, ownSubject, ""), func(ctx context.Context, _ *struct{}) (*SignOutOutput, error) {
+	}, core.OwnSubject, ""), func(ctx context.Context, _ *struct{}) (*SignOutOutput, error) {
 		// Signing out is not something a pipeline's key can do: there is no
 		// session behind it to end, and answering as though there were would
 		// suggest one existed.
@@ -44,10 +45,10 @@ func registerSession(api huma.API, in Ingest) {
 			return nil, huma.Error400BadRequest("this request did not arrive on a session")
 		}
 		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
+			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := access.NewStore(in.DB.DB).EndSession(ctx, session.ID); err != nil {
-			return nil, wentWrong(in.Logger, "the session could not be ended", err)
+			return nil, core.WentWrong(in.Logger, "the session could not be ended", err)
 		}
 		return &SignOutOutput{
 			SetCookie: []http.Cookie{

@@ -9,6 +9,8 @@ import (
 	"sort"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // ProviderBody is one way in.
@@ -17,8 +19,8 @@ type ProviderBody struct {
 	Path string `json:"path" doc:"The address to send the browser to"`
 }
 
-func registerProviders(api huma.API, in Ingest) {
-	huma.Register(api, requiring(huma.Operation{
+func registerProviders(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-sign-in-providers", Method: http.MethodGet, Path: "/v1/sign-in",
 		Summary: "List sign-in providers",
 		Description: "Returns the sign-in providers this deployment has configured, so a " +
@@ -28,8 +30,8 @@ func registerProviders(api huma.API, in Ingest) {
 			"operator configured and nothing else — no account exists or does not exist as far " +
 			"as this is concerned, which is the disclosure that would matter.",
 		Tags: []string{"Access"},
-	}, noCredential, ""), func(_ context.Context, _ *struct{}) (*listOutput[ProviderBody], error) {
-		out := &listOutput[ProviderBody]{}
+	}, core.NoCredential, ""), func(_ context.Context, _ *struct{}) (*core.ListOutput[ProviderBody], error) {
+		out := &core.ListOutput[ProviderBody]{}
 		out.Body.Items = make([]ProviderBody, 0, len(in.Providers))
 		for name := range in.Providers {
 			out.Body.Items = append(out.Body.Items, ProviderBody{

@@ -113,7 +113,7 @@ var Held = []Entry{
 	// An SPDX document written inline as a test's input, whose data license
 	// is the one the format requires every document to state.
 	{"internal/sbom/spdx_test.go", Ours, ""},
-	{"internal/httpapi/scans_test.go", Ours, ""},
+	{"internal/httpapi/scansapi/scans_test.go", Ours, ""},
 
 	// The programs that write this tree's own header, which spell the
 	// identifier they write.

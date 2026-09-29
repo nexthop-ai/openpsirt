@@ -1,0 +1,104 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package reportsapi
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+)
+
+// WentBody is one advisory that went out.
+type WentBody struct {
+	Advisory string `json:"advisory" doc:"The identifier it went out under"`
+	Title    string `json:"title,omitempty"`
+	// Issues and Products are both given because one issue in three products
+	// and three issues in one are different documents, and a single count
+	// reads the same for each.
+	Issues   int `json:"issues" doc:"How many issues it covered"`
+	Products int `json:"products" doc:"How many products those sat in"`
+	// Ordinal is which issuance this was, counting from one. Anything above
+	// one is a revision, which is what somebody reading a period is looking
+	// for.
+	Ordinal  int    `json:"ordinal" doc:"The issuance number, counting from one. Above one is a revision"`
+	Summary  string `json:"summary,omitempty"`
+	IssuedBy string `json:"issued_by"`
+	IssuedAt string `json:"issued_at"`
+	Digest   string `json:"digest" doc:"The digest of what the document stated when it went out, which is what makes comparing it against what would be generated now possible"`
+}
+
+// registerPublished answers what advisories went out over a period.
+//
+// The per-flaw list answers whether one has gone out for this flaw and whether
+// what is published is still what we would generate, which is what somebody
+// about to publish a revision asks. A period asks something else: what went
+// out at all, and what went out more than once.
+func registerPublished(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-published-advisories", Method: http.MethodGet,
+		// A period's report rather than the advisories themselves, which is
+		// what /v1/advisories answers. The two ask different questions: one
+		// is what exists, the other is what went out and what went out twice.
+		Path:    "/v1/advisories/published",
+		Summary: "List advisories that have gone out",
+		Description: "Every advisory published from this deployment in a period, newest first, " +
+			"with how much it covered, which revision it was, who published it and what " +
+			"the document hashed to at the time.\n\n" +
+			"Advisories are about flaws in our own product, recorded here by hand. Known " +
+			"issues in third-party components are tracked and fixed rather than published " +
+			"about, and the document for those is a VEX statement per build.\n\n" +
+			"`ordinal` above one is a revision of an advisory already out, which is the entry " +
+			"a period is usually read for.\n\n" +
+			"Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody " +
+			"who may not read it, and a count is as much a disclosure as a row.\n\n" +
+			"Asked for neither a period nor a window, this is the last 365 days. An auditor " +
+			"asking what went out in a financial year names the two dates instead.",
+		Tags: []string{"Reports"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `query:"product" doc:"Limit to one product, by name"`
+		core.Period
+	}) (*core.OverPeriod[WentBody], error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, core.NoDatabase(in.Logger)
+		}
+		var products []int64
+		if input.Product != "" {
+			named, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			products = []int64{named.ID}
+		}
+		since, until, err := input.Window(365, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+
+		gone, err := advisory.NewStore(in.DB.DB).Published(ctx, subject, products, since, until)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "what has been published could not be read", err)
+		}
+		out := &core.OverPeriod[WentBody]{}
+		out.Body.From, out.Body.To = core.Stating(since, until)
+		out.Body.Items = make([]WentBody, 0, len(gone))
+		for _, row := range gone {
+			out.Body.Items = append(out.Body.Items, WentBody{
+				Advisory: row.Advisory, Title: row.Title,
+				Issues: row.Issues, Products: row.Products, Ordinal: row.Ordinal,
+				Summary: row.Summary, IssuedBy: row.IssuedBy,
+				IssuedAt: core.Stamp(row.IssuedAt), Digest: row.Digest,
+			})
+		}
+		return out, nil
+	})
+}

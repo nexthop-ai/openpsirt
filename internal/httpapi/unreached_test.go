@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 // Routes nothing reached.
@@ -37,8 +39,8 @@ type reached struct {
 }
 
 func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
 
 		const build = "/v1/products/mine/streams/master/variants/broadcom"
 		for _, c := range []reached{
@@ -109,11 +111,11 @@ func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
 				refusedFor: "", refusal: http.StatusUnauthorized,
 			},
 		} {
-			if got := asPerson(t, r, c.who, c.method, c.path, c.body); got.Code != c.want {
+			if got := httpapitest.AsPerson(t, r, c.who, c.method, c.path, c.body); got.Code != c.want {
 				t.Errorf("%s answered %s %d, want %d: %s",
 					c.what, c.who, got.Code, c.want, got.Body.String())
 			}
-			if got := asPerson(t, r, c.refusedFor, c.method, c.path, c.body); got.Code != c.refusal {
+			if got := httpapitest.AsPerson(t, r, c.refusedFor, c.method, c.path, c.body); got.Code != c.refusal {
 				who := c.refusedFor
 				if who == "" {
 					who = "nobody"
@@ -133,7 +135,7 @@ func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
 // only thing narrowing them is a check in the handler. No test named
 // `/v1/outbound` at all.
 func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		const secret = "sixteen-characters-at-least"
 		const at = "/v1/outbound"
 
@@ -147,13 +149,13 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 					`"url":"https://hooks.example.test/t/abc","secret":"` + secret + `"}`},
 				{http.MethodDelete, at + "/theirs/*", ""},
 			} {
-				if got := asPerson(t, r, who, c.method, c.path, c.body); got.Code != http.StatusForbidden {
+				if got := httpapitest.AsPerson(t, r, who, c.method, c.path, c.body); got.Code != http.StatusForbidden {
 					t.Errorf("%s reached %s %s, answering %d", who, c.method, c.path, got.Code)
 				}
 			}
 		}
 
-		created := asPerson(t, r, "admin", http.MethodPost, at,
+		created := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at,
 			`{"name":"ops","kind":"*","url":"https://hooks.example.test/t/s3cr3t-path",`+
 				`"secret":"`+secret+`"}`)
 		if created.Code != http.StatusCreated {
@@ -167,7 +169,7 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 		// Never what it is signed with. For Slack and for Teams the
 		// address is itself the credential — the path carries the token and
 		// there is no other authentication — so neither may come back.
-		listed := asPerson(t, r, "admin", http.MethodGet, at, "")
+		listed := httpapitest.AsPerson(t, r, "admin", http.MethodGet, at, "")
 		if listed.Code != http.StatusOK {
 			t.Fatalf("listing answered %d: %s", listed.Code, listed.Body.String())
 		}
@@ -202,7 +204,7 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 				"https://hooks.slack.com@127.0.0.1/services/x"},
 			{"an address that is not one", "not-an-address"},
 		} {
-			refusedWith(t, asPerson(t, r, "admin", http.MethodPost, at,
+			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPost, at,
 				`{"name":"bad","kind":"*","url":"`+c.url+`","secret":"`+secret+`"}`),
 				http.StatusUnprocessableEntity)
 		}
@@ -216,14 +218,14 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 // counted there and never named: the document is the thing that leaves this
 // deployment, so the rule that governs it is the one that governs an advisory.
 func TestReleaseNotesNameNothingNobodyHasAnnounced(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		embargoed := r.embargoed(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		embargoed := r.Embargoed(t)
 
 		const notes = "/v1/products/mine/comparison/notes" +
 			"?from=master&from_variant=broadcom&to=master&to_variant=broadcom"
 
-		got := asPerson(t, r, "private-triage", http.MethodGet, notes, "")
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, notes, "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("release notes answered %d: %s", got.Code, got.Body.String())
 		}
@@ -238,7 +240,7 @@ func TestReleaseNotesNameNothingNobodyHasAnnounced(t *testing.T) {
 		}
 
 		// And somebody holding nothing on the product does not get them.
-		if refusedFor := asPerson(t, r, "outsider", http.MethodGet, notes,
+		if refusedFor := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, notes,
 			""); refusedFor.Code != http.StatusNotFound {
 			t.Errorf("somebody holding nothing on the product read its release notes: %d",
 				refusedFor.Code)
@@ -250,14 +252,14 @@ func TestReleaseNotesNameNothingNobodyHasAnnounced(t *testing.T) {
 // reaches `resolve-finding`, the act that closes findings, which was pinned
 // nowhere through the router.
 func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
 
 		// A flaw somebody recorded, because a scan is the authority on what it
 		// found: only a hand-recorded one is closed this way. Disclosed, so
 		// that the refusal below is about the right to close rather than about
 		// the right to see it at all.
-		recorded := asPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/findings",
+		recorded := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/findings",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200","disclosed":true}`)
@@ -278,11 +280,11 @@ func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *
 		// Answered as a finding that is not there rather than as a refusal:
 		// the per-product half of a requirement is resolved in the handler,
 		// and it refuses the way every other read of one does.
-		if got := asPerson(t, r, "reader", http.MethodPost, at, body); got.Code != http.StatusNotFound {
+		if got := httpapitest.AsPerson(t, r, "reader", http.MethodPost, at, body); got.Code != http.StatusNotFound {
 			t.Errorf("somebody who may not triage closed a finding, answering %d", got.Code)
 		}
 
-		got := asPerson(t, r, "triager", http.MethodPost, at, body)
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at, body)
 		if got.Code != http.StatusOK {
 			t.Fatalf("closing a finding answered %d: %s", got.Code, got.Body.String())
 		}
@@ -305,12 +307,12 @@ func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *
 // the only test that reached the route asserted a refusal — so the success
 // path, and both counts it publishes, were unpinned.
 func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		r.scannedAlso(t, "mellanox", "3.7.0")
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		r.ScannedAlso(t, "mellanox", "3.7.0")
 
 		// Recorded against two builds, then narrowed to one.
-		recorded := asPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/findings",
+		recorded := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/findings",
 			`{"builds":[{"stream":"master","variant":"broadcom"},`+
 				`{"stream":"master","variant":"mellanox"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
@@ -326,7 +328,7 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 		}
 
 		at := "/v1/products/mine/issues/" + flaw.Identifier + "/builds"
-		got := asPerson(t, r, "triager", http.MethodPut, at,
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
 				`"reason":"The mellanox build never shipped the component."}`)
 		if got.Code != http.StatusOK {
@@ -351,7 +353,7 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 
 		// Taking a build out with no reason is refused: closing a finding as
 		// never-affected is a judgment, and one with no reason is not.
-		refusedWith(t, asPerson(t, r, "triager", http.MethodPut, at,
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"builds":[{"stream":"master","variant":"mellanox"}]}`),
 			http.StatusUnprocessableEntity)
 	})

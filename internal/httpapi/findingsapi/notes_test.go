@@ -1,0 +1,328 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package findingsapi_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+// The routes a note is reached by, as one table so a role that reaches a
+// thread by one and not the other cannot hide between two tests.
+const (
+	notesHere  = "/v1/products/mine/issues/CVE-2026-9999/notes"
+	notesThere = "/v1/products/theirs/issues/CVE-2026-9999/notes"
+)
+
+func TestReadingAProductDoesNotCarryWritingANoteInIt(t *testing.T) {
+	// A note records no judgment, which is the whole of what it is for — and
+	// writing one is still saying something on the record about work. So the
+	// matrix is the same shape as every other write here: reading the product
+	// is not enough, and triage on it is.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		const note = `{"body":"Upstream says a patch lands next week."}`
+
+		for _, each := range []struct {
+			who  string
+			want int
+		}{
+			// Triage here, which is what writing asks for.
+			{"triager", http.StatusCreated},
+			{"private-triage", http.StatusCreated},
+			// Reading here, which is not.
+			{"reader", http.StatusForbidden},
+			{"private", http.StatusForbidden},
+			// The capability with no triage right under it.
+			{"approver", http.StatusNotFound},
+			// Nobody at all.
+			{"", http.StatusUnauthorized},
+		} {
+			got := httpapitest.AsPerson(t, r, each.who, http.MethodPost, notesHere, note)
+			if got.Code != each.want {
+				t.Errorf("%q writing a note answered %d, want %d: %s",
+					each.who, got.Code, each.want, got.Body.String())
+			}
+		}
+	})
+}
+
+func TestANoteInAProductYouHoldNothingOnReadsAsNotThere(t *testing.T) {
+	// A note carries what somebody wrote about an issue, so "you may not read
+	// this" about a product somebody holds nothing on says the issue is there.
+	// A product nobody holds and a product that does not exist answer alike.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+
+		for _, path := range []string{notesThere, "/v1/products/nobodys/issues/CVE-2026-9999/notes"} {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, path, "")
+			if got.Code != http.StatusNotFound {
+				t.Errorf("reading %s answered %d, want the words an undeclared product gets: %s",
+					path, got.Code, got.Body.String())
+			}
+			wrote := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
+				`{"body":"Probing."}`)
+			if wrote.Code != http.StatusNotFound {
+				t.Errorf("writing into %s answered %d, want the same: %s",
+					path, wrote.Code, wrote.Body.String())
+			}
+		}
+	})
+}
+
+func TestANoteIsReadBackInTheProductItWasWrittenIn(t *testing.T) {
+	// The round trip, and the boundary in one: what is written in one product
+	// is read back there and nowhere else. The reader here holds both products
+	// so the empty answer is a boundary rather than a refusal.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost, notesHere,
+			`{"body":"Upstream says a patch lands next week."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("writing a note answered %d: %s", made.Code, made.Body.String())
+		}
+
+		var page struct {
+			Items []struct {
+				ID        int64  `json:"id"`
+				Body      string `json:"body"`
+				WrittenBy string `json:"written_by"`
+			} `json:"items"`
+		}
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, notesHere, "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading the notes answered %d: %s", got.Code, got.Body.String())
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		if len(page.Items) != 1 || page.Items[0].Body == "" {
+			t.Fatalf("the thread came back as %+v, want the note that was written", page.Items)
+		}
+		if page.Items[0].WrittenBy != "triager" {
+			t.Errorf("the note is attributed to %q", page.Items[0].WrittenBy)
+		}
+
+		// And not from the other product, asked by somebody holding every
+		// product: the issue does not sit there, so the thread answers as an
+		// issue that is not there rather than carrying what was written next
+		// door.
+		elsewhere := httpapitest.AsPerson(t, r, "estate-reader", http.MethodGet, notesThere, "")
+		if elsewhere.Code != http.StatusNotFound {
+			t.Errorf("a reader of every product reached the other product's thread with %d: %s",
+				elsewhere.Code, elsewhere.Body.String())
+		}
+	})
+}
+
+func TestOnlyTheAuthorEditsANoteThroughTheApi(t *testing.T) {
+	// An edit another person could make is not a correction, and the record
+	// keeps what it said before either way.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost, notesHere,
+			`{"body":"First thought."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("writing a note answered %d: %s", made.Code, made.Body.String())
+		}
+		var wrote struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &wrote); err != nil {
+			t.Fatal(err)
+		}
+		at := "/v1/notes/" + httpapitest.Itoa(wrote.ID)
+
+		// Somebody else who holds triage here.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPut, at,
+			`{"body":"Somebody else's words."}`), http.StatusUnprocessableEntity)
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
+			`{"body":"Second thought."}`); got.Code != http.StatusOK {
+			t.Fatalf("the author could not change their own note: %d %s",
+				got.Code, got.Body.String())
+		}
+
+		var history struct {
+			Items []struct {
+				Version int    `json:"version"`
+				Body    string `json:"body"`
+			} `json:"items"`
+		}
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"/history", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading what it said before answered %d: %s", got.Code, got.Body.String())
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &history); err != nil {
+			t.Fatal(err)
+		}
+		if len(history.Items) != 1 || history.Items[0].Body != "First thought." {
+			t.Errorf("the history is %+v, want the one version that was replaced", history.Items)
+		}
+	})
+}
+
+func TestACollaboratorReachesTheNotesOnTheirOwnCase(t *testing.T) {
+	// A collaborator holds nothing on the product and is brought in on one
+	// issue in it. The route has to resolve the product's name for them —
+	// refusing there would refuse them the one thing they were granted while
+	// telling them nothing they did not already know — and then the issue is
+	// where the grant is honored again.
+	//
+	// Without this the case arms in the note store are unreachable and the
+	// design document promises access the routes refuse.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		embargoed := r.Embargoed(t)
+		notes := "/v1/products/mine/issues/" + embargoed + "/notes"
+
+		// The outsider holds a role on the other product and nothing on this
+		// one, so this product does not resolve for them at all yet. Somebody
+		// granted nothing anywhere is refused at the door, which is why the
+		// case is put on a person who holds something somewhere else.
+		if got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, notes, ""); got.Code != http.StatusNotFound {
+			t.Fatalf("somebody holding nothing on this product reached the thread with %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing somebody in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		if got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, notes, ""); got.Code != http.StatusOK {
+			t.Fatalf("a collaborator cannot read the notes on the case they are on: %d %s",
+				got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "outsider", http.MethodPost, notes,
+			`{"body":"We saw this in our own build last month."}`); got.Code != http.StatusCreated {
+			t.Fatalf("a collaborator cannot write a note on the case they are on: %d %s",
+				got.Code, got.Body.String())
+		}
+
+		// And nothing else of the product: the scanned issue is one they were
+		// not brought in on.
+		other := "/v1/products/mine/issues/CVE-2026-9999/notes"
+		if got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, other, ""); got.Code != http.StatusNotFound {
+			t.Errorf("the case grant reached an issue it does not name: %d %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
+	// Home shows every figure the scope narrows beside its all-products twin,
+	// so the difference a selection makes is on screen. These two answered for
+	// every product whatever was selected, and the page said so in words
+	// instead — which describes an inconsistency rather than removing one.
+	//
+	// A product nobody holds answers as one nobody declared, like every other
+	// product a list narrows by.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		// A claim waiting on somebody, and a finding somebody holds, both in
+		// `mine`. Without them every count is zero and a lost narrowing reads
+		// the same as a working one.
+		r.Decided(t, place)
+		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
+			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"+
+				"/components/libnl-3-200/assignment",
+			`{"person":"triager"}`); got.Code >= 400 {
+			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
+		}
+
+		count := func(who, path string) int {
+			t.Helper()
+			got := httpapitest.AsPerson(t, r, who, http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s answered %d: %s", path, got.Code, got.Body.String())
+			}
+			var page struct {
+				Total int               `json:"total"`
+				Items []json.RawMessage `json:"items"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			if page.Total > 0 {
+				return page.Total
+			}
+			return len(page.Items)
+		}
+
+		// Holdings are read by somebody holding both products, so the other
+		// product's empty answer is a narrowing rather than a refusal.
+		if whole := count("estate-reader", "/v1/assignments"); whole == 0 {
+			t.Fatal("nobody holds anything, so narrowing holdings proves nothing")
+		}
+		if here := count("estate-reader", "/v1/assignments?product=mine"); here == 0 {
+			t.Error("narrowed to the product the work is in, holdings answered nothing")
+		}
+		if elsewhere := count("estate-reader", "/v1/assignments?product=theirs"); elsewhere != 0 {
+			t.Errorf("holdings in a product nobody holds work in answered %d", elsewhere)
+		}
+
+		// The queue is read by whoever may approve, which is a narrower thing
+		// than reading: an estate reader has nothing waiting on them however it
+		// is narrowed, so asserting through one proves nothing.
+		//
+		// This half shows that narrowing to the product holding the
+		// claim keeps it, and that a product the approver cannot act in is
+		// refused. It cannot show a claim being *excluded*, because the only
+		// approver here holds one product — that half is shown by the holdings
+		// above, which are read by somebody holding both and narrow the same
+		// way through the same resolver.
+		if whole := count("reviewer", "/v1/review-queue"); whole == 0 {
+			t.Fatal("nothing waits on the approver, so narrowing the queue proves nothing")
+		}
+		if here := count("reviewer", "/v1/review-queue?product=mine"); here == 0 {
+			t.Error("narrowed to the product the claim is in, the queue answered nothing")
+		}
+
+		// The file a narrowed screen offers is the narrowed backlog. Taken from
+		// a screen showing one product and answering for every product, a
+		// backlog report is about work the reader was not looking at.
+		exported := func(who, query string) int {
+			t.Helper()
+			got := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/review-queue.csv"+query, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("the queue export answered %d: %s", got.Code, got.Body.String())
+			}
+			return strings.Count(strings.TrimRight(got.Body.String(), "\n"), "\n")
+		}
+		// Asserted against a file that has rows to lose, so a narrowing that
+		// dropped everything and one that narrowed nothing are told apart.
+		if whole := exported("reviewer", ""); whole == 0 {
+			t.Fatal("the unnarrowed queue export is empty, so narrowing it proves nothing")
+		}
+		if here := exported("reviewer", "?product=mine"); here == 0 {
+			t.Error("narrowed to the product holding the claim, the export is empty")
+		}
+		// A product this approver holds nothing on is refused rather than
+		// silently written out whole — the same answer the list gives, because
+		// the name is resolved after the right to act is checked.
+		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodGet,
+			"/v1/review-queue.csv?product=theirs", ""); got.Code != http.StatusNotFound {
+			t.Errorf("the export answered %d for a product the approver cannot act in", got.Code)
+		}
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+			"/v1/review-queue.csv?product=nobodys", ""); got.Code != http.StatusNotFound {
+			t.Errorf("the export answered %d for an undeclared product", got.Code)
+		}
+
+		// And a product this reader holds nothing on is refused in the words an
+		// undeclared name gets, rather than silently answering for everything.
+		for _, path := range []string{"/v1/review-queue?product=nobodys",
+			"/v1/assignments?product=nobodys"} {
+			if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, path, ""); got.Code != http.StatusNotFound {
+				t.Errorf("%s answered %d, want the words an undeclared product gets: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+	})
+}

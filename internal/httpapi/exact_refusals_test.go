@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -45,8 +46,20 @@ func boundedRefusals(file *ast.File, name string) []string {
 // A refusal is asserted as the exact status it answers with. A bound below 400
 // also holds for a panic answered 500, a route that moved and answers 404 or
 // 405, and a 403 that says a hidden product exists.
+//
+// The tests are every test file in this package and the packages beneath it,
+// and the shared harness, which is ordinary source in a package of its own.
 func TestARefusalIsAssertedAsItsExactStatus(t *testing.T) {
-	names, err := filepath.Glob("*_test.go")
+	var names []string
+	err := filepath.WalkDir(".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(name, ".go") {
+			return err
+		}
+		if strings.HasSuffix(name, "_test.go") || filepath.Dir(name) == "httpapitest" {
+			names = append(names, name)
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +76,7 @@ func TestARefusalIsAssertedAsItsExactStatus(t *testing.T) {
 		bounded = append(bounded, boundedRefusals(file, name)...)
 	}
 	for _, each := range bounded {
-		t.Errorf("%s asserts a refusal as a status below 400; use refusedWith with the exact status", each)
+		t.Errorf("%s asserts a refusal as a status below 400; use RefusedWith with the exact status", each)
 	}
 }
 

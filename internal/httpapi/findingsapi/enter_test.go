@@ -1,0 +1,784 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package findingsapi_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+func TestAWeaknessThatIsNotAnIdentifierIsTheCallersToFix(t *testing.T) {
+	// Refused in words before anything is written, rather than answered as a
+	// fault by the engines whose column is narrower than what was sent.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		many := make([]string, 0, 17)
+		for i := 1; i <= 17; i++ {
+			many = append(many, `"CWE-`+strconv.Itoa(i)+`"`)
+		}
+		for what, weaknesses := range map[string]string{
+			"seventeen":         strings.Join(many, ","),
+			"one with a suffix": `"CWE-79x"`,
+			"one too long":      `"CWE-` + strings.Repeat("7", 300) + `"`,
+		} {
+			body := `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+				`"summary":"The parser reads past its buffer.","severity":"high",` +
+				`"weaknesses":[` + weaknesses + `]}`
+			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings", body)
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("%s answered %d: %s", what, got.Code, got.Body.String())
+			}
+		}
+	})
+}
+
+func TestAFlawInOurOwnProductIsRecordedAndReadBackLikeAnyOther(t *testing.T) {
+	// The point of doing this before the reports and the channels: from the
+	// moment it is recorded it is an ordinary finding. It appears in the list,
+	// it can be assigned, it can be decided — with one difference, which is
+	// that nobody outside has been told about it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		// Recording belongs to a build; the list it appears in takes
+		// the build as a selection.
+		const listing = "/v1/products/mine/findings?stream=master&variant=broadcom"
+
+		// A reader cannot, and neither can somebody who may only argue about
+		// known issues in shipped components.
+		body := `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+			`"summary":"The management socket answers before anyone authenticated.",` +
+			`"severity":"critical"}`
+		for _, who := range []string{"reader", "triager"} {
+			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, who, http.MethodPost, at, body), http.StatusNotFound)
+		}
+
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at, body)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+			Component  string `json:"component"`
+			Visibility string `json:"visibility"`
+			DueAt      string `json:"due_at"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if !regexp.MustCompile(`^MINE-\d{4}-\d+$`).MatchString(recorded.Identifier) {
+			t.Errorf("filed under %q, want one of the product's own identifiers",
+				recorded.Identifier)
+		}
+		if recorded.Visibility != "private" {
+			t.Errorf("a flaw nobody announced was recorded as %q", recorded.Visibility)
+		}
+		if recorded.DueAt == "" {
+			t.Error("it carries no deadline, so it is on nobody's clock")
+		}
+
+		// And it reads back only for somebody who may see undisclosed work.
+		var mine struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "private-triage", listing, &mine)
+		var listed bool
+		for _, item := range mine.Items {
+			if item.Vulnerability == recorded.Identifier {
+				listed = true
+			}
+		}
+		if !listed {
+			t.Errorf("what was just recorded is not in the list its author can see: %+v",
+				mine.Items)
+		}
+
+		var theirs struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", listing, &theirs)
+		for _, item := range theirs.Items {
+			if item.Vulnerability == recorded.Identifier {
+				t.Errorf("an undisclosed finding is listed for somebody who may not see one")
+			}
+		}
+	})
+}
+
+func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
+	// Every row is a finding nobody has announced, so the list is a disclosure
+	// in its own right. A product somebody may not read undisclosed work in
+	// contributes nothing to it — not even a count, because a count says as
+	// much as a row.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"critical"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var listed struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+				DiscloseAt    string `json:"disclose_at"`
+				Passed        bool   `json:"passed"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/disclosing?within=365", &listed)
+		if len(listed.Items) != 1 {
+			t.Fatalf("%d findings are approaching disclosure for somebody who may see them",
+				len(listed.Items))
+		}
+		if listed.Items[0].DiscloseAt == "" {
+			t.Error("the row does not say when the embargo ends")
+		}
+		if listed.Items[0].Passed {
+			t.Error("an embargo ninety days out reads as passed")
+		}
+
+		for _, who := range []string{"reader", "triager"} {
+			var theirs struct {
+				Items []struct {
+					Vulnerability string `json:"vulnerability"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, who, "/v1/disclosing?within=365", &theirs)
+			if len(theirs.Items) != 0 {
+				t.Errorf("%s was shown %d undisclosed findings", who, len(theirs.Items))
+			}
+		}
+	})
+}
+
+func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing.T) {
+	// A short extension is ordinary triage; past the threshold it needs a
+	// second person, and until it has one the date has not moved. The request
+	// is on record either way, because what was asked for is part of how long
+	// this stayed hidden.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const findings = "/v1/products/mine/findings"
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, findings,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"high"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		at := "/v1/products/mine/issues/" + recorded.Identifier + "/disclosure"
+		extend := at + "/extension"
+
+		// A reason is required.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, extend,
+			`{"until":"2030-01-01","reason":""}`), http.StatusUnprocessableEntity)
+		// And somebody who may not see undisclosed work cannot move one.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, extend,
+			`{"until":"2030-01-01","reason":"Because."}`), http.StatusNotFound)
+		// Each act refuses the date the other one takes, so neither is ever
+		// recorded as the other. The refusal is the caller's to correct. Verified
+		// by deleting the wrong-direction arm of refusedMovement: both answer 500.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at+"/shortening",
+			`{"until":"2030-01-01","reason":"Pulling it in."}`), http.StatusUnprocessableEntity)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, extend,
+			`{"until":"2020-01-01","reason":"Pushing it out."}`), http.StatusUnprocessableEntity)
+
+		// Years out, so well past the threshold: it waits.
+		got = httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, extend,
+			`{"until":"2030-01-01","reason":"Upstream has not answered."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("asking answered %d: %s", got.Code, got.Body.String())
+		}
+		var asked struct {
+			ID            int64  `json:"id"`
+			Act           string `json:"act"`
+			NeedsApproval bool   `json:"needs_approval"`
+			InForce       bool   `json:"in_force"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &asked); err != nil {
+			t.Fatal(err)
+		}
+		if !asked.NeedsApproval || asked.InForce {
+			t.Errorf("a four-year extension stood on one person's say-so: %+v", asked)
+		}
+		if asked.Act != "extension" {
+			t.Errorf("the record calls it %q, want it recorded as an extension", asked.Act)
+		}
+
+		// The person who asked may not agree to it.
+		approval := fmt.Sprintf("/v1/disclosure-movements/%d/approval", asked.ID)
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, approval, `{}`); got.Code != http.StatusConflict {
+			t.Errorf("agreeing to one's own extension answered %d, want 409", got.Code)
+		}
+
+		// The history is kept whether or not anybody agreed.
+		var history struct {
+			Items []struct {
+				Act         string `json:"act"`
+				Reason      string `json:"reason"`
+				InForce     bool   `json:"in_force"`
+				AskedBy     string `json:"asked_by"`
+				AskedByName string `json:"asked_by_name"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-triage", at, &history)
+		if len(history.Items) != 1 || history.Items[0].Reason == "" {
+			t.Fatalf("the record of what was asked reads as %+v", history.Items)
+		}
+		if history.Items[0].InForce {
+			t.Error("an extension nobody agreed to is reported as in force")
+		}
+		// The identity, which is what a caller matches on, with the label
+		// beside it rather than in its place.
+		if history.Items[0].AskedBy != "private-triage" ||
+			history.Items[0].AskedByName != httpapitest.ShownAs("private-triage") {
+			t.Errorf("the history names who asked as %q (%q), want the sign-in identity",
+				history.Items[0].AskedBy, history.Items[0].AskedByName)
+		}
+		if history.Items[0].Act != "extension" {
+			t.Errorf("the history does not say which act it was: %+v", history.Items[0])
+		}
+
+		// And there is somewhere to be the second person. Until this, a
+		// request could be read on the finding it belongs to and nowhere else,
+		// so the only way to find one was to already know it existed.
+		var pending struct {
+			Items []struct {
+				ID            int64  `json:"id"`
+				Vulnerability string `json:"vulnerability"`
+				Product       string `json:"product"`
+				Act           string `json:"act"`
+				Days          int    `json:"days"`
+				By            string `json:"by"`
+				Mine          bool   `json:"mine"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-dispatcher", "/v1/disclosure-movements", &pending)
+		if len(pending.Items) != 1 || pending.Items[0].ID != asked.ID {
+			t.Fatalf("what is waiting to be agreed to reads as %+v", pending.Items)
+		}
+		if pending.Items[0].Days <= 0 || pending.Items[0].By != "private-triage" {
+			t.Errorf("the row does not say how far, or who asked by identity: %+v",
+				pending.Items[0])
+		}
+		if pending.Items[0].Act != "extension" {
+			t.Errorf("the row does not say which act is waiting: %+v", pending.Items[0])
+		}
+		if pending.Items[0].Mine {
+			t.Error("somebody else's request is reported as this reader's own")
+		}
+
+		// Their own is shown and marked, because hiding it would leave
+		// somebody hunting for what is holding their case up.
+		var theirs struct {
+			Items []struct {
+				Mine bool `json:"mine"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/disclosure-movements", &theirs)
+		if len(theirs.Items) != 1 || !theirs.Items[0].Mine {
+			t.Errorf("a proposer's own request reads as %+v", theirs.Items)
+		}
+
+		// Somebody who may not read undisclosed work sees nothing: the list is
+		// itself a disclosure, because a row says an issue exists and is being
+		// kept hidden longer.
+		var public struct {
+			Items []struct {
+				ID int64 `json:"id"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/disclosure-movements", &public)
+		if len(public.Items) != 0 {
+			t.Errorf("somebody who may not read undisclosed work sees %+v", public.Items)
+		}
+
+		// A request in a product they read nothing undisclosed in is not
+		// theirs to see either. Written straight to the table, because no
+		// route can make one there — which is the point: the narrowing has to
+		// be in the query rather than in what the routes happen to allow.
+		theirProduct, err := catalog.NewStore(r.DB.DB).ProductByName(t.Context(), "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var issue int64
+		if err := r.DB.DB.NewSelect().Table("vulnerability").ColumnExpr("id").
+			Limit(1).Scan(t.Context(), &issue); err != nil {
+			t.Fatal(err)
+		}
+		// A real person, resolved rather than assumed: identifiers are not the
+		// same number on every engine, and a foreign key is enforced on three
+		// of the four.
+		asker, err := access.NewStore(r.DB.DB).Resolve(t.Context(), "admin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.DB.NewInsert().Model(&finding.Movement{
+			VulnerabilityID: issue, ProductID: theirProduct.ID, Act: finding.Extension,
+			Was: time.Now().UTC(), Until: time.Now().UTC().AddDate(1, 0, 0),
+			Reason: "Somebody else's case.", AskedBy: asker.ID, AskedAt: time.Now().UTC(),
+			NeedsApproval: true,
+		}).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/disclosure-movements", &pending)
+		if len(pending.Items) != 1 {
+			t.Errorf("a request in a product they read nothing undisclosed in is listed: %+v",
+				pending.Items)
+		}
+
+		// A second person agrees, and it leaves the list because it has been
+		// answered rather than because anybody dismissed it.
+		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
+			approval, `{}`); got.Code != http.StatusNoContent {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
+		}
+		httpapitest.Read(t, r, "private-dispatcher", "/v1/disclosure-movements", &pending)
+		if len(pending.Items) != 0 {
+			t.Errorf("an extension somebody agreed to is still waiting: %+v", pending.Items)
+		}
+	})
+}
+
+func TestANameTheBuildHoldsTwiceIsRefusedWithTheChoicesToPickFrom(t *testing.T) {
+	// The screen recording a flaw offers the choices back, so what it needs is
+	// which versions rather than only that it could not tell. Resolving to one
+	// of them would file a flaw against a version nobody named and say nothing.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		r.ShipsTwice(t)
+		const at = "/v1/products/mine/findings"
+		const said = `"summary":"The parser accepts a message it should refuse.","severity":"high"`
+
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+said+`,"component":"libnl-3-200"}`)
+		if got.Code != http.StatusConflict {
+			t.Fatalf("an ambiguous name answered %d: %s", got.Code, got.Body.String())
+		}
+		var refused struct {
+			Errors []struct {
+				Location string            `json:"location"`
+				Message  string            `json:"message"`
+				Value    map[string]string `json:"value"`
+			} `json:"errors"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &refused); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if len(refused.Errors) != 2 {
+			t.Fatalf("the refusal offers %d choices, want both: %s", len(refused.Errors),
+				got.Body.String())
+		}
+		// The ecosystem travels with each, because a version alone does not
+		// always resolve one — a source repository and the package built from
+		// it share both a name and a version.
+		for _, choice := range refused.Errors {
+			if choice.Value["ecosystem"] == "" {
+				t.Errorf("choice %q offers no ecosystem", choice.Message)
+			}
+		}
+
+		// Named, it is recorded against that one.
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+said+`,"component":"libnl-3-200","version":"3.9.0"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("naming the version answered %d: %s", made.Code, made.Body.String())
+		}
+	})
+}
+
+func TestASummaryOfNothingButSpacesIsTheCallersToFix(t *testing.T) {
+	// Whitespace passes a minimum length, so this reaches the store, and the
+	// store's refusal is the caller's to fix rather than a 500 saying
+	// something went wrong here. Nothing went wrong here.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"summary":"   ","severity":"high"}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a summary of spaces answered %d, want it named as the caller's to fix: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAVectorThisCannotScoreIsTheCallersToFix(t *testing.T) {
+	// A caller's input, answered as theirs. Falling through to the generic
+	// refusal tells somebody to report a fault when what they have to do is
+	// send a different vector — and this is the endpoint whose own comment
+	// says so about every other refusal it makes.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Something is wrong.",`+
+				`"vector":"AV:N/AC:L/Au:N/C:P/I:P/A:P"}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a scheme this cannot score answered %d, want it named as the caller's"+
+				" to fix: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(t *testing.T) {
+	// The population a deployment writes advisories about is the one it
+	// assesses itself, so this is the scheme that matters most. A number
+	// recorded without it cannot be placed: 7.5 under version 3 and 7.5 under
+	// version 4 are two different judgments.
+	//
+	// On every engine, because it is the only test that reaches the aggregate
+	// carrying the scheme, and an aggregate is SQL. Both lists: the one inside
+	// a product and the one spanning them, which are separate statements and
+	// the second is where two schemes share a column.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		for _, at := range []struct{ what, path string }{
+			{"inside the product", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"across every product", "/v1/findings"},
+		} {
+			t.Run(at.what, func(t *testing.T) {
+				// Read fresh. A field left out of a payload is left alone by
+				// the decoder rather than cleared, so a struct reused across
+				// two reads reports the first read's answer for anything the
+				// second omits — and an omitted scheme is the thing under
+				// test.
+				var listed struct {
+					Items []struct {
+						Vulnerability string  `json:"vulnerability"`
+						Severity      string  `json:"severity"`
+						Score         float64 `json:"score"`
+						ScoreVersion  string  `json:"score_version"`
+					} `json:"items"`
+				}
+				httpapitest.Read(t, r, "private-triage", at.path, &listed)
+				for _, item := range listed.Items {
+					if item.Vulnerability != recorded.Identifier {
+						continue
+					}
+					if item.ScoreVersion != "4.0" {
+						t.Errorf("the list says the score is on %q, want the 4.0 it was "+
+							"assessed under", item.ScoreVersion)
+					}
+					// 10.0 by the published tables, which is "critical".
+					if item.Severity != "critical" {
+						t.Errorf("the vector said critical and the finding reads %q",
+							item.Severity)
+					}
+					if item.Score != 10 {
+						t.Errorf("the score is %v, want the 10.0 the vector works out to",
+							item.Score)
+					}
+					return
+				}
+				t.Error("what was recorded is not in the list")
+			})
+		}
+	})
+}
+
+func TestAFlawMayBeRecordedBeforeAnybodyHasRatedIt(t *testing.T) {
+	// Early triage. Making somebody pick a severity to get the record written
+	// is how a guess ends up stored as a judgment.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Found during early triage; how bad it is comes later."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("an unrated flaw answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAVectorSettlesTheSeverityRatherThanBeingAskedTwice(t *testing.T) {
+	// Somebody who has done the analysis has already answered this, and asking
+	// again invites a word that disagrees with the vector beside it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",`+
+				`"weaknesses":["CWE-306","cwe-306","  "]}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		var listed struct {
+			Items []struct {
+				Vulnerability string  `json:"vulnerability"`
+				Severity      string  `json:"severity"`
+				Score         float64 `json:"score"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-triage",
+			"/v1/products/mine/findings?stream=master&variant=broadcom", &listed)
+		for _, item := range listed.Items {
+			if item.Vulnerability != recorded.Identifier {
+				continue
+			}
+			// 9.8 by the published formula, which is "critical".
+			if item.Severity != "critical" {
+				t.Errorf("the vector said critical and the finding reads %q", item.Severity)
+			}
+			if item.Score < 9.7 || item.Score > 9.9 {
+				t.Errorf("the score is %v, want the 9.8 the vector works out to", item.Score)
+			}
+			return
+		}
+		t.Error("what was recorded is not in the list")
+	})
+}
+
+func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
+	// authorizing before resolving a name applied to issues. Every route
+	// shaped "this issue, at this place" resolved the name first and
+	// checked what it reached second, so a name somebody holds and a name
+	// nobody holds came back differently — and on two of them the check
+	// that came second was not a refusal at all: a fix target answered an
+	// empty list and an assignment answered "done" while writing nothing.
+	// Both disclose by succeeding.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+
+		// An undisclosed flaw somebody recorded, at a component the prober can
+		// otherwise read.
+		recorded := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+				`"summary":"The management socket answers before anyone authenticated.",`+
+				`"severity":"critical"}`)
+		if recorded.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", recorded.Code, recorded.Body.String())
+		}
+		var flaw struct {
+			Identifier string `json:"identifier"`
+			Component  string `json:"component"`
+		}
+		if err := json.Unmarshal(recorded.Body.Bytes(), &flaw); err != nil {
+			t.Fatalf("decode: %v (%s)", err, recorded.Body.String())
+		}
+		// A name of the same shape that nobody has ever issued.
+		absent := "MINE-2026-404404"
+		if flaw.Identifier == absent {
+			t.Fatalf("the drawn identifier collided with the one used as absent")
+		}
+
+		const build = "/v1/products/mine/streams/master/variants/broadcom"
+		routes := []struct {
+			what   string
+			method string
+			path   string
+			body   string
+		}{
+			{"the finding itself", http.MethodGet,
+				build + "/findings/%s/components/" + flaw.Component, ""},
+			{"a decision about it", http.MethodPost,
+				build + "/findings/%s/components/" + flaw.Component + "/decision",
+				`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",` +
+					`"reasoning":"Probing."}`},
+			{"who is holding it", http.MethodPut,
+				build + "/findings/%s/components/" + flaw.Component + "/assignment",
+				`{"person":"reader"}`},
+			{"closing it", http.MethodPost, build + "/findings/%s/resolve",
+				`{"because":"invalid"}`},
+			{"extending the embargo", http.MethodPost,
+				"/v1/products/mine/issues/%s/disclosure/extension",
+				`{"until":"2027-01-01T00:00:00Z","reason":"Probing for the date."}`},
+			{"bringing the embargo in", http.MethodPost,
+				"/v1/products/mine/issues/%s/disclosure/shortening",
+				`{"until":"2027-01-01T00:00:00Z","reason":"Probing for the date."}`},
+			{"disclosing it", http.MethodPost,
+				"/v1/products/mine/issues/%s/disclosure",
+				`{"reason":"Probing for the issue."}`},
+			{"its attachments", http.MethodGet,
+				"/v1/products/mine/issues/%s/attachments", ""},
+			{"when it is disclosed", http.MethodGet,
+				"/v1/products/mine/issues/%s/disclosure", ""},
+			{"which builds it affects", http.MethodPut,
+				"/v1/products/mine/issues/%s/builds",
+				`{"builds":[{"stream":"master","variant":"broadcom"}]}`},
+		}
+
+		// The prober triages this product and may not read undisclosed work,
+		// which is the credential the leak was demonstrated with.
+		for _, route := range routes {
+			hidden := httpapitest.AsPerson(t, r, "triager", route.method,
+				fmt.Sprintf(route.path, flaw.Identifier), route.body)
+			unused := httpapitest.AsPerson(t, r, "triager", route.method,
+				fmt.Sprintf(route.path, absent), route.body)
+
+			if hidden.Code != unused.Code {
+				t.Errorf("%s: a hidden issue answers %d and an unused name %d",
+					route.what, hidden.Code, unused.Code)
+			}
+			if hidden.Code != http.StatusNotFound {
+				t.Errorf("%s: probing a hidden issue answered %d, want 404: %s",
+					route.what, hidden.Code, hidden.Body.String())
+			}
+			if hidden.Body.String() != unused.Body.String() {
+				t.Errorf("%s: the two answers read differently\n hidden: %s\n unused: %s",
+					route.what, hidden.Body.String(), unused.Body.String())
+			}
+		}
+	})
+}
+
+func TestARecordedSummaryGoesThroughTheSamePolicyAsAJustification(t *testing.T) {
+	// our own prose rendered says a summary somebody types goes through
+	// the same editor and the same submission policy as a justification.
+	// It went through neither: no scheme check, no refusal of raw HTML,
+	// and no bound on length at all — and it is rendered as markdown where
+	// it is read back, which is what makes the first two matter and what
+	// makes the third a rendering nobody bounded.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		body := func(summary string) string {
+			return `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+				`"summary":` + quotedJSON(summary) + `,"severity":"high",` +
+				`"component":"libnl-3-200"}`
+		}
+
+		for _, each := range []struct{ why, summary string }{
+			{"a link nothing here may follow",
+				"The socket answers early. [detail](javascript:alert(1))"},
+			{"raw markup", "The socket answers early.<script>alert(1)</script>"},
+		} {
+			// Refused as the writing it is, naming the line, as a justification
+			// is: not a fault at our end.
+			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at, body(each.summary))
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("%s in a recorded summary answered %d: %s",
+					each.why, got.Code, got.Body.String())
+			} else if !strings.Contains(got.Body.String(), "line 1") {
+				t.Errorf("the refusal of %s does not say where: %s", each.why, got.Body.String())
+			}
+		}
+
+		// And the ordinary case still lands, so the checks above are not
+		// passing because everything is refused.
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			body("The management socket answers before anyone has authenticated.")); got.Code != http.StatusCreated {
+			t.Errorf("an ordinary summary answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+// quotedJSON is a JSON string literal for text a test is embedding.
+func quotedJSON(s string) string {
+	encoded, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return string(encoded)
+}
+
+func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
+	// A number alone is not readable across schemes, and a rule enforced at
+	// one of six places holds until somebody does their job. Two of these
+	// leave the deployment as files a script reads, where a bare column of
+	// numbers from two schemes is a ranking that is not one.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		for _, at := range []struct{ what, path string }{
+			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"the list across products", "/v1/findings"},
+			{"the issue", "/v1/issues/" + recorded.Identifier},
+			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document"},
+			{"the export of one product", "/v1/products/mine/findings.csv"},
+			{"the export of every product", "/v1/findings.csv"},
+		} {
+			t.Run(at.what, func(t *testing.T) {
+				got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, at.path, "")
+				if got.Code != http.StatusOK {
+					t.Fatalf("GET %s answered %d: %s", at.path, got.Code, got.Body.String())
+				}
+				body := got.Body.String()
+				if !strings.Contains(body, recorded.Identifier) {
+					t.Fatalf("what was recorded is not in %s", at.what)
+				}
+				if !strings.Contains(body, "10") {
+					t.Fatalf("%s carries no score, so this checked nothing:\n%s", at.what, body)
+				}
+				// The vector states the scheme inside itself, so a surface
+				// carrying the vector would answer this without ever saying
+				// which scheme its number is on. Taken out before asking.
+				said := strings.ReplaceAll(body, "CVSS:4.0", "")
+				// The scheme, however the surface spells it. A payload says
+				// 4.0 in a field, a document says it in a sentence, and a
+				// spreadsheet says it in a column.
+				if !strings.Contains(said, "4.0") {
+					t.Errorf("%s carries the score and not the scheme it is on:\n%s",
+						at.what, body)
+				}
+			})
+		}
+	})
+}
+
+func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
+	// A parameter that is required is checked for being there rather than for
+	// saying anything, and scoring nothing answers every field empty,
+	// including a severity this operation's own enumeration has no word for.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/score?vector=", "")
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an empty vector answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}

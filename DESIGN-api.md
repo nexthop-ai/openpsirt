@@ -413,17 +413,40 @@ or team a row is about, are named the same way.
 
 ## File organization
 
-One file per subject, where a subject is a noun somebody acts on rather than a
-count of lines. The catalog is three — declaring what exists, stating policy on
-it, and reading it — because stating policy is the group that silently rewrites
-what the tool reports and was the hardest of the three to find inside a
-five-hundred-line registration. Keys left the people endpoints for the same
-reason: a different noun, a different lifetime, and the one act here that hands
-out a new way in.
+The API is registered from one package per area somebody works in, into one
+description. The top package holds the router, the middleware in front of every
+route, sign-in and the served interface, and registers each area in turn.
 
-The package's authorization primitives sit beside the declarations they
-enforce. A declaration in one file and the primitive enforcing it in another
-with nothing to do with it is what makes the privilege ladder hard to audit.
+| Area | Operations |
+|---|---|
+| Inventories arriving | Uploads, their receipts, the documents a build sent, one scanner run |
+| Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
+| Handing work out | Assignment, routing rules, teams, tags, bulk acts, fix bundles, planned upgrades, one component |
+| Claims and decisions | The review queue, proposing, approving, re-affirmation, comments, exploitation here, obligation windows, assessments, scrutiny, readiness |
+| Reports | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
+| Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |
+| Administration | The catalog, people and their roles, role bindings, keys, tokens, settings, the trail, work set aside, saved filters, notifications, the caller's own session |
+
+| Rule | Why |
+|---|---|
+| An area reaches the rest of the API only through one shared package | The dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies and helpers a second area needs live there. Areas import nothing of each other, so each builds and tests alone |
+| An area's tests sit beside it, over one shared harness | Each area is one test binary with a database of its own, so the areas run beside each other: 39 s for the API's tests on all four engines on a twelve-core machine, against 107 s for the same tests as one binary |
+| Every area registers into the one description | The document stays one generated file, and a method and path claimed twice is still caught across areas |
+| A check over the source reads every area | The count of registrations, the struct tags a trail filter offers, and the exact-status rule on refusals each walk the whole tree, and fail when they find nothing |
+| Each area checks its own refusal mappers | A mapper is usually private to its area, so only that area can call it. A check at the top fails where an area declares a mapper and runs no such check |
+
+Within an area, one file per subject, where a subject is a noun somebody acts on
+rather than a count of lines. The catalog is three — declaring what exists,
+stating policy on it, and reading it — because stating policy is the group that
+silently rewrites what the tool reports and was the hardest of the three to
+find inside a five-hundred-line registration. Keys left the people endpoints for
+the same reason: a different noun, a different lifetime, and the one act here
+that hands out a new way in.
+
+The authorization primitives sit beside the declarations they enforce, in the
+shared package. A declaration in one file and the primitive enforcing it in
+another with nothing to do with it is what makes the privilege ladder hard to
+audit.
 
 ### Deliberate omissions
 
@@ -431,7 +454,6 @@ Recorded because the conclusion is the deliverable.
 
 | Left alone | Why |
 |---|---|
-| `findings.go` | The findings list, its filter mapping, and the narrowing, paging and single-build types every other list embeds. Cutting it would separate the filter struct from the one function that reads it |
 | The two-build `locate` closures in the report handlers | The shared part is four lines over different response shapes. A helper whose body is an argument list is harder to read than the repetition |
 
 ## Limits

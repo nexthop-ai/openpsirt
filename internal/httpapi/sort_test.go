@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
@@ -17,8 +19,8 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 	// example, and the live hole in a codebase that parameterizes
 	// everything else. What reaches the statement is the allowlist's own
 	// expression; a word that is not one of them is not a sort.
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedTwoIssues(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
 
 		const at = "/v1/products/mine/findings"
 		var ordered struct {
@@ -34,7 +36,7 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 				Items []struct{} `json:"items"`
 				Total int        `json:"total"`
 			}
-			read(t, r, "triager", at+"?sort="+by, &page)
+			httpapitest.Read(t, r, "triager", at+"?sort="+by, &page)
 			if page.Total != 2 || len(page.Items) != 2 {
 				t.Errorf("sorting by %s answered %d of %d, want both rows",
 					by, len(page.Items), page.Total)
@@ -43,11 +45,11 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 
 		// And it actually orders: the high sits above the low by severity, and
 		// under it the other way.
-		read(t, r, "triager", at+"?sort=severity", &ordered)
+		httpapitest.Read(t, r, "triager", at+"?sort=severity", &ordered)
 		if len(ordered.Items) != 2 || ordered.Items[0].Vulnerability != "CVE-2026-9999" {
 			t.Errorf("by severity the worst is not first: %+v", ordered.Items)
 		}
-		read(t, r, "triager", at+"?sort=severity&asc=true", &ordered)
+		httpapitest.Read(t, r, "triager", at+"?sort=severity&asc=true", &ordered)
 		if len(ordered.Items) != 2 || ordered.Items[0].Vulnerability != "CVE-2026-1000" {
 			t.Errorf("asked the other way the worst is still first: %+v", ordered.Items)
 		}
@@ -62,7 +64,7 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 			"1",
 			"f.assigned_to",
 		} {
-			got := asPerson(t, r, "triager", http.MethodGet,
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
 				at+"?sort="+url.QueryEscape(hostile), "")
 			switch got.Code {
 			case http.StatusUnprocessableEntity, http.StatusBadRequest:
@@ -72,7 +74,7 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 				var page struct {
 					Total int `json:"total"`
 				}
-				read(t, r, "triager", at+"?sort="+url.QueryEscape(hostile), &page)
+				httpapitest.Read(t, r, "triager", at+"?sort="+url.QueryEscape(hostile), &page)
 				if page.Total != 2 {
 					t.Errorf("%q changed what the list answers: %d rows", hostile, page.Total)
 				}
@@ -95,11 +97,11 @@ func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
 	// finding has not, so the two lists offer different words and a check
 	// that sent one list's words to the other route would be asking the
 	// wrong question.
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedTwoIssues(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
 
 		declared := map[string][]string{}
-		for path, item := range r.api.OpenAPI().Paths {
+		for path, item := range r.API.OpenAPI().Paths {
 			if item.Get == nil {
 				continue
 			}
@@ -134,7 +136,7 @@ func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
 				if strings.Contains(at, "{") {
 					t.Fatalf("%s names something this test cannot stand in for", path)
 				}
-				got := asPerson(t, r, "triager", http.MethodGet, at, "")
+				got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
 				if got.Code != http.StatusOK {
 					t.Errorf("%s sorted by %q answered %d: %s",
 						path, word, got.Code, got.Body.String())

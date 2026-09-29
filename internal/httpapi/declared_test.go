@@ -5,12 +5,10 @@ package httpapi_test
 
 import (
 	"encoding/json"
-	"net/http"
-	"sort"
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 // asked is what an operation declares it needs, read back off the document the
@@ -57,16 +55,16 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 	// right one — only that there is one — and a refusal for the wrong
 	// reason (an identifier the fixture does not have) passes it. That is
 	// why it is a floor and not the ceiling.
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scanned(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
 
 		// Counted by class, because a sweep that quietly stops walking is
 		// worse than no sweep: the numbers it checks are the only evidence
 		// it is still looking at the API, and a class emptying is invisible
 		// in one total.
 		var onProduct, deployment, records, notAGate, narrowed, noValue int
-		for path, item := range r.api.OpenAPI().Paths {
-			for method, op := range operations(item) {
+		for path, item := range r.API.OpenAPI().Paths {
+			for method, op := range httpapitest.Operations(item) {
 				want, ok := op.Extensions[requiresExtensionName]
 				if !ok {
 					t.Errorf("%s %s declares nothing at all: every operation "+
@@ -123,7 +121,7 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 						"for, so it is not being checked", method, path)
 					continue
 				}
-				if got := r.as(t, who, method, asking); got >= 200 && got < 300 {
+				if got := r.As(t, who, method, asking); got >= 200 && got < 300 {
 					t.Errorf("%s %s answered %q with %d, and %q satisfies none of "+
 						"what it declares (%s)", method, asking, who, got, who,
 						describe(needs))
@@ -200,26 +198,4 @@ func fill(path string) string {
 		path = strings.ReplaceAll(path, "{"+name+"}", value)
 	}
 	return path
-}
-
-// operations is the methods one path answers, in a fixed order so a failure
-// reads the same twice.
-func operations(item *huma.PathItem) map[string]*huma.Operation {
-	all := map[string]*huma.Operation{
-		http.MethodGet: item.Get, http.MethodPost: item.Post,
-		http.MethodPut: item.Put, http.MethodPatch: item.Patch,
-		http.MethodDelete: item.Delete,
-	}
-	out := map[string]*huma.Operation{}
-	names := make([]string, 0, len(all))
-	for method := range all {
-		names = append(names, method)
-	}
-	sort.Strings(names)
-	for _, method := range names {
-		if all[method] != nil {
-			out[method] = all[method]
-		}
-	}
-	return out
 }

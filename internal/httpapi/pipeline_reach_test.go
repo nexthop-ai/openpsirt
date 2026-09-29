@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 // A pipeline's key reads back what it sent and nothing else, on every read
@@ -34,15 +36,15 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 		build + "/scans/{scan}/documents/{document}": http.StatusNotFound,
 	}
 	parameter := regexp.MustCompile(`\{[^}]+\}`)
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scanned(t)
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
 		checked, allowed := 0, 0
-		for path, item := range r.api.OpenAPI().Paths {
+		for path, item := range r.API.OpenAPI().Paths {
 			if item.Get == nil {
 				continue
 			}
 			if asks, stated := item.Get.Extensions["x-openpsirt-requires"]; stated &&
-				declaredScope(t, asks) == "none" {
+				httpapitest.DeclaredScope(t, asks) == "none" {
 				continue
 			}
 			at := parameter.ReplaceAllStringFunc(filled(path), func(name string) string {
@@ -67,7 +69,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 			if len(asked) > 0 {
 				at += "?" + strings.Join(asked, "&")
 			}
-			got := r.asKey(t, http.MethodGet, at)
+			got := r.AsKey(t, http.MethodGet, at)
 			if want, ok := sent[path]; ok {
 				allowed++
 				if got != want {

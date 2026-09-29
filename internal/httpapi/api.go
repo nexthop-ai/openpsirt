@@ -1,9 +1,11 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpapi builds the HTTP surface.
+// Package httpapi builds the HTTP surface: the router, the middleware in front
+// of every route, sign-in and the served interface. The operations live in one
+// package per area beneath it, and New registers each of them into one API.
 //
-// The OpenAPI document is generated from the operations registered here — it is
+// The OpenAPI document is generated from the operations registered — it is
 // never written by hand, so it cannot drift from what the server actually does.
 package httpapi
 
@@ -27,11 +29,14 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/markdown"
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/adminapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/advisoryapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/assignapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/reportsapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/scansapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -145,7 +150,7 @@ func changesSomething(method string) bool {
 //
 // The description is returned so the OpenAPI document can be written out
 // without starting a server.
-func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
+func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API) {
 	in.Logger = logger
 	router := chi.NewMux()
 	router.Use(middleware.RequestID)
@@ -202,7 +207,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 				// A credential that could not be looked up is a fault, not
 				// a stranger. Logged, and answered in words that say
 				// nothing about the caller or the database.
-				in.logger().Error("who is asking could not be resolved", "error", err)
+				in.Log().Error("who is asking could not be resolved", "error", err)
 				unavailable(w)
 				return
 			}
@@ -234,7 +239,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 				// deployment answers to. Both are already known to whoever
 				// can read the log.
 				{
-					in.logger().Warn("a write was refused because it did not come from a page this deployment served",
+					in.Log().Warn("a write was refused because it did not come from a page this deployment served",
 						"origin", r.Header.Get("Origin"),
 						"referer", r.Header.Get("Referer"),
 						"answers_to", strings.Join(origins(r, in.BaseURL), ", "),
@@ -322,283 +327,23 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	api := humachi.New(router, cfg)
 	// Before anything registers, so no operation can be added without the
 	// scope on its own declaration being enforced.
-	enforceDeclarations(api)
+	core.EnforceDeclarations(api)
 	refuseUnknownParameters(api)
 	registerVersion(api)
-	registerScans(api, in)
-	registerFindings(api, in)
-	registerComponentFindings(api, in)
-	// The findings list across every product somebody may see.
-	registerAnywhere(api, in)
-	registerHolders(api, in)
-	registerComponent(api, in)
-	registerPlanUpgrade(api, in)
-	registerReceipts(api, in)
-	registerInventoryChanges(api, in)
-	// Which names two builds differ on, and the same as a file.
-	registerInventoryComparison(api, in)
-	registerInventoryComparisonExport(api, in)
-	// Reading back a document a build sent.
-	registerRetained(api, in)
-	// One run of the scanner.
-	registerRun(api, in)
-	// One product's own page.
-	registerOverview(api, in)
-	registerCoverage(api, in)
-	registerCoverageExport(api, in)
-	registerOutOfSupport(api, in)
-	registerScrutiny(api, in)
-	registerPublished(api, in)
-	registerAudit(api, in)
-	registerNotifications(api, in)
-	registerDigest(api, in)
-	registerChatChoices(api, in)
 	registerSession(api, in)
-	registerTokens(api, in)
-	registerFindingDetail(api, in)
-	registerAssignment(api, in)
-	registerAssignMatching(api, in)
-	registerReadiness(api, in)
-	registerEntry(api, in)
-	registerDisclosure(api, in)
-	registerResolution(api, in)
-	registerAdvisory(api, in)
-	registerAttachments(api, in)
-	registerRemediation(api, in)
-	registerNotes(api, in)
-	registerReleaseTrend(api, in)
-	registerCarrying(api, in)
-	registerScoring(api, in)
-	registerAffects(api, in)
-	registerMovements(api, in)
-	registerDue(api, in)
-	registerGraph(api, in)
-	registerMatchCoverage(api, in)
-	registerMatchCoverageExport(api, in)
-	registerSettings(api, in)
-	// Components with no upstream answer, and the reason for each.
-	registerUpstream(api, in)
-	registerPatchBranches(api, in)
-	// Work the queue set aside, and putting it back.
-	registerWork(api, in)
-	registerTrail(api, in)
-	registerSaved(api, in)
-	registerBundles(api, in)
-	registerPendingUpgrades(api, in)
-	registerVexImport(api, in)
-	registerAdvisoryImport(api, in)
-	// The suppliers whose published advisories are read on a schedule, which
-	// is the same evidence arriving without anybody choosing each document.
-	registerAdvisorySources(api, in)
-	registerExport(api, in)
-	registerAnywhereExport(api, in)
-	// The three lists that could be read and not taken away.
-	registerMoreExports(api, in)
-	registerRegister(api, in)
-	registerCompliance(api, in)
-	registerRouting(api, in)
 	registerProviders(api, in)
-	registerWhoAmI(api, in)
-	registerMentions(api, in)
-	registerBulk(api, in)
-	registerReports(api, in)
-	registerMeasures(api, in)
-	registerEffort(api, in)
-	registerCarried(api, in)
-	registerCarry(api, in)
-	registerTriage(api, in)
-	registerFindingDecision(api, in)
-	registerAssessment(api, in)
-	registerExploitedHere(api, in)
-	registerObligations(api, in)
-	registerTriageReading(api, in)
-	registerComments(api, in)
-	registerIssueNotes(api, in)
-	registerClaims(api, in)
-	registerReaffirmClaim(api, in)
-	registerReaffirmMany(api, in)
-	registerProposing(api, in)
-	registerPlaceDecisions(api, in)
-	registerElsewhere(api, in)
-	registerReachAcross(api, in)
-	registerBindings(api, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-		Groups: in.groupsReachable,
-	}, in.settings)
-	registerCatalog(api, Declaring{
-		DB: in.DB, Store: in.catalog, Logger: logger,
-		Findings: func() *finding.Store {
-			if in.DB == nil {
-				return nil
-			}
-			return finding.NewStore(in.DB.DB)
-		},
-		Scans: func() *ingest.Store {
-			if in.DB == nil {
-				return nil
-			}
-			return ingest.NewStore(in.DB.DB)
-		},
-		RewriteDeadlines: deadlinesRewritten(in),
-	})
-	registerAdministration(api, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-		Findings: func() *finding.Store {
-			if in.DB == nil {
-				return nil
-			}
-			return finding.NewStore(in.DB.DB)
-		},
-		Settings: in.settings,
-	})
-	registerTeams(api, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-	})
-	// The record of who told us, and the names an issue goes by.
-	registerWhoTold(api, in)
-	registerIntake(api, in)
-	// Standing claims about the third-party components a build ships.
-	registerVEX(api, in)
-	// One issue, everywhere it sits, across products.
-	registerIssue(api, in)
-	registerIssueDocument(api, in)
-	// The words people put on findings.
-	registerTags(api, in)
-	// The tree seen upward, for somebody narrowed to their own work.
-	registerUpward(api, in)
-	// The place a claim's work is happening, stored and never sent to.
-	registerClaimLink(api, in)
-	// The people on one undisclosed case. It takes both: the grant is managed
-	// by whoever reads the case rather than by an administrator, and it lands
-	// in the administration trail like every other access change.
-	registerCollaborators(api, in, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-	})
-	// One person, whole: the grants in force, the grants withdrawn, their part
-	// in the record, and what they were told.
-	registerPerson(api, in, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-		// Deactivating somebody hands back what they were dealing with.
-		Findings: func() *finding.Store {
-			if in.DB == nil {
-				return nil
-			}
-			return finding.NewStore(in.DB.DB)
-		},
-	})
-	// The destinations this deployment posts to.
-	registerOutbound(api, in, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-	})
-	registerRevocation(api, Administering{
-		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
-	})
+	scansapi.Register(api, in)
+	findingsapi.Register(api, in)
+	assignapi.Register(api, in)
+	triageapi.Register(api, in)
+	reportsapi.Register(api, in)
+	advisoryapi.Register(api, in)
+	adminapi.Register(api, in)
 
 	// Last, so it claims only what nothing above it did.
 	mountInterface(router, in.Interface)
 
 	return router, api
-}
-
-// wentWrong reports a fault to the caller without describing it to them.
-//
-// The framework serializes an error passed alongside the message, so handing
-// it one hands the caller the query text and whatever the driver put in its
-// message — which for a connection failure is the address and the user it
-// tried. Whoever operates this deployment needs that; whoever is asking does
-// not.
-//
-// The cause travels with the refusal and is not part of it. An act is a
-// transaction, and the helper that opened it asks whether what came back is
-// worth going again — a deadlock on one engine, a lost race on another.
-// Answered with a refusal built fresh, that question is asked of an error
-// wrapping nothing, so a mid-transaction deadlock is reported to an
-// administrator instead of taken again.
-func wentWrong(logger *slog.Logger, what string, err error) error {
-	if logger != nil {
-		logger.Error(what, "error", err)
-	}
-	return carried{said: huma.Error500InternalServerError(what), cause: err}
-}
-
-// carried is a refusal that remembers what caused it.
-//
-// The refusal is what a caller is told and is the whole of what they are told:
-// the framework resolves a returned error to the first status error it finds,
-// which is the refusal inside this, so nothing a driver wrote reaches a
-// response. The cause is there for the retry helper, which reads the driver's
-// own types through the wrapping.
-type carried struct {
-	said  error
-	cause error
-}
-
-// Error is the refusal alone. It is what a log line and a text comparison see,
-// and the cause is logged beside it where it is wrapped.
-func (c carried) Error() string { return c.said.Error() }
-
-// Unwrap gives both, so that a walk for the status error and a walk for the
-// driver's type each find what they are looking for.
-func (c carried) Unwrap() []error { return []error{c.said, c.cause} }
-
-// asked is the answer when a store refused what the caller asked for.
-//
-// A store returns two kinds of error through one return: a sentence written
-// for a person — a decision already standing here, a version that is not a
-// version, a threshold crossed — and a query that failed, which carries the
-// statement text and whatever the driver put in its message. Answered the same
-// way, as a 422 with the message in it, a lost connection reaches whoever
-// asked as a bad request carrying the address the driver tried.
-//
-// A store's sentences are refusals, and only a refusal's text is published.
-// Everything else is a fault, logged and answered in fixed words, so a failure
-// nobody classified — a connection that dropped, an object store that did not
-// answer — never reaches the caller as text.
-func asked(logger *slog.Logger, err error) error {
-	// An authorization refusal is not somebody having asked for the
-	// impossible. Without this arm it falls to the sentence below and comes
-	// back 422 carrying the store's own words — which name the product
-	// identifier the refusal exists to withhold. `add-alias` is the live
-	// case: recording another name asks for triage in every product the issue
-	// is open in, and the route guard can only authorize the one in the path.
-	if errors.Is(err, access.ErrDenied) {
-		return huma.Error403Forbidden("not authorized")
-	}
-	// A lost race is a fault that carries its cause: the transaction around
-	// the act reads the cause and takes it again, and a caller with no
-	// transaction around it, or one out of attempts, is answered 500 in words
-	// of our own and logged. Answered as a refusal it is a 422 telling the
-	// caller to go again, and the retry helper never sees it.
-	if errors.Is(err, database.ErrGoAgain) || database.FromEngine(err) {
-		return wentWrong(logger, "that could not be recorded", err)
-	}
-	// Writing the policy refused, a detail per fault, each naming its line.
-	var faults markdown.Faults
-	if errors.As(err, &faults) {
-		return refusedText(faults)
-	}
-	if refusal.In(err) {
-		return huma.Error422UnprocessableEntity(err.Error())
-	}
-	return wentWrong(logger, "that could not be recorded", err)
-}
-
-// noDatabase is the answer when this process has no database behind it.
-//
-// One sentence for every handler. Each guards against it, because a nil
-// pointer inside one is worse than a refusal, and a guard that words it for
-// itself reads as many conditions where there is one. Logged, because
-// otherwise the only trace of a deployment wired up wrong is a 500 with a
-// sentence in it.
-//
-// It says nothing about what the caller asked for, because the caller did not
-// cause it and cannot fix it: this is a process that came up without the thing
-// it exists to read.
-func noDatabase(logger *slog.Logger) error {
-	if logger != nil {
-		logger.Error("this process has no database behind it, so it can answer nothing")
-	}
-	return huma.Error500InternalServerError("this deployment is not fully configured")
 }
 
 // open is every path served without a credential. It is a list rather than a
@@ -687,20 +432,20 @@ type VersionOutput struct {
 }
 
 func registerVersion(api huma.API) {
-	huma.Register(api, requiring(huma.Operation{
+	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-version",
 		Method:      http.MethodGet,
 		Path:        "/v1/version",
 		Summary:     "Get the server version",
 		Description: "Identifies the build that is answering, so an operator can tell which version they are looking at.",
 		Tags:        []string{"Meta"},
-	}, anyPerson, "A person rather than a pipeline: a build server has no "+
+	}, core.AnyPerson, "A person rather than a pipeline: a build server has no "+
 		"business asking what version is running."),
 		func(ctx context.Context, _ *struct{}) (*VersionOutput, error) {
 			// A person, not a pipeline. A build server has no business asking
 			// what is deployed, and "nothing else" has to mean this too or it
 			// means whatever each new endpoint remembers.
-			if _, err := reading(ctx); err != nil {
+			if _, err := core.Reading(ctx); err != nil {
 				return nil, err
 			}
 			return &VersionOutput{Body: version.Get()}, nil

@@ -88,7 +88,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// layer, which is what carrying the subject into it means.
 			"handed to something that carries the subject",
 			`func f() {
-				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
 				_ = err
 				ready, err := store.ReadyFor(ctx, subject, named.ProductID, named.StreamID)
 				_ = ready
@@ -102,9 +102,9 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// checking the exempt call and nothing else.
 			"read through the build a resolver handed back",
 			`func f() {
-				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
 				_ = err
-				target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
+				target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
 				_ = err
 				planned, err := store.PendingUpgrades(ctx, target.ID)
 				_ = planned
@@ -114,9 +114,9 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"the same, with the subject carried into the read",
 			`func f() {
-				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
 				_ = err
-				target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
+				target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
 				_ = err
 				planned, err := store.PendingUpgrades(ctx, subject, target.ID)
 				_ = planned
@@ -151,9 +151,9 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"read through the build a resolver handed back, bound with var",
 			`func f() {
-				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
 				_ = err
-				var target, _ = targetRow(ctx, in, named.StreamID, named.VariantID)
+				var target, _ = core.TargetRow(ctx, in, named.StreamID, named.VariantID)
 				planned, err := store.PendingUpgrades(ctx, target.ID)
 				_ = planned
 			}`,

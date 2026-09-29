@@ -1,0 +1,273 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package triageapi_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+// A judgment's reach, asked of the two operations that answer it and
+// of the one that writes across builds.
+
+func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
+	// The decision is keyed on the upstream version where a component is a
+	// patched fork, and on the shipped version otherwise. The reach compared
+	// the raw upstream column instead, which is empty for anything that is
+	// not a fork: every other build then read as differing, including one at
+	// the very same version, which the decision already reached by lookup.
+	// And what it named as the version was that empty column, so the
+	// interface had nothing to pass when it applied the decision there — a
+	// build shipping the name at four versions refused the request.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		r.ScannedAlso(t, "arista", "3.7.0")
+		r.ScannedAlso(t, "mellanox", "3.8.0")
+		var reached struct {
+			Automatic []struct {
+				Variant string `json:"variant"`
+				Version string `json:"version"`
+			} `json:"automatic"`
+			Differing []struct {
+				Variant string `json:"variant"`
+				Version string `json:"version"`
+			} `json:"differing"`
+		}
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/places/%s/reach", place), &reached)
+		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
+			t.Errorf("the build at the same version should be reached by lookup: %+v", reached)
+		}
+		if len(reached.Differing) != 1 || reached.Differing[0].Variant != "mellanox" ||
+			reached.Differing[0].Version != "3.8.0" {
+			t.Fatalf("the build at another version should be offered with that version: %+v", reached)
+		}
+		// The name it gave is what the route resolves by.
+		path := "/v1/products/mine/streams/master/variants/mellanox/findings/CVE-2026-9999" +
+			"/components/libnl-3-200/decision?version=" + reached.Differing[0].Version
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
+				`"reasoning":"The parser is never reached there either."}`)
+		if got.Code != http.StatusCreated {
+			t.Errorf("applying the decision by the version the reach named answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
+	// already-fixed carries the packager's version, which the claim is
+	// refused without. The finding-level route offered the outcome in its
+	// enum and had nowhere in the body to put that version, so every
+	// request choosing it was refused — an outcome listed and unreachable,
+	// which reads as the tool being broken rather than as the request
+	// being wrong.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const path = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
+
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
+			`{"outcome":"already-fixed","fixed_version":"3.7.0-r4",`+
+				`"reasoning":"Alpine backported it in r4, which is what we ship."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording an already-fixed claim answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// And the evidence is still required: the outcome without it is a
+		// claim nobody can check.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
+			`{"outcome":"already-fixed","reasoning":"Trust me."}`),
+			http.StatusUnprocessableEntity)
+	})
+}
+
+func TestReachingAnotherBuildCoversOnlyWhatIsLeftThere(t *testing.T) {
+	// A build at the same versions is already reached by lookup, so a second
+	// claim about its places is refused — and the guided review, which posts
+	// to each build it applies to, has no way to know which places those are.
+	// Asked to decide only what remains, the route records nothing there and
+	// says so, rather than refusing.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		r.ScannedAlso(t, "arista", "3.7.0")
+		r.Decided(t, place)
+		body := `{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",` +
+			`"reasoning":"The parser is never reached there either."`
+		path := "/v1/products/mine/streams/master/variants/arista/findings/CVE-2026-9999" +
+			"/components/libnl-3-200/decision?version=3.7.0"
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path, body+`}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a second claim about a place already reached answered %d, want 422: %s",
+				got.Code, got.Body.String())
+		}
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path, body+`,"remaining":true}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("deciding what remains answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Recorded int `json:"recorded"`
+			Left     int `json:"left"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Recorded != 0 || out.Left != 1 {
+			t.Errorf("recorded %d and left %d on a build wholly reached by lookup, want 0 and 1",
+				out.Recorded, out.Left)
+		}
+	})
+}
+
+func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
+	// Presenting it as one number is what turns a considered judgment into a
+	// reflex, and it is how a decision comes to reach builds the person making
+	// it never knew about. The first two parts are consequences of the
+	// matching rules and are not choices; only the third is.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		var reached struct {
+			Here      int `json:"here"`
+			Automatic []struct {
+				Stream string `json:"stream"`
+			} `json:"automatic"`
+			Differing []struct {
+				Stream  string `json:"stream"`
+				Version string `json:"version"`
+			} `json:"differing"`
+		}
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/places/%s/reach", place), &reached)
+
+		if reached.Here != 1 {
+			t.Errorf("the judgment covers %d places here, want 1", reached.Here)
+		}
+		// One build in this deployment, so nothing else to reach either way —
+		// what matters is that both lists come back rather than being absent.
+		if reached.Automatic == nil || reached.Differing == nil {
+			t.Errorf("reach came back incomplete: %+v", reached)
+		}
+	})
+}
+
+func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
+	// The whole reason this operation exists beside the per-place one. A
+	// judgment is about an issue in a component, which is a group of places
+	// rather than one — a kernel flaw sits at sixty — and asking per place is
+	// a request each, so the screen sampled the first few and merged what came
+	// back. A build reachable only from a place the sample missed was never
+	// offered, and the judgment silently did not travel there.
+	//
+	// This route is the merged answer's only caller, and the merged answer is
+	// the only producer of the set of other builds a judgment is offered
+	// against. Without a test here, a judgment travelling to the wrong builds
+	// — or to none — looks exactly like one that travelled correctly.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		// One other build at the version this one ships, and one at another.
+		// The decision is keyed on the versions rather than on the build, so
+		// the first is reached by lookup and the second has to be agreed to.
+		r.ScannedAlso(t, "arista", "3.7.0")
+		r.ScannedAlso(t, "mellanox", "3.8.0")
+
+		var reached struct {
+			Automatic []struct {
+				Variant string `json:"variant"`
+				Version string `json:"version"`
+				Places  int    `json:"places"`
+			} `json:"automatic"`
+			Differing []struct {
+				Variant string `json:"variant"`
+				Version string `json:"version"`
+				Places  int    `json:"places"`
+			} `json:"differing"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/components/libnl-3-200/reach", &reached)
+
+		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
+			t.Errorf("the build at the same version is reached by lookup and was "+
+				"answered as %+v", reached.Automatic)
+		}
+		if len(reached.Differing) != 1 || reached.Differing[0].Variant != "mellanox" ||
+			reached.Differing[0].Version != "3.8.0" {
+			t.Errorf("the build at another version has to be agreed to and was "+
+				"answered as %+v", reached.Differing)
+		}
+		// A build reached from two places of one finding is one thing to tick
+		// and carries the places of both, which is what merging means here.
+		for _, each := range append(reached.Automatic, reached.Differing...) {
+			if each.Places < 1 {
+				t.Errorf("%s is offered and names no place it was reached from", each.Variant)
+			}
+		}
+	})
+}
+
+func TestTheMergedReachAnswersNothingToSomebodyWhoMayNotSeeTheProduct(t *testing.T) {
+	// Every query carries a subject, and this one produces the list of other
+	// builds a judgment is written into. An answer that named a build somebody
+	// may not see would be a directory of what exists, and ticking it would
+	// write a decision where they hold nothing.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		r.ScannedAlso(t, "arista", "3.7.0")
+		got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/components/libnl-3-200/reach", "")
+		if got.Code != http.StatusNotFound {
+			t.Errorf("somebody who may not see the product was answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
+	// Both reach reads asked whether the subject may read the product, where
+	// every other read of one finding asks about the issue. A collaborator
+	// holds nothing on the product and holds exactly the case, so the product
+	// question refused them — and the route answers a refusal from the store
+	// as a fault, so the two screens offering to carry a judgment across
+	// builds answered with a fault for the one person whose only finding they
+	// are about.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		build := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"
+		paths := []string{
+			build + "/places/" + place + "/reach",
+			build + "/components/libnl-3-200/reach",
+		}
+
+		// Before the case is theirs, and the refusal is a refusal rather than
+		// a fault: the issue scope must not hand the product away either.
+		for _, path := range paths {
+			got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, "")
+			if got.Code != http.StatusNotFound {
+				t.Errorf("%s answers somebody with nothing on this product %d: %s",
+					path, got.Code, got.Body.String())
+			}
+			if !httpapitest.Contains(got.Body.String(), "no product is declared by that name") {
+				t.Errorf("%s words its refusal differently from every other product route: %s",
+					path, got.Body.String())
+			}
+		}
+
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/CVE-2026-9999/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		for _, path := range paths {
+			got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Errorf("%s answers the collaborator of that very case %d: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+	})
+}

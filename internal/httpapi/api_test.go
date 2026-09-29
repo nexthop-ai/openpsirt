@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -20,11 +21,13 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	h, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{})
+	h, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
 	return h
 }
 
@@ -77,7 +80,7 @@ func TestOpenAPIDocumentDescribesTheRegisteredRoutes(t *testing.T) {
 	// This is the check that keeps the published specification honest: it is
 	// generated from the same registrations the server routes on, so a route
 	// that exists but is undocumented cannot happen.
-	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{})
+	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
 	doc := api.OpenAPI()
 	if doc.Paths["/v1/version"] == nil {
 		t.Fatal("/v1/version missing from the generated document")
@@ -115,7 +118,7 @@ func TestReadinessFailsWhenTheServiceCannotWork(t *testing.T) {
 	// A process that is up but cannot reach its database should not be sent
 	// traffic. Answering "ok" regardless would make the probe decorative.
 	h, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)),
-		func(context.Context) error { return errUnavailable }, Ingest{})
+		func(context.Context) error { return errUnavailable }, core.Deps{})
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
@@ -148,7 +151,7 @@ func TestEveryOperationSaysWhatItAsksFor(t *testing.T) {
 	// Checked rather than trusted, because the failure is silent: an endpoint
 	// added without one is not broken, it is undocumented, and nobody notices
 	// until they need the answer.
-	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{})
+	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
 	spec := api.OpenAPI()
 
 	var missing []string
@@ -196,8 +199,8 @@ func TestThePagesOwnInlineScriptIsAllowedByHashAndNothingWider(t *testing.T) {
 		`</head><body></body></html>`)
 	files := fstest.MapFS{"index.html": &fstest.MapFile{Data: page}}
 
-	handler, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{
-		Interface: Interface{Files: files},
+	handler, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{
+		Interface: core.Interface{Files: files},
 	})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/version", nil))
@@ -221,7 +224,7 @@ func TestThePagesOwnInlineScriptIsAllowedByHashAndNothingWider(t *testing.T) {
 
 	// A deployment serving no page has no inline script to allow, and its
 	// policy says so rather than carrying a hash of nothing.
-	api, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{})
+	api, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
 	bare := httptest.NewRecorder()
 	api.ServeHTTP(bare, httptest.NewRequest(http.MethodGet, "/v1/version", nil))
 	if strings.Contains(bare.Header().Get("Content-Security-Policy"), "sha256-") {
@@ -244,28 +247,30 @@ func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
 	// The generated document cannot show the collision, because the two share
 	// one entry by the time it is built. So the registrations are counted in
 	// the source and joined against what the document ended up holding: one
-	// swallowed by another leaves the second number short.
+	// swallowed by another leaves the second number short. The source is this
+	// package and every package beneath it, which is where the routes are.
 	registered := 0
-	sources, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range sources {
-		if strings.HasSuffix(name, "_test.go") {
-			continue
+	err := filepath.WalkDir(".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(name, ".go") ||
+			strings.HasSuffix(name, "_test.go") {
+			return err
 		}
-		body, err := os.ReadFile(name) //nolint:gosec // G304: every path is this package's own source
+		body, err := os.ReadFile(name) //nolint:gosec // G304: every path is this tree's own source
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		registered += strings.Count(string(body), "huma.Register(api")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	if registered == 0 {
 		t.Fatal("no registrations were found in the source, so this checked nothing")
 	}
 
 	described := 0
-	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{})
+	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
 	for _, item := range api.OpenAPI().Paths {
 		for _, operation := range []*huma.Operation{
 			item.Get, item.Post, item.Put, item.Patch, item.Delete,

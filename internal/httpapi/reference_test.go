@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 // namesADecision matches a decision identifier, which belongs in
@@ -61,10 +63,10 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 	// counter-examples verbatim, and a description citing a decision
 	// identifier into a document published to people who have no way to look
 	// it up, are checkable.
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		var checked int
-		for path, item := range r.api.OpenAPI().Paths {
-			for method, op := range operations(item) {
+		for path, item := range r.API.OpenAPI().Paths {
+			for method, op := range httpapitest.Operations(item) {
 				where := method + " " + path
 				checked++
 
@@ -115,10 +117,10 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 var factsDescribedOnce = []string{"consumer", "sees_nothing"}
 
 func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		said := map[string]map[string][]string{}
 		carried := map[string]int{}
-		for name, schema := range r.api.OpenAPI().Components.Schemas.Map() {
+		for name, schema := range r.API.OpenAPI().Components.Schemas.Map() {
 			for field, property := range schema.Properties {
 				if !slices.Contains(factsDescribedOnce, field) {
 					continue
@@ -157,7 +159,7 @@ func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
 // properties. A rule over half the document is a rule that holds until
 // somebody writes in the other half.
 func TestThePublishedDocumentCarriesNoBold(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		var checked int
 		bold := func(where, what, text string) {
 			checked++
@@ -186,10 +188,10 @@ func TestThePublishedDocumentCarriesNoBold(t *testing.T) {
 			}
 		}
 
-		document := r.api.OpenAPI()
+		document := r.API.OpenAPI()
 		bold("info", "description", document.Info.Description)
 		for path, item := range document.Paths {
-			for method, op := range operations(item) {
+			for method, op := range httpapitest.Operations(item) {
 				where := method + " " + path
 				bold(where, "summary", op.Summary)
 				bold(where, "description", op.Description)
