@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { unwrap, Refused } from "../api/queries";
 import { forgetAll, forgetSession } from "./drafts";
 import { sessionEnded } from "./ended";
@@ -59,6 +59,9 @@ export type Who = {
   // round trips as a filter matched — a page nobody can use and nothing can
   // cancel.
   bulk_cap?: number;
+  // Every triage outcome with what it claims, which is how a screen tells a
+  // dismissal from a deferral and knows which outcomes state a reason.
+  outcomes: Body<"WhoBody">["outcomes"];
 };
 
 // The caller, and their reach. Asked once and shared, because every

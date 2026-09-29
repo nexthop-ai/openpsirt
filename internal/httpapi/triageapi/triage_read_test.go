@@ -500,16 +500,20 @@ func TestAFindingCarriesEverythingNeededToActOnIt(t *testing.T) {
 		r.ScannedWithEvidence(t)
 
 		var detail struct {
-			Vulnerability string   `json:"vulnerability"`
-			Severity      string   `json:"severity"`
-			Score         float64  `json:"score"`
-			Vector        string   `json:"vector"`
-			Exploited     bool     `json:"exploited"`
-			Likelihood    float64  `json:"likelihood"`
-			Weaknesses    []string `json:"weaknesses"`
-			Description   string   `json:"description"`
-			Advisory      string   `json:"advisory"`
-			References    []struct {
+			Vulnerability string  `json:"vulnerability"`
+			Severity      string  `json:"severity"`
+			Score         float64 `json:"score"`
+			Vector        string  `json:"vector"`
+			Exploited     bool    `json:"exploited"`
+			Likelihood    float64 `json:"likelihood"`
+			Weaknesses    []struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Short string `json:"short"`
+			} `json:"weaknesses"`
+			Description string `json:"description"`
+			Advisory    string `json:"advisory"`
+			References  []struct {
 				URL  string `json:"url"`
 				Kind string `json:"kind"`
 			} `json:"references"`
@@ -543,6 +547,10 @@ func TestAFindingCarriesEverythingNeededToActOnIt(t *testing.T) {
 		}
 		if len(detail.Weaknesses) == 0 {
 			t.Error("what kind of flaw this is was not kept")
+		} else if w := detail.Weaknesses[0]; w.ID != "CWE-125" || w.Name != "Out-of-bounds Read" ||
+			w.Short != "Out-of-bounds read" {
+			// Named in both lists, so nobody leaves to read what the number is.
+			t.Errorf("the kind of flaw came back as %+v", w)
 		}
 		if len(detail.Places) == 0 || detail.Places[0].Place == "" {
 			t.Fatalf("the answer does not say where it sits: %+v", detail.Places)

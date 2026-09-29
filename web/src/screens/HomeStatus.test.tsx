@@ -29,7 +29,16 @@ describe("the front page's coverage figure", () => {
     });
     mount.render(
       screen(
-        <Home who={{ identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] }} />,
+        <Home
+          who={{
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            kind: "person",
+            reach: [],
+            outcomes: [],
+          }}
+        />,
       ),
     );
     await settle();

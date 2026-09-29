@@ -10,7 +10,14 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const admin: Who = { identity: "root", name: "Root", admin: true, kind: "person", reach: [] };
+const admin: Who = {
+  identity: "root",
+  name: "Root",
+  admin: true,
+  kind: "person",
+  reach: [],
+  outcomes: [],
+};
 const auditor: Who = { ...admin, identity: "audit", admin: false, audits: true };
 
 const alice = {

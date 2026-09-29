@@ -25,6 +25,8 @@ export function Words({
   // the ones somebody used before are the ones they mean.
   offered,
   listId,
+  named,
+  onTyping,
 }: {
   label: string;
   hint?: string;
@@ -33,8 +35,18 @@ export function Words({
   onChange: (words: string[]) => void;
   offered?: string[];
   listId?: string;
+  // What a word is called and what it is called in full, for a word that is
+  // an identifier: drawn beside it on its chip and its offer, the full name
+  // on hover.
+  named?: (word: string) => { called: string; full?: string } | undefined;
+  // What is being typed, for a box whose offers are searched as it is.
+  onTyping?: (typed: string) => void;
 }) {
-  const [typed, setTyped] = useState("");
+  const [typed, setTypedHere] = useState("");
+  const setTyped = (next: string) => {
+    setTypedHere(next);
+    onTyping?.(next);
+  };
 
   // Everything typed or pasted, split where a comma ends a word: the words it
   // finished, and the part still being typed.
@@ -67,10 +79,13 @@ export function Words({
               type="button"
               className="chip"
               aria-pressed
-              title="Remove this one"
+              title={
+                named?.(word)?.full ? `${named(word)?.full}. Remove this one` : "Remove this one"
+              }
               onClick={() => onChange(words.filter((each) => each !== word))}
             >
               {word}
+              {named?.(word)?.called ? ` ${named(word)?.called}` : ""}
               <span aria-hidden>&times;</span>
             </button>
           ))}
@@ -101,7 +116,7 @@ export function Words({
       {listId && offered && (
         <datalist id={listId}>
           {offered.map((each) => (
-            <option key={each} value={each} />
+            <option key={each} value={each} label={named?.(each)?.called} />
           ))}
         </datalist>
       )}

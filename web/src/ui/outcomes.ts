@@ -1,46 +1,57 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useMemo } from "react";
 import type { Body } from "../api/client";
+import { useWho } from "../app/session";
 
 // Every outcome the server records, read from the published API document so a
-// word the server adds is a compile error here until it has an entry.
+// word the server adds is a compile error wherever a screen names it.
 export type Outcome = NonNullable<Body<"DisposedBody">["outcome"]>;
 
-// What each outcome claims, in the terms the server classifies it by.
+// What one outcome claims, as the server publishes it beside the caller.
+export type Claims = Body<"OutcomeBody">;
+
+// The outcomes sorted by what they claim, in the terms the server counts,
+// filters and refuses by. Built from what the server publishes rather than
+// kept here, so an outcome it moves to another class moves here too.
 //
 // | Field | Means |
 // |---|---|
+// | known | the server's answer has arrived; until it has, nothing is in any class |
+// | dismissing | the server calls it a dismissal: it hides risk and stores no date |
 // | hidesRisk | recording it takes the issue out of the working queue |
 // | dated | it stores a date: a review date, or when promised work lands |
 // | needsJustification | it states which recognized reason applies |
-const CLAIMS: Record<Outcome, { hidesRisk: boolean; dated: boolean; needsJustification: boolean }> =
-  {
-    affected: { hidesRisk: false, dated: false, needsJustification: false },
-    "not-applicable": { hidesRisk: true, dated: false, needsJustification: true },
-    mismatched: { hidesRisk: true, dated: false, needsJustification: true },
-    deferred: { hidesRisk: true, dated: true, needsJustification: false },
-    "wont-fix": { hidesRisk: true, dated: false, needsJustification: false },
-    "already-fixed": { hidesRisk: true, dated: false, needsJustification: false },
-    "upgrade-needed": { hidesRisk: true, dated: true, needsJustification: false },
-    "patch-needed": { hidesRisk: true, dated: true, needsJustification: false },
+export type Classes = {
+  known: boolean;
+  dismissing: Outcome[];
+  dismisses: (outcome?: string) => boolean;
+  hidesRisk: (outcome?: string) => boolean;
+  dated: (outcome?: string) => boolean;
+  needsJustification: (outcome?: string) => boolean;
+};
+
+// The classes over one published list. A word the list does not hold is in
+// none of them, and the server is the one to refuse it.
+export function classesOf(published: readonly Claims[] | null | undefined): Classes {
+  const by = new Map((published ?? []).map((each) => [each.outcome as string, each]));
+  const has = (field: "hides_risk" | "dated" | "needs_justification") => (outcome?: string) =>
+    by.get(outcome ?? "")?.[field] ?? false;
+  const dismissing = (published ?? []).filter((each) => each.dismisses).map((each) => each.outcome);
+  return {
+    known: by.size > 0,
+    dismissing,
+    dismisses: (outcome) => (dismissing as string[]).includes(outcome ?? ""),
+    hidesRisk: has("hides_risk"),
+    dated: has("dated"),
+    needsJustification: has("needs_justification"),
   };
-
-const OUTCOMES = Object.keys(CLAIMS) as Outcome[];
-
-// The outcomes that close the question: they hide risk and carry no date, so
-// nothing later re-opens them. The same rule the server counts and filters by.
-export const DISMISSING: Outcome[] = OUTCOMES.filter(
-  (each) => CLAIMS[each].hidesRisk && !CLAIMS[each].dated,
-);
-
-// Whether a claim of this outcome has to say which recognized reason applies.
-// A word this does not know needs none, and the server is the one to refuse it.
-export function needsJustification(outcome?: string): boolean {
-  return Object.hasOwn(CLAIMS, outcome ?? "") && CLAIMS[outcome as Outcome].needsJustification;
 }
 
-// Whether a word is one of the dismissing outcomes.
-export function dismisses(outcome?: string): boolean {
-  return (DISMISSING as string[]).includes(outcome ?? "");
+// The classes the server published for this session, read from the answer
+// every screen already loads.
+export function useOutcomes(): Classes {
+  const published = useWho().data?.outcomes;
+  return useMemo(() => classesOf(published), [published]);
 }

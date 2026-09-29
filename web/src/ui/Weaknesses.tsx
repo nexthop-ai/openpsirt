@@ -3,11 +3,11 @@
 
 import { notACredential } from "./noautofill";
 import { useState } from "react";
-import { asWeakness, COMMON, MOST_WEAKNESSES, nameOf } from "./cwe";
+import { asWeakness, called, MOST_WEAKNESSES, useWeaknessNames, useWeaknessSearch } from "./cwe";
 
-// The picker for what kind of flaw something is. The vocabulary, the names and
-// where to read about one live beside it in `cwe.ts`, because the finding
-// screen names them too and two lists of names is two lists that disagree.
+// The picker for what kind of flaw something is. What is offered while typing
+// is the server's search over both lists of names, by number or by words, most
+// common first; the vocabulary and where to read about one live in `cwe.ts`.
 
 export function Weaknesses({
   chosen,
@@ -18,12 +18,14 @@ export function Weaknesses({
 }) {
   const [typed, setTyped] = useState("");
   const [problem, setProblem] = useState("");
+  const offered = useWeaknessSearch(typed).data ?? [];
+  const names = useWeaknessNames(chosen);
 
   function add(id: string) {
     if (id.trim() === "") return;
     const clean = asWeakness(id);
     if (clean === null) {
-      setProblem("Type CWE- and a number, like CWE-125.");
+      setProblem("Pick one, or type CWE- and a number, like CWE-125.");
       return;
     }
     if (chosen.includes(clean)) {
@@ -59,7 +61,11 @@ export function Weaknesses({
               >
                 {id} ×
               </button>
-              {nameOf(id) && <span className="hint">{nameOf(id)}</span>}
+              {called(names.get(id)) && (
+                <span className="hint" title={names.get(id)?.name}>
+                  {called(names.get(id))}
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -69,9 +75,9 @@ export function Weaknesses({
         id="cwe-typed"
         {...notACredential}
         type="text"
-        list="cwe-common"
+        list="cwe-offered"
         value={typed}
-        placeholder="CWE-125, or pick one"
+        placeholder="CWE-125, or words to search"
         onChange={(event) => setTyped(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -81,10 +87,10 @@ export function Weaknesses({
         }}
         onBlur={() => typed.trim() !== "" && add(typed)}
       />
-      <datalist id="cwe-common">
-        {COMMON.map((each) => (
-          <option key={each.id} value={each.id}>
-            {each.name}
+      <datalist id="cwe-offered">
+        {offered.map((each) => (
+          <option key={each.id} value={each.id} label={called(each)}>
+            {called(each)}
           </option>
         ))}
       </datalist>
@@ -93,7 +99,7 @@ export function Weaknesses({
           {problem}
         </span>
       )}
-      <span className="hint">CWE- and a number. These are the most common.</span>
+      <span className="hint">By number or by name. The most common come first.</span>
     </div>
   );
 }

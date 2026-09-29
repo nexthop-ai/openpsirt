@@ -3,7 +3,9 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Audit, CHANGES_MOST, periodSent } from "./Audit";
+import { Audit, CHANGES_MOST, outcomesSaid, periodSent } from "./Audit";
+import { classesOf } from "../ui/outcomes";
+import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
@@ -75,5 +77,17 @@ describe("the period on the record", () => {
       from: "",
       to: "",
     });
+  });
+});
+
+describe("the outcomes the record is filtered by", () => {
+  it("name a dismissal as one where the server says it is", () => {
+    const said = new Map(outcomesSaid(classesOf(PUBLISHED).dismisses));
+    expect(said.get("wont-fix")).toBe("dismissed — will not fix");
+    expect(said.get("deferred")).toBe("deferred");
+    const moved = PUBLISHED.map((each) =>
+      each.outcome === "wont-fix" ? { ...each, dismisses: false } : each,
+    );
+    expect(new Map(outcomesSaid(classesOf(moved).dismisses)).get("wont-fix")).toBe("will not fix");
   });
 });

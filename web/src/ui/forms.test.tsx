@@ -7,6 +7,8 @@ import { belongTo, keep } from "../app/drafts";
 import { Carried } from "./Carried";
 import { consumersOf, type Sitting } from "./Covering";
 import { forecast } from "./Decide";
+import { classesOf } from "./outcomes";
+import { PUBLISHED } from "../test/outcomes";
 import { Editor } from "./Editor";
 import { revisionStart } from "./ReasonEditor";
 import { Scoring } from "./Scoring";
@@ -25,9 +27,13 @@ const out = (days: number) => {
 };
 
 describe("what the decision form says about a second person", () => {
+  const classes = classesOf(PUBLISHED);
+
   it("counts what the place was already put off for", () => {
-    expect(forecast("deferred", 30, out(10))).toContain("stands on its own");
-    expect(forecast("deferred", 30, out(10), 25)).toContain("a second person has to agree");
+    expect(forecast("deferred", classes, 30, out(10))).toContain("stands on its own");
+    expect(forecast("deferred", classes, 30, out(10), 25)).toContain(
+      "a second person has to agree",
+    );
   });
 
   it("measures to the moment, the way the server does", () => {
@@ -35,9 +41,13 @@ describe("what the decision form says about a second person", () => {
     // of the threshold, and the server lets it stand alone.
     vi.useFakeTimers({ now: new Date("2026-03-01T12:00:00Z"), toFake: ["Date"] });
     try {
-      expect(forecast("deferred", 30, "2026-03-31")).toContain("29 days is inside");
-      expect(forecast("deferred", 30, "2026-04-01")).toContain("a second person has to agree");
-      expect(forecast("deferred", 30, "2026-03-31", 0.5)).toContain("a second person has to agree");
+      expect(forecast("deferred", classes, 30, "2026-03-31")).toContain("29 days is inside");
+      expect(forecast("deferred", classes, 30, "2026-04-01")).toContain(
+        "a second person has to agree",
+      );
+      expect(forecast("deferred", classes, 30, "2026-03-31", 0.5)).toContain(
+        "a second person has to agree",
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -45,17 +55,21 @@ describe("what the decision form says about a second person", () => {
 
   it("does not call a promise to act by a date a dismissal", () => {
     for (const outcome of ["patch-needed", "upgrade-needed"]) {
-      const said = forecast(outcome, 30, "");
+      const said = forecast(outcome, classes, 30, "");
       expect(said, outcome).toContain("earliest deadline");
       expect(said, outcome).not.toContain("ismissal");
     }
   });
 
   it("names the act that waits for a second person", () => {
-    expect(forecast("not-applicable", 30, "")).toBe(
+    expect(forecast("not-applicable", classes, 30, "")).toBe(
       "A dismissal takes effect only after a second person approves.",
     );
-    expect(forecast("affected", 30, "")).toBe("No approval needed. Goes to remediation.");
+    expect(forecast("affected", classes, 30, "")).toBe("No approval needed. Goes to remediation.");
+  });
+
+  it("says nothing before the server has said what each outcome claims", () => {
+    expect(forecast("not-applicable", classesOf(undefined), 30, "")).toBe("");
   });
 });
 

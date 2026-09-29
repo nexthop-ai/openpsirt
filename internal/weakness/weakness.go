@@ -10,15 +10,17 @@
 // about an issue is the identifier alone: a scanner reports "CWE-787" and which
 // source said so, and a person recording a flaw types the same.
 //
-// So the names come from the authority that assigns them, read from the
-// published catalog by "make weakness-names" and committed. The version they
+// So the catalog's names come from the authority that assigns them, read from
+// the published catalog by "make weakness-names" and committed. The version they
 // were read from is in the generated file.
 //
-// This is not the screen's list. The interface names a weakness in a few
-// words a reader scans — "Buffer overflow" — and the catalog calls the same one
-// "Improper Restriction of Operations within the Bounds of a Memory Buffer".
-// Both are right for their reader and only one of them passes a validator, so
-// they are two lists rather than one used twice.
+// Both lists a weakness is named from live here. A screen names a weakness in
+// a few words a reader scans — "Buffer overflow" — and the catalog calls the
+// same one "Improper Restriction of Operations within the Bounds of a Memory
+// Buffer". Both are right for their reader and only one of them passes a
+// validator, so they are two lists rather than one used twice. A published
+// advisory states the catalog's name alone; a response a screen draws carries
+// both, and the screen chooses.
 package weakness
 
 // Name is what the catalog calls this identifier, and whether it knows it.

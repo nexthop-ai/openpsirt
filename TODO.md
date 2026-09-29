@@ -310,15 +310,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Send outbound requests through a configured proxy, starting with patch branch clones |
 | Waits on | The owner. REQ-69 and REQ-78 refuse any address inside the network, checked on the address a name resolved to. Through a proxy, the proxy resolves the name. Resolving locally, checking the address and asking the proxy to connect to that address keeps the check, and is a change to a security rule that needs agreeing first |
 
-### TODO-34 Weakness names on screen
-
-| | |
-|---|---|
-| Today | A finding's weakness types (CWE) show with a name only when the web client's own list of about 55 common ones has it. Every other one shows as a bare number such as "CWE-1321", linked to MITRE. The server holds the whole CWE catalog, about 970 names, and uses it only in advisories. The weakness filter and the picker on the record-a-flaw form show bare numbers too |
-| Problem | Kernel and library findings often carry uncommon weakness types, and each costs a click out to MITRE to read |
-| Work | Send the catalog name beside each identifier from the server, and show the screen's own short name where it has one and the catalog's otherwise. Specified in `DESIGN-interface.md` |
-| Waits on | The owner: whether long catalog names are shown whole, shortened or on hover; whether the filter and picker offer the whole catalog, which needs a lookup endpoint. The same pattern as GitHub issue #137 |
-
 ### TODO-35 Saved filters across products
 
 | | |
@@ -327,15 +318,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Problem | Anybody working in several products saves each filter once per product. Prefill rules are built on saved filters, so the duplication multiplies |
 | Work | Keep one list per person, applied within whatever scope is on screen (`DESIGN-interface.md` § Saved filters). Leave release and build out of what is kept. Where one person kept one name in two products, add the product to one of the names |
 | Waits on | The owner: whether a filter that prefills a decision applies in every product or only its own; the rename format; whether saving drops the build silently or says so. The schema change goes in migration 39 |
-
-### TODO-36 Package kinds present
-
-| | |
-|---|---|
-| Today | The findings list's package type filter offers a fixed list of twelve kinds. The server filters on any kind given, and cannot say which kinds a scope holds |
-| Problem | A kind outside the twelve, such as Conan, Swift or Composer, is reached only by typing it into the address. A kind the scope does not hold is offered, and ticking it shows an empty list |
-| Work | Report from the server the kinds present in a scope, counted over the findings the person may see (REQ-43), and offer those in the filter plus whatever is already chosen |
-| Waits on | The owner: whether the kinds follow the whole scope or the list as other filters narrowed it; whether counts show; working the kind out from the package identifier in Go after measuring, or in engine-specific SQL. The same pattern as GitHub issue #137 |
 
 ### TODO-37 Full-queue upload refusals
 

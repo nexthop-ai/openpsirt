@@ -241,9 +241,35 @@ Filters are named fields with fixed meanings, bound as parameters.
 
 A filter over an open set says so. The kind of package is read out of the
 identifier a producer wrote, so the set is whatever producers emit and the
-parameter carries any string: one nothing carries matches nothing. Named as
-eight kinds and offered as eight, most of an image whose packages are `apk` or
-`rpm` cannot be narrowed to at all, while the server answers either correctly.
+parameter carries any string: one nothing carries matches nothing.
+
+What the set holds in a scope is a read of its own, one per product with the
+branch and the variant as the list takes them, and one across every product.
+Each kind comes with how many of the findings list's rows are open at it: one
+per issue at a source package and version.
+
+| Rule | |
+|---|---|
+| Counted over what the reader may see (REQ-43) | Narrowed in the data-access layer like every other aggregate. A kind present only on an undisclosed finding is absent for somebody who reads disclosed ones |
+| Over the whole scope | The list's other filters, its release and support defaults and the triage line do not narrow it. It answers what the filter can offer, and a kind that vanished whenever another filter was on would be a choice nobody can see |
+| A row is counted once per product | However many builds and binaries of the selection hold it, as the list holds it as one row. Across products it counts in each, as it is a row in each |
+| Every binary of one source package is one kind | So a row's lowest package identifier speaks for it |
+| A kind is read as the filter reads it | The identifier as stored, without regard to capitals, beginning `pkg:`, the kind and a slash. An identifier the filter finds under no kind, and a component with no identifier, is not counted, because ticking it would empty the list |
+| Read in Go from each distinct identifier | The statement takes the distinct issues at components first, joins each to its component and folds them into rows, and counts the rows per identifier. Reading the kind in the statement is spelled once per engine. Grouping the findings themselves by fold took 300 to 590 ms on the same data |
+
+Measured on the full-size fixture, with every one of its 6,843 components that
+has a package identifier carrying an issue and the kernel carrying 4,943:
+241,313 findings, 11,785 rows, eight kinds.
+
+| Engine | The kinds read | The list's first page |
+|---|---|---|
+| SQLite | 60 ms | 230 ms |
+| PostgreSQL | 145 ms | 450 ms |
+| MySQL | 250 ms | 380 ms |
+| MariaDB | 148 ms | 410 ms |
+
+Below the page it is offered beside on every engine, so no engine spells the
+kind and nothing stores it.
 
 Sorting is permitted (REQ-66). A value in a query can be bound as a parameter
 and a column name cannot, so a sort column arriving from a query string becomes

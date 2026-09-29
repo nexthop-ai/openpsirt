@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { activeFilters, without, withoutAny } from "./FindingsFilters";
+import { activeFilters, kindsOffered, without, withoutAny } from "./FindingsFilters";
 
 // The chips above the findings list: what narrows it, read from the address,
 // and what removing each one leaves.
@@ -101,5 +101,69 @@ describe("clearing every chip", () => {
 
   it("changes nothing where nothing narrows", () => {
     expect(withoutAny(address("view=issues")).toString()).toBe("view=issues");
+  });
+});
+
+describe("the package kinds the filter offers", () => {
+  it("are the kinds the server reports, in its order, with their counts", () => {
+    expect(
+      kindsOffered(
+        [
+          { kind: "deb", open: 4210 },
+          { kind: "conan", open: 3 },
+        ],
+        [],
+      ),
+    ).toEqual([
+      ["deb", "Debian (deb) · 4,210"],
+      ["conan", "conan · 3"],
+    ]);
+  });
+
+  it("keep a kind already chosen that the scope does not hold", () => {
+    // Ticked on another scope and carried here by a link: offered so it can
+    // be seen and unticked, and without a count, because there is nothing.
+    expect(kindsOffered([{ kind: "deb", open: 1 }], ["deb", "apk"])).toEqual([
+      ["deb", "Debian (deb) · 1"],
+      ["apk", "Alpine (apk)"],
+    ]);
+  });
+
+  it("draw a chip naming the kind, and removing it removes that kind alone", () => {
+    const asked = address("ecosystem=cargo&ecosystem=swift");
+    expect(chips(asked)).toEqual(["Package type: Rust (cargo)", "Package type: swift"]);
+    const cargo = activeFilters(asked)[0]!;
+    expect(without(asked, cargo).toString()).toBe("ecosystem=swift");
+  });
+});
+
+describe("the weakness chips", () => {
+  it("name a weakness where its names have been read, and the catalog's name on hover", () => {
+    const names = new Map([
+      [
+        "CWE-119",
+        {
+          id: "CWE-119",
+          name: "Improper Restriction of Operations within the Bounds of a Memory Buffer",
+          short: "Buffer overflow",
+        },
+      ],
+      ["CWE-1321", { id: "CWE-1321", name: "Prototype Pollution" }],
+    ]);
+    const drawn = activeFilters(
+      address("weakness=CWE-119&weakness=CWE-1321&weakness=CWE-9"),
+      names,
+    );
+    expect(drawn.map((each) => `${each.label}: ${each.value}`)).toEqual([
+      "Weakness: CWE-119 Buffer overflow",
+      "Weakness: CWE-1321 Prototype Pollution",
+      "Weakness: CWE-9",
+    ]);
+    expect(drawn[0]?.title).toBe(names.get("CWE-119")?.name);
+    expect(drawn[2]?.title).toBeUndefined();
+  });
+
+  it("show the number alone before the names are read", () => {
+    expect(chips("weakness=CWE-79")).toEqual(["Weakness: CWE-79"]);
   });
 });

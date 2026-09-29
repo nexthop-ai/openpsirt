@@ -19,6 +19,8 @@ func Register(api huma.API, in core.Deps) {
 	registerComponentFindings(api, in)
 	// The findings list across every product somebody may see.
 	registerAnywhere(api, in)
+	// The kinds of package open findings sit at, for the list's filter.
+	registerKinds(api, in)
 	registerHolders(api, in)
 	registerFindingDetail(api, in)
 	registerEntry(api, in)
@@ -26,6 +28,8 @@ func Register(api huma.API, in core.Deps) {
 	registerResolution(api, in)
 	registerAttachments(api, in)
 	registerScoring(api, in)
+	// What a weakness is called, and a search over both lists of names.
+	registerWeaknesses(api)
 	registerAffects(api, in)
 	registerMovements(api, in)
 	registerGraph(api, in)
