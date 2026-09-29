@@ -645,7 +645,7 @@ function Dated({ claim, reason, marked }: { claim: Claim; reason: Reason; marked
   return (
     <article
       id={`claim-${claim.id}`}
-      className="qcard"
+      className="qcard lapsedcard"
       style={marked ? { outline: "2px solid var(--accent)", outlineOffset: 2 } : undefined}
     >
       <header>
