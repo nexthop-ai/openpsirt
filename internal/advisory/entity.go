@@ -27,7 +27,8 @@ import (
 // A configuration gap rather than a bad request, the way a missing publisher
 // is: whoever is asking cannot fix it, and an operator can.
 var ErrNoPrefix = refusal.New(
-	"no advisory identifier prefix is configured: set OPENPSIRT_ADVISORY_PREFIX")
+	"no advisory identifier prefix is configured: set OPENPSIRT_ADVISORY_PREFIX, " +
+		"or publisher.advisory_prefix in a configuration file")
 
 // ErrNoSuchAdvisory says there is no advisory by that name that this reader
 // may see.

@@ -53,13 +53,26 @@ func main() {
 // configUsage is what --config says about itself wherever it is accepted.
 const configUsage = "read settings from this TOML file rather than the environment"
 
+// configFlag sets where settings are read from, refusing an empty path. An
+// empty one is what `--config "$CONF"` passes with CONF unset, and read as no
+// file it would fall back to the environment and stop somewhere unrelated.
+func configFlag(file *string) func(string) error {
+	return func(path string) error {
+		if path == "" {
+			return errors.New("names no file")
+		}
+		*file = path
+		return nil
+	}
+}
+
 func run(args []string, stdout, stderr *os.File) (err error) {
 	fs := flag.NewFlagSet("openpsirt", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	showVersion := fs.Bool("version", false, "print the build and exit")
 	dumpSpec := fs.Bool("openapi", false, "write the OpenAPI document to stdout and exit")
 	var file string
-	fs.StringVar(&file, "config", "", configUsage)
+	fs.Func("config", configUsage, configFlag(&file))
 	if err := fs.Parse(args); err != nil {
 		// A request for help is not a failure.
 		if errors.Is(err, flag.ErrHelp) {
@@ -92,7 +105,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		for {
 			sub := flag.NewFlagSet("openpsirt "+command, flag.ContinueOnError)
 			sub.SetOutput(stderr)
-			sub.StringVar(&file, "config", file, configUsage)
+			sub.Func("config", configUsage, configFlag(&file))
 			if err := sub.Parse(rest); err != nil {
 				if errors.Is(err, flag.ErrHelp) {
 					return nil
@@ -612,7 +625,7 @@ func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) 
 	if applied < wanted {
 		return fmt.Errorf(
 			"the database is at schema version %d and this build expects %d: "+
-				"run \"openpsirt migrate up\", or set OPENPSIRT_AUTO_MIGRATE=true",
+				"run \"openpsirt migrate up\" with the same configuration, or set OPENPSIRT_AUTO_MIGRATE=true",
 			applied, wanted)
 	}
 	if applied > wanted {

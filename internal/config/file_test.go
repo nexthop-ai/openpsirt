@@ -5,6 +5,7 @@ package config
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -289,6 +290,40 @@ func TestAFileThatIsNotTOMLIsRefusedNamingTheLine(t *testing.T) {
 	if !strings.Contains(err.Error(), "line 3") {
 		t.Errorf("the refusal does not name the line: %v", err)
 	}
+	if strings.Contains(err.Error(), "https") {
+		t.Errorf("the refusal repeats what the file holds: %v", err)
+	}
+}
+
+// A secret written without its quotes is not repeated in the refusal, which
+// goes to the journal.
+func TestARefusalOfAMalformedFileRepeatsNoValue(t *testing.T) {
+	for _, body := range []string{
+		"[mail]\npassword = correcthorsebattery\n",
+		"[mail]\npassword = \"s\" correcthorsebattery\n",
+		"[mail]\npassword = 'correcthorsebattery\n",
+	} {
+		_, err := LoadFile(writeFile(t, body), nil)
+		if err == nil {
+			t.Errorf("%q was accepted", body)
+			continue
+		}
+		if strings.Contains(err.Error(), "correcthorsebattery") {
+			t.Errorf("the refusal repeats what the file holds: %v", err)
+		}
+		if !strings.Contains(err.Error(), "line 2") {
+			t.Errorf("the refusal does not name the line: %v", err)
+		}
+	}
+}
+
+// A quoted dotted key names the same setting as the key under its table, and
+// a file holding both is refused rather than one silently winning.
+func TestASettingWrittenTwiceIsRefused(t *testing.T) {
+	_, err := LoadFile(writeFile(t, "\"database.url\" = \"sqlite:///a.db\"\n\n[database]\nurl = \"sqlite:///b.db\"\n"), nil)
+	if err == nil || !strings.Contains(err.Error(), "database.url") {
+		t.Errorf("a setting written twice was not refused naming it: %v", err)
+	}
 }
 
 // Every refusal the loader makes of a value is made of the same value in a
@@ -347,9 +382,21 @@ func TestARefusalNamesTheKeyAndKeepsWhatItWraps(t *testing.T) {
 
 // Every configuration file the documentation shows is one the loader reads.
 func TestTheDocumentedFilesAreRead(t *testing.T) {
-	block := regexp.MustCompile("(?s)```toml\n(.*?)```")
+	// A fence may carry attributes after the language, as a title.
+	block := regexp.MustCompile("(?s)```toml[^\n]*\n(.*?)```")
+	var pages []string
+	err := filepath.WalkDir("../../docs", func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".md") {
+			pages = append(pages, path)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireAmong(t, pages, "../../docs/configuration.md", "../../docs/running.md")
 	shown := 0
-	for _, page := range []string{"../../docs/configuration.md", "../../docs/running.md"} {
+	for _, page := range pages {
 		text, err := os.ReadFile(page) //nolint:gosec // G304: this repository's own documents
 		if err != nil {
 			t.Fatal(err)

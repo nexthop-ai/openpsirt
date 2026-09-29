@@ -117,6 +117,28 @@ func TestARefusalOfAFileNamesTheKey(t *testing.T) {
 		strings.Contains(err.Error(), "OPENPSIRT_") {
 		t.Errorf("a refusal after startup began does not name the key: %v", err)
 	}
+	// The command it names reads the same configuration, rather than the
+	// environment a bare `migrate up` falls back to.
+	if err == nil || !strings.Contains(err.Error(), "with the same configuration") {
+		t.Errorf("the schema refusal names a command without its configuration: %v", err)
+	}
+}
+
+// An empty path is what an unset shell variable passes, and read as no file it
+// falls back to the environment and stops somewhere unrelated.
+func TestAnEmptyConfigurationPathIsRefused(t *testing.T) {
+	withoutOurVariables(t)
+	for _, args := range [][]string{
+		{"--config", ""},
+		{"--config="},
+		{"serve", "--config", ""},
+		{"migrate", "up", "--config", ""},
+	} {
+		_, err := runOut(t, args...)
+		if err == nil || !strings.Contains(err.Error(), "names no file") {
+			t.Errorf("%q: %v", args, err)
+		}
+	}
 }
 
 func TestAnArgumentAfterACommandIsRefused(t *testing.T) {

@@ -43,7 +43,8 @@ var ErrNotOurs = refusal.New(
 
 // ErrNoPublisher says the deployment has not been told who it publishes as.
 //
-// Wrapped by missingPublisher, which names the variable that is not set: the
+// Wrapped by missingPublisher, which names the setting that is not set, by
+// its variable and by its key in a configuration file: the
 // person who sees this cannot fix it, and the operator who can is reading a
 // relayed message rather than sitting at the process.
 var ErrNoPublisher = refusal.New("this deployment has not been configured with a publisher")
@@ -52,12 +53,14 @@ var ErrNoPublisher = refusal.New("this deployment has not been configured with a
 func missingPublisher(p publisher.Named) error {
 	switch {
 	case p.Name == "" && p.Namespace == "":
-		return fmt.Errorf("%w: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE",
-			ErrNoPublisher)
+		return fmt.Errorf("%w: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE, "+
+			"or publisher.name and publisher.namespace in a configuration file", ErrNoPublisher)
 	case p.Name == "":
-		return fmt.Errorf("%w: OPENPSIRT_PUBLISHER_NAME is not set", ErrNoPublisher)
+		return fmt.Errorf("%w: set OPENPSIRT_PUBLISHER_NAME, or publisher.name in a configuration file",
+			ErrNoPublisher)
 	default:
-		return fmt.Errorf("%w: OPENPSIRT_PUBLISHER_NAMESPACE is not set", ErrNoPublisher)
+		return fmt.Errorf("%w: set OPENPSIRT_PUBLISHER_NAMESPACE, or publisher.namespace in a "+
+			"configuration file", ErrNoPublisher)
 	}
 }
 

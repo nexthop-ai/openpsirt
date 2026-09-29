@@ -70,26 +70,36 @@ func requireAmong(t *testing.T, found []string, want ...string) {
 }
 
 // loaderReads is every setting the loader reads, by environment name after
-// the prefix: the literal at each call of the reader in this package.
-func loaderReads(t *testing.T) map[string]bool {
+// the prefix — the literal at each call of the reader in this package — with
+// the reader it is read by.
+func loaderReads(t *testing.T) map[string]string {
 	t.Helper()
 	sources := goSources(t, ".")
 	requireAmong(t, sources, "config.go")
-	read := regexp.MustCompile(`r\.(?:text|duration|number|boolean)\("([A-Z0-9_]+)"`)
-	reads := map[string]bool{}
+	read := regexp.MustCompile(`r\.(text|duration|number|boolean)\("([A-Z0-9_]+)"`)
+	reads := map[string]string{}
 	for _, path := range sources {
 		source, err := os.ReadFile(path) //nolint:gosec // G304: a Go file of this repository, found by the walk above
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, found := range read.FindAllStringSubmatch(string(source), -1) {
-			reads[found[1]] = true
+			if was, ok := reads[found[2]]; ok && was != found[1] {
+				t.Errorf("%s%s is read as a %s and as a %s", envPrefix, found[2], was, found[1])
+			}
+			reads[found[2]] = found[1]
 		}
 	}
 	if len(reads) == 0 {
 		t.Fatal("no settings were found in the source, so this checked nothing")
 	}
 	return reads
+}
+
+// readBy is the reader a setting of each kind is read with. A list is read as
+// text and split, which is how the environment carries one.
+var readBy = map[kind]string{
+	text: "text", list: "text", number: "number", duration: "duration", boolean: "boolean",
 }
 
 // The table is what the loader reads, in both directions.
@@ -115,8 +125,15 @@ func TestTheSettingsTableIsWhatTheLoaderReads(t *testing.T) {
 		if one.file == "" || strings.Count(one.file, ".") < 1 {
 			t.Errorf("%s%s has no key under a table in a file: %q", envPrefix, one.env, one.file)
 		}
-		if !reads[one.env] {
+		switch reader, ok := reads[one.env]; {
+		case !ok:
 			t.Errorf("%s%s (%s) is in the table and the loader never reads it", envPrefix, one.env, one.file)
+		case reader != readBy[one.kind]:
+			// A file checks a value's type by the row's kind, and the loader
+			// parses it by the reader, so the two have to agree or a file
+			// refuses the form the loader reads.
+			t.Errorf("%s%s is read as a %s, and its row's kind wants a %s",
+				envPrefix, one.env, reader, readBy[one.kind])
 		}
 	}
 	for name := range reads {
@@ -136,7 +153,10 @@ func TestTheSettingsTableIsWhatTheLoaderReads(t *testing.T) {
 
 func TestEverySettingIsWrittenDown(t *testing.T) {
 	// Where a setting is read: every file in this package.
-	reads := loaderReads(t)
+	reads := map[string]bool{}
+	for name := range loaderReads(t) {
+		reads[name] = true
+	}
 	// Where one is named in a message, an API description or a field telling
 	// an operator to set it: every file of the program. The harness and the
 	// gates are left out, because the names they carry configure a test run

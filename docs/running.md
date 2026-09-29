@@ -44,11 +44,14 @@ with a deployment running the image.
 
 ```
 curl -fsSLO https://github.com/anchore/grype/releases/download/v{{ scanner }}/grype_{{ scanner }}_linux_amd64.tar.gz
-curl -fsSLO https://github.com/anchore/grype/releases/download/v{{ scanner }}/grype_{{ scanner }}_checksums.txt
-sha256sum --ignore-missing -c grype_{{ scanner }}_checksums.txt
+echo "{{ scanner_sha256_amd64 }}  grype_{{ scanner }}_linux_amd64.tar.gz" | sha256sum -c -
 tar -xzf grype_{{ scanner }}_linux_amd64.tar.gz grype
 sudo install -m 0755 grype /usr/local/bin/grype
 ```
+
+The checksum is the one the image build verifies its own download against. On
+arm64 the archive ends `_linux_arm64.tar.gz`, and its checksum is
+`{{ scanner_sha256_arm64 }}`.
 
 The process finds it on `PATH`. `scanner.path` in the configuration file names
 it anywhere else.
@@ -110,7 +113,7 @@ username_claim = "preferred_username"
 
 | Key | Why |
 |---|---|
-| `server.address` on `127.0.0.1` | Only the proxy reaches the process. Reached directly, a request skips TLS and, with trusted-header sign-in, the proxy that authenticated it |
+| `server.address` on `127.0.0.1` | Nothing off the host reaches the process. Every account and program on the host still does, and a request reaching it directly skips TLS and, with trusted-header sign-in, the proxy that authenticated it |
 | `server.base_url` | The address people type. Sign-in providers send people back to it, links in notifications point at it, and a browser's write is refused when its origin is anything else |
 | `server.plain_http` left unset | The session cookie is marked for HTTPS only. The browser is on HTTPS at the proxy, which is what the cookie needs |
 
@@ -168,7 +171,7 @@ reverse proxy terminating TLS.
 | Passes to `server.address` | `127.0.0.1:8080` in the examples |
 | Passes the `Host` header through | Where `server.base_url` is unset, a browser's origin is compared with the `Host` the process receives. Set `server.base_url` to the address the proxy answers on, and the comparison is with that |
 | Sends no forwarding headers the process needs | It reads no `X-Forwarded-For`, `X-Forwarded-Proto` or `Forwarded` header. The client address it sees is the proxy's, and `signin.trusted_header.sources` is matched against that address |
-| Accepts a request body of twice `ingest.max_bytes` | One upload carries an inventory and its suppression documents: 512 MB at the defaults. Past the proxy's own limit the upload is refused by the proxy with a 413, before the process sees it, and nginx's default is 1 MB |
+| Accepts a request body of twice `ingest.max_bytes` | One upload carries an inventory and its suppression documents: 512 MiB, 536,870,912 bytes, at the defaults. Past the proxy's own limit the upload is refused by the proxy with a 413, before the process sees it, and nginx's default is 1 MB |
 | Waits 300 seconds for a response | The process gives a request five minutes to arrive and five minutes to answer. An export of a large product, a CSV or VEX download, and a scan upload over a slow link run close to that |
 | Does not buffer responses | Exports, the `.csv` and `.json` downloads, are written as they are read |
 
@@ -245,7 +248,7 @@ Caddy obtains the certificate, and redirects HTTP to HTTPS, by itself.
 ```
 psirt.example.com {
 	request_body {
-		max_size 512MB
+		max_size 512MiB
 	}
 	reverse_proxy 127.0.0.1:8080 {
 		flush_interval -1
@@ -278,7 +281,25 @@ groups_header = "X-Groups"
 | Authenticates every request to the people's address | A request that reaches the process without passing authentication carries no identity |
 | Removes any `X-User` and `X-Groups` the client sent, then sets them from who it authenticated | The process cannot tell a header the proxy wrote from one the client wrote |
 | Is the only address in `signin.trusted_header.sources` | Anything else listed there can assert anybody |
+| Is the only program on the host that reaches the process's port | `127.0.0.1` is every account on the host, so with `sources = ["127.0.0.1/32"]` any local user who sends `X-User` is whoever they name. Run nothing untrusted on the host, or refuse the port to every user but the proxy's, as below |
 | Serves build pipelines on an address of their own, removing both headers and authenticating nothing | A pipeline sends an API key and cannot sign in through a browser, and the process authenticates the key |
+
+The port refused to every local user but the proxy's, with nftables. The
+proxy's user is `www-data` on Debian and Ubuntu, and `nginx` or `apache`
+elsewhere:
+
+```
+table inet openpsirt {
+	chain output {
+		type filter hook output priority 0;
+		oifname "lo" tcp dport 8080 meta skuid != "www-data" reject with tcp reset
+	}
+}
+```
+
+Save it as `/etc/nftables.d/openpsirt.nft` and load it with
+`sudo nft -f /etc/nftables.d/openpsirt.nft`, or wherever the host's firewall
+reads its rules at boot.
 
 ### nginx with oauth2-proxy
 
@@ -439,5 +460,5 @@ from first.
    Otherwise the process migrates as it starts.
 5. Start the service: `sudo systemctl start openpsirt`.
 
-`openpsirt migrate status --config /etc/openpsirt/openpsirt.toml` says which
+`sudo -u openpsirt openpsirt migrate status --config /etc/openpsirt/openpsirt.toml` says which
 schema version the database is at and which this build expects.

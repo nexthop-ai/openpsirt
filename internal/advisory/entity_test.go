@@ -175,6 +175,13 @@ func TestAnAdvisoryCannotBeStartedWhereNothingSaysWhatToMintUnder(t *testing.T) 
 		if !errors.Is(err, advisory.ErrNoPrefix) {
 			t.Errorf("an unconfigured deployment minted a name: %v", err)
 		}
+		// Named both ways, since the process cannot know which source the
+		// operator reading a relayed refusal configured.
+		for _, want := range []string{"OPENPSIRT_ADVISORY_PREFIX", "publisher.advisory_prefix"} {
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("the refusal does not say to set %s: %v", want, err)
+			}
+		}
 	})
 }
 

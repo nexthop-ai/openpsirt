@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -67,6 +68,9 @@ func LoadFile(path string, environ []string) (Config, error) {
 	return c, InFile(err)
 }
 
+// quoted is text the parser quotes in a message about what it could not read.
+var quoted = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'[^']*'`)
+
 // parseFile reads a configuration file into the values the loader reads,
 // keyed by environment name and spelled as the environment spells them.
 func parseFile(raw string) (map[string]string, error) {
@@ -74,7 +78,13 @@ func parseFile(raw string) (map[string]string, error) {
 	if _, err := toml.Decode(raw, &tree); err != nil {
 		var parse toml.ParseError
 		if errors.As(err, &parse) {
-			return nil, fmt.Errorf("line %d: %s", parse.Position.Line, parse.Message)
+			// The parser quotes what it could not read, which in a file of
+			// secrets may be a password written without its quotes.
+			said := quoted.ReplaceAllString(parse.Message, "(hidden)")
+			if parse.LastKey != "" {
+				return nil, fmt.Errorf("line %d, at %s: %s", parse.Position.Line, parse.LastKey, said)
+			}
+			return nil, fmt.Errorf("line %d: %s", parse.Position.Line, said)
 		}
 		return nil, err
 	}
@@ -105,6 +115,11 @@ func walk(tree map[string]any, under string, byKey map[string]setting, given map
 		}
 		value := tree[name]
 		if one, ok := byKey[key]; ok {
+			// A quoted dotted key, "database.url", reads here as the same
+			// setting as url under [database], and one would silently win.
+			if _, twice := given[one.env]; twice {
+				return fmt.Errorf("%s is set twice", key)
+			}
 			spelled, err := spell(one, value)
 			if err != nil {
 				return fmt.Errorf("%s: %w", key, err)

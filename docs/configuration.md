@@ -54,7 +54,8 @@ openpsirt migrate up --config /etc/openpsirt/openpsirt.toml
 | The environment | Any variable starting `OPENPSIRT_` set beside the file is refused at startup, naming every one, even when it is empty. Unset them |
 | Permissions | Readable and writable by its owner alone, `chmod 600`, owned by the user the process runs as. A file anybody else may read or write is refused at startup: it holds the database password and every secret below |
 | Refused at startup | A key that is not a setting, a value of the wrong type, a list entry holding a comma, and a file that is not TOML. Each refusal names the key, or the line |
-| Refusals | Name the key, as `database.max_open`, rather than the variable. A log line written while running names the variable, which the tables pair with the key |
+| Refusals | A refusal that stops the process names the key, as `database.max_open`, rather than the variable. A refusal answered to a request names both. A log line, a hint on a screen and the API reference name the variable, which the tables pair with the key |
+| Kubernetes | A pod gets variables for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service called `openpsirt` they start `OPENPSIRT_`, and are refused beside a file. A pod configured by file sets `enableServiceLinks: false` |
 
 Every rule in the tables applies to a value from the file exactly as to one
 from the environment: the defaults, the zero read as unset, and every value
@@ -100,7 +101,8 @@ starts read them, so they stay in the environment beside a file.
 
 | Variable | Read by |
 |---|---|
-| `PATH`, `HOME` | The process, the scanner and git |
+| `PATH` | The process, the scanner and git |
+| `HOME` | The process and the scanner. git is given a home of its own |
 | `TMPDIR` | Where uploads and the scanner's scratch files are written |
 | `TZ` | The time zone logs and the scanner use |
 | `SSL_CERT_FILE`, `SSL_CERT_DIR` | The certificate authorities outbound TLS trusts |

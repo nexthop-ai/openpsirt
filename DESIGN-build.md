@@ -867,17 +867,26 @@ kept, and that one a release candidate built is recreated, because a
 candidate's migration can be fixed before the release (`DESIGN-database.md`
 § Migrations).
 
-### Scanner version
+### Scanner pins
 
-A page names the scanner version the image carries as `{{ scanner }}`, and the
-build writes in the version the Dockerfile's one scanner pin names. A
-Dockerfile pinning the scanner on no line, or on more than one, fails the
-build. A written-out scanner version is a release-shaped literal, so the same
-test reports it.
+The pages name what the Dockerfile's scanner stage pins, and the build writes
+it in.
 
-A test in `internal/docs` fails on a placeholder the build does not fill in,
-and on a Dockerfile without exactly one pin. A workflow expression, `${{ … }}`,
-in a pipeline example is not a placeholder.
+| Placeholder | Filled with |
+|---|---|
+| `{{ scanner }}` | The scanner version the image carries |
+| `{{ scanner_sha256_amd64 }}`, `{{ scanner_sha256_arm64 }}` | The checksum the image build verifies each architecture's download against, so a host installing the scanner checks it against the same pin rather than a checksum file from the release it is checking |
+
+| Rule | |
+|---|---|
+| The hook declares every name a page may write | The build fails on a page writing any other, and on a declared name it does not fill |
+| Each pin is read from the scanner stage alone, and must appear there once | Another stage pins another tool's checksums the same way. None, or two, fails the build |
+| A written-out scanner version is reported | It is a release-shaped literal, which the release test already reports |
+| A workflow expression, `${{ … }}`, in a pipeline example is not a placeholder | It follows a dollar sign and holds a dot |
+
+A test in `internal/docs` reads the declared names from the hook, and fails on
+a page writing any other, on a declared name no page writes, and on a pin the
+scanner stage does not hold exactly once.
 
 ### The settings reference
 
