@@ -113,12 +113,11 @@ export function markable(row: { covered?: unknown; decided?: string }): boolean 
   return row.covered !== undefined && row.covered !== null && row.decided !== "known_affected";
 }
 
-// Whether the decision covering a release was made on another variant, and
-// reaches this one only by matching versions.
-export function madeElsewhere(row: {
-  variant?: string;
-  covered?: { decided_in?: string[] | null } | null;
-}): boolean {
-  const made = row.covered?.decided_in ?? [];
-  return made.length > 0 && !made.includes(row.variant ?? "");
+// The builds a decision was made on, as a release is named. Nothing recorded
+// is said as that rather than left blank, which would read as nowhere.
+export function madeOnLabel(
+  made: readonly { stream?: string; variant?: string }[] | null | undefined,
+): string {
+  if (!made || made.length === 0) return "not recorded";
+  return made.map((one) => `${one.stream ?? ""} (${one.variant ?? ""})`).join(", ");
 }

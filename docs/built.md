@@ -22,7 +22,7 @@ build is recreated.
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
-| Advisories | CSAF advisories with editorial states and a second person's agreement, stating a release known not affected where approved decisions cover it, a CSAF provider directory, and per-build OpenVEX documents with a revision chain |
+| Advisories | CSAF advisories with editorial states and a second person's agreement, stating a release known not affected where approved decisions cover it and saying no fix is planned where they say it will not be fixed, a CSAF provider directory, and per-build OpenVEX documents with a revision chain |
 | Obligations | Records of exploitation, the windows they may oblige, and the notices given |
 | Reporting | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
 | Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, Slack and Zulip channels and direct messages, and operational alerts |

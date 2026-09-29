@@ -26,12 +26,32 @@ type Covering struct {
 	DecidedBy int64  `bun:"decided_by"`
 }
 
-// publishedOutcomes is the outcomes a published statement may carry. A claim
-// that will not be fixed joins only where it names what a holder can do
-// instead: the formats require an action on an affected statement, so one
-// without a mitigation has nothing to publish and falls through to silence.
-const publishedOutcomes = `(cl.outcome IN ('not-applicable', '` + Mismatched + `', 'already-fixed')
-	OR (cl.outcome = 'wont-fix' AND COALESCE(cl.mitigation, '') <> ''))`
+// Reader is which document a coverage is read for, which decides the outcomes
+// that cover a place.
+type Reader int
+
+const (
+	// ForStatements is the VEX document of one build. A claim that will not
+	// be fixed covers a place only where it names what a holder can do
+	// instead: the format requires an action on an affected statement, so one
+	// without a mitigation has nothing to publish and falls through to
+	// silence.
+	ForStatements Reader = iota
+	// ForReleases is an advisory, release by release. A claim that will not
+	// be fixed covers a place whether or not it names a mitigation, because
+	// the document says no fix is planned there either way.
+	ForReleases
+)
+
+// coveringOutcomes is the outcomes that cover a place for one reader.
+func coveringOutcomes(reader Reader) string {
+	wontFix := `(cl.outcome = 'wont-fix' AND COALESCE(cl.mitigation, '') <> '')`
+	if reader == ForReleases {
+		wontFix = `cl.outcome = 'wont-fix'`
+	}
+	return `(cl.outcome IN ('not-applicable', '` + Mismatched + `', 'already-fixed') OR ` +
+		wontFix + `)`
+}
 
 // WhollyCovered narrows a grouped read of findings to the groups whose every
 // open place is covered by approved, live decisions agreeing on one outcome,
@@ -60,7 +80,7 @@ const publishedOutcomes = `(cl.outcome IN ('not-applicable', '` + Mismatched + `
 // per column composes a statement from several claims that no record ever
 // held.
 func WhollyCovered(q *bun.SelectQuery, productID int64,
-	visible []access.Visibility) *bun.SelectQuery {
+	visible []access.Visibility, reader Reader) *bun.SelectQuery {
 
 	return q.
 		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
@@ -69,7 +89,7 @@ func WhollyCovered(q *bun.SelectQuery, productID int64,
 			AND de.visibility IN (?)
 			AND `+keyMatchesOn("de", `(SELECT mc.outcome FROM "claim" AS "mc"
 				WHERE mc.id = de.claim_id)`), productID, bun.List(visible)).
-		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id AND ` + publishedOutcomes).
+		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id AND ` + coveringOutcomes(reader)).
 		// Safe as an aggregate, because the grouping refuses a group whose
 		// places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).

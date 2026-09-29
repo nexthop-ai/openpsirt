@@ -363,7 +363,7 @@ export interface paths {
          * List what an advisory states about each release
          * @description Every release of every issue this advisory covers, with the status its document states and the decision behind it.
          *
-         *     A release whose every open place is covered by approved, live decisions with one outcome names the earliest of them, with the variants it was made on. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
+         *     A release whose every open place is covered by approved, live decisions with one outcome names the earliest of them, with the builds it was made on. `elsewhere` is true where that decision records the builds it was made on and this release is not one of them. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
          *
          *     An advisory covering a product you hold nothing on answers as one that does not exist.
          *
@@ -4139,7 +4139,7 @@ export interface paths {
          *
          *     The ordinary approval rules apply however many places this reaches: covering many places does not on its own require a second person.
          *
-         *     Pass `also` to apply the same judgment to other builds of this product, naming each as the reach gives it. All of it is written in one transaction: the response is what every build recorded, or a refusal and nothing written anywhere. In those builds only the places nothing already stands at are written, because the ones at matching versions are reached by lookup already.
+         *     Pass `also` to apply the same judgment to other builds of this product, naming each as the reach gives it. All of it is written in one transaction: the response is what every build recorded, or a refusal and nothing written anywhere. In those builds only the places nothing already stands at are written, because the ones at matching versions are reached by lookup already. The claim records the build in the path and each build named in `also` as the builds it was made on, and no build it reaches by lookup.
          *
          *     Pass `extends` to carry an approved claim to this issue: the source must be approved, sit at the same component under the same consumer, and the outcome and justification must match it. The new claim is recorded as an extension of it and still waits for a second person. `similar` on `GET .../findings/{vulnerability}/components/{component}` lists the claims that qualify.
          *
@@ -6207,6 +6207,8 @@ export interface components {
              * @enum {string}
              */
             decided: "known_affected" | "known_not_affected" | "fixed";
+            /** @description Whether the covering decision records the builds it was made on and this release is not one of them */
+            elsewhere: boolean;
             /** @description Whether the release is marked affected whatever its decisions say */
             marked: boolean;
             product: string;
@@ -9380,6 +9382,10 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        MadeOnBody: {
+            stream: string;
+            variant: string;
+        };
         "Mark-advisory-releaseRequest": {
             /**
              * Format: uri
@@ -10893,13 +10899,13 @@ export interface components {
             variant: string;
         };
         ReleaseCoveringBody: {
-            /** @description The variants the decision's place was open in when it was proposed. A release in another variant is one the decision reached by matching versions */
-            decided_in: string[] | null;
             /**
              * Format: int64
              * @description The earliest decision covering the release
              */
             decision: number;
+            /** @description The builds the decision was made on: the one on screen when it was proposed and every one chosen beside it. Empty where none was recorded */
+            made_on: components["schemas"]["MadeOnBody"][] | null;
             /** @description What stops the flaw, where the decision named it. The document states it as the impact */
             mitigation?: string;
             outcome: string;

@@ -313,29 +313,82 @@ func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []
 // inside this deployment; the same sentence in a published advisory is a
 // promise to a customer about a date, and whether to make one is the
 // publisher's.
-func remediationsFor(fixed []Named, affected []string) []Remediation {
-	// Nothing to remediate where nothing carries it: a document about a flaw
-	// every release has left behind is a record rather than a warning.
-	if len(affected) == 0 {
-		return nil
-	}
-	if len(fixed) > 0 {
+//
+// A release a decision says will not be fixed is told so, and never told a fix
+// is coming or merely unavailable: it takes a remediation saying no fix is
+// planned, and one carrying what stops the flaw where the decision named it —
+// the mitigation, never the reasoning. It is not offered the releases that
+// are fixed. A fix in another release beside "no fix is planned" for the same
+// product reads as the two contradicting each other, and moving to another
+// line is the reader's decision rather than a remediation of this one.
+func remediationsFor(fixed []Named, affected []string, unfixed *noFix) []Remediation {
+	var out []Remediation
+	switch {
+	case len(affected) == 0:
+		// Nothing to remediate where nothing the fix is for carries it: a
+		// document about a flaw every release has left behind is a record
+		// rather than a warning.
+	case len(fixed) > 0:
 		names := make([]string, 0, len(fixed))
 		for _, one := range fixed {
 			names = append(names, one.Name)
 		}
-		return []Remediation{{
+		out = append(out, Remediation{
 			Category: "vendor_fix",
 			Details: "Update to a release in which this flaw is fixed: " +
 				strings.Join(names, ", ") + ".",
 			ProductIDs: affected,
-		}}
+		})
+	default:
+		out = append(out, Remediation{
+			Category:   "none_available",
+			Details:    "No release fixing this is available.",
+			ProductIDs: affected,
+		})
 	}
-	return []Remediation{{
-		Category:   "none_available",
-		Details:    "No release fixing this is available.",
-		ProductIDs: affected,
-	}}
+	if len(unfixed.releases) == 0 {
+		return out
+	}
+	out = append(out, Remediation{
+		Category:   "no_fix_planned",
+		Details:    "No fix is planned for this release.",
+		ProductIDs: unfixed.releases,
+	})
+	for _, one := range unfixed.mitigations {
+		out = append(out, Remediation{
+			Category: "mitigation", Details: one.text, ProductIDs: one.releases,
+		})
+	}
+	return out
+}
+
+// noFix is the affected releases a decision says will not be fixed, and
+// what stops the flaw in them, one entry per mitigation in the order the
+// releases are named.
+type noFix struct {
+	releases    []string
+	mitigations []mitigated
+}
+
+// mitigated is one mitigation and the releases it is stated for.
+type mitigated struct {
+	text     string
+	releases []string
+}
+
+// add records one release, and its mitigation where the decision named one.
+func (s *noFix) add(release, mitigation string) {
+	s.releases = append(s.releases, release)
+	if mitigation == "" {
+		return
+	}
+	for i := range s.mitigations {
+		if s.mitigations[i].text == mitigation {
+			s.mitigations[i].releases = append(s.mitigations[i].releases, release)
+			return
+		}
+	}
+	s.mitigations = append(s.mitigations, mitigated{text: mitigation, releases: []string{release}})
 }
 
 // weaknessOf is what kind of flaw this is, where the catalog knows the name.

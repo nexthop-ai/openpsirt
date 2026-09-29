@@ -318,7 +318,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		// from landing on it exactly.
 		Limit(s.carrying() + 1)
 	// Every open place agreed, and agreed the same way.
-	err := finding.WhollyCovered(q, named.ProductID, visible).Scan(ctx, &rows)
+	err := finding.WhollyCovered(q, named.ProductID, visible, finding.ForStatements).Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
 	}

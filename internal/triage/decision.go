@@ -288,6 +288,14 @@ type Proposal struct {
 	// was. Recorded so that a revision to it can be noticed; it is never
 	// what the claim rests on, which is the reasoning somebody typed.
 	FromStatement *int64
+	// MadeOn is the builds the claim is made on: the one on screen and every
+	// one the person chose beside it. A build the claim reaches by lookup is
+	// not one of them. Empty where no build is in hand.
+	MadeOn []int64
+	// MadeAs is a claim whose recorded builds this one keeps, for a claim
+	// re-made as the same judgment: re-affirmed after its code moved, or the
+	// rows an approver set aside.
+	MadeAs int64
 	// NeedsApproval says a second person must agree before this takes effect.
 	//
 	// Worked out by the store, inside the transaction that writes. Not

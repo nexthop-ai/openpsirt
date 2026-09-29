@@ -900,6 +900,8 @@ var tables = []string{
 	"decision",
 	// After the rows that point at it, and before the claim it hangs off.
 	"claim_revision",
+	// Before claim and target, both of which it points at.
+	"claim_build",
 	// Before person, which it points at, and after everything above, which
 	// points at it.
 	"claim",

@@ -96,6 +96,11 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	// asking "am I affected", which a dependency path does not answer.
 	fixed := make([]Named, 0, len(releases))
 	rated := make([]string, 0, len(releases))
+	// The affected releases split by what can be done about them: the ones a
+	// fix is for, and the ones a decision says will not be fixed, with what
+	// stops the flaw there where the decision named it.
+	var fixable []string
+	unfixed := &noFix{}
 	for _, release := range releases {
 		leaf := Named{
 			Name: fmt.Sprintf("%s %s", one.ProductName, release.Name()),
@@ -134,6 +139,11 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		default:
 			vulnerability.Status.KnownAffected = append(
 				vulnerability.Status.KnownAffected, leaf.ID)
+			if release.NoFixPlanned() {
+				unfixed.add(leaf.ID, release.Grounds.Mitigation)
+			} else {
+				fixable = append(fixable, leaf.ID)
+			}
 		}
 		// Every release the flaw is or was in, which is what a rating is
 		// stated for: the score is the flaw's, and the flaw is the same flaw
@@ -145,7 +155,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		return err
 	}
 	vulnerability.Scores = scoresFor(issue, ratings, rated)
-	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
+	vulnerability.Remediations = remediationsFor(fixed, fixable, unfixed)
 
 	a.vulnerabilities = append(a.vulnerabilities, vulnerability)
 	a.point(pointers)

@@ -651,6 +651,8 @@ func registerProposing(api huma.API, in core.Deps) {
 			// the commitment may state.
 			BindingAcross: []int64{target},
 			FromStatement: core.Cited(input.Body.FromStatement),
+			// Made on the build in the path, which is the one on screen.
+			MadeOn: []int64{target},
 		}
 		if input.Body.DeferredUntil != "" {
 			until, err := time.Parse(time.DateOnly, input.Body.DeferredUntil)

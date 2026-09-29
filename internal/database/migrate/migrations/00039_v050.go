@@ -116,6 +116,9 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //     recorded here that v0.4.0 left undated under a duplicate ruling from
 //     outside is dated, and each such date recorded as a movement from its
 //     ruling.
+//   - A claim records the builds it was made on, in a table of its own.
+//     v0.4.0 recorded none, so every claim it holds says nothing about where
+//     it was made.
 //   - A build's claim records the version it was made about, where the
 //     document stated one outside the package identifier. Every claim v0.4.0
 //     holds takes none, and covers what it covered before: v0.4.0 kept no
@@ -212,6 +215,9 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := u.create(advisoryV050(t), "advisory_override", "advisory_agreed_status"); err != nil {
 		return err
 	}
+	if err := u.create(claimBuildV050(t), "claim_build"); err != nil {
+		return err
+	}
 	return u.create(chatV050(t), "chat_preference", "chat_delivery")
 }
 
@@ -251,7 +257,8 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // change no person made. The day an issue was listed as exploited goes with
 // its column. A movement a ruling recorded goes, and the date it set stays.
 //
-// A claim's version goes with its column, and the two advisory tables go:
+// A claim's version goes with its column, the builds each claim was made on
+// go with their table, and the two advisory tables go:
 // v0.4.0 states every release holding a flaw as known affected.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
@@ -277,7 +284,8 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := dropTables(ctx, tx.Tx, "chat_delivery", "chat_preference"); err != nil {
 		return err
 	}
-	if err := dropTables(ctx, tx.Tx, "advisory_agreed_status", "advisory_override"); err != nil {
+	if err := dropTables(ctx, tx.Tx, "claim_build", "advisory_agreed_status",
+		"advisory_override"); err != nil {
 		return err
 	}
 	if err := dropTables(ctx, tx.Tx, "decision_superseded", "vulnerability_merge"); err != nil {

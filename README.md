@@ -271,9 +271,11 @@ says what turns each on.
   CSAF 2.0 document
 - A release whose every open place stands under an approved decision that the
   flaw does not apply is stated known not affected, with the decision's reason
-  and mitigation, and the document is published under the VEX profile. Whoever
-  prepares the advisory sees which variant each decision was made on, and can
-  mark a release affected anyway
+  and mitigation, and the document is published under the VEX profile. A release
+  approved decisions say will not be fixed says no fix is planned. Whoever
+  prepares the advisory sees the builds each decision was made on, with a
+  release it reaches only by matching versions flagged, and can mark a release
+  affected anyway
 
 | Advisory state | Means |
 |---|---|

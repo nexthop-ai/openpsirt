@@ -28,6 +28,7 @@ const (
 const (
 	notApplicable = "not-applicable"
 	alreadyFixed  = "already-fixed"
+	wontFix       = "wont-fix"
 )
 
 // Release is one build of the product and where it stands on the issue.
@@ -63,11 +64,40 @@ type Grounds struct {
 	// Mitigation is what stops the flaw, where the decision named it. The
 	// decision's reasoning is never read.
 	Mitigation string
-	// DecidedIn is the variants the decision's place was open in when it was
-	// proposed. A decision reaches every build whose versions match, so a
-	// release outside this list is one the decision reached rather than one
-	// it was made about.
-	DecidedIn []string
+	// MadeOn is the builds the decision's claim was made on: the one on
+	// screen when it was proposed and every one the person chose beside it,
+	// in name order. Empty where nothing was recorded, which says nothing
+	// about where it was made.
+	MadeOn []Built
+}
+
+// Built is one build a decision was made on.
+type Built struct {
+	StreamID  int64
+	VariantID int64
+	Stream    string
+	Variant   string
+}
+
+// MadeElsewhere says the covering decision records the builds it was made on
+// and this release is not one of them: the decision reaches it only because
+// the versions match. A decision recording nothing says nothing either way.
+func (r Release) MadeElsewhere() bool {
+	if r.Grounds == nil || len(r.Grounds.MadeOn) == 0 {
+		return false
+	}
+	for _, one := range r.Grounds.MadeOn {
+		if one.StreamID == r.StreamID && one.VariantID == r.VariantID {
+			return false
+		}
+	}
+	return true
+}
+
+// NoFixPlanned says the release is stated affected because approved decisions
+// that it will not be fixed cover every open place of the issue there.
+func (r Release) NoFixPlanned() bool {
+	return r.Holds && r.Grounds != nil && r.Grounds.Outcome == wontFix
 }
 
 // Name is how the release is written in the document.
@@ -232,7 +262,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 		Where("f.vulnerability_id = ?", issueID).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("t.stream_id, t.variant_id")
-	if err := finding.WhollyCovered(q, productID, visible).Scan(ctx, &rows); err != nil {
+	if err := finding.WhollyCovered(q, productID, visible, finding.ForReleases).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which releases a decision covers: %w", err)
 	}
 	out := make(map[[2]int64]*Grounds, len(rows))
@@ -247,7 +277,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 	if err != nil {
 		return nil, err
 	}
-	in, err := decidedIn(ctx, db, decided, visible)
+	made, err := madeOn(ctx, db, decided)
 	if err != nil {
 		return nil, err
 	}
@@ -256,52 +286,56 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 			Decision: row.DecidedBy, Outcome: row.Outcome,
 			Reason:     said[row.DecidedBy].Justification,
 			Mitigation: said[row.DecidedBy].Mitigation,
-			DecidedIn:  in[row.DecidedBy],
+			MadeOn:     made[row.DecidedBy],
 		}
 	}
 	return out, nil
 }
 
-// decidedIn is the variants each decision's place was open in when the
-// decision was proposed, in name order.
+// madeOn is the builds each decision's claim was made on, in name order.
 //
-// A decision records the product, the issue and the place, and no build: it
-// reaches every build whose versions match. What the record does hold is when
-// it was proposed and when each finding at its place opened and closed, which
-// says where the place stood at that moment.
-func decidedIn(ctx context.Context, db bun.IDB, decisions []int64,
-	visible []access.Visibility) (map[int64][]string, error) {
-
+// A decision is keyed without a build and reaches every build whose versions
+// match, so what it was made on is read from the record its claim keeps, and a
+// claim keeping none has nothing to say here.
+func madeOn(ctx context.Context, db bun.IDB, decisions []int64) (map[int64][]Built, error) {
+	out := map[int64][]Built{}
+	if len(decisions) == 0 {
+		return out, nil
+	}
 	var rows []struct {
-		ID      int64  `bun:"id"`
-		Variant string `bun:"variant"`
+		ID int64 `bun:"id"`
+		Built
 	}
 	where, args := database.InAnyOf("de.id", decisions)
 	err := db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "vulnerability" AS "dv" ON dv.id = de.vulnerability_id`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = dv.issue_id
-			AND f.place_identity = de.place_identity`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN "claim_build" AS "cb" ON cb.claim_id = de.claim_id`).
+		Join(`JOIN "target" AS "t" ON t.id = cb.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
-		Distinct().
 		ColumnExpr(`de.id AS "id"`).
+		ColumnExpr(`st.id AS "stream_id"`).
+		ColumnExpr(`va.id AS "variant_id"`).
+		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`va.name AS "variant"`).
 		Where(where, args...).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("f.opened_at <= de.proposed_at").
-		Where("(f.closed_at IS NULL OR f.closed_at > de.proposed_at)").
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read where these decisions were made: %w", err)
+		return nil, fmt.Errorf("read the builds these decisions were made on: %w", err)
 	}
-	out := map[int64][]string{}
 	for _, row := range rows {
-		out[row.ID] = append(out[row.ID], row.Variant)
+		out[row.ID] = append(out[row.ID], row.Built)
 	}
+	// Ordered here rather than by the engine, which the engines do not agree
+	// on for text.
 	for id := range out {
-		sort.Strings(out[id])
+		sort.Slice(out[id], func(i, j int) bool {
+			a, b := out[id][i], out[id][j]
+			if a.Stream != b.Stream {
+				return a.Stream < b.Stream
+			}
+			return a.Variant < b.Variant
+		})
 	}
 	return out, nil
 }

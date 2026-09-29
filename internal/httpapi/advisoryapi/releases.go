@@ -28,15 +28,24 @@ type AdvisoryReleaseBody struct {
 	Marked  bool                 `json:"marked" doc:"Whether the release is marked affected whatever its decisions say"`
 	Changed bool                 `json:"changed" doc:"Whether the status differs from what an agreement standing on what the advisory says now saw. The agreement stands"`
 	Covered *ReleaseCoveringBody `json:"covered,omitempty" doc:"The decision every open place of the issue in the release stands under. Absent where no one outcome covers them all"`
+	// Elsewhere is the release the covering decision reaches only because the
+	// versions match.
+	Elsewhere bool `json:"elsewhere" doc:"Whether the covering decision records the builds it was made on and this release is not one of them"`
 }
 
 // ReleaseCoveringBody is the decision a release stands under.
 type ReleaseCoveringBody struct {
-	Decision   int64    `json:"decision" doc:"The earliest decision covering the release"`
-	Outcome    string   `json:"outcome"`
-	Reason     string   `json:"reason,omitempty" doc:"The decision's justification, which the document states as the reason the release is not affected"`
-	Mitigation string   `json:"mitigation,omitempty" doc:"What stops the flaw, where the decision named it. The document states it as the impact"`
-	DecidedIn  []string `json:"decided_in" doc:"The variants the decision's place was open in when it was proposed. A release in another variant is one the decision reached by matching versions"`
+	Decision   int64        `json:"decision" doc:"The earliest decision covering the release"`
+	Outcome    string       `json:"outcome"`
+	Reason     string       `json:"reason,omitempty" doc:"The decision's justification, which the document states as the reason the release is not affected"`
+	Mitigation string       `json:"mitigation,omitempty" doc:"What stops the flaw, where the decision named it. The document states it as the impact"`
+	MadeOn     []MadeOnBody `json:"made_on" doc:"The builds the decision was made on: the one on screen when it was proposed and every one chosen beside it. Empty where none was recorded"`
+}
+
+// MadeOnBody is one build a decision was made on.
+type MadeOnBody struct {
+	Stream  string `json:"stream"`
+	Variant string `json:"variant"`
 }
 
 func registerReleases(api huma.API, in core.Deps) {
@@ -47,7 +56,9 @@ func registerReleases(api huma.API, in core.Deps) {
 		Description: "Every release of every issue this advisory covers, with the status its " +
 			"document states and the decision behind it.\n\n" +
 			"A release whose every open place is covered by approved, live decisions with " +
-			"one outcome names the earliest of them, with the variants it was made on. " +
+			"one outcome names the earliest of them, with the builds it was made on. " +
+			"`elsewhere` is true where that decision records the builds it was made on and " +
+			"this release is not one of them. " +
 			"`changed` is true where the status differs from what an agreement standing on " +
 			"what the advisory says now saw; the agreement stands.\n\n" +
 			"An advisory covering a product you hold nothing on answers as one that does " +
@@ -76,15 +87,17 @@ func registerReleases(api huma.API, in core.Deps) {
 				Vulnerability: one.Covered.Issue, Stream: one.Stream, Variant: one.Variant,
 				Status: one.Status, Decided: one.Decided(),
 				Marked: one.Overridden, Changed: one.Changed,
+				Elsewhere: one.MadeElsewhere(),
 			}
 			if one.Grounds != nil {
 				body.Covered = &ReleaseCoveringBody{
 					Decision: one.Grounds.Decision, Outcome: one.Grounds.Outcome,
 					Reason: one.Grounds.Reason, Mitigation: one.Grounds.Mitigation,
-					DecidedIn: one.Grounds.DecidedIn,
+					MadeOn: make([]MadeOnBody, 0, len(one.Grounds.MadeOn)),
 				}
-				if body.Covered.DecidedIn == nil {
-					body.Covered.DecidedIn = []string{}
+				for _, built := range one.Grounds.MadeOn {
+					body.Covered.MadeOn = append(body.Covered.MadeOn,
+						MadeOnBody{Stream: built.Stream, Variant: built.Variant})
 				}
 			}
 			out.Body.Items = append(out.Body.Items, body)

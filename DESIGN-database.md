@@ -435,8 +435,8 @@ gains the team it is about, and a destination its platform, channel, topic and
 the product or team it belongs to, with a reference for each; SQLite rebuilds
 both tables from the release's declarations. What a person chose about chat,
 and what has been carried to them there, are two new tables, and so are a
-release an advisory marks affected and what an agreement to an advisory saw
-about each release. An issue gains the
+release an advisory marks affected, what an agreement to an advisory saw
+about each release, and the builds a claim was made on. An issue gains the
 day the known-exploited catalog listed it, a column that holds a null. A
 movement of an embargo gains the ruling that recorded it and the claim its date
 counts from, and its two dates take a null; SQLite rebuilds the table from the
@@ -474,6 +474,7 @@ it from the release's declaration.
 | A flaw recorded here, undisclosed and open in a product with no disclosure date there, under a duplicate ruling in force covering a claim from outside | Dated by each such ruling in the order they took effect, where it brings the date earlier: the earliest claim from outside the ruling covers, by arrival or else by recording, plus the disclosure window. The first gives the date; a later one bringing it in past the movement threshold is recorded waiting for a second person and moves nothing. Each is a movement from its ruling, asked by its proposer when it took effect. A claim found here, a withdrawn ruling and a flaw with a date on any place there contribute nothing, unless every place holds exactly the date its rulings give, which is a flaw an earlier upgrade dated and a roll back kept |
 | A build's claim | Gains the version it was made about, holding nothing. v0.4.0 kept no version beside a claim, so each covers what it covered before, and its identity is unchanged |
 | An advisory | Marks no release affected, and its agreements record no release's status. Two new tables, empty: v0.4.0 stated no release known not affected |
+| A claim | Records no build it was made on. A new table, empty: v0.4.0 kept none, and nothing is guessed |
 
 A username is the rule a key's and a token's name follow: the first to hold a
 name keeps it, and a later one folding to it is refused. An upgrade cannot
@@ -504,10 +505,10 @@ upgrading again keeps them apart. Each saved filter is kept in every product,
 because nothing records the one it was kept in and v0.5.0 offered it in all of
 them, under the name the upgrade left it; a deployment with no product keeps
 none. The scope it lost stays lost. A claim's folded subject and its version go
-with their columns. The two advisory tables go: v0.4.0 states every release
-holding a flaw as known affected, whatever its decisions say. A key or token
-keeps the name it was folded or numbered to, which
-v0.4.0 matches as typed, and one the upgrade withdrew stays withdrawn. The
+with their columns. The two advisory tables and the builds each claim was made
+on go: v0.4.0 states every release holding a flaw as known affected, whatever
+its decisions say. A key or token keeps the name it was folded or numbered to,
+which v0.4.0 matches as typed, and one the upgrade withdrew stays withdrawn. The
 trail rows recording those withdrawals go, because v0.4.0 has no place for a
 change no person made. The day an issue was listed goes with its column. A
 movement a ruling recorded goes, because v0.4.0 has no place for an act nobody

@@ -205,7 +205,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// One act, one argument: every proposal here promises the same
 		// version by the same date, and what varies per place is the versions
 		// it was made against and whether a second person has to agree.
-		claim, err := within.newClaim(ctx, FindingClaim, subject.ID, nil, "", proposals[0])
+		// Made on every build the promise names: each was chosen.
+		first := proposals[0]
+		first.MadeOn = up.Builds
+		claim, err := within.newClaim(ctx, FindingClaim, subject.ID, nil, "", first)
 		if err != nil {
 			return err
 		}

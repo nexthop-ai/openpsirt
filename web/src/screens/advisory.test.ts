@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agreeing,
-  madeElsewhere,
+  madeOnLabel,
   markable,
   missing,
   nameable,
@@ -160,7 +160,7 @@ describe("what a document states about a release", () => {
 });
 
 describe("marking a release affected", () => {
-  const covered = { decision: 1, outcome: "not-applicable", decided_in: ["broadcom"] };
+  const covered = { decision: 1, outcome: "not-applicable", made_on: [] };
 
   it("is offered where a decision moves the release off affected", () => {
     expect(markable({ covered, decided: "known_not_affected" })).toBe(true);
@@ -174,18 +174,19 @@ describe("marking a release affected", () => {
   });
 });
 
-describe("a decision made on another variant", () => {
-  it("is said where the release's variant is not one it was made on", () => {
-    expect(madeElsewhere({ variant: "mellanox", covered: { decided_in: ["broadcom"] } })).toBe(
-      true,
-    );
+describe("the builds a decision was made on", () => {
+  it("are named the way a release is", () => {
+    expect(
+      madeOnLabel([
+        { stream: "master", variant: "broadcom" },
+        { stream: "master", variant: "mellanox" },
+      ]),
+    ).toBe("master (broadcom), master (mellanox)");
   });
 
-  it("is not said where it was made on this variant, or nothing says where", () => {
-    expect(
-      madeElsewhere({ variant: "broadcom", covered: { decided_in: ["broadcom", "mellanox"] } }),
-    ).toBe(false);
-    expect(madeElsewhere({ variant: "broadcom", covered: { decided_in: [] } })).toBe(false);
-    expect(madeElsewhere({ variant: "broadcom" })).toBe(false);
+  it("are said to be not recorded where there are none, rather than left blank", () => {
+    expect(madeOnLabel([])).toBe("not recorded");
+    expect(madeOnLabel(null)).toBe("not recorded");
+    expect(madeOnLabel(undefined)).toBe("not recorded");
   });
 });

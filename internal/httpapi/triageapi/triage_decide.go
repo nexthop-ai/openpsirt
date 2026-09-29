@@ -132,7 +132,8 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			"response is what every build recorded, or a refusal and nothing written " +
 			"anywhere. In those builds only the places nothing already stands at are " +
 			"written, because the ones at matching versions are reached by lookup " +
-			"already.\n\n" +
+			"already. The claim records the build in the path and each build named in " +
+			"`also` as the builds it was made on, and no build it reaches by lookup.\n\n" +
 			"Pass `extends` to carry an approved claim to this issue: the source must be " +
 			"approved, sit at the same component under the same consumer, and the outcome and " +
 			"justification must match it. The new claim is recorded as an extension of it and " +
@@ -282,6 +283,10 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 					DeferredUntil: until,
 					CommittedTo:   lands,
 					BindingAcross: covering,
+					// Made on the build in the path and every build the
+					// caller named beside it. The builds the claim reaches by
+					// lookup are not among them.
+					MadeOn: covering,
 				}
 				writes[i]++
 				holds[i] += place.Places

@@ -26,7 +26,7 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import {
   agreeing,
-  madeElsewhere,
+  madeOnLabel,
   markable,
   missing,
   releaseStatus,
@@ -333,14 +333,18 @@ function Releases({
                       )}
                     </td>
                     <td>
-                      {row.covered?.decided_in?.join(", ")}
-                      {madeElsewhere(row) && (
+                      {row.covered && (
+                        <span className={row.covered.made_on?.length ? "" : "hint"}>
+                          {madeOnLabel(row.covered.made_on)}
+                        </span>
+                      )}
+                      {row.elsewhere && (
                         <div>
                           <span
                             className="state waiting"
-                            title="Made on another variant. It reaches this one because the versions match"
+                            title="Made on another build. It reaches this one because the versions match"
                           >
-                            Another variant
+                            Another build
                           </span>
                         </div>
                       )}

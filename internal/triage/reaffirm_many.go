@@ -432,6 +432,8 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 // argument — the shape every other bulk write here takes.
 func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirmed, error) {
 	first := plan.proposals[0]
+	// The same judgment re-made, so it keeps the builds it was made on.
+	first.MadeAs = plan.previous.ID
 	claim, err := s.newClaim(ctx, FindingClaim, first.By, &plan.previous.ID, "", first)
 	if err != nil {
 		return Reaffirmed{}, err

@@ -47,9 +47,19 @@ func (f *fixture) issueOf(t *testing.T, identifier string) int64 {
 }
 
 // claimed has the first person claim something about the flaw at one place in
-// one build, and answers the claim. Nobody has agreed to it.
+// one build, made on that build, and answers the claim. Nobody has agreed to
+// it.
 func (f *fixture) claimed(t *testing.T, target int64, identifier, place string,
 	outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
+
+	t.Helper()
+	return f.claimedOn(t, target, []int64{target}, identifier, place, outcome, why, mitigation)
+}
+
+// claimedOn is the same, recorded as made on the builds given: the one on
+// screen and those chosen beside it, or none.
+func (f *fixture) claimedOn(t *testing.T, target int64, madeOn []int64, identifier,
+	place string, outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
 
 	t.Helper()
 	ctx := t.Context()
@@ -65,7 +75,7 @@ func (f *fixture) claimed(t *testing.T, target int64, identifier, place string,
 			OnTag: at.OnTag,
 		},
 		Outcome: outcome, Justification: why, Mitigation: mitigation,
-		Reasoning: argued, By: f.who.ID, NeedsApproval: true,
+		Reasoning: argued, By: f.who.ID, NeedsApproval: true, MadeOn: madeOn,
 	})
 	if err != nil {
 		t.Fatalf("claiming %s: %v", outcome, err)
@@ -230,8 +240,8 @@ func TestAReleaseEveryOpenPlaceOfWhichIsDismissedIsKnownNotAffected(t *testing.T
 		// The screen names the decision and where it was made.
 		row := f.placedAt(t, named, master)
 		if row.Grounds == nil || row.Grounds.Reason != string(triage.MitigationsExist) ||
-			!slices.Equal(row.Grounds.DecidedIn, []string{"broadcom"}) {
-			t.Errorf("the screen reads %+v, want the decision made on broadcom", row.Grounds)
+			!slices.Equal(variantsOf(row.Grounds.MadeOn), []string{"broadcom"}) || row.MadeElsewhere() {
+			t.Errorf("the screen reads %+v, want the decision made here on broadcom", row.Grounds)
 		}
 	})
 }
@@ -547,29 +557,160 @@ func TestADecisionAgreedAfterTheAdvisoryMovesItsStatusAndTheAgreementStands(t *t
 	})
 }
 
-func TestTheScreenSaysWhichVariantADecisionWasMadeOn(t *testing.T) {
-	// A decision reaches every variant whose versions match, so one made
-	// where the code is compiled out also covers a variant where it is
-	// compiled in. The person preparing the advisory is shown where it was
-	// made beside each release it reaches, which is what lets them mark one
-	// affected anyway.
+func TestAReleaseADecisionReachesByLookupIsFlaggedAsMadeElsewhere(t *testing.T) {
+	// The same kernel at the same versions in two variants, with an option
+	// compiled out of one. Both hold the place when the decision is made on
+	// broadcom, and it reaches mellanox because the versions match. What it
+	// was made on is what was recorded, so mellanox is flagged and broadcom
+	// is not.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, f.otherVariant)
 		identifier := f.recorded(t, f.master)
-		f.dismissed(t, f.master, identifier)
-		// Filed on the second variant after the decision was made.
 		f.alsoIn(t, identifier, f.otherVariant)
+		f.dismissed(t, f.master, identifier)
 		named := f.covering(t, [2]string{"sonic", identifier})
 
-		reached := f.placedAt(t, named, "sonic:"+fixtures.BranchName+":mellanox")
+		reached := f.placedAt(t, named, mellanox)
 		if reached.Status != advisory.KnownNotAffected || reached.Grounds == nil {
-			t.Fatalf("the second variant reads %+v, want it reached by the decision", reached)
+			t.Fatalf("mellanox reads %+v, want it reached by the decision", reached)
 		}
-		if !slices.Equal(reached.Grounds.DecidedIn, []string{"broadcom"}) {
+		if !slices.Equal(variantsOf(reached.Grounds.MadeOn), []string{"broadcom"}) {
 			t.Errorf("the decision reads as made on %v, want broadcom alone",
-				reached.Grounds.DecidedIn)
+				variantsOf(reached.Grounds.MadeOn))
+		}
+		if !reached.MadeElsewhere() {
+			t.Error("mellanox, reached by lookup, is not flagged")
+		}
+		if f.placedAt(t, named, master).MadeElsewhere() {
+			t.Error("broadcom, the build it was made on, is flagged")
 		}
 	})
+}
+
+func TestABuildChosenBesideTheOneOnScreenCountsAsMadeOn(t *testing.T) {
+	// Ticking a build on the reach sheet is choosing it, so the decision was
+	// made on it too and it is not flagged.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, f.otherVariant)
+		identifier := f.recorded(t, f.master)
+		f.alsoIn(t, identifier, f.otherVariant)
+		claim := f.claimedOn(t, f.master, []int64{f.master, f.otherVariant}, identifier,
+			onPlace, triage.NotApplicable, triage.CodeNotPresent, "")
+		f.agree(t, claim)
+		named := f.covering(t, [2]string{"sonic", identifier})
+
+		row := f.placedAt(t, named, mellanox)
+		if row.Grounds == nil || row.MadeElsewhere() {
+			t.Errorf("a build chosen beside the one on screen reads %+v", row.Grounds)
+		}
+		if got := variantsOf(row.Grounds.MadeOn); !slices.Equal(got, []string{"broadcom", "mellanox"}) {
+			t.Errorf("the decision reads as made on %v, want both", got)
+		}
+	})
+}
+
+func TestADecisionRecordingNoBuildSaysNothingAboutWhereItWasMade(t *testing.T) {
+	// A claim made where no build was in hand, and every claim an upgraded
+	// deployment held, records none. Nothing is guessed, and nothing is
+	// flagged.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, f.otherVariant)
+		identifier := f.recorded(t, f.master)
+		f.alsoIn(t, identifier, f.otherVariant)
+		claim := f.claimedOn(t, f.master, nil, identifier, onPlace, triage.NotApplicable,
+			triage.CodeNotPresent, "")
+		f.agree(t, claim)
+		named := f.covering(t, [2]string{"sonic", identifier})
+
+		for _, release := range []string{master, mellanox} {
+			row := f.placedAt(t, named, release)
+			if row.Grounds == nil {
+				t.Fatalf("%s reads as covered by nothing", release)
+			}
+			if len(row.Grounds.MadeOn) != 0 || row.MadeElsewhere() {
+				t.Errorf("%s reads as made on %v, flagged %v, want nothing recorded",
+					release, row.Grounds.MadeOn, row.MadeElsewhere())
+			}
+		}
+	})
+}
+
+func TestAReleaseNobodyWillFixIsToldSoAndNotToUpdate(t *testing.T) {
+	// A release a decision says will not be fixed stays known affected, and
+	// its remediation says no fix is planned. Told to update, or that no fix
+	// is available yet, a customer on it reads that one is coming.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		f.alsoIn(t, identifier, f.tagged)
+		f.alsoIn(t, identifier, f.older)
+		// The older tag is fixed, so the ordinary remediation has a release to
+		// name, and the tag holds a second place nobody decided, so it keeps
+		// the ordinary remediation.
+		issue := f.issueOf(t, identifier)
+		if _, err := f.finds.Resolve(t.Context(), f.who, f.older, issue, "Patched."); err != nil {
+			t.Fatal(err)
+		}
+		f.elsewhereIn(t, identifier, f.tagged)
+		// One decision, which the tag's place at the same versions reaches too.
+		f.agree(t, f.claimed(t, f.master, identifier, onPlace, triage.WontFix, "", stops))
+		doc := f.generated(t, f.covering(t, [2]string{"sonic", identifier}))
+		one := doc.Vulnerabilities[0]
+
+		if !slices.Equal(one.Status.KnownAffected, []string{master, tagged}) {
+			t.Fatalf("known affected: %v, want the branch and the tag", one.Status.KnownAffected)
+		}
+		byCategory := map[string][]string{}
+		details := map[string]string{}
+		for _, fix := range one.Remediations {
+			byCategory[fix.Category] = append(byCategory[fix.Category], fix.ProductIDs...)
+			details[fix.Category] = fix.Details
+		}
+		if !slices.Equal(byCategory["no_fix_planned"], []string{master}) {
+			t.Errorf("no fix planned: %v, want the branch", byCategory["no_fix_planned"])
+		}
+		if !slices.Equal(byCategory["vendor_fix"], []string{tagged}) {
+			t.Errorf("vendor fix: %v, want the partly covered tag alone", byCategory["vendor_fix"])
+		}
+		if !slices.Equal(byCategory["mitigation"], []string{master}) || details["mitigation"] != stops {
+			t.Errorf("mitigation: %v %q, want what stops it on the branch",
+				byCategory["mitigation"], details["mitigation"])
+		}
+		body, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(body), "unit files") {
+			t.Errorf("the reasoning reached the document: %s", body)
+		}
+		required(t, doc)
+		vexProfile(t, doc)
+	})
+}
+
+func TestAReleaseNobodyWillFixWithNoMitigationStatesOnlyThat(t *testing.T) {
+	// A decision naming nothing that stops the flaw adds no mitigation, and
+	// the release still says no fix is planned.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		f.agree(t, f.claimed(t, f.master, identifier, onPlace, triage.WontFix, "", ""))
+		one := f.generated(t, f.covering(t, [2]string{"sonic", identifier})).Vulnerabilities[0]
+		if len(one.Remediations) != 1 || one.Remediations[0].Category != "no_fix_planned" ||
+			!slices.Equal(one.Remediations[0].ProductIDs, []string{master}) {
+			t.Errorf("remediations: %+v, want no fix planned for the branch alone", one.Remediations)
+		}
+	})
+}
+
+// mellanox is the branch built as the second variant.
+var mellanox = "sonic:" + fixtures.BranchName + ":mellanox"
+
+// variantsOf is the variants of the builds a decision was made on.
+func variantsOf(built []advisory.Built) []string {
+	out := make([]string, 0, len(built))
+	for _, one := range built {
+		out = append(out, one.Variant)
+	}
+	return out
 }
 
 // vexProfile fails on anything the VEX profile asks of a document that

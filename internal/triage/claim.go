@@ -257,6 +257,9 @@ func (s *Store) newClaimNarrowed(ctx context.Context, kind ClaimKind, by int64,
 		return nil, fmt.Errorf("record the reasoning: %w", err)
 	}
 	claim.RevisionID = &revision.ID
+	if err := s.recordMadeOn(ctx, claim.ID, p); err != nil {
+		return nil, err
+	}
 	if err := noting(ctx, s.db, p.Reasoning, claim.ProposedAt); err != nil {
 		return nil, err
 	}
@@ -529,6 +532,7 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 		// reasoning travels with it, because a claim with none is one nobody
 		// can be asked to agree to.
 		carried := claim.argument()
+		carried.MadeAs = claim.ID
 		if carried.Reasoning, err = s.reasoningOn(ctx, *claim); err != nil {
 			return nil, err
 		}
@@ -738,6 +742,7 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 	// because a claim with none is one nobody can be asked to agree to — and
 	// what makes it a different claim is the revision that follows.
 	carried := claim.argument()
+	carried.MadeAs = claim.ID
 	if carried.Reasoning, err = s.reasoningOn(ctx, *claim); err != nil {
 		return nil, err
 	}

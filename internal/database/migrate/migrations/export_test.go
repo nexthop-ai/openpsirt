@@ -39,6 +39,9 @@ func StatementsV050(engine database.Engine) map[string][]string {
 		// What an advisory marks and what an agreement to one saw.
 		"advisory_override":      advisoryV050(t)[:1],
 		"advisory_agreed_status": advisoryV050(t)[1:],
+
+		// The builds a claim was made on.
+		"claim_build": claimBuildV050(t),
 	}
 }
 
