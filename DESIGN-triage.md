@@ -552,6 +552,7 @@ that not looking is a choice rather than an omission.
 | The claim's own place is not excluded from that count | A place identity is a pair of names with no product in it, so excluding by place alone would drop a decision in *another* product shipping the same pair — exactly the counter-evidence worth having. Nothing of the claim's own can be counted anyway, because it is proposed |
 | A run is the second signal | A claim in a run of forty is usually right, and a run is also how forty get waved through |
 | Both are read for the whole page in two statements | Fifty cards read a row at a time is a hundred round trips before the queue draws |
+| The second count reaches each decision through the issue first | The index on a decision's product, issue and place then answers each finding at the place in one seek. Reached from the decision first, SQLite reads every decision in the product once per finding: 1.0 s against 0.016 s for a kernel place carrying 6,000 issues, in a product holding 3,060 decisions, and 2.2 s against 0.13 s for the queue's first card. The other engines answer that card in under 0.05 s either way, measured after refreshing their statistics |
 
 ### Queue contents
 

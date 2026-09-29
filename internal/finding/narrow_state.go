@@ -179,11 +179,20 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	// live claim is about the place at the versions it was keyed on, and
 	// matching it by place alone reports a claim made about one build's
 	// version as standing over a second build shipping another.
+	//
+	// The decision is on the outside of the join to the findings, and CROSS
+	// JOIN ... WHERE is what puts it there. It is an inner join on every
+	// engine; on SQLite it also fixes the order. Across products nothing binds
+	// the decision's product, and SQLite left to choose starts from every open
+	// finding and reads every decision of its product once per row: 331 s to
+	// count the undecided among 425,680 open rows with 3,060 decisions, against
+	// 1.5 s with the decisions outermost and 0.83 s inside one product.
 	standingHere, inForce := InForce()
 	decided := q.NewSelect().
-		TableExpr(Decisions).
-		Join(`JOIN "finding" AS "f2" ON f2.vulnerability_id = dv.issue_id`+
-			" AND f2.place_identity = de.place_identity").
+		TableExpr(`"decision" AS "de"`).
+		Join(DecisionIssue).
+		Join(`CROSS JOIN "finding" AS "f2"`).
+		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
 		// The argument, which is where the outcome lives: one act is one

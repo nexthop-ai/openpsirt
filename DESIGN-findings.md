@@ -1157,6 +1157,28 @@ Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
 went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
 s.
 
+The list across products asks the same question without naming a product, so
+each decision is matched to the product of the finding it reaches. The
+decisions stay on the outside of that join, written `CROSS JOIN ... WHERE`,
+which is an inner join on every engine and on SQLite also fixes the order.
+Left to choose, SQLite starts from every open finding and reads every decision
+of its product once per row.
+
+| Undecided, first page and total | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| Across products, decisions outermost | 1.5 s | 0.57 s | 1.7 s | 0.78 s |
+| Across products, findings outermost | 331 s | 0.56 s | 1.7 s | 0.77 s |
+| Inside one product | 0.83 s | 0.57 s | 1.2 s | 0.98 s |
+
+Measured over 425,680 open rows in two products, a kernel carrying 6,000 issues
+under 34 consumers among them, and 3,060 decisions, one row per page. Every
+figure is taken after the servers' planner statistics are refreshed, which a
+server does on its own once about a tenth of a table has changed; SQLite
+gathers none, as in a deployment. Before that refresh the servers plan freshly
+loaded tables from one-row estimates: MySQL then reaches the findings through
+the index on open rows instead of the place index and takes minutes, whichever
+way the statement is written.
+
 ## Urgency
 
 Each finding carries an urgency, worked out when a scan is applied and read back

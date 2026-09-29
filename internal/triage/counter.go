@@ -127,9 +127,17 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Where("f.closed_at IS NULL").
 		Where("f.place_identity IN (?)", bun.List(places)).
 		Where("st.product_id IN (?)", bun.List(products)).
-		Where(`NOT EXISTS (SELECT 1 FROM ` + finding.Decisions + `
+		// The issue before the decision, and CROSS JOIN ... WHERE is what fixes
+		// that order on SQLite: the decision is then reached through its index
+		// on product, issue and place. Joined the other way, SQLite reads every
+		// decision in the product once per finding at the place — 1.0 s for a
+		// kernel place carrying 6,000 issues in a product holding 3,060
+		// decisions, against 0.016 s this way.
+		Where(`NOT EXISTS (SELECT 1 FROM "vulnerability" AS "dv"
+			CROSS JOIN "decision" AS "de"
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			WHERE ` + finding.DecisionAt("st.product_id") + `
+			WHERE de.vulnerability_id = dv.id
+			  AND ` + finding.DecisionAt("st.product_id") + `
 			  AND de.live_key IS NOT NULL
 			  AND ` + finding.KeyMatches + `)`).
 		GroupExpr("st.product_id, f.place_identity")

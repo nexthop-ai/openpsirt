@@ -152,6 +152,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			t.Logf("%s: finding=%d scan_run=%d graph_node=%d graph_edge=%d",
 				label, count("finding"), count("scan_run"),
 				count("graph_node"), count("graph_edge"))
+			dbtest.SettleStatistics(t, db)
 			timed(t, ctx, store, who, finding.Scope{
 				ProductID: &product.ID, StreamID: &branch.ID, VariantID: &variant.ID,
 			})
@@ -246,6 +247,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		dbtest.SettleStatistics(t, db)
 		onBranch := finding.Scope{ProductID: &product.ID, StreamID: &branch.ID}
 		start := time.Now()
 		_, common, err := store.Groups(ctx, who, onBranch, 50, 0,
@@ -533,6 +535,7 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 		if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
 			t.Fatal(err)
 		}
+		dbtest.SettleStatistics(t, db)
 
 		var open int
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
@@ -660,6 +663,7 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 
 		opened, _, _ := night(false)
 		t.Logf("opening night: %d findings opened", opened.Opened)
+		dbtest.SettleStatistics(t, db)
 
 		applied, took, issued := night(true)
 		t.Logf("the night the fix dates arrive: %d updated, %d statements, %s, %s per statement",
