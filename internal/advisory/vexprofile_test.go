@@ -429,6 +429,12 @@ func TestASupersededClosureIsNeverReadAsAFix(t *testing.T) {
 		if len(one.Status.Fixed) != 0 || !slices.Contains(one.Status.KnownAffected, tagged) {
 			t.Errorf("a release whose only closure is superseded reads %+v", one.Status)
 		}
+		// A scanner falling silent is not a fix either.
+		f.filed(t, identifier, f.tagged, onPlace, &then, finding.Unexplained)
+		one = f.generated(t, named).Vulnerabilities[0]
+		if len(one.Status.Fixed) != 0 || !slices.Contains(one.Status.KnownAffected, tagged) {
+			t.Errorf("a release whose closures are superseded and unexplained reads %+v", one.Status)
+		}
 
 		f.filed(t, identifier, f.tagged, onPlace, &then, finding.Upgraded)
 		one = f.generated(t, named).Vulnerabilities[0]
@@ -764,4 +770,70 @@ func vexProfile(t *testing.T, doc *advisory.Document) {
 	if examined == 0 {
 		t.Fatal("no release was examined, so this checked nothing")
 	}
+}
+
+func TestAnAgreementGivenBeforeStatusesWereRecordedMarksNothingChanged(t *testing.T) {
+	// An agreement given before the upgrade recorded no release's status. It
+	// says nothing about what it saw, and read as having seen nothing, every
+	// release of every advisory agreed to then reads as changed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		claim := f.claimed(t, f.master, identifier, onPlace, triage.NotApplicable,
+			triage.CodeNotPresent, "")
+		named := f.covering(t, [2]string{"sonic", identifier})
+		f.agreed(t, named)
+		if _, err := f.db.DB.NewDelete().TableExpr(`"advisory_agreed_status"`).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.agree(t, claim)
+
+		row := f.placedAt(t, named, master)
+		if row.Status != advisory.KnownNotAffected {
+			t.Fatalf("the release reads %s, so the decision moved nothing to compare", row.Status)
+		}
+		if row.Changed {
+			t.Error("an agreement that recorded nothing reads the release as changed")
+		}
+	})
+}
+
+func TestAMarkAndAnAgreementFollowAnIssueThatMergedIntoAnother(t *testing.T) {
+	// An issue on the advisory merges into another. A mark set on it is the
+	// other's, and clearing it clears it; what an agreement saw about it is
+	// what it saw about the other.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		first := f.recorded(t, f.master)
+		second := f.recorded(t, f.master)
+		f.dismissed(t, f.master, second)
+		named := f.covering(t, [2]string{"sonic", second})
+		if err := f.store.MarkAffected(ctx, f.who, named, "sonic", second,
+			fixtures.BranchName, "broadcom", true); err != nil {
+			t.Fatal(err)
+		}
+		f.agreed(t, named)
+
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: first, Aliases: []string{second}},
+		}); err != nil {
+			t.Fatalf("merge the two: %v", err)
+		}
+
+		row := f.placedAt(t, named, master)
+		if !row.Overridden {
+			t.Fatal("the mark set before the merge does not follow the issue")
+		}
+		if row.Changed {
+			t.Error("the merge alone reads the release as changed since the agreement")
+		}
+		if err := f.store.MarkAffected(ctx, f.who, named, "sonic", first,
+			fixtures.BranchName, "broadcom", false); err != nil {
+			t.Fatal(err)
+		}
+		if f.placedAt(t, named, master).Overridden {
+			t.Error("clearing the mark after the merge left it standing")
+		}
+	})
 }

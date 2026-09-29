@@ -94,26 +94,50 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	for _, one := range agreed {
 		ids = append(ids, one.ID)
 	}
-	var saw []agreedStatus
+	// Read as the issue each recorded row stands for, so an issue that
+	// merged into another after the agreement is compared as the one it
+	// merged into.
+	var saw []struct {
+		ApprovalID int64  `bun:"approval_id"`
+		ProductID  int64  `bun:"product_id"`
+		IssueID    int64  `bun:"issue_id"`
+		StreamID   int64  `bun:"stream_id"`
+		VariantID  int64  `bun:"variant_id"`
+		Status     string `bun:"status"`
+	}
 	where, args := database.InAnyOf("ag.approval_id", ids)
-	if err := s.db.NewSelect().Model(&saw).Where(where, args...).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().
+		TableExpr(`"advisory_agreed_status" AS "ag"`).
+		Join(`JOIN "vulnerability" AS "sv" ON sv.id = ag.vulnerability_id`).
+		ColumnExpr(`ag.approval_id AS "approval_id"`).
+		ColumnExpr(`ag.product_id AS "product_id"`).
+		ColumnExpr(`sv.issue_id AS "issue_id"`).
+		ColumnExpr(`ag.stream_id AS "stream_id"`).
+		ColumnExpr(`ag.variant_id AS "variant_id"`).
+		ColumnExpr(`ag.status AS "status"`).
+		Where(where, args...).Scan(ctx, &saw); err != nil {
 		return nil, fmt.Errorf("read what the agreements saw: %w", err)
 	}
 	seen := make(map[int64]map[releaseKey]string, len(ids))
-	for _, id := range ids {
-		seen[id] = map[releaseKey]string{}
-	}
 	for _, one := range saw {
-		seen[one.ApprovalID][releaseKey{one.ProductID, one.VulnerabilityID,
+		if seen[one.ApprovalID] == nil {
+			seen[one.ApprovalID] = map[releaseKey]string{}
+		}
+		seen[one.ApprovalID][releaseKey{one.ProductID, one.IssueID,
 			one.StreamID, one.VariantID}] = one.Status
 	}
 	// Against every agreement standing rather than the first: two people
 	// agreeing a day apart can have seen two different documents, and either
 	// of them is owed the difference.
+	//
+	// An agreement that recorded nothing was given before statuses were
+	// recorded, and says nothing about what it saw. Compared, every release
+	// of every advisory agreed to before the upgrade reads as changed.
 	for i := range out {
-		key := releaseKey{out[i].Covered.ProductID, out[i].Covered.IssueID, out[i].StreamID, out[i].VariantID}
+		key := releaseKey{out[i].Covered.ProductID, out[i].Covered.IssueID,
+			out[i].StreamID, out[i].VariantID}
 		for _, id := range ids {
-			if seen[id][key] != out[i].Status {
+			if seen[id] != nil && seen[id][key] != out[i].Status {
 				out[i].Changed = true
 			}
 		}
@@ -206,27 +230,43 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
-		var mark Override
-		err := tx.NewSelect().Model(&mark).
-			Where("advisory_id = ?", row.ID).
-			Where("product_id = ?", named.ID).
-			Where("vulnerability_id = ?", issue.ID).
-			Where("stream_id = ?", at.StreamID).
-			Where("variant_id = ?", at.VariantID).
-			Limit(1).Scan(ctx)
-		found := err == nil
-		if err != nil && !database.IsNoRows(err) {
+		// Every mark on this release filed under any name of the issue, the
+		// way the document reads them: a mark set before the issue merged
+		// into another is the other's.
+		const marks = `"advisory_id" = ? AND "product_id" = ?
+			AND "vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "issue_id" = ?)
+			AND "stream_id" = ? AND "variant_id" = ?`
+		on := []any{row.ID, named.ID, issue.ID, at.StreamID, at.VariantID}
+		var held []Override
+		if err := tx.NewSelect().Model(&held).Where(marks, on...).
+			OrderExpr("ao.id").Scan(ctx); err != nil {
 			return err
 		}
-		standing := found && mark.RemovedAt == nil
+		standing := false
+		var revive *Override
+		for i := range held {
+			if held[i].RemovedAt == nil {
+				standing = true
+			} else if revive == nil {
+				revive = &held[i]
+			}
+		}
 		switch {
 		case standing == affected:
 			return nil
-		case affected && found:
-			if _, err := tx.NewUpdate().Model((*Override)(nil)).
+		case affected && revive != nil:
+			// Matched on still being cleared, and counted: two people
+			// marking at once both read it cleared, and the second must not
+			// open an edition for a change the first already made.
+			result, err := tx.NewUpdate().Model((*Override)(nil)).
 				Set("removed_at = NULL").Set("removed_by = NULL").
 				Set("set_at = ?", now).Set("set_by = ?", subject.ID).
-				Where("id = ?", mark.ID).Exec(ctx); err != nil {
+				Where("id = ?", revive.ID).
+				Where("removed_at IS NOT NULL").Exec(ctx)
+			if err != nil {
+				return err
+			}
+			if n, err := database.Affected(result); err != nil || n == 0 {
 				return err
 			}
 		case affected:
@@ -244,10 +284,15 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 				return err
 			}
 		default:
-			if _, err := tx.NewUpdate().Model((*Override)(nil)).
+			// Counted for the reason reviving one is.
+			result, err := tx.NewUpdate().Model((*Override)(nil)).
 				Set("removed_at = ?", now).Set("removed_by = ?", subject.ID).
-				Where("id = ?", mark.ID).
-				Where("removed_at IS NULL").Exec(ctx); err != nil {
+				Where(marks, on...).
+				Where("removed_at IS NULL").Exec(ctx)
+			if err != nil {
+				return err
+			}
+			if n, err := database.Affected(result); err != nil || n == 0 {
 				return err
 			}
 		}

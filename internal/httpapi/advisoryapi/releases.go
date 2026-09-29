@@ -112,9 +112,7 @@ func registerReleases(api huma.API, in core.Deps) {
 		Summary: "Mark a release affected",
 		Description: "Marks one release of one issue this advisory covers as affected whatever " +
 			"its decisions say, or clears the mark where `affected` is false.\n\n" +
-			"A decision reaches every build whose versions match, so one made on another " +
-			"variant can cover a release it was never about. The document states a marked " +
-			"release as known affected.\n\n" +
+			"The document states a marked release as known affected.\n\n" +
 			"A change opens a new edition and takes back every agreement standing, as " +
 			"retitling does. Asking for what already stands changes nothing.\n\n" +
 			"A release the issue is not in answers 404.",

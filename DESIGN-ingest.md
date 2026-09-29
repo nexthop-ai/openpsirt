@@ -598,7 +598,7 @@ other: a statement that acme-fw 4.2 is not affected leaves a finding on acme-fw
 
 | Stored version | |
 |---|---|
-| The version is part of the claim's identity where one is stated | A claim about 4.2 and one about 5.0 are two claims. A claim stating none keys as it did before a version was stored, so no stored claim closes and reopens on the upgrade |
+| The version is part of the claim's identity where one is stated outside the package identifier | A claim about 4.2 and one about 5.0 are two claims. A version inside the identifier is already part of the identity through it and is not stored again. A claim stating no version keys as it did before a version was stored. A claim stating its version only as a branch has a new identity, so each such claim closes and reopens once, on the first scan after the upgrade |
 | The carried patches read names the version beside the subject | "acme-fw 4.2". A status shown without the version reads as a claim about whatever ships |
 
 A claim that matched nothing is reported, not dropped. A build's judgment that

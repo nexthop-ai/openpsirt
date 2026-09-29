@@ -148,11 +148,11 @@ func (r Release) Status() string {
 // builds closes a build's finding that way, and that build never shipped the
 // flaw: named as fixed, it reads as a release somebody upgrades to.
 //
-// A superseded closure is never read as a fix. The version moved and the flaw
-// came with it, so the row that superseded it speaks for the place. A release
-// whose only closures are superseded, with nothing open, is stated as known
-// affected: the last word on it says the flaw moved with the version, and
-// nothing after it says the flaw left.
+// Only a closure that counts as the issue going away is read as a fix. A
+// superseded closure is the version moving with the flaw still in it, so the
+// row that superseded it speaks for the place. A release whose closures are
+// none of them a fix, with nothing open, is stated as known affected: nothing
+// on it says the flaw left.
 //
 // The decisions are read at the visibilities the findings are, and through
 // the one rule the VEX document of a build reads them by.
@@ -190,8 +190,11 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 		// to, and dropping it would leave finished work indistinguishable
 		// from a release that never shipped the thing.
 		ColumnExpr(`COUNT(CASE WHEN f.closed_at IS NULL THEN 1 END) AS "open"`).
-		ColumnExpr(`COUNT(CASE WHEN f.closed_at IS NOT NULL
-			AND COALESCE(f.closed_because, '') <> ? THEN 1 END) AS "settled"`, finding.Superseded).
+		// Closures that are a fix, from the one list of them. A superseded
+		// closure is the flaw moving with the version, and an unexplained one
+		// is a scanner falling silent; neither says it left.
+		ColumnExpr(`COUNT(CASE WHEN f.closed_because IN (?) THEN 1 END) AS "settled"`,
+			bun.List(finding.Resolving())).
 		// One value per build, aggregated because the grouping is on the
 		// build's names as well as its keys.
 		ColumnExpr(`MIN(COALESCE(sc.root_identifier, '')) AS "root_identifier"`).

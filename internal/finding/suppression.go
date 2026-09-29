@@ -78,8 +78,8 @@ func (c Claim) fixes() bool { return sbom.Status(c.Status).Fixes() }
 // Everything that makes the claim a different claim is in it, so re-sending
 // the same argument writes nothing and changing the reasoning is a change. The
 // version is part of it where one is stated, so a claim about 4.2 and one about
-// 5.0 are two claims; a claim stating none keys as it did before a version
-// could be stored.
+// 5.0 are two claims; a claim stating none outside its package identifier
+// keys as it did before a version could be stored.
 func claimIdentity(c Claim) string {
 	parts := []string{
 		strings.ToUpper(strings.TrimSpace(c.Vulnerability)),
@@ -91,6 +91,17 @@ func claimIdentity(c Claim) string {
 	basis := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:])
+}
+
+// statedBeside is the version a claim states outside its package identifier,
+// and nothing where the identifier carries one: that version is already part of
+// the claim through the identifier, and storing it twice would give every claim
+// about a versioned identifier a new identity.
+func statedBeside(subject sbom.Target) string {
+	if _, inside := graph.PackageOf(subject.Purl); inside != "" {
+		return ""
+	}
+	return strings.TrimSpace(subject.Version)
 }
 
 // ClaimsApplied describes what recording a build's claims changed.
@@ -150,7 +161,7 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 					Statement: claim.Statement, Origin: string(claim.Origin),
 					SubjectPurl: subject.Purl, SubjectName: subject.Name,
 					SubjectFolded:  graph.Folded(subject.Name),
-					SubjectVersion: strings.TrimSpace(subject.Version),
+					SubjectVersion: statedBeside(subject),
 					OpenedScanID:   scanID,
 				}
 				row.Identity = claimIdentity(row)

@@ -67,3 +67,33 @@ func TestAStatementAboutOneVersionDoesNotSuppressAnother(t *testing.T) {
 		}
 	})
 }
+
+func TestAVersionInsideAPackageIdentifierIsNotStoredAgain(t *testing.T) {
+	// The identifier already carries it, and through the identifier it is
+	// already part of the claim's identity. Stored again, every claim about a
+	// versioned identifier held before the version was kept would close and
+	// reopen on the next scan.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+			[]sbom.Suppression{{
+				Vulnerability: "CVE-2026-8", Status: sbom.NotAffected,
+				Justification: "vulnerable_code_not_present",
+				Targets:       []sbom.Target{{Purl: libnl.Purl, Name: libnl.Name, Version: libnl.Version}},
+				Origin:        sbom.FromStatement,
+			}}, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		carried, _, err := f.store.CarriedPatches(t.Context(), f.holding(t, access.PublicRead),
+			f.target, "", 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(carried) != 1 {
+			t.Fatalf("%d claims are stored, want the one", len(carried))
+		}
+		if carried[0].Version != "" {
+			t.Errorf("a version inside the identifier is stored again as %q", carried[0].Version)
+		}
+	})
+}
