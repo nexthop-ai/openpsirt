@@ -48,6 +48,23 @@ describe("the filter a list is narrowed by", () => {
     expect(here(at)).toBe("component=firmware");
   });
 
+  it("is the same one in any grouping, which a saved filter does not keep", () => {
+    const at = new URLSearchParams("view=components&component=firmware");
+    expect(ruleIn(kept, at)?.name).toBe("put off drivers");
+  });
+
+  it("is never one that keeps nothing, which would read as open on every bare list", () => {
+    const emptied: Kept[] = [
+      {
+        name: "all of main",
+        query: "",
+        prepares: { outcome: "wont-fix", reasoning: "Everything." },
+      },
+    ];
+    expect(ruleIn(emptied, new URLSearchParams("stream=main"))).toBeUndefined();
+    expect(ruleIn(emptied, new URLSearchParams())).toBeUndefined();
+  });
+
   it("is none of them on a list nobody kept", () => {
     expect(ruleIn(kept, new URLSearchParams("component=openssl"))).toBeUndefined();
   });

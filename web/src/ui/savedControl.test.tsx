@@ -53,12 +53,12 @@ async function save(name: string) {
 }
 
 describe("a saved filter", () => {
-  it("opens within the branch and variant on screen", async () => {
+  it("opens within the scope and grouping on screen", async () => {
     keeping([{ name: "kernel", query: "component=linux" }]);
     mount.render(
       screen(
         <Saved onBuild={false} onPicked={() => {}} />,
-        "/f?stream=main&severity=critical&variant=x86",
+        "/f?stream=main&severity=critical&variant=x86&opened_by_run=4&view=components",
       ),
     );
     await settle();
@@ -66,7 +66,9 @@ describe("a saved filter", () => {
     if (!select) throw new Error("no saved filters control");
     act(() => pick(select, "kernel"));
     await settle();
-    expect(location()).toBe("/f?component=linux&stream=main&variant=x86");
+    expect(location()).toBe(
+      "/f?component=linux&stream=main&variant=x86&opened_by_run=4&view=components",
+    );
     // Open, because what it keeps is what the list is narrowed by.
     expect(select.value).toBe("kernel");
   });

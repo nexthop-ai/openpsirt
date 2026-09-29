@@ -210,8 +210,8 @@ going back to v0.4.0.
 | An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
 | An exploited issue | Has no day it was listed in the known-exploited catalog. The first scan stating one moves every open exploited finding of the issue to count from that day, and some become overdue at once |
 | A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
-| A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant and anything naming one build or one run are no longer part of it |
-| One person's saved filters of one name in several products | The oldest keeps the name. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
+| A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it |
+| One person's saved filters of one name in several products | The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
 | Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it |
 
 ## Serving

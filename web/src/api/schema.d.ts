@@ -5412,7 +5412,7 @@ export interface paths {
          * Keep a filter under a name
          * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
          *
-         *     The branch, the variant and anything naming one build or one run are left out of what is kept: `stream`, `variant`, `beneath` and its three qualifiers, `differs`, `variants` and `opened_by_run`. Every other parameter is kept as sent.
+         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath` and its three qualifiers, `differs`, `variants`, `opened_by_run` and `view`. Every other parameter is kept as sent.
          *
          *     Refused with 422 where adding the name would take you past the per-person limit.
          *

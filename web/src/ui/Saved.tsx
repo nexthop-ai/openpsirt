@@ -51,11 +51,12 @@ export function useKept(when = true) {
   });
 }
 
-// The words of the list's address that say where it is rather than what it is
-// narrowed by: the branch, the variant, a subtree of one build, what differs
-// between the builds of a selection, what is spread over the variants of one
-// branch, and the run that opened it. A saved filter keeps none of them, so one
-// filter applies within whatever scope is on screen. The server drops the same
+// The words of the list's address that say where it is or how it is grouped
+// rather than what it is narrowed by: the branch, the variant, a subtree of one
+// build, what differs between the builds of a selection, what is spread over
+// the variants of one branch, the run that opened it, and the grouping. A saved
+// filter keeps none of them, so one filter applies within whatever scope and
+// grouping is on screen, and picking one keeps them. The server drops the same
 // words from what it keeps.
 const SCOPE = [
   "stream",
@@ -67,17 +68,17 @@ const SCOPE = [
   "differs",
   "variants",
   "opened_by_run",
+  "view",
 ];
-
-// The selection a picked filter is applied within, which picking keeps.
-const SELECTION = ["stream", "variant"];
 
 // The filter a list is currently narrowed by, where its address is exactly one
 // somebody kept. Derived rather than remembered, so narrowing further drops it
 // and coming back to the list finds it again.
 export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined {
   const current = here(params);
-  return kept.find((one) => one.query === current);
+  // A filter that keeps nothing narrows nothing, and would otherwise read as
+  // open on every list with no filter on it.
+  return kept.find((one) => one.query !== "" && one.query === current);
 }
 
 // Filters somebody kept, and what one of them prepares.
@@ -198,10 +199,10 @@ export function Saved({
     if (!one) return;
     // The saved address wins outright rather than being merged into what is
     // on screen: opening a saved filter means "show me that list", and a
-    // merge would answer a question nobody saved. The branch and variant on
+    // merge would answer a question nobody saved. The scope and grouping on
     // screen stay, because the filter applies within them.
     const next = new URLSearchParams(one.query);
-    for (const key of SELECTION) {
+    for (const key of SCOPE) {
       const value = params.get(key);
       if (value) next.set(key, value);
     }
@@ -400,7 +401,8 @@ export function here(params: URLSearchParams): string {
   return asked.toString();
 }
 
-// Whether the address carries scope that saving leaves out.
+// Whether the address carries scope that saving leaves out. The grouping is
+// left out too, and is not what the confirmation is about.
 function scoped(params: URLSearchParams): boolean {
-  return SCOPE.some((key) => params.has(key));
+  return SCOPE.some((key) => key !== "view" && params.has(key));
 }

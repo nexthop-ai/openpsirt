@@ -85,17 +85,24 @@ var savedFilterColumns = []string{"person_id", "name", "display_name", "query",
 	"outcome", "justification", "reasoning", "defer_days", "created_at"}
 
 // scopeWordsV050 is every word of the findings list's address that says where
-// the list is rather than what it is narrowed by: the branch, the variant, a
-// subtree of one build, what differs between the builds of a selection, what
-// is spread over the variants of one branch, and the run that opened it.
+// the list is or how it is grouped rather than what it is narrowed by: the
+// branch, the variant, a subtree of one build, what differs between the builds
+// of a selection, what is spread over the variants of one branch, the run that
+// opened it, and the grouping.
 //
 // Copied rather than read from the list, so that what this release's upgrade
 // strips does not move when the list gains a word.
 var scopeWordsV050 = map[string]bool{
 	"stream": true, "variant": true,
 	"beneath": true, "beneath_version": true, "beneath_ecosystem": true, "beneath_namespace": true,
-	"differs": true, "variants": true, "opened_by_run": true,
+	"differs": true, "variants": true, "opened_by_run": true, "view": true,
 }
+
+// savedNameV050 is the longest name the saved-filter endpoints take, in
+// characters. A rename longer than it could never be saved over or forgotten.
+// Copied rather than read from the endpoint, as every rule a migration applies
+// is.
+const savedNameV050 = 120
 
 // unscopedV050 is one kept query without its scope. Every other parameter is
 // kept exactly as written, since the list recognizes a kept filter as open by
@@ -126,29 +133,61 @@ type keptFilter struct {
 	// Product is how the product it was kept in is shown: its display name,
 	// else its name.
 	Product string `bun:"product"`
+	// What it prepares, compared to tell a twin from a filter that says
+	// something else.
+	Outcome       sql.NullString `bun:"outcome"`
+	Justification sql.NullString `bun:"justification"`
+	Reasoning     sql.NullString `bun:"reasoning"`
+	DeferDays     sql.NullInt64  `bun:"defer_days"`
+}
+
+// twinV050 is what makes two of one person's filters of one name the same
+// filter once their scope is gone: the query without its scope, and the claim
+// it prepares.
+func twinV050(each keptFilter) string {
+	return strings.Join([]string{
+		strconv.FormatInt(each.Person, 10), each.Name, unscopedV050(each.Query),
+		each.Outcome.String, each.Justification.String, each.Reasoning.String,
+		strconv.FormatInt(each.DeferDays.Int64, 10),
+	}, "\x00")
 }
 
 // savedFiltersPersonal takes the product out of every saved filter, which is
 // one list per person from v0.5.0 on.
 //
 //   - Where one person kept one name in more than one product, the oldest
-//     keeps the name and each other is renamed "Name (Product)". A rename that
-//     another of theirs already holds takes a number after it, as
-//     "Name (Product) 2".
+//     keeps the name. Each other that, without its scope, is the same query
+//     preparing the same claim as an older one of that name is dropped, since
+//     it is that filter twice. Every other is renamed "Name (Product)", within
+//     the width the endpoints take a name at. A rename that another of theirs
+//     already holds takes a number after it, as "Name (Product) 2".
 //   - Every kept query loses its scope: the branch, the variant and anything
 //     naming one build or one run.
 //   - The product goes, and the name becomes unique to the person.
 func savedFiltersPersonal(ctx context.Context, tx bun.Tx) error {
 	var kept []keptFilter
 	if err := tx.NewRaw(`SELECT "s"."id", "s"."person_id", "s"."name", "s"."display_name",
-		"s"."query", "s"."created_at",
+		"s"."query", "s"."created_at", "s"."outcome", "s"."justification", "s"."reasoning",
+		"s"."defer_days",
 		COALESCE(NULLIF("p"."display_name", ''), "p"."name") AS "product"
 		FROM "saved_filter" AS "s" JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
 		Scan(ctx, &kept); err != nil {
 		return fmt.Errorf("read the kept filters: %w", err)
 	}
-	renamed := renamedV050(kept)
+	renamed, twins := renamedV050(kept)
+	for _, id := range twins {
+		if _, err := tx.NewRaw(`DELETE FROM "saved_filter" WHERE "id" = ?`, id).Exec(ctx); err != nil {
+			return fmt.Errorf("drop kept filter %d, the twin of an older one: %w", id, err)
+		}
+	}
+	dropped := map[int64]bool{}
+	for _, id := range twins {
+		dropped[id] = true
+	}
 	for _, each := range kept {
+		if dropped[each.ID] {
+			continue
+		}
 		query := unscopedV050(each.Query)
 		to, moving := renamed[each.ID]
 		if !moving && query == each.Query {
@@ -213,11 +252,16 @@ func savedFiltersPersonal(ctx context.Context, tx bun.Tx) error {
 }
 
 // renamedV050 is the name each filter moves to, for every filter whose name
-// one of the same person's filters in another product holds too. The oldest
-// holder keeps the name. Every name any of their filters holds is reserved
-// before any is renamed, so a rename never takes a name somebody kept, and no
-// step writes a name another row still holds.
-func renamedV050(kept []keptFilter) map[int64]string {
+// one of the same person's filters in another product holds too, and the
+// filters dropped as twins of an older one of the same name. The oldest holder
+// keeps the name. Every name any of their filters holds is reserved before any
+// is renamed, so a rename never takes a name somebody kept, and no step writes
+// a name another row still holds.
+//
+// A rename fits the width the endpoints take a name at. The product is cut to
+// half of it first, so the product and a number always fit beside what is
+// left of the name.
+func renamedV050(kept []keptFilter) (map[int64]string, []int64) {
 	ordered := make([]keptFilter, len(kept))
 	copy(ordered, kept)
 	sort.SliceStable(ordered, func(i, j int) bool {
@@ -234,22 +278,31 @@ func renamedV050(kept []keptFilter) map[int64]string {
 		taken[held(each.Person, each.Name)] = true
 	}
 	first := map[string]bool{}
+	seen := map[string]bool{}
 	out := map[int64]string{}
+	var twins []int64
 	for _, each := range ordered {
 		if !first[held(each.Person, each.Name)] {
 			first[held(each.Person, each.Name)] = true
+			seen[twinV050(each)] = true
 			continue
 		}
+		if seen[twinV050(each)] {
+			twins = append(twins, each.ID)
+			continue
+		}
+		seen[twinV050(each)] = true
 		called := each.Name
 		if each.DisplayName.Valid && strings.TrimSpace(each.DisplayName.String) != "" {
 			called = strings.TrimSpace(each.DisplayName.String)
 		}
-		suffix := " (" + each.Product + ")"
+		product := bound.HeadRunes(each.Product, savedNameV050/2)
+		suffix := " (" + product + ")"
 		for again := 1; ; again++ {
 			if again > 1 {
-				suffix = " (" + each.Product + ") " + strconv.Itoa(again)
+				suffix = " (" + product + ") " + strconv.Itoa(again)
 			}
-			to := bound.HeadRunes(called, database.NameWidth-len([]rune(suffix))) + suffix
+			to := bound.HeadRunes(called, savedNameV050-len([]rune(suffix))) + suffix
 			if !taken[held(each.Person, foldedV050(to))] {
 				taken[held(each.Person, foldedV050(to))] = true
 				out[each.ID] = to
@@ -257,7 +310,7 @@ func renamedV050(kept []keptFilter) map[int64]string {
 			}
 		}
 	}
-	return out
+	return out, twins
 }
 
 // savedFiltersProductsBack puts the product back on every saved filter, which

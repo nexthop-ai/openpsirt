@@ -98,14 +98,15 @@ func NewStore(db bun.IDB) *Store {
 }
 
 // scopeWords is every word of the findings list's address that says where the
-// list is rather than what it is narrowed by: the branch, the variant, a
-// subtree of one build, what differs between the builds of a selection, what
-// is spread over the variants of one branch, and the run that opened it. The
-// product is in the list's path and never in its query.
+// list is or how it is grouped rather than what it is narrowed by: the branch,
+// the variant, a subtree of one build, what differs between the builds of a
+// selection, what is spread over the variants of one branch, the run that
+// opened it, and the grouping. The product is in the list's path and never in
+// its query.
 var scopeWords = map[string]bool{
 	"stream": true, "variant": true,
 	"beneath": true, "beneath_version": true, "beneath_ecosystem": true, "beneath_namespace": true,
-	"differs": true, "variants": true, "opened_by_run": true,
+	"differs": true, "variants": true, "opened_by_run": true, "view": true,
 }
 
 // unscoped is a query without its scope. Every other parameter is kept exactly

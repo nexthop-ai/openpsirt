@@ -334,7 +334,7 @@ func TestAKeptFilterHoldsNoScope(t *testing.T) {
 		}
 		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel",
 			"?stream=main&exploited=1&variant=x86&beneath=zlib&beneath_version=1.2"+
-				"&differs=1&variants=only&opened_by_run=4&hide=a%7Eb&q=open+ssl",
+				"&differs=1&variants=only&opened_by_run=4&view=components&hide=a%7Eb&q=open+ssl",
 			saved.Filter{}, 0)
 		if err != nil {
 			t.Fatal(err)
