@@ -50,11 +50,16 @@ func main() {
 	}
 }
 
-func run(args []string, stdout, stderr *os.File) error {
+// configUsage is what --config says about itself wherever it is accepted.
+const configUsage = "read settings from this TOML file rather than the environment"
+
+func run(args []string, stdout, stderr *os.File) (err error) {
 	fs := flag.NewFlagSet("openpsirt", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	showVersion := fs.Bool("version", false, "print the build and exit")
 	dumpSpec := fs.Bool("openapi", false, "write the OpenAPI document to stdout and exit")
+	var file string
+	fs.StringVar(&file, "config", "", configUsage)
 	if err := fs.Parse(args); err != nil {
 		// A request for help is not a failure.
 		if errors.Is(err, flag.ErrHelp) {
@@ -69,9 +74,55 @@ func run(args []string, stdout, stderr *os.File) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	// A subcommand this does not know is refused rather than ignored.
+	// Ignored, `openpsirt migrat` would start the server — a typo in a job
+	// meant to apply migrations and nothing else, answering requests against
+	// whatever schema is there. runMigrate already refuses an
+	// action it does not know, which is the contrast.
+	//
+	// Each subcommand takes --config after its name as well as before it, so
+	// `openpsirt migrate up --config f` names the file where it is written.
+	command, action := "serve", ""
+	if fs.NArg() > 0 {
+		command = fs.Arg(0)
+		if command != "serve" && command != "migrate" {
+			return fmt.Errorf("unknown command %q: the commands are \"serve\" and \"migrate\"", command)
+		}
+		rest := fs.Args()[1:]
+		for {
+			sub := flag.NewFlagSet("openpsirt "+command, flag.ContinueOnError)
+			sub.SetOutput(stderr)
+			sub.StringVar(&file, "config", file, configUsage)
+			if err := sub.Parse(rest); err != nil {
+				if errors.Is(err, flag.ErrHelp) {
+					return nil
+				}
+				return err
+			}
+			if sub.NArg() == 0 {
+				break
+			}
+			if command != "migrate" || action != "" {
+				return fmt.Errorf("openpsirt %s: unexpected argument %q", command, sub.Arg(0))
+			}
+			action, rest = sub.Arg(0), sub.Args()[1:]
+		}
+	}
+
+	var cfg config.Config
+	if file == "" {
+		cfg, err = config.Load()
+	} else {
+		cfg, err = config.LoadFile(file, os.Environ())
+	}
 	if err != nil {
 		return err
+	}
+	if file != "" {
+		// Every refusal from here on names a setting by its key in the file,
+		// which is where somebody configuring by file changes it. Not the
+		// refusal of the file itself, which names variables that are set.
+		defer func() { err = config.InFile(err) }()
 	}
 	logger := newLogger(cfg, stderr)
 
@@ -88,16 +139,8 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	ctx := context.Background()
-	// A subcommand this does not know is refused rather than ignored.
-	// Ignored, `openpsirt migrat` would start the server — a typo in a job
-	// meant to apply migrations and nothing else, answering requests against
-	// whatever schema is there. runMigrate already refuses an
-	// action it does not know, which is the contrast.
-	if fs.NArg() > 0 {
-		if fs.Arg(0) != "migrate" {
-			return fmt.Errorf("unknown command %q: the only one is \"migrate\"", fs.Arg(0))
-		}
-		return runMigrate(ctx, cfg, logger, stdout, fs.Args()[1:])
+	if command == "migrate" {
+		return runMigrate(ctx, cfg, logger, stdout, action)
 	}
 
 	// Everything below this line is contacted before the server listens, and
@@ -584,10 +627,9 @@ func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) 
 
 // runMigrate applies or rolls back schema changes on their own, so an operator
 // can run them under different credentials and at a time they choose.
-func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout *os.File, args []string) error {
-	action := "up"
-	if len(args) > 0 {
-		action = args[0]
+func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout *os.File, action string) error {
+	if action == "" {
+		action = "up"
 	}
 
 	db, err := openDatabase(ctx, cfg, logger)

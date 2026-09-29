@@ -228,9 +228,11 @@ COPY --from=build /out/openpsirt /usr/local/bin/openpsirt
 COPY --from=build /out/openpsirt.cdx.json /usr/share/openpsirt/openpsirt.cdx.json
 COPY --from=scanner /out/grype /usr/local/bin/grype
 
-# Where the scanner keeps its vulnerability data, and where this process looks
-# for the scanner. Both are set so that a deployment which configures nothing
-# still scans.
+# Where the scanner keeps its vulnerability data. The scanner itself is on the
+# image's PATH, which is where the process looks for it when nothing names it,
+# so a deployment which configures nothing still scans. Nothing here sets a
+# variable of the deployment's own: a configuration file is refused beside
+# one, so an image that set one could not be configured by file.
 #
 # The data is fetched at runtime rather than built in. A database baked into an
 # image is stale the day after it is published, and the reason scanning happens
@@ -242,8 +244,7 @@ COPY --from=scanner /out/grype /usr/local/bin/grype
 # asks its publisher's host, which nobody configured and which an air-gapped
 # deployment cannot reach. The server hands the scanner the same setting.
 ENV GRYPE_DB_CACHE_DIR=/var/cache/openpsirt/grype \
-    GRYPE_CHECK_FOR_APP_UPDATE=false \
-    OPENPSIRT_SCANNER_PATH=/usr/local/bin/grype
+    GRYPE_CHECK_FOR_APP_UPDATE=false
 RUN mkdir -p /var/cache/openpsirt/grype /var/cache/openpsirt/repositories \
  && chown -R 65532:65532 /var/cache/openpsirt
 

@@ -867,11 +867,18 @@ kept, and that one a release candidate built is recreated, because a
 candidate's migration can be fixed before the release (`DESIGN-database.md`
 § Migrations).
 
-### Environment variables
+### The settings reference
 
-The configuration page lists every environment variable the process reads, with
-its meaning and default. A variable that is set and cannot be read stops the
-process with the variable named rather than falling back.
+The configuration page lists every setting the process reads, with its
+environment variable, its key in a configuration file, its meaning and its
+default. A value that is set and cannot be read stops the process with the
+setting named rather than falling back.
+
+| Held by a test | |
+|---|---|
+| Every variable the loader reads is on the page, and every variable on the page is read | Both directions, failing on zero examined |
+| Every setting's file key is on the page, in the row of its variable, and no other key is | A key read into the wrong setting shows as a key documented beside the wrong variable |
+| The table of settings in code is what the loader reads | A name the loader asks for and the table lacks is settable from neither source |
 
 ## The review checklist
 

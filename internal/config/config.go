@@ -3,8 +3,9 @@
 
 // Package config loads runtime settings.
 //
-// Settings come from the environment. Every one has a working default, so an
-// operator can start the binary with nothing set and get something sensible.
+// Settings come from the environment or from a configuration file, never
+// both. Every one has a working default, so an operator can start the binary
+// with nothing set and get something sensible.
 package config
 
 import (
@@ -315,23 +316,45 @@ type Store struct {
 // the opposite of what it says — worse than refusing to start, because the
 // operator has no reason to look.
 func Load() (Config, error) {
-	var r reader
+	// The name this list had when it covered repositories alone. Refused
+	// rather than ignored: ignored, a deployment that set it fetches from
+	// everything it meant to keep out. A file has no key under the old name,
+	// and a file with the variable set beside it is refused for that.
+	if os.Getenv("OPENPSIRT_PATCH_EXCLUDED") != "" {
+		return Config{}, fmt.Errorf("OPENPSIRT_PATCH_EXCLUDED is now OPENPSIRT_OUTBOUND_EXCLUDED: " +
+			"rename it, since the old name is not read")
+	}
+	given := map[string]string{}
+	for _, one := range settings {
+		if v, ok := os.LookupEnv(envPrefix + one.env); ok {
+			given[one.env] = v
+		}
+	}
+	return load(given)
+}
+
+// load is the one reading of a deployment's settings, from the values a
+// source supplied, keyed by environment name and spelled as the environment
+// spells them. Every default, every validation and every refusal is here, so
+// none of them depends on which source a value came from.
+func load(given map[string]string) (Config, error) {
+	r := reader{values: given}
 	// The queue's defaults where nothing says otherwise, read from
 	// the queue rather than restated: two spellings of one default disagree
 	// the first time either moves.
 	queueing := queue.DefaultOptions()
 	pool := database.DefaultPool()
 	c := Config{
-		Addr:                env("ADDR", ":8080"),
-		BaseURL:             env("BASE_URL", ""),
-		MailFrom:            env("MAIL_FROM", ""),
-		MailServer:          env("MAIL_SERVER", ""),
-		MailUsername:        env("MAIL_USERNAME", ""),
-		MailPassword:        env("MAIL_PASSWORD", ""),
-		SlackToken:          env("SLACK_TOKEN", ""),
-		ZulipSite:           env("ZULIP_SITE", ""),
-		ZulipEmail:          env("ZULIP_EMAIL", ""),
-		ZulipKey:            env("ZULIP_KEY", ""),
+		Addr:                r.text("ADDR", ":8080"),
+		BaseURL:             r.text("BASE_URL", ""),
+		MailFrom:            r.text("MAIL_FROM", ""),
+		MailServer:          r.text("MAIL_SERVER", ""),
+		MailUsername:        r.text("MAIL_USERNAME", ""),
+		MailPassword:        r.text("MAIL_PASSWORD", ""),
+		SlackToken:          r.text("SLACK_TOKEN", ""),
+		ZulipSite:           r.text("ZULIP_SITE", ""),
+		ZulipEmail:          r.text("ZULIP_EMAIL", ""),
+		ZulipKey:            r.text("ZULIP_KEY", ""),
 		IngestMaxBytes:      r.number("INGEST_MAX_BYTES", 0),
 		IngestMaxComponents: r.number("INGEST_MAX_COMPONENTS", 0),
 		IngestMaxEdges:      r.number("INGEST_MAX_EDGES", 0),
@@ -355,61 +378,61 @@ func Load() (Config, error) {
 		// every setting is documented reads; the two stores share the shape
 		// they are read into.
 		Attachments: Store{
-			Bucket:    env("ATTACHMENT_BUCKET", ""),
-			Endpoint:  env("ATTACHMENT_ENDPOINT", ""),
-			Region:    env("ATTACHMENT_REGION", ""),
-			Key:       env("ATTACHMENT_KEY", ""),
-			Secret:    env("ATTACHMENT_SECRET", ""),
-			Token:     env("ATTACHMENT_SESSION_TOKEN", ""),
-			PathStyle: r.boolean("ATTACHMENT_PATH_STYLE", env("ATTACHMENT_ENDPOINT", "") != ""),
+			Bucket:    r.text("ATTACHMENT_BUCKET", ""),
+			Endpoint:  r.text("ATTACHMENT_ENDPOINT", ""),
+			Region:    r.text("ATTACHMENT_REGION", ""),
+			Key:       r.text("ATTACHMENT_KEY", ""),
+			Secret:    r.text("ATTACHMENT_SECRET", ""),
+			Token:     r.text("ATTACHMENT_SESSION_TOKEN", ""),
+			PathStyle: r.boolean("ATTACHMENT_PATH_STYLE", r.text("ATTACHMENT_ENDPOINT", "") != ""),
 			AllowHTTP: r.boolean("ATTACHMENT_ALLOW_HTTP", false),
-			Dir:       env("ATTACHMENT_DIR", ""),
+			Dir:       r.text("ATTACHMENT_DIR", ""),
 		},
-		DirectoryURL: env("DIRECTORY_URL", ""),
+		DirectoryURL: r.text("DIRECTORY_URL", ""),
 		Directory: Store{
-			Bucket:    env("DIRECTORY_BUCKET", ""),
-			Endpoint:  env("DIRECTORY_ENDPOINT", ""),
-			Region:    env("DIRECTORY_REGION", ""),
-			Key:       env("DIRECTORY_KEY", ""),
-			Secret:    env("DIRECTORY_SECRET", ""),
-			Token:     env("DIRECTORY_SESSION_TOKEN", ""),
-			PathStyle: r.boolean("DIRECTORY_PATH_STYLE", env("DIRECTORY_ENDPOINT", "") != ""),
+			Bucket:    r.text("DIRECTORY_BUCKET", ""),
+			Endpoint:  r.text("DIRECTORY_ENDPOINT", ""),
+			Region:    r.text("DIRECTORY_REGION", ""),
+			Key:       r.text("DIRECTORY_KEY", ""),
+			Secret:    r.text("DIRECTORY_SECRET", ""),
+			Token:     r.text("DIRECTORY_SESSION_TOKEN", ""),
+			PathStyle: r.boolean("DIRECTORY_PATH_STYLE", r.text("DIRECTORY_ENDPOINT", "") != ""),
 			AllowHTTP: r.boolean("DIRECTORY_ALLOW_HTTP", false),
-			Dir:       env("DIRECTORY_DIR", ""),
+			Dir:       r.text("DIRECTORY_DIR", ""),
 		},
 		// The standard's own reading of an answer nobody gave.
 		DirectoryList:          r.boolean("DIRECTORY_LIST", true),
 		DirectoryMirror:        r.boolean("DIRECTORY_MIRROR", false),
-		PublisherName:          env("PUBLISHER_NAME", ""),
-		PublisherNamespace:     env("PUBLISHER_NAMESPACE", ""),
-		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),
-		AdvisoryPrefix:         env("ADVISORY_PREFIX", ""),
-		UpstreamInternal:       listed(env("UPSTREAM_INTERNAL", "")),
-		PatchDir:               env("PATCH_DIR", "/var/cache/openpsirt/repositories"),
+		PublisherName:          r.text("PUBLISHER_NAME", ""),
+		PublisherNamespace:     r.text("PUBLISHER_NAMESPACE", ""),
+		PublisherCategory:      r.text("PUBLISHER_CATEGORY", "vendor"),
+		AdvisoryPrefix:         r.text("ADVISORY_PREFIX", ""),
+		UpstreamInternal:       listed(r.text("UPSTREAM_INTERNAL", "")),
+		PatchDir:               r.text("PATCH_DIR", "/var/cache/openpsirt/repositories"),
 		PatchQuota:             r.number("PATCH_QUOTA", patchbranch.DefaultQuota),
 		PatchBranches:          r.boolean("PATCH_BRANCHES", false),
-		TrustedGroupsHeader:    env("TRUSTED_GROUPS_HEADER", ""),
-		TrustedGroupsDelimiter: env("TRUSTED_GROUPS_DELIMITER", ","),
+		TrustedGroupsHeader:    r.text("TRUSTED_GROUPS_HEADER", ""),
+		TrustedGroupsDelimiter: r.text("TRUSTED_GROUPS_DELIMITER", ","),
 		PlainHTTP:              r.boolean("PLAIN_HTTP", false),
 		SessionLifetime:        r.duration("SESSION_LIFETIME", 0),
 
-		OIDCName:          env("OIDC_NAME", "oidc"),
-		OIDCIssuer:        env("OIDC_ISSUER", ""),
-		OIDCClientID:      env("OIDC_CLIENT_ID", ""),
-		OIDCClientSecret:  env("OIDC_CLIENT_SECRET", ""),
-		OIDCGroupsClaim:   env("OIDC_GROUPS_CLAIM", ""),
-		OIDCUsernameClaim: env("OIDC_USERNAME_CLAIM", ""),
+		OIDCName:          r.text("OIDC_NAME", "oidc"),
+		OIDCIssuer:        r.text("OIDC_ISSUER", ""),
+		OIDCClientID:      r.text("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret:  r.text("OIDC_CLIENT_SECRET", ""),
+		OIDCGroupsClaim:   r.text("OIDC_GROUPS_CLAIM", ""),
+		OIDCUsernameClaim: r.text("OIDC_USERNAME_CLAIM", ""),
 
-		GitHubClientID:     env("GITHUB_CLIENT_ID", ""),
-		GitHubClientSecret: env("GITHUB_CLIENT_SECRET", ""),
-		GitHubOrg:          env("GITHUB_ORG", ""),
-		LogFormat:          env("LOG_FORMAT", "text"),
+		GitHubClientID:     r.text("GITHUB_CLIENT_ID", ""),
+		GitHubClientSecret: r.text("GITHUB_CLIENT_SECRET", ""),
+		GitHubOrg:          r.text("GITHUB_ORG", ""),
+		LogFormat:          r.text("LOG_FORMAT", "text"),
 		ShutdownGrace:      r.duration("SHUTDOWN_GRACE", 15*time.Second),
 		StartupTimeout:     r.duration("STARTUP_TIMEOUT", 60*time.Second),
-		DatabaseURL:        env("DATABASE_URL", ""),
-		ScannerPath:        env("SCANNER_PATH", ""),
+		DatabaseURL:        r.text("DATABASE_URL", ""),
+		ScannerPath:        r.text("SCANNER_PATH", ""),
 		ScannerTimeout:     r.duration("SCANNER_TIMEOUT", scanner.DefaultTimeout),
-		TrustedHeader:      env("TRUSTED_HEADER", ""),
+		TrustedHeader:      r.text("TRUSTED_HEADER", ""),
 		AutoMigrate:        r.boolean("AUTO_MIGRATE", true),
 		ReadTimeout:        5 * time.Minute,
 		WriteTimeout:       5 * time.Minute,
@@ -425,22 +448,15 @@ func Load() (Config, error) {
 		return Config{}, r.err
 	}
 
-	c.BootstrapAdmins = access.Identities(env("BOOTSTRAP_ADMINS", ""))
+	c.BootstrapAdmins = access.Identities(r.text("BOOTSTRAP_ADMINS", ""))
 
-	// The name this list had when it covered repositories alone. Refused
-	// rather than ignored: ignored, a deployment that set it fetches from
-	// everything it meant to keep out.
-	if env("PATCH_EXCLUDED", "") != "" {
-		return Config{}, fmt.Errorf("OPENPSIRT_PATCH_EXCLUDED is now OPENPSIRT_OUTBOUND_EXCLUDED: " +
-			"rename it, since the old name is not read")
-	}
-	excluded, err := outward.ParseExcluded(env("OUTBOUND_EXCLUDED", ""))
+	excluded, err := outward.ParseExcluded(r.text("OUTBOUND_EXCLUDED", ""))
 	if err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_OUTBOUND_EXCLUDED: %w", err)
 	}
 	c.OutboundExcluded = excluded
 
-	sources, err := access.ParseSources(env("TRUSTED_SOURCES", ""))
+	sources, err := access.ParseSources(r.text("TRUSTED_SOURCES", ""))
 	if err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_SOURCES: %w", err)
 	}
@@ -483,7 +499,7 @@ func Load() (Config, error) {
 		}
 	}
 
-	if err := c.LogLevel.UnmarshalText([]byte(env("LOG_LEVEL", "info"))); err != nil {
+	if err := c.LogLevel.UnmarshalText([]byte(r.text("LOG_LEVEL", "info"))); err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_LOG_LEVEL: %w", err)
 	}
 	switch c.LogFormat {
@@ -636,7 +652,8 @@ func masked(address string) string {
 // parse, and zero or negative reads as unset everywhere so it is refused
 // rather than taken.
 type reader struct {
-	err error
+	values map[string]string
+	err    error
 }
 
 // The one refusal here that composes the prefix rather than writing a name
@@ -652,7 +669,7 @@ func (r *reader) refuse(key, want, got string) {
 
 // boolean reads a switch: true or false, in the spellings strconv accepts.
 func (r *reader) boolean(key string, fallback bool) bool {
-	raw, ok := os.LookupEnv(envPrefix + key)
+	raw, ok := r.values[key]
 	if !ok {
 		return fallback
 	}
@@ -666,7 +683,7 @@ func (r *reader) boolean(key string, fallback bool) bool {
 
 // duration reads a positive duration, such as 30s or 5m.
 func (r *reader) duration(key string, fallback time.Duration) time.Duration {
-	raw, ok := os.LookupEnv(envPrefix + key)
+	raw, ok := r.values[key]
 	if !ok {
 		return fallback
 	}
@@ -680,7 +697,7 @@ func (r *reader) duration(key string, fallback time.Duration) time.Duration {
 
 // number reads a positive integer.
 func (r *reader) number(key string, fallback int) int {
-	raw, ok := os.LookupEnv(envPrefix + key)
+	raw, ok := r.values[key]
 	if !ok {
 		return fallback
 	}
@@ -692,8 +709,9 @@ func (r *reader) number(key string, fallback int) int {
 	return n
 }
 
-func env(key, fallback string) string {
-	if v, ok := os.LookupEnv(envPrefix + key); ok {
+// text reads a value as written.
+func (r *reader) text(key, fallback string) string {
+	if v, ok := r.values[key]; ok {
 		return v
 	}
 	return fallback
