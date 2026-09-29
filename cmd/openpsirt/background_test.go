@@ -127,7 +127,8 @@ func TestAnUnknownSubcommandIsRefused(t *testing.T) {
 		refused bool
 	}{
 		{[]string{"migrat"}, true},
-		{[]string{"serve"}, true},
+		{[]string{"serv"}, true},
+		{[]string{"serve"}, false},
 		// A flag nobody defined is the parser's to refuse, and it already
 		// does — with a better message than this could give.
 		{[]string{"migrate"}, false},

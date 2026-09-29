@@ -329,9 +329,14 @@ func TestAnAdvisoryIsRefusedWhereNobodyHasSaidWhoPublishesIt(t *testing.T) {
 		if !errors.Is(err, advisory.ErrNoPublisher) {
 			t.Errorf("an unconfigured deployment generated a document: %v", err)
 		}
-		if !strings.Contains(err.Error(), "PUBLISHER_NAME") ||
-			!strings.Contains(err.Error(), "PUBLISHER_NAMESPACE") {
-			t.Errorf("the refusal does not say what to set: %v", err)
+		// By its variable and by its key in a configuration file, because
+		// the refusal is answered to a request and the process cannot know
+		// which of the two the operator reading it configured.
+		for _, want := range []string{"PUBLISHER_NAME", "PUBLISHER_NAMESPACE",
+			"publisher.name", "publisher.namespace"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("the refusal does not say to set %s: %v", want, err)
+			}
 		}
 		// A name with no namespace is the same gap: both fields are required.
 		// The message names the half that is missing, and only that half —
@@ -343,7 +348,9 @@ func TestAnAdvisoryIsRefusedWhereNobodyHasSaidWhoPublishesIt(t *testing.T) {
 			t.Errorf("a publisher with no namespace was accepted: %v", err)
 		}
 		if !strings.Contains(err.Error(), "PUBLISHER_NAMESPACE") ||
-			strings.Contains(err.Error(), "PUBLISHER_NAME ") {
+			!strings.Contains(err.Error(), "publisher.namespace") ||
+			strings.Contains(err.Error(), "PUBLISHER_NAME,") ||
+			strings.Contains(err.Error(), "publisher.name ") {
 			t.Errorf("the refusal does not name the missing half: %v", err)
 		}
 	})

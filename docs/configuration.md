@@ -1,16 +1,18 @@
 # Configuration
 
-Every setting comes from the environment, and every name starts with
-`OPENPSIRT_`. Each one has a working default, so the process starts with
-nothing set but a database — and a value that is set and cannot be read stops
-the process with the variable named, rather than falling back to the default.
-A switch spelled wrongly that silently reads as its opposite is worse than a
-refusal to start.
+A deployment is configured by environment variables or by a
+[configuration file](#configuration-file), never both. Every setting has a
+name in each, side by side in the tables below: the variable, which starts
+`OPENPSIRT_`, and the key in the file. Each one has a working default, so the
+process starts with nothing set but a database — and a value that is set and
+cannot be read stops the process with the setting named, rather than falling
+back to the default. A switch spelled wrongly that silently reads as its
+opposite is worse than a refusal to start.
 
-A switch takes `true` or `false` (also `1`, `0`, `t`, `f`, in any case). A
-duration is written as Go reads it: `30s`, `5m`, `12h`. A number is a positive
-whole number; zero reads as unset everywhere, so it is refused rather than
-taken.
+In the environment, a switch takes `true` or `false` (also `1`, `0`, `t`, `f`,
+in any case). A duration is written as Go reads it: `30s`, `5m`, `12h`. A
+number is a positive whole number; zero reads as unset everywhere, so it is
+refused rather than taken.
 
 ## Features
 
@@ -33,6 +35,81 @@ Everything marked off does nothing until the thing in the last column is set.
 
 A sign-in method is not in this list because one is required: the process
 refuses to start without one. [Sign-in](#sign-in) says which.
+
+## Configuration file
+
+A TOML file, named on the command line. The Helm chart configures through the
+environment and takes no file.
+
+```
+openpsirt serve --config /etc/openpsirt/openpsirt.toml
+openpsirt migrate up --config /etc/openpsirt/openpsirt.toml
+```
+
+| | |
+|---|---|
+| Naming it | `--config <path>`, before the command or after it. No environment variable names it |
+| Keys | The File key column in each table below. `database.url` is `url` under `[database]`, and `signin.oidc.issuer` is `issuer` under `[signin.oidc]` |
+| Types | A switch is `true` or `false`. A number is a whole number, unquoted. A duration is a string, such as `"30s"`. A list is an array of strings, such as `["ana", "ben"]`, where the variable joins them with commas |
+| The environment | Any variable starting `OPENPSIRT_` set beside the file is refused at startup, naming every one, even when it is empty. Unset them |
+| Permissions | Readable and writable by its owner alone, `chmod 600`, owned by the user the process runs as. A file anybody else may read or write is refused at startup: it holds the database password and every secret below |
+| Refused at startup | A key that is not a setting, a value of the wrong type, a list entry holding a comma, and a file that is not TOML. Each refusal names the key, or the line |
+| Refusals | A refusal that stops the process names the key, as `database.max_open`, rather than the variable. A refusal answered to a request names both. A log line, a hint on a screen and the API reference name the variable, which the tables pair with the key |
+| Kubernetes | A pod gets variables for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service called `openpsirt` they start `OPENPSIRT_`, and are refused beside a file. A pod configured by file sets `enableServiceLinks: false` |
+
+Every rule in the tables applies to a value from the file exactly as to one
+from the environment: the defaults, the zero read as unset, and every value
+refused at startup.
+
+```toml
+[server]
+address = "127.0.0.1:8080"
+base_url = "https://psirt.example.com"
+
+[database]
+url = "postgres://openpsirt:secret@db.example.com:5432/openpsirt?sslmode=verify-full"
+require_encryption = true
+
+[signin]
+bootstrap_admins = ["ana"]
+
+[signin.oidc]
+issuer = "https://id.example.com"
+client_id = "openpsirt"
+client_secret = "secret"
+username_claim = "preferred_username"
+groups_claim = "groups"
+
+[mail]
+from = "psirt@example.com"
+server = "smtp.example.com:587"
+username = "psirt"
+password = "secret"
+
+[attachments]
+bucket = "openpsirt-attachments"
+region = "eu-west-1"
+
+[outbound]
+excluded = ["corp.example.com", "10.0.0.0/8"]
+```
+
+### Variables in both modes
+
+These are not settings of this deployment. The libraries and the programs it
+starts read them, so they stay in the environment beside a file.
+
+| Variable | Read by |
+|---|---|
+| `PATH` | The process, the scanner and git |
+| `HOME` | The process and the scanner. git is given a home of its own |
+| `TMPDIR` | Where uploads and the scanner's scratch files are written |
+| `TZ` | The time zone logs and the scanner use |
+| `SSL_CERT_FILE`, `SSL_CERT_DIR` | The certificate authorities outbound TLS trusts |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, in either case | The scanner, fetching its vulnerability data |
+| `PGSSLMODE` and the PostgreSQL driver's other `PG` variables | The PostgreSQL connection, where the URL does not say. [Database connection encryption](#database-connection-encryption) says how `PGSSLMODE` is judged |
+| `AWS_` variables | The object store client, for a role, a region or a profile where the settings name no key |
+| `GRYPE_` variables | The scanner. [Scanning](#scanning) lists the ones that matter here |
 
 ## Upgrading
 
@@ -133,15 +210,15 @@ going back to v0.4.0.
 
 ## Serving
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_ADDR` | The `host:port` the HTTP server listens on | `:8080` |
-| `OPENPSIRT_BASE_URL` | The address people arrive on, **written in full, with no path below it and no query, fragment or credentials**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
-| `OPENPSIRT_PLAIN_HTTP` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
-| `OPENPSIRT_SHUTDOWN_GRACE` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |
-| `OPENPSIRT_STARTUP_TIMEOUT` | How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on | `60s` |
-| `OPENPSIRT_LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` |
-| `OPENPSIRT_LOG_FORMAT` | `text` or `json` | `text` |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_ADDR` | `server.address` | The `host:port` the HTTP server listens on | `:8080` |
+| `OPENPSIRT_BASE_URL` | `server.base_url` | The address people arrive on, **written in full, with no path below it and no query, fragment or credentials**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
+| `OPENPSIRT_PLAIN_HTTP` | `server.plain_http` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
+| `OPENPSIRT_SHUTDOWN_GRACE` | `server.shutdown_grace` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |
+| `OPENPSIRT_STARTUP_TIMEOUT` | `server.startup_timeout` | How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on | `60s` |
+| `OPENPSIRT_LOG_LEVEL` | `log.level` | `debug`, `info`, `warn` or `error` | `info` |
+| `OPENPSIRT_LOG_FORMAT` | `log.format` | `text` or `json` | `text` |
 
 The defaults above are the binary's. The chart sets a log format of `json`,
 because a cluster's collector parses the logs; run the binary yourself and it
@@ -149,15 +226,15 @@ writes `text`.
 
 ## Database
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_DATABASE_URL` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. A `/`, `?`, `#` or `@` in the user name or password is percent-encoded, as `%2F`, `%3F`, `%23` and `%40`, and a URL holding one unencoded is refused. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
-| `OPENPSIRT_AUTO_MIGRATE` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and `openpsirt migrate status` says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created | `true` |
-| `OPENPSIRT_DB_MAX_OPEN` | Most connections open at once. At least 2 on a server engine to migrate: the migration lock holds one connection while the migrations use another | `25` |
-| `OPENPSIRT_DB_MAX_IDLE` | Most connections kept open idle | `25` |
-| `OPENPSIRT_DB_IDLE_TIMEOUT` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |
-| `OPENPSIRT_DB_CONN_LIFETIME` | How long a connection is used before it is replaced | `30m` |
-| `OPENPSIRT_DB_REQUIRE_ENCRYPTION` | Refuse to start where the connection to the database is not encrypted. See below | `false` |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_DATABASE_URL` | `database.url` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. A `/`, `?`, `#` or `@` in the user name or password is percent-encoded, as `%2F`, `%3F`, `%23` and `%40`, and a URL holding one unencoded is refused. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
+| `OPENPSIRT_AUTO_MIGRATE` | `database.auto_migrate` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and `openpsirt migrate status` says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created | `true` |
+| `OPENPSIRT_DB_MAX_OPEN` | `database.max_open` | Most connections open at once. At least 2 on a server engine to migrate: the migration lock holds one connection while the migrations use another | `25` |
+| `OPENPSIRT_DB_MAX_IDLE` | `database.max_idle` | Most connections kept open idle | `25` |
+| `OPENPSIRT_DB_IDLE_TIMEOUT` | `database.idle_timeout` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |
+| `OPENPSIRT_DB_CONN_LIFETIME` | `database.connection_lifetime` | How long a connection is used before it is replaced | `30m` |
+| `OPENPSIRT_DB_REQUIRE_ENCRYPTION` | `database.require_encryption` | Refuse to start where the connection to the database is not encrypted. See below | `false` |
 
 ### Database connection encryption
 
@@ -195,18 +272,20 @@ read.
 
 ## Scanning
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_SCANNER_PATH` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
-| `OPENPSIRT_SCANNER_TIMEOUT` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
-| `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it, and the chart sets it from `scanner.cacheDir`, where it mounts the volume; outside the chart, a deployment that moves it moves the volume with it, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
-| `GRYPE_DB_AUTO_UPDATE` | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
-| `GRYPE_CHECK_FOR_APP_UPDATE` | Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured | `false` |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_SCANNER_PATH` | `scanner.path` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
+| `OPENPSIRT_SCANNER_TIMEOUT` | `scanner.timeout` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
+| `GRYPE_DB_CACHE_DIR` | — | Where the scanner keeps its vulnerability data. The image sets it, and the chart sets it from `scanner.cacheDir`, where it mounts the volume; outside the chart, a deployment that moves it moves the volume with it, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
+| `GRYPE_DB_AUTO_UPDATE` | — | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
+| `GRYPE_CHECK_FOR_APP_UPDATE` | — | Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured | `false` |
 
 The scanner is given only part of this process's environment: `PATH`, `HOME`,
 `TMPDIR`, `TZ`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, the proxy variables in either
 case, and every `GRYPE_` variable. None of the `OPENPSIRT_` settings reaches it,
-so a credential the scanner needs has to be given under a name of its own.
+so a credential the scanner needs has to be given under a name of its own. The
+`GRYPE_` variables have no key in a configuration file: they are the scanner's,
+and stay in the environment in both modes.
 
 ### An air-gapped install
 
@@ -251,12 +330,12 @@ server with nobody to send as is half a configuration, and either alone sends
 nothing rather than failing at startup. Credentials are optional, and are
 refused over a connection the server would not secure with STARTTLS.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_MAIL_FROM` | The address messages are sent as. Set it and the server together, or neither: half of the pair is refused at startup, because a server with nobody to send as sends nothing and would say nothing about it | unset |
-| `OPENPSIRT_MAIL_SERVER` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
-| `OPENPSIRT_MAIL_USERNAME` | Username, where the server wants one. Sent only after STARTTLS | unset |
-| `OPENPSIRT_MAIL_PASSWORD` | Password for that username. Sent only after STARTTLS | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_MAIL_FROM` | `mail.from` | The address messages are sent as. Set it and the server together, or neither: half of the pair is refused at startup, because a server with nobody to send as sends nothing and would say nothing about it | unset |
+| `OPENPSIRT_MAIL_SERVER` | `mail.server` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
+| `OPENPSIRT_MAIL_USERNAME` | `mail.username` | Username, where the server wants one. Sent only after STARTTLS | unset |
+| `OPENPSIRT_MAIL_PASSWORD` | `mail.password` | Password for that username. Sent only after STARTTLS | unset |
 
 Who gets what is not configuration: each person chooses in their own settings,
 and the daily digest is off until somebody asks for it. A message about a
@@ -272,12 +351,12 @@ Slack and Zulip, each through a bot this deployment holds the credential for.
 A bot posts to the channels an administrator names under Settings, and sends
 people direct messages.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_SLACK_TOKEN` | A Slack app's bot token, beginning `xoxb-` | unset |
-| `OPENPSIRT_ZULIP_SITE` | The Zulip server's https address, e.g. `https://chat.example.com` | unset |
-| `OPENPSIRT_ZULIP_EMAIL` | The bot's address, as Zulip shows it | unset |
-| `OPENPSIRT_ZULIP_KEY` | The bot's API key | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_SLACK_TOKEN` | `chat.slack.token` | A Slack app's bot token, beginning `xoxb-` | unset |
+| `OPENPSIRT_ZULIP_SITE` | `chat.zulip.site` | The Zulip server's https address, e.g. `https://chat.example.com` | unset |
+| `OPENPSIRT_ZULIP_EMAIL` | `chat.zulip.email` | The bot's address, as Zulip shows it | unset |
+| `OPENPSIRT_ZULIP_KEY` | `chat.zulip.key` | The bot's API key | unset |
 
 The three Zulip settings are set together or not at all, and anything else is
 refused at startup.
@@ -355,12 +434,12 @@ document requires a publisher, so with one missing no advisory is generated and
 the refusal says which — rather than handing you a document that fails
 validation after you have sent it.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_PUBLISHER_NAME` | The organization advisories say issued them. Set it and the namespace together, or neither | unset |
-| `OPENPSIRT_PUBLISHER_NAMESPACE` | A URL identifying that organization, which is what a reader of a CSAF document matches on | unset |
-| `OPENPSIRT_PUBLISHER_CATEGORY` | What the standard calls the kind of publisher: `coordinator`, `discoverer`, `other`, `translator`, `user` or `vendor`. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them | `vendor` |
-| `OPENPSIRT_ADVISORY_PREFIX` | What a minted advisory identifier opens with, before the year and a number within it — the half a reader recognizes the publisher by. A letter followed by up to nineteen letters, digits or hyphens, upper case; anything else is refused at startup. Unset, no advisory can be started and the refusal says so: an identifier traceable to no publisher is in every document that went out, where a refusal is fixed once | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_PUBLISHER_NAME` | `publisher.name` | The organization advisories say issued them. Set it and the namespace together, or neither | unset |
+| `OPENPSIRT_PUBLISHER_NAMESPACE` | `publisher.namespace` | A URL identifying that organization, which is what a reader of a CSAF document matches on | unset |
+| `OPENPSIRT_PUBLISHER_CATEGORY` | `publisher.category` | What the standard calls the kind of publisher: `coordinator`, `discoverer`, `other`, `translator`, `user` or `vendor`. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them | `vendor` |
+| `OPENPSIRT_ADVISORY_PREFIX` | `publisher.advisory_prefix` | What a minted advisory identifier opens with, before the year and a number within it — the half a reader recognizes the publisher by. A letter followed by up to nineteen letters, digits or hyphens, upper case; anything else is refused at startup. Unset, no advisory can be started and the refusal says so: an identifier traceable to no publisher is in every document that went out, where a refusal is fixed once | unset |
 
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
@@ -376,20 +455,20 @@ of changes, a ROLIE feed, a description of you as a provider, and a `.sha256`
 beside each document. This application serves none of it. It writes files; your
 web server serves them, at the address you give below.
 
-| Variable | What it does | Default |
-|---|---|---|
-| `OPENPSIRT_DIRECTORY_URL` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address, or carries a query, a fragment or credentials. A value that is only whitespace is unset | unset |
-| `OPENPSIRT_DIRECTORY_BUCKET` | The bucket the files are written to. Empty means no object store | unset |
-| `OPENPSIRT_DIRECTORY_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
-| `OPENPSIRT_DIRECTORY_REGION` | The region, where the store wants one | unset |
-| `OPENPSIRT_DIRECTORY_KEY` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_DIRECTORY_SECRET` | Its secret. The key and the secret are set together or not at all | unset |
-| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
-| `OPENPSIRT_DIRECTORY_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants | set when an endpoint is |
-| `OPENPSIRT_DIRECTORY_ALLOW_HTTP` | Accept a store endpoint that is not `https` and is not this machine | off |
-| `OPENPSIRT_DIRECTORY_DIR` | A directory on this machine to write the files into instead. The bucket wins where both are set | unset |
-| `OPENPSIRT_DIRECTORY_LIST` | Tell aggregators they may list you | on |
-| `OPENPSIRT_DIRECTORY_MIRROR` | Tell aggregators they may mirror your documents | off |
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_DIRECTORY_URL` | `directory.url` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address, or carries a query, a fragment or credentials. A value that is only whitespace is unset | unset |
+| `OPENPSIRT_DIRECTORY_BUCKET` | `directory.bucket` | The bucket the files are written to. Empty means no object store | unset |
+| `OPENPSIRT_DIRECTORY_ENDPOINT` | `directory.endpoint` | The address of a self-hosted store. A cloud provider needs none | unset |
+| `OPENPSIRT_DIRECTORY_REGION` | `directory.region` | The region, where the store wants one | unset |
+| `OPENPSIRT_DIRECTORY_KEY` | `directory.key` | Access key, where the environment supplies no role | unset |
+| `OPENPSIRT_DIRECTORY_SECRET` | `directory.secret` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | `directory.session_token` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
+| `OPENPSIRT_DIRECTORY_PATH_STYLE` | `directory.path_style` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants | set when an endpoint is |
+| `OPENPSIRT_DIRECTORY_ALLOW_HTTP` | `directory.allow_http` | Accept a store endpoint that is not `https` and is not this machine | off |
+| `OPENPSIRT_DIRECTORY_DIR` | `directory.dir` | A directory on this machine to write the files into instead. The bucket wins where both are set | unset |
+| `OPENPSIRT_DIRECTORY_LIST` | `directory.list` | Tell aggregators they may list you | on |
+| `OPENPSIRT_DIRECTORY_MIRROR` | `directory.mirror` | Tell aggregators they may mirror your documents | off |
 
 A directory on this machine is a deployment here, unlike for attachments: a
 web server reading the same disk is the ordinary way to serve static files.
@@ -521,9 +600,9 @@ So names this deployment calls its own are never sent. Three sources, unioned:
 | What each build declared itself to be | The account, scope or group that identifier is published under, where an inventory names one. Read from the scans rather than from here, so a product declared this morning is one whose name does not leave this afternoon |
 | `OPENPSIRT_UPSTREAM_INTERNAL` | Whatever else you name, separated by commas |
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_UPSTREAM_INTERNAL` | Names never sent to a public index, separated by commas, on top of the two derived sources above. Here rather than among the settings an administrator tunes, beside the namespace the default is derived from: asking upstream is a switch an administrator throws, and what leaves the deployment when it is on is a boundary you drew | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_UPSTREAM_INTERNAL` | `upstream.internal` | Names never sent to a public index, separated by commas, on top of the two derived sources above. Here rather than among the settings an administrator tunes, beside the namespace the default is derived from: asking upstream is a switch an administrator throws, and what leaves the deployment when it is on is a boundary you drew | unset |
 
 A name matches each part of a package's own name, either exactly or followed by
 `-`, `.` or `_`. A name without a dot also matches each dotted part, which is
@@ -568,9 +647,9 @@ loopback, private, link-local and shared address space regardless. An internal
 service on a public address or behind a public name is kept out by this list
 alone.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_OUTBOUND_EXCLUDED` | Hosts and networks nothing is fetched from, separated by commas. A name covers itself and every host under it; a network is written as `10.0.0.0/8` and covers every address a name resolves to inside it | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_OUTBOUND_EXCLUDED` | `outbound.excluded` | Hosts and networks nothing is fetched from, separated by commas. A name covers itself and every host under it; a network is written as `10.0.0.0/8` and covers every address a name resolves to inside it | unset |
 
 ```
 OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
@@ -590,11 +669,11 @@ patch link names, from the host the link names, and asks the copy which
 branches hold each commit. Progress, failures and the size of each copy are on
 the System screen and at `/v1/patch-branches`.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_PATCH_BRANCHES` | Whether the lookups run. Read at startup, so changing it takes a restart | `false` |
-| `OPENPSIRT_PATCH_DIR` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
-| `OPENPSIRT_PATCH_QUOTA` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_PATCH_BRANCHES` | `patch_branches.enabled` | Whether the lookups run. Read at startup, so changing it takes a restart | `false` |
+| `OPENPSIRT_PATCH_DIR` | `patch_branches.dir` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
+| `OPENPSIRT_PATCH_QUOTA` | `patch_branches.quota` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
 
 ### Enabling
 
@@ -654,10 +733,10 @@ The Helm chart refuses to render an install with none; the binary does not
 check, because a deployment being brought up in pieces is an ordinary state
 for a process and not for an install.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked | unset |
-| `OPENPSIRT_SESSION_LIFETIME` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held | 12 hours |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_BOOTSTRAP_ADMINS` | `signin.bootstrap_admins` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked | unset |
+| `OPENPSIRT_SESSION_LIFETIME` | `signin.session_lifetime` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held | 12 hours |
 
 ### An OpenID Connect provider
 
@@ -665,14 +744,14 @@ One sign-in provider is configured at a time. Setting both an issuer here and a
 GitHub client id below stops the process, naming the two: an identity is a
 username, and two providers issuing them independently cannot be told apart.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_OIDC_ISSUER` | The provider's issuer address. Empty means no provider. **Every endpoint the provider publishes must be on this host** — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network | unset |
-| `OPENPSIRT_OIDC_NAME` | What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise | `oidc` |
-| `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
-| `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
-| `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_OIDC_ISSUER` | `signin.oidc.issuer` | The provider's issuer address. Empty means no provider. **Every endpoint the provider publishes must be on this host** — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network | unset |
+| `OPENPSIRT_OIDC_NAME` | `signin.oidc.name` | What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise | `oidc` |
+| `OPENPSIRT_OIDC_CLIENT_ID` | `signin.oidc.client_id` | The client registered with the provider | unset |
+| `OPENPSIRT_OIDC_CLIENT_SECRET` | `signin.oidc.client_secret` | Its secret | unset |
+| `OPENPSIRT_OIDC_USERNAME_CLAIM` | `signin.oidc.username_claim` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
+| `OPENPSIRT_OIDC_GROUPS_CLAIM` | `signin.oidc.groups_claim` | The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored | unset |
 
 ### The username claim
 
@@ -759,11 +838,11 @@ alone is caught.
 
 ### GitHub
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_GITHUB_CLIENT_ID` | The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside `OPENPSIRT_OIDC_ISSUER` | unset |
-| `OPENPSIRT_GITHUB_CLIENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_GITHUB_ORG` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_GITHUB_CLIENT_ID` | `signin.github.client_id` | The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside `OPENPSIRT_OIDC_ISSUER` | unset |
+| `OPENPSIRT_GITHUB_CLIENT_SECRET` | `signin.github.client_secret` | Its secret | unset |
+| `OPENPSIRT_GITHUB_ORG` | `signin.github.org` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
 
 ### The trusted header
 
@@ -771,12 +850,12 @@ Both the header and the sources it is believed from are required together: a
 header named with nothing to trust it from is either a mistake or the first
 half of one, and the process stops rather than accept a header anybody can set.
 
-| Variable | Meaning | Default |
-|---|---|---|
-| `OPENPSIRT_TRUSTED_HEADER` | The header an identity-aware proxy sets to say who somebody is | unset |
-| `OPENPSIRT_TRUSTED_SOURCES` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored | unset |
-| `OPENPSIRT_TRUSTED_GROUPS_HEADER` | Where that proxy reports group membership, if it does | unset |
-| `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_TRUSTED_HEADER` | `signin.trusted_header.name` | The header an identity-aware proxy sets to say who somebody is | unset |
+| `OPENPSIRT_TRUSTED_SOURCES` | `signin.trusted_header.sources` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored | unset |
+| `OPENPSIRT_TRUSTED_GROUPS_HEADER` | `signin.trusted_header.groups_header` | Where that proxy reports group membership, if it does | unset |
+| `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | `signin.trusted_header.groups_delimiter` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
 
 The header is believed by address alone. In a cluster the sources are usually
 the pod network, which every pod is on, so the chart renders a NetworkPolicy
@@ -804,17 +883,17 @@ is what a self-hosted store needs and a cloud one does not, and credentials are
 optional — a deployment on a cloud provider gets a rotating role from its
 environment rather than a key somebody stored.
 
-| Variable | What it does | Default |
-|---|---|---|
-| `OPENPSIRT_ATTACHMENT_BUCKET` | The bucket files are kept in. Empty means attachments are off | unset |
-| `OPENPSIRT_ATTACHMENT_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
-| `OPENPSIRT_ATTACHMENT_REGION` | The region, where the store wants one | unset |
-| `OPENPSIRT_ATTACHMENT_KEY` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_ATTACHMENT_SECRET` | Its secret. The key and the secret are set together or not at all | unset |
-| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
-| `OPENPSIRT_ATTACHMENT_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
-| `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
-| `OPENPSIRT_ATTACHMENT_DIR` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_ATTACHMENT_BUCKET` | `attachments.bucket` | The bucket files are kept in. Empty means attachments are off | unset |
+| `OPENPSIRT_ATTACHMENT_ENDPOINT` | `attachments.endpoint` | The address of a self-hosted store. A cloud provider needs none | unset |
+| `OPENPSIRT_ATTACHMENT_REGION` | `attachments.region` | The region, where the store wants one | unset |
+| `OPENPSIRT_ATTACHMENT_KEY` | `attachments.key` | Access key, where the environment supplies no role | unset |
+| `OPENPSIRT_ATTACHMENT_SECRET` | `attachments.secret` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | `attachments.session_token` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
+| `OPENPSIRT_ATTACHMENT_PATH_STYLE` | `attachments.path_style` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
+| `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | `attachments.allow_http` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
+| `OPENPSIRT_ATTACHMENT_DIR` | `attachments.dir` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |
 
 An endpoint that is not `https` is refused, because a file is handed over as a
 redirect to a signed address and that address is a bearer token: anybody on the
@@ -843,13 +922,13 @@ How deep the queue may get before uploads are refused is not here: it is a
 setting an administrator changes on screen, because the refusal lands on a
 build server and waiting for a restart is not a remedy.
 
-| Variable | What it does | Default |
-|---|---|---|
-| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | How many times a job is tried before it is set aside with its last error | `5` |
-| `OPENPSIRT_QUEUE_CLAIM_TIMEOUT` | How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take | `30m` |
-| `OPENPSIRT_QUEUE_HEARTBEAT` | How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup | `5m` |
-| `OPENPSIRT_QUEUE_MAX_HOLD` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
-| `OPENPSIRT_QUEUE_BACKOFF` | How long a failed job waits before it is tried again, multiplied by the attempt | `30s` |
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | `queue.max_attempts` | How many times a job is tried before it is set aside with its last error | `5` |
+| `OPENPSIRT_QUEUE_CLAIM_TIMEOUT` | `queue.claim_timeout` | How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take | `30m` |
+| `OPENPSIRT_QUEUE_HEARTBEAT` | `queue.heartbeat` | How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup | `5m` |
+| `OPENPSIRT_QUEUE_MAX_HOLD` | `queue.max_hold` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
+| `OPENPSIRT_QUEUE_BACKOFF` | `queue.backoff` | How long a failed job waits before it is tried again, multiplied by the attempt | `30s` |
 
 ## Scan file limits
 
@@ -872,15 +951,15 @@ That 250 MB is the server's share of the pod. The scanner runs as a second
 process in the same container, so the memory limit covers both — see
 [Memory and the scanner's database](#memory-and-the-scanners-database).
 
-| Variable | What it does | Default |
-|---|---|---|
-| `OPENPSIRT_INGEST_MAX_BYTES` | How large a single document may be | 256 MB |
-| `OPENPSIRT_INGEST_MAX_COMPONENTS` | How many components it may describe. About 1.3 KB of heap each while reading | 100,000 |
-| `OPENPSIRT_INGEST_MAX_EDGES` | How many dependency edges it may declare. The component count does not bound this: a thousand components can declare a million edges between them. About 0.5 KB of heap each while reading | 250,000 |
-| `OPENPSIRT_INGEST_MAX_FILES` | How many files a document may catalog. Not covered by the component count: a real scan catalogs forty-five to fifty-six files per package, so one bound cannot size both | 500,000 |
-| `OPENPSIRT_INGEST_MAX_STATEMENTS` | How many claims a suppression document may make | 100,000 |
-| `OPENPSIRT_INGEST_MAX_DEPTH` | How deeply it may nest | 64 |
-| `OPENPSIRT_INGEST_MAX_DOCUMENTS` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_INGEST_MAX_BYTES` | `ingest.max_bytes` | How large a single document may be | 256 MB |
+| `OPENPSIRT_INGEST_MAX_COMPONENTS` | `ingest.max_components` | How many components it may describe. About 1.3 KB of heap each while reading | 100,000 |
+| `OPENPSIRT_INGEST_MAX_EDGES` | `ingest.max_edges` | How many dependency edges it may declare. The component count does not bound this: a thousand components can declare a million edges between them. About 0.5 KB of heap each while reading | 250,000 |
+| `OPENPSIRT_INGEST_MAX_FILES` | `ingest.max_files` | How many files a document may catalog. Not covered by the component count: a real scan catalogs forty-five to fifty-six files per package, so one bound cannot size both | 500,000 |
+| `OPENPSIRT_INGEST_MAX_STATEMENTS` | `ingest.max_statements` | How many claims a suppression document may make | 100,000 |
+| `OPENPSIRT_INGEST_MAX_DEPTH` | `ingest.max_depth` | How deeply it may nest | 64 |
+| `OPENPSIRT_INGEST_MAX_DOCUMENTS` | `ingest.max_documents` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
 
 ## Scanner output limits
 
@@ -893,12 +972,12 @@ A report past its ceiling fails the run rather than being read in part: half a
 report reads as a product that stopped having problems. Complaints past theirs
 are dropped instead, because a scanner with a lot to say still scanned.
 
-| Variable | What it does | Default |
-|---|---|---|
-| `OPENPSIRT_SCANNER_MAX_OUTPUT` | How large one report may be. The load-bearing bound: every count below is bounded by it | 256 MB |
-| `OPENPSIRT_SCANNER_MAX_COMPLAINT` | How much of what a scanner said while running is kept | 1 MB |
-| `OPENPSIRT_SCANNER_MAX_MATCHES` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
-| `OPENPSIRT_SCANNER_MAX_REFERENCES` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_SCANNER_MAX_OUTPUT` | `scanner.max_output` | How large one report may be. The load-bearing bound: every count below is bounded by it | 256 MB |
+| `OPENPSIRT_SCANNER_MAX_COMPLAINT` | `scanner.max_complaint` | How much of what a scanner said while running is kept | 1 MB |
+| `OPENPSIRT_SCANNER_MAX_MATCHES` | `scanner.max_matches` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
+| `OPENPSIRT_SCANNER_MAX_REFERENCES` | `scanner.max_references` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |
 
 ## Memory and the scanner's database
 

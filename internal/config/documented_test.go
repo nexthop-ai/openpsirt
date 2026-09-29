@@ -69,11 +69,94 @@ func requireAmong(t *testing.T, found []string, want ...string) {
 	}
 }
 
-func TestEverySettingIsWrittenDown(t *testing.T) {
-	// Where a setting is read from the environment: every file in this
-	// package.
+// loaderReads is every setting the loader reads, by environment name after
+// the prefix — the literal at each call of the reader in this package — with
+// the reader it is read by.
+func loaderReads(t *testing.T) map[string]string {
+	t.Helper()
 	sources := goSources(t, ".")
 	requireAmong(t, sources, "config.go")
+	read := regexp.MustCompile(`r\.(text|duration|number|boolean)\("([A-Z0-9_]+)"`)
+	reads := map[string]string{}
+	for _, path := range sources {
+		source, err := os.ReadFile(path) //nolint:gosec // G304: a Go file of this repository, found by the walk above
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, found := range read.FindAllStringSubmatch(string(source), -1) {
+			if was, ok := reads[found[2]]; ok && was != found[1] {
+				t.Errorf("%s%s is read as a %s and as a %s", envPrefix, found[2], was, found[1])
+			}
+			reads[found[2]] = found[1]
+		}
+	}
+	if len(reads) == 0 {
+		t.Fatal("no settings were found in the source, so this checked nothing")
+	}
+	return reads
+}
+
+// readBy is the reader a setting of each kind is read with. A list is read as
+// text and split, which is how the environment carries one.
+var readBy = map[kind]string{
+	text: "text", list: "text", number: "number", duration: "duration", boolean: "boolean",
+}
+
+// The table is what the loader reads, in both directions.
+//
+// A name the loader asks for that the table lacks is read from neither source,
+// so a deployment setting it gets nothing. A row the loader never asks for is
+// a key a file accepts and nothing reads. And every row has one name in each
+// source, neither shared with another row.
+func TestTheSettingsTableIsWhatTheLoaderReads(t *testing.T) {
+	reads := loaderReads(t)
+	if len(settings) == 0 {
+		t.Fatal("the table of settings is empty, so this checked nothing")
+	}
+	envs, files := map[string]bool{}, map[string]bool{}
+	for _, one := range settings {
+		if envs[one.env] {
+			t.Errorf("%s%s is in the table twice", envPrefix, one.env)
+		}
+		if files[one.file] {
+			t.Errorf("%s is in the table twice", one.file)
+		}
+		envs[one.env], files[one.file] = true, true
+		if one.file == "" || strings.Count(one.file, ".") < 1 {
+			t.Errorf("%s%s has no key under a table in a file: %q", envPrefix, one.env, one.file)
+		}
+		switch reader, ok := reads[one.env]; {
+		case !ok:
+			t.Errorf("%s%s (%s) is in the table and the loader never reads it", envPrefix, one.env, one.file)
+		case reader != readBy[one.kind]:
+			// A file checks a value's type by the row's kind, and the loader
+			// parses it by the reader, so the two have to agree or a file
+			// refuses the form the loader reads.
+			t.Errorf("%s%s is read as a %s, and its row's kind wants a %s",
+				envPrefix, one.env, reader, readBy[one.kind])
+		}
+	}
+	for name := range reads {
+		if !envs[name] {
+			t.Errorf("the loader reads %s%s and the table has no row for it, so neither source can set it",
+				envPrefix, name)
+		}
+	}
+	// A key is either a setting or a table of them, never both, or a file
+	// could not write it.
+	for _, one := range settings {
+		if section(one.file) {
+			t.Errorf("%s is a setting and also a table holding others", one.file)
+		}
+	}
+}
+
+func TestEverySettingIsWrittenDown(t *testing.T) {
+	// Where a setting is read: every file in this package.
+	reads := map[string]bool{}
+	for name := range loaderReads(t) {
+		reads[name] = true
+	}
 	// Where one is named in a message, an API description or a field telling
 	// an operator to set it: every file of the program. The harness and the
 	// gates are left out, because the names they carry configure a test run
@@ -81,21 +164,6 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	refusals := goSources(t, "../..", "../../internal/tools", "../../internal/dbtest",
 		"../../web", "../../node_modules")
 	requireAmong(t, refusals, "../../internal/config/config.go", "../../cmd/openpsirt/main.go")
-
-	read := regexp.MustCompile(`(?:env|r\.duration|r\.number|r\.boolean)\("([A-Z0-9_]+)"`)
-	reads := map[string]bool{}
-	for _, path := range sources {
-		source, err := os.ReadFile(path) //nolint:gosec // G304: a Go file of this repository, found by the walk above
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, found := range read.FindAllStringSubmatch(string(source), -1) {
-			reads[found[1]] = true
-		}
-	}
-	if len(reads) == 0 {
-		t.Fatal("no settings were found in the source, so this checked nothing")
-	}
 
 	// A variable named anywhere in the program is one an operator is being
 	// told to set, so it is held to the documented set exactly as one that is
@@ -124,6 +192,35 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	for _, found := range regexp.MustCompile(`OPENPSIRT_([A-Z0-9_]+)`).
 		FindAllStringSubmatch(string(page), -1) {
 		written[found[1]] = true
+	}
+
+	// Every setting's key in a file is documented beside its variable, in the
+	// row of the page's table that describes it, and the page names no key
+	// the table does not hold under that variable.
+	paired := regexp.MustCompile("(?m)^\\| `OPENPSIRT_([A-Z0-9_]+)` \\| `([a-z0-9_.]+)` \\|")
+	keyed := map[string]string{}
+	for _, found := range paired.FindAllStringSubmatch(string(page), -1) {
+		keyed[found[1]] = found[2]
+	}
+	if len(keyed) == 0 {
+		t.Fatal("no row of the page pairs a variable with its key in a file, so this checked nothing")
+	}
+	byEnv := map[string]string{}
+	for _, one := range settings {
+		byEnv[one.env] = one.file
+		switch documented, ok := keyed[one.env]; {
+		case !ok:
+			t.Errorf("%s%s has no row pairing it with its key in a file, %s", envPrefix, one.env, one.file)
+		case documented != one.file:
+			t.Errorf("%s%s is documented with the key %s and read from %s",
+				envPrefix, one.env, documented, one.file)
+		}
+	}
+	for name, documented := range keyed {
+		if _, ok := byEnv[name]; !ok {
+			t.Errorf("%s%s is documented with the key %s, and no file key is read for it",
+				envPrefix, name, documented)
+		}
 	}
 
 	var missing, invented []string

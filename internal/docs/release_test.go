@@ -141,6 +141,69 @@ func TestPublishedPagesNameNoReleaseByHand(t *testing.T) {
 	}
 }
 
+// A page names the scanner the image carries as {{ scanner }}, and its pinned
+// checksums likewise, which the documentation build fills in from the
+// Dockerfile. The names a page may write are the ones the hook declares, read
+// from its source here; the hook fails the build on any other, and on a
+// declared name it does not fill. A placeholder no page writes, or one the
+// Dockerfile does not pin exactly once, is reported too.
+func TestEveryPlaceholderIsOneTheBuildFills(t *testing.T) {
+	hook, err := os.ReadFile(filepath.Join("..", "..", "docs", "hooks", "release.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	declared := regexp.MustCompile(`(?m)^PLACEHOLDERS = \(([^)]*)\)`).FindSubmatch(hook)
+	if declared == nil {
+		t.Fatal("the hook declares no placeholders, so this checked nothing")
+	}
+	known := map[string]bool{}
+	for _, found := range regexp.MustCompile(`"([a-z0-9_]+)"`).FindAllSubmatch(declared[1], -1) {
+		known[string(found[1])] = true
+	}
+	if len(known) == 0 {
+		t.Fatal("the hook declares no placeholders, so this checked nothing")
+	}
+
+	// The hook's own pattern: a workflow expression, ${{ matrix.variant }}, in
+	// a pipeline example follows a dollar sign and holds a dot.
+	placeholder := regexp.MustCompile(`(?:^|[^$])\{\{\s*([a-z0-9_]+)\s*\}\}`)
+	seen := map[string]bool{}
+	for name, text := range publishedPages(t) {
+		for _, found := range placeholder.FindAllStringSubmatch(text, -1) {
+			seen[found[1]] = true
+			if !known[found[1]] {
+				t.Errorf("%s writes {{ %s }}, which the documentation build does not fill in", name, found[1])
+			}
+		}
+	}
+	for name := range known {
+		if !seen[name] {
+			t.Errorf("no page writes {{ %s }}, so this checked less than it says", name)
+		}
+	}
+
+	dockerfile, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The stage that fetches the scanner, as the hook reads it: another stage
+	// pins another tool's checksums the same way.
+	stage := regexp.MustCompile(`(?ms)^FROM \S+ AS scanner$(.*?)^FROM `).FindSubmatch(dockerfile)
+	if stage == nil {
+		t.Fatal("the Dockerfile has no scanner stage, so this checked nothing")
+	}
+	dockerfile = stage[1]
+	for what, pin := range map[string]string{
+		"the scanner":                  `(?m)^ARG GRYPE_VERSION=\d+\.\d+\.\d+\s*$`,
+		"the scanner's amd64 checksum": `(?m)^\s*amd64\) expected=[0-9a-f]{64} ;;`,
+		"the scanner's arm64 checksum": `(?m)^\s*arm64\) expected=[0-9a-f]{64} ;;`,
+	} {
+		if n := len(regexp.MustCompile(pin).FindAll(dockerfile, -1)); n != 1 {
+			t.Errorf("the Dockerfile pins %s %d times, and the pages need exactly one", what, n)
+		}
+	}
+}
+
 func TestReleaseLiteralsAreToldFromWhatIsNotARelease(t *testing.T) {
 	reported := []struct{ name, text, want string }{
 		{"docs/trying.md", "  ghcr.io/nexthop-ai/openpsirt:0.2.0\n", "0.2.0"},

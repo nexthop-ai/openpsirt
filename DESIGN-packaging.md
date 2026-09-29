@@ -2,7 +2,7 @@
 
 The container image, the Helm chart, and what a deployment looks like.
 
-Satisfies REQ-01, REQ-02, REQ-04, REQ-76, the probe behavior REQ-72
+Satisfies REQ-01, REQ-02, REQ-04, REQ-76, REQ-83, the probe behavior REQ-72
 requires, and the storage REQ-78 needs.
 
 ## Contents
@@ -15,6 +15,7 @@ requires, and the storage REQ-78 needs.
 - [Image and archive checks](#image-and-archive-checks)
 - [Chart probes](#chart-probes)
 - [Starting and stopping](#starting-and-stopping)
+- [Configuration sources](#configuration-sources)
 - [Chart security context](#chart-security-context)
 - [Network policy](#network-policy)
 - [Render-time refusals](#render-time-refusals)
@@ -198,6 +199,31 @@ the migration from the beginning.
 | Both halves of the shutdown grace answer the same way | One setting bounds them both, so an overrun request exiting 1 and an overrun worker exiting 0 tells a supervisor reading the exit code that half of an unfinished shutdown finished |
 | The chart stops every pod of the earlier release before it starts one of this one | Below 1.0 an upgrade may drop and reshape tables the earlier release reads (REQ-76), so a replica of it left serving fails on them. A ReadWriteOnce claim moves to the new pod too, where a rolling update leaves that pod waiting for a volume the old one holds |
 | A rolling update is the operator's choice | Nothing answers between the old pods stopping and a new one passing readiness, and an upgrade that fails to start leaves nothing serving. A deployment that has to stay up chooses it, and scales to zero by hand before an upgrade that changes the schema |
+| The commands are `serve`, which is also what no command means, and `migrate` | Each takes `--config` after its name as well as before it |
+
+## Configuration sources
+
+A deployment is configured by environment variables or by a configuration
+file, never both (REQ-83).
+
+| Rule | |
+|---|---|
+| The file is TOML, named by `--config` on the command line | No environment variable names it, since that variable would be one of the deployment's own set beside the file |
+| A variable whose name begins `OPENPSIRT_` beside a file is refused at startup, naming every one | Set-but-empty counts as set. The harness's own variables share the prefix and are refused the same way |
+| Variables the deployment's libraries and child programs read stay in the environment in both modes | `PATH`, `HOME`, `TMPDIR`, `TZ`, the certificate and proxy variables, the PostgreSQL driver's `PG` variables, the object store client's `AWS_` variables and every `GRYPE_` variable. None of them is a setting of this deployment |
+| Every setting has one environment name and one file key, defined together in one table | Both sources read through it. A test holds the table to what the loader reads, both directions, and to the configuration page, which pairs each variable with its key |
+| A file's keys are tables by area and a key within, nesting where an area has parts | `database.url` is `url` under `[database]`; `signin.oidc.issuer` is `issuer` under `[signin.oidc]` |
+| A file's values pass through the one loader the environment's do | Every default, every validation and every refusal is one path, so none depends on the source. A value is spelled as the environment would spell it on the way in: a whole number, `true` or `false`, and a list joined with commas |
+| A value of the wrong type is refused rather than converted | A quoted number or a switch written as a word is a mistake a typed format makes visible |
+| A key the table does not know is refused, naming it | A misspelled key otherwise configures nothing and says nothing |
+| A list entry holding a comma is refused | The loader reads a list as the environment carries it, where one entry would become two |
+| A malformed file is refused naming the line | What the parser reports |
+| A file anybody but its owner may read or write is refused, saying to set 0600 | It holds the database password and the sign-in and store secrets. Write is refused with read, because a file somebody else can change is a configuration somebody else chose |
+| A refusal that stops the process names the key rather than the variable, including one made after startup began | The process rewrites each variable's name in a refusal to its key on the way out, so a check written once for both sources speaks to whichever source is in use |
+| A refusal answered to a request names the setting both ways | Answered while running, it cannot be rewritten on the way out, and the operator reading it relayed may have configured either source. The advisory prefix and the publisher are the two |
+| A pod configured by file sets `enableServiceLinks: false` | Kubernetes gives a pod a variable for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service named `openpsirt` they start `OPENPSIRT_`, and are refused beside a file. The chart configures by environment and is unaffected |
+| The chart configures by environment | Its secrets arrive as references into variables, which is what a cluster already does with a Secret |
+| The image sets no variable of the deployment's own | A file would be refused beside it. The scanner is found on the image's `PATH` |
 
 ## Chart security context
 
@@ -551,4 +577,5 @@ should get.
 | Pinned pairs are compared rather than trusted | The Go toolchain, the inventory generator and Node are each written in two files. The same check catches a build argument given two different defaults, which makes a binary report one version and its inventory another |
 | The binary archives are a convenience, not the product | REQ-02 says this ships as an image and a chart, and a binary run bare has none of the chart's render-time refusals in front of it. Linux amd64 and arm64 only: nothing in the design targets another platform, and an archive nobody tests is a support surface rather than a release |
 | `make dist` reads one image inventory, for the architecture it runs on | Cataloging a foreign filesystem means running foreign binaries under emulation. The workflow publishes one per architecture it pushes; a developer who wants the other names it and waits |
+| Text written ahead of time names a setting by its variable whatever the source | A log line, a hint on a screen, the API reference and a recorded history entry are written without knowing which source a deployment uses. Each keeps the variable's name, which the configuration page pairs with the key |
 | Nothing is fetched at run time from a source only this project controls | And nothing is gated on a key this project issues. An operator who mirrors the image into their own registry has the whole thing, which is what Apache 2.0 (REQ-01) requires of delivery |

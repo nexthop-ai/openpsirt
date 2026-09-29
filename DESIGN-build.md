@@ -867,11 +867,39 @@ kept, and that one a release candidate built is recreated, because a
 candidate's migration can be fixed before the release (`DESIGN-database.md`
 § Migrations).
 
-### Environment variables
+### Scanner pins
 
-The configuration page lists every environment variable the process reads, with
-its meaning and default. A variable that is set and cannot be read stops the
-process with the variable named rather than falling back.
+The pages name what the Dockerfile's scanner stage pins, and the build writes
+it in.
+
+| Placeholder | Filled with |
+|---|---|
+| `{{ scanner }}` | The scanner version the image carries |
+| `{{ scanner_sha256_amd64 }}`, `{{ scanner_sha256_arm64 }}` | The checksum the image build verifies each architecture's download against, so a host installing the scanner checks it against the same pin rather than a checksum file from the release it is checking |
+
+| Rule | |
+|---|---|
+| The hook declares every name a page may write | The build fails on a page writing any other, and on a declared name it does not fill |
+| Each pin is read from the scanner stage alone, and must appear there once | Another stage pins another tool's checksums the same way. None, or two, fails the build |
+| A written-out scanner version is reported | It is a release-shaped literal, which the release test already reports |
+| A workflow expression, `${{ … }}`, in a pipeline example is not a placeholder | It follows a dollar sign and holds a dot |
+
+A test in `internal/docs` reads the declared names from the hook, and fails on
+a page writing any other, on a declared name no page writes, and on a pin the
+scanner stage does not hold exactly once.
+
+### The settings reference
+
+The configuration page lists every setting the process reads, with its
+environment variable, its key in a configuration file, its meaning and its
+default. A value that is set and cannot be read stops the process with the
+setting named rather than falling back.
+
+| Held by a test | |
+|---|---|
+| Every variable the loader reads is on the page, and every variable on the page is read | Both directions, failing on zero examined |
+| Every setting's file key is on the page, in the row of its variable, and no other key is | A key read into the wrong setting shows as a key documented beside the wrong variable |
+| The table of settings in code is what the loader reads | A name the loader asks for and the table lacks is settable from neither source |
 
 ## The review checklist
 
