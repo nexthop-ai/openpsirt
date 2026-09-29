@@ -309,15 +309,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Done | Each flow ends with a link to where its result now is: the decision's own page when it waits, the pending upgrades of each build a promise names, the queue section where a disclosure date or rating waits. "Pending a second person" shows only when one is needed |
 | Waits on | The owner: for a waiting decision, its own page or the "Mine" tab; for a promise across several builds, one link per build or one to the release; whether "each act offers its next act as a visible control" becomes a written rule in `DESIGN-interface.md` |
 
-### TODO-31 Flaws recorded before v0.3.0
-
-| | |
-|---|---|
-| Today | Since v0.3.0, recording a flaw in our own product also files a report saying who recorded it. v0.2.0 and earlier kept no recorder, so the upgrade marked their flaws as found here and filed no report |
-| Problem | When an outside researcher later reports one of these flaws, a triager can accept the report as that existing issue. Acceptance is refused for an issue that already has a report, and these flaws have none, so it goes through. The researcher then shows as the flaw's reporter, is credited in the published advisory with reporting it, and no disclosure date is set from their report |
-| Done | Either a check that refuses acceptance for an issue with recorded flaws and no report, and tells the triager to rule it a duplicate; or migration 39 files a found-here report for each such flaw |
-| Waits on | The owner: the check or the backfill; for a backfill, who is named as recorder; whether reports already wrongly accepted are repaired. Fix with TODO-40, or these flaws keep escaping it |
-
 ### TODO-32 A real SPDX 3 fixture
 
 | | |
@@ -397,7 +388,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Today | An outside report recorded as a new flaw starts a disclosure date. A flaw found here has none. Ruling an outside report a duplicate of a flaw found here leaves the flaw with no date |
 | Problem | The researcher publishes on the date they announced, and no warning before it ever fires. It is the reporter coordination REQ-37 exists for |
 | Done | Ruling an outside report a duplicate gives the flaw's private findings a disclosure date counted from when the report arrived, keeping any earlier date already set, and records where the date came from |
-| Waits on | The owner: whether withdrawing the ruling removes the date; whether the ruling form shows the date it will start; whether duplicates ruled before the fix get dates. Fix with TODO-31 |
+| Waits on | The owner: whether withdrawing the ruling removes the date; whether the ruling form shows the date it will start; whether duplicates ruled before the fix get dates. |
 
 ### TODO-41 Documents that contradict the code
 
