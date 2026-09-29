@@ -229,23 +229,14 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Draw the chart for the component by name across versions, and mark each week the shipped version changed, labeled with the version. Work the version per scan out from the graph's history |
 | Waits on | Nothing |
 
-### TODO-22 CVSS 4.0 in advisories
+### TODO-22 CVSS 4.0 and CSAF 2.1
 
 | | |
 |---|---|
-| Today | An advisory's CSAF document carries the first CVSS 3.0 or 3.1 score found for each flaw. CSAF 2.0 has no field for a 4.0 score |
+| Today | Advisories are written as CSAF 2.0, which has fields for CVSS 2, 3.0 and 3.1 scores and none for 4.0. The document carries the first CVSS 3.0 or 3.1 score found for each flaw. CSAF 2.1, which adds a 4.0 field, is a committee draft at OASIS |
 | Problem | A flaw rated only under CVSS 4.0 publishes no score at all, although the application shows it. A flaw rated only under CVSS 2 publishes none either, although CSAF 2.0 has a field for it |
-| Work | Add a note to such a flaw giving the CVSS version, base score, severity and vector (`DESIGN-remediation.md` § Not built). TODO-23 replaces the note with a field |
-| Waits on | Nothing |
-
-### TODO-23 CSAF 2.1
-
-| | |
-|---|---|
-| Today | Advisories are written as CSAF 2.0. CSAF 2.1 is a committee draft at OASIS |
-| Problem | CSAF 2.0 has no field for a CVSS 4.0 score, and 2.1 does |
-| Work | Write advisories as CSAF 2.1 and check them against a 2.1 validator. Changes expected from the draft: scores move into a new metrics structure, the TLP label for public documents becomes CLEAR where 2.0 uses WHITE, and a flaw can name several weakness types. An advisory issued before the change will not regenerate byte for byte afterwards |
-| Waits on | CSAF 2.1 becoming an OASIS standard |
+| Work | Two steps. Now: carry a CVSS 2 score in its field, and give a flaw rated only under 4.0 a note with the version, base score, severity and vector (`DESIGN-remediation.md` § Not built). Once CSAF 2.1 is a standard: write advisories as 2.1, move scores into its metrics structure with 4.0 in its own field and drop the note, change the TLP label for public documents from WHITE to CLEAR, let a flaw name several weakness types, and check documents against a 2.1 validator. An advisory issued before the move will not regenerate byte for byte afterwards |
+| Waits on | Nothing for the first step. CSAF 2.1 becoming an OASIS standard for the second |
 
 ### TODO-24 Advisory-wide notes
 
