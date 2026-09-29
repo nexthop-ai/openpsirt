@@ -66,9 +66,10 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
+		today := now
 		asked := &Movement{
 			VulnerabilityID: vulnerabilityID, ProductID: productID,
-			Act: Disclosure, Was: now, Until: now, Reason: reason,
+			Act: Disclosure, Was: &today, Until: &today, Reason: reason,
 			AskedBy: subject.ID, AskedAt: now,
 		}
 		switch {
@@ -76,9 +77,9 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 			// Recorded with no distance: there was no end to bring in.
 			asked.NeedsApproval = true
 		case !ends.After(now):
-			asked.Was = *ends
+			asked.Was = ends
 		default:
-			asked.Was = *ends
+			asked.Was = ends
 			threshold, err := setting.NewStore(tx).Duration(ctx,
 				setting.MovementThreshold, setting.DefaultMovementThreshold)
 			if err != nil {

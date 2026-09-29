@@ -232,7 +232,9 @@ says what turns each on.
   likelihood, and whether the component reaches customers
 - A deadline is set by policy from severity and known exploitation. It counts
   from the latest of when the finding was first seen, when exploitation was
-  learned, and when a fix became available
+  known, and when a fix became available. Exploitation is known from the day
+  the known-exploited catalog listed the issue, or the scan that saw it where
+  that is earlier
 - A flaw in our own product runs on deadline windows of its own, counted from
   when it was first given a severity
 - A finding with no deadline says why: nobody has rated it, it is below the
@@ -249,7 +251,9 @@ says what turns each on.
 
 - A flaw recorded here starts undisclosed. One reported from outside carries a
   disclosure date, 90 days from when the report arrived by default. One found
-  here carries none. Reaching the date escalates and publishes nothing
+  here carries none unless a report from outside is ruled a duplicate of it,
+  which dates it from that report. Reaching the date escalates and publishes
+  nothing
 - A disclosure date moves either way, as two separate acts. Each takes a
   reason, and past a threshold a second person, and is raised before the date
 - A record is written to be disclosed whole: comments, decisions, actors.

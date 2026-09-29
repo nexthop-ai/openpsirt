@@ -172,20 +172,23 @@ const (
 	// Disclosure is the embargo ending today, and the issue becoming public
 	// in the product. The last movement an embargo has.
 	Disclosure Act = "disclosure"
+	// Duplicated is a claim from outside ruled a duplicate of a flaw recorded
+	// here, starting the embargo's end or bringing it earlier. Nobody chose
+	// the date: it is when the claim arrived plus the disclosure window.
+	Duplicated Act = "duplicate"
+	// Unduplicated is that ruling withdrawn, and the end put back where the
+	// movements still standing leave it.
+	Unduplicated Act = "duplicate-undone"
 )
 
 // Acts are all of them, in the order a person meets them.
-func Acts() []Act { return []Act{Extension, Shortening, Disclosure} }
-
-// Valid reports whether a is one we recognize.
-func (a Act) Valid() bool {
-	for _, known := range Acts() {
-		if a == known {
-			return true
-		}
-	}
-	return false
+func Acts() []Act {
+	return []Act{Extension, Shortening, Disclosure, Duplicated, Unduplicated}
 }
+
+// ruled reports whether a ruling recorded this movement rather than a person
+// asking for it.
+func (a Act) ruled() bool { return a == Duplicated || a == Unduplicated }
 
 // moves reports whether this act is the one that moves a date from was to
 // until. A movement of no distance is neither.
@@ -193,7 +196,7 @@ func (a Act) moves(was, until time.Time) bool {
 	switch a {
 	case Extension:
 		return until.After(was)
-	case Shortening:
+	case Shortening, Duplicated:
 		return until.Before(was)
 	case Disclosure:
 		// Disclosing moves no date a person typed. It ends the embargo
@@ -214,17 +217,28 @@ type Movement struct {
 	Act Act `bun:"act,notnull"`
 	// Was and Until are where the embargo ended before and where it is asked
 	// to end. Both kept: "extended by three weeks" is not answerable from the
-	// new date alone once a second movement follows it.
-	Was     time.Time `bun:"was,notnull"`
-	Until   time.Time `bun:"until,notnull"`
-	Reason  string    `bun:"reason,notnull"`
-	AskedBy int64     `bun:"asked_by,notnull"`
-	AskedAt time.Time `bun:"asked_at,notnull"`
+	// new date alone once a second movement follows it. Only a movement a
+	// ruling recorded holds a nil: an embargo it started had no end before,
+	// and one its withdrawal put back may have none after.
+	Was     *time.Time `bun:"was"`
+	Until   *time.Time `bun:"until"`
+	Reason  string     `bun:"reason,notnull"`
+	AskedBy int64      `bun:"asked_by,notnull"`
+	AskedAt time.Time  `bun:"asked_at,notnull"`
 	// NeedsApproval says a second person had to agree, recorded rather than
 	// recomputed: the threshold is a setting and it moves.
 	NeedsApproval bool       `bun:"needs_approval,notnull"`
 	ApprovedBy    *int64     `bun:"approved_by"`
 	ApprovedAt    *time.Time `bun:"approved_at"`
+	// RulingID is the ruling that recorded this movement, and FlawReportID
+	// the claim whose arrival the date counts from. Nil on a movement a
+	// person asked for.
+	RulingID     *int64 `bun:"ruling_id"`
+	FlawReportID *int64 `bun:"flaw_report_id"`
+
+	// Report is that claim's reference, filled in for a reader who may read
+	// the product's reports.
+	Report string `bun:"-"`
 }
 
 // InForce says this movement is the one the date follows.
@@ -236,11 +250,19 @@ func (m Movement) InForce() bool { return !m.NeedsApproval || m.ApprovedAt != ni
 // embargo's end has been carried from where it was agreed to sit. A date
 // pulled in three weeks and pushed back three weeks is six weeks of movement,
 // not none.
+//
+// A ruling bringing an existing date earlier is a shortening and carries its
+// distance. A ruling starting a flaw's first date carries none, having no date
+// to move, and a withdrawal putting a ruling's date back carries none either:
+// it undoes a movement rather than making one.
 func (m Movement) Distance() time.Duration {
-	if span := m.Until.Sub(m.Was); span > 0 {
+	if m.Act == Unduplicated || m.Was == nil || m.Until == nil {
+		return 0
+	}
+	if span := m.Until.Sub(*m.Was); span > 0 {
 		return span
 	}
-	return m.Was.Sub(m.Until)
+	return m.Was.Sub(*m.Until)
 }
 
 // ErrNotEmbargoed says there is no embargo here to move.
@@ -271,7 +293,7 @@ var ErrNotEarlier = refusal.New("bringing a disclosure date forward moves it ear
 
 // wrongWay is the refusal for an act asked to move a date the way it does not.
 func wrongWay(act Act) error {
-	if act == Shortening {
+	if act == Shortening || act == Duplicated {
 		return ErrNotEarlier
 	}
 	return ErrNotLater
@@ -323,8 +345,8 @@ func (s *Store) BringForward(ctx context.Context, subject access.Subject,
 func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 	productID, vulnerabilityID int64, until time.Time, reason string) (*Movement, error) {
 
-	if !act.Valid() {
-		return nil, refusal.Errorf("a disclosure date moves as one of the acts this records")
+	if act != Extension && act != Shortening {
+		return nil, refusal.Errorf("a disclosure date is moved later or brought forward")
 	}
 	if !subject.Triages(access.Private, productID) {
 		return nil, access.Denied(
@@ -371,7 +393,7 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 		}
 		asked := &Movement{
 			VulnerabilityID: vulnerabilityID, ProductID: productID,
-			Act: act, Was: was, Until: until, Reason: reason,
+			Act: act, Was: &was, Until: &until, Reason: reason,
 			AskedBy: subject.ID, AskedAt: now,
 		}
 		asked.NeedsApproval = threshold <= 0 || already+asked.Distance() >= threshold
@@ -456,8 +478,9 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 		// One that needed nobody already moved the date when it was asked
 		// for. Agreeing to it would write its old date over whatever has
 		// happened since, and there is no agreement to record: the record
-		// says it needed none.
-		if !asked.NeedsApproval {
+		// says it needed none. That includes every movement a ruling
+		// recorded.
+		if !asked.NeedsApproval || asked.Until == nil {
 			return ErrAlreadyAgreed
 		}
 
@@ -474,6 +497,14 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 			return makePublic(ctx, tx, asked.ProductID, asked.VulnerabilityID, now)
 		}
 
+		// A ruling's shortening stands only while the ruling does. Withdrawn,
+		// there is no claim left for the date to count from.
+		if asked.Act == Duplicated {
+			if err := rulingStands(ctx, tx, asked.RulingID); err != nil {
+				return err
+			}
+		}
+
 		// Where the embargo ends now, rather than where it ended when this
 		// was asked for. A request waits in the queue while other movements
 		// take effect, so the date it was measured against is not the date it
@@ -484,14 +515,17 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 		if err != nil {
 			return err
 		}
-		if !asked.Act.moves(was, asked.Until) {
+		if !asked.Act.moves(was, *asked.Until) {
 			return wrongWay(asked.Act)
 		}
 
 		if err := agree(ctx, tx, id, subject.ID, now); err != nil {
 			return err
 		}
-		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, now)
+		if asked.Act == Duplicated {
+			return dateFlaw(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, true, now)
+		}
+		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, *asked.Until, now)
 	})
 	if err != nil {
 		return nil, err
@@ -558,6 +592,47 @@ func (s *Store) Movements(ctx context.Context, subject access.Subject,
 		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
 		Order("asked_at", "id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how this embargo has been moved: %w", err)
+	}
+	// The ruling, the claim it counted from and the ruling's reasoning are
+	// read by somebody who may read the product's reports, under the rule
+	// every report is read under. The history being public says nothing about
+	// whether what a stranger sent, or what was said about it, is.
+	if mayReadReports(subject, productID) != nil {
+		for i := range rows {
+			if rows[i].Act.ruled() {
+				rows[i].Reason = ""
+			}
+			rows[i].RulingID, rows[i].FlawReportID = nil, nil
+		}
+		return rows, nil
+	}
+	var reports []int64
+	for _, row := range rows {
+		if row.FlawReportID != nil {
+			reports = append(reports, *row.FlawReportID)
+		}
+	}
+	if len(reports) == 0 {
+		return rows, nil
+	}
+	var named []struct {
+		ID        int64  `bun:"id"`
+		Reference string `bun:"reference"`
+	}
+	if err := s.db.NewSelect().Model((*FlawReport)(nil)).
+		Column("fr.id", "fr.reference").
+		Where("fr.id IN (?)", bun.List(reports)).
+		Scan(ctx, &named); err != nil {
+		return nil, fmt.Errorf("read which claims this embargo counts from: %w", err)
+	}
+	references := make(map[int64]string, len(named))
+	for _, row := range named {
+		references[row.ID] = row.Reference
+	}
+	for i := range rows {
+		if rows[i].FlawReportID != nil {
+			rows[i].Report = references[*rows[i].FlawReportID]
+		}
 	}
 	return rows, nil
 }
@@ -687,6 +762,10 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 			WHERE `+SameIssue("fu.vulnerability_id", "dx.vulnerability_id")+`
 			AND su.product_id = dx.product_id
 			AND fu.visibility = ?)`, access.Private).
+		// Nor one a withdrawn ruling asked for, which can no longer be agreed
+		// to.
+		Where(`NOT EXISTS (SELECT 1 FROM "report_ruling" AS "rw"
+			WHERE rw.id = dx.ruling_id AND rw.withdrawn_at IS NOT NULL)`).
 		OrderExpr("dx.asked_at DESC")
 	if !all {
 		query = query.Where("dx.product_id IN (?)", bun.List(readable))

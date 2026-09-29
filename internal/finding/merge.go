@@ -307,7 +307,7 @@ func (v *Vulnerabilities) saidOf(ctx context.Context, row Vulnerability) (Named,
 	said := Named{
 		Identifier: row.Identifier, Severity: row.Severity,
 		Description: row.Description, Advisory: row.Advisory,
-		Exploited: row.Exploited, LikelihoodOn: row.LikelihoodOn,
+		Exploited: row.Exploited, ExploitedOn: row.ExploitedOn, LikelihoodOn: row.LikelihoodOn,
 	}
 	if row.LikelihoodPPM != nil {
 		said.Likelihood = float64(*row.LikelihoodPPM) / 1_000_000

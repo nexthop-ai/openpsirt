@@ -22,8 +22,8 @@ const v050 = 39
 
 // upgradeCheck is one thing the upgrade to v0.5.0 holds to: the rows it puts
 // in a v0.4.0 database, what it asserts once that database is upgraded, what
-// a roll back it expects to be refused, and what it asserts once rolled back.
-// A phase a check has nothing to say in is nil.
+// a roll back it expects to be refused, what it asserts once rolled back, and
+// what it asserts once upgraded again. A phase a check has nothing to say in is nil.
 //
 // Every check's rows sit in one database, so a check reads its own rows by
 // what identifies them rather than by counting a table. The checks are built
@@ -34,6 +34,9 @@ type upgradeCheck struct {
 	upgraded   func(t *testing.T, ctx context.Context, db *database.DB)
 	refused    func(t *testing.T, ctx context.Context, db *database.DB)
 	rolledBack func(t *testing.T, ctx context.Context, db *database.DB)
+	// upgradedAgain asserts once the rolled back database is upgraded a
+	// second time.
+	upgradedAgain func(t *testing.T, ctx context.Context, db *database.DB)
 }
 
 // A v0.4.0 database holding the rows every check puts in it is upgraded once
@@ -53,6 +56,7 @@ func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
 		keyNamesAreFoldedAndClashesWithdrawn(),
 		tokenNamesAreFoldedAndClashesWithdrawn(),
 		claimSubjectsAreFolded(),
+		duplicatesDateTheirFlaws(),
 		theV050DeclarationsAreTheTablesTheMigrationsBuild(),
 	}
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -78,6 +82,8 @@ func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
 			t.Fatalf("roll the upgrade back: %v", err)
 		}
 		phase(t, ctx, db, "rolled back", checks, func(c upgradeCheck) phaseFunc { return c.rolledBack })
+		dbtest.MigrateTo(t, db, v050)
+		phase(t, ctx, db, "upgraded again", checks, func(c upgradeCheck) phaseFunc { return c.upgradedAgain })
 		leaveAtLatest(t, ctx, db)
 	})
 }

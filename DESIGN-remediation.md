@@ -147,8 +147,16 @@ Exploitation is learned on the date the known-exploited catalog added the
 issue, bounded by the moment of the scan, the same bound a fix's date takes.
 The days before a scan sees a listing are the pipeline's lag, and they do not
 extend the window. A finding opened after the listing still counts from its
-opening, because the latest moment wins. Not built: the moment a scan first
-saw the listing stands in for the catalog's date, which is not read.
+opening, because the latest moment wins. A finding may be overdue the moment
+it opens, and there is no floor for a slow pipeline.
+
+| Rule | |
+|---|---|
+| The listing day is read from the scanner's output | From the catalog entries on the matched record and on every record related to it. The earliest readable day stands, as midnight UTC. An entry whose day cannot be read still marks the issue exploited, from no day |
+| The issue keeps the earliest day any report states | Stored on the issue, and only ever moved earlier, by a statement of its own. Two reports stating different days leave the earlier whichever arrives first |
+| A scan with no listing day learns exploitation at its own start | The moment every issue a database held before the day was read counts from |
+| A listing day filled or moved earlier re-clocks the issue | Every open exploited finding of the issue counting from a later moment is moved onto the day, in every build, and its deadline worked out again. Once per issue: after it, nothing counts from later |
+| A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is |
 
 The same rule governs every writer. A scan counts it per finding, and an edited
 window rewrites every open deadline as three passes, one per moment, each over
@@ -199,6 +207,7 @@ only be met by waiting.
 |---|---|
 | A scan opening a finding, or answering one already open | The one deadline rule, with either exploitation signal |
 | A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
+| A scan moving the listing day earlier, for every build of the issue | The one deadline rule, over findings that already carry a deadline |
 | A record of this product being attacked, set or cleared | The recount, with either signal |
 | An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the line passes over either signal |
 

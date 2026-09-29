@@ -269,7 +269,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				// A finding that opens already exploited was learned about
 				// when it opened, and every later recount has to reach the
 				// same answer.
-				entry.ExploitedLearnedAt = learnedExploitation(entry, startedAt)
+				entry.ExploitedLearnedAt = learnedExploitation(entry, rated.ExploitedOn, startedAt)
 				severity := rated.Severity()
 				// The line admits either exploitation signal; the window
 				// reads only the world's. How long a fix may take is a
@@ -372,7 +372,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			// forward every night and never arrive.
 			learned := already.ExploitedLearnedAt
 			if exploitationMoved {
-				learned = learnedExploitation(f, startedAt)
+				learned = learnedExploitation(f, ratings[f.VulnerabilityID].ExploitedOn, startedAt)
 			}
 			window, onClock := windowFor[k]
 			if onClock {
@@ -682,13 +682,28 @@ func same(held, found Finding) bool {
 // learnedExploitation is the moment to record beside a clock that just moved,
 // or nothing where the row is no longer exploited.
 //
-// The run's start rather than the wall clock, because that is what the
-// deadline beside it was counted from and the two have to agree.
-func learnedExploitation(f Finding, startedAt time.Time) *time.Time {
+// The day the known-exploited catalog listed the issue, or the run's start
+// where that is earlier or no day is known. The run's start rather than the
+// wall clock, because that is what the deadline beside it was counted from and
+// the two have to agree. A finding first seen after the listing still counts
+// from when it was seen, which Deadline answers by counting from the later of
+// this and the opening.
+func learnedExploitation(f Finding, listedOn *time.Time, startedAt time.Time) *time.Time {
 	if !f.RankExploited {
 		return nil
 	}
-	return &startedAt
+	return exploitationKnown(listedOn, startedAt)
+}
+
+// exploitationKnown is when exploitation counts from: the day the catalog
+// listed the issue, or the moment it was learned here where that is earlier or
+// no day is known.
+func exploitationKnown(listedOn *time.Time, learnedAt time.Time) *time.Time {
+	if listedOn != nil && listedOn.Before(learnedAt) {
+		at := listedOn.UTC()
+		return &at
+	}
+	return &learnedAt
 }
 
 // ranking reports whether an open finding's place in the order has moved, and
@@ -710,6 +725,18 @@ func ranking(held, found Finding) (moved, exploitationMoved bool) {
 		held.RankShipped != found.RankShipped
 	exploitationMoved = held.RankExploited != found.RankExploited
 	return moved, exploitationMoved
+}
+
+// ratingRow is one issue as ratingsInForce reads it.
+type ratingRow struct {
+	ID            int64      `bun:"id"`
+	Published     string     `bun:"published"`
+	Assessed      string     `bun:"assessed"`
+	Exploited     bool       `bun:"exploited"`
+	ExploitedHere int        `bun:"exploited_here"`
+	ScoreCenti    int        `bun:"score_centi"`
+	LikelihoodPPM int        `bun:"likelihood_ppm"`
+	ExploitedOn   *time.Time `bun:"exploited_on"`
 }
 
 // ratingsInForce reads what is on record about each interned issue.
@@ -744,25 +771,9 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 	if len(ids) == 0 {
 		return ratings, nil
 	}
-	var rows []struct {
-		ID            int64  `bun:"id"`
-		Published     string `bun:"published"`
-		Assessed      string `bun:"assessed"`
-		Exploited     bool   `bun:"exploited"`
-		ExploitedHere int    `bun:"exploited_here"`
-		ScoreCenti    int    `bun:"score_centi"`
-		LikelihoodPPM int    `bun:"likelihood_ppm"`
-	}
+	var rows []ratingRow
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var found []struct {
-			ID            int64  `bun:"id"`
-			Published     string `bun:"published"`
-			Assessed      string `bun:"assessed"`
-			Exploited     bool   `bun:"exploited"`
-			ExploitedHere int    `bun:"exploited_here"`
-			ScoreCenti    int    `bun:"score_centi"`
-			LikelihoodPPM int    `bun:"likelihood_ppm"`
-		}
+		var found []ratingRow
 		err := tx.NewSelect().
 			TableExpr(`"vulnerability" AS "v"`).
 			Join(rating.Here, productID).
@@ -778,6 +789,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			ColumnExpr(`CASE WHEN eh.id IS NULL THEN 0 ELSE 1 END AS "exploited_here"`).
 			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 			ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
+			ColumnExpr(`v.exploited_on AS "exploited_on"`).
 			Where("v.id IN (?)", bun.List(batch)).
 			Scan(ctx, &found)
 		rows = append(rows, found...)
@@ -792,6 +804,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere == 1,
 			ScoreCenti:    row.ScoreCenti,
 			LikelihoodPPM: row.LikelihoodPPM,
+			ExploitedOn:   row.ExploitedOn,
 		}
 	}
 	return ratings, nil

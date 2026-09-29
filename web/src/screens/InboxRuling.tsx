@@ -9,6 +9,7 @@ import {
   type Rulable,
   type Ruling,
   useApproveRuling,
+  useDuplicateStarts,
   useRule,
   useRulingsAcross,
   useWithdrawRuling,
@@ -41,6 +42,20 @@ export function RuleForm({
   const [disposition, setDisposition] = useState<Rulable | "">("");
   const [reasoning, setReasoning] = useState("");
   const [duplicateOf, setDuplicateOf] = useState("");
+  // The issue once typing pauses, which is what the date a duplicate starts is
+  // asked for: asked on every keystroke, each partial identifier is a lookup
+  // that finds nothing.
+  const [named, setNamed] = useState("");
+  useEffect(() => {
+    const settled = setTimeout(() => setNamed(duplicateOf.trim()), 400);
+    return () => clearTimeout(settled);
+  }, [duplicateOf]);
+  const preview = useDuplicateStarts(
+    product,
+    disposition === "duplicate" ? named : "",
+    references,
+  ).data;
+  const starts = preview?.disclose_at;
   const rule = useRule(product);
   const asTyped = { disposition, reasoning, duplicateOf };
   const many = references.length > 1;
@@ -79,6 +94,12 @@ export function RuleForm({
           <span className="hint">
             An issue open in {product}. For a closed one, reject instead.
           </span>
+          {starts && named === duplicateOf.trim() && (
+            <p role="status" style={{ margin: "6px 0 0" }}>
+              This starts a disclosure date of {on(starts)} on {named}
+              {preview?.needs_approval ? ", once somebody else agrees." : "."}
+            </p>
+          )}
         </div>
       )}
 
@@ -113,6 +134,7 @@ export function RuleForm({
                   setDisposition("");
                   setReasoning("");
                   setDuplicateOf("");
+                  setNamed("");
                   onDone?.();
                 },
               },

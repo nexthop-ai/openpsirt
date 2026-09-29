@@ -11,7 +11,6 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
@@ -103,6 +102,14 @@ func downV050(ctx context.Context, sqldb *sql.DB) error {
 //   - A build's claim records the name of what it is about folded, beside the
 //     name as the producer spelled it. Each claim v0.4.0 holds takes its own
 //     name folded.
+//   - An issue records the day the known-exploited catalog listed it. v0.4.0
+//     read no day, so the column starts empty and the first scan stating one
+//     re-clocks the issue's open exploited findings.
+//   - A movement of an embargo may be one a ruling recorded, naming the ruling
+//     and the claim its date counts from, and its dates may be absent. A flaw
+//     recorded here that v0.4.0 left undated under a duplicate ruling from
+//     outside is dated, and each such date recorded as a movement from its
+//     ruling.
 func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -160,12 +167,15 @@ func upgradeV050(ctx context.Context, tx bun.Tx) error {
 	// cannot name another column, so it is added holding zero and each row is
 	// then pointed at itself.
 	if err := u.change(vulnerabilityV050(t), change{table: "vulnerability",
-		add:     []added{{column: "issue_id", fill: "0"}},
+		add:     []added{{column: "issue_id", fill: "0"}, {column: "exploited_on"}},
 		then:    func() error { return eachIssueItself(ctx, tx) },
 		indexes: []string{"vulnerability_issue_idx"}}); err != nil {
 		return err
 	}
 	if err := u.create(mergeV050(t), "vulnerability_merge", "decision_superseded"); err != nil {
+		return err
+	}
+	if err := movementsFromRulings(ctx, u); err != nil {
 		return err
 	}
 	if err := u.change(assessmentV050(t), change{table: "assessment",
@@ -221,7 +231,8 @@ func eachIssueItself(ctx context.Context, tx bun.Tx) error {
 // folded or numbered to, which v0.4.0 matches as typed, and one the upgrade
 // withdrew stays withdrawn: nothing says it would still be wanted. The trail
 // rows recording those withdrawals go, because v0.4.0 has no place for a
-// change no person made.
+// change no person made. The day an issue was listed as exploited goes with
+// its column. A movement a ruling recorded goes, and the date it set stays.
 func downgradeV050(ctx context.Context, tx bun.Tx) error {
 	if err := reidentified(ctx, tx, identityV040); err != nil {
 		return err
@@ -253,6 +264,7 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		`ALTER TABLE "suppression" DROP COLUMN "subject_folded"`,
 		`ALTER TABLE "assessment" DROP COLUMN "withdrawn_because"`,
 		`ALTER TABLE "vulnerability" DROP COLUMN "issue_id"`,
+		`ALTER TABLE "vulnerability" DROP COLUMN "exploited_on"`,
 		`DELETE FROM "admin_change" WHERE "actor" = 'merge'`,
 		`DELETE FROM "admin_change" WHERE "actor" = 'upgrade'`,
 	}); err != nil {
@@ -269,6 +281,9 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+	if err := u.movementsNarrowed(); err != nil {
+		return err
+	}
 	if err := u.narrow(narrowing{table: "notification",
 		keys: []string{"notification_team_fk"}, columns: []string{"team_id"}}); err != nil {
 		return err
@@ -294,30 +309,7 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 // trailNarrowed puts back the administrative trail v0.4.0 built: no actor,
 // and a person on every row.
 func (u *upgrader) trailNarrowed(t *columnTypes) error {
-	trail := narrowing{table: "admin_change",
+	return u.narrowRequiring(narrowing{table: "admin_change",
 		forget:  `DELETE FROM "admin_change" WHERE "actor" = 'configuration'`,
-		columns: []string{"actor"}}
-	if u.engine == database.SQLite {
-		trail.require = []string{"by"}
-		return u.narrow(trail)
-	}
-	if err := u.narrow(trail); err != nil {
-		return err
-	}
-	if u.engine == database.Postgres {
-		return u.run([]string{`ALTER TABLE "admin_change" ALTER COLUMN "by" SET NOT NULL`})
-	}
-	made, _, err := pick(trailV050(t), "admin_change")
-	if err != nil {
-		return err
-	}
-	items, err := declared(made)
-	if err != nil {
-		return err
-	}
-	def, err := items.column("by")
-	if err != nil {
-		return err
-	}
-	return u.run([]string{`ALTER TABLE "admin_change" MODIFY COLUMN ` + refusingNull(def)})
+		columns: []string{"actor"}}, trailV050(t), "by")
 }

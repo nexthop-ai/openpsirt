@@ -328,15 +328,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Send outbound requests through a configured proxy, starting with patch branch clones |
 | Waits on | The owner. REQ-69 and REQ-78 refuse any address inside the network, checked on the address a name resolved to. Through a proxy, the proxy resolves the name. Resolving locally, checking the address and asking the proxy to connect to that address keeps the check, and is a change to a security rule that needs agreeing first |
 
-### TODO-33 Exploitation date from the catalog
-
-| | |
-|---|---|
-| Today | The deadline window for an exploited issue starts at the scan that first sees it in the CISA catalog. The scanner's output carries the date CISA added it, and the reader throws the date away |
-| Problem | The delay between listing and scan is added to the window. With nightly scans a three-day deadline gains one or two days; with weekly scans or a weekly offline database import, it lands about ten days after the listing. Overdue exploited findings, the most urgent there are, are hidden from the overdue list and the compliance figures |
-| Work | Start the window at the catalog's date, or at the scan if that is earlier (`DESIGN-remediation.md` § Deadlines). A finding first seen after the listing still counts from when it was seen. Some findings will then be overdue the moment they appear, as intended |
-| Waits on | The owner: whether open findings already clocked from a scan are recounted once when the date arrives; whether a slow pipeline gets a floor such as never due before the scan plus one day |
-
 ### TODO-34 Weakness names on screen
 
 | | |
@@ -372,15 +363,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Problem | A pipeline that does not retry loses the inventory with no trace. A week later the deployment tells administrators the build "has not been scanned for a week. Nothing has failed — nothing has arrived", which blames a pipeline that did send it. |
 | Work | Log and record the refusal like any other, name it in the week-quiet message, and alert administrators naming the build, the limit and how to raise it, at most once per build per day |
 | Waits on | The owner: an event people acknowledge, or a condition that clears when the build next uploads; administrators only, or the product's triagers too. Logging and recording need nothing |
-
-### TODO-38 Disclosure date from a duplicate
-
-| | |
-|---|---|
-| Today | An outside report recorded as a new flaw starts a disclosure date. A flaw found here has none. Ruling an outside report a duplicate of a flaw found here leaves the flaw with no date |
-| Problem | The researcher publishes on the date they announced, and no warning before it ever fires. It is the reporter coordination REQ-37 exists for |
-| Work | When an outside report is ruled a duplicate, give the flaw's private findings a disclosure date counted from when the report arrived, keep any earlier date already set, and record where the date came from |
-| Waits on | The owner: whether withdrawing the ruling removes the date; whether the ruling form shows the date it will start; whether duplicates ruled before the fix get dates. |
 
 ## Weak tests
 

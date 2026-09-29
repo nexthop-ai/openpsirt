@@ -5,8 +5,8 @@ package migrations
 
 // v0.5.0's declaration of the vulnerability table.
 //
-// It is v0.2.0's, which v0.3.0 and v0.4.0 did not change,
-// with the issue each row is read as.
+// It is v0.2.0's, which v0.3.0 and v0.4.0 did not change, with the issue each
+// row is read as and the day the known-exploited catalog listed it.
 func vulnerabilityV050(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "vulnerability" (
@@ -22,6 +22,10 @@ func vulnerabilityV050(t *columnTypes) []string {
 			"description"     ` + t.text + ` NULL,
 			"advisory"        ` + t.free + ` NULL,
 			"exploited"       ` + t.boolean + ` NOT NULL,
+			-- The earliest day any report says the known-exploited catalog
+			-- listed it. An exploited deadline counts from it, and it only
+			-- ever moves earlier.
+			"exploited_on"    ` + t.date + ` NULL,
 			-- Held as parts per million rather than as a fraction. Every engine
 			-- spells an exact decimal differently and a float compares
 			-- differently again, and this has to sort in an index.
