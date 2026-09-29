@@ -620,9 +620,14 @@ race on it regardless of any database lock. The advisory lock exists because a
 rolling deployment starts several instances at once.
 
 SQLite takes its lock outside the database, because it cannot take one inside.
-The handle is capped at a single connection — the file has one writer — so a
-lock held on a pinned connection would hold the only connection the migration
-needs.
+The handle migrates on a single connection, so a lock held on a pinned
+connection would hold the only connection the migration needs.
+
+A migration that changes a table's shape on SQLite turns foreign keys off on a
+connection and then opens its transaction. On a wider pool the transaction can
+land on a connection where they are still on, and the connection they were
+turned off on goes back into the pool that way. So the pool is narrowed to one
+connection for the migration and put back as it was afterwards.
 
 Assuming one process instead is enforced by one chart template, while the
 binary accepts a SQLite URL with a warning. Four processes against one file
@@ -1058,8 +1063,12 @@ is set. A value below a second reaps no faster.
 
 | Setting | Reason |
 |---|---|
-| One connection | SQLite has a single writer. More connections add contention rather than concurrency: transactions on different connections collide instead of queueing |
-| A busy timeout | Without one, a concurrent access fails immediately with "database is locked" rather than waiting its turn |
+| The configured pool, as on the servers | In WAL mode readers block neither each other nor the writer. On one connection every request waits for the slowest read in flight: eight requests from one home page took 12.5 s together, and 4.4 s for the slowest alone |
+| One connection to an in-memory database | Every connection to one opens a database of its own |
+| Every transaction takes the write lock as it begins | A transaction begun deferred that reads and then writes cannot wait for a writer that committed after its read. Its snapshot is stale, so it fails at once and the busy timeout never applies |
+| A busy timeout of a minute | Writers take turns on the one write lock. Without a timeout, a write that finds the lock held fails at once with "database is locked" rather than waiting its turn. The longest writer is a scan's apply, one transaction: 26.1 s for 321,067 findings, which a minute covers twice over |
+| One connection while migrating | A migration's connection settings have to reach the transaction it opens. § Migration locks says why |
+| One connection in the test harness | A read through the root handle inside a transaction then waits for ever on the connection the transaction holds, and the test's deadline reports it. On a wider pool the read answers from a second connection, outside the transaction, and nothing reports it |
 | Write-ahead log, synchronous NORMAL | The default is a rollback journal synced twice per commit, and a scan applies hundreds of thousands of rows through it. In WAL mode a commit appends to the log, readers do not block the writer, and NORMAL syncs at a checkpoint. A process crash loses nothing; a power loss can lose the last commits, never consistency |
 
 The pragmas are set on the connection string, and a URL may add its own after
@@ -1239,6 +1248,13 @@ and the granularity are open questions.
   its own clamp written beside it — twenty-one of them, six different pairs of
   numbers. One helper takes what was asked, the most this list will give, and
   what it gives when nobody says.
+- A SQLite write waiting on the write lock does not stop when its request
+  does. The busy wait ignores the context: a write given 300 ms waited out
+  the whole timeout, 55 s, and only then failed. So a write behind a scan's
+  apply holds its goroutine and its connection until the lock comes free or
+  the minute passes, whoever it was for. The driver offers no busy handler to
+  replace it with. Writes queued in the process instead would respect the
+  context, and would miss every write that is not a transaction.
 - Index key length is tightest on MySQL, and package identifiers get long.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about

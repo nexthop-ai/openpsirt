@@ -103,6 +103,10 @@ type Server struct {
 type DB struct {
 	*bun.DB
 	Server Server
+	// Pool is the settings last applied to the handle. The standard pool
+	// reports its open limit and not its idle one, so a caller that narrows
+	// the pool for a while reads what to put back here.
+	Pool Pool
 }
 
 // OpenWithPool connects using specific pool settings.
@@ -111,7 +115,7 @@ func OpenWithPool(ctx context.Context, target Target, pool Pool) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	pool.apply(db)
+	pool.apply(db, target)
 	return db, nil
 }
 
@@ -157,7 +161,7 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 	// bun's dialect is chosen from the URL's scheme, which is right even when
 	// the server turns out to be MariaDB: the two share a dialect.
 	db := &DB{DB: bun.NewDB(sqldb, dialect()), Server: server}
-	DefaultPool().apply(db)
+	DefaultPool().apply(db, target)
 	return db, nil
 }
 

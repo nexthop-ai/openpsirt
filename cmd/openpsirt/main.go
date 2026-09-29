@@ -850,9 +850,9 @@ func serveBeside(cfg config.Config, logger *slog.Logger, handler http.Handler,
 	//
 	// A worker mid-query should not have the database pulled from under it,
 	// which argues for waiting; an unbounded wait is that argument with no
-	// end. On SQLite the pool is one connection by design, so an HTTP handler
-	// running a slow statement blocks every worker behind it, and a worker
-	// that cannot get a connection cannot notice it has been asked to stop.
+	// end. On SQLite an HTTP handler running a slow write holds the write lock,
+	// so it blocks every worker writing behind it, and a worker waiting on
+	// that lock cannot notice it has been asked to stop.
 	// Waiting for it then waits for the request, and shutting down takes as
 	// long as the slowest thing in the process.
 	//

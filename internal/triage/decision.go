@@ -358,9 +358,8 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 // One judgment about a finding covers every place it sits at unless somebody
 // narrows it, and a finding on shared code reaches many: on a real image a
 // kernel issue averages eighty-six. Written one at a time that is eighty-six
-// transactions, each with its own commit, and on SQLite — held to a single
-// connection because it has one writer — that is the whole process waiting
-// while somebody presses a button.
+// transactions, each with its own commit, and on SQLite, which has one
+// writer, that is every other write waiting while somebody presses a button.
 //
 // Atomic for a better reason than speed. One action writes one record per
 // place; half of them written and the rest abandoned is not that, and it

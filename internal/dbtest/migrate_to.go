@@ -16,9 +16,9 @@ import (
 // how a test builds the schema a release shipped.
 //
 // Through the runner a deployment uses, with its lock. A migration registered
-// without the library's transaction opens connections of its own, and on
-// SQLite, held to one connection, a runner that keeps one for itself waits on
-// that migration for ever.
+// without the library's transaction opens connections of its own, and on a
+// pool of one connection, which is what the harness gives SQLite, a runner that
+// keeps one for itself waits on that migration for ever.
 func MigrateTo(t *testing.T, db *database.DB, version int64) {
 	t.Helper()
 	if err := migrate.UpTo(t.Context(), db, slog.New(slog.NewTextHandler(io.Discard, nil)),

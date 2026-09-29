@@ -244,7 +244,9 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// busy_timeout: wait for a held lock rather than failing at once.
 		// Without this, anything concurrent gets an immediate "database is
 		// locked" instead of queueing, which looks like a bug and is really
-		// impatience.
+		// impatience. A minute, because writers take turns on one lock and
+		// the longest writer holds it for a scan's whole apply: 26 s for
+		// 321,067 findings.
 		//
 		// foreign_keys: not enforced unless asked, and the schema relies on
 		// them.
@@ -259,13 +261,18 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// database's consistency. That is the right trade for the only
 		// place SQLite runs, which is development and the demo.
 		pragmas := []string{
-			"busy_timeout(10000)",
+			"busy_timeout(60000)",
 			"foreign_keys(1)",
 			"journal_mode(WAL)",
 			"synchronous(NORMAL)",
 		}
 		pragmas = append(pragmas, u.Query()["_pragma"]...)
-		return path + "?_pragma=" + strings.Join(pragmas, "&_pragma="), nil
+		// Every transaction begins by taking the write lock. A transaction
+		// that begins deferred, reads, and then writes cannot wait for a
+		// writer that committed after its read: its snapshot is stale, so it
+		// fails at once without the busy timeout applying. Taken at the
+		// start, the lock is waited for like any other.
+		return path + "?_pragma=" + strings.Join(pragmas, "&_pragma=") + "&_txlock=immediate", nil
 	}
 	return "", fmt.Errorf("unsupported database %q", engine)
 }

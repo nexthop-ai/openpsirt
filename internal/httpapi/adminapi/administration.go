@@ -378,10 +378,10 @@ func registerAdministration(api huma.API, a core.Administering) {
 			// outlives every group change without a group ever having been
 			// behind it.
 			//
-			// Through the transaction's own handle. The stall to avoid comes
-			// from reading through the *root* handle while the closure holds
-			// SQLite's one connection, not from reading inside the transaction
-			// at all. Unbinding a group reads the mode exactly this way.
+			// Through the transaction's own handle. A read through the root
+			// handle is outside the transaction, and on a pool of one
+			// connection it waits for ever on the connection the closure
+			// holds. Unbinding a group reads the mode exactly this way.
 			deriving, err := roleModeIn(a.Settings)(ctx, db)
 			if err != nil {
 				return core.WentWrong(a.Logger, "cannot read where roles come from", err)

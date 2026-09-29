@@ -5,6 +5,7 @@ package migrate
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -270,8 +271,8 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 
 func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 	// The other three engines take a lock in the database. SQLite could not:
-	// its handle is capped at one connection, which the migration itself
-	// needs, so every in-database spelling deadlocks against that — and what
+	// it migrates on one connection, which the migration itself needs, so
+	// every in-database spelling deadlocks against that — and what
 	// stood instead was a comment saying SQLite "is only ever used by a single
 	// process", enforced by one Helm template while the binary accepts a
 	// SQLite URL with a warning.
@@ -456,5 +457,56 @@ func TestAFailedUpgradeNamesTheRecoveryItsEngineNeeds(t *testing.T) {
 		if got := strings.Contains(err.Error(), "recreated"); got != c.recover {
 			t.Errorf("%s from %d: names recreating = %v, want %v: %v", c.engine, c.before, got, c.recover, err)
 		}
+	}
+}
+
+func TestSQLiteMigratesOnOneConnectionAndGetsItsPoolBack(t *testing.T) {
+	// A migration's connection settings have to reach the transaction it
+	// opens, which on a wider pool they need not.
+	target, err := database.ParseURL("sqlite://" + t.TempDir() + "/pool.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.OpenWithPool(t.Context(), target, database.DefaultPool())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	width := db.Stats().MaxOpenConnections
+	if width < 2 {
+		t.Fatalf("a deployment's SQLite pool is %d wide, which proves nothing here", width)
+	}
+
+	quiet := slog.New(slog.DiscardHandler)
+	var during int
+	if err := withLock(t.Context(), db, quiet, func(context.Context) error {
+		during = db.Stats().MaxOpenConnections
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if during != 1 {
+		t.Errorf("SQLite migrated on a pool of %d connections, want 1", during)
+	}
+	if after := db.Stats().MaxOpenConnections; after != width {
+		t.Errorf("the pool was %d wide after migrating, want %d as before", after, width)
+	}
+
+	// The idle limit is not reported, so it is read from what the pool keeps:
+	// connections held at once and then returned stay open up to it.
+	const held = 4
+	conns := make([]*sql.Conn, 0, held)
+	for range held {
+		conn, err := db.DB.DB.Conn(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		conns = append(conns, conn)
+	}
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
+	if idle := db.Stats().Idle; idle != held {
+		t.Errorf("%d of %d returned connections stayed open after migrating, want all of them", idle, held)
 	}
 }

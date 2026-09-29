@@ -85,8 +85,8 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 	// Both read the same highest number inside their transactions, and the
 	// unique constraint refuses the second write. That refusal is a lost race:
 	// the whole attempt is taken again, reads the number the first wrote, and
-	// records the next one. SQLite has one connection, so nothing lands
-	// between the read and the write there.
+	// records the next one. The harness holds SQLite to one connection, so
+	// nothing lands between the read and the write there.
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		if db.Stats().MaxOpenConnections == 1 {

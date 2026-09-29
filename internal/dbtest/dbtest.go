@@ -151,8 +151,10 @@ func Two(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // Servers runs fn against the three server engines and not SQLite.
 //
 // For a test that needs two transactions open at once, which SQLite cannot
-// give it: its pool is one connection, so a second writer waits for a
-// connection the first is holding and the test deadlocks rather than racing.
+// give it: this harness holds it to one connection, so a second writer waits
+// for a connection the first is holding and the test deadlocks rather than
+// racing. A deployment's SQLite pool is wider, and serializes writers all the
+// same, because every transaction takes the write lock as it begins.
 //
 // A narrow exemption, and the only one: everything else that pins what a query
 // does belongs in Each, whatever it costs. What qualifies here is a test whose
@@ -371,6 +373,15 @@ func Open(t *testing.T, url string) *database.DB {
 	db, err := database.Open(context.Background(), target)
 	if err != nil {
 		t.Fatalf("open %s: %v", target.Redacted, err)
+	}
+	if db.Server.Engine == database.SQLite {
+		// One connection, where a deployment has a pool. A read through the
+		// root handle inside a transaction then waits for the connection the
+		// transaction holds, and the test hangs on it. That is the one engine
+		// on which the rule that a transaction reads only through itself
+		// fails loudly; with a pool the read answers from a second connection
+		// and nothing reports it.
+		db.SetMaxOpenConns(1)
 	}
 	t.Cleanup(func() {
 		if err := db.Close(); err != nil {

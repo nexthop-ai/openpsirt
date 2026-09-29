@@ -17,7 +17,7 @@ func TestARacingHandleIsOpenedAsTheApplicationOpensSQLite(t *testing.T) {
 	ctx := t.Context()
 	for pragma, want := range map[string]string{
 		"foreign_keys": "1",
-		"busy_timeout": "10000",
+		"busy_timeout": "60000",
 		"journal_mode": "wal",
 	} {
 		var got string

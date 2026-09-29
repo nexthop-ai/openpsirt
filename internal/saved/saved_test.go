@@ -288,7 +288,8 @@ func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
 	// A second press of save, or a second tab. Both find no filter by that
 	// name and both add one; the unique index refuses the later addition,
 	// and taken again it finds the filter the other kept and replaces it.
-	// SQLite has one connection, so nothing lands between the two there.
+	// The harness holds SQLite to one connection, so nothing lands between
+	// the two there.
 	each(t, func(t *testing.T, f *fixture) {
 		if f.DB.Stats().MaxOpenConnections == 1 {
 			t.Skip("one connection: nothing lands between a read and a write")

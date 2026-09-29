@@ -30,12 +30,15 @@ func TestStreamedExportsPastTheSlotsAreRefused(t *testing.T) {
 	}
 }
 
-// SQLite's pool is one connection, so a streamed export is given one slot
-// there: a second would wait for the connection the first holds.
-func TestSQLiteGivesStreamedExportsOneSlot(t *testing.T) {
+// A pool of one connection gives a streamed export one slot: a second would
+// wait for the connection the first holds. The harness holds SQLite to one.
+func TestAPoolOfOneConnectionGivesStreamedExportsOneSlot(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		if open := db.Stats().MaxOpenConnections; open != 1 {
+			t.Fatalf("the harness gave SQLite %d connections, where this needs one", open)
+		}
 		if got := cap(newStreamSlots(db)); got != 1 {
-			t.Errorf("SQLite's one connection is shared by %d streamed exports", got)
+			t.Errorf("one connection is shared by %d streamed exports", got)
 		}
 	})
 }

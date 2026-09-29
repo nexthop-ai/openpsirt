@@ -33,8 +33,8 @@ import (
 // test asserts that it did.
 //
 // The servers only, because holding four transactions open is the whole
-// method: SQLite's pool is one connection, so the second writer would wait for
-// a connection the first is holding. It is also where the defect lived — the
+// method: the harness holds SQLite to one connection, so the second writer
+// would wait for a connection the first is holding. It is also where the defect lived — the
 // broken version was correct on SQLite and wrong on all three servers.
 func TestEveryReplicaThatLosesTheMintTakesTheWinnersKey(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
@@ -136,8 +136,8 @@ func TestEveryReplicaThatLosesTheMintTakesTheWinnersKey(t *testing.T) {
 // than assumed.
 //
 // The servers only, for the reason the mint race is: holding two transactions
-// open is the whole method, and SQLite's pool is one connection, so the second
-// writer would wait for a connection the first is holding.
+// open is the whole method, and the harness holds SQLite to one connection, so
+// the second writer would wait for a connection the first is holding.
 func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()

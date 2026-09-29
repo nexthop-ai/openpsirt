@@ -5,6 +5,7 @@ package database
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -63,12 +64,24 @@ func DefaultPool() Pool {
 }
 
 // apply sets the pool on an open database.
-func (p Pool) apply(db *DB) {
+func (p Pool) apply(db *DB, target Target) {
+	db.Pool = p
 	if db.Server.Engine == SQLite {
-		// SQLite has one writer. More connections add contention rather than
-		// concurrency: transactions on different connections collide instead
-		// of queueing. Nothing else here applies to a local file.
-		db.SetMaxOpenConns(1)
+		// Readers of a file in WAL mode do not block each other or the writer,
+		// so the pool is as wide as configured: one connection makes every
+		// request queue behind the slowest read in flight. Writers still take
+		// turns, because every transaction takes the write lock as it begins
+		// and waits out the busy timeout for it.
+		//
+		// An in-memory database is one connection, because every connection
+		// to one opens a database of its own. The timeouts are about a network
+		// path, which a local file does not have.
+		if target.DSN == ":memory:" || strings.HasPrefix(target.DSN, ":memory:?") {
+			db.SetMaxOpenConns(1)
+			return
+		}
+		db.SetMaxOpenConns(p.MaxOpen)
+		db.SetMaxIdleConns(p.MaxIdle)
 		return
 	}
 	db.SetMaxOpenConns(p.MaxOpen)
