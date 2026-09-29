@@ -99,10 +99,10 @@ The owner has chosen to wait on each of these.
 
 | | |
 |---|---|
-| Today | An advisory's CSAF document lists each release as known affected or fixed. A separate OpenVEX document per build is built on the VEX screen |
-| Problem | A release that ships the flaw but cannot be hit by it, because the vulnerable code is compiled out of one variant, can only be listed as affected or left out. The advisory has no way to say "known not affected, because…" |
-| Work | Generate the advisory under the CSAF VEX profile. List each release covered by an approved not-applicable decision as known not affected, with the machine-readable justification and an impact statement |
-| Waits on | A way to say which releases a decision covers. A decision is keyed on the product, the issue and the place in the build, and never names a release (REQ-23) |
+| Today | An advisory's CSAF document lists each release (a branch or tag built as one variant) as known affected when any finding of the flaw is open there, and fixed otherwise. It reads no triage decisions. The per-build OpenVEX document on the VEX screen does: a build's issue is not affected when every open place is covered by an approved, still-valid decision with one outcome |
+| Problem | A release covered by an approved not-applicable decision is published as known affected, with a remediation telling customers to update. The advisory has no way to say "known not affected, because…" |
+| Work | Move the VEX screen's coverage rule into one shared query and use it for the advisory. List each fully covered release as known not affected, with the decision's reason as the CSAF flag (the five reasons are the CSAF flag names) and its mitigation, never its reasoning, as the impact statement. Leave a partly covered release known affected. Keep not-affected releases out of remediations and scores, and emit the VEX profile when any release is not affected |
+| Waits on | A decision reaches every variant whose versions match, because a place is identified without its root. A not-applicable decision made for a variant where the code is compiled out also covers a variant where it is compiled in, in the OpenVEX document today and in the advisory once this is built. Limiting a decision to a variant changes REQ-26 and is a separate decision |
 
 ### TODO-09 Microsoft Teams and Google Chat
 
