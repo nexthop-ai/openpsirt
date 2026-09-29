@@ -547,87 +547,23 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 	}
 	for _, id := range issues {
 		var issue struct {
-			Exploited bool `bun:"exploited"`
+			Exploited   bool       `bun:"exploited"`
+			ExploitedOn *time.Time `bun:"exploited_on"`
 		}
 		if err := tx.NewSelect().
 			TableExpr(`"vulnerability" AS "v"`).
 			ColumnExpr(`COALESCE(v.exploited, ?) AS "exploited"`, false).
+			ColumnExpr(`v.exploited_on AS "exploited_on"`).
 			Where("v.id = ?", id).Scan(ctx, &issue); err != nil {
 			return fmt.Errorf("read what is known about this issue: %w", err)
 		}
 
 		recorded := false
 		if issue.Exploited {
-			// learning is which rows are learning it now, read
-			// before the flag is raised: afterwards there is
-			// nothing to tell them from the ones that already
-			// carried it.
-			var learning []int64
-			if err := tx.NewSelect().Model((*Finding)(nil)).
-				ColumnExpr("id").
-				Where("vulnerability_id = ?", id).
-				Where("closed_at IS NULL").
-				Where("urgency_exploited = ?", false).
-				Scan(ctx, &learning); err != nil {
-				return fmt.Errorf("read what is learning this: %w", err)
-			}
-			if len(learning) > 0 {
-				held, err := tx.NewSelect().Model((*Finding)(nil)).
-					Where("vulnerability_id = ?", id).
-					Where("closed_at IS NULL").
-					Where("kind = ?", Entered).
-					Count(ctx)
-				if err != nil {
-					return fmt.Errorf("read whether a recorded flaw is learning this: %w", err)
-				}
-				recorded = held > 0
-			}
-			// Batched. This is every open finding of one issue across the
-			// deployment — a kernel flaw carries 45 places each across
-			// thousands of issues — and one statement binding that many
-			// parameters is refused by two of the four engines, inside the
-			// transaction a scan applies in, so the whole upload fails and
-			// retries into the same refusal.
-			if err := database.IDsInBatches(ctx, learning,
-				func(ctx context.Context, batch []int64) error {
-					_, err := tx.NewUpdate().Model((*Finding)(nil)).
-						Set("urgency_exploited = ?", true).
-						// Counted from this moment rather than from when the
-						// finding opened. Counted from the opening, an issue
-						// that became exploited after six months would land
-						// three days before it was known — a deadline nobody
-						// could have met.
-						//
-						// The moment is kept on the row as well as spent here,
-						// because every later recount has to arrive at the same
-						// answer and nothing else holds it.
-						Set("exploited_learned_at = ?", learnedAt).
-						Set("due_at = ?", learnedAt.Add(windows.Exploited)).
-						Where("id IN (?)", bun.List(batch)).Exec(ctx)
-					if err != nil {
-						return err
-					}
-					// And off again where no fix has been released. An issue
-					// becoming exploited says how long there is; it does not
-					// say there is a version to take, so the clock the scan
-					// path took off would otherwise be handed straight back —
-					// and on a tag, scanned once and never again, it stays
-					// handed back. An upstream refusal keeps the clock this
-					// gave it, because on an exploited issue a refusal leaves
-					// work only this deployment can do (Clocked).
-					//
-					// A second statement rather than a condition inside the
-					// first: a CASE choosing between NULL and a parameter
-					// leaves one engine with nothing to infer the column's
-					// type from, which it refuses and another accepts.
-					_, err = tx.NewUpdate().Model((*Finding)(nil)).
-						Set("due_at = NULL").
-						Where("id IN (?)", bun.List(batch)).
-						Where("fix_state = ?", NoFix).
-						Exec(ctx)
-					return err
-				}); err != nil {
-				return fmt.Errorf("mark what is being exploited: %w", err)
+			recorded, err = exploitationClocked(ctx, tx, id,
+				*exploitationKnown(issue.ExploitedOn, learnedAt), learnedAt, windows)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -666,6 +602,101 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 		}
 	}
 	return nil
+}
+
+// exploitationClocked puts an exploited issue's open findings on the clock
+// exploitation starts, and reports whether a recorded flaw was among them.
+//
+// Two kinds of row. One learning it now takes the flag, the moment and a
+// deadline counted from it. One that learned it later than known is re-clocked
+// to the moment: the catalog's listing day arrives after the scan that first
+// saw the issue exploited, or an earlier one arrives, and every open exploited
+// finding of the issue counts from it once. A row with no deadline keeps none,
+// because a tag or a build past end of life is off the clock whatever the
+// moment is.
+//
+// Counted from the moment rather than from when the finding opened: counted
+// from the opening, an issue that became exploited after six months would land
+// three days before it was known — a deadline nobody could have met. The
+// moment is kept on the row as well as spent here, because every later recount
+// has to arrive at the same answer and nothing else holds it. Deadline counts
+// from the later of the moment and the opening, so a finding first seen after
+// the listing counts from when it was seen.
+//
+// Where no fix has been released the clock is off. An issue becoming exploited
+// says how long there is; it does not say there is a version to take. An
+// upstream refusal keeps the clock, because on an exploited issue a refusal
+// leaves work only this deployment can do (Clocked).
+func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
+	known, observedAt time.Time, windows Windows) (bool, error) {
+
+	var rows []struct {
+		ID        int64      `bun:"id"`
+		Kind      Kind       `bun:"kind"`
+		Exploited bool       `bun:"urgency_exploited"`
+		OpenedAt  time.Time  `bun:"opened_at"`
+		FixState  FixState   `bun:"fix_state"`
+		FixedAt   *time.Time `bun:"fixed_at"`
+		DueAt     *time.Time `bun:"due_at"`
+	}
+	// Read before the flag is raised: afterwards there is nothing to tell the
+	// rows learning it from the ones that already carried it.
+	if err := tx.NewSelect().Model((*Finding)(nil)).
+		Column("id", "kind", "urgency_exploited", "opened_at", "fix_state", "fixed_at", "due_at").
+		Where("vulnerability_id = ?", issue).
+		Where("closed_at IS NULL").
+		Where("urgency_exploited = ? OR exploited_learned_at > ?", false, known).
+		Scan(ctx, &rows); err != nil {
+		return false, fmt.Errorf("read what is learning this: %w", err)
+	}
+
+	type clock struct {
+		due time.Time
+		off bool
+	}
+	byClock := map[clock][]int64{}
+	recorded := false
+	for _, row := range rows {
+		recorded = recorded || row.Kind == Entered
+		due := Deadline(row.FixState, true, row.OpenedAt, observedAt, &known,
+			row.FixedAt, windows.Exploited)
+		if row.Exploited && row.DueAt == nil {
+			due = nil
+		}
+		key := clock{off: due == nil}
+		if due != nil {
+			key.due = due.UTC().Round(0)
+		}
+		byClock[key] = append(byClock[key], row.ID)
+	}
+	for key, ids := range byClock {
+		// Batched. This is every open finding of one issue across the
+		// deployment — a kernel flaw carries 45 places each across thousands
+		// of issues — and one statement binding that many parameters is
+		// refused by two of the four engines, inside the transaction a scan
+		// applies in, so the whole upload fails and retries into the same
+		// refusal.
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			q := tx.NewUpdate().Model((*Finding)(nil)).
+				Set("urgency_exploited = ?", true).
+				Set("exploited_learned_at = ?", known).
+				Where("id IN (?)", bun.List(batch))
+			// Two spellings rather than a CASE choosing between NULL and a
+			// parameter, which leaves one engine with nothing to infer the
+			// column's type from.
+			if key.off {
+				q = q.Set("due_at = NULL")
+			} else {
+				q = q.Set("due_at = ?", key.due)
+			}
+			_, err := q.Exec(ctx)
+			return err
+		})
+		if err != nil {
+			return false, fmt.Errorf("mark what is being exploited: %w", err)
+		}
+	}
+	return recorded, nil
 }
 
 // redue rewrites the deadline on an issue's open findings in one product.

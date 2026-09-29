@@ -33,6 +33,7 @@ func StatementsV050(engine database.Engine) map[string][]string {
 		"chat_preference":     {chatV050(t)[0]},
 		"chat_delivery":       {chatV050(t)[1]},
 		"suppression":         suppressionV050(t),
+		"disclosure_movement": disclosureMovementV050(t),
 	}
 }
 

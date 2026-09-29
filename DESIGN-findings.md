@@ -230,6 +230,7 @@ would depend on which scan ran last.
 | Field | Rule | Reason |
 |---|---|---|
 | Known-exploited | Moves forward only | It is a claim about the world rather than a description of an issue: a later report not mentioning it is a gap in that report |
+| The day the known-exploited catalog listed it | Keeps the earliest any report states | Exploitation was known from the first listing, and an earliest is the same whatever the order. Moving it re-clocks the issue's exploited findings (`DESIGN-remediation.md` § Deadlines) |
 | Score | Keeps the worst anybody claimed | A maximum is the only answer that comes out the same whatever the order. A report saying something is worse is news; one saying it is milder is a gap |
 | Likelihood | Keeps the newest, by the day the estimate is about | It is a thirty-day forecast recomputed every day and it legitimately falls, so a maximum makes the order answer "was ever risky" rather than "is risky" — a spike read as the issue's value for ever. What makes it order-independent is the day rather than which scan wrote last: a dated estimate beats an undated one and an older dated one, and two undated reports are last-seen |
 | Likelihood, where a report carries none | Left alone | Silence is a gap in that report. A feed omitting the estimate is not a feed saying it is zero |
@@ -734,7 +735,17 @@ A claim from outside ruled a duplicate of a flaw found here gives the flaw a
 disclosure date, counted from when the report was received as for any outside
 report, because its reporter is counting down to a publication whoever found
 the flaw first (REQ-37). A flaw that already carries a date keeps the earlier
-one. Not built: the ruling starts no date.
+one.
+
+| Rule | |
+|---|---|
+| The date is set in the ruling's act | Inside the one write that records the ruling, with the disclosure window read there |
+| It counts from the earliest claim from outside the ruling covers | When it arrived, or when it was recorded where it does not say. A claim found here starts nothing |
+| It reaches a flaw recorded here, at its undisclosed open places in the ruling's product | A scanned issue is published by whoever published its advisory, so no reporter counts down to it here. The places take the date where they have none or a later one |
+| It is a movement of the embargo | Recorded with the act `duplicate`, naming the ruling and the claim the date counts from. It needs nobody else and carries no distance toward the movement threshold, being arithmetic on an arrival rather than a person moving a date |
+| Withdrawing the ruling puts the date back only where the ruling set it | The embargo's record is replayed without every withdrawn ruling: a person's extension or shortening sets an end, and a ruling brings it earlier. Where the answer is where the embargo stands, nothing moves. Where it differs, the places take it, which may be no date at all, and the act `duplicate-undone` records it naming the ruling |
+| The ruling form says the date before it is submitted | "This starts a disclosure date of *date* on *flaw*", asked of the server with the reports and the issue typed, under the right to propose the ruling. Nothing is shown where the ruling would start no date |
+| A duplicate ruled before the date was set by a ruling is dated on upgrade | `DESIGN-database.md` § The v0.5.0 upgrade |
 
 | Refusal | Reason |
 |---|---|

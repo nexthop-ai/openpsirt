@@ -392,8 +392,8 @@ func TestAgreeingMovesTheDateFromWhereItIsNow(t *testing.T) {
 		if _, err := f.store.AgreeToMovement(ctx, other, far.ID); err != nil {
 			t.Fatal(err)
 		}
-		if got := f.endsAt(t, issue); !got.Equal(far.Until) {
-			t.Fatalf("the embargo ends %s, want %s", got, far.Until)
+		if got := f.endsAt(t, issue); !got.Equal(*far.Until) {
+			t.Fatalf("the embargo ends %s, want %s", got, *far.Until)
 		}
 
 		// Agreeing to the shorter one would now carry the date backwards,
@@ -401,7 +401,7 @@ func TestAgreeingMovesTheDateFromWhereItIsNow(t *testing.T) {
 		if _, err := f.store.AgreeToMovement(ctx, other, near.ID); !errors.Is(err, finding.ErrNotLater) {
 			t.Errorf("agreeing to the earlier extension answered %v, want ErrNotLater", err)
 		}
-		if got := f.endsAt(t, issue); !got.Equal(far.Until) {
+		if got := f.endsAt(t, issue); !got.Equal(*far.Until) {
 			t.Errorf("the embargo was carried back to %s by an extension", got)
 		}
 	})

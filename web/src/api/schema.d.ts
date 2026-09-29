@@ -2948,6 +2948,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview the disclosure date a duplicate ruling starts
+         * @description The disclosure date ruling these reports a duplicate of this issue would give it here, without ruling anything.
+         *
+         *     The date is when the earliest report from outside arrived, or was recorded where it does not say, plus `disclosure.after`. It is set on the undisclosed open places of a flaw recorded here that have no date or a later one. `disclose_at` is absent where the ruling would set nothing: every report was found here, the issue is not a flaw recorded here, or its places already end that day or earlier.
+         *
+         *     An issue that is not here and one you may not be told of answer alike.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["preview-duplicate-disclosure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/duplicates": {
         parameters: {
             query?: never;
@@ -7514,6 +7540,16 @@ export interface components {
             passed: boolean;
             window: components["schemas"]["WindowBody"];
         };
+        DuplicateDisclosureBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DuplicateDisclosureBody.json
+             */
+            readonly $schema?: string;
+            /** @description The disclosure date the ruling would set. Absent where it would set none */
+            disclose_at?: string;
+        };
         EarlierBody: {
             /** @description The component upstream version it was a claim about */
             about?: string;
@@ -9317,10 +9353,10 @@ export interface components {
              */
             readonly $schema?: string;
             /**
-             * @description Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public
+             * @description Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public. A duplicate is a vulnerability report ruled a duplicate of the flaw, starting the end or bringing it earlier, and duplicate-undone is that ruling withdrawn and the end put back
              * @enum {string}
              */
-            act: "extension" | "shortening" | "disclosure";
+            act: "extension" | "shortening" | "disclosure" | "duplicate" | "duplicate-undone";
             approved_at?: string;
             /** @description The second person, by sign-in identity */
             approved_by?: string;
@@ -9337,10 +9373,17 @@ export interface components {
             /** @description Whether a second person had to agree */
             needs_approval: boolean;
             reason: string;
-            /** @description The end that was asked for */
-            until: string;
-            /** @description The embargo's previous end */
-            was: string;
+            /** @description The vulnerability report whose arrival the date counts from. Named only where you may read the product's reports */
+            report?: string;
+            /**
+             * Format: int64
+             * @description The ruling on vulnerability reports that recorded this movement
+             */
+            ruling?: number;
+            /** @description The end that was asked for. Absent where a withdrawn ruling left the embargo with none */
+            until?: string;
+            /** @description The embargo's previous end. Absent where it had none */
+            was?: string;
         };
         NameableBody: {
             /**
@@ -9872,7 +9915,7 @@ export interface components {
              * @description Which act is being asked for
              * @enum {string}
              */
-            act: "extension" | "shortening" | "disclosure";
+            act: "extension" | "shortening" | "disclosure" | "duplicate" | "duplicate-undone";
             asked_at: string;
             /** @description The person who asked, by sign-in identity */
             by: string;
@@ -17179,6 +17222,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "preview-duplicate-disclosure": {
+        parameters: {
+            query?: {
+                /** @description The references of the reports the ruling would cover. Repeatable */
+                report?: string[] | null;
+            };
+            header?: never;
+            path: {
+                product: string;
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateDisclosureBody"];
                 };
             };
             /** @description Error */

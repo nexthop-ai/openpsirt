@@ -298,7 +298,9 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 		if _, err := tx.NewInsert().Model(&covered).Exec(ctx); err != nil {
 			return fmt.Errorf("record which reports a ruling covers: %w", err)
 		}
-		return nil
+		// A claim from outside ruled a duplicate of a flaw recorded here
+		// starts that flaw's disclosure date, in the same act.
+		return duplicateDated(ctx, tx, ruling, ids, now)
 	})
 	if err != nil {
 		return nil, err
@@ -470,7 +472,8 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 		// Read for whether it is here at all. Whether it is still standing
 		// is asked in the write, so two people withdrawing at once cannot
 		// both succeed.
-		if _, err := rulingIn(ctx, tx, productID, rulingID); err != nil {
+		ruling, err := rulingIn(ctx, tx, productID, rulingID)
+		if err != nil {
 			return err
 		}
 		res, err := tx.NewUpdate().Model((*ReportRuling)(nil)).
@@ -497,7 +500,9 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 			Exec(ctx); err != nil {
 			return fmt.Errorf("return those reports to the inbox: %w", err)
 		}
-		return nil
+		// A disclosure date the ruling started goes back to where the rest
+		// of the embargo's record leaves it.
+		return duplicateUndated(ctx, tx, ruling, subject.ID, now)
 	})
 	if err != nil {
 		return nil, err

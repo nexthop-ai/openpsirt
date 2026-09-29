@@ -433,7 +433,11 @@ name folded, which every engine adds where the table stands. A notification
 gains the team it is about, and a destination its platform, channel, topic and
 the product or team it belongs to, with a reference for each; SQLite rebuilds
 both tables from the release's declarations. What a person chose about chat,
-and what has been carried to them there, are two new tables.
+and what has been carried to them there, are two new tables. An issue gains the
+day the known-exploited catalog listed it, a column that holds a null. A
+movement of an embargo gains the ruling that recorded it and the claim its date
+counts from, and its two dates take a null; SQLite rebuilds the table from the
+release's declaration.
 
 | In v0.4.0 | After the upgrade |
 |---|---|
@@ -455,6 +459,9 @@ and what has been carried to them there, are two new tables.
 | Two or more keys, or two or more of one person's tokens, whose names fold to one | The first keeps the folded name and stays as it was: one in force before a withdrawn one, then the oldest. Each other still in force is withdrawn at the moment of the upgrade, and a trail row records it with the upgrade as the actor, naming a token's owner as a withdrawal by a person does. One withdrawn already is left as it was. Each other is named by the folded name and its number, as `ci #7`, because the name is unique across withdrawn ones too. Every first holder is reserved before any is numbered, so one already named like a number keeps that name and the number moves past it, as `ci #7.2` |
 | A key or token whose name is only spaces | Named `key #7` or `token #7` by its number, and left in force: it clashes with nothing |
 | A build's claim about a named subject | Gains the subject's name folded, beside the producer's spelling. A claim naming only a package identifier gains nothing |
+| An issue | Listed in the known-exploited catalog on no day: v0.4.0 read none. The first scan stating one re-clocks the issue's open exploited findings, as `DESIGN-remediation.md` § Deadlines describes |
+| A movement of an embargo | A person's, naming no ruling |
+| A flaw recorded here, undisclosed and open in a product with no disclosure date there, under a duplicate ruling in force covering a claim from outside | Dated by each such ruling in the order they took effect, where it brings the date earlier: the earliest claim from outside the ruling covers, by arrival or else by recording, plus the disclosure window. Each date is a movement from that ruling, asked by its proposer when it took effect. A claim found here, a withdrawn ruling and a flaw with a date on any place there contribute nothing |
 
 A username is the rule a key's and a token's name follow: the first to hold a
 name keeps it, and a later one folding to it is refused. An upgrade cannot
@@ -485,7 +492,9 @@ upgrading again keeps them apart. A claim's folded subject goes with its
 column. A key or token keeps the name it was folded or numbered to, which
 v0.4.0 matches as typed, and one the upgrade withdrew stays withdrawn. The
 trail rows recording those withdrawals go, because v0.4.0 has no place for a
-change no person made.
+change no person made. The day an issue was listed goes with its column. A
+movement a ruling recorded goes, because v0.4.0 has no place for an act nobody
+asked for, and the date it set stays on the flaw's places.
 
 Two components v0.4.0 identifies alike refuse the roll back, and the refusal
 names both: a name shaped like a package identifier beside that package, or a
@@ -513,6 +522,7 @@ of what a check costs, so the checks share the build.
 | A v0.4.0 database with keys named in mixed capitals, three pairs folding to one name | Upgraded, every name is folded, and the key in force and then the older keeps a shared name and authenticates, including one moving onto a name a withdrawn key still holds. The other in force is withdrawn and refused, with one trail row by the upgrade; those withdrawn already keep their withdrawal time. Each is numbered, past a key already named like the number. A spaces-only key is numbered and stays in force, and a scan sent under a mixed-case name reads as that key. Rolled back, the names and withdrawals stay and the trail row goes |
 | A v0.4.0 database with two people's tokens named in mixed capitals, three of one person's pairs folding to one name | Upgraded, as for keys, per person: the kept tokens authenticate, the duplicate in force is withdrawn and refused with one trail row naming its owner, those withdrawn already keep their withdrawal time, a spaces-only name and a name shaped like a number are handled as for keys, and the other person's token of the same name is untouched. Rolled back, the names and withdrawals stay and the trail row goes |
 | A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing. Rolled back, the table is described as v0.4.0 built it and the producer's spelling remains |
+| A v0.4.0 database with an undated flaw and a dated one under duplicate rulings, one covering a claim found here beside one from outside, one withdrawn, and an exploited issue | Upgraded, the undated flaw is dated from the claim from outside in the ruling in force, with one movement naming that ruling and its proposer, the dated flaw keeps its date, and the issue is listed on no day. Rolled back, the movement goes, the date stays and the listing day's column is gone |
 
 ### Release records
 

@@ -1153,7 +1153,8 @@ A private finding reported from outside carries a disclosure date, defaulting to
 ninety days after the report was received (REQ-37). A flaw found here carries
 none, because nobody outside is counting down to a publication, and neither does
 a public finding. A claim from outside ruled a duplicate of a flaw found here
-does not give it one; that half is not built. The point of having one
+gives it one, counted from when that claim arrived, or brings an existing one
+earlier (`DESIGN-findings.md` § Judgment). The point of having one
 is that it gives the embargo an end somebody outside could hold this deployment
 to.
 
@@ -1209,13 +1210,19 @@ Needs a reason, and past a threshold that is a setting — thirty days by defaul
 a second person (REQ-38). The same shape as a deferral, because moving a date
 is the same act: changing how long something stays hidden.
 
-Three acts, recorded apart.
+Three acts a person asks for, and two a ruling records, recorded apart.
 
 | Act | What it says |
 |---|---|
 | **Extension** | The embargo ends later. The unilateral case: the fix slipped |
 | **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
 | **Disclosure** | The embargo ends today and the issue is public. § Issue disclosure holds its rules |
+| **Duplicate** | A claim from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the claim, which a reader of the product's reports is shown. `DESIGN-findings.md` § Judgment holds its rules |
+| **Duplicate undone** | That ruling was withdrawn and the end put back where the rest of the record leaves it, which may be no end at all |
+
+A movement a ruling records needs nobody else and counts nothing toward the
+threshold. Its date is when a claim arrived plus the disclosure window, and the
+threshold measures how far people have carried an embargo from there.
 
 | Rule | Reason |
 |---|---|

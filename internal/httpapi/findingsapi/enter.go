@@ -386,9 +386,11 @@ func registerDisclosure(api huma.API, in core.Deps) {
 // MovementBody is one time somebody moved the end of an embargo.
 type MovementBody struct {
 	ID             int64    `json:"id"`
-	Act            core.Act `json:"act" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public"`
-	Was            string   `json:"was" doc:"The embargo's previous end"`
-	Until          string   `json:"until" doc:"The end that was asked for"`
+	Act            core.Act `json:"act" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public. A duplicate is a vulnerability report ruled a duplicate of the flaw, starting the end or bringing it earlier, and duplicate-undone is that ruling withdrawn and the end put back"`
+	Was            string   `json:"was,omitempty" doc:"The embargo's previous end. Absent where it had none"`
+	Until          string   `json:"until,omitempty" doc:"The end that was asked for. Absent where a withdrawn ruling left the embargo with none"`
+	Ruling         int64    `json:"ruling,omitempty" doc:"The ruling on vulnerability reports that recorded this movement"`
+	Report         string   `json:"report,omitempty" doc:"The vulnerability report whose arrival the date counts from. Named only where you may read the product's reports"`
 	Reason         string   `json:"reason"`
 	AskedBy        string   `json:"asked_by" doc:"The person who asked, by sign-in identity"`
 	AskedByName    string   `json:"asked_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
@@ -634,7 +636,7 @@ func registerMovements(api huma.API, in core.Deps) {
 				ID:      row.ID,
 				Product: row.Product, Vulnerability: row.Vulnerability,
 				Act: core.Act(row.Act),
-				Was: row.Was.Format(time.DateOnly), Until: row.Until.Format(time.DateOnly),
+				Was: dayOf(row.Was), Until: dayOf(row.Until),
 				By:      who.Identity(row.AskedBy),
 				ByName:  who.Label(row.AskedBy),
 				AskedAt: row.AskedAt.UTC().Format(time.RFC3339),
@@ -775,6 +777,16 @@ func embargoAt(ctx context.Context, in core.Deps, productName, issueName string)
 	return subject, finding.NewStore(in.DB.DB), product.ID, issue, nil
 }
 
+// dayOf is a date as a day, or nothing where there is none. Only a movement a
+// ruling recorded lacks one, and a movement waiting for a second person never
+// is one.
+func dayOf(at *time.Time) string {
+	if at == nil {
+		return ""
+	}
+	return at.Format(time.DateOnly)
+}
+
 // movementBody names the people a movement record refers to by the identity
 // they sign in under, with the display name beside it.
 func movementBody(ctx context.Context, in core.Deps, rows []finding.Movement) ([]MovementBody, error) {
@@ -792,11 +804,20 @@ func movementBody(ctx context.Context, in core.Deps, rows []finding.Movement) ([
 	out := make([]MovementBody, 0, len(rows))
 	for _, row := range rows {
 		body := MovementBody{
-			ID: row.ID, Act: core.Act(row.Act), Was: core.Stamp(row.Was), Until: core.Stamp(row.Until),
+			ID: row.ID, Act: core.Act(row.Act), Report: row.Report,
 			Reason: row.Reason, AskedBy: who.Identity(row.AskedBy),
 			AskedByName: who.Label(row.AskedBy),
 			AskedAt:     core.Stamp(row.AskedAt), NeedsApproval: row.NeedsApproval,
 			InForce: row.InForce(),
+		}
+		if row.Was != nil {
+			body.Was = core.Stamp(*row.Was)
+		}
+		if row.Until != nil {
+			body.Until = core.Stamp(*row.Until)
+		}
+		if row.RulingID != nil {
+			body.Ruling = *row.RulingID
 		}
 		if row.ApprovedBy != nil {
 			body.ApprovedBy = who.Identity(*row.ApprovedBy)

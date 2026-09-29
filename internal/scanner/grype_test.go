@@ -762,3 +762,73 @@ func TestTheCatalogIsAskedUnderEveryIdentifierAnIssueAnswersTo(t *testing.T) {
 		}
 	}
 }
+
+func TestTheCatalogListingDayIsTheEarliestReadableOne(t *testing.T) {
+	// The day an entry says the catalog added the issue is when exploitation
+	// became known, and a deadline counts from it.
+	f, err := os.OpenInRoot("testdata", "grype-known-exploited.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	recorded, err := scanner.ParseGrype(f, scanner.Limits{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	day := func(s string) time.Time {
+		parsed, err := time.Parse(time.DateOnly, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return parsed
+	}
+	if got := recorded.Reported[0].Issue.ExploitedOn; got == nil || !got.Equal(day("2026-09-18")) {
+		t.Errorf("the recorded match reads as listed on %v, want 2026-09-18", got)
+	}
+
+	for what, one := range map[string]struct {
+		document string
+		want     *time.Time
+	}{
+		// An entry on a related record listing it earlier than the match's
+		// own entry: the earlier stands.
+		"on a related record, earlier": {`{"matches":[{
+		  "vulnerability":{"id":"CVE-2026-1","severity":"High",
+		    "knownExploited":[{"cve":"CVE-2026-1","dateAdded":"2026-09-18"}]},
+		  "relatedVulnerabilities":[{"id":"GHSA-0000-0000-0000",
+		    "knownExploited":[{"cve":"CVE-2026-1","dateAdded":"2026-09-10"}]}],
+		  "artifact":{"name":"libfoo","version":"1.0"}}],
+		  "descriptor":{"name":"grype","version":"0.119.0"}}`, ptr(day("2026-09-10"))},
+		// A day nobody can read is one nobody gave, and a readable one
+		// beside it stands.
+		"beside an unreadable one": {`{"matches":[{
+		  "vulnerability":{"id":"CVE-2026-1","severity":"High",
+		    "knownExploited":[{"cve":"CVE-2026-1","dateAdded":"last week"},
+		      {"cve":"CVE-2026-1","dateAdded":"2026-09-20"}]},
+		  "artifact":{"name":"libfoo","version":"1.0"}}],
+		  "descriptor":{"name":"grype","version":"0.119.0"}}`, ptr(day("2026-09-20"))},
+		// An entry stating no day still says it is exploited, from no day.
+		"with no day": {`{"matches":[{
+		  "vulnerability":{"id":"CVE-2026-1","severity":"High",
+		    "knownExploited":[{"cve":"CVE-2026-1"}]},
+		  "artifact":{"name":"libfoo","version":"1.0"}}],
+		  "descriptor":{"name":"grype","version":"0.119.0"}}`, nil},
+	} {
+		result, err := scanner.ParseGrype(strings.NewReader(one.document), scanner.Limits{})
+		if err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		issue := result.Reported[0].Issue
+		if !issue.Exploited {
+			t.Errorf("%s: reads as not exploited", what)
+		}
+		switch got := issue.ExploitedOn; {
+		case one.want == nil && got != nil:
+			t.Errorf("%s: reads as listed on %s, want no day", what, got)
+		case one.want != nil && (got == nil || !got.Equal(*one.want)):
+			t.Errorf("%s: reads as listed on %v, want %s", what, got, one.want)
+		}
+	}
+}
+
+func ptr[T any](v T) *T { return &v }

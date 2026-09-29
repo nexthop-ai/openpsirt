@@ -193,6 +193,27 @@ export function useAcceptReport(product: string, reference: string) {
   });
 }
 
+// The disclosure date ruling these reports a duplicate of an issue would
+// start, absent where it would start none. Nothing is asked until the issue
+// and the reports are named.
+export function useDuplicateStarts(
+  product: string,
+  issue: string,
+  reports: string[],
+): UseQueryResult<Body<"DuplicateDisclosureBody">> {
+  return useQuery({
+    queryKey: ["duplicate-disclosure", product, issue, reports],
+    enabled: product !== "" && issue !== "" && reports.length > 0,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure", {
+          params: { path: { product, vulnerability: issue }, query: { report: reports } },
+        }),
+      ),
+    retry: false,
+  });
+}
+
 export function useRule(product: string) {
   const after = useAfterReport();
   return useMutation({

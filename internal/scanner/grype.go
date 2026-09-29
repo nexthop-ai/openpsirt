@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -221,14 +222,13 @@ type grypeMatch struct {
 			Date       string  `json:"date"`
 		} `json:"epss"`
 		// KEV is the catalog entries saying this is exploited in the
-		// world. Whether there is one is the whole of what is read —
-		// the entry states a vendor, a product, a due date and the
-		// action a federal agency is required to take, none of which
-		// is a fact about this deployment.
-		//
-		// Decoded as an empty element, because the count is all that
-		// is read. The entries carry the issue under `cve`.
-		KEV  []struct{}        `json:"knownExploited"`
+		// world. Whether there is one, and the day the catalog listed
+		// it, are what is read — the entry also states a vendor, a
+		// product, a due date and the action a federal agency is
+		// required to take, none of which is a fact about this
+		// deployment. The listing day is when exploitation became
+		// known, which is where an exploited deadline counts from.
+		KEV  []catalogEntry    `json:"knownExploited"`
 		CVSS []publishedRating `json:"cvss"`
 		// CWEs is what kind of weakness this is. Several entries
 		// usually say the same thing from different sources, and the
@@ -260,7 +260,7 @@ type grypeMatch struct {
 		// The catalog decorates whichever record the scanner resolved
 		// to, and which one that is depends on the database it
 		// consulted rather than on the issue.
-		KEV []struct{} `json:"knownExploited"`
+		KEV []catalogEntry `json:"knownExploited"`
 	} `json:"relatedVulnerabilities"`
 	Artifact struct {
 		Name    string `json:"name"`
@@ -426,6 +426,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 			Advisory:             strings.TrimSpace(match.Vulnerability.DataSource),
 			References:           pointing,
 			Exploited:            exploited(match),
+			ExploitedOn:          listedOn(match),
 			Likelihood:           epss.value,
 			LikelihoodPercentile: epss.percentile,
 			LikelihoodOn:         epss.on,
@@ -477,6 +478,37 @@ func exploited(match grypeMatch) bool {
 		}
 	}
 	return false
+}
+
+// catalogEntry is one known-exploited catalog entry, by the day it was added.
+type catalogEntry struct {
+	DateAdded string `json:"dateAdded"`
+}
+
+// listedOn is the earliest day the catalog says it listed this issue, under
+// any of the identifiers it answers to, or nothing where no entry states a day
+// that can be read.
+//
+// The earliest, because entries on two records of one issue can disagree and
+// exploitation was known from the first of them. A day nobody can read is
+// treated as one nobody gave, and the issue still reads as exploited through
+// the entry itself.
+func listedOn(match grypeMatch) *time.Time {
+	entries := slices.Clone(match.Vulnerability.KEV)
+	for _, other := range match.RelatedVulnerabilities {
+		entries = append(entries, other.KEV...)
+	}
+	var earliest *time.Time
+	for _, entry := range entries {
+		day, err := time.Parse(time.DateOnly, strings.TrimSpace(entry.DateAdded))
+		if err != nil {
+			continue
+		}
+		if earliest == nil || day.Before(*earliest) {
+			earliest = &day
+		}
+	}
+	return earliest
 }
 
 // matchedRange is the version range the match fired on, taken from the detail

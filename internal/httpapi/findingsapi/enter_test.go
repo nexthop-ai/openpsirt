@@ -335,9 +335,11 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
+		was := time.Now().UTC()
+		until := was.AddDate(1, 0, 0)
 		if _, err := r.DB.DB.NewInsert().Model(&finding.Movement{
 			VulnerabilityID: issue, ProductID: theirProduct.ID, Act: finding.Extension,
-			Was: time.Now().UTC(), Until: time.Now().UTC().AddDate(1, 0, 0),
+			Was: &was, Until: &until,
 			Reason: "Somebody else's case.", AskedBy: asker.ID, AskedAt: time.Now().UTC(),
 			NeedsApproval: true,
 		}).Exec(t.Context()); err != nil {

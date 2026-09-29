@@ -3,6 +3,8 @@
 
 package finding
 
+import "time"
+
 // Rank is how urgent a finding is, as one number that sorts.
 //
 // One number because sorting tens of thousands of rows has to hit an index, and
@@ -73,6 +75,10 @@ type Rating struct {
 	// anybody has claimed.
 	ScoreCenti    int
 	LikelihoodPPM int
+	// ExploitedOn is the day the known-exploited catalog listed it, where a
+	// report said. Exploitation counts from it where it is earlier than the
+	// scan that learned it.
+	ExploitedOn *time.Time
 }
 
 // Severity is the word in force: ours where somebody has made a rating, the
