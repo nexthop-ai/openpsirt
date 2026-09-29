@@ -11,7 +11,8 @@ import { DAY_MS, on } from "../ui/when";
 import { own } from "../ui/own";
 import { Peek, Sits } from "./FindingsViews";
 import { SORTS, identityOf, type Row } from "./list";
-import { componentAt, findingAt, productFindingsAt } from "../app/routes";
+import { claimAt, componentAt, findingAt, productFindingsAt } from "../app/routes";
+import { said, type Recorded } from "../ui/Decide";
 import { bandOf } from "../ui/severities";
 
 // The findings list as a table, and as cards on a narrow screen.
@@ -21,6 +22,17 @@ import { bandOf } from "../ui/severities";
 // It takes what it draws and holds none of it, so a row is the only source of
 // that row's product — which is what stops the path's product being used by
 // accident on the list that spans every product, where there is none.
+// A decision just recorded from a row's preview: the row it was about, the row
+// after it when it was made, and what the form answered. The confirmation is
+// drawn where the row was, which is under it while it is still listed and in
+// its place when the list read again no longer holds it.
+export type Decided = {
+  key: string;
+  next: string | null;
+  recorded: Recorded;
+  issue: string;
+};
+
 // The age of this finding here.
 //
 // The finding's own age, not the year in the identifier: an issue assigned in
@@ -100,6 +112,8 @@ export function FindingsTable({
   setPeeking,
   cursor,
   onDecided,
+  decided,
+  onDismiss,
 }: {
   rows: Row[];
   // The selection's key for each row on this page, in the same order.
@@ -126,7 +140,9 @@ export function FindingsTable({
   setPeeking: (key: string | null) => void;
   // The act once a row has been decided where it sits: the list is read
   // again, because the state the row draws has moved.
-  onDecided: () => void;
+  onDecided: (key: string, recorded: Recorded) => void;
+  decided: Decided | null;
+  onDismiss: () => void;
   // The row the keys are about, by its position on the page. Drawn rather
   // than only acted on: a cursor nobody can see is a key that appears to do
   // nothing.
@@ -137,6 +153,37 @@ export function FindingsTable({
   // preview row spans all of them, the product among them on a list spanning
   // every product.
   const columns = spanning ? 11 : 10;
+  // Where the confirmation goes: under the decided row while it is listed, and
+  // in its place, above the row that followed it, once it is not.
+  const listed = !!decided && rows.some((row) => identityOf(row) === decided.key);
+  const answer = decided && (
+    <tr className="places">
+      <td colSpan={columns}>
+        <div className="alert info" role="status" style={{ margin: 0 }}>
+          <strong>Submitted</strong>
+          <span>
+            <span className="id">{decided.issue}</span>:{" "}
+            {decided.recorded.needsApproval
+              ? `the ${said(decided.recorded.outcome)} takes effect once a second person approves it.`
+              : "in force now."}{" "}
+            {decided.recorded.needsApproval && (
+              <Link to={claimAt(decided.recorded.claimId)} className="linkish">
+                Open the decision →
+              </Link>
+            )}
+          </span>
+          <button
+            type="button"
+            className="linkish"
+            style={{ marginLeft: "auto" }}
+            onClick={onDismiss}
+          >
+            Dismiss
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
   return (
     <div className="findings">
       <Wide>
@@ -188,6 +235,7 @@ export function FindingsTable({
               const pill = decidedAs(row.state, row.sent_back);
               return (
                 <Fragment key={key}>
+                  {!listed && decided?.next === key && answer}
                   <tr
                     className={i === cursor ? "row at" : "row"}
                     data-i={i}
@@ -500,11 +548,12 @@ export function FindingsTable({
                           ecosystem={row.ecosystem}
                           namespace={row.namespace}
                           to={at}
-                          onDecided={onDecided}
+                          onDecided={(recorded) => onDecided(key, recorded)}
                         />
                       </td>
                     </tr>
                   )}
+                  {listed && decided?.key === key && answer}
                 </Fragment>
               );
             })}

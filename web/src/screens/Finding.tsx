@@ -16,7 +16,7 @@ import { ExploitedHere } from "./FindingExploited";
 import { Notes } from "./FindingNotes";
 import { Duplicates, MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -34,7 +34,7 @@ import { Because } from "../ui/Outcome";
 import { useFindingNeighbors } from "./findingNeighbors";
 import { useDecisionPrefill } from "./findingPrefill";
 import { FindingWhich } from "./FindingWhich";
-import { buildFindingsAt, componentAt, issueAt, productFindingsAt } from "../app/routes";
+import { buildFindingsAt, claimAt, componentAt, issueAt, productFindingsAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
@@ -121,10 +121,8 @@ export function Finding() {
   // somebody: reusing an earlier reasoning fills it in and then has to show
   // them what it filled in.
   const form = useRef<HTMLDivElement>(null);
-  // The place the confirmation is drawn. It sits at the head of the screen,
-  // above everything the finding says, and the button that produces it is at
-  // the foot of the decision form, a page and a half below — so the screen is
-  // brought to it once something is recorded.
+  // The place the confirmation is drawn: directly above the decision card the
+  // submission produced.
   const confirmation = useRef<HTMLDivElement>(null);
   // The finding the screen is on. A params-only change does not remount it,
   // so anything below that belongs to one finding has to say which.
@@ -133,14 +131,17 @@ export function Finding() {
   const prefill = useDecisionPrefill(product, oneFinding, rule);
   const { startFrom } = prefill;
   const [reclassifying, setReclassifying] = useState(false);
+  // The rating just recorded, confirmed on the line the form opened from.
+  const [rated, setRated] = useState<{ severity: string; waiting: boolean } | null>(null);
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
   // The rest of what belongs to one finding, put back on walking to the next:
   // the confirmation of what was recorded, the decision being extended, and
-  // the rating form.
+  // the rating form and what it recorded.
   useReseed(`${product}|${stream}|${variant}|${oneFinding}`, () => {
     setRecorded(null);
     setExtending(null);
     setReclassifying(false);
+    setRated(null);
   });
   const walk = useFindingNeighbors(
     { product, vulnerability, component, version, ecosystem, namespace },
@@ -185,6 +186,20 @@ export function Finding() {
         unwrap(await api.GET("/v1/decisions/{id}", { params: { path: { id } } })),
     })),
   });
+  // The decision card a submission produced, once the finding is read again
+  // and the card is drawn. The confirmation sits directly above it, and both
+  // are brought into view when it lands: the page shortens under whoever
+  // pressed the button, so where they were looking no longer holds anything.
+  // Smooth, so the page moving is something they watch rather than a jump.
+  const landed =
+    !!recorded && standing.some((q) => q.data?.decision?.claim_id === recorded.claimId);
+  useEffect(() => {
+    if (!recorded) return;
+    const frame = requestAnimationFrame(() =>
+      confirmation.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [recorded, landed]);
   // The place each earlier decision was at, for reaffirming it.
   const openPlaces = places.filter((p) => p.decision == null).slice(0, SAMPLE);
   const history = useQueries({
@@ -421,36 +436,6 @@ export function Finding() {
         </div>
       )}
 
-      {recorded && (
-        <div className="alert info" style={{ marginBottom: 14 }} ref={confirmation}>
-          <strong>Submitted</strong>
-          <span>
-            Recorded against {recorded.recorded} {recorded.recorded === 1 ? "place" : "places"} here
-            {recorded.applied.length > 0 && <>, and in {recorded.applied.join(", ")}</>};{" "}
-            {recorded.matching} matching {recorded.matching === 1 ? "build is" : "builds are"}{" "}
-            reached by lookup.{" "}
-            {recorded.needsApproval
-              ? `The ${said(recorded.outcome)} takes effect once a second person approves it. ` +
-                `It is now in the review queue.`
-              : "In force now."}{" "}
-            {/* The next finding first, where there is one: somebody working a
-                list wants the next one, and the review queue is where the
-                claim went rather than where they are going. */}
-            {walk?.next && (
-              <>
-                <Link to={walk.next.to} className="linkish">
-                  Next finding →
-                </Link>{" "}
-                ·{" "}
-              </>
-            )}
-            <Link to="/review-queue" className="linkish">
-              Go to the review queue →
-            </Link>
-          </span>
-        </div>
-      )}
-
       {it.arrived_from && (
         <div className="shortfall">
           <span className="icon">◭</span>
@@ -607,7 +592,28 @@ export function Finding() {
               published={it.severity ?? ""}
               assessed={it.assessed ?? ""}
               onClose={() => setReclassifying(false)}
+              onDone={(r) => {
+                setReclassifying(false);
+                setRated(r);
+              }}
             />
+          )}
+          {/* Where the form was. A milder rating waits for a second person on
+              the review queue, in the section for ratings. */}
+          {rated && !reclassifying && (
+            <div className="alert info" role="status" style={{ marginBottom: 8 }}>
+              <strong>Rated {rated.severity}</strong>
+              <span>
+                {rated.waiting
+                  ? "Milder than published, so it takes effect once a second person agrees. "
+                  : "In force now."}
+                {rated.waiting && (
+                  <Link to="/review-queue#ratings" className="linkish">
+                    Waiting in the review queue →
+                  </Link>
+                )}
+              </span>
+            </div>
           )}
           {/* Beside the rating, because the two are the pair a reader is
               weighing: what the world says this is worth, and whether it has
@@ -726,6 +732,41 @@ export function Finding() {
       </div>
 
       <div className="acting">
+        {/* Directly above the decision card it produced. Submitting hides the
+            form and the publisher statements, so the page shortens under
+            whoever pressed the button, and a confirmation at the head of the
+            screen lands out of view. */}
+        {recorded && (
+          <div className="alert info" style={{ marginBottom: 14 }} ref={confirmation}>
+            <strong>Submitted</strong>
+            <span>
+              Recorded against {recorded.recorded} {recorded.recorded === 1 ? "place" : "places"}{" "}
+              here
+              {recorded.applied.length > 0 && <>, and in {recorded.applied.join(", ")}</>};{" "}
+              {recorded.matching} matching {recorded.matching === 1 ? "build is" : "builds are"}{" "}
+              reached by lookup.{" "}
+              {recorded.needsApproval
+                ? `The ${said(recorded.outcome)} takes effect once a second person approves it.`
+                : "In force now."}{" "}
+              {/* The next finding first, where there is one: somebody working
+                  a list wants the next one. A decision that waits is followed
+                  on its own page, where its approval lands. */}
+              {walk?.next && (
+                <>
+                  <Link to={walk.next.to} className="linkish">
+                    Next finding →
+                  </Link>
+                  {recorded.needsApproval && " · "}
+                </>
+              )}
+              {recorded.needsApproval && (
+                <Link to={claimAt(recorded.claimId)} className="linkish">
+                  Open the decision →
+                </Link>
+              )}
+            </span>
+          </div>
+        )}
         {pairs.map(({ claim, summary }) => (
           <Standing
             key={claim.decision?.id}
@@ -980,16 +1021,6 @@ export function Finding() {
                     setRecorded(r);
                     startFrom(null);
                     setExtending(null);
-                    // Brought to where somebody is looking. Smooth, like the
-                    // form's own scroll, so the page moving is something they
-                    // watch happen rather than a jump they have to re-find
-                    // themselves after.
-                    requestAnimationFrame(() =>
-                      confirmation.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "center",
-                      }),
-                    );
                   }}
                   extending={extending}
                   prefill={prefill.opening}

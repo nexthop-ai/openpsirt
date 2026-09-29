@@ -188,6 +188,12 @@ func (ClaimStateEnded) Schema(huma.Registry) *huma.Schema {
 	return words(Which(triage.States(), triage.State.Ended))
 }
 
+// QueueReason is why a claim waits in the review queue.
+type QueueReason string
+
+// Schema offers every reason, in the order the queue offers them.
+func (QueueReason) Schema(huma.Registry) *huma.Schema { return words(triage.QueueReasons()) }
+
 // ClaimKind is what sort of action a claim was.
 type ClaimKind string
 

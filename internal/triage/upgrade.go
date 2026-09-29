@@ -253,7 +253,8 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 	return out, nil
 }
 
-// Repromise changes what a release is moving to, or by when.
+// Repromise changes what a release is moving to, or by when. A promised patch
+// has no version, so only its date moves and the version is empty.
 //
 // Editing a commitment is editing what somebody agreed to. An approver
 // agreed to "8.5.0 by 8 October"; a coordinator quietly rewriting either half
@@ -269,9 +270,6 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID int64,
 	to string, by time.Time, reasoning string) ([]ForPerson, bool, error) {
 
-	if strings.TrimSpace(to) == "" {
-		return nil, false, refusal.Errorf("say which version this is moving to")
-	}
 	if strings.TrimSpace(reasoning) == "" {
 		return nil, false, refusal.Errorf("say why the promise is changing: a date moved with no reason " +
 			"is one nobody can agree to again")
@@ -291,9 +289,9 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		if err != nil {
 			return err
 		}
-		if claim.Outcome != UpgradeNeeded {
-			return refusal.Errorf("that claim is %s, and only a promised upgrade has a version to move",
-				claim.Outcome)
+		if !claim.Outcome.Commits() {
+			return refusal.Errorf("that claim is %s, and only a promised upgrade or patch has a "+
+				"date to move", claim.Outcome)
 		}
 		for _, row := range rows {
 			if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
@@ -301,6 +299,12 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 			}
 		}
 		moving := strings.TrimSpace(to)
+		switch {
+		case claim.Outcome == UpgradeNeeded && moving == "":
+			return refusal.Errorf("say which version this is moving to")
+		case claim.Outcome == PatchNeeded && moving != "":
+			return refusal.Errorf("a promised patch has no version to move to; name only the date")
+		}
 		when := by.UTC()
 		if !when.After(s.now()) {
 			return refusal.Errorf("a promise lands on a date still to come: %s has passed",
@@ -320,14 +324,18 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		// Whether the version or the date moves, or only the words do. The
 		// agreements are withdrawn either way; what their holders are told
 		// names which.
-		moved = claim.UpgradeTo == nil || strings.TrimSpace(*claim.UpgradeTo) != moving ||
+		moved = orEmpty(claim.UpgradeTo) != moving ||
 			claim.CommittedTo == nil || !claim.CommittedTo.Equal(when)
-		gated, err := within.regate(ctx, tx, findings, subject, claimID, rows, when)
+		gated, err := within.regate(ctx, tx, findings, subject, *claim, rows, when)
 		if err != nil {
 			return err
 		}
+		var version *string
+		if moving != "" {
+			version = &moving
+		}
 		if _, err := tx.NewUpdate().Model((*Claim)(nil)).
-			Set("upgrade_to = ?", moving).
+			Set("upgrade_to = ?", version).
 			Set("committed_to = ?", when).
 			Where("id = ?", claimID).Exec(ctx); err != nil {
 			return fmt.Errorf("change what was promised: %w", err)
@@ -370,21 +378,43 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 // regate works out whether a changed promise needs a second person, from what
 // the claim covers rather than from what it covered when it was made.
 //
-// The builds come from the commitments the claim wrote, which are what says
-// where the promise applies, and the places from the claim's own rows. The
+// The places come from the claim's own rows. An upgrade's builds come from the
+// commitments it wrote, which are what says where the promise applies. A
+// patch writes none, so its builds are the ones holding an open finding the
+// claim covers now, by the match that names the builds a queue card lists. The
 // deadline is then the earliest among the findings still open at those places
 // in those builds.
 func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
-	subject access.Subject, claimID int64, rows []Decision, by time.Time) (bool, error) {
+	subject access.Subject, claim Claim, rows []Decision, by time.Time) (bool, error) {
 
 	if len(rows) == 0 {
 		return true, nil
 	}
 	var targets []int64
-	if err := tx.NewSelect().Table("upgrade").
-		ColumnExpr("DISTINCT target_id").
-		Where("claim_id = ?", claimID).Scan(ctx, &targets); err != nil {
-		return false, fmt.Errorf("read which releases this was promised for: %w", err)
+	if claim.Outcome == UpgradeNeeded {
+		if err := tx.NewSelect().Table("upgrade").
+			ColumnExpr("DISTINCT target_id").
+			Where("claim_id = ?", claim.ID).Scan(ctx, &targets); err != nil {
+			return false, fmt.Errorf("read which releases this was promised for: %w", err)
+		}
+	} else if err := tx.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(finding.DecisionIssue).
+		Join(`CROSS JOIN "finding" AS "f"`).
+		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr("DISTINCT f.target_id").
+		Where("de.claim_id = ?", claim.ID).
+		Where("de.live_key IS NOT NULL").
+		Where("f.closed_at IS NULL").
+		Where("st.product_id = de.product_id").
+		Where(finding.KeyMatches).
+		Scan(ctx, &targets); err != nil {
+		return false, fmt.Errorf("read which builds this promise covers: %w", err)
 	}
 	places := make([]finding.At, 0, len(rows))
 	for _, row := range rows {

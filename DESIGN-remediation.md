@@ -106,6 +106,7 @@ which is the failure REQ-28 exists to prevent.
 |---|---|
 | **The gate is worked out again** | Moving the date moves the thing the gate is about. Withdrawing the agreements and leaving the rows recorded as needing nobody put a promise first made inside the deadline back in force at any later date somebody chose — in force, suppressing what it covered, and listed in no queue |
 | It is measured over what the claim covers now | The builds come from the commitments the claim wrote and the places from its own rows, read inside the transaction that writes. A deadline moves when the policy or the rating moves, so the one it was made against is not the one it is judged by |
+| A promised patch moves by its date alone | It has no version. It writes no commitments, so its builds are the ones holding an open finding the claim covers now |
 | A date already past is refused | It says the work will have happened before now |
 | The reasoning goes through the text policy | Every path that stores typed text runs it before storing, and this one reached the write through an inner act that did not |
 

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -19,7 +20,7 @@ export function Disclose({ product, vulnerability }: { product: string; vulnerab
   const queries = useQueryClient();
   const [open, setOpen] = useState(false);
   const [because, setBecause] = useState("");
-  const [said, setSaid] = useState<string | null>(null);
+  const [said, setSaid] = useState<{ text: string; waiting: boolean } | null>(null);
 
   const disclose = useMutation({
     mutationFn: async () =>
@@ -30,9 +31,12 @@ export function Disclose({ product, vulnerability }: { product: string; vulnerab
         }),
       ),
     onSuccess: (asked) => {
-      setSaid(
-        asked.in_force ? "Disclosed." : "Asked. It stays undisclosed until a second person agrees.",
-      );
+      setSaid({
+        text: asked.in_force
+          ? "Disclosed."
+          : "Asked. It stays undisclosed until a second person agrees.",
+        waiting: !asked.in_force,
+      });
       setOpen(false);
       setBecause("");
       void queries.invalidateQueries({ queryKey: ["finding"] });
@@ -41,7 +45,16 @@ export function Disclose({ product, vulnerability }: { product: string; vulnerab
   });
 
   if (said) {
-    return <div className="hint">{said}</div>;
+    return (
+      <div className="hint" role="status">
+        {said.text}{" "}
+        {said.waiting && (
+          <Link to="/review-queue#embargoes" className="linkish">
+            Waiting in the review queue →
+          </Link>
+        )}
+      </div>
+    );
   }
   if (!open) {
     return (

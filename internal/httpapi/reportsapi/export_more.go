@@ -370,26 +370,21 @@ func registerAuditExport(api huma.API, in core.Deps) {
 	})
 }
 
-// registerQueueExport writes out what is waiting for a second person.
+// registerQueueExport writes out one list of the review queue.
 func registerQueueExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-review-queue", Method: http.MethodGet,
 		Path:    "/v1/review-queue.{format}",
 		Summary: "Export the review queue",
-		Description: "What is waiting for a second person, as a file: every claim, not one " +
-			"page of them.\n\n" +
+		Description: "The review queue as a file: every claim, not one page of them.\n\n" +
 			"One row per claim, the way the screen counts them — one proposer's action, " +
-			"however many decisions it wrote — with how much it covers and how old it is. " +
-			"A backlog is reported in claims because that is the unit somebody works " +
-			"through.\n\n" +
-			"Limited to what you may approve every row of, as the screen is, and your own " +
-			"claims are not in it. `mine=true` writes out what you proposed and nobody has " +
-			"agreed to, which is a different question. `product` and the other filters narrow " +
-			"it the way the screen does.",
+			"however many decisions it wrote — with how much it covers and how old it is.\n\n" +
+			"Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, " +
+			"and holds the same claims.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
-		Mine    bool   `query:"mine" doc:"Write out what you proposed and nobody has agreed to, instead of what is waiting on you"`
+		Mine    bool   `query:"mine" doc:"Write out only claims you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you"`
 		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		core.QueueNarrowing
 	}) (*huma.StreamResponse, error) {

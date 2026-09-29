@@ -27,6 +27,10 @@ export type Claim = {
   outcome: string;
   justification: string;
   deferredUntil: string;
+  // What a promise says: the date the work lands by, and for an upgrade the
+  // version it moves to.
+  committedTo: string;
+  upgradeTo: string;
   proposedBy: string;
   proposedAt: string;
   selectedBy: string;
@@ -60,6 +64,8 @@ export function claimOf(row: QueueRow): Claim {
     outcome: row.decision.outcome ?? "",
     justification: row.decision.justification ?? "",
     deferredUntil: row.decision.deferred_until ?? "",
+    committedTo: row.decision.committed_to ?? "",
+    upgradeTo: row.decision.upgrade_to ?? "",
     proposedBy:
       row.claim.proposed_by_name ||
       row.claim.proposed_by ||

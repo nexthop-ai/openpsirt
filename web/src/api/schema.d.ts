@@ -727,8 +727,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Change what a release is moving to
-         * @description Changes the version a promised upgrade moves to, or the date it is promised by, on the claim and on every commitment it wrote.
+         * Change a promised upgrade or patch
+         * @description Changes the version a promised upgrade moves to, or the date a promised upgrade or patch is promised by, on the claim and on every commitment it wrote. A promised patch has no version: send `to` empty or leave it out.
          *
          *     This withdraws any existing approval and returns every row of the claim to the review queue, and notifies everybody whose approval it withdrew. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
          *
@@ -5014,14 +5014,20 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List claims awaiting approval
-         * @description Returns the claims waiting for a second person, newest first, limited to what you may approve every row of. One entry is one claim — one proposer's action, however many decisions it wrote — with a representative decision and place, how many rows, issues and places it covers, and every build it currently reaches.
+         * List the review queue
+         * @description Returns the claims waiting for one reason, newest first. One entry is one claim — one proposer's action, however many decisions it wrote — with a representative decision and place, how many rows, issues and places it covers, and every build it currently reaches.
+         *
+         *     `reason` picks the list:
+         *
+         *     - `approval`, the default: claims waiting for a second person, limited to what you may approve every row of. Your own are not here, because approving your own is refused. Approve, send back or set rows aside with `POST /v1/claims/{id}/approval` and `POST /v1/claims/{id}/send-back`.
+         *     - `expired-deferral`: deferrals whose date has passed.
+         *     - `missed-fix-date`: promised upgrades and patches whose date has passed with the finding still open. Change the promise with `PUT /v1/claims/{id}/promise`.
+         *
+         *     The last two list claims you may decide on every row of, your own included, and are answered by a new decision. A decision the code moved out from under is in none of them; its author finds it in `GET /v1/to-reaffirm`.
+         *
+         *     `mine=true` keeps only your own claims: for approvals, what you proposed and nobody has agreed to yet.
          *
          *     Each entry carries the full reasoning, whether it was previously approved and came back, how long the finding has been deferred in total, and how old the claim is. A claim over many issues also carries `outliers`: the rows that do not look like the rest, which is what to read instead of all of them.
-         *
-         *     Approve, send back or set rows aside with `POST /v1/claims/{id}/approval` and `POST /v1/claims/{id}/send-back`.
-         *
-         *     Your own claims are not here. Approving your own is refused, so a queue containing them is a list of work you cannot do. Ask for `mine=true` to see what you proposed and nobody has agreed to yet, which is a different question.
          *
          *     Narrow by who proposed a claim, how old it is, how severe the issues it covers are, its outcome, and the release it covers. A claim is kept where one of its rows matches every filter, and is then returned whole.
          *
@@ -5045,11 +5051,11 @@ export interface paths {
         };
         /**
          * Export the review queue
-         * @description What is waiting for a second person, as a file: every claim, not one page of them.
+         * @description The review queue as a file: every claim, not one page of them.
          *
-         *     One row per claim, the way the screen counts them — one proposer's action, however many decisions it wrote — with how much it covers and how old it is. A backlog is reported in claims because that is the unit somebody works through.
+         *     One row per claim, the way the screen counts them — one proposer's action, however many decisions it wrote — with how much it covers and how old it is.
          *
-         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question. `product` and the other filters narrow it the way the screen does.
+         *     Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, and holds the same claims.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -10814,8 +10820,8 @@ export interface components {
             by: string;
             /** @description The reason the promise is changing, in markdown */
             reasoning: string;
-            /** @description The version it now moves to */
-            to: string;
+            /** @description The version an upgrade now moves to. Required for an upgrade, and refused for a patch */
+            to?: string;
         };
         "Resolve-findingRequest": {
             /**
@@ -20351,10 +20357,12 @@ export interface operations {
     "list-review-queue": {
         parameters: {
             query?: {
-                /** @description Return what you proposed and nobody has agreed to, instead of what is waiting on you */
+                /** @description Return only claims you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
                 /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
+                /** @description Which list: claims waiting for your approval, deferrals whose date has passed, or promised upgrades and patches whose date has passed with the finding still open */
+                reason?: "approval" | "expired-deferral" | "missed-fix-date";
                 /** @description Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty */
                 proposed_by?: string;
                 /** @description Keep only claims at least this many days old */
@@ -20397,10 +20405,12 @@ export interface operations {
     "export-review-queue": {
         parameters: {
             query?: {
-                /** @description Write out what you proposed and nobody has agreed to, instead of what is waiting on you */
+                /** @description Write out only claims you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
                 /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
+                /** @description Which list: claims waiting for your approval, deferrals whose date has passed, or promised upgrades and patches whose date has passed with the finding still open */
+                reason?: "approval" | "expired-deferral" | "missed-fix-date";
                 /** @description Keep only claims this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty */
                 proposed_by?: string;
                 /** @description Keep only claims at least this many days old */

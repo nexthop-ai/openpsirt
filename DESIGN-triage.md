@@ -555,16 +555,29 @@ that not looking is a choice rather than an omission.
 
 ### Queue contents
 
-| | |
-|---|---|
-| A claim awaiting agreement | The obvious one |
-| **A rating of an issue** somebody proposed | It had nowhere to be agreed to at all — the route existed and no screen reached it |
-| **A deferral that has run out** | The finding is back. Left out, it resurfaces as new with what somebody wrote last time attached to nothing anyone is looking at |
-| **A decision the code moved out from under** | The person who made the judgment is the person to tell, which is the entire reason a lapse is marked rather than the decision deleted |
-| **A promise whose date has gone by** | The work was to be done by then and the finding is still open, so the promise did not hold. A commitment has no expiry of its own — it goes on suppressing the finding, and the deadline the finding had passes behind it in silence |
+The queue holds three lists, one per reason a claim waits. Each is asked for
+by its reason, and a claim waiting for two reasons is in both.
 
-A claim that needed nobody — a deferral under the threshold — is not here at all,
-by the same rule that keeps unreachable work out.
+| Reason | Holds | Shown to | Answered by |
+|---|---|---|---|
+| **Approval** | A claim awaiting a second person, and nothing sent back | Whoever may approve every row of it, never its proposer | Approving, sending back, or setting rows aside |
+| **Expired deferral** | A deferral, proposed or agreed, whose date has passed | Whoever may decide on every row of it, the proposer included | A new decision |
+| **Missed fix date** | A promised upgrade or patch, proposed or agreed, whose date has passed | Whoever may decide on every row of it, the proposer included | Moving the promise to a new version or date, or a new decision |
+
+| Rule | |
+|---|---|
+| A claim that needed nobody waits for no approval | A deferral under the threshold is in force when made |
+| A decision the code moved out from under is in none of the lists | It is its author's to re-affirm, and the To reaffirm list holds it (§ Whole-action re-affirmation) |
+| An expired deferral or a missed fix date is anybody's in the product | Any triager may decide it again, and the proposer is often the one who does |
+| A promise with a passed date stays in force | A commitment has no expiry of its own, so the passed date is the only sign it did not hold |
+| Moving a promise withdraws every agreement on it | § Commitment changes in `DESIGN-remediation.md` |
+
+A rating of an issue and a movement of a disclosure date wait for a second
+person too. Neither is a claim, and each is listed apart from the three
+(`DESIGN-interface.md` § The review queue).
+
+The count beside the queue and a product's count of what waits in it take
+their claims from the approval list alone.
 
 ### Queue filters
 
@@ -573,6 +586,8 @@ waiting rows satisfies every filter, and is then shown whole.
 
 | Filter | Meaning |
 |---|---|
+| Reason | Which of the three lists. Approval where none is named |
+| Own claims | Only the reader's own. On the approval list, what they proposed and nobody has agreed to |
 | Product | Claims made in one product |
 | Proposer | Claims one person made, by sign-in identity. A name nobody holds leaves the queue empty, so a filter that could not be applied never reads as one that worked, and the answer is the same whether the name exists or not |
 | Age | Claims proposed at least this many days ago, on the clock the age beside each entry is read from |

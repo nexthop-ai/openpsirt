@@ -117,37 +117,76 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	return total, nil
 }
 
-// waitingClaims is the claims with a waiting row this person may act on, one
-// row per claim with the newest of its rows. Grouped in the statement rather
-// than afterwards, so a page is a page of claims and a count counts claims.
+// waitingClaims is the claims with a row waiting for the reason the filter
+// names, one row per claim with the newest of its rows. Grouped in the
+// statement rather than afterwards, so a page is a page of claims and a count
+// counts claims.
+//
+// Who is shown what depends on the reason. An approval is somebody else's
+// claim the reader may agree to, and never their own: approving your own is
+// refused. An expired deferral or a missed fix date asks for a new decision,
+// which anybody who may decide in the product can make, the proposer
+// included. In each case a claim is shown only where the reader may act on
+// every row of it, because acting on a claim acts on the whole argument.
 func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.SelectQuery {
 	q := s.db.NewSelect().Model((*Decision)(nil)).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`MAX(de.id) AS "newest"`).
 		GroupExpr("de.claim_id")
-	q = approvableBy(waiting(q, s.now()), subject, "de")
+	q = waiting(q, filter.Reason, s.now())
 	// One product where the caller named one, and whatever else the reader
 	// narrowed by. A claim is decided in a product, so this narrows the same
 	// way every other list does — and zero is every product, which is what the
 	// queue screen asks for.
 	q = filter.narrow(q, subject)
-	// Whose claims. Their own are not waiting on them: approving your own is
-	// refused, so counting them would be counting work nobody can do. Mine
-	// asks for exactly those instead, in the same statement, so the count and
-	// the page cannot disagree about which question was asked.
+	others := s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
+		Where(`"other".claim_id = de.claim_id`)
+	if filter.Reason.decides() {
+		if filter.Mine {
+			q = q.Where("de.proposed_by = ?", subject.ID)
+		}
+		outOfReach, args := notDecidableWhere(subject, `"other"`)
+		return decidableBy(q, subject, "de").
+			Where("NOT EXISTS (?)", others.Where(outOfReach, args...))
+	}
+	q = approvableBy(q, subject, "de")
+	// Mine asks for the reader's own claims waiting on somebody else, in the
+	// same statement, so the count and the page cannot disagree about which
+	// question was asked.
 	if filter.Mine {
 		q = q.Where("de.proposed_by = ?", subject.ID)
 	} else {
 		q = q.Where("de.proposed_by <> ?", subject.ID)
 	}
-	return q.Where("NOT EXISTS (?)", notApprovableBy(
-		s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
-			Where(`"other".claim_id = de.claim_id`), subject, `"other"`))
+	return q.Where("NOT EXISTS (?)", notApprovableBy(others, subject, `"other"`))
 }
+
+// QueueReason is why a claim waits in the review queue. Each reason is its own
+// list, with its own audience and its own acts.
+type QueueReason string
+
+const (
+	// ForApproval is a claim waiting for a second person to agree to it.
+	ForApproval QueueReason = "approval"
+	// DeferralExpired is a deferral whose date has passed.
+	DeferralExpired QueueReason = "expired-deferral"
+	// FixDateMissed is a promise of an upgrade or a patch whose date has
+	// passed with the finding still open.
+	FixDateMissed QueueReason = "missed-fix-date"
+)
+
+// QueueReasons is every reason, in the order the queue offers them.
+func QueueReasons() []QueueReason { return []QueueReason{ForApproval, DeferralExpired, FixDateMissed} }
+
+// decides reports whether the reason asks for a new decision rather than an
+// agreement.
+func (r QueueReason) decides() bool { return r == DeferralExpired || r == FixDateMissed }
 
 // QueueFilter narrows the review queue. The zero value is every claim waiting
 // on the reader, in every product they may approve in.
 type QueueFilter struct {
+	// Reason is which list: the zero value is claims waiting for approval.
+	Reason QueueReason
 	// Mine asks for what the reader proposed instead of what waits on them.
 	Mine bool
 	// ProductID is one product, or zero for every one.
@@ -238,11 +277,9 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 // part they may approve, a reader would agree to words whose other half stays
 // waiting on somebody else, and the count beside the card would be wrong.
 //
-// And not their own. Approving your own claim is refused, because a control
-// one person completes alone is not one — so a queue containing them
-// is a work list of things the reader cannot do, which teaches them to skip
-// rows. `mine` asks for exactly those instead: somebody wants to find what they
-// proposed and nobody has agreed to yet, and that is a different question from
+// The filter's reason picks the list, and waitingClaims says who is shown
+// each. `mine` keeps the reader's own claims: for approvals, what they
+// proposed and nobody has agreed to yet, which is a different question from
 // what is waiting on them.
 func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueFilter,
 	limit, offset int) ([]Waiting, int, error) {
@@ -727,43 +764,30 @@ func (s *Store) everApproved(ctx context.Context, ids []int64) (map[int64]bool, 
 	return seen, nil
 }
 
-// waiting narrows a query to what somebody has to look at.
+// waiting narrows a query to the rows waiting for one reason.
 //
-// Three things, not one. A claim awaiting agreement is the obvious case. The
-// other two are what happens when a judgment stops covering anything:
-//
-// A deferral that has run out has said what it was going to say. The finding
-// is back, and if it does not appear here it simply reappears as new with the
-// reasoning stranded behind it — which is the outcome marking a lapse exists
-// to prevent.
-//
-// A decision the code moved out from under is the same shape: somebody made a
-// judgment, it no longer applies, and they are the person who should be told.
-//
-// A promise whose date has gone by is the third of that shape. The work was
-// to be done by then and the finding is still open, so the promise did not
-// hold — and nothing else notices, because a commitment has no expiry: it goes
-// on suppressing the finding, and the deadline the finding had passes behind
-// it in silence.
-//
-// A claim that needed nobody — a short deferral — is not here at all. A work
-// list containing work nobody has to do teaches people to skip rows.
-func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
-	// The run-out deferral asks the claim, which is where the outcome and the
-	// date are. An EXISTS rather than a join, because this narrows queries
-	// that already group and count over the decision and a join would multiply
-	// nothing here but would have to be repeated at every caller.
-	ranOut := `EXISTS (SELECT 1 FROM "claim" AS "wc" WHERE wc.id = de.claim_id
-		AND wc.outcome = ? AND wc.deferred_until IS NOT NULL AND wc.deferred_until <= ?)`
-	// The promise that came due, asked the same way of the same table.
-	cameDue := `EXISTS (SELECT 1 FROM "claim" AS "wp" WHERE wp.id = de.claim_id
-		AND wp.outcome IN (?) AND wp.committed_to IS NOT NULL AND wp.committed_to <= ?)`
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.
-			WhereOr("de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL", Proposed, true).
-			WhereOr("de.state = ?", LapsedState).
-			WhereOr("de.state IN (?, ?) AND "+ranOut, Proposed, Approved, Deferred, now).
-			WhereOr("de.state IN (?, ?) AND "+cameDue, Proposed, Approved,
+// A claim that needed nobody — a short deferral — waits for no approval. A
+// decision the code moved out from under is not here: it is its author's to
+// re-affirm, and that list is its own.
+func waiting(query *bun.SelectQuery, reason QueueReason, now time.Time) *bun.SelectQuery {
+	switch reason {
+	case DeferralExpired:
+		// The date is on the claim. An EXISTS rather than a join, because
+		// this narrows a query that already groups over the decision.
+		return query.Where("de.state IN (?, ?)", Proposed, Approved).
+			Where(`EXISTS (SELECT 1 FROM "claim" AS "wc" WHERE wc.id = de.claim_id
+		AND wc.outcome = ? AND wc.deferred_until IS NOT NULL AND wc.deferred_until <= ?)`,
+				Deferred, now)
+	case FixDateMissed:
+		// A promise has no expiry of its own and goes on suppressing the
+		// finding after its date, so a passed date is the only sign it did not
+		// hold.
+		return query.Where("de.state IN (?, ?)", Proposed, Approved).
+			Where(`EXISTS (SELECT 1 FROM "claim" AS "wp" WHERE wp.id = de.claim_id
+		AND wp.outcome IN (?) AND wp.committed_to IS NOT NULL AND wp.committed_to <= ?)`,
 				bun.List([]Outcome{UpgradeNeeded, PatchNeeded}), now)
-	})
+	default:
+		return query.Where("de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL",
+			Proposed, true)
+	}
 }

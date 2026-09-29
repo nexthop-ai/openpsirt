@@ -25,7 +25,7 @@ import { Markdown } from "../ui/Markdown";
 import { EditPiece, Thread } from "../ui/Thread";
 import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
-import { decisionAt } from "../app/routes";
+import { claimAt, decisionAt } from "../app/routes";
 
 type Detail = Body<"DecisionDetail">;
 
@@ -47,6 +47,9 @@ export type Previous = {
 // The head's pill reads each claim's state as a whole where the finding
 // reports it, not the representative row's: one row approved and forty
 // returned is pending, not approved.
+//
+// A proposed claim that needs nobody is in force, the same as an approved one:
+// an "affected" answer or a short deferral waits for no second person.
 export function stateOf(
   claims: Detail[],
   decided: number,
@@ -59,10 +62,13 @@ export function stateOf(
       : { label: "Undecided", cls: "open" };
   const states =
     overall.length === claims.length ? overall : claims.map((c) => c.decision?.state ?? "");
-  if (states.some((s) => s === "proposed")) return { label: "Pending approval", cls: "waiting" };
-  if (states.every((s) => s === "approved")) {
+  const waits = (i: number) => !!claims[i]?.decision?.needs_approval;
+  if (states.some((s, i) => s === "proposed" && waits(i)))
+    return { label: "Pending approval", cls: "waiting" };
+  if (states.every((s) => s === "approved" || s === "proposed")) {
     const outcome = claims[0]?.decision?.outcome ?? "";
-    return { label: `${labeled(outcome)} · approved`, cls: "agreed" };
+    const word = states.every((s) => s === "approved") ? "approved" : "in force";
+    return { label: `${labeled(outcome)} · ${word}`, cls: "agreed" };
   }
   if (states.some((s) => s === "lapsed")) return { label: "Lapsed", cls: "lapsed" };
   return { label: "Decided", cls: "agreed" };
@@ -107,6 +113,8 @@ export function Standing({
   // The claim's state as a whole, not its representative row's: a claim with
   // one row approved and forty sent back is not approved.
   const state = summary?.state ?? claim.decision?.state ?? "";
+  // Proposed and needing nobody is in force: nothing waits on a second person.
+  const waiting = state === "proposed" && !!claim.decision?.needs_approval;
   const rows = summary?.rows;
   const mixed =
     !!rows &&
@@ -120,14 +128,13 @@ export function Standing({
   });
   const live = (approvals.data?.items ?? []).filter((a) => !a.withdrawn_at);
   const last = live[live.length - 1];
-  const stripe =
-    state === "proposed"
-      ? "pending"
-      : state === "approved"
-        ? "approved"
-        : state === "lapsed"
-          ? "lapsed"
-          : "";
+  const stripe = waiting
+    ? "pending"
+    : state === "approved" || state === "proposed"
+      ? "approved"
+      : state === "lapsed"
+        ? "lapsed"
+        : "";
 
   return (
     <div className={`card standing ${stripe}`}>
@@ -219,7 +226,11 @@ export function Standing({
         <div>
           <span className="l">Approval</span>
           <span className="v">
-            {state === "proposed" ? (
+            {state === "proposed" && !waiting ? (
+              <>
+                <span className="state agreed">In force</span> needs no second person
+              </>
+            ) : state === "proposed" ? (
               <>
                 <span className="state waiting">Pending</span> waiting for a second person
                 {mixed && rows && (
@@ -578,6 +589,8 @@ function Prior({
   const queries = useQueryClient();
   const [note, setNote] = useState("");
   const [asking, setAsking] = useState(false);
+  // What reaffirming answered, said on the card it was done from.
+  const [done, setDone] = useState<{ claimId: number; waiting: boolean } | null>(null);
   const reaffirm = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -589,8 +602,9 @@ function Prior({
           },
         ),
       ),
-    onSuccess: () => {
+    onSuccess: (made) => {
       setAsking(false);
+      setDone({ claimId: made.claim_id ?? 0, waiting: !!made.needs_approval });
       void queries.invalidateQueries({ queryKey: ["finding"] });
       void queries.invalidateQueries({ queryKey: ["decided"] });
       void queries.invalidateQueries({ queryKey: ["queue"] });
@@ -636,6 +650,21 @@ function Prior({
       )}
       {reaffirm.error != null && (
         <Failed error={reaffirm.error} what="That could not be reaffirmed." />
+      )}
+      {done && (
+        <div className="alert info" role="status" style={{ margin: "8px 0 0" }}>
+          <strong>Reaffirmed</strong>
+          <span>
+            {done.waiting
+              ? "It takes effect once a second person agrees. "
+              : "In force now, with the earlier agreement carried onto it."}
+            {done.waiting && done.claimId > 0 && (
+              <Link to={claimAt(done.claimId)} className="linkish">
+                Open the decision →
+              </Link>
+            )}
+          </span>
+        </div>
       )}
       {asking && (
         <div className="field" style={{ margin: "8px 0 0", maxWidth: "78ch" }}>

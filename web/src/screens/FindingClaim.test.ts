@@ -7,8 +7,11 @@ import { labeled } from "../ui/Outcome";
 
 // The state a finding's header says it is in. Each case reaches one arm.
 type Claims = Parameters<typeof stateOf>[0];
+// Every claim here is a dismissal, which needs a second person.
 const claims = (...states: string[]): Claims =>
-  states.map((state) => ({ decision: { state, outcome: "wont-fix" } })) as unknown as Claims;
+  states.map((state) => ({
+    decision: { state, outcome: "wont-fix", needs_approval: true },
+  })) as unknown as Claims;
 
 describe("the state a finding is said to be in", () => {
   it("is decided where no claim stands and every place is answered", () => {
@@ -24,6 +27,16 @@ describe("the state a finding is said to be in", () => {
     expect(stateOf(claims("approved", "proposed", "lapsed"), 1, 3, []).label).toBe(
       "Pending approval",
     );
+  });
+
+  it("is in force where a proposed claim needs nobody", () => {
+    const affected = [
+      { decision: { state: "proposed", outcome: "affected" } },
+    ] as unknown as Claims;
+    expect(stateOf(affected, 1, 1, [])).toEqual({
+      label: `${labeled("affected")} · in force`,
+      cls: "agreed",
+    });
   });
 
   it("names the outcome where every claim is approved", () => {

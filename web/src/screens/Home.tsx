@@ -941,8 +941,14 @@ function Lapsed() {
         <p className="reading">Nothing has lapsed.</p>
       )}
       <footer>
-        <Link to="/review-queue#lapsed" className="linkish">
-          Lapsed decisions →
+        {/* Each to the list that answers it: an expired deferral is anybody's
+            in the product to decide again, and a lapsed claim is its author's
+            to re-affirm. */}
+        <Link to="/review-queue?reason=expired-deferral" className="linkish">
+          Expired deferrals →
+        </Link>{" "}
+        <Link to="/review-queue?reaffirm=1" className="linkish">
+          To reaffirm →
         </Link>
       </footer>
     </div>

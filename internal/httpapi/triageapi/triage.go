@@ -172,26 +172,34 @@ type QueueOutput struct {
 func registerTriage(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-review-queue", Method: http.MethodGet, Path: "/v1/review-queue",
-		Summary: "List claims awaiting approval",
-		Description: "Returns the claims waiting for a second person, newest first, limited to " +
-			"what you may approve every row of. One entry is one claim — one proposer's action, " +
-			"however many decisions it wrote — with a representative decision and place, how " +
-			"many rows, issues and places it covers, and every build it currently reaches.\n\n" +
+		Summary: "List the review queue",
+		Description: "Returns the claims waiting for one reason, newest first. One entry is one " +
+			"claim — one proposer's action, however many decisions it wrote — with a " +
+			"representative decision and place, how many rows, issues and places it covers, " +
+			"and every build it currently reaches.\n\n" +
+			"`reason` picks the list:\n\n" +
+			"- `approval`, the default: claims waiting for a second person, limited to what " +
+			"you may approve every row of. Your own are not here, because approving your own " +
+			"is refused. Approve, send back or set rows aside with " +
+			"`POST /v1/claims/{id}/approval` and `POST /v1/claims/{id}/send-back`.\n" +
+			"- `expired-deferral`: deferrals whose date has passed.\n" +
+			"- `missed-fix-date`: promised upgrades and patches whose date has passed with the " +
+			"finding still open. Change the promise with `PUT /v1/claims/{id}/promise`.\n\n" +
+			"The last two list claims you may decide on every row of, your own included, and " +
+			"are answered by a new decision. A decision the code moved out from under is in " +
+			"none of them; its author finds it in `GET /v1/to-reaffirm`.\n\n" +
+			"`mine=true` keeps only your own claims: for approvals, what you proposed and " +
+			"nobody has agreed to yet.\n\n" +
 			"Each entry carries the full reasoning, whether it was previously approved and came " +
 			"back, how long the finding has been deferred in total, and how old the claim is. A " +
 			"claim over many issues also carries `outliers`: the rows that do not look like the " +
 			"rest, which is what to read instead of all of them.\n\n" +
-			"Approve, send back or set rows aside with `POST /v1/claims/{id}/approval` and " +
-			"`POST /v1/claims/{id}/send-back`.\n\n" +
-			"Your own claims are not here. Approving your own is refused, so a queue " +
-			"containing them is a list of work you cannot do. Ask for `mine=true` to see what " +
-			"you proposed and nobody has agreed to yet, which is a different question.\n\n" +
 			"Narrow by who proposed a claim, how old it is, how severe the issues it covers " +
 			"are, its outcome, and the release it covers. A claim is kept where one of its " +
 			"rows matches every filter, and is then returned whole.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Mine    bool   `query:"mine" doc:"Return what you proposed and nobody has agreed to, instead of what is waiting on you"`
+		Mine    bool   `query:"mine" doc:"Return only claims you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you"`
 		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		core.QueueNarrowing
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
@@ -263,9 +271,10 @@ func registerTriage(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "repromise-upgrade", Method: http.MethodPut,
 		Path:    "/v1/claims/{id}/promise",
-		Summary: "Change what a release is moving to",
-		Description: "Changes the version a promised upgrade moves to, or the date it is " +
-			"promised by, on the claim and on every commitment it wrote.\n\n" +
+		Summary: "Change a promised upgrade or patch",
+		Description: "Changes the version a promised upgrade moves to, or the date a promised " +
+			"upgrade or patch is promised by, on the claim and on every commitment it wrote. " +
+			"A promised patch has no version: send `to` empty or leave it out.\n\n" +
 			"This withdraws any existing approval and returns every row of the claim to " +
 			"the review queue, and notifies everybody whose approval it withdrew. An approver " +
 			"agreed to a version by a date; changing either is " +
@@ -278,7 +287,7 @@ func registerTriage(api huma.API, in core.Deps) {
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			To        string `json:"to" minLength:"1" doc:"The version it now moves to"`
+			To        string `json:"to,omitempty" doc:"The version an upgrade now moves to. Required for an upgrade, and refused for a patch"`
 			By        string `json:"by" format:"date" doc:"The date the work will be done by"`
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason the promise is changing, in markdown"`
 		}

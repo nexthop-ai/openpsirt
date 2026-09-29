@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap, whichOf } from "../api/queries";
-import { componentAt, decideAt, treeAt } from "../app/routes";
+import { claimAt, componentAt, decideAt, treeAt } from "../app/routes";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Empty } from "../ui/Empty";
@@ -22,7 +22,7 @@ import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
-import { binaries, findingsAt, openIssues } from "./componentLinks";
+import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
 
 // One source package, and the one piece of work it is.
 //
@@ -709,6 +709,13 @@ function Upgrade({
   const [because, setBecause] = useState("");
   const [holder, setHolder] = useState<Held | null>(null);
   const [said, setSaid] = useState<string | null>(null);
+  // Where the promise just made is followed: its own page while it waits for
+  // a second person, and the pending upgrades of the builds it names.
+  const [made, setMade] = useState<{
+    claimId: number;
+    waiting: boolean;
+    builds: { stream: string; variant: string }[];
+  } | null>(null);
   // Every release shipping this version, because one bump moves all of them.
   const [chosen, setChosen] = useState<Set<string>>(
     () => new Set(covering.map((row) => buildKey(row, row.version))),
@@ -746,6 +753,14 @@ function Upgrade({
             : " In force now.") +
           (done.held ? ` Carried by ${holder?.name ?? "them"}.` : ""),
       );
+      setMade({
+        claimId: done.claim_id,
+        waiting: done.waiting,
+        builds: [...chosen].map((each) => {
+          const { stream, variant } = fromBuildKey(each);
+          return { stream, variant };
+        }),
+      });
       setBy("");
       setBecause("");
       setHolder(null);
@@ -759,7 +774,23 @@ function Upgrade({
     return (
       <div className="alert info" style={{ marginTop: 12 }}>
         <strong>Recorded</strong>
-        <span>{said}</span>
+        <span>
+          {said}{" "}
+          {made?.waiting && (
+            <>
+              <Link to={claimAt(made.claimId)} className="linkish">
+                Open the decision →
+              </Link>{" "}
+            </>
+          )}
+          {promiseLinks(product, made?.builds ?? []).map((link) => (
+            <span key={link.to}>
+              <Link to={link.to} className="linkish">
+                {link.label}
+              </Link>{" "}
+            </span>
+          ))}
+        </span>
         <button type="button" className="linkish" onClick={() => setSaid(null)}>
           Schedule another
         </button>
