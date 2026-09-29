@@ -518,8 +518,9 @@ channel there will be. Mail carries the text as its plain-text part.
 ## Outbound HTTP
 
 One signed HTTP request per notification kind and per operational condition,
-configured per deployment. That covers Slack, Teams, a tracker driven by
-automation and paging without an adapter each.
+configured per deployment. That covers Slack, a tracker driven by automation
+and paging without an adapter each. Teams takes one only through a workflow
+built in its tenant that turns the body into a card, as § Chat says.
 
 This is an egress to an address an operator types: a host an administrator
 configured, which REQ-69 lets it reach wherever that is. It is still a
@@ -754,7 +755,7 @@ finding it names may since have been decided, closed or reopened.
 |---|---|
 | Teams and Google Chat | Slack and Zulip are built. § Chat says what each of the other two needs |
 | A message when a rule routes work to a team | Routed work arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
-| The HTML part of a mail | It needs a markdown renderer on the server, and none exists |
+| The HTML part of a mail | Every mail body is text the server composes, so the part is that text escaped, with the link as an anchor. A renderer would be needed only for typed notes, which mail does not carry |
 
 ## Limits
 

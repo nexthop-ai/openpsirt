@@ -166,14 +166,20 @@ this is the whole of it.
 
 ## The work list
 
-`TODO.md` holds everything still in scope and not built: the work that has to
-happen before 1.0, what the owner deferred, decisions taken but not
-implemented, questions waiting on an answer, and what was measured and left
-alone deliberately.
+`TODO.md` is deprecated. New work is filed as a GitHub issue, and nothing is
+added to the file. What it still holds is in scope, not built and not yet filed:
+the work that has to happen before 1.0, what the owner deferred, decisions taken
+but not implemented, questions waiting on an answer, and what was measured and
+left alone deliberately. An item filed as an issue leaves it.
 
-Nothing may reference it — not code, not comments, not commit messages, not
-the design documents. It is a work list, not a record. Anything durable moves
-to `REQUIREMENTS.md` or a `DESIGN-*.md` before it is ticked off.
+| Rule | |
+|---|---|
+| Every item carries an identifier, `TODO-` and a number, never changed or reused | Conversation and pull request descriptions cite an item by it |
+| An item says what exists today, what is missing or wrong, the work to do as an instruction, and what it waits on, in plain words | A reader who has not seen the code knows what the work is |
+| Code, comments, commit messages and design documents do not cite the file or its identifiers | It is a work list, not a record, and an identifier dies with its item |
+
+Anything durable moves to `REQUIREMENTS.md` or a `DESIGN-*.md` before an item
+is deleted.
 
 Name regression tests for the invariant they pin, never for an item on a list.
 

@@ -571,7 +571,7 @@ filtered set out of the list.
 
 ## Saved filters
 
-Personal, and nothing is shared (REQ-57). No ownership, no permissions, no
+Personal, and nothing is shared. No ownership, no permissions, no
 arguing about whose filter is authoritative, and nobody hesitates to save
 something half-formed.
 

@@ -155,8 +155,9 @@ Markdown is what an integrating application can most easily lay out, and it read
 as plain text as it stands. HTML assumes a browser, which most callers of an
 API-first tool are not.
 
-Mail is plain text, so nothing renders there either. An HTML part is the case
-that would need a renderer on the server, and it is not built.
+Mail is plain text, so nothing renders there either. Mail carries no typed
+text, only sentences the server composes, so an HTML part needs no renderer.
+It is not built.
 
 Sanitizing travels with rendering, and every renderer is somebody else's: the
 interface for a browser, an integrator for their own application. A rendering

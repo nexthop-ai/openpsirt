@@ -169,7 +169,7 @@ administrator sets. The caller is told to retry.
 | A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
 | Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
 | Back-pressure rather than an exact bound | Producers adding at the same moment each count what has committed, so the backlog can pass the limit by as many as are adding at once. An exact bound takes a lock per kind, which is spelled per engine |
-| An upload refused for a full queue raises an alert | It names the build and says the limit and how to raise it. The refusal is the moment data may be lost, because the producer may not retry, and it is an event rather than a level, so no threshold is needed. A deep queue that still takes work is a busy night and alerts nobody. Not built: the refusal is logged, and the System screen marks the kind at its limit |
+| An upload refused for a full queue raises an alert | It names the build and says the limit and how to raise it. The refusal is the moment data may be lost, because the producer may not retry, and it is an event rather than a level, so no threshold is needed. A deep queue that still takes work is a busy night and alerts nobody. Not built: the refusal is answered 503 and is neither logged nor recorded as a refused upload, and the System screen marks the kind at its limit |
 
 ## Configurable bounds
 
