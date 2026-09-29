@@ -6,6 +6,7 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -228,6 +229,29 @@ func savedFiltersBecomeTheirPersons() upgradeCheck {
 				if got != claim {
 					t.Errorf("rolled back, the filter preparing a claim prepares %+v, want %+v", got, claim)
 				}
+			}
+		},
+		// Upgraded again, every copy the roll back made is the twin of the one
+		// in the first product and goes, so the person holds what the first
+		// upgrade left them and nothing is renamed twice.
+		upgradedAgain: func(t *testing.T, ctx context.Context, db *database.DB) {
+			want := []string{
+				"claim", "kernel", "kernel (saved-edge)", "kernel (saved-edge) 2",
+				strings.ToLower("kernel (" + longProduct[:60] + ")"), "kernel (switch)",
+				"lonely", longName, longName[:111] + " (switch)",
+			}
+			var names []string
+			if err := db.DB.NewRaw(`SELECT "name" FROM "saved_filter" WHERE "person_id" = ?`,
+				ana).Scan(ctx, &names); err != nil {
+				t.Fatal(err)
+			}
+			slices.Sort(names)
+			slices.Sort(want)
+			if !slices.Equal(names, want) {
+				t.Errorf("upgraded again, the person keeps %q, want %q", names, want)
+			}
+			if got := preparedBy(t, ctx, db, `"person_id" = ? AND "name" = 'claim'`, ana); len(got) != 1 || got[0] != claim {
+				t.Errorf("upgraded again, the filter preparing a claim prepares %+v, want %+v", got, claim)
 			}
 		},
 	}
