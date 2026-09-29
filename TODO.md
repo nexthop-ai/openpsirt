@@ -1,13 +1,14 @@
 # TODO
 
-Everything still in scope, not built, and not tracked anywhere else. Work filed
-as a GitHub issue leaves this file.
+> Deprecated. New work is filed as a GitHub issue, never added here. The items
+> below move to issues and leave this file as they do.
+
+Everything still in scope, not built, and not yet filed as a GitHub issue.
 
 | Rule | |
 |---|---|
 | Each item has an identifier, `TODO-` and a number | Conversation and pull request descriptions cite an item by it |
 | An identifier is never changed or reused | A finished item is deleted and its number retired |
-| A new item takes the next unused number, whichever section it lands in | Numbers say nothing about order or priority |
 | Code, comments, commit messages and design documents do not cite this file or its identifiers | Anything durable moves to `REQUIREMENTS.md` or a `DESIGN-*.md` before an item is deleted |
 
 Each item says what exists today, what is missing or wrong, what done looks
@@ -280,7 +281,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Today | Each notification goes out as one plain-text mail, with the link as a bare address |
 | Problem | No clickable link and no layout |
 | Done | A multipart mail carrying the same text plus an HTML part with the link as an anchor and nothing fetched remotely. The content rules for undisclosed work are unchanged (REQ-48) |
-| Waits on | Nothing. Mail bodies are sentences the server composes, so the HTML part is the escaped text with the link wrapped. `DESIGN-text.md` and `DESIGN-notifications.md` say it needs a server-side markdown renderer, which holds only if mail starts carrying typed notes |
+| Waits on | Nothing. Mail bodies are sentences the server composes, so the HTML part is the escaped text with the link wrapped. |
 
 ### TODO-28 Spacing scale
 
@@ -316,7 +317,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Today | SPDX 3 inventories are read. Every SPDX 3 test document is an example from the specification's repository, and the one written by a real tool holds only its own subject |
 | Problem | What real producers emit (which way relationships point, scopes, identifiers) is untested. One specification example already has its relationships backwards. A Yocto build uploading SPDX 3 could lose its dependency tree and no test would notice |
 | Done | At least one real producer's document, such as Yocto's `create-spdx-3.0` output, under a license the repository may carry and named in `NOTICE`, with a test pinning its component, edge and unplaced counts |
-| Waits on | Finding a document with a usable license. The fixtures README says there are four SPDX 3 fixtures, and there are five |
+| Waits on | Finding a document with a usable license. |
 
 ### TODO-33 Version on build VEX claims
 
@@ -377,7 +378,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | | |
 |---|---|
 | Today | An upload that arrives while 1,000 inventories wait to be read is answered 503 "try again shortly". Nothing is logged, and no record of the refused upload is kept, unlike every other refusal. The System screen marks the queue at its limit |
-| Problem | A pipeline that does not retry loses the inventory with no trace. A week later the deployment tells administrators the build "has not been scanned for a week. Nothing has failed — nothing has arrived", which blames a pipeline that did send it. `DESIGN-queue.md` says the refusal is logged |
+| Problem | A pipeline that does not retry loses the inventory with no trace. A week later the deployment tells administrators the build "has not been scanned for a week. Nothing has failed — nothing has arrived", which blames a pipeline that did send it. |
 | Done | The refusal is logged and recorded like any other, the week-quiet message names it, and administrators are alerted naming the build, the limit and how to raise it, at most once per build per day |
 | Waits on | The owner: an event people acknowledge, or a condition that clears when the build next uploads; administrators only, or the product's triagers too. Logging and recording need nothing |
 
@@ -389,15 +390,6 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Problem | The researcher publishes on the date they announced, and no warning before it ever fires. It is the reporter coordination REQ-37 exists for |
 | Done | Ruling an outside report a duplicate gives the flaw's private findings a disclosure date counted from when the report arrived, keeping any earlier date already set, and records where the date came from |
 | Waits on | The owner: whether withdrawing the ruling removes the date; whether the ruling form shows the date it will start; whether duplicates ruled before the fix get dates. |
-
-### TODO-41 Documents that contradict the code
-
-| | |
-|---|---|
-| Today | A review of this file against the code found statements in the design documents that the code does not bear out |
-| Problem | `DESIGN-notifications.md` says the signed webhook covers Teams, and its § Chat says Teams retired incoming webhooks. `DESIGN-interface.md` cites REQ-57 for saved filters being personal, and REQ-57 is about the grain of the findings list. `DESIGN-queue.md` says a full-queue refusal is logged (TODO-39). `DESIGN-text.md` and `DESIGN-notifications.md` say HTML mail needs a markdown renderer (TODO-27) |
-| Done | Each document says what the code does |
-| Waits on | Nothing |
 
 ## Weak tests
 

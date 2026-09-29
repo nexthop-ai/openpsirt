@@ -82,7 +82,8 @@ every decision already made alone.
 
 ## The SPDX 3.0 fixtures
 
-There are four, and none from a producer. Every other format here is read
+There are five. One was written by sbom-tool and holds only its own subject, so
+none shows what a producer's output looks like. Every other format here is read
 against
 somebody's own output as well as against a written specification. Nothing this
 deployment ingests emits 3.0 — the scanner it ships emits 2.3 and tag-value —

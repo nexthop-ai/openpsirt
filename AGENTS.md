@@ -166,11 +166,11 @@ this is the whole of it.
 
 ## The work list
 
-`TODO.md` holds everything still in scope and not built: the work that has to
-happen before 1.0, what the owner deferred, decisions taken but not
-implemented, questions waiting on an answer, and what was measured and left
-alone deliberately. It holds only what is tracked nowhere else: work filed as a
-GitHub issue leaves it.
+`TODO.md` is deprecated. New work is filed as a GitHub issue, and nothing is
+added to the file. What it still holds is in scope, not built and not yet filed:
+the work that has to happen before 1.0, what the owner deferred, decisions taken
+but not implemented, questions waiting on an answer, and what was measured and
+left alone deliberately. An item filed as an issue leaves it.
 
 | Rule | |
 |---|---|

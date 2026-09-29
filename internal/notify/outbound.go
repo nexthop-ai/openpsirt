@@ -42,9 +42,10 @@ const signalTimeout = 15 * time.Second
 // Mail alone reaches a person who is already looking. Every comparable tool
 // reaches a chat channel and a tracker, and without one a fix target is a wish
 // and an approver discovers a claim by opening the queue. One signed HTTP
-// request gives Slack, Teams, a tracker driven by automation and paging
-// without an adapter for any of them, which is what the channel interface was
-// for and is reached more cheaply than by writing two of them.
+// request gives Slack, a tracker driven by automation and paging without an
+// adapter for any of them, and Teams through a workflow built in its tenant.
+// That is what the channel interface was for, reached more cheaply than by
+// writing two adapters.
 //
 // It carries what the channel rules already allow. The body is composed by
 // the same code that composes a mail, so a notification about a
