@@ -206,6 +206,8 @@ going back to v0.4.0.
 | An API key's name | Stored in lower case. Withdraw it by that name in any capitals |
 | One person's API tokens whose names differ only in capitals or surrounding spaces | One keeps the name in lower case and goes on working: a token in force before a withdrawn one, then the oldest. Every other token in force is withdrawn, so a script using it is refused from the upgrade on and its owner needs to mint a new one. The owner's token list shows each one as withdrawn under a numbered name, as `laptop #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it |
 | An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
+| An exploited issue | Has no day it was listed in the known-exploited catalog. The first scan stating one moves every open exploited finding of the issue to count from that day, and some become overdue at once |
+| A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
 | Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made |
 
 ## Serving
