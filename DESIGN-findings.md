@@ -1166,15 +1166,16 @@ of its product once per row.
 
 | Undecided, first page and total | SQLite | PostgreSQL | MySQL | MariaDB |
 |---|---|---|---|---|
-| Across products, decisions outermost | 1.5 s | 0.57 s | 1.7 s | 0.78 s |
-| Across products, findings outermost | 331 s | 0.56 s | 1.7 s | 0.77 s |
-| Inside one product | 0.83 s | 0.57 s | 1.2 s | 0.98 s |
+| Across products, decisions outermost | 0.78 s | 0.57 s | 1.7 s | 0.78 s |
+| Across products, findings outermost | 331 s, without statistics | 0.56 s | 1.7 s | 0.77 s |
+| Inside one product | 1.3 s | 0.57 s | 1.2 s | 0.98 s |
 
 Measured over 425,680 open rows in two products, a kernel carrying 6,000 issues
 under 34 consumers among them, and 3,060 decisions, one row per page. Every
-figure is taken after the servers' planner statistics are refreshed, which a
-server does on its own once about a tenth of a table has changed; SQLite
-gathers none, as in a deployment. Before that refresh the servers plan freshly
+figure but one is taken after the planner statistics are refreshed, which a
+server does on its own once about a tenth of a table has changed and a SQLite
+deployment does at start and after every scan. SQLite with the findings
+outermost was taken without them. Before that refresh the servers plan freshly
 loaded tables from one-row estimates: MySQL then reaches the findings through
 the index on open rows instead of the place index and takes minutes, whichever
 way the statement is written.

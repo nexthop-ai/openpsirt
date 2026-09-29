@@ -97,8 +97,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		TableExpr(`"decision" AS "de"`).
 		// The decision is on the outside of this join by construction, and
 		// the spelling is the instruction. CROSS JOIN ... WHERE is an inner
-		// join on every engine; on SQLite, until its statistics are first
-		// refreshed, it also fixes the order — and left
+		// join on every engine; on SQLite it also fixes the order, statistics
+		// or not — and left
 		// to itself the planner started from finding, taking "open" as an
 		// equality that matches ten rows when it matches every open row in
 		// the deployment, and probed the decisions once per row: 0.46 s to
