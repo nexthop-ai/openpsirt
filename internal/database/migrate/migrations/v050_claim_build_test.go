@@ -14,9 +14,29 @@ import (
 
 // Upgraded, a claim v0.4.0 holds records no build it was made on: v0.4.0 kept
 // none, and the record is never guessed. Rolled back, the table is gone and
-// the claim stays.
+// the claim stays. Upgraded again, it still records none.
 func claimsRecordNoBuildTheyWereMadeOn() upgradeCheck {
 	var claim int64
+	// Upgraded again after the roll back, the claim is still there and still
+	// records nothing: the table comes back empty.
+	recordsNone := func(t *testing.T, ctx context.Context, db *database.DB) {
+		t.Helper()
+		var held, recorded int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "claim" WHERE "id" = ?`, claim).
+			Scan(ctx, &held); err != nil {
+			t.Fatal(err)
+		}
+		if held != 1 {
+			t.Fatalf("the seeded claim is not there, so this checked nothing")
+		}
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "claim_build" WHERE "claim_id" = ?`, claim).
+			Scan(ctx, &recorded); err != nil {
+			t.Fatal(err)
+		}
+		if recorded != 0 {
+			t.Errorf("a claim v0.4.0 held records %d builds it was made on, want none", recorded)
+		}
+	}
 	return upgradeCheck{
 		name: "AnUpgradedClaimRecordsNoBuildItWasMadeOn",
 		seed: func(t *testing.T, ctx context.Context, db *database.DB) {
@@ -37,24 +57,8 @@ func claimsRecordNoBuildTheyWereMadeOn() upgradeCheck {
 				t.Fatal(err)
 			}
 		},
-		upgraded: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var held, recorded int
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "claim" WHERE "id" = ?`, claim).
-				Scan(ctx, &held); err != nil {
-				t.Fatal(err)
-			}
-			if held != 1 {
-				t.Fatalf("upgraded, the seeded claim is not there, so this checked nothing")
-			}
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "claim_build" WHERE "claim_id" = ?`, claim).
-				Scan(ctx, &recorded); err != nil {
-				t.Fatal(err)
-			}
-			if recorded != 0 {
-				t.Errorf("upgraded, a claim v0.4.0 held records %d builds it was made on, want none",
-					recorded)
-			}
-		},
+		upgraded:      recordsNone,
+		upgradedAgain: recordsNone,
 		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
 			var held int
 			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "claim" WHERE "id" = ?`, claim).

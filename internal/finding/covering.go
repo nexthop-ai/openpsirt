@@ -67,6 +67,12 @@ func coveringOutcomes(reader Reader) string {
 // findings are read at: a decision carries the visibility of the finding it was
 // made about.
 //
+// Approved, and not merely in force. A proposal needing nobody is in force on
+// the screens here, and a published document carries only what a second
+// person agreed to. Every outcome that covers a place hides risk, which always
+// needs one, so the two agree today; the narrower word keeps them apart if
+// that ever moves.
+//
 // The joins are left and the outcome test is part of the join rather than a
 // filter, because what the counting asks is whether every open place is
 // decided: a place nobody decided contributes a row with no claim, and a
