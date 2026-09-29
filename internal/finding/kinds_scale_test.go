@@ -131,6 +131,7 @@ func TestMeasurePackageKindsOnARealImage(t *testing.T) {
 		t.Logf("%d components, %d with a package identifier; %d issue-at-component pairs "+
 			"reported, %d findings opened in %s",
 			len(doc.Components), identifiers, len(reported), applied.Opened, time.Since(start))
+		dbtest.SettleStatistics(t, db)
 
 		who := access.NewPerson(1, "a reader", false,
 			map[int64][]access.Role{w.Product.ID: {access.PublicRead, access.PrivateRead}}, 0)

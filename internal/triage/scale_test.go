@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -122,6 +123,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 		}
 		t.Logf("seeded %d findings in %s",
 			applied.Opened, time.Since(seeding).Round(time.Second))
+		dbtest.SettleStatistics(t, db)
 
 		store := triage.NewStore(db.DB)
 		by := time.Now().UTC().AddDate(0, 0, 30)
