@@ -7,8 +7,10 @@ package finding
 // it is ruled a duplicate of it.
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -169,9 +171,6 @@ func duplicateDated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 	if err != nil || start == nil {
 		return err
 	}
-	if err := dateFlaw(ctx, tx, ruling.ProductID, issue, &start.at, true, now); err != nil {
-		return err
-	}
 	at, rulingID, report := start.at, ruling.ID, start.report
 	moved := &Movement{
 		VulnerabilityID: issue, ProductID: ruling.ProductID,
@@ -179,10 +178,41 @@ func duplicateDated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 		AskedBy: ruling.ProposedBy, AskedAt: now,
 		RulingID: &rulingID, FlawReportID: &report,
 	}
+	moved.NeedsApproval, err = waitsAsShortening(ctx, tx, moved)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.NewInsert().Model(moved).Exec(ctx); err != nil {
 		return fmt.Errorf("record the date a duplicate started: %w", err)
 	}
-	return nil
+	if moved.NeedsApproval {
+		// Recorded, and the date left where it is until somebody else
+		// agrees, as a person's shortening is.
+		return nil
+	}
+	return dateFlaw(ctx, tx, ruling.ProductID, issue, &start.at, true, now)
+}
+
+// waitsAsShortening reports whether a ruling's movement needs a second person.
+//
+// A ruling giving a flaw its first date needs nobody, as recording a report
+// from outside does. One bringing an existing date earlier is a shortening, and
+// is held to the threshold a person's shortening is: measured against how far
+// the embargo has already been carried, plus how far this brings it in.
+func waitsAsShortening(ctx context.Context, db bun.IDB, moved *Movement) (bool, error) {
+	if moved.Was == nil {
+		return false, nil
+	}
+	threshold, err := setting.NewStore(db).Duration(ctx,
+		setting.MovementThreshold, setting.DefaultMovementThreshold)
+	if err != nil {
+		return false, err
+	}
+	already, err := movedBy(ctx, db, moved.ProductID, moved.VulnerabilityID)
+	if err != nil {
+		return false, err
+	}
+	return threshold <= 0 || already+moved.Distance() >= threshold, nil
 }
 
 // duplicateUndated puts a flaw's embargo back where the movements still
@@ -270,15 +300,32 @@ func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 // replayed is where an embargo's record leaves its end once the rulings named
 // are taken out of it.
 //
-// It starts where the first movement found the embargo. A person's extension or
-// shortening in force sets the end to the date it asked for; a ruling brings it
-// earlier or starts it. A movement still waiting moved nothing, and one
-// recording a withdrawal is itself worked out from the others.
+// The record is taken in the order each movement took effect: when it was
+// agreed to where it needed a second person, and when it was asked for
+// otherwise. An extension that waited across a ruling moved the date when it
+// was agreed, after the ruling.
+//
+// It starts where the first movement other than a disclosure found the
+// embargo. A disclosure asked of an embargo with no end records today as where
+// it stood, which is no end anybody set. A person's extension or shortening in
+// force sets the end to the date it asked for; a ruling brings it earlier or
+// starts it. A movement still waiting moved nothing, and one recording a
+// withdrawal is itself worked out from the others.
 func replayed(record []Movement, withdrawn map[int64]bool) *time.Time {
-	if len(record) == 0 {
-		return nil
+	record = slices.Clone(record)
+	slices.SortStableFunc(record, func(a, b Movement) int {
+		if c := tookEffect(a).Compare(tookEffect(b)); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+	var ends *time.Time
+	for _, row := range record {
+		if row.Act != Disclosure {
+			ends = row.Was
+			break
+		}
 	}
-	ends := record[0].Was
 	for _, row := range record {
 		if !row.InForce() {
 			continue
@@ -298,6 +345,33 @@ func replayed(record []Movement, withdrawn map[int64]bool) *time.Time {
 	return ends
 }
 
+// rulingStands refuses a ruling that has been withdrawn.
+func rulingStands(ctx context.Context, db bun.IDB, rulingID *int64) error {
+	if rulingID == nil {
+		return nil
+	}
+	withdrawn, err := db.NewSelect().Model((*ReportRuling)(nil)).
+		Where("rr.id = ?", *rulingID).
+		Where("rr.withdrawn_at IS NOT NULL").
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("read whether the ruling stands: %w", err)
+	}
+	if withdrawn {
+		return ErrWithdrawn
+	}
+	return nil
+}
+
+// tookEffect is when a movement moved the date: when it was agreed to, or when
+// it was asked for where it needed nobody.
+func tookEffect(m Movement) time.Time {
+	if m.ApprovedAt != nil {
+		return *m.ApprovedAt
+	}
+	return m.AskedAt
+}
+
 // sameMoment reports whether two dates that may be absent are the same.
 func sameMoment(a, b *time.Time) bool {
 	if a == nil || b == nil {
@@ -307,14 +381,15 @@ func sameMoment(a, b *time.Time) bool {
 }
 
 // DuplicateStarts is the disclosure date ruling these reports a duplicate of
-// an issue would give it in this product, or nothing where it would give none.
+// an issue would give it in this product, and whether that waits for a second
+// person, or nothing where it would give none.
 //
 // For the form a ruling is made on, which says what submitting it starts.
 // Asked under the rule proposing the ruling is, and the issue under the rule
 // naming it as the duplicate target is, so the answer says nothing somebody
 // who could not submit the ruling would not be told.
 func (s *Store) DuplicateStarts(ctx context.Context, subject access.Subject,
-	productID, vulnerabilityID int64, references []string) (*time.Time, error) {
+	productID, vulnerabilityID int64, references []string) (*DuplicateStart, error) {
 
 	if err := mayHandle(subject, productID); err != nil {
 		return nil, err
@@ -359,5 +434,19 @@ func (s *Store) DuplicateStarts(ctx context.Context, subject access.Subject,
 	if err != nil || start == nil {
 		return nil, err
 	}
-	return &start.at, nil
+	waits, err := waitsAsShortening(ctx, s.db, &Movement{
+		VulnerabilityID: vulnerabilityID, ProductID: productID,
+		Act: Duplicated, Was: start.was, Until: &start.at,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &DuplicateStart{At: start.at, NeedsApproval: waits}, nil
+}
+
+// DuplicateStart is the disclosure date a duplicate ruling would set, and
+// whether it would wait for a second person first.
+type DuplicateStart struct {
+	At            time.Time
+	NeedsApproval bool
 }

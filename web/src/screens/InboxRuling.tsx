@@ -50,8 +50,12 @@ export function RuleForm({
     const settled = setTimeout(() => setNamed(duplicateOf.trim()), 400);
     return () => clearTimeout(settled);
   }, [duplicateOf]);
-  const starts = useDuplicateStarts(product, disposition === "duplicate" ? named : "", references)
-    .data?.disclose_at;
+  const preview = useDuplicateStarts(
+    product,
+    disposition === "duplicate" ? named : "",
+    references,
+  ).data;
+  const starts = preview?.disclose_at;
   const rule = useRule(product);
   const asTyped = { disposition, reasoning, duplicateOf };
   const many = references.length > 1;
@@ -92,7 +96,8 @@ export function RuleForm({
           </span>
           {starts && named === duplicateOf.trim() && (
             <p role="status" style={{ margin: "6px 0 0" }}>
-              This starts a disclosure date of {on(starts)} on {named}.
+              This starts a disclosure date of {on(starts)} on {named}
+              {preview?.needs_approval ? ", once somebody else agrees." : "."}
             </p>
           )}
         </div>

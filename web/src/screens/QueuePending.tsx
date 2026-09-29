@@ -111,9 +111,14 @@ export function Embargoes({
               </p>
             ) : (
               <p className="hint">
-                {row.act === "shortening" ? "Brought forward" : "Extended"} · ends <b>{row.was}</b>{" "}
-                → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
-                {row.act === "shortening" ? " sooner" : " longer"}.
+                {row.act === "duplicate"
+                  ? "Brought forward by a duplicate report"
+                  : row.act === "shortening"
+                    ? "Brought forward"
+                    : "Extended"}{" "}
+                · ends <b>{row.was}</b> → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()}{" "}
+                days
+                {row.act === "extension" ? " longer" : " sooner"}.
               </p>
             )}
             <div className="cardfoot">

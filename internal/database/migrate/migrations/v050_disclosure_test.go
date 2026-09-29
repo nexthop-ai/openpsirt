@@ -14,20 +14,26 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// Upgraded, a flaw recorded here that v0.4.0 left undated under a duplicate
-// ruling from outside is dated from the earliest claim from outside the
-// ruling covers, and the date is recorded as a movement from that ruling. A
-// claim found here, a withdrawn ruling and a flaw already dated contribute
-// nothing. An issue's listing day starts empty. Rolled back, the movement goes
-// and the date stays.
+// Upgraded, a flaw recorded here that v0.4.0 left undated under duplicate
+// rulings from outside is dated by them in the order they took effect: the
+// first gives the date, one bringing it in within the threshold moves it, and
+// one bringing it in past the threshold is recorded waiting for a second
+// person. Each is a movement from its ruling. A claim found here, a withdrawn
+// ruling and a flaw already dated contribute nothing. An issue's listing day
+// starts empty. Rolled back, the movements go and the date stays; upgraded
+// again, the same movements are recorded and the date is the same.
 func duplicatesDateTheirFlaws() upgradeCheck {
 	var (
-		undated, dated, listed, ruling   int64
+		undated, dated, listed           int64
 		undatedPlace, datedPlace, person int64
+		first, within, past              int64
 	)
-	received := time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)
-	already := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	want := received.Add(90 * 24 * time.Hour)
+	day := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+	window := 90 * 24 * time.Hour
+	already := day(2026, 6, 1)
+	firstAt := day(2026, 1, 10).Add(window)
+	withinAt := day(2026, 1, 1).Add(window)
+	pastAt := day(2025, 12, 1).Add(window)
 	return upgradeCheck{
 		name: "AnUpgradeDatesAFlawItsDuplicatesFromOutsideLeftUndated",
 		seed: func(t *testing.T, ctx context.Context, db *database.DB) {
@@ -119,43 +125,29 @@ func duplicatesDateTheirFlaws() upgradeCheck {
 				}
 				return id
 			}
-			earlierFoundHere := time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)
-			earlierWithdrawn := time.Date(2025, 11, 1, 0, 0, 0, 0, time.UTC)
-			ruling = rule(undated, false,
-				claim("escalation-R-2026-1", &received, false),
-				claim("escalation-R-2026-2", &earlierFoundHere, true))
-			rule(undated, true, claim("escalation-R-2026-3", &earlierWithdrawn, false))
-			rule(dated, false, claim("escalation-R-2026-4", &earlierWithdrawn, false))
+			received := func(d time.Time) *time.Time { return &d }
+			first = rule(undated, false,
+				claim("escalation-R-2026-1", received(day(2026, 1, 10)), false),
+				claim("escalation-R-2026-2", received(day(2025, 10, 1)), true))
+			rule(undated, true, claim("escalation-R-2026-3", received(day(2025, 11, 1)), false))
+			within = rule(undated, false, claim("escalation-R-2026-5", received(day(2026, 1, 1)), false))
+			past = rule(undated, false, claim("escalation-R-2026-6", received(day(2025, 12, 1)), false))
+			rule(dated, false, claim("escalation-R-2026-4", received(day(2025, 11, 1)), false))
 		},
 		upgraded: func(t *testing.T, ctx context.Context, db *database.DB) {
-			if got := discloseAt(t, ctx, db, undatedPlace); got == nil || !got.Equal(want) {
-				t.Errorf("upgraded, the undated flaw ends %v, want %s", got, want)
-			}
+			datedByRulings(t, ctx, db, "upgraded", undated, undatedPlace, withinAt, person,
+				[]movedByRuling{{first, nil, firstAt, false}, {within, &firstAt, withinAt, false},
+					{past, &withinAt, pastAt, true}})
 			if got := discloseAt(t, ctx, db, datedPlace); got == nil || !got.Equal(already) {
 				t.Errorf("upgraded, the flaw already dated ends %v, want %s", got, already)
 			}
-			var moved []struct {
-				Act    string     `bun:"act"`
-				Was    *time.Time `bun:"was"`
-				Until  *time.Time `bun:"until"`
-				Ruling *int64     `bun:"ruling_id"`
-				By     int64      `bun:"asked_by"`
-			}
-			if err := db.DB.NewRaw(`SELECT "act", "was", "until", "ruling_id", "asked_by"
-				FROM "disclosure_movement" WHERE "vulnerability_id" IN (?, ?)`,
-				undated, dated).Scan(ctx, &moved); err != nil {
+			var moved int
+			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "disclosure_movement" WHERE "vulnerability_id" = ?`,
+				dated).Scan(ctx, &moved); err != nil {
 				t.Fatal(err)
 			}
-			if len(moved) != 1 {
-				t.Fatalf("upgraded, %d movements recorded, want the one", len(moved))
-			}
-			row := moved[0]
-			if row.Act != "duplicate" || row.Was != nil || row.Until == nil ||
-				!row.Until.Equal(want) || row.Ruling == nil || *row.Ruling != ruling ||
-				row.By != person {
-				t.Errorf("upgraded, recorded %s from %v to %v by ruling %v asked by %d, "+
-					"want duplicate from none to %s by %d asked by %d",
-					row.Act, row.Was, row.Until, row.Ruling, row.By, want, ruling, person)
+			if moved != 0 {
+				t.Errorf("upgraded, the flaw already dated gained %d movements", moved)
 			}
 			var on *time.Time
 			if err := db.DB.NewRaw(`SELECT "exploited_on" FROM "vulnerability" WHERE "id" = ?`,
@@ -175,14 +167,65 @@ func duplicatesDateTheirFlaws() upgradeCheck {
 			if left != 0 {
 				t.Errorf("rolled back, %d movements a ruling recorded remain", left)
 			}
-			if got := discloseAt(t, ctx, db, undatedPlace); got == nil || !got.Equal(want) {
-				t.Errorf("rolled back, the flaw ends %v, want the %s it was given", got, want)
+			if got := discloseAt(t, ctx, db, undatedPlace); got == nil || !got.Equal(withinAt) {
+				t.Errorf("rolled back, the flaw ends %v, want the %s it was given", got, withinAt)
 			}
 			if err := db.DB.NewRaw(`SELECT "exploited_on" FROM "vulnerability"`).
 				Scan(ctx, new(*time.Time)); err == nil {
 				t.Error("rolled back, the listing day is still there")
 			}
 		},
+		upgradedAgain: func(t *testing.T, ctx context.Context, db *database.DB) {
+			datedByRulings(t, ctx, db, "upgraded again", undated, undatedPlace, withinAt, person,
+				[]movedByRuling{{first, nil, firstAt, false}, {within, &firstAt, withinAt, false},
+					{past, &withinAt, pastAt, true}})
+		},
+	}
+}
+
+// movedByRuling is a movement a ruling recorded, as a check expects it.
+type movedByRuling struct {
+	ruling int64
+	was    *time.Time
+	until  time.Time
+	waits  bool
+}
+
+// datedByRulings checks a flaw's date and the movements its rulings recorded,
+// in order.
+func datedByRulings(t *testing.T, ctx context.Context, db *database.DB, step string,
+	issue, place int64, ends time.Time, person int64, want []movedByRuling) {
+
+	t.Helper()
+	if got := discloseAt(t, ctx, db, place); got == nil || !got.Equal(ends) {
+		t.Errorf("%s, the flaw ends %v, want %s", step, got, ends)
+	}
+	var moved []struct {
+		Act    string     `bun:"act"`
+		Was    *time.Time `bun:"was"`
+		Until  *time.Time `bun:"until"`
+		Ruling *int64     `bun:"ruling_id"`
+		By     int64      `bun:"asked_by"`
+		Waits  bool       `bun:"needs_approval"`
+	}
+	if err := db.DB.NewRaw(`SELECT "act", "was", "until", "ruling_id", "asked_by", "needs_approval"
+		FROM "disclosure_movement" WHERE "vulnerability_id" = ? ORDER BY "id"`,
+		issue).Scan(ctx, &moved); err != nil {
+		t.Fatal(err)
+	}
+	if len(moved) != len(want) {
+		t.Fatalf("%s, %d movements recorded, want %d", step, len(moved), len(want))
+	}
+	for i, row := range moved {
+		w := want[i]
+		sameWas := (row.Was == nil && w.was == nil) || (row.Was != nil && w.was != nil && row.Was.Equal(*w.was))
+		if row.Act != "duplicate" || !sameWas || row.Until == nil || !row.Until.Equal(w.until) ||
+			row.Ruling == nil || *row.Ruling != w.ruling || row.By != person || row.Waits != w.waits {
+			t.Errorf("%s, movement %d is %s from %v to %v by ruling %v asked by %d waiting %v, "+
+				"want duplicate from %v to %s by %d asked by %d waiting %v", step, i,
+				row.Act, row.Was, row.Until, row.Ruling, row.By, row.Waits,
+				w.was, w.until, w.ruling, person, w.waits)
+		}
 	}
 }
 

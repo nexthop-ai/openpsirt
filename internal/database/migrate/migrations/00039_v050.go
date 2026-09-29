@@ -11,7 +11,6 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
@@ -310,30 +309,7 @@ func downgradeV050(ctx context.Context, tx bun.Tx) error {
 // trailNarrowed puts back the administrative trail v0.4.0 built: no actor,
 // and a person on every row.
 func (u *upgrader) trailNarrowed(t *columnTypes) error {
-	trail := narrowing{table: "admin_change",
+	return u.narrowRequiring(narrowing{table: "admin_change",
 		forget:  `DELETE FROM "admin_change" WHERE "actor" = 'configuration'`,
-		columns: []string{"actor"}}
-	if u.engine == database.SQLite {
-		trail.require = []string{"by"}
-		return u.narrow(trail)
-	}
-	if err := u.narrow(trail); err != nil {
-		return err
-	}
-	if u.engine == database.Postgres {
-		return u.run([]string{`ALTER TABLE "admin_change" ALTER COLUMN "by" SET NOT NULL`})
-	}
-	made, _, err := pick(trailV050(t), "admin_change")
-	if err != nil {
-		return err
-	}
-	items, err := declared(made)
-	if err != nil {
-		return err
-	}
-	def, err := items.column("by")
-	if err != nil {
-		return err
-	}
-	return u.run([]string{`ALTER TABLE "admin_change" MODIFY COLUMN ` + refusingNull(def)})
+		columns: []string{"actor"}}, trailV050(t), "by")
 }

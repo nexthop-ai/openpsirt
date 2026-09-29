@@ -34,11 +34,14 @@ func TestADuplicateRulingSaysTheDateItStartsAndRecordsIt(t *testing.T) {
 		preview := "/v1/products/mine/issues/" + minted + "/duplicate-disclosure?report=" +
 			claimed.Reference
 		var starts struct {
-			DiscloseAt string `json:"disclose_at"`
+			DiscloseAt    string `json:"disclose_at"`
+			NeedsApproval bool   `json:"needs_approval"`
 		}
 		httpapitest.Read(t, r, "private-triage", preview, &starts)
-		if starts.DiscloseAt != want {
-			t.Errorf("the preview says %q, want %s", starts.DiscloseAt, want)
+		// The flaw already ends ninety days from now, so bringing it in to
+		// April is a shortening past the threshold.
+		if starts.DiscloseAt != want || !starts.NeedsApproval {
+			t.Errorf("the preview says %+v, want %s waiting for a second person", starts, want)
 		}
 		// Asked under the rule proposing the ruling is.
 		if code := r.As(t, "private", http.MethodGet, preview); code != http.StatusForbidden {

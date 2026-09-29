@@ -55,6 +55,18 @@ describe("ruling a report a duplicate", () => {
     });
   });
 
+  it("says a date brought in past the threshold waits for somebody else", async () => {
+    serve((path) =>
+      path === "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure"
+        ? { data: { disclose_at: "2026-04-10T00:00:00Z", needs_approval: true } }
+        : { data: {} },
+    );
+    await duplicateOf("OPENPSIRT-2026-0001");
+    expect(mount.host().textContent).toContain(
+      "on OPENPSIRT-2026-0001, once somebody else agrees.",
+    );
+  });
+
   it("says nothing where the ruling starts no date", async () => {
     serve(() => ({ data: {} }));
     await duplicateOf("CVE-2026-0001");

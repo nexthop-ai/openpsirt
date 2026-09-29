@@ -69,7 +69,9 @@ func registerRulings(api huma.API, in core.Deps) {
 			"report instead.\n\n" +
 			"A duplicate of a flaw recorded here, covering a report from outside, gives the " +
 			"flaw's undisclosed places in this product a disclosure date, or brings theirs " +
-			"earlier: when the earliest such report arrived, plus `disclosure.after`. " +
+			"earlier: when the earliest such report arrived, plus `disclosure.after`. Bringing " +
+			"a date earlier past the movement threshold waits for a second person, as a " +
+			"shortening does. " +
 			"Withdrawing the ruling puts the date back where it set it. " +
 			"`GET /v1/products/{product}/issues/{vulnerability}/duplicate-disclosure` says the " +
 			"date first.\n\n" +
@@ -311,7 +313,10 @@ func registerRulings(api huma.API, in core.Deps) {
 			"give it here, without ruling anything.\n\n" +
 			"The date is when the earliest report from outside arrived, or was recorded where " +
 			"it does not say, plus `disclosure.after`. It is set on the undisclosed open places " +
-			"of a flaw recorded here that have no date or a later one. `disclose_at` is absent " +
+			"of a flaw recorded here that have no date or a later one. A first date takes " +
+			"effect at once; bringing an existing date earlier is a shortening, and past the " +
+			"movement threshold waits for a second person, which `needs_approval` says. " +
+			"`disclose_at` is absent " +
 			"where the ruling would set nothing: every report was found here, the issue is not " +
 			"a flaw recorded here, or its places already end that day or earlier.\n\n" +
 			"An issue that is not here and one you may not be told of answer alike.",
@@ -340,7 +345,8 @@ func registerRulings(api huma.API, in core.Deps) {
 		}
 		out := &struct{ Body DuplicateDisclosureBody }{}
 		if starts != nil {
-			out.Body.DiscloseAt = core.Stamp(*starts)
+			out.Body.DiscloseAt = core.Stamp(starts.At)
+			out.Body.NeedsApproval = starts.NeedsApproval
 		}
 		return out, nil
 	})
@@ -349,7 +355,8 @@ func registerRulings(api huma.API, in core.Deps) {
 // DuplicateDisclosureBody is the disclosure date a duplicate ruling would
 // start.
 type DuplicateDisclosureBody struct {
-	DiscloseAt string `json:"disclose_at,omitempty" doc:"The disclosure date the ruling would set. Absent where it would set none"`
+	DiscloseAt    string `json:"disclose_at,omitempty" doc:"The disclosure date the ruling would set. Absent where it would set none"`
+	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether the date waits for a second person, as a shortening past the movement threshold does. Only where it brings an existing date earlier"`
 }
 
 // rulingOutput renders one ruling as a response.

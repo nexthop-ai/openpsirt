@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
-
-	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // disclosureMovementV050 is v0.5.0's declaration of the record of every time
@@ -79,15 +77,19 @@ func disclosureMovementV050(t *columnTypes) []string {
 // ones a ruling records, and gives each flaw recorded here the disclosure date
 // its duplicates from outside start.
 //
-// v0.4.0 dated nothing from a duplicate ruling. A flaw still undisclosed and
-// open in a product, with no date on any of its places there, takes the date
-// each duplicate ruling in force would have given it: when the earliest claim
-// from outside the ruling covers arrived, or was recorded where it does not
-// say, plus the disclosure window. The rulings are taken in the order they took
-// effect, and each one moving the date earlier is recorded as a movement from
-// that ruling, as a ruling made after the upgrade is. A flaw with a date on any
-// place is left as it is, because an end already set is one somebody is held
-// to.
+// v0.4.0 dated nothing from a duplicate ruling. For a flaw still undisclosed
+// and open in a product, each duplicate ruling in force is taken in the order
+// it took effect, as a ruling made after the upgrade is: its date is when the
+// earliest claim from outside it covers arrived, or was recorded where it does
+// not say, plus the disclosure window. The first gives the flaw its date and
+// needs nobody. A later one bringing the date earlier is a shortening: past the
+// movement threshold it is recorded waiting for a second person and moves
+// nothing. Each is a movement from its ruling.
+//
+// A flaw with a date on a place is left as it is, because an end already set
+// is one somebody is held to — except where every place holds exactly the date
+// its rulings give. That is the date an earlier run of this upgrade wrote and
+// a roll back kept, and the movements naming the rulings are recorded again.
 func movementsFromRulings(ctx context.Context, u *upgrader) error {
 	if err := u.change(disclosureMovementV050(u.t), change{table: "disclosure_movement",
 		add:         []added{{column: "ruling_id"}, {column: "flaw_report_id"}},
@@ -99,37 +101,93 @@ func movementsFromRulings(ctx context.Context, u *upgrader) error {
 	return datedFromDuplicates(ctx, u.tx)
 }
 
-// v0.4.0's name for the disclosure window and its default. Spelled here rather
-// than read from the settings package, because this migration upgrades what
-// v0.4.0 stored and a later rename there must not change what it does.
+// v0.4.0's names for the disclosure window and the movement threshold, and
+// their defaults. Spelled here rather than read from the settings package,
+// because this migration upgrades what v0.4.0 stored and a later rename there
+// must not change what it does.
 const (
-	v040DiscloseAfter        = "disclosure.after"
-	v040DefaultDiscloseAfter = 90 * 24 * time.Hour
+	v040DiscloseAfter            = "disclosure.after"
+	v040DefaultDiscloseAfter     = 90 * 24 * time.Hour
+	v040MovementThreshold        = "disclosure.movement-threshold"
+	v040DefaultMovementThreshold = 30 * 24 * time.Hour
 )
+
+// v040Duration reads a duration v0.4.0 stored, falling back where it is unset
+// or unreadable, as v0.4.0 read it.
+func v040Duration(ctx context.Context, tx bun.Tx, name string, fallback time.Duration) (time.Duration, error) {
+	var stored []string
+	if err := tx.NewRaw(`SELECT "value" FROM "application_setting" WHERE "name" = ?`,
+		name).Scan(ctx, &stored); err != nil {
+		return 0, fmt.Errorf("read %s: %w", name, err)
+	}
+	if len(stored) > 0 {
+		if parsed, err := time.ParseDuration(stored[0]); err == nil && parsed > 0 {
+			return parsed, nil
+		}
+	}
+	return fallback, nil
+}
+
+// dupRuling is one duplicate ruling in force, and the date it gives.
+type dupRuling struct {
+	ID         int64          `bun:"id"`
+	ProductID  int64          `bun:"product_id"`
+	Issue      int64          `bun:"duplicate_of"`
+	Reasoning  sql.NullString `bun:"reasoning"`
+	ProposedBy int64          `bun:"proposed_by"`
+	SettledAt  time.Time      `bun:"settled_at"`
+
+	at     time.Time
+	report int64
+}
+
+// dupStep is one movement a ruling records.
+type dupStep struct {
+	ruling dupRuling
+	was    *time.Time
+	waits  bool
+}
+
+// dupChain is what a flaw's rulings record, in order, and where they leave its
+// date.
+func dupChain(rulings []dupRuling, threshold time.Duration) ([]dupStep, *time.Time) {
+	var steps []dupStep
+	var ends *time.Time
+	var already time.Duration
+	for _, ruling := range rulings {
+		if ends != nil && !ruling.at.Before(*ends) {
+			continue
+		}
+		step := dupStep{ruling: ruling, was: ends}
+		if ends != nil {
+			distance := ends.Sub(ruling.at)
+			step.waits = already+distance >= threshold
+			if !step.waits {
+				already += distance
+			}
+		}
+		steps = append(steps, step)
+		if !step.waits {
+			at := ruling.at
+			ends = &at
+		}
+	}
+	return steps, ends
+}
 
 // datedFromDuplicates writes the dates v0.4.0's duplicate rulings would have
 // started, and the movements recording them.
 func datedFromDuplicates(ctx context.Context, tx bun.Tx) error {
-	window := v040DefaultDiscloseAfter
-	var stored []string
-	if err := tx.NewRaw(`SELECT "value" FROM "application_setting" WHERE "name" = ?`,
-		v040DiscloseAfter).Scan(ctx, &stored); err != nil {
-		return fmt.Errorf("read the disclosure window: %w", err)
+	window, err := v040Duration(ctx, tx, v040DiscloseAfter, v040DefaultDiscloseAfter)
+	if err != nil {
+		return err
 	}
-	if len(stored) > 0 {
-		if parsed, err := time.ParseDuration(stored[0]); err == nil && parsed > 0 {
-			window = parsed
-		}
+	threshold, err := v040Duration(ctx, tx, v040MovementThreshold, v040DefaultMovementThreshold)
+	if err != nil {
+		return err
 	}
 
-	var rulings []struct {
-		ID         int64          `bun:"id"`
-		ProductID  int64          `bun:"product_id"`
-		Issue      int64          `bun:"duplicate_of"`
-		Reasoning  sql.NullString `bun:"reasoning"`
-		ProposedBy int64          `bun:"proposed_by"`
-		SettledAt  time.Time      `bun:"settled_at"`
-	}
+	var rulings []dupRuling
 	if err := tx.NewRaw(`SELECT "id", "product_id", "duplicate_of", "reasoning",
 			"proposed_by", "settled_at"
 		FROM "report_ruling"
@@ -140,8 +198,8 @@ func datedFromDuplicates(ctx context.Context, tx bun.Tx) error {
 	}
 
 	type flaw struct{ product, issue int64 }
-	ends := map[flaw]*time.Time{}
-	undated := map[flaw]bool{}
+	var order []flaw
+	byFlaw := map[flaw][]dupRuling{}
 	for _, ruling := range rulings {
 		var claims []struct {
 			ID         int64      `bun:"id"`
@@ -157,7 +215,6 @@ func datedFromDuplicates(ctx context.Context, tx bun.Tx) error {
 			return fmt.Errorf("read when a duplicate's claims arrived: %w", err)
 		}
 		var from *time.Time
-		var report int64
 		for _, claim := range claims {
 			arrived := claim.RecordedAt
 			if claim.ReceivedOn != nil {
@@ -165,14 +222,21 @@ func datedFromDuplicates(ctx context.Context, tx bun.Tx) error {
 			}
 			arrived = arrived.UTC()
 			if from == nil || arrived.Before(*from) {
-				from, report = &arrived, claim.ID
+				from, ruling.report = &arrived, claim.ID
 			}
 		}
 		if from == nil {
 			continue
 		}
-		at := from.Add(window).Truncate(time.Microsecond)
+		ruling.at = from.Add(window).Truncate(time.Microsecond)
+		key := flaw{ruling.ProductID, ruling.Issue}
+		if _, seen := byFlaw[key]; !seen {
+			order = append(order, key)
+		}
+		byFlaw[key] = append(byFlaw[key], ruling)
+	}
 
+	for _, key := range order {
 		var places []struct {
 			ID         int64      `bun:"id"`
 			DiscloseAt *time.Time `bun:"disclose_at"`
@@ -183,48 +247,46 @@ func datedFromDuplicates(ctx context.Context, tx bun.Tx) error {
 			JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 			WHERE "f"."vulnerability_id" = ? AND "st"."product_id" = ?
 			  AND "f"."kind" = ? AND "f"."visibility" = ? AND "f"."closed_at" IS NULL`,
-			ruling.Issue, ruling.ProductID, "entered", "private").Scan(ctx, &places); err != nil {
+			key.issue, key.product, "entered", "private").Scan(ctx, &places); err != nil {
 			return fmt.Errorf("read a duplicated flaw's places: %w", err)
 		}
 		if len(places) == 0 {
 			continue
 		}
-		key := flaw{ruling.ProductID, ruling.Issue}
-		if _, seen := undated[key]; !seen {
-			none := true
-			for _, place := range places {
-				none = none && place.DiscloseAt == nil
-			}
-			undated[key] = none
-		}
-		if !undated[key] {
-			continue
-		}
-		was := ends[key]
-		if was != nil && !at.Before(*was) {
-			continue
-		}
-		ids := make([]int64, 0, len(places))
+		steps, ends := dupChain(byFlaw[key], threshold)
+		undated, given := true, ends != nil
 		for _, place := range places {
-			ids = append(ids, place.ID)
+			undated = undated && place.DiscloseAt == nil
+			given = given && place.DiscloseAt != nil && place.DiscloseAt.Equal(*ends)
 		}
-		if err := inBatches(ctx, ids, func(batch []int64) error {
-			_, err := tx.NewRaw(`UPDATE "finding" SET "disclose_at" = ? WHERE "id" IN (?)`,
-				at, bun.List(batch)).Exec(ctx)
-			return err
-		}); err != nil {
-			return fmt.Errorf("date a duplicated flaw: %w", err)
+		if !undated && !given {
+			continue
 		}
-		if _, err := tx.NewRaw(`INSERT INTO "disclosure_movement"
-			("vulnerability_id", "product_id", "act", "was", "until", "reason",
-			 "asked_by", "asked_at", "needs_approval", "ruling_id", "flaw_report_id")
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			ruling.Issue, ruling.ProductID, "duplicate", was, at, ruling.Reasoning.String,
-			ruling.ProposedBy, ruling.SettledAt, false, ruling.ID, report).Exec(ctx); err != nil {
-			return fmt.Errorf("record the date a duplicate started: %w", err)
+		if ends != nil {
+			ids := make([]int64, 0, len(places))
+			for _, place := range places {
+				ids = append(ids, place.ID)
+			}
+			if err := inBatches(ctx, ids, func(batch []int64) error {
+				_, err := tx.NewRaw(`UPDATE "finding" SET "disclose_at" = ? WHERE "id" IN (?)`,
+					*ends, bun.List(batch)).Exec(ctx)
+				return err
+			}); err != nil {
+				return fmt.Errorf("date a duplicated flaw: %w", err)
+			}
 		}
-		dated := at
-		ends[key] = &dated
+		for _, step := range steps {
+			ruling := step.ruling
+			if _, err := tx.NewRaw(`INSERT INTO "disclosure_movement"
+				("vulnerability_id", "product_id", "act", "was", "until", "reason",
+				 "asked_by", "asked_at", "needs_approval", "ruling_id", "flaw_report_id")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				ruling.Issue, ruling.ProductID, "duplicate", step.was, ruling.at,
+				ruling.Reasoning.String, ruling.ProposedBy, ruling.SettledAt, step.waits,
+				ruling.ID, ruling.report).Exec(ctx); err != nil {
+				return fmt.Errorf("record the date a duplicate started: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -235,38 +297,9 @@ func datedFromDuplicates(ctx context.Context, tx bun.Tx) error {
 // nobody asked for. The dates it set stay on the flaw's places, which v0.4.0
 // reads as an end like any other.
 func (u *upgrader) movementsNarrowed() error {
-	movements := narrowing{table: "disclosure_movement",
+	return u.narrowRequiring(narrowing{table: "disclosure_movement",
 		forget:  `DELETE FROM "disclosure_movement" WHERE "ruling_id" IS NOT NULL`,
 		keys:    []string{"disclosure_movement_ruling_fk", "disclosure_movement_report_fk"},
-		columns: []string{"ruling_id", "flaw_report_id"}}
-	if u.engine == database.SQLite {
-		movements.require = []string{"was", "until"}
-		return u.narrow(movements)
-	}
-	if err := u.narrow(movements); err != nil {
-		return err
-	}
-	if u.engine == database.Postgres {
-		return u.run([]string{
-			`ALTER TABLE "disclosure_movement" ALTER COLUMN "was" SET NOT NULL`,
-			`ALTER TABLE "disclosure_movement" ALTER COLUMN "until" SET NOT NULL`,
-		})
-	}
-	made, _, err := pick(disclosureMovementV050(u.t), "disclosure_movement")
-	if err != nil {
-		return err
-	}
-	items, err := declared(made)
-	if err != nil {
-		return err
-	}
-	var stmts []string
-	for _, column := range []string{"was", "until"} {
-		def, err := items.column(column)
-		if err != nil {
-			return err
-		}
-		stmts = append(stmts, `ALTER TABLE "disclosure_movement" MODIFY COLUMN `+refusingNull(def))
-	}
-	return u.run(stmts)
+		columns: []string{"ruling_id", "flaw_report_id"}},
+		disclosureMovementV050(u.t), "was", "until")
 }

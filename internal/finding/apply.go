@@ -727,6 +727,18 @@ func ranking(held, found Finding) (moved, exploitationMoved bool) {
 	return moved, exploitationMoved
 }
 
+// ratingRow is one issue as ratingsInForce reads it.
+type ratingRow struct {
+	ID            int64      `bun:"id"`
+	Published     string     `bun:"published"`
+	Assessed      string     `bun:"assessed"`
+	Exploited     bool       `bun:"exploited"`
+	ExploitedHere int        `bun:"exploited_here"`
+	ScoreCenti    int        `bun:"score_centi"`
+	LikelihoodPPM int        `bun:"likelihood_ppm"`
+	ExploitedOn   *time.Time `bun:"exploited_on"`
+}
+
 // ratingsInForce reads what is on record about each interned issue.
 //
 // Read back from the issue rather than taken from the report that is being
@@ -759,27 +771,9 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 	if len(ids) == 0 {
 		return ratings, nil
 	}
-	var rows []struct {
-		ID            int64      `bun:"id"`
-		Published     string     `bun:"published"`
-		Assessed      string     `bun:"assessed"`
-		Exploited     bool       `bun:"exploited"`
-		ExploitedHere int        `bun:"exploited_here"`
-		ScoreCenti    int        `bun:"score_centi"`
-		LikelihoodPPM int        `bun:"likelihood_ppm"`
-		ExploitedOn   *time.Time `bun:"exploited_on"`
-	}
+	var rows []ratingRow
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var found []struct {
-			ID            int64      `bun:"id"`
-			Published     string     `bun:"published"`
-			Assessed      string     `bun:"assessed"`
-			Exploited     bool       `bun:"exploited"`
-			ExploitedHere int        `bun:"exploited_here"`
-			ScoreCenti    int        `bun:"score_centi"`
-			LikelihoodPPM int        `bun:"likelihood_ppm"`
-			ExploitedOn   *time.Time `bun:"exploited_on"`
-		}
+		var found []ratingRow
 		err := tx.NewSelect().
 			TableExpr(`"vulnerability" AS "v"`).
 			Join(rating.Here, productID).

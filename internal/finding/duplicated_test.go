@@ -182,14 +182,83 @@ func TestADuplicateMovesADateOnlyEarlier(t *testing.T) {
 			t.Errorf("a claim that moved nothing recorded %+v", moved)
 		}
 
-		ruling := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-05-01"}))
-		want := f.windowAfter(t, "2026-05-01")
+		// Twelve days in, well inside the thirty-day threshold, so in force.
+		ruling := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-05-20"}))
+		want := f.windowAfter(t, "2026-05-20")
 		if got := f.flawEnds(t, issue); !isAt(got, want) {
 			t.Errorf("an earlier claim left the flaw at %v, want %s", got, want)
 		}
 		moved := f.movedBy(t, who, issue)
-		if len(moved) != 1 || !isAt(moved[0].Was, first) || *moved[0].RulingID != ruling.ID {
-			t.Errorf("recorded %+v, want one movement from %s by ruling %d", moved, first, ruling.ID)
+		if len(moved) != 1 || !isAt(moved[0].Was, first) || *moved[0].RulingID != ruling.ID ||
+			moved[0].NeedsApproval {
+			t.Errorf("recorded %+v, want one movement in force from %s by ruling %d",
+				moved, first, ruling.ID)
+		}
+
+		// The twelve days count toward the threshold as a shortening's do: a
+		// twenty-day extension after them is past thirty.
+		asked, err := f.store.Extend(t.Context(), who, f.productID, issue,
+			want.Add(20*24*time.Hour), "The fix slipped.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !asked.NeedsApproval {
+			t.Error("an extension past the threshold, counting the ruling's shortening, needs nobody")
+		}
+	})
+}
+
+func TestADuplicateBringingADateEarlierPastTheThresholdWaitsForASecondPerson(t *testing.T) {
+	// Bringing an existing date in is a shortening, whoever brings it in: past
+	// the threshold, the date stays until somebody else agrees.
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		second := f.somebody(t, "second@example.com", access.PrivateTriage)
+		issue := f.flaw(t, who, finding.Told{Received: "2026-06-01"})
+		first := f.windowAfter(t, "2026-06-01")
+
+		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-04-01"}))
+		if got := f.flawEnds(t, issue); !isAt(got, first) {
+			t.Errorf("a shortening waiting for agreement moved the flaw to %v", got)
+		}
+		moved := f.movedBy(t, who, issue)
+		if len(moved) != 1 || !moved[0].NeedsApproval || moved[0].InForce() {
+			t.Fatalf("recorded %+v, want one movement waiting for a second person", moved)
+		}
+		if _, err := f.store.AgreeToMovement(t.Context(), who, moved[0].ID); !errors.Is(err, finding.ErrSamePerson) {
+			t.Errorf("the ruling's proposer agreeing was answered %v", err)
+		}
+		if _, err := f.store.AgreeToMovement(t.Context(), second, moved[0].ID); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := f.flawEnds(t, issue), f.windowAfter(t, "2026-04-01"); !isAt(got, want) {
+			t.Errorf("agreed, the flaw ends %v, want %s", got, want)
+		}
+	})
+}
+
+func TestAWaitingShortenedDateCannotBeAgreedOnceItsRulingIsWithdrawn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		second := f.somebody(t, "second@example.com", access.PrivateTriage)
+		issue := f.flaw(t, who, finding.Told{Received: "2026-06-01"})
+		ruling := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-04-01"}))
+		moved := f.movedBy(t, who, issue)
+		if _, err := f.store.WithdrawRuling(t.Context(), who, f.productID, ruling.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AgreeToMovement(t.Context(), second, moved[0].ID); !errors.Is(err, finding.ErrWithdrawn) {
+			t.Errorf("agreeing to a withdrawn ruling's shortening was answered %v", err)
+		}
+		waiting, _, err := f.store.PendingPage(t.Context(), second, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(waiting) != 0 {
+			t.Errorf("a withdrawn ruling's shortening is still waiting: %+v", waiting)
+		}
+		if got := f.flawEnds(t, issue); !isAt(got, f.windowAfter(t, "2026-06-01")) {
+			t.Errorf("the flaw ends %v, want the date it had", got)
 		}
 	})
 }
@@ -201,9 +270,15 @@ func TestWithdrawingADuplicatePutsTheDateBackWhereTheRestLeaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
+		// A disclosure asked of the flaw while it had no date, still waiting,
+		// which records today as where the embargo stood.
+		if _, err := f.store.Disclose(t.Context(), who, f.productID, issue,
+			"Fixed in every release."); err != nil {
+			t.Fatal(err)
+		}
 		overtaken := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-08-01"}))
-		standing := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-07-01"}))
-		earlier := f.windowAfter(t, "2026-07-01")
+		standing := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-07-20"}))
+		earlier := f.windowAfter(t, "2026-07-20")
 
 		if _, err := f.store.WithdrawRuling(t.Context(), who, f.productID, overtaken.ID); err != nil {
 			t.Fatal(err)
@@ -211,7 +286,7 @@ func TestWithdrawingADuplicatePutsTheDateBackWhereTheRestLeaveIt(t *testing.T) {
 		if got := f.flawEnds(t, issue); !isAt(got, earlier) {
 			t.Errorf("withdrawing a duplicate another overtook moved the flaw to %v", got)
 		}
-		if moved := f.movedBy(t, who, issue); len(moved) != 2 {
+		if moved := f.movedBy(t, who, issue); len(moved) != 3 {
 			t.Errorf("withdrawing a duplicate that set nothing still standing recorded %+v", moved)
 		}
 
@@ -282,8 +357,8 @@ func TestTheRulingFormIsToldTheDateADuplicateWouldStart(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := f.windowAfter(t, "2026-09-01")
-		if !isAt(starts, want) {
-			t.Errorf("the form is told %v, want %s", starts, want)
+		if starts == nil || !starts.At.Equal(want) || starts.NeedsApproval {
+			t.Errorf("the form is told %+v, want %s taking effect at once", starts, want)
 		}
 		if got := f.flawEnds(t, issue); got != nil {
 			t.Errorf("asking what a ruling would start dated the flaw %s", got)
@@ -294,6 +369,13 @@ func TestTheRulingFormIsToldTheDateADuplicateWouldStart(t *testing.T) {
 		if starts, err := f.store.DuplicateStarts(t.Context(), who, f.productID, issue,
 			[]string{f.claim(t, who, finding.Told{Received: "2026-09-10"})}); err != nil || starts != nil {
 			t.Errorf("a later claim would start %v (%v), want nothing", starts, err)
+		}
+		// Two months earlier brings the date in past the threshold, which
+		// waits for a second person.
+		if early, err := f.store.DuplicateStarts(t.Context(), who, f.productID, issue,
+			[]string{f.claim(t, who, finding.Told{Received: "2026-07-01"})}); err != nil ||
+			early == nil || !early.NeedsApproval {
+			t.Errorf("a claim two months earlier would start %+v (%v), want it to wait", early, err)
 		}
 
 		// Asked under the rule proposing the ruling is.

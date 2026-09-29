@@ -389,7 +389,7 @@ type MovementBody struct {
 	Act            core.Act `json:"act" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public. A duplicate is a vulnerability report ruled a duplicate of the flaw, starting the end or bringing it earlier, and duplicate-undone is that ruling withdrawn and the end put back"`
 	Was            string   `json:"was,omitempty" doc:"The embargo's previous end. Absent where it had none"`
 	Until          string   `json:"until,omitempty" doc:"The end that was asked for. Absent where a withdrawn ruling left the embargo with none"`
-	Ruling         int64    `json:"ruling,omitempty" doc:"The ruling on vulnerability reports that recorded this movement"`
+	Ruling         int64    `json:"ruling,omitempty" doc:"The ruling on vulnerability reports that recorded this movement. Named only where you may read the product's reports"`
 	Report         string   `json:"report,omitempty" doc:"The vulnerability report whose arrival the date counts from. Named only where you may read the product's reports"`
 	Reason         string   `json:"reason"`
 	AskedBy        string   `json:"asked_by" doc:"The person who asked, by sign-in identity"`
@@ -663,7 +663,9 @@ func registerMovements(api huma.API, in core.Deps) {
 			"the same as one nobody approved.\n\n" +
 			"A movement the date has since overtaken — an extension to a date no longer " +
 			"later, or a shortening to one no longer earlier — is refused with 409. Ask " +
-			"again from the date as it stands.",
+			"again from the date as it stands.\n\n" +
+			"A duplicate ruling bringing a date earlier past the threshold waits here as a " +
+			"shortening does. Once its ruling is withdrawn it is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Not the person who asked for it.", []access.Role{access.PrivateTriage}...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
@@ -685,6 +687,10 @@ func registerMovements(api huma.API, in core.Deps) {
 		case errors.Is(err, finding.ErrSamePerson):
 			return nil, huma.Error409Conflict(
 				"the person who asked to move a date may not be the one who agrees to it")
+		case errors.Is(err, finding.ErrWithdrawn):
+			// A ruling's shortening whose ruling was taken back since.
+			return nil, huma.Error409Conflict(
+				"the ruling that asked for this has been withdrawn, so there is nothing to agree to")
 		case errors.Is(err, finding.ErrAlreadyAgreed):
 			// The same shape as the self-approval case beside it: somebody
 			// else got there first, which is a conflict rather than a fault.

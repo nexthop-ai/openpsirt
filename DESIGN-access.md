@@ -1217,19 +1217,29 @@ Three acts a person asks for, and two a ruling records, recorded apart.
 | **Extension** | The embargo ends later. The unilateral case: the fix slipped |
 | **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
 | **Disclosure** | The embargo ends today and the issue is public. § Issue disclosure holds its rules |
-| **Duplicate** | A claim from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the claim, which a reader of the product's reports is shown. `DESIGN-findings.md` § Judgment holds its rules |
+| **Duplicate** | A claim from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the claim. `DESIGN-findings.md` § Judgment holds its rules |
 | **Duplicate undone** | That ruling was withdrawn and the end put back where the rest of the record leaves it, which may be no end at all |
 
-A movement a ruling records needs nobody else and counts nothing toward the
-threshold. Its date is when a claim arrived plus the disclosure window, and the
-threshold measures how far people have carried an embargo from there.
+A movement a ruling records takes no reason of its own. It carries the
+ruling's reasoning, which a duplicate may leave empty, and that reasoning, like
+the ruling and the claim, is shown only to a reader of the product's reports.
+
+| Ruled movement | Second person | Toward the threshold |
+|---|---|---|
+| A duplicate giving a flaw its first date | Never, as recording a report from outside needs nobody | Nothing: there was no date to move |
+| A duplicate bringing an existing date earlier | Past the threshold, measured as a shortening is | Its distance, once in force |
+| A duplicate undone | Never: it takes back a movement rather than making one | Nothing |
+
+A duplicate waiting for agreement moves nothing, as a shortening waiting does,
+and is agreed to on the same list. Once its ruling is withdrawn it cannot be
+agreed to and leaves the list.
 
 | Rule | Reason |
 |---|---|
 | Which act it was is stored, not read off the two dates | "We extended it because the fix slipped" and "we shortened it because it leaked" are different events, and a reader inferring which from the direction a date moved is reading an inference |
 | Each act refuses the date the other takes, as the caller's to correct | A date typed the wrong way round would otherwise be recorded as a decision somebody made |
 | Agreement is refused as a conflict when the date has since moved past the request | The request was measured against a date that is no longer the embargo's end, and agreeing to it would move the date the other way |
-| A reason is required always, however short | One with no reason is a record saying somebody moved it and nothing else |
+| A reason is required on every movement a person asks for, however short | One with no reason is a record saying somebody moved it and nothing else |
 | The threshold is measured against how far the end has already been carried | Measured per request, the exception swallows the rule three weeks at a time. Only movements that took effect count, and each counts by its distance rather than by its direction — a date pulled in and pushed back is a date nobody can rely on, whichever way it went last |
 | A movement that needs agreement moves nothing until it has it | An embargo running on while somebody thought about it would be the movement taking effect on one person's say-so with a queue entry as decoration |
 | The person who asked may not be the one who agrees | That is the control the threshold exists to reach. It is the control both acts need: a shortening publishes sooner than the people relying on the date were told |
