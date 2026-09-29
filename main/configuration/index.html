@@ -1957,6 +1957,14 @@ going back to v0.4.0.</p>
 <td>Another name for an issue is recorded only on a flaw recorded here, and only as a CVE or a GitHub advisory. In v0.4.0 any text was taken on any issue</td>
 <td>Nothing. A scanner's issue takes its other names from the scans</td>
 </tr>
+<tr>
+<td>Saved filters are read and kept at <code>/v1/session/me/saved-filters</code>. In v0.4.0 they were kept per product, under <code>/v1/products/{product}/saved-filters</code></td>
+<td>Point a script that keeps filters at the new address</td>
+</tr>
+<tr>
+<td><code>saved.max-per-person</code> counts every saved filter one person keeps. In v0.4.0 it counted each product's</td>
+<td>Nothing, unless somebody keeps more than it after the upgrade: they are refused a new filter until they forget enough, or it is raised under Settings, Limits</td>
+</tr>
 </tbody>
 </table>
 <table>
@@ -2012,8 +2020,16 @@ going back to v0.4.0.</p>
 <td>Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling</td>
 </tr>
 <tr>
+<td>A saved filter</td>
+<td>Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it</td>
+</tr>
+<tr>
+<td>One person's saved filters of one name in several products</td>
+<td>The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as <code>Kernel (Router)</code>, with a number after it where that name is taken too</td>
+</tr>
+<tr>
 <td>Going back to v0.4.0</td>
-<td>Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made</td>
+<td>Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it</td>
 </tr>
 </tbody>
 </table>

@@ -9199,7 +9199,7 @@ components:
           $ref: "#/components/schemas/PreparedBody"
           description: The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to
         query:
-          description: The list's query string, without a leading ?
+          description: The list's query string, without a leading ?. Its scope is left out of what is kept
           maxLength: 2000
           type: string
       required:
@@ -9217,7 +9217,7 @@ components:
           $ref: "#/components/schemas/PreparedBody"
           description: The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them
         query:
-          description: The findings list's query string, without a leading ?
+          description: The findings list's query string, without a leading ?, and without the branch, the variant or anything naming one build or one run
           maxLength: 2000
           type: string
       required:
@@ -22377,119 +22377,6 @@ paths:
         scope: product
         any_of:
           - assigner
-  /v1/products/{product}/saved-filters:
-    get:
-      description: |-
-        The narrowings you have kept, by name.
-
-        Personal, and nothing is shared. No ownership, no permissions and no arguing about whose filter is authoritative — which is also what lets somebody keep one that is half-formed. Yours are the only ones this answers with, whoever asks.
-
-        A saved filter naming something the list no longer offers simply stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one.
-
-        At most as many as the per-person limit, in name order. `total` is how many you keep, which is more than the list holds where the limit was lowered after they were saved.
-
-        Kept per product. A filter narrows one product's findings list and its query names branches and variants that usually exist in no other, so one offered everywhere would be offered where it matches nothing.
-
-        Requires: any signed-in person, and not a pipeline key. Answers your own and nobody else's.
-      operationId: list-saved-filters
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListBodySavedBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: List your saved filters
-      tags:
-        - Findings
-      x-openpsirt-requires:
-        scope: person
-        note: Answers your own and nobody else's.
-  /v1/products/{product}/saved-filters/{name}:
-    delete:
-      description: |-
-        Drops one of your own. A name you have not kept is not there, which is the same answer as somebody else's — the filters are personal, and the query says so rather than only the screen.
-
-        Requires: any signed-in person, and not a pipeline key. Yours alone.
-      operationId: forget-filter
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-        - in: path
-          name: name
-          required: true
-          schema:
-            maxLength: 120
-            type: string
-      responses:
-        "204":
-          description: No Content
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Forget a saved filter
-      tags:
-        - Findings
-      x-openpsirt-requires:
-        scope: person
-        note: Yours alone.
-    put:
-      description: |-
-        Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
-
-        Requires: any signed-in person, and not a pipeline key. Yours alone.
-      operationId: save-filter
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-        - in: path
-          name: name
-          required: true
-          schema:
-            maxLength: 120
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Save-filterRequest"
-        required: true
-      responses:
-        "204":
-          description: No Content
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Keep a filter under a name
-      tags:
-        - Findings
-      x-openpsirt-requires:
-        scope: person
-        note: Yours alone.
   /v1/products/{product}/streams:
     get:
       description: |-
@@ -26832,6 +26719,107 @@ paths:
         - Notifications
       x-openpsirt-requires:
         scope: self
+  /v1/session/me/saved-filters:
+    get:
+      description: |-
+        The narrowings you have kept, by name.
+
+        Personal, and nothing is shared. No ownership, no permissions and no arguing about whose filter is authoritative — which is also what lets somebody keep one that is half-formed. Yours are the only ones this answers with, whoever asks.
+
+        A saved filter naming something the list no longer offers simply stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one.
+
+        At most as many as the per-person limit, in name order. `total` is how many you keep, which is more than the list holds where the limit was lowered after they were saved.
+
+        One list per person, for every findings list. A filter applies within whichever product, branch and variant the list is scoped to.
+
+        Requires: any signed-in person, and not a pipeline key. Answers your own and nobody else's.
+      operationId: list-saved-filters
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodySavedBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List your saved filters
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers your own and nobody else's.
+  /v1/session/me/saved-filters/{name}:
+    delete:
+      description: |-
+        Drops one of your own. A name you have not kept is not there, which is the same answer as somebody else's — the filters are personal, and the query says so rather than only the screen.
+
+        Requires: any signed-in person, and not a pipeline key. Yours alone.
+      operationId: forget-filter
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            maxLength: 120
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Forget a saved filter
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Yours alone.
+    put:
+      description: |-
+        Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
+
+        The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath` and its three qualifiers, `differs`, `variants`, `opened_by_run` and `view`. Every other parameter is kept as sent.
+
+        Refused with 422 where adding the name would take you past the per-person limit.
+
+        Requires: any signed-in person, and not a pipeline key. Yours alone.
+      operationId: save-filter
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            maxLength: 120
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Save-filterRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Keep a filter under a name
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Yours alone.
   /v1/settings:
     get:
       description: |-
