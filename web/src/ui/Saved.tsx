@@ -74,7 +74,15 @@ const SCOPE = [
 // The filter a list is currently narrowed by, where its address is exactly one
 // somebody kept. Derived rather than remembered, so narrowing further drops it
 // and coming back to the list finds it again.
+//
+// Picking a filter puts its name in the address as `rule`, the word a finding
+// already reads the filter's name from, and the list names that one: two
+// filters can keep one query, and only the name tells them apart. Changing a
+// filter on screen drops the name. An address without one, typed or kept from
+// before, is matched by its query.
 export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined {
+  const named = params.get("rule");
+  if (named) return kept.find((one) => one.name === named);
   const current = here(params);
   // A filter that keeps nothing narrows nothing, and would otherwise read as
   // open on every list with no filter on it.
@@ -105,13 +113,14 @@ export function Saved({
   // Whether the list is scoped to a branch or a variant, which saving leaves
   // out and the confirmation says so.
   onBuild: boolean;
-  // Told that a filter was picked, which replaces the list wholesale. What
+  // Told that a filter was picked, with the address it opens, which replaces
+  // the list wholesale. What
   // the picked one prepares is not passed: the list reads that off its own
   // address, so it is dropped by narrowing further and found again by coming
   // back.
-  onPicked: () => void;
+  onPicked: (next: URLSearchParams) => void;
 }) {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const queries = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
@@ -206,9 +215,9 @@ export function Saved({
       const value = params.get(key);
       if (value) next.set(key, value);
     }
+    next.set("rule", one.name);
     setSaid("");
-    setParams(next);
-    onPicked();
+    onPicked(next);
   }
 
   return (
@@ -397,6 +406,7 @@ function whole(days: string): boolean {
 export function here(params: URLSearchParams): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
+  asked.delete("rule");
   for (const key of SCOPE) asked.delete(key);
   return asked.toString();
 }

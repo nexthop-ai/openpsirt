@@ -384,7 +384,11 @@ export function Findings() {
   // Every change to the question the list is asking goes through the hook that
   // holds the selection, which is where the rule that a changed question
   // clears it now lives.
-  function ask(next: URLSearchParams) {
+  //
+  // A changed question is no longer the saved filter that was picked, so the
+  // filter's name goes too. Picking one is the change that keeps it.
+  function ask(next: URLSearchParams, picked = false) {
+    if (!picked) next.delete("rule");
     // The cursor and the open row go with it. Both point at a position in a
     // page, and a changed question is a different page — row nine of the
     // answer is a different finding from row nine of the last one.
@@ -646,8 +650,8 @@ export function Findings() {
           taken under another. */}
         <Saved
           onBuild={Boolean(stream || variant)}
-          onPicked={() => {
-            ask(new URLSearchParams(asked));
+          onPicked={(next) => {
+            ask(next, true);
             setDeclined(null);
           }}
         />
@@ -837,6 +841,7 @@ export function Findings() {
             const next = new URLSearchParams(params);
             next.delete("view");
             next.delete("offset");
+            next.delete("rule");
             next.set("component", name);
             setParams(next);
           }}

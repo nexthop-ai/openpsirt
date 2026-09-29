@@ -2,12 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
+import { useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { location, mounted, screen, serve, settle } from "../test/mount";
 import { Saved } from "./Saved";
 
 const mount = mounted();
+
+// The control as the list holds it: a pick replaces the address.
+function Picking() {
+  const [, setParams] = useSearchParams();
+  return <Saved onBuild={false} onPicked={(next) => setParams(next)} />;
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -57,7 +64,7 @@ describe("a saved filter", () => {
     keeping([{ name: "kernel", query: "component=linux" }]);
     mount.render(
       screen(
-        <Saved onBuild={false} onPicked={() => {}} />,
+        <Picking />,
         "/f?stream=main&severity=critical&variant=x86&opened_by_run=4&view=components",
       ),
     );
@@ -67,7 +74,7 @@ describe("a saved filter", () => {
     act(() => pick(select, "kernel"));
     await settle();
     expect(location()).toBe(
-      "/f?component=linux&stream=main&variant=x86&opened_by_run=4&view=components",
+      "/f?component=linux&stream=main&variant=x86&opened_by_run=4&view=components&rule=kernel",
     );
     // Open, because what it keeps is what the list is narrowed by.
     expect(select.value).toBe("kernel");
