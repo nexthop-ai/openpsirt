@@ -238,7 +238,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Two steps. Now: carry a CVSS 2 score in its field, and give a flaw rated only under 4.0 a note with the version, base score, severity and vector (`DESIGN-remediation.md` § Not built). Once CSAF 2.1 is a standard: write advisories as 2.1, move scores into its metrics structure with 4.0 in its own field and drop the note, change the TLP label for public documents from WHITE to CLEAR, let a flaw name several weakness types, and check documents against a 2.1 validator. An advisory issued before the move will not regenerate byte for byte afterwards |
 | Waits on | Nothing for the first step. CSAF 2.1 becoming an OASIS standard for the second |
 
-### TODO-24 Advisory-wide notes
+### TODO-23 Advisory-wide notes
 
 | | |
 |---|---|
@@ -247,7 +247,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Let the advisory screen take document notes, each with a category from the standard (summary, legal disclaimer, general and so on), possibly with a deployment-wide default disclaimer |
 | Waits on | Nothing. The notes are what the company says, so editing them opens a new edition and withdraws its approval, as retitling does (REQ-24, REQ-28), and they go through the text policy for typed markdown |
 
-### TODO-25 Review queue by reason
+### TODO-24 Review queue by reason
 
 | | |
 |---|---|
@@ -256,7 +256,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Let the queue be narrowed by the reason an item is waiting, name the reason on each card, and offer on each card only the actions that work for it. Describe it in `DESIGN-triage.md` § Queue filters |
 | Waits on | The owner: whether lapsed and past-date items belong in an approver's queue at all or move to the person who proposed them; whether the sidebar counts approvals only; whether the "Lapsed decisions" section goes; filter or tabs |
 
-### TODO-26 Promise status across builds
+### TODO-25 Promise status across builds
 
 | | |
 |---|---|
@@ -265,7 +265,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | List on the Claim screen each release the promise names, with its state, what is still open there and the date. It reads nothing new (REQ-35) |
 | Waits on | Nothing |
 
-### TODO-27 HTML mail
+### TODO-26 HTML mail
 
 | | |
 |---|---|
@@ -274,7 +274,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Send a multipart mail: the same text, plus an HTML part with the link as an anchor and nothing fetched remotely. The content rules for undisclosed work are unchanged (REQ-48) |
 | Waits on | Nothing. Mail bodies are sentences the server composes, so the HTML part is the escaped text with the link wrapped. |
 
-### TODO-28 Spacing scale
+### TODO-27 Spacing scale
 
 | | |
 |---|---|
@@ -283,7 +283,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Choose a scale, draw every spacing value from it, and make the token check refuse a raw pixel spacing value. Review with before and after screenshots |
 | Waits on | The owner choosing the scale by looking at it in a browser |
 
-### TODO-29 API operations no screen reaches
+### TODO-28 API operations no screen reaches
 
 | | |
 |---|---|
@@ -292,7 +292,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Add a check that walks every operation in the API document, finds where the web client calls it, and fails on one with no caller unless it is on a list of operations meant for pipelines, each with a reason. Make it fail when it examines nothing, and show it reporting one input and passing another |
 | Waits on | Nothing |
 
-### TODO-30 Next step after a submission
+### TODO-29 Next step after a submission
 
 | | |
 |---|---|
@@ -301,7 +301,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | End each flow with a link to where its result now is: the decision's own page when it waits, the pending upgrades of each build a promise names, the queue section where a disclosure date or rating waits. Show "pending a second person" only when one is needed |
 | Waits on | The owner: for a waiting decision, its own page or the "Mine" tab; for a promise across several builds, one link per build or one to the release; whether "each act offers its next act as a visible control" becomes a written rule in `DESIGN-interface.md` |
 
-### TODO-32 A real SPDX 3 fixture
+### TODO-30 A real SPDX 3 fixture
 
 | | |
 |---|---|
@@ -310,7 +310,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Add at least one real producer's document, such as Yocto's `create-spdx-3.0` output, under a license the repository may carry and named in `NOTICE`, with a test pinning its component, edge and unplaced counts |
 | Waits on | Finding a document with a usable license. |
 
-### TODO-33 Version on build VEX claims
+### TODO-31 Version on build VEX claims
 
 | | |
 |---|---|
@@ -319,7 +319,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Store the statement's version, match only that version, and show it |
 | Waits on | The owner: the next upload of a moving branch closes and reopens each such statement once, which is acceptable or is avoided by leaving versionless statements' identity alone; and whether statements already stored for tags are re-read from their kept documents |
 
-### TODO-34 Outbound HTTP proxy
+### TODO-32 Outbound HTTP proxy
 
 | | |
 |---|---|
@@ -328,7 +328,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Send outbound requests through a configured proxy, starting with patch branch clones |
 | Waits on | The owner. REQ-69 and REQ-78 refuse any address inside the network, checked on the address a name resolved to. Through a proxy, the proxy resolves the name. Resolving locally, checking the address and asking the proxy to connect to that address keeps the check, and is a change to a security rule that needs agreeing first |
 
-### TODO-35 Exploitation date from the catalog
+### TODO-33 Exploitation date from the catalog
 
 | | |
 |---|---|
@@ -337,7 +337,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Start the window at the catalog's date, or at the scan if that is earlier (`DESIGN-remediation.md` § Deadlines). A finding first seen after the listing still counts from when it was seen. Some findings will then be overdue the moment they appear, as intended |
 | Waits on | The owner: whether open findings already clocked from a scan are recounted once when the date arrives; whether a slow pipeline gets a floor such as never due before the scan plus one day |
 
-### TODO-36 Weakness names on screen
+### TODO-34 Weakness names on screen
 
 | | |
 |---|---|
@@ -346,7 +346,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Send the catalog name beside each identifier from the server, and show the screen's own short name where it has one and the catalog's otherwise. Specified in `DESIGN-interface.md` |
 | Waits on | The owner: whether long catalog names are shown whole, shortened or on hover; whether the filter and picker offer the whole catalog, which needs a lookup endpoint. The same pattern as GitHub issue #137 |
 
-### TODO-37 Saved filters across products
+### TODO-35 Saved filters across products
 
 | | |
 |---|---|
@@ -355,7 +355,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Keep one list per person, applied within whatever scope is on screen (`DESIGN-interface.md` § Saved filters). Leave release and build out of what is kept. Where one person kept one name in two products, add the product to one of the names |
 | Waits on | The owner: whether a filter that prefills a decision applies in every product or only its own; the rename format; whether saving drops the build silently or says so. The schema change goes in migration 39 |
 
-### TODO-38 Package kinds present
+### TODO-36 Package kinds present
 
 | | |
 |---|---|
@@ -364,7 +364,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Report from the server the kinds present in a scope, counted over the findings the person may see (REQ-43), and offer those in the filter plus whatever is already chosen |
 | Waits on | The owner: whether the kinds follow the whole scope or the list as other filters narrowed it; whether counts show; working the kind out from the package identifier in Go after measuring, or in engine-specific SQL. The same pattern as GitHub issue #137 |
 
-### TODO-39 Full-queue upload refusals
+### TODO-37 Full-queue upload refusals
 
 | | |
 |---|---|
@@ -373,7 +373,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Work | Log and record the refusal like any other, name it in the week-quiet message, and alert administrators naming the build, the limit and how to raise it, at most once per build per day |
 | Waits on | The owner: an event people acknowledge, or a condition that clears when the build next uploads; administrators only, or the product's triagers too. Logging and recording need nothing |
 
-### TODO-40 Disclosure date from a duplicate
+### TODO-38 Disclosure date from a duplicate
 
 | | |
 |---|---|
@@ -386,7 +386,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 
 Each test passes today, and would keep passing if the code it covers broke.
 
-### TODO-42 Scanner arguments
+### TODO-39 Scanner arguments
 
 | | |
 |---|---|
@@ -394,7 +394,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 | Problem | The stand-in never looks at the arguments or at the inventory it is sent. Dropping the flag that asks for JSON output, or not sending the inventory at all, leaves every test green |
 | Work | Make the stand-in fail unless it is asked for JSON output, and have it report what it read so the test compares it with what was sent |
 
-### TODO-43 Upgrade list sort orders
+### TODO-40 Upgrade list sort orders
 
 | | |
 |---|---|
@@ -402,7 +402,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 | Problem | An offered order with no matching column silently sorts by the default and still answers, and an order mapped to the wrong column passes too. The findings list has a test tying every offered order to a column. The upgrade list has none |
 | Work | Add the same two-way test between offered orders and columns, and data in which each order puts a different upgrade first |
 
-### TODO-44 Connection pool limits
+### TODO-41 Connection pool limits
 
 | | |
 |---|---|
@@ -410,7 +410,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 | Problem | The first dials a port that refuses at once, so it fails in milliseconds whatever the timeout is, and it calls the open function where its name says validate. The second compares the pool's limit with the function that set it, so setting that limit to zero, which means unlimited, still passes |
 | Work | Point the timeout test at a listener that accepts and never answers, and check the attempt gives up in time. Make the pool test check a fixed number, or that one query past the limit waits |
 
-### TODO-45 Upstream currency retry
+### TODO-42 Upstream currency retry
 
 | | |
 |---|---|
@@ -418,7 +418,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 | Problem | It never runs a second pass. If a failure were remembered between passes and the package never asked again, the test would still pass |
 | Work | Fail the first pass, have the index answer, and check that the second pass asks again and stores the answer |
 
-### TODO-46 Empty inventory part
+### TODO-43 Empty inventory part
 
 | | |
 |---|---|
@@ -426,7 +426,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 | Problem | No test sends an empty inventory through the upload endpoint, so if the endpoint stopped refusing one nothing would notice |
 | Work | Rename and recomment this test for what it checks. Add one that sends an empty inventory to the endpoint and checks that it is refused with a reason and recorded as refused |
 
-### TODO-47 Scanned builds in API tests
+### TODO-44 Scanned builds in API tests
 
 | | |
 |---|---|
@@ -438,7 +438,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 
 Nothing is made faster until it is measured slow. These were measured and left.
 
-### TODO-48 Writes on an unchanged rescan
+### TODO-45 Writes on an unchanged rescan
 
 | | |
 |---|---|
