@@ -230,12 +230,12 @@ func TestAReleaseEveryOpenPlaceOfWhichIsDismissedIsKnownNotAffected(t *testing.T
 		if len(one.Remediations) == 0 {
 			t.Error("the affected tag has no remediation, which the profile asks for")
 		}
-		if doc.Document.Category != "csaf_vex" {
+		if doc.Document.Category != "csaf_security_advisory" {
 			t.Errorf("a document stating a release not affected declares %q",
 				doc.Document.Category)
 		}
 		required(t, doc)
-		vexProfile(t, doc)
+		explained(t, doc)
 
 		// The screen names the decision and where it was made.
 		row := f.placedAt(t, named, master)
@@ -356,10 +356,11 @@ func TestAnAlreadyFixedClaimStatesTheReleaseFixed(t *testing.T) {
 	})
 }
 
-func TestTheProfileFollowsWhatTheDocumentStates(t *testing.T) {
-	// Declared as VEX where any release is stated not affected, and as a
-	// security advisory otherwise: a profile declared unconditionally fails
-	// its own tests and is dropped by the tooling that reads it.
+func TestAnAdvisoryIsASecurityAdvisoryWhateverItStates(t *testing.T) {
+	// An advisory stating a release known not affected stays a security
+	// advisory. Switching category between editions by what it contains, it
+	// drops out of every reader that filters on the category, this
+	// deployment's own supplier reader included; VEX is a separate document.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 		named := f.covering(t, [2]string{"sonic", identifier})
@@ -368,19 +369,19 @@ func TestTheProfileFollowsWhatTheDocumentStates(t *testing.T) {
 		}
 		f.dismissed(t, f.master, identifier)
 		doc := f.generated(t, named)
-		if doc.Document.Category != "csaf_vex" {
-			t.Errorf("a document stating a release not affected declares %q",
-				doc.Document.Category)
-		}
 		// Its only status is known not affected, which still states one for
-		// every release it names.
+		// every release it names, so it is complete.
 		if len(doc.Vulnerabilities[0].Status.KnownAffected) != 0 ||
-			len(doc.Vulnerabilities[0].Status.Fixed) != 0 {
+			len(doc.Vulnerabilities[0].Status.Fixed) != 0 ||
+			len(doc.Vulnerabilities[0].Status.KnownNotAffected) == 0 {
 			t.Fatalf("the fixture states more than not affected: %+v",
 				doc.Vulnerabilities[0].Status)
 		}
+		if doc.Document.Category != "csaf_security_advisory" {
+			t.Errorf("a document stating only not affected declares %q", doc.Document.Category)
+		}
 		required(t, doc)
-		vexProfile(t, doc)
+		explained(t, doc)
 	})
 }
 
@@ -699,7 +700,7 @@ func TestAReleaseNobodyWillFixIsToldSoAndNotToUpdate(t *testing.T) {
 			t.Errorf("the reasoning reached the document: %s", body)
 		}
 		required(t, doc)
-		vexProfile(t, doc)
+		explained(t, doc)
 	})
 }
 
@@ -729,14 +730,11 @@ func variantsOf(built []advisory.Built) []string {
 	return out
 }
 
-// vexProfile fails on anything the VEX profile asks of a document that
-// declares it: an impact statement for every release known not affected, and
-// an action statement for every release known affected.
-func vexProfile(t *testing.T, doc *advisory.Document) {
+// explained fails on a release the document states without saying why or
+// what to do: a flag or an impact for every release known not affected, and a
+// remediation for every release known affected.
+func explained(t *testing.T, doc *advisory.Document) {
 	t.Helper()
-	if doc.Document.Category != "csaf_vex" {
-		return
-	}
 	examined := 0
 	for _, one := range doc.Vulnerabilities {
 		if one.CVE == "" && len(one.IDs) == 0 {

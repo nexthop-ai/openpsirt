@@ -900,12 +900,10 @@ func required(t *testing.T, doc *advisory.Document) {
 	}
 }
 
-// profiled says the document declares a profile that asks for vulnerabilities
-// with notes and a status: the security advisory's, and the VEX profile's,
-// which asks the same.
+// profiled says the document declares the security-advisory profile, which
+// asks for vulnerabilities with notes and a status.
 func profiled(doc *advisory.Document) bool {
-	return doc.Document.Category == "csaf_security_advisory" ||
-		doc.Document.Category == "csaf_vex"
+	return doc.Document.Category == "csaf_security_advisory"
 }
 
 // at resolves a JSON pointer against a decoded document.

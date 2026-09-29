@@ -50,11 +50,9 @@ func (d Document) MarshalJSON() ([]byte, error) {
 
 // Meta is the document's own description.
 type Meta struct {
-	// Category is what kind of document this is, and it follows what the
-	// document can actually support rather than what would sound better: the
-	// VEX profile where any release is stated known not affected, which is
-	// the profile that carries "not affected, and here is why", and the
-	// security-advisory profile otherwise.
+	// Category is what kind of document this is: the security-advisory
+	// profile wherever the document meets it, whether or not any release is
+	// stated known not affected, and never the VEX profile.
 	Category     string        `json:"category"`
 	CSAFVersion  string        `json:"csaf_version"`
 	Title        string        `json:"title"`

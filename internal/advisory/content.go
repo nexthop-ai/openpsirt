@@ -474,11 +474,12 @@ func distributionFor(undisclosed bool) *Distribution {
 // every flaw of our own before a feed carries it — declared the base profile,
 // and a customer's tooling filtering for security advisories skipped it.
 //
-// § 4.5's VEX profile asks the same of a document and is the one declared
-// where any release is stated known not affected, because its point is "not
-// affected, and here is why". Every such release carries a flag, which is the
-// impact statement the profile requires, and every known-affected release a
-// remediation, which is its action statement.
+// Never § 4.5's VEX profile, whatever the document states. A release known not
+// affected, its flag and its impact are information inside a security
+// advisory, which the standard allows. An advisory that switched category
+// between editions by what it contains would drop out of every reader that
+// filters on the category, this deployment's own supplier reader included;
+// VEX is the separate per-build document.
 func profileOf(doc *Document) string {
 	return Categorized(doc)
 }
@@ -490,12 +491,11 @@ func profileOf(doc *Document) string {
 // product tree and one vulnerability.
 //
 // A document whose only status is known not affected still states a status for
-// every release it names, so it is complete.
+// every release it names, so it is a complete security advisory.
 func Categorized(doc *Document) string {
 	if len(doc.ProductTree.Branches) == 0 || len(doc.Vulnerabilities) == 0 {
 		return "csaf_base"
 	}
-	vex := false
 	for _, one := range doc.Vulnerabilities {
 		if len(one.Notes) == 0 {
 			return "csaf_base"
@@ -504,10 +504,6 @@ func Categorized(doc *Document) string {
 			len(one.Status.KnownNotAffected) == 0 {
 			return "csaf_base"
 		}
-		vex = vex || len(one.Status.KnownNotAffected) > 0
-	}
-	if vex {
-		return "csaf_vex"
 	}
 	return "csaf_security_advisory"
 }
