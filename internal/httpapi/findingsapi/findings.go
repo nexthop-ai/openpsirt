@@ -490,11 +490,11 @@ type EvidenceBody struct {
 	// one, and the day beside it dates the forecast. The probability alone is
 	// unreadable — nobody acts on 0.00042 — and it is a thirty-day forecast
 	// recomputed daily, so the day it covers is part of it.
-	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"The estimate's standing among all published ones, 0 to 1"`
-	LikelihoodOn         string   `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
-	Weaknesses           []string `json:"weaknesses,omitempty" doc:"The kind of flaw, as CWE identifiers"`
-	Description          string   `json:"description,omitempty"`
-	Advisory             string   `json:"advisory,omitempty" doc:"The issue's write-up"`
+	LikelihoodPercentile float64             `json:"likelihood_percentile,omitempty" doc:"The estimate's standing among all published ones, 0 to 1"`
+	LikelihoodOn         string              `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
+	Weaknesses           []core.WeaknessBody `json:"weaknesses,omitempty" doc:"The kinds of flaw, as CWE identifiers with their names, the root cause first"`
+	Description          string              `json:"description,omitempty"`
+	Advisory             string              `json:"advisory,omitempty" doc:"The issue's write-up"`
 	// References carries patches first, because for somebody deciding whether
 	// to backport rather than upgrade, the change itself is the answer.
 	References []ReferenceBody `json:"references,omitempty"`
@@ -742,7 +742,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		// The day rather than an instant: the estimate is computed per day,
 		// and a timestamp would state a precision the feed does not have.
 		LikelihoodOn: core.DayOf(e.LikelihoodOn),
-		Weaknesses:   e.Weaknesses, Description: e.Description, Advisory: e.Advisory,
+		Weaknesses:   core.Weaknesses(e.Weaknesses), Description: e.Description, Advisory: e.Advisory,
 		Component: e.Component, Version: e.Version, Upstream: e.Upstream,
 		FixState: string(e.FixState), FixedIn: e.FixedIn, ArrivedFrom: e.ArrivedFrom,
 		Matched: string(e.Matched), MatchedFrom: e.MatchedFrom,

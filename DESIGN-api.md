@@ -241,9 +241,34 @@ Filters are named fields with fixed meanings, bound as parameters.
 
 A filter over an open set says so. The kind of package is read out of the
 identifier a producer wrote, so the set is whatever producers emit and the
-parameter carries any string: one nothing carries matches nothing. Named as
-eight kinds and offered as eight, most of an image whose packages are `apk` or
-`rpm` cannot be narrowed to at all, while the server answers either correctly.
+parameter carries any string: one nothing carries matches nothing.
+
+What the set holds in a scope is a read of its own, one per product with the
+branch and the variant as the list takes them, and one across every product.
+Each kind comes with how many issues at components are open at it, which is
+what the findings list counts as rows.
+
+| Rule | |
+|---|---|
+| Counted over what the reader may see (REQ-43) | Narrowed in the data-access layer like every other aggregate. A kind present only on an undisclosed finding is absent for somebody who reads disclosed ones |
+| Over the whole scope | The list's other filters, its release and support defaults and the triage line do not narrow it. It answers what the filter can offer, and a kind that vanished whenever another filter was on would be a choice nobody can see |
+| An issue at a component is counted once per product | However many builds of the selection hold it, as the list holds it as one row. Across products it counts in each, as it is a row in each |
+| A component with no package identifier has no kind | It is not counted, because the filter has no word to ask for it by |
+| Read in Go from each distinct identifier | The statement counts what is open per component and returns one row each; the kind is the text before the first slash after `pkg:`. Reading it in the statement is spelled once per engine |
+
+Measured on the full-size fixture, with every one of its 6,843 components that
+has a package identifier carrying an issue and the kernel carrying 4,943:
+241,313 findings, 11,785 issues at components, eight kinds.
+
+| Engine | The kinds read | The list's first page |
+|---|---|---|
+| SQLite | 45 ms | 240 ms |
+| PostgreSQL | 95 ms | 460 ms |
+| MySQL | 330 ms | 500 ms |
+| MariaDB | 73 ms | 275 ms |
+
+Below the page it is offered beside on every engine, so no engine spells the
+kind and nothing stores it.
 
 Sorting is permitted (REQ-66). A value in a query can be bound as a parameter
 and a column name cannot, so a sort column arriving from a query string becomes

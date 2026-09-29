@@ -65,6 +65,8 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"a document a build sent",
 				"/v1/products/mine/streams/master/variants/broadcom/scans/1/documents/1"},
 			{"productNamed", "/v1/products/mine/findings/components"},
+			{"the package kinds a product holds", "/v1/products/mine/findings/package-kinds"},
+			{"the package kinds across products", "/v1/findings/package-kinds"},
 			{"the catalog's own reader", "/v1/products/mine/streams"},
 			{"the build lookup a document is generated from",
 				"/v1/products/mine/streams/master/variants/broadcom/vex"},

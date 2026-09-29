@@ -53,6 +53,18 @@ type ChatBody struct {
 	Shared    bool     `json:"shared" doc:"What a channel carries is sent to them directly as well"`
 }
 
+// OutcomeBody is what one triage outcome claims, in the terms the server
+// counts, filters and refuses by.
+//
+// Published so that a screen asking for dismissals, or requiring a
+// justification, applies the rule the server applies rather than a copy of it.
+type OutcomeBody struct {
+	Outcome            core.Outcome `json:"outcome"`
+	HidesRisk          bool         `json:"hides_risk" doc:"Whether recording it takes the issue out of the working queue"`
+	Dated              bool         `json:"dated" doc:"Whether it stores a date: when somebody looks again, or when promised work lands"`
+	NeedsJustification bool         `json:"needs_justification" doc:"Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one"`
+}
+
 // WhoBody is the caller, as the caller.
 type WhoBody struct {
 	Identity string    `json:"identity" doc:"The identity this deployment holds for them"`
@@ -86,6 +98,9 @@ type WhoBody struct {
 	// trips as the filter matched, which is a page nobody can use and
 	// nothing can cancel.
 	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
+	// Outcomes is the same for everybody and is answered here because every
+	// screen that records or reads a decision needs it before it draws.
+	Outcomes []OutcomeBody `json:"outcomes" doc:"Every triage outcome, in the order the vocabulary lists them, with what each claims. A dismissal is an outcome that hides risk and stores no date"`
 }
 
 func registerWhoAmI(api huma.API, in core.Deps) {
@@ -109,7 +124,7 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 
 		body := WhoBody{
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
-			Kind: string(subject.Kind), Reach: []CanBody{},
+			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.
@@ -218,4 +233,17 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		})
 		return &struct{ Body WhoBody }{Body: body}, nil
 	})
+}
+
+// outcomeBodies is every outcome with what it claims, read from the rules the
+// server applies.
+func outcomeBodies() []OutcomeBody {
+	out := make([]OutcomeBody, 0, len(triage.Outcomes()))
+	for _, each := range triage.Outcomes() {
+		out = append(out, OutcomeBody{
+			Outcome: core.Outcome(each), HidesRisk: each.HidesRisk(), Dated: each.Dated(),
+			NeedsJustification: each.NeedsJustification(),
+		})
+	}
+	return out
 }

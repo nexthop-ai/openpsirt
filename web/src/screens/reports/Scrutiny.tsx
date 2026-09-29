@@ -10,7 +10,7 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Outcome } from "../../ui/Outcome";
-import { dismisses } from "../../ui/outcomes";
+import { useOutcomes } from "../../ui/outcomes";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import {
@@ -87,6 +87,7 @@ export function Scrutiny() {
   const alone = got.data?.alone ?? [];
   // A deferral standing alone reads very differently from a dismissal standing
   // alone, and the table says which it is looking at.
+  const { dismisses } = useOutcomes();
   const dismissed = alone.filter((row) => dismisses(row.outcome));
   const exempt = alone.filter((row) => !dismisses(row.outcome));
 

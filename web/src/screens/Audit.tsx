@@ -13,7 +13,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Because, labeled } from "../ui/Outcome";
-import { dismisses, type Outcome } from "../ui/outcomes";
+import { useOutcomes, type Outcome } from "../ui/outcomes";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
@@ -75,6 +75,7 @@ export function Audit() {
   // ask. The findings list already reads its filters this way.
   const products = params.getAll("product").filter(Boolean);
   const outcomes = params.getAll("outcome").filter(Boolean);
+  const classes = useOutcomes();
   const states = params.getAll("state").filter(Boolean);
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
@@ -169,7 +170,7 @@ export function Audit() {
   // would be telling an auditor a control had failed when it had not.
   // The exception report is asked of dismissals alone: asked of everything it
   // returns a large and entirely legitimate population.
-  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => dismisses(each));
+  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => classes.dismisses(each));
   const asked = [
     products.length > 0 ? products.join(", ") : "every product you can see",
     said(OUTCOMES, outcomes),

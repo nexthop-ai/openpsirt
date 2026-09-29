@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { labeled, reasonOffered, reasonsFor } from "./Outcome";
-import { needsJustification as statesReason } from "./outcomes";
+import { useOutcomes } from "./outcomes";
 import { notACredential } from "./noautofill";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -110,7 +110,7 @@ export function Saved({
   // The two outcomes whose claim is which recognized reason applies, and the
   // reasons each may state. A correction carries past every version bump, so
   // the three reasons a bump can change are not among the ones it offers.
-  const needsJustification = statesReason(outcome);
+  const needsJustification = useOutcomes().needsJustification(outcome);
   const reasons = reasonsFor(outcome);
   // Dropped rather than carried when the outcome moves under it: a correction
   // takes only the reasons no version bump can answer, and a rule prepared

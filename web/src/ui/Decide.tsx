@@ -13,6 +13,7 @@ import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
+import { useOutcomes, type Classes } from "./outcomes";
 import { DECIDE_KEPT, keepAnswer, ownsSession, restoreAnswer } from "../app/drafts";
 import { DAY_MS } from "./when";
 
@@ -204,17 +205,25 @@ function deferredDays(until: string): number {
 // Whether a claim stands on its own or waits for a second person, said before
 // it is sent and in the terms the server decides it in.
 //
-// A deferral is measured with what the place was already put off for, and a
-// promise to act by a date against the earliest deadline it covers. One
-// function for the aside and the field beside the date, so the two cannot
-// come to say different things about one claim.
+// What an outcome claims comes from the classes the server publishes: one that
+// hides no risk needs nobody, and one that hides risk and stores no date always
+// waits for a second person. Of the dated ones, a deferral is measured with
+// what the place was already put off for, and a promise to act by a date
+// against the earliest deadline it covers. One function for the aside and the
+// field beside the date, so the two cannot come to say different things about
+// one claim. Nothing is said before the classes have arrived.
 export function forecast(
   outcome: string,
+  classes: Classes,
   threshold: number | null,
   until: string,
   soFar = 0,
 ): string {
-  if (outcome === "affected") return "No approval needed. Goes to remediation.";
+  if (!classes.known || outcome === "") return "";
+  if (!classes.hidesRisk(outcome)) return "No approval needed. Goes to remediation.";
+  if (!classes.dated(outcome)) {
+    return `A ${said(outcome)} takes effect only after a second person approves.`;
+  }
   if (outcome === "deferred") {
     const before =
       soFar > 0 ? ` Already put off ${Math.floor(soFar)} days, which counts toward it.` : "";
@@ -230,10 +239,7 @@ export function forecast(
       ? `${counted} reaches the ${threshold}-day threshold, so a second person has to agree.`
       : `${counted} is inside the ${threshold}-day threshold, so this stands on its own.`;
   }
-  if (outcome === "patch-needed" || outcome === "upgrade-needed") {
-    return "By the earliest deadline it covers, this stands on its own. Later, a second person.";
-  }
-  return `A ${said(outcome)} takes effect only after a second person approves.`;
+  return "By the earliest deadline it covers, this stands on its own. Later, a second person.";
 }
 
 export function Decide({
@@ -337,7 +343,8 @@ export function Decide({
   // measures each place's deferral with its own, and one place over the
   // threshold sends the claim to a second person.
   const soFar = Math.max(0, ...covering.map((p) => p.deferred_days ?? 0));
-  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  const classes = useOutcomes();
+  const needsJustification = classes.needsJustification(outcome);
   // A correction carries past every version bump, so the reasons it may state
   // are the two that say something is not there. The other three are about how
   // code is reached or what stops it, which a bump changes — and one chosen
@@ -739,7 +746,7 @@ export function Decide({
           <span className="hint">
             {days !== null && until === "" && soFar === 0
               ? `Up to ${days} days needs nobody; longer waits for a second person.`
-              : forecast("deferred", days, until, soFar)}
+              : forecast("deferred", classes, days, until, soFar)}
           </span>
         </div>
       )}
@@ -805,7 +812,7 @@ export function Decide({
         differing={offered.length}
       />
       <div className="tier auto" style={{ margin: 0 }}>
-        <p className="said">{forecast(outcome, days, until, soFar)}</p>
+        <p className="said">{forecast(outcome, classes, days, until, soFar)}</p>
       </div>
     </aside>
   );

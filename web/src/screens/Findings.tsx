@@ -36,6 +36,7 @@ import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
 import { activates, meansFor, moved, typingIn } from "./keys";
 import { useWho } from "../app/session";
+import { useWeaknessNames } from "../ui/cwe";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
 // question of the server to offer the row before and the row after. Fifty rows
@@ -309,6 +310,25 @@ export function Findings() {
       unwrap(await api.GET("/v1/products/{product}/tags", { params: { path: { product } } })),
     retry: false,
   });
+  // The package kinds present in the scope on screen, with how much is open at
+  // each, for the filter to offer. Read when the panel opens, over the whole
+  // scope rather than the list as filtered, so a kind does not vanish from the
+  // filter because another filter is on.
+  const kindsHere = useQuery({
+    enabled: more,
+    queryKey: ["package-kinds", product, stream, variant],
+    queryFn: async () =>
+      spanning
+        ? unwrap(await api.GET("/v1/findings/package-kinds", {}))
+        : unwrap(
+            await api.GET("/v1/products/{product}/findings/package-kinds", {
+              params: { path: { product }, query: selection },
+            }),
+          ),
+    retry: false,
+  });
+  // The names of the weaknesses the address narrows by, for their chips.
+  const weaknessNames = useWeaknessNames(asked.getAll("weakness"));
   const { hand, handMatching } = useHandOver({ product, query, selection, buildOf });
   const { findings, byIssue, byComponent, byUpgrade } = useFindingsViews({
     product,
@@ -665,6 +685,7 @@ export function Findings() {
         // re-open exactly the write that rule was added for.
         clear={(chip) => ask(without(asked, chip))}
         clearAll={() => ask(withoutAny(asked))}
+        weaknesses={weaknessNames}
       />
 
       {more && (
@@ -673,6 +694,7 @@ export function Findings() {
           set={set}
           setMany={setMany}
           tags={inUse.data?.items ?? []}
+          kinds={kindsHere.data?.items ?? []}
           oneBuild={oneBuild}
           spanning={spanning}
           variantNamed={Boolean(variant)}

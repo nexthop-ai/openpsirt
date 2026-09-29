@@ -1282,6 +1282,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/findings/package-kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List package kinds with open findings across every product
+         * @description Returns each kind of package that open findings sit at, across every product you may see, with how many. An issue at a component in two products counts in each, as it is two rows on the findings list across products.
+         *
+         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A component with no package identifier has no kind and is not counted. Ordered by the count, largest first.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-package-kinds-anywhere"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/issues/{vulnerability}": {
         parameters: {
             query?: never;
@@ -2566,6 +2590,32 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-finding-components"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/findings/package-kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List package kinds with open findings
+         * @description Returns each kind of package that open findings in the product sit at, with how many.
+         *
+         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A component with no package identifier has no kind and is not counted. Ordered by the count, largest first.
+         *
+         *     `stream` and `variant` are optional and independent, as they are on the findings list.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-package-kinds"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5830,6 +5880,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/weaknesses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Look up weaknesses
+         * @description Names weaknesses from the CWE catalog, each with a short name where it is a common one.
+         *
+         *     `id` names exactly the identifiers given, in the order given, whether or not either list holds them: one neither holds comes back with no names.
+         *
+         *     `q` searches. Digits, with or without `CWE-`, find every identifier whose number begins with them, the one typed exactly first. Words find every weakness whose catalog name and short name together hold each of them, without regard to capitals. Nothing typed answers the common weaknesses. Matches come most common first: the common ones in their own order, then the rest by number.
+         *
+         *     A request carrying both `id` and `q` is refused. Reads no finding.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers from the catalog, and reads no finding.
+         */
+        get: operations["list-weaknesses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/work/set-aside": {
         parameters: {
             query?: never;
@@ -7884,8 +7962,8 @@ export interface components {
             vector?: string;
             version: string;
             vulnerability: string;
-            /** @description The kind of flaw, as CWE identifiers */
-            weaknesses?: string[] | null;
+            /** @description The kinds of flaw, as CWE identifiers with their names, the root cause first */
+            weaknesses?: components["schemas"]["WeaknessBody"][] | null;
         };
         ExploitedHereBody: {
             /**
@@ -9668,6 +9746,16 @@ export interface components {
             /** @description The topic within a Zulip channel */
             topic?: string;
         };
+        OutcomeBody: {
+            /** @description Whether it stores a date: when somebody looks again, or when promised work lands */
+            dated: boolean;
+            /** @description Whether recording it takes the issue out of the working queue */
+            hides_risk: boolean;
+            /** @description Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one */
+            needs_justification: boolean;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+        };
         OutlierBody: {
             /**
              * Format: int64
@@ -9788,6 +9876,24 @@ export interface components {
              * @description Claims about this product waiting for a second person
              */
             waiting: number;
+        };
+        PackageKindBody: {
+            /** @description The package type as the package identifier spells it, such as deb, golang or pypi. What the findings list's ecosystem filter takes */
+            kind: string;
+            /**
+             * Format: int64
+             * @description The number of issues open at components of this kind, counted as the findings list counts rows
+             */
+            open: number;
+        };
+        PackageKindsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PackageKindsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["PackageKindBody"][] | null;
         };
         PairThresholdsBody: {
             /**
@@ -12204,6 +12310,23 @@ export interface components {
             id: string;
             name: string;
         };
+        WeaknessBody: {
+            /** @description The identifier, such as CWE-787, or the word a feed uses for no classification */
+            id: string;
+            /** @description The name the CWE catalog assigns. Absent where the catalog does not assign the identifier */
+            name?: string;
+            /** @description A name of a few words, where the weakness is a common one. Absent for every other */
+            short?: string;
+        };
+        WeaknessesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WeaknessesOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["WeaknessBody"][] | null;
+        };
         WentBody: {
             /** @description The identifier it went out under */
             advisory: string;
@@ -12265,6 +12388,8 @@ export interface components {
             kind: "person" | "key";
             /** @description The display name, where one is recorded */
             name: string;
+            /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims. A dismissal is an outcome that hides risk and stores no date */
+            outcomes: components["schemas"]["OutcomeBody"][] | null;
             /** @description The products they can reach, and what they may do in each */
             reach: components["schemas"]["CanBody"][] | null;
             /** @description An address is recorded for them, so anything can be sent at all */
@@ -14339,6 +14464,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-package-kinds-anywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageKindsOutputBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -16646,6 +16800,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-package-kinds": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageKindsOutputBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -21566,6 +21756,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VulnerabilityDataBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-weaknesses": {
+        parameters: {
+            query?: {
+                /** @description Identifiers to name, such as CWE-787 */
+                id?: string[] | null;
+                /** @description A number or words to search for */
+                q?: string;
+                /** @description The most matches a search answers */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeaknessesOutputBody"];
                 };
             };
             /** @description Error */

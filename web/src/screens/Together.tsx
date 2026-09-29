@@ -24,7 +24,7 @@ import {
   reasonsFor,
   type Justification,
 } from "../ui/Outcome";
-import { needsJustification as statesReason } from "../ui/outcomes";
+import { useOutcomes } from "../ui/outcomes";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
 import { claimAt, decisionAt, issueAt } from "../app/routes";
@@ -446,7 +446,7 @@ function Claim({
   // refused, naming the decision, unless the person asks to leave it out.
   const [skipDecided, setSkipDecided] = useState(false);
 
-  const needsJustification = statesReason(outcome);
+  const needsJustification = useOutcomes().needsJustification(outcome);
   // A correction carries past every version bump, so it takes only the two
   // reasons that say something is not there. The endpoint refuses the rest,
   // and a reason chosen under another outcome is clamped rather than sent.

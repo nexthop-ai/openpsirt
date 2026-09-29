@@ -14,7 +14,7 @@ import { Paged } from "../../ui/Paged";
 import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
-import { DISMISSING } from "../../ui/outcomes";
+import { useOutcomes } from "../../ui/outcomes";
 import { Sheet } from "./Sheet";
 import {
   PeriodPicker,
@@ -118,8 +118,12 @@ export function Overview() {
   // Read from the record rather than from the decisions list, because the
   // record is the one that takes an outcome repeated and names the place each
   // judgment sits at.
+  const { known, dismissing } = useOutcomes();
   const argued = useQuery({
-    queryKey: ["dismissals", at.product ?? "", when],
+    // Asked once the server has said which outcomes dismiss: asked before, the
+    // list of them is empty and the answer is about none of them.
+    enabled: known,
+    queryKey: ["dismissals", at.product ?? "", when, dismissing],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/audit", {
@@ -127,7 +131,7 @@ export function Overview() {
             query: {
               // Every dismissing outcome at once: asked of some, the answer
               // is about part of the program while reading as the whole.
-              outcome: DISMISSING,
+              outcome: dismissing,
               state: ["approved" as const],
               // The window this report states, so the sheet does not carry a
               // header saying ninety days over a list that ignores it. Dated

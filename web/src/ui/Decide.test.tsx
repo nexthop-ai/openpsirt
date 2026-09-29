@@ -5,6 +5,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Decide, type At } from "./Decide";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
+import { PUBLISHED } from "../test/outcomes";
 
 const mount = mounted();
 
@@ -48,7 +49,14 @@ describe("proposing a deferral past the threshold", () => {
     serve((path) => {
       if (path === "/v1/session/me") {
         return {
-          data: { identity: "ana", name: "Ana", admin: false, kind: "person", deferral_days: 30 },
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            kind: "person",
+            deferral_days: 30,
+            outcomes: PUBLISHED,
+          },
         };
       }
       if (path.endsWith("/reach")) return { data: { automatic: [], differing: [] } };

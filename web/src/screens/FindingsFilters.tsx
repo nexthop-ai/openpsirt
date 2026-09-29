@@ -7,6 +7,8 @@ import type { Outcome } from "../ui/outcomes";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
+import { called, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
+import { useState } from "react";
 // The findings list's filters, apart from the list itself.
 //
 // Everything the server can narrow by is here, named for what it asks, each
@@ -142,37 +144,47 @@ export const DEADLINES = [
   ["90", "Due within 90 days"],
 ] as const;
 
-// The package kinds worth offering, most numerous first. The name is the one
-// the package identifier spells, with the language beside it where they differ
-// — Rust is cargo and Python is pypi, and somebody looking for one of those
-// searches for the language.
+// What a package kind is called, where the word the package identifier spells
+// is not the one somebody looks for: Rust is cargo and Python is pypi, and
+// somebody looking for one of those searches for the language. A kind this
+// does not name is called by its own word.
 //
-// The server takes an open set, and this is the offered part of it. The filter
-// carries whatever string arrives and matches the identifier against it, so
-// this list bounds the picker rather than the question — and a list short of
-// what an image actually holds is a capability that exists and cannot be
-// reached. On an Alpine or RPM image `apk` or `rpm` is most of the inventory.
-//
-// A kind this does not list is still askable: the address carries it, the
-// server matches it, and the chip above the list labels it with the word
-// itself. What it has no way to do is offer it, and the durable answer to that
-// is the kinds actually present travelling with the read rather than a longer
-// list here — which is a question the server does not answer yet.
-const ECOSYSTEMS = [
-  ["", "Any"],
-  ["generic", "Generic"],
-  ["golang", "Go (golang)"],
-  ["deb", "Debian (deb)"],
-  ["rpm", "RPM"],
-  ["apk", "Alpine (apk)"],
-  ["cargo", "Rust (cargo)"],
-  ["pypi", "Python (pypi)"],
-  ["npm", "npm"],
-  ["gem", "Ruby (gem)"],
-  ["oci", "Container image (oci)"],
-  ["github", "GitHub"],
-  ["maven", "Maven"],
-] as const;
+// Names only. Which kinds are offered is the server's answer about the scope
+// on screen, counted over what the reader may see.
+const KIND_NAMES: Record<string, string> = {
+  generic: "Generic",
+  golang: "Go (golang)",
+  deb: "Debian (deb)",
+  rpm: "RPM",
+  apk: "Alpine (apk)",
+  cargo: "Rust (cargo)",
+  pypi: "Python (pypi)",
+  gem: "Ruby (gem)",
+  oci: "Container image (oci)",
+  github: "GitHub",
+  maven: "Maven",
+};
+
+function kindCalled(kind: string): string {
+  return Object.hasOwn(KIND_NAMES, kind) ? (KIND_NAMES[kind] ?? kind) : kind;
+}
+
+// One kind the server reports present, and how many rows it would ask for.
+type KindPresent = { kind: string; open: number };
+
+// The kinds the filter offers: every kind the server reports, with its count,
+// then whatever is already chosen and not reported, so a kind in force is one
+// the reader can see and untick.
+export function kindsOffered(present: readonly KindPresent[], chosen: readonly string[]): Pairs {
+  const out: [string, string][] = present.map(({ kind, open }) => [
+    kind,
+    `${kindCalled(kind)} · ${open.toLocaleString("en-US")}`,
+  ]);
+  for (const kind of chosen) {
+    if (!present.some((each) => each.kind === kind)) out.push([kind, kindCalled(kind)]);
+  }
+  return out;
+}
 
 // The scopes a producer may state for a dependency, in the two formats' own
 // words.
@@ -216,12 +228,19 @@ type Active = {
   // how the address asks for the default — so removing that chip writes the
   // word that means "ask for everything".
   then?: [string, string[]][];
+  // The value in full, on hover, where the chip shows a shorter name.
+  title?: string;
 };
 
 // The filters narrowing the list right now. Read from the address rather than
 // from the controls, so a filter set by a link somebody was sent shows up
 // exactly like one set by clicking.
-export function activeFilters(params: URLSearchParams): Active[] {
+export function activeFilters(
+  params: URLSearchParams,
+  // The names of the weaknesses the address asks for, where they have been
+  // read.
+  weaknesses?: Map<string, Named>,
+): Active[] {
   const out: Active[] = [];
   const at = (key: string) => params.get(key) ?? "";
   const add = (key: string, label: string, value: string, clears?: [string, string][]) => {
@@ -296,7 +315,14 @@ export function activeFilters(params: URLSearchParams): Active[] {
   each("vex_publisher", "VEX publisher", []);
   each("vex_status", "VEX status", VEX_STATUS);
   each("component", "Component", []);
-  each("ecosystem", "Package type", ECOSYSTEMS);
+  for (const kind of params.getAll("ecosystem").filter(Boolean)) {
+    out.push({
+      key: "ecosystem",
+      label: "Package type",
+      value: kindCalled(kind),
+      clears: [["ecosystem", kind]],
+    });
+  }
   each("declared_as", "Producer said", DECLARED_AS);
   add("under", "Inside container", at("under"));
   add("beneath", "At or under", at("beneath"));
@@ -331,7 +357,16 @@ export function activeFilters(params: URLSearchParams): Active[] {
   );
   add("proposed_after", "Claimed after", at("proposed_after"));
   add("closed_after", "Closed after", at("closed_after"));
-  each("weakness", "Weakness", []);
+  for (const id of params.getAll("weakness").filter(Boolean)) {
+    const named = weaknesses?.get(id);
+    out.push({
+      key: "weakness",
+      label: "Weakness",
+      value: called(named) ? `${id} ${called(named)}` : id,
+      clears: [["weakness", id]],
+      ...(named?.name ? { title: named.name } : {}),
+    });
+  }
   each("tag", "Tag", []);
   if (at("differs") === "1") add("differs", "Differs between builds", "only");
   add(
@@ -465,6 +500,7 @@ export function Filters({
   set,
   setMany,
   tags,
+  kinds,
   oneBuild,
   spanning,
   variantNamed,
@@ -477,6 +513,8 @@ export function Filters({
   // them.
   setMany: (key: string, values: string[]) => void;
   tags: string[];
+  // The package kinds the server reports present in the scope on screen.
+  kinds: readonly KindPresent[];
   oneBuild: boolean;
   spanning: boolean;
   // Whether the selection names a variant, which is what "only this
@@ -486,6 +524,15 @@ export function Filters({
   const at = (key: string) => params.get(key) ?? "";
   const all = (key: string) => params.getAll(key).filter(Boolean);
   const flag = (key: string, on: boolean) => set(key, on ? "1" : "");
+  // The weaknesses offered while one is typed, searched by number or by name,
+  // and the names of the ones chosen.
+  const [weaknessTyped, setWeaknessTyped] = useState("");
+  const weaknessOffers = useWeaknessSearch(weaknessTyped).data ?? [];
+  const weaknessNames = useWeaknessNames(all("weakness"));
+  const weaknessNamed = (word: string) => {
+    const named = weaknessNames.get(word) ?? weaknessOffers.find((each) => each.id === word);
+    return named && called(named) ? { called: called(named), full: named.name } : undefined;
+  };
 
   return (
     <div className="filterpanel">
@@ -631,7 +678,7 @@ export function Filters({
         <Choices
           label="Package type"
           chosen={all("ecosystem")}
-          options={ECOSYSTEMS}
+          options={kindsOffered(kinds, all("ecosystem"))}
           onChange={(chosen) => setMany("ecosystem", chosen)}
         />
         <Choices
@@ -699,10 +746,14 @@ export function Filters({
       <Group legend="Other">
         <Words
           label="Weakness"
-          hint="Kinds of flaw, by CWE identifier. A class is usually several"
-          placeholder="CWE-79"
+          hint="Kinds of flaw, by CWE number or name. A class is usually several"
+          placeholder="CWE-79, or words to search"
           words={all("weakness")}
           onChange={(words) => setMany("weakness", words)}
+          offered={weaknessOffers.map((each) => each.id)}
+          listId="findings-weaknesses"
+          named={weaknessNamed}
+          onTyping={setWeaknessTyped}
         />
         <Words
           label="Tag"
@@ -747,8 +798,10 @@ export function Narrowed({
   widen,
   clear,
   clearAll,
+  weaknesses,
 }: {
   params: URLSearchParams;
+  weaknesses?: Map<string, Named>;
   // The narrowing the selection puts on this list, which is a filter like any
   // other and says so. It rides on the path rather than in the parameters, so
   // it draws a chip of its own: a list that narrows itself and does not say so
@@ -760,7 +813,7 @@ export function Narrowed({
   clear: (chip: Active) => void;
   clearAll: () => void;
 }) {
-  const active = activeFilters(params);
+  const active = activeFilters(params, weaknesses);
   const where: { label: string; value: string; to: typeof scope }[] = [];
   if (scope.product) {
     where.push({
@@ -812,7 +865,7 @@ export function Narrowed({
           type="button"
           className="chip"
           aria-pressed
-          title="Remove this filter"
+          title={each.title ? `${each.title}. Remove this filter` : "Remove this filter"}
           onClick={() => clear(each)}
         >
           <span className="l">{each.label}:</span> {each.value}
