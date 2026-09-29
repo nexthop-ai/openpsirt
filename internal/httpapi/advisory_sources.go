@@ -35,7 +35,7 @@ type AdvisorySourceBody struct {
 
 // registerAdvisorySources configures which suppliers this deployment reads
 // published advisories from.
-func registerAdvisorySources(api huma.API, in Ingest) {
+func registerAdvisorySources(api huma.API, in Deps) {
 	const path = "/v1/products/{product}/advisory-sources"
 
 	huma.Register(api, requiring(huma.Operation{

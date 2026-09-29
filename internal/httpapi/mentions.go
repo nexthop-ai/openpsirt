@@ -20,7 +20,7 @@ type MentionableBody struct {
 	Name     string `json:"name" doc:"The label shown while choosing"`
 }
 
-func registerMentions(api huma.API, in Ingest) {
+func registerMentions(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-mentionable", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/mentionable",
@@ -70,7 +70,7 @@ func registerMentions(api huma.API, in Ingest) {
 // A request about who may read undisclosed work is itself about undisclosed
 // work. Somebody who cannot read it is answered as though the product were not
 // there, which is the answer every other path gives.
-func readersHere(ctx context.Context, in Ingest, product, visibility string) (
+func readersHere(ctx context.Context, in Deps, product, visibility string) (
 	access.Subject, *catalog.Product, access.Visibility, error) {
 
 	subject, err := reading(ctx)

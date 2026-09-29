@@ -26,7 +26,7 @@ type SignOutOutput struct {
 	Status    int
 }
 
-func registerSession(api huma.API, in Ingest) {
+func registerSession(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "sign-out", Method: http.MethodDelete, Path: "/v1/session",
 		Summary: "Sign out",

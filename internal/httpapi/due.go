@@ -39,7 +39,7 @@ type LateBody struct {
 	DaysLeft     int    `json:"days_left" doc:"Negative once it is overdue"`
 }
 
-func registerDue(api huma.API, in Ingest) {
+func registerDue(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-running-out", Method: http.MethodGet, Path: "/v1/running-out",
 		Summary: "List findings running out of time that nobody has decided about",

@@ -48,7 +48,7 @@ type RulingProposedBody struct {
 
 // registerRulings is saying what claims are when the answer is not an issue
 // here, and the second person some of those answers take.
-func registerRulings(api huma.API, in Ingest) {
+func registerRulings(api huma.API, in Deps) {
 	const list = "/v1/products/{product}/report-rulings"
 	const one = list + "/{ruling}"
 
@@ -298,7 +298,7 @@ func registerRulings(api huma.API, in Ingest) {
 }
 
 // rulingOutput renders one ruling as a response.
-func rulingOutput(ctx context.Context, in Ingest, subject access.Subject,
+func rulingOutput(ctx context.Context, in Deps, subject access.Subject,
 	ruling *finding.ReportRuling) (*struct{ Body RulingBody }, error) {
 
 	bodies, err := rulingBodies(ctx, in, subject, []finding.ReportRuling{*ruling})
@@ -310,7 +310,7 @@ func rulingOutput(ctx context.Context, in Ingest, subject access.Subject,
 
 // rulingBodies renders rulings, naming the people and issues they refer to in
 // one read each.
-func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
+func rulingBodies(ctx context.Context, in Deps, subject access.Subject,
 	rows []finding.ReportRuling) ([]RulingBody, error) {
 
 	people := make([]int64, 0, len(rows))
@@ -380,7 +380,7 @@ func rulingState(row finding.ReportRuling) string {
 
 // refusedRuling turns what the store answers about a ruling into what the
 // caller sees.
-func refusedRuling(in Ingest, err error, what string) error {
+func refusedRuling(in Deps, err error, what string) error {
 	var faults markdown.Faults
 	var missing *finding.NotHere
 	switch {

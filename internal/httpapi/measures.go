@@ -50,7 +50,7 @@ type MeasuresBody struct {
 // person, each person's throughput and how much came back: four questions a
 // manager asks constantly, and without this the answer to all four is a screen
 // somebody counts rows on.
-func registerMeasures(api huma.API, in Ingest) {
+func registerMeasures(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-measures", Method: http.MethodGet, Path: "/v1/measures",
 		Summary: "Show how long triage is taking and who is doing it",

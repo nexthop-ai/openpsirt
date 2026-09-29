@@ -46,7 +46,7 @@ const pendingLife = 10 * time.Minute
 // with a client, the response is a 302 with cookies, and describing them as
 // operations would put two routes in the document that no generated client
 // could ever usefully call.
-func registerSignIn(router chi.Router, in Ingest) {
+func registerSignIn(router chi.Router, in Deps) {
 	if len(in.Providers) == 0 {
 		return
 	}
@@ -59,7 +59,7 @@ func registerSignIn(router chi.Router, in Ingest) {
 }
 
 // begin sends the browser to the provider.
-func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
+func begin(w http.ResponseWriter, r *http.Request, in Deps) {
 	provider, ok := in.Providers[chi.URLParam(r, "provider")]
 	if !ok {
 		// The same answer a provider nobody configured gets, so that guessing
@@ -108,7 +108,7 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 }
 
 // complete turns what the provider sent back into a session.
-func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
+func complete(w http.ResponseWriter, r *http.Request, in Deps) {
 	provider, ok := in.Providers[chi.URLParam(r, "provider")]
 	if !ok {
 		Problem(w, http.StatusNotFound, "no such sign-in provider")
@@ -209,7 +209,7 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 
 // admit decides whether somebody who authenticated may be here, in whichever
 // way this deployment assigns roles.
-func admit(r *http.Request, in Ingest, rights *access.Store, identity *signin.Identity) (*access.Account, error) {
+func admit(r *http.Request, in Deps, rights *access.Store, identity *signin.Identity) (*access.Account, error) {
 	// Matched on the provider's own stable identifier, with the username only
 	// redeeming an authorization nobody has pinned yet. A username moves —
 	// people rename themselves, and a forge login left behind can be taken by
@@ -259,7 +259,7 @@ func admit(r *http.Request, in Ingest, rights *access.Store, identity *signin.Id
 // is the thing that was asked for; where to reach them later is not part of
 // it, and refusing the first because the second did not work would lock people
 // out over a column.
-func fillEmail(r *http.Request, in Ingest, rights *access.Store,
+func fillEmail(r *http.Request, in Deps, rights *access.Store,
 	person *access.Account, identity *signin.Identity,
 ) {
 	if !identity.EmailVerified || strings.TrimSpace(identity.Email) == "" {
@@ -285,7 +285,7 @@ func fillEmail(r *http.Request, in Ingest, rights *access.Store,
 // attacker who can write a cookie starts a sign-in of their own, takes the
 // validly-signed pending value it hands back, plants that, and the callback
 // issues the victim's browser a session for the attacker's account.
-func pendingFrom(ctx context.Context, in Ingest, r *http.Request) (inProgress, error) {
+func pendingFrom(ctx context.Context, in Deps, r *http.Request) (inProgress, error) {
 	cookie, err := r.Cookie(access.CookieName(pendingCookie, in.PlainHTTP))
 	if err != nil || cookie.Value == "" {
 		return inProgress{}, errors.New("no sign-in is in progress")
@@ -323,7 +323,7 @@ func pendingFrom(ctx context.Context, in Ingest, r *http.Request) (inProgress, e
 // opaque one: what it holds is short-lived, meaningless to anybody else, and
 // needed by whichever replica the callback lands on — so the thing that has
 // to be shared is a key rather than a table and a sweep.
-func sealPending(ctx context.Context, in Ingest, payload []byte) (string, error) {
+func sealPending(ctx context.Context, in Deps, payload []byte) (string, error) {
 	key, err := signingKey(ctx, in)
 	if err != nil {
 		return "", err
@@ -334,7 +334,7 @@ func sealPending(ctx context.Context, in Ingest, payload []byte) (string, error)
 		base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
-func openPending(ctx context.Context, in Ingest, value string) ([]byte, error) {
+func openPending(ctx context.Context, in Deps, value string) ([]byte, error) {
 	body, signature, found := strings.Cut(value, ".")
 	if !found {
 		return nil, errors.New("the sign-in in progress is not signed")
@@ -367,7 +367,7 @@ func openPending(ctx context.Context, in Ingest, value string) ([]byte, error) {
 // replica and across a restart: a sign-in begun on one process is finished by
 // whichever answers the callback, and a key per process would refuse half of
 // them for no reason a person could act on.
-func signingKey(ctx context.Context, in Ingest) ([]byte, error) {
+func signingKey(ctx context.Context, in Deps) ([]byte, error) {
 	if in.DB == nil {
 		return nil, errors.New("no database, so a sign-in cannot be signed")
 	}
@@ -447,7 +447,7 @@ func aLocalPath(where string) string {
 // compares this against what it was registered with, so it has to be the
 // address people actually arrive on rather than whatever this process thinks
 // it is called — behind a proxy those differ.
-func (in Ingest) redirectURI(r *http.Request, provider string) (string, error) {
+func (in Deps) redirectURI(r *http.Request, provider string) (string, error) {
 	base := strings.TrimSuffix(in.BaseURL, "/")
 	if base == "" {
 		// The Host header is whatever the caller sent. Building the address a
@@ -472,7 +472,7 @@ func (in Ingest) redirectURI(r *http.Request, provider string) (string, error) {
 // match, somebody unknown, and somebody known but granted nothing. Telling
 // them apart says whether a name is real, which is free reconnaissance for
 // somebody who has just proved nothing.
-func refuseSignIn(w http.ResponseWriter, in Ingest) {
+func refuseSignIn(w http.ResponseWriter, in Deps) {
 	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
 	http.SetCookie(w, &cleared)
 	Problem(w, http.StatusUnauthorized, "not authorized")
@@ -480,7 +480,7 @@ func refuseSignIn(w http.ResponseWriter, in Ingest) {
 
 // wentWrongHere records a fault where an operator can read it and says nothing
 // about it to whoever asked.
-func wentWrongHere(w http.ResponseWriter, in Ingest, what string, err error) {
+func wentWrongHere(w http.ResponseWriter, in Deps, what string, err error) {
 	if in.Logger != nil {
 		in.logger().Error(what, "error", err)
 	}
@@ -498,7 +498,7 @@ func wentWrongHere(w http.ResponseWriter, in Ingest, what string, err error) {
 // to issue, and the bound on a grant a group derived, which is the same window
 // seen from the other side. Written twice they drift, and the pair is only
 // meaningful while they agree.
-func sessionWindow(ctx context.Context, in Ingest) (time.Duration, error) {
+func sessionWindow(ctx context.Context, in Deps) (time.Duration, error) {
 	var settings *setting.Store
 	if in.DB != nil {
 		settings = setting.NewStore(in.DB.DB)

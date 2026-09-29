@@ -48,7 +48,7 @@ type CatchesOutput struct {
 	}
 }
 
-func registerRouting(api huma.API, in Ingest) {
+func registerRouting(api huma.API, in Deps) {
 	const path = "/v1/products/{product}/routing-rules"
 
 	huma.Register(api, requiring(huma.Operation{
@@ -257,7 +257,7 @@ func registerRouting(api huma.API, in Ingest) {
 // which is satisfied by any one of what it names. Writing a rule performs the
 // act the assigner right is named for — continuously, on behalf of whoever
 // wrote it — so it asks for that right and not merely for triage.
-func routable(ctx context.Context, in Ingest, name string) (access.Subject, int64,
+func routable(ctx context.Context, in Deps, name string) (access.Subject, int64,
 	*access.Store, error) {
 
 	subject, err := reading(ctx)
@@ -284,7 +284,7 @@ func routable(ctx context.Context, in Ingest, name string) (access.Subject, int6
 // Queued rather than run here. A failure to queue is logged rather than
 // returned: the rule is recorded either way, and answering with an error would
 // invite a retry that records it twice.
-func queueSweep(ctx context.Context, in Ingest, productID int64) {
+func queueSweep(ctx context.Context, in Deps, productID int64) {
 	if in.Queue == nil {
 		return
 	}
@@ -296,7 +296,7 @@ func queueSweep(ctx context.Context, in Ingest, productID int64) {
 
 // teamsByID is every team's two names, by identifier: the one a write resolves
 // and the one a screen shows.
-func teamsByID(ctx context.Context, in Ingest) (map[int64]named, error) {
+func teamsByID(ctx context.Context, in Deps) (map[int64]named, error) {
 	teams, err := access.NewStore(in.DB.DB).Teams(ctx, "", database.InBulk.Most)
 	if err != nil {
 		return nil, err

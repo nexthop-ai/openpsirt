@@ -503,7 +503,7 @@ func quoted(value string) string {
 	return string(out)
 }
 
-func registerExport(api huma.API, in Ingest) {
+func registerExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-findings", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings.{format}",
@@ -569,7 +569,7 @@ func registerExport(api huma.API, in Ingest) {
 // The triage line is per product here, so the file cannot name one. It
 // says so rather than naming a number that would be wrong for every product
 // but one.
-func registerAnywhereExport(api huma.API, in Ingest) {
+func registerAnywhereExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-findings-anywhere", Method: http.MethodGet,
 		Path:    "/v1/findings.{format}",

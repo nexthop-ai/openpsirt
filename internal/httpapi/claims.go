@@ -36,7 +36,7 @@ type ClaimApprovedBody struct {
 	ReturnedClaim int64 `json:"returned_claim,omitempty" doc:"The claim the rows set aside went into, where any were"`
 }
 
-func registerClaims(api huma.API, in Ingest) {
+func registerClaims(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "approve-claim", Method: http.MethodPost, Path: "/v1/claims/{id}/approval",
 		Summary: "Approve a claim",
@@ -165,7 +165,7 @@ func registerClaims(api huma.API, in Ingest) {
 }
 
 // registerClaimLink is where a claim's work is happening.
-func registerClaimLink(api huma.API, in Ingest) {
+func registerClaimLink(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "point-claim-elsewhere", Method: http.MethodPut,
 		Path:    "/v1/claims/{id}/elsewhere",
@@ -215,7 +215,7 @@ type ReaffirmedBody struct {
 }
 
 // registerReaffirmClaim re-makes everything one action claimed.
-func registerReaffirmClaim(api huma.API, in Ingest) {
+func registerReaffirmClaim(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "reaffirm-claim", Method: http.MethodPost,
 		Path:    "/v1/claims/{id}/reaffirmation",
@@ -411,7 +411,7 @@ type ElsewhereBody struct {
 // decidedAbout gathers what has been decided at a finding's places: what
 // stands, what stood before, what was argued about other issues at the same
 // places, and what another product decided about this same issue there.
-func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, productID, issueID int64,
+func decidedAbout(ctx context.Context, in Deps, subject access.Subject, productID, issueID int64,
 	at []finding.Deciding) ([]StandingClaimBody, []EarlierBody, []SimilarBody,
 	[]ElsewhereBody, error) {
 
@@ -568,7 +568,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 // catalog, and the read that found the judgments is narrowed by what the
 // subject may see — so a name only ever reaches a reader who could already read
 // the judgment it belongs to.
-func productsDecidedIn(ctx context.Context, in Ingest, rows []triage.Elsewhere) (map[int64]string, error) {
+func productsDecidedIn(ctx context.Context, in Deps, rows []triage.Elsewhere) (map[int64]string, error) {
 	ids := make([]int64, 0, len(rows))
 	for _, one := range rows {
 		ids = append(ids, one.ProductID)

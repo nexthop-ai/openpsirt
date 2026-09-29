@@ -44,7 +44,7 @@ const changesWhatItSays = "A triage role on every product the advisory covers. W
 	"about one product is part of the same document as what it says about another."
 
 // advisoryRefused maps what the store refuses to what a caller is told.
-func advisoryRefused(in Ingest, err error, what string) error {
+func advisoryRefused(in Deps, err error, what string) error {
 	switch {
 	case errors.Is(err, advisory.ErrNoPublisher), errors.Is(err, advisory.ErrNoPrefix):
 		// A configuration gap rather than a bad request, and named as one:
@@ -73,7 +73,7 @@ func advisoryRefused(in Ingest, err error, what string) error {
 	return wentWrong(in.Logger, what, err)
 }
 
-func registerAdvisory(api huma.API, in Ingest) {
+func registerAdvisory(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "start-advisory", Method: http.MethodPost, Path: "/v1/advisories",
 		Summary: "Start an advisory",

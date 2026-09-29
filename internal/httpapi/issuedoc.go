@@ -38,7 +38,7 @@ const howManyJudgments = 200
 // documents that go out are the advisory and the VEX, and both are assembled
 // elsewhere and deliberately say less. The lead line says so, because a
 // document that does not say who it is for is one somebody forwards.
-func registerIssueDocument(api huma.API, in Ingest) {
+func registerIssueDocument(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-issue-document", Method: http.MethodGet,
 		Path:    "/v1/issues/{vulnerability}/document",
@@ -77,7 +77,7 @@ func registerIssueDocument(api huma.API, in Ingest) {
 }
 
 // issueDocument assembles it, from the same readers the screens use.
-func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
+func issueDocument(ctx context.Context, in Deps, subject access.Subject,
 	name string) (string, error) {
 
 	var out strings.Builder

@@ -150,7 +150,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 			provider: provider, rights: rights, db: db,
 			product: product.ID, mode: access.Direct,
 		}
-		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
+		handler, _ := httpapi.New(quiet, nil, httpapi.Deps{
 			Mode: func(context.Context) access.Mode { return reach.mode },
 			DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
 			// Plain HTTP, so the cookies keep their bare names: a browser

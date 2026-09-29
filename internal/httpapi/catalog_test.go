@@ -122,7 +122,7 @@ func catalogOn(t *testing.T, on engines, fn func(t *testing.T, d *declaring)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
+		handler, _ := httpapi.New(quiet, nil, httpapi.Deps{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()),
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
 		})

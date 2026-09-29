@@ -112,7 +112,7 @@ type CoveredBuild struct {
 	Covered  int    `json:"covered" doc:"The number of findings those places hold"`
 }
 
-func registerFindingDecision(api huma.API, in Ingest) {
+func registerFindingDecision(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "decide-finding", Method: http.MethodPost,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
@@ -331,7 +331,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 // Returns the places to write against and the number the finding sits at
 // there. The two differ whenever something was left out, and the difference
 // states how much of the finding is still open.
-func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, store *triage.Store,
+func placesToDecide(ctx context.Context, in Deps, subject access.Subject, store *triage.Store,
 	product, stream, variant, vulnerability, component string, which graph.Choice,
 	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {
 
@@ -415,7 +415,7 @@ func aboutBuild(stream, variant string, err error) error {
 // Name and version together, because a name alone is not unique — a real image
 // ships three vendored versions of one library, and resolving the name on its
 // own answers about whichever was interned first.
-func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
+func findingAbout(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant, vulnerability, component string,
 	which graph.Choice) (int64, int64, int64, error) {
 
@@ -445,7 +445,7 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 // A build the caller cannot reach answers with the sentence every other
 // finding route gives. Naming which part of the address failed is for a
 // pipeline filing a scan; here it would tell a reader which products exist.
-func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
+func decidingAbout(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant, vulnerability, place string) (*finding.Deciding, int64, error) {
 	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {

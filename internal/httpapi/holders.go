@@ -48,7 +48,7 @@ const teamShare = 5
 // Teams are named to anybody, which is already true of the teams list: a
 // team grants no role, no visibility and no capability, so its name discloses
 // nothing that its existence does not. Membership stays an administrator's.
-func registerHolders(api huma.API, in Ingest) {
+func registerHolders(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-holders", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/holders",

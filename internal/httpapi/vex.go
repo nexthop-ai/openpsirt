@@ -18,7 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
-func registerVEX(api huma.API, in Ingest) {
+func registerVEX(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-vex", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex",
@@ -246,7 +246,7 @@ type VEXIssuanceBody struct {
 // A build in a product nobody may see and one nobody declared answer the same
 // way. Telling them apart turns a lookup into a directory of what this
 // deployment ships.
-func vexRefused(in Ingest, err error, what string) error {
+func vexRefused(in Deps, err error, what string) error {
 	switch {
 	case errors.Is(err, vex.ErrMayNotPublish):
 		// Before the denial below, which this one is. Whoever sees it has

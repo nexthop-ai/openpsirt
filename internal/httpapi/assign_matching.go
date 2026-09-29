@@ -39,7 +39,7 @@ type errRecipient struct{ answer error }
 
 func (e errRecipient) Error() string { return e.answer.Error() }
 
-func registerAssignMatching(api huma.API, in Ingest) {
+func registerAssignMatching(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "assign-matching-findings", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/findings/assignment",
@@ -181,7 +181,7 @@ func registerAssignMatching(api huma.API, in Ingest) {
 // refused by name, because a person who picked it from a list wants to know
 // which row went wrong rather than bisect the selection — and a name filed
 // only where this person may not look is refused in the same words.
-func piecesNamed(ctx context.Context, in Ingest, subject access.Subject, productID int64,
+func piecesNamed(ctx context.Context, in Deps, subject access.Subject, productID int64,
 	picked []PieceBody) ([]finding.Piece, error) {
 
 	if len(picked) == 0 {
@@ -209,7 +209,7 @@ func piecesNamed(ctx context.Context, in Ingest, subject access.Subject, product
 }
 
 // pieceBodies names pieces by their issues' names.
-func pieceBodies(ctx context.Context, in Ingest, pieces []finding.Piece) ([]PieceBody, error) {
+func pieceBodies(ctx context.Context, in Deps, pieces []finding.Piece) ([]PieceBody, error) {
 	if len(pieces) == 0 {
 		return nil, nil
 	}

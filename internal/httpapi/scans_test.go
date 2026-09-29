@@ -180,7 +180,7 @@ func ingestOn(t *testing.T, on engines, opts queue.Options, fn func(t *testing.T
 		}
 
 		q := queue.New(db, opts)
-		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
+		handler, _ := httpapi.New(quiet, nil, httpapi.Deps{
 			DB: db, Queue: q,
 			Access: access.NewResolver(rights, access.Trust{}),
 			// Small enough that a test can write a document past it. Every

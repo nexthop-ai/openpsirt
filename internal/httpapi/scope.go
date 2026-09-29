@@ -35,7 +35,7 @@ type ScopeQuery struct {
 // cannot be reached through the interface, which leaves those unselectable
 // until a product is chosen, and guessing which product was meant is how a
 // number quietly answers a different question from the one on screen.
-func scoped(ctx context.Context, in Ingest, subject access.Subject, q ScopeQuery) (finding.Scope, error) {
+func scoped(ctx context.Context, in Deps, subject access.Subject, q ScopeQuery) (finding.Scope, error) {
 	// Here rather than in each caller, so a route reaching the store through
 	// this cannot forget it.
 	if in.DB == nil {
@@ -66,7 +66,7 @@ func scoped(ctx context.Context, in Ingest, subject access.Subject, q ScopeQuery
 //
 // It reports whether they see the product, because that is what the caller
 // needs in order to do it.
-func scopedByHolding(ctx context.Context, in Ingest, subject access.Subject,
+func scopedByHolding(ctx context.Context, in Deps, subject access.Subject,
 	q ScopeQuery) (finding.Scope, bool, error) {
 
 	return resolveScope(ctx, in, subject, q)
@@ -74,7 +74,7 @@ func scopedByHolding(ctx context.Context, in Ingest, subject access.Subject,
 
 // resolveScope turns names into identifiers and says whether the subject reads
 // the product, without deciding what to do about it.
-func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
+func resolveScope(ctx context.Context, in Deps, subject access.Subject,
 	q ScopeQuery) (finding.Scope, bool, error) {
 
 	var scope finding.Scope

@@ -75,7 +75,7 @@ type OverviewOutput struct {
 // five requests and a spreadsheet — what is open per build, how much is
 // overdue, how much has been decided, when each build was last scanned — every
 // piece of which exists and none of which sits together.
-func registerOverview(api huma.API, in Ingest) {
+func registerOverview(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-product-overview", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/overview",

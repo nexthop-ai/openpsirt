@@ -152,7 +152,7 @@ func overAClosedDatabaseAs(t *testing.T, r *reach, logged slog.Handler,
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Ingest{
+	handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Deps{
 		DB: gone, Queue: queue.New(gone, queue.DefaultOptions()), Files: files,
 		Access:    access.NewResolver(r.rights, access.Trust{Header: testHeader, From: sources}),
 		Publisher: who,
@@ -224,7 +224,7 @@ func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
 			t.Fatal(err)
 		}
 		logged := &counting{}
-		handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Ingest{
+		handler, _ := httpapi.New(slog.New(logged), nil, httpapi.Deps{
 			DB: gone, Queue: queue.New(gone, queue.DefaultOptions()),
 			Access: access.NewResolver(access.NewStore(gone.DB),
 				access.Trust{Header: testHeader, From: sources}),

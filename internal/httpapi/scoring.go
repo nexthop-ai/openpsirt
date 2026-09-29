@@ -11,10 +11,11 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 )
 
-func registerScoring(api huma.API, in Ingest) {
+func registerScoring(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "score-vector", Method: http.MethodGet, Path: "/v1/score",
 		Summary: "Score a CVSS vector",

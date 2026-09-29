@@ -99,7 +99,7 @@ func (c *counting) Read(p []byte) (int, error) {
 // Read one byte past the limit, so a document over it is refused as too large
 // rather than cut off and reported as malformed — and so the digest recorded
 // is over what arrived rather than over the part that fitted.
-func uploaded(in Ingest, file huma.FormFile, read func(io.Reader) error) (string, error) {
+func uploaded(in Deps, file huma.FormFile, read func(io.Reader) error) (string, error) {
 	most := in.Limits.OrDefault().MaxBytes
 	digest := sha256.New()
 	counted := &counting{r: io.TeeReader(io.LimitReader(file, most+1), digest)}
@@ -133,7 +133,7 @@ func uploaded(in Ingest, file huma.FormFile, read func(io.Reader) error) (string
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
-func registerVexImport(api huma.API, in Ingest) {
+func registerVexImport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "upload-vex-statements", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/vex-statements",
@@ -256,7 +256,7 @@ func statementsOf(said []sbom.Suppression) []finding.Statement {
 // place of what the same document said before, and notes the upload in the
 // trail under about. It answers how many statements it recorded and how many
 // earlier ones it set aside.
-func recordSupplied(ctx context.Context, in Ingest, by access.Subject, productID int64,
+func recordSupplied(ctx context.Context, in Deps, by access.Subject, productID int64,
 	from finding.Supplied, said []sbom.Suppression, about string) (int, int, error) {
 
 	statements := statementsOf(said)

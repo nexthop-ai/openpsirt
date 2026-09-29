@@ -26,7 +26,7 @@ import (
 // things: a comment is about one argument at one place, and a note is about
 // the issue here. Merging them is not available — a claim is keyed on a place
 // and a note on an issue, so they cannot become one record.
-func registerIssueNotes(api huma.API, in Ingest) {
+func registerIssueNotes(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-issue-notes", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/notes",
@@ -216,7 +216,7 @@ type NoteWritten struct {
 // was typed. A note may be reached through any name the issue answers to, and
 // a notification naming whichever alias the writer happened to use says a
 // different thing about the same note depending on who wrote it.
-func noteAbout(ctx context.Context, in Ingest, subject access.Subject,
+func noteAbout(ctx context.Context, in Deps, subject access.Subject,
 	product, vulnerability string) (int64, int64, string, error) {
 
 	named, err := productForIssue(ctx, in, subject, product)
@@ -236,7 +236,7 @@ func noteAbout(ctx context.Context, in Ingest, subject access.Subject,
 }
 
 // notesOut renders a thread, naming its authors in one lookup.
-func notesOut(ctx context.Context, in Ingest, notes []triage.IssueNote) (*listOutput[NoteBody], error) {
+func notesOut(ctx context.Context, in Deps, notes []triage.IssueNote) (*listOutput[NoteBody], error) {
 	authors := make([]int64, 0, len(notes))
 	for _, note := range notes {
 		authors = append(authors, note.WrittenBy)
@@ -268,7 +268,7 @@ func notesOut(ctx context.Context, in Ingest, notes []triage.IssueNote) (*listOu
 // Failing to tell somebody never fails the write. The words are on record by
 // the time this runs, and losing a note because a notification could not be
 // stored would be sacrificing the wrong half.
-func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *triage.Store,
+func tellNamed(ctx context.Context, in Deps, subject access.Subject, store *triage.Store,
 	note triage.IssueNote, identifier string) []string {
 
 	visibility, err := store.NoteVisibility(ctx, note.ProductID, note.VulnerabilityID)

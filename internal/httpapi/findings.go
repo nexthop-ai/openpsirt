@@ -431,7 +431,7 @@ type AtOneBuild struct {
 	AcrossVariants   string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
 
-func registerFindings(api huma.API, in Ingest) {
+func registerFindings(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-findings", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings",
@@ -546,7 +546,7 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 	return row
 }
 
-func registerComponentFindings(api huma.API, in Ingest) {
+func registerComponentFindings(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-finding-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings/components",
@@ -632,7 +632,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 // asked of the store rather than inferred from which levels were named — one
 // rule, in one place, so the endpoint cannot come to disagree with the
 // statement it is narrowing.
-func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string,
+func beneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 	which graph.Choice) (*int64, error) {
 	if name == "" {
 		return nil, nil
@@ -889,7 +889,7 @@ type EvidenceBody struct {
 	Said []SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied"`
 }
 
-func registerFindingDetail(api huma.API, in Ingest) {
+func registerFindingDetail(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-finding", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
@@ -1103,7 +1103,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 }
 
 // putOff fills in how long each place has been put off for, in one read.
-func putOff(ctx context.Context, in Ingest, subject access.Subject, productID,
+func putOff(ctx context.Context, in Deps, subject access.Subject, productID,
 	vulnerabilityID int64, places []SittingBody) error {
 	if len(places) == 0 {
 		return nil

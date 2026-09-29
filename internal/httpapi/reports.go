@@ -67,7 +67,7 @@ type ChangedBody struct {
 	Due           string        `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
 }
 
-func registerReports(api huma.API, in Ingest) {
+func registerReports(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-trend", Method: http.MethodGet, Path: "/v1/trend",
 		Summary: "Show new, resolved and open over time",
@@ -247,7 +247,7 @@ type TwoBuilds struct {
 
 // targets resolves the two builds. Either one out of reach answers as never
 // scanned.
-func (pair TwoBuilds) targets(ctx context.Context, in Ingest, subject access.Subject,
+func (pair TwoBuilds) targets(ctx context.Context, in Deps, subject access.Subject,
 	product string) (from, to int64, err error) {
 
 	if from, err = targetIDOf(ctx, in, subject, product, pair.From, pair.FromVariant); err != nil {
@@ -267,7 +267,7 @@ type ReleasePointBody struct {
 }
 
 // registerReleaseTrend offers the trend on the other axis.
-func registerReleaseTrend(api huma.API, in Ingest) {
+func registerReleaseTrend(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-release-trend", Method: http.MethodGet, Path: "/v1/trend/releases",
 		Summary: "Show what each release shipped with",
@@ -327,7 +327,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 }
 
 // registerNotes offers the comparison as prose.
-func registerNotes(api huma.API, in Ingest) {
+func registerNotes(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-release-notes", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/comparison/notes",
@@ -471,7 +471,7 @@ type CarriedBody struct {
 	Absent    int             `json:"absent" doc:"Cover nothing in the new line"`
 }
 
-func registerCarry(api huma.API, in Ingest) {
+func registerCarry(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "preview-carried-decisions", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried",
@@ -527,7 +527,7 @@ func registerCarry(api huma.API, in Ingest) {
 }
 
 // registerCarrying takes the chosen judgments onto the new line.
-func registerCarrying(api huma.API, in Ingest) {
+func registerCarrying(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "carry-decisions", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried",

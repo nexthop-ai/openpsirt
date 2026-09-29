@@ -75,7 +75,7 @@ type UploadResult struct {
 	DatedOnArrival bool `json:"dated_on_arrival,omitempty" doc:"Whether the inventory stated no build time, so the time it arrived orders it instead"`
 }
 
-func registerScans(api huma.API, in Ingest) {
+func registerScans(api huma.API, in Deps) {
 	// Registered whether or not there is a database behind it. The OpenAPI
 	// document is generated from these registrations by a process that never
 	// opens one, and an operation missing from the document because of how the
@@ -141,7 +141,7 @@ func maxUpload(limits sbom.Limits) int64 {
 	return 2 * limits.OrDefault().MaxBytes
 }
 
-func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, error) {
+func upload(ctx context.Context, in Deps, input *UploadInput) (*UploadOutput, error) {
 	if in.DB == nil || in.Queue == nil {
 		return nil, noDatabase(in.Logger)
 	}

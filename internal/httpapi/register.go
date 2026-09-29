@@ -77,7 +77,7 @@ func (closure) Schema(huma.Registry) *huma.Schema {
 // not finished scanning is the one somebody is most likely asking about. A
 // read that failed fails the register, because an absent block is the answer
 // for an unscanned build and a fault is not that.
-func measuredWith(ctx context.Context, in Ingest, subject access.Subject,
+func measuredWith(ctx context.Context, in Deps, subject access.Subject,
 	targetID int64, product, stream, variant string) (*MeasuredBody, error) {
 
 	scan, err := ingest.NewStore(in.DB.DB).Newest(ctx, targetID)
@@ -189,7 +189,7 @@ func (r Registering) narrow() finding.Registering {
 	return only
 }
 
-func registerRegister(api huma.API, in Ingest) {
+func registerRegister(api huma.API, in Deps) {
 	const path = "/v1/products/{product}/streams/{stream}/variants/{variant}/register"
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-disposition-register", Method: http.MethodGet, Path: path,
@@ -381,7 +381,7 @@ type RateBody struct {
 	Open int `json:"open" doc:"Still open at all, whatever their deadline. The denominator the deferred and overdue counts are read against"`
 }
 
-func registerCompliance(api huma.API, in Ingest) {
+func registerCompliance(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-compliance-rate", Method: http.MethodGet,
 		Path:    "/v1/compliance",

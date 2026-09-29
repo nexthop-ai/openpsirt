@@ -36,7 +36,7 @@ type AtComponentBody struct {
 	Due           string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its places here, which is the one that makes it late"`
 }
 
-func registerBulk(api huma.API, in Ingest) {
+func registerBulk(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-issues-at-component", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
@@ -318,7 +318,7 @@ type SkippedBody struct {
 }
 
 // skippedBodies names what a bulk judgment left out, by the issues' names.
-func skippedBodies(ctx context.Context, in Ingest, skipped []triage.Skipped) ([]SkippedBody, error) {
+func skippedBodies(ctx context.Context, in Deps, skipped []triage.Skipped) ([]SkippedBody, error) {
 	if len(skipped) == 0 {
 		return nil, nil
 	}
@@ -342,7 +342,7 @@ func skippedBodies(ctx context.Context, in Ingest, skipped []triage.Skipped) ([]
 
 // boundsFor reads the limits on an act answering many issues at once, as the
 // deployment sets them.
-func boundsFor(ctx context.Context, in Ingest) (triage.Bounds, error) {
+func boundsFor(ctx context.Context, in Deps) (triage.Bounds, error) {
 	settings := setting.NewStore(in.DB.DB)
 	var b triage.Bounds
 	for _, each := range []struct {

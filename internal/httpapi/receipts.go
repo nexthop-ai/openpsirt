@@ -160,7 +160,7 @@ type ReceiptsOutput struct {
 	}
 }
 
-func registerReceipts(api huma.API, in Ingest) {
+func registerReceipts(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-scans", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans",

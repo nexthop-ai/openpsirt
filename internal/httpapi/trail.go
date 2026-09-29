@@ -133,7 +133,7 @@ type ChangeBody struct {
 	Cleared bool `json:"cleared,omitempty" doc:"This change cleared it"`
 }
 
-func registerTrail(api huma.API, in Ingest) {
+func registerTrail(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-administrative-changes", Method: http.MethodGet,
 		Path:    "/v1/administration/changes",

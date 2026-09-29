@@ -81,7 +81,7 @@ type WindowsBody struct {
 	Items []WindowBody `json:"items"`
 }
 
-func registerObligations(api huma.API, in Ingest) {
+func registerObligations(api huma.API, in Deps) {
 	huma.Register(api, answering(huma.Operation{
 		OperationID: "list-obligations", Method: http.MethodGet, Path: "/v1/obligations",
 		Summary: "List standing attacks and their windows",
@@ -321,7 +321,7 @@ func registerObligations(api huma.API, in Ingest) {
 }
 
 // refusedWindow answers a store's refusal to change a window.
-func refusedWindow(in Ingest, err error) error {
+func refusedWindow(in Deps, err error) error {
 	switch {
 	case errors.Is(err, obligation.ErrNoSuchWindow):
 		return huma.Error404NotFound("no window in force goes by that")

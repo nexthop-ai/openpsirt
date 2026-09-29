@@ -51,7 +51,7 @@ type PatchBranchesOutput struct {
 //
 // An operator's question, like the rest of the deployment's own state: whether
 // the work is moving, where it is stuck, and how much disk the copies take.
-func registerPatchBranches(api huma.API, in Ingest) {
+func registerPatchBranches(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-patch-branch-progress", Method: http.MethodGet,
 		Path:    "/v1/patch-branches",

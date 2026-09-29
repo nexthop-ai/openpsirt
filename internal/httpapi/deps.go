@@ -23,9 +23,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
-// Ingest is what every route runs on: the database, the queue, the caller
+// Deps is what every route runs on: the database, the queue, the caller
 // resolver and the rest of what a handler reads.
-type Ingest struct {
+type Deps struct {
 	// Chats is the chat platforms this deployment holds a credential for,
 	// which a destination and a person's own chat settings are checked
 	// against.
@@ -90,7 +90,7 @@ type Ingest struct {
 // attachments returns a store over the files this deployment holds, or nothing
 // where there is no database. A nil Storage inside it is the deployment that
 // configured none, and every path through it refuses in the same words.
-func (in Ingest) attachments() *attach.Store {
+func (in Deps) attachments() *attach.Store {
 	if in.DB == nil {
 		return nil
 	}
@@ -102,7 +102,7 @@ func (in Ingest) attachments() *attach.Store {
 //
 // The handle is the transaction an administrative act is being made in, or
 // this deployment's pooled one where the route only reads.
-func (in Ingest) catalog(db bun.IDB) *catalog.Store {
+func (in Deps) catalog(db bun.IDB) *catalog.Store {
 	if in.DB == nil || db == nil {
 		return nil
 	}
@@ -111,7 +111,7 @@ func (in Ingest) catalog(db bun.IDB) *catalog.Store {
 
 // settings returns a store over what an operator has set, or nothing where
 // there is no database.
-func (in Ingest) settings(db bun.IDB) *setting.Store {
+func (in Deps) settings(db bun.IDB) *setting.Store {
 	if in.DB == nil || db == nil {
 		return nil
 	}
@@ -125,7 +125,7 @@ func (in Ingest) settings(db bun.IDB) *setting.Store {
 // middleware and answers 500 where the route has words for a refusal, wherever
 // a site forgets the `if in.Logger != nil` guard. A no-op logger makes the
 // omission impossible rather than rare.
-func (in Ingest) logger() *slog.Logger {
+func (in Deps) logger() *slog.Logger {
 	if in.Logger != nil {
 		return in.Logger
 	}
@@ -138,7 +138,7 @@ func (in Ingest) logger() *slog.Logger {
 // Asked before roles are switched to group-bound. Without a source every
 // arrival belongs to nothing, so nobody derives any role and the deployment
 // locks itself out — including whoever made the change.
-func (in Ingest) groupsReachable() bool {
+func (in Deps) groupsReachable() bool {
 	for _, provider := range in.Providers {
 		if provider.GroupsSource() {
 			return true
@@ -149,7 +149,7 @@ func (in Ingest) groupsReachable() bool {
 
 // rights returns a store over who may do what, built over the handle it is
 // given, or nothing where there is none.
-func (in Ingest) rights(db bun.IDB) *access.Store {
+func (in Deps) rights(db bun.IDB) *access.Store {
 	if in.DB == nil || db == nil {
 		return nil
 	}
@@ -161,7 +161,7 @@ func (in Ingest) rights(db bun.IDB) *access.Store {
 // Named rather than written as in.DB at each site: a nil *database.DB handed
 // to an interface parameter is an interface that is not nil, so every check
 // below it reads as a database that is there.
-func (in Ingest) handle() bun.IDB {
+func (in Deps) handle() bun.IDB {
 	if in.DB == nil {
 		return nil
 	}

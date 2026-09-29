@@ -7,11 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
-
-	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"

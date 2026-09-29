@@ -40,7 +40,7 @@ type ListedInventoryChanges = listOutput[InventoryChangeBody]
 // The counts on a receipt say how much moved and this says what. They are one
 // comparison read twice: an alert about a build that changed sharply is an
 // alarm pointing at nothing without somewhere to go and look.
-func registerInventoryChanges(api huma.API, in Ingest) {
+func registerInventoryChanges(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-inventory-changes", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/changes",
@@ -128,7 +128,7 @@ type ListedInventoryDifferences = listOutput[InventoryDifferenceBody]
 
 // differences resolves the two builds and works out how their inventories
 // differ.
-func (pair TwoBuilds) differences(ctx context.Context, in Ingest, subject access.Subject,
+func (pair TwoBuilds) differences(ctx context.Context, in Deps, subject access.Subject,
 	product string, only string, limit, offset int) ([]graph.Change, int, error) {
 
 	from, to, err := pair.targets(ctx, in, subject, product)
@@ -153,7 +153,7 @@ func (pair TwoBuilds) differences(ctx context.Context, in Ingest, subject access
 // An upload's own listing compares a build with itself a moment earlier. This
 // compares two builds: two releases, two platforms of one release, or a tag and
 // the branch it was cut from.
-func registerInventoryComparison(api huma.API, in Ingest) {
+func registerInventoryComparison(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "compare-inventories", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/comparison/inventory",
@@ -198,7 +198,7 @@ func registerInventoryComparison(api huma.API, in Ingest) {
 
 // registerInventoryComparisonExport writes out which names two builds differ
 // on, whole rather than a page of them.
-func registerInventoryComparisonExport(api huma.API, in Ingest) {
+func registerInventoryComparisonExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-inventory-comparison", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/comparison/inventory.{format}",

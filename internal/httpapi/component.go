@@ -97,7 +97,7 @@ type FoldPackageBody struct {
 // a filtered list of its findings leaves it read and never acted on, and the
 // act of upgrading one on a screen of its own, keyed on version pairs, puts
 // the thing somebody does on a different page from the thing it is done to.
-func registerComponent(api huma.API, in Ingest) {
+func registerComponent(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-component", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/components/{component}",
@@ -227,7 +227,7 @@ type PlannedUpgradeBody struct {
 // the same thing, recorded as a decision with the version and the date as its
 // payload rather than as a record beside one, so what somebody decided and
 // what a release is waiting on cannot come to disagree.
-func registerPlanUpgrade(api huma.API, in Ingest) {
+func registerPlanUpgrade(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "plan-upgrade", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/components/{component}/upgrade",
@@ -328,7 +328,7 @@ func oneVersion(err error, otherwise func(error) error) error {
 // somebody was looking at — one embargoed finding among fifty is enough to
 // make the handover the disclosure. And somebody has to be able to read a
 // team's queue, or it sits where none of them can see it.
-func carrying(ctx context.Context, in Ingest, subject access.Subject, productID int64,
+func carrying(ctx context.Context, in Deps, subject access.Subject, productID int64,
 	targets []int64, component, version, person, team string) (*int64, error) {
 
 	if person == "" && team == "" {

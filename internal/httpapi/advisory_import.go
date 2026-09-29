@@ -35,7 +35,7 @@ type AdvisoryTakenBody struct {
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
-func registerAdvisoryImport(api huma.API, in Ingest) {
+func registerAdvisoryImport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "upload-supplier-advisory", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/supplier-advisories",

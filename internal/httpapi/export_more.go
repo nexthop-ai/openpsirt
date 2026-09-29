@@ -35,7 +35,7 @@ import (
 // smaller set is a file that quietly answers a different question from the one
 // on screen, which is worse than no export: nothing about the file says it.
 
-func registerMoreExports(api huma.API, in Ingest) {
+func registerMoreExports(api huma.API, in Deps) {
 	registerAuditExport(api, in)
 	registerChangeExport(api, in)
 	registerTrendExport(api, in)
@@ -50,7 +50,7 @@ func registerMoreExports(api huma.API, in Ingest) {
 // The deadline report is the one somebody takes to a meeting about dates.
 // Without a file the late list is retyped, and a retyped list is wrong by the
 // meeting after next.
-func registerDueExport(api huma.API, in Ingest) {
+func registerDueExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-running-out", Method: http.MethodGet,
 		Path:    "/v1/running-out.{format}",
@@ -147,7 +147,7 @@ func registerDueExport(api huma.API, in Ingest) {
 // One file rather than three, with a column saying which of the three each row
 // belongs to: what is fixed, newly present and still present is one comparison,
 // and three files are three things to keep together by hand.
-func registerComparisonExport(api huma.API, in Ingest) {
+func registerComparisonExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-comparison", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/comparison.{format}",
@@ -266,7 +266,7 @@ func asDay(at time.Time) string {
 }
 
 // registerAuditExport writes out the record of judgments.
-func registerAuditExport(api huma.API, in Ingest) {
+func registerAuditExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-audit", Method: http.MethodGet, Path: "/v1/audit.{format}",
 		Summary: "Export the record of judgments",
@@ -370,7 +370,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 }
 
 // registerQueueExport writes out what is waiting for a second person.
-func registerQueueExport(api huma.API, in Ingest) {
+func registerQueueExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-review-queue", Method: http.MethodGet,
 		Path:    "/v1/review-queue.{format}",
@@ -463,7 +463,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 }
 
 // registerComponentExport writes out what is open, gathered by component.
-func registerComponentExport(api huma.API, in Ingest) {
+func registerComponentExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-finding-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings/components.{format}",
@@ -529,7 +529,7 @@ func registerComponentExport(api huma.API, in Ingest) {
 // page at a time on a screen, capped at fifty rows, undated and reached by
 // scrolling past a hundred audit cards, that answer cannot leave the
 // application at all.
-func registerChangeExport(api huma.API, in Ingest) {
+func registerChangeExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-administrative-changes", Method: http.MethodGet,
 		Path:    "/v1/administration/changes.{format}",
@@ -609,7 +609,7 @@ func registerChangeExport(api huma.API, in Ingest) {
 // A growing backlog is the first thing a manager asks about. As a panel on one
 // screen at a fixed twelve weeks — no catalog entry, no window, no file — the
 // answer can be looked at and not taken to the meeting it was asked in.
-func registerTrendExport(api huma.API, in Ingest) {
+func registerTrendExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",
 		Summary: "Export new, resolved and open over time",

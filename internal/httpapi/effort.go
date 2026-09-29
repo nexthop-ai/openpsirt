@@ -33,7 +33,7 @@ type SpentBody struct {
 }
 
 // registerEffort answers where the work went.
-func registerEffort(api huma.API, in Ingest) {
+func registerEffort(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-effort", Method: http.MethodGet, Path: "/v1/effort",
 		Summary: "Report where triage effort went",
@@ -95,7 +95,7 @@ func registerEffort(api huma.API, in Ingest) {
 //
 // One spelling, because two reports take the same pair and a name resolved two
 // ways is two answers about one reader's reach.
-func measuring(ctx context.Context, in Ingest, subject access.Subject,
+func measuring(ctx context.Context, in Deps, subject access.Subject,
 	product, team string) (triage.Measuring, error) {
 
 	var only triage.Measuring

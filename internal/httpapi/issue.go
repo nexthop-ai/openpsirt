@@ -63,7 +63,7 @@ type IssueOutput struct {
 // in openssl raises the question of which products ship an affected version,
 // and answered per product that is a question assembled by hand a dozen
 // times.
-func registerIssue(api huma.API, in Ingest) {
+func registerIssue(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-issue", Method: http.MethodGet, Path: "/v1/issues/{vulnerability}",
 		Summary: "List findings for one issue across every product",

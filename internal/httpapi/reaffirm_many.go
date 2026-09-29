@@ -43,7 +43,7 @@ type ToReaffirmOutput struct {
 
 // registerReaffirmMany lists what is yours to re-affirm and re-makes several
 // of those claims in one act.
-func registerReaffirmMany(api huma.API, in Ingest) {
+func registerReaffirmMany(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-to-reaffirm", Method: http.MethodGet, Path: "/v1/to-reaffirm",
 		Summary: "List your lapsed claims",

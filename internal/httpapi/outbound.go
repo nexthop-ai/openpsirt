@@ -45,7 +45,7 @@ type OutboundBody struct {
 
 // registerOutbound configures where this deployment sends what it has to
 // say.
-func registerOutbound(api huma.API, in Ingest, a Administering) {
+func registerOutbound(api huma.API, in Deps, a Administering) {
 	const path = "/v1/outbound"
 
 	huma.Register(api, requiring(huma.Operation{

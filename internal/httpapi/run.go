@@ -45,7 +45,7 @@ type RunBody struct {
 }
 
 // registerRun answers what one run of the scanner did.
-func registerRun(api huma.API, in Ingest) {
+func registerRun(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-scan-run", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/runs/{run}",

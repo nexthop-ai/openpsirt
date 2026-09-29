@@ -22,7 +22,7 @@ import (
 // can be re-scanned later, and without a route that returns one the inventory
 // a release was scanned against is answered from the build system, which is
 // the copy that may have moved since.
-func registerRetained(api huma.API, in Ingest) {
+func registerRetained(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "fetch-scan-document", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +

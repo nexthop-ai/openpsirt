@@ -23,7 +23,7 @@ func built() fstest.MapFS {
 
 func serving(t *testing.T, files fstest.MapFS) http.Handler {
 	t.Helper()
-	handler, _ := httpapi.New(nil, nil, httpapi.Ingest{
+	handler, _ := httpapi.New(nil, nil, httpapi.Deps{
 		Interface: httpapi.Interface{Files: files},
 	})
 	return handler
@@ -137,7 +137,7 @@ func TestThePageIsNeverCached(t *testing.T) {
 func TestABinaryBuiltWithoutTheInterfaceServesTheAPIAlone(t *testing.T) {
 	// A checkout with no node toolchain still has to build and serve. What it
 	// must not do is answer as though a page were there.
-	handler, _ := httpapi.New(nil, nil, httpapi.Ingest{})
+	handler, _ := httpapi.New(nil, nil, httpapi.Deps{})
 	got := fetch(t, handler, http.MethodGet, "/products")
 	if got.Code == http.StatusOK {
 		t.Errorf("a binary with no interface served %q", got.Body.String())

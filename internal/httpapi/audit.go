@@ -95,7 +95,7 @@ type Auditing struct {
 
 // narrow turns the request's parameters into the store's filter, resolving the
 // product against what the caller may see.
-func (a Auditing) narrow(ctx context.Context, in Ingest,
+func (a Auditing) narrow(ctx context.Context, in Deps,
 	subject access.Subject) (triage.Filter, time.Time, time.Time, error) {
 
 	filter := triage.Filter{
@@ -171,7 +171,7 @@ func (a Auditing) narrow(ctx context.Context, in Ingest,
 	return filter, since, until, nil
 }
 
-func registerAudit(api huma.API, in Ingest) {
+func registerAudit(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-audit", Method: http.MethodGet, Path: "/v1/audit",
 		Summary: "List judgments with who made them and who agreed",

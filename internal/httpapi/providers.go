@@ -17,7 +17,7 @@ type ProviderBody struct {
 	Path string `json:"path" doc:"The address to send the browser to"`
 }
 
-func registerProviders(api huma.API, in Ingest) {
+func registerProviders(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-sign-in-providers", Method: http.MethodGet, Path: "/v1/sign-in",
 		Summary: "List sign-in providers",

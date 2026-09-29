@@ -37,7 +37,7 @@ type notificationsOutput struct {
 	}
 }
 
-func registerNotifications(api huma.API, in Ingest) {
+func registerNotifications(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-notifications", Method: http.MethodGet,
 		Path:    "/v1/notifications",
@@ -147,7 +147,7 @@ func registerNotifications(api huma.API, in Ingest) {
 }
 
 // registerDigest is the two switches a person sets for themselves.
-func registerDigest(api huma.API, in Ingest) {
+func registerDigest(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-digest", Method: http.MethodPut, Path: "/v1/session/me/digest",
 		Summary: "Choose what is sent to you daily",
@@ -185,7 +185,7 @@ func registerDigest(api huma.API, in Ingest) {
 
 // registerChatChoices is the two switches a person sets for themselves about
 // chat.
-func registerChatChoices(api huma.API, in Ingest) {
+func registerChatChoices(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-chat", Method: http.MethodPut, Path: "/v1/session/me/chat",
 		Summary: "Choose what is sent to you in chat",

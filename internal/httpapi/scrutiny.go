@@ -93,7 +93,7 @@ type scrutinyOutput struct {
 // being agreed to, and the write is conditional on that revision still being
 // current. What is worth reporting is where the rule did not apply, and where
 // it applied in form only.
-func registerScrutiny(api huma.API, in Ingest) {
+func registerScrutiny(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-approval-scrutiny", Method: http.MethodGet,
 		Path:    "/v1/approvals/scrutiny",

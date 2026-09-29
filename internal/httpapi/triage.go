@@ -285,7 +285,7 @@ type QueueNarrowing struct {
 // done by reaching here: a name nobody holds and a name somebody holds both
 // narrow the queue, to nothing where they proposed nothing, so the answer
 // says nothing about who has an account.
-func (n QueueNarrowing) filter(ctx context.Context, in Ingest, subject access.Subject,
+func (n QueueNarrowing) filter(ctx context.Context, in Deps, subject access.Subject,
 	mine bool, product string) (triage.QueueFilter, error) {
 
 	within, err := narrowedTo(ctx, in, subject, product)
@@ -317,7 +317,7 @@ func (n QueueNarrowing) filter(ctx context.Context, in Ingest, subject access.Su
 	return filter, nil
 }
 
-func registerTriage(api huma.API, in Ingest) {
+func registerTriage(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-review-queue", Method: http.MethodGet, Path: "/v1/review-queue",
 		Summary: "List claims awaiting approval",
@@ -704,7 +704,7 @@ func registerTriage(api huma.API, in Ingest) {
 	})
 }
 
-func registerProposing(api huma.API, in Ingest) {
+func registerProposing(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "decide", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision",
@@ -830,7 +830,7 @@ func registerProposing(api huma.API, in Ingest) {
 }
 
 // triaging resolves who is asking and the store they act through.
-func triaging(ctx context.Context, in Ingest) (access.Subject, *triage.Store, error) {
+func triaging(ctx context.Context, in Deps) (access.Subject, *triage.Store, error) {
 	subject, err := reading(ctx)
 	if err != nil {
 		return access.Subject{}, nil, err
@@ -925,7 +925,7 @@ func decisionBody(d triage.Decision) DecisionBody {
 // deployment that had tightened it would find it loosened at exactly the
 // moment its database was in trouble, with nothing saying so. A setting nobody
 // has changed is a different matter, and answers with the default.
-func deferralThreshold(ctx context.Context, in Ingest) (time.Duration, error) {
+func deferralThreshold(ctx context.Context, in Deps) (time.Duration, error) {
 	if in.DB == nil {
 		return triage.DefaultDeferralThreshold, nil
 	}
@@ -943,7 +943,7 @@ func deferralThreshold(ctx context.Context, in Ingest) (time.Duration, error) {
 // stopped counting. What changed is named, the claim is linked, and a claim
 // with an undisclosed row carries nothing more than that, like every telling
 // about an undisclosed finding.
-func tellTheApprovers(ctx context.Context, in Ingest, claimID int64,
+func tellTheApprovers(ctx context.Context, in Deps, claimID int64,
 	withdrawn []triage.ForPerson, what string) {
 
 	for _, one := range withdrawn {

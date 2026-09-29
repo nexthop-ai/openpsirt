@@ -72,7 +72,7 @@ type VulnerabilityDataBody struct {
 	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
 }
 
-func registerWork(api huma.API, in Ingest) {
+func registerWork(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-vulnerability-data", Method: http.MethodGet,
 		Path:    "/v1/vulnerability-data",

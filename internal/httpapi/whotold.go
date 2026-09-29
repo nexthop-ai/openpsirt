@@ -53,7 +53,7 @@ type ReportBody struct {
 
 // registerWhoTold is the record of who told us, and the act of saying we
 // answered them.
-func registerWhoTold(api huma.API, in Ingest) {
+func registerWhoTold(api huma.API, in Deps) {
 	const path = "/v1/products/{product}/issues/{vulnerability}/report"
 
 	huma.Register(api, requiring(huma.Operation{
@@ -259,7 +259,7 @@ type AliasRemovedBody struct {
 }
 
 // reportBody names the people and the issue one report refers to.
-func reportBody(ctx context.Context, in Ingest, told finding.FlawReport) (ReportBody, error) {
+func reportBody(ctx context.Context, in Deps, told finding.FlawReport) (ReportBody, error) {
 	bodies, err := reportBodies(ctx, in, []finding.FlawReport{told})
 	if err != nil {
 		return ReportBody{}, err
@@ -273,7 +273,7 @@ func reportBody(ctx context.Context, in Ingest, told finding.FlawReport) (Report
 // Two reads for the page rather than two per row: a page of fifty reports is
 // a hundred round trips asked one at a time, and the names are the same
 // handful of people over and over.
-func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
+func reportBodies(ctx context.Context, in Deps, rows []finding.FlawReport) (
 	[]ReportBody, error) {
 
 	people := make([]int64, 0, len(rows))

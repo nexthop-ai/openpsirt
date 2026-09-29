@@ -26,7 +26,7 @@ func TestAReadWithNoDatabaseRefusesInWords(t *testing.T) {
 		next(huma.WithContext(ctx, access.With(ctx.Context(),
 			access.Everything("a test with no database"))))
 	})
-	in := Ingest{}
+	in := Deps{}
 	registerDue(api, in)
 	registerDueExport(api, in)
 	registerComparisonExport(api, in)

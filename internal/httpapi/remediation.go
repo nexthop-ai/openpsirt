@@ -63,7 +63,7 @@ type RepeatBody struct {
 	LastUntil     string `json:"last_until,omitempty" doc:"The furthest any of them reached"`
 }
 
-func registerRemediation(api huma.API, in Ingest) {
+func registerRemediation(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-remediation", Method: http.MethodGet, Path: "/v1/remediation",
 		Summary: "Report how fast findings are being fixed",

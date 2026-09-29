@@ -35,7 +35,7 @@ type ReportIssueBody struct {
 
 // registerIntake is the record of what arrived, what it turned out to be,
 // and the act of saying the reporter was answered.
-func registerIntake(api huma.API, in Ingest) {
+func registerIntake(api huma.API, in Deps) {
 	const list = "/v1/products/{product}/reports"
 	const one = list + "/{reference}"
 
@@ -347,7 +347,7 @@ func registerIntake(api huma.API, in Ingest) {
 // whole rather than about one named issue, so somebody brought into a single
 // case reaches nothing here. Resolved before any reference in the request is,
 // so a refusal says nothing about which references exist.
-func productForReports(ctx context.Context, in Ingest, name string) (
+func productForReports(ctx context.Context, in Deps, name string) (
 	access.Subject, *catalog.Product, error) {
 
 	subject, err := reading(ctx)
@@ -369,7 +369,7 @@ func productForReports(ctx context.Context, in Ingest, name string) (
 // A reference that is not here is a 404 and nothing else: the store gives the
 // same answer for one nobody minted, one recorded against another product and
 // one the subject may not read, and telling them apart here would undo that.
-func refusedReport(in Ingest, err error, what string) error {
+func refusedReport(in Deps, err error, what string) error {
 	var faults markdown.Faults
 	switch {
 	case errors.Is(err, finding.ErrNoSuchReport):

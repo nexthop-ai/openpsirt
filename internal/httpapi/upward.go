@@ -38,7 +38,7 @@ type OursOutput struct {
 
 // registerUpward is the tree seen upward, for somebody narrowed to their own
 // work.
-func registerUpward(api huma.API, in Ingest) {
+func registerUpward(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-my-components", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +

@@ -25,7 +25,7 @@ type AnywhereOutput struct {
 }
 
 // registerAnywhere is the findings list across products.
-func registerAnywhere(api huma.API, in Ingest) {
+func registerAnywhere(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-findings-anywhere", Method: http.MethodGet, Path: "/v1/findings",
 		Summary: "List findings across every product",

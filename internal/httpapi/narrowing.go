@@ -50,7 +50,7 @@ type listing struct {
 //
 // `whyFloor` is the sentence a failure reading the line answers with, because
 // two of these answer a list and three answer a file and the wording differs.
-func narrowing(ctx context.Context, in Ingest, q ScopeQuery,
+func narrowing(ctx context.Context, in Deps, q ScopeQuery,
 	at AtOneBuild, by Narrowing, whyFloor string) (listing, error) {
 
 	var out listing
@@ -91,7 +91,7 @@ func narrowing(ctx context.Context, in Ingest, q ScopeQuery,
 // the order they have to happen in: the scope is what says the product
 // exists and may be reached, and the line is read against the product the
 // scope resolved to.
-func scopedFloor(ctx context.Context, in Ingest, q ScopeQuery,
+func scopedFloor(ctx context.Context, in Deps, q ScopeQuery,
 	whyFloor string) (access.Subject, finding.Scope, finding.Floor, error) {
 
 	var none finding.Scope
@@ -129,7 +129,7 @@ func scopedFloor(ctx context.Context, in Ingest, q ScopeQuery,
 //
 // `why` is the sentence for that line and `about` the pairs that say which
 // act it was, in the logger's own key-and-value form.
-func tell(ctx context.Context, in Ingest, why string, telling notify.Telling, about ...any) {
+func tell(ctx context.Context, in Deps, why string, telling notify.Telling, about ...any) {
 	if err := notify.NewStore(in.DB.DB).Tell(ctx, telling); err != nil {
 		in.logger().Error(why, append([]any{"error", err}, about...)...)
 	}

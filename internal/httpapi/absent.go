@@ -134,7 +134,7 @@ func (q ComponentQuery) choice() graph.Choice {
 // ships one library at fifteen versions of which three carry a given issue.
 // Where one carries it, that one is taken: one choice is not a choice. none
 // answers where none does.
-func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
+func componentCarrying(ctx context.Context, in Deps, subject access.Subject,
 	targetID, issue int64, name string, which graph.Choice, none func(error) error) (int64, error) {
 
 	id, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, which)
@@ -332,7 +332,7 @@ func undeclared(logger *slog.Logger, err error, reading string) error {
 // somebody brought into a case here as well. Two deliberately different
 // contracts, and which one an endpoint wants is a security judgment — made by
 // hand at every call site, it is invisible at all of them.
-func productNamedVisibly(ctx context.Context, in Ingest, subject access.Subject,
+func productNamedVisibly(ctx context.Context, in Deps, subject access.Subject,
 	name string) (*catalog.Product, error) {
 
 	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
@@ -360,7 +360,7 @@ func productNamedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 // know. Every read past this still asks about the issue, which is where the
 // case grant is honored again. It is the rule the catalog already applies when
 // it resolves a build for somebody on a case.
-func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
+func productForIssue(ctx context.Context, in Deps, subject access.Subject,
 	name string) (*catalog.Product, error) {
 
 	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
@@ -378,7 +378,7 @@ func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
 // The refusal is noSuchProduct whichever of the three did not resolve. Which
 // part of an address is wrong is a statement about what exists under the
 // other two, and answering it turns the route into a way to walk the catalog.
-func locatedVisibly(ctx context.Context, in Ingest, subject access.Subject,
+func locatedVisibly(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant string) (*catalog.Named, error) {
 
 	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
@@ -390,7 +390,7 @@ func locatedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 
 // visibleBuild is the reader and the build a route is about: the build
 // resolved as the reader may see it and required to have been scanned.
-func visibleBuild(ctx context.Context, in Ingest, product, stream, variant string) (access.Subject, int64, error) {
+func visibleBuild(ctx context.Context, in Deps, product, stream, variant string) (access.Subject, int64, error) {
 	subject, err := reading(ctx)
 	if err != nil {
 		return access.Subject{}, 0, err
@@ -412,7 +412,7 @@ func visibleBuild(ctx context.Context, in Ingest, product, stream, variant strin
 // "the names do not resolve" and "nothing has been filed here" stay two
 // answers: the first is a typo and the second is a build waiting for its first
 // scan, and a reader can act on only one of them.
-func targetIDOf(ctx context.Context, in Ingest, subject access.Subject,
+func targetIDOf(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant string) (int64, error) {
 
 	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
@@ -432,7 +432,7 @@ func targetIDOf(ctx context.Context, in Ingest, subject access.Subject,
 // "Nothing has been scanned there" is an answer about the build. A read that
 // could not be made does not support it, and this is the reader with the most
 // callers in the tree — nearly all of which answer 404.
-func targetRow(ctx context.Context, in Ingest, streamID, variantID int64) (*catalog.Target, error) {
+func targetRow(ctx context.Context, in Deps, streamID, variantID int64) (*catalog.Target, error) {
 	target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, streamID, variantID)
 	if err != nil {
 		return nil, absent(in.Logger, err, "that build could not be looked up", nothingScannedThere)
@@ -452,7 +452,7 @@ func targetRow(ctx context.Context, in Ingest, streamID, variantID int64) (*cata
 // The refusal is noSuchFinding, which is what these routes already answer when
 // the place is not one the caller may read. That is the point: the two have to
 // be the same sentence, or the difference between them is the disclosure.
-func issueHere(ctx context.Context, in Ingest, subject access.Subject,
+func issueHere(ctx context.Context, in Deps, subject access.Subject,
 	productID int64, name string) (int64, error) {
 
 	issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, name)
@@ -476,7 +476,7 @@ func issueHere(ctx context.Context, in Ingest, subject access.Subject,
 // The two go into one list because they have to be answered in the same
 // words. A name filed where the caller may not look, answered differently
 // from a name nobody filed, is a lookup that counts what is kept quiet.
-func issuesHere(ctx context.Context, in Ingest, subject access.Subject,
+func issuesHere(ctx context.Context, in Deps, subject access.Subject,
 	productID int64, names []string) (map[string]int64, []string, error) {
 
 	found, err := finding.NewVulnerabilities(in.DB.DB).IDsByName(ctx, names)
@@ -509,7 +509,7 @@ func issuesHere(ctx context.Context, in Ingest, subject access.Subject,
 // Empty is every product, which is what a list asks for when nothing is
 // selected. A name nobody holds answers as a name nobody has declared, for the
 // reason every other product lookup does.
-func narrowedTo(ctx context.Context, in Ingest, subject access.Subject,
+func narrowedTo(ctx context.Context, in Deps, subject access.Subject,
 	name string) (int64, error) {
 
 	if name == "" {

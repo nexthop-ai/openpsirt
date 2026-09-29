@@ -62,7 +62,7 @@ type MentionsBody struct {
 // the time this runs, and losing a comment because a notification could not be
 // stored would be sacrificing the wrong half. A failure reports every name as
 // reaching nobody, because none of them was told.
-func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
+func tellMentioned(ctx context.Context, in Deps, subject access.Subject,
 	store *triage.Store, claimID int64, body string) []string {
 
 	if len(markdown.Mentions(body)) == 0 {
@@ -117,7 +117,7 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 // Reported rather than refused. The words are worth keeping either way, and a
 // comment rejected because one name in it was wrong loses the paragraph to fix
 // a word.
-func mentioned(ctx context.Context, in Ingest, subject access.Subject,
+func mentioned(ctx context.Context, in Deps, subject access.Subject,
 	about mentionTarget, body, link string) ([]string, error) {
 
 	names := markdown.Mentions(body)

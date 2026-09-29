@@ -94,7 +94,7 @@ func countCoverage(rows []ingest.Coverage) coverageCounts {
 	return out
 }
 
-func registerCoverage(api huma.API, in Ingest) {
+func registerCoverage(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-scanning", Method: http.MethodGet, Path: "/v1/scanning",
 		Summary: "List when each build was last scanned",
@@ -163,7 +163,7 @@ func registerCoverage(api huma.API, in Ingest) {
 
 // scanningRows is when each build the reader may see in the scope was last
 // scanned, with the threshold past which a build counts as quiet.
-func scanningRows(ctx context.Context, in Ingest, q ScopeQuery) ([]ingest.Coverage, time.Duration, error) {
+func scanningRows(ctx context.Context, in Deps, q ScopeQuery) ([]ingest.Coverage, time.Duration, error) {
 	subject, err := reading(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -198,7 +198,7 @@ func scanningRows(ctx context.Context, in Ingest, q ScopeQuery) ([]ingest.Covera
 // The threshold is stated in the file. A `quiet` column of true and false
 // means nothing six months later without the number it was computed against,
 // and a spreadsheet has nowhere else to carry it.
-func registerCoverageExport(api huma.API, in Ingest) {
+func registerCoverageExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-scanning", Method: http.MethodGet,
 		Path:    "/v1/scanning.{format}",

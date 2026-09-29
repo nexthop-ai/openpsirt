@@ -86,7 +86,7 @@ type BlockingBody struct {
 // without assembling it, and the worst few are that.
 const blocking = 5
 
-func registerReadiness(api huma.API, in Ingest) {
+func registerReadiness(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-readiness", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/readiness",

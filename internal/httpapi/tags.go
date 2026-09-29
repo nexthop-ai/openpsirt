@@ -19,7 +19,7 @@ import (
 // People tag work regardless. With nowhere to put it they do it inside the
 // reasoning text, where nothing can filter on it and an approver reads it as
 // part of the argument.
-func registerTags(api huma.API, in Ingest) {
+func registerTags(api huma.API, in Deps) {
 	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 		"/findings/{vulnerability}/components/{component}/tags/{tag}"
 

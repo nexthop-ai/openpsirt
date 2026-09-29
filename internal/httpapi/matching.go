@@ -46,7 +46,7 @@ type matchCoverageOutput struct {
 
 // unmatchedIn reads what one build holds that the scanner cannot match, and
 // how much it holds in all.
-func unmatchedIn(ctx context.Context, in Ingest, product, stream, variant string) ([]graph.Unmatched, int, error) {
+func unmatchedIn(ctx context.Context, in Deps, product, stream, variant string) ([]graph.Unmatched, int, error) {
 	subject, target, err := browsing(ctx, in, product, stream, variant)
 	if err != nil {
 		return nil, 0, err
@@ -78,7 +78,7 @@ func onlyReason(listed []graph.Unmatched, reason string) []graph.Unmatched {
 
 // registerMatchCoverage answers what a build holds that the scanner has no way
 // to match (REQ-79).
-func registerMatchCoverage(api huma.API, in Ingest) {
+func registerMatchCoverage(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-match-coverage", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage",
@@ -127,7 +127,7 @@ func registerMatchCoverage(api huma.API, in Ingest) {
 
 // registerMatchCoverageExport writes out what a build holds that the scanner
 // cannot match, whole rather than a page of it.
-func registerMatchCoverageExport(api huma.API, in Ingest) {
+func registerMatchCoverageExport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-match-coverage", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}",

@@ -42,7 +42,7 @@ type CollaboratorBody struct {
 // than an administrator: knowing who needs to be on a case is knowing the case,
 // and routing that through somebody who does not read it would make the
 // administrator the bottleneck on every embargo.
-func registerCollaborators(api huma.API, in Ingest, a Administering) {
+func registerCollaborators(api huma.API, in Deps, a Administering) {
 	const path = "/v1/products/{product}/issues/{vulnerability}/collaborators"
 
 	huma.Register(api, requiring(huma.Operation{
@@ -212,7 +212,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 }
 
 // collaboratorBodies names the people on a case.
-func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64,
+func collaboratorBodies(ctx context.Context, in Deps, productID, issueID int64,
 	people []int64) ([]CollaboratorBody, error) {
 
 	out := make([]CollaboratorBody, 0, len(people))
@@ -269,7 +269,7 @@ func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64
 
 // caseAt resolves a product and an issue for the collaborator endpoints, and
 // answers "no such finding" for anything the caller may not reach.
-func caseAt(ctx context.Context, in Ingest, product, vulnerability string) (
+func caseAt(ctx context.Context, in Deps, product, vulnerability string) (
 	access.Subject, *access.Store, int64, int64, error) {
 
 	return caseAtHolding(ctx, in, product, vulnerability, false)
@@ -284,7 +284,7 @@ func caseAt(ctx context.Context, in Ingest, product, vulnerability string) (
 // name whose head is a real identifier resolves, and composing the record from
 // it writes seven hundred characters into a column sized for three names. The
 // row it resolved to is the thing the record is about anyway.
-func namedCase(ctx context.Context, in Ingest, productID, issueID int64) (string, string, error) {
+func namedCase(ctx context.Context, in Deps, productID, issueID int64) (string, string, error) {
 	product, err := catalog.NewStore(in.DB.DB).ProductByID(ctx, productID)
 	if err != nil {
 		return "", "", wentWrong(in.Logger, "that product could not be looked up", err)
@@ -303,13 +303,13 @@ func namedCase(ctx context.Context, in Ingest, productID, issueID int64) (string
 // declares triage and enforces a read role has the annotation on the
 // operation and the check in the handler saying different things — and the
 // annotation is what the generated reference tells an operator the rule is.
-func caseAtTriaging(ctx context.Context, in Ingest, product, vulnerability string) (
+func caseAtTriaging(ctx context.Context, in Deps, product, vulnerability string) (
 	access.Subject, *access.Store, int64, int64, error) {
 
 	return caseAtHolding(ctx, in, product, vulnerability, true)
 }
 
-func caseAtHolding(ctx context.Context, in Ingest, product, vulnerability string,
+func caseAtHolding(ctx context.Context, in Deps, product, vulnerability string,
 	triaging bool) (access.Subject, *access.Store, int64, int64, error) {
 
 	subject, err := reading(ctx)

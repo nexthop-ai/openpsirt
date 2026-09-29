@@ -46,7 +46,7 @@ type TokenBody struct {
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
 
-func registerTokens(api huma.API, in Ingest) {
+func registerTokens(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-my-tokens", Method: http.MethodGet, Path: "/v1/tokens",
 		Summary: "List your API tokens",
@@ -250,7 +250,7 @@ func narrowedTokenSays(product string, holds []access.Role) string {
 // A person, and only a person. A pipeline's key has no owner to be a live
 // reference to, and a token minted by one would be a credential nobody's
 // departure ever invalidates.
-func mine(ctx context.Context, in Ingest) (access.Subject, *access.Store, *catalog.Store, error) {
+func mine(ctx context.Context, in Deps) (access.Subject, *access.Store, *catalog.Store, error) {
 	subject, err := reading(ctx)
 	if err != nil {
 		return access.Subject{}, nil, nil, err

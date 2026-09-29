@@ -92,7 +92,7 @@ type arrivedParts struct {
 	File huma.FormFile `form:"file" required:"true"`
 }
 
-func registerAttachments(api huma.API, in Ingest) {
+func registerAttachments(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "upload-attachment", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/attachments",
@@ -310,7 +310,7 @@ func registerAttachments(api huma.API, in Ingest) {
 }
 
 // attachmentLimits reads what this deployment accepts.
-func attachmentLimits(ctx context.Context, in Ingest) (maxSize, quota, share int64, err error) {
+func attachmentLimits(ctx context.Context, in Deps) (maxSize, quota, share int64, err error) {
 	settings := setting.NewStore(in.DB.DB)
 	size, err := settings.Count(ctx, setting.AttachmentMaxSize, setting.DefaultAttachmentMaxSize)
 	if err != nil {

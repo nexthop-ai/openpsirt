@@ -39,7 +39,7 @@ type CarriedClaimBody struct {
 // build saying so in its own inventory. Stored and read by nothing a person
 // can reach, the start and the persistence of a carried patch are facts held
 // only in the database.
-func registerCarried(api huma.API, in Ingest) {
+func registerCarried(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-carried-patches", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +

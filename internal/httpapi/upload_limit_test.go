@@ -35,7 +35,7 @@ func limitedIngest(t *testing.T, limits sbom.Limits, fn func(t *testing.T, f *in
 		}
 
 		q := queue.New(db, queue.DefaultOptions())
-		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
+		handler, _ := httpapi.New(quiet, nil, httpapi.Deps{
 			DB: db, Queue: q, Limits: limits,
 			Access: access.NewResolver(rights, access.Trust{}),
 		})

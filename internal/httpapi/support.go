@@ -54,7 +54,7 @@ type RetiredBody struct {
 // It is not a coverage question and not a compliance one. A release out of
 // support going quiet is expected, and work on it is not late; the question is
 // what is still shipped and no longer maintained.
-func registerOutOfSupport(api huma.API, in Ingest) {
+func registerOutOfSupport(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-out-of-support", Method: http.MethodGet,
 		Path:    "/v1/releases/out-of-support",
@@ -185,7 +185,7 @@ type retiredOutput struct {
 // outOfSupport is the answer both the screen and the file read, so a file
 // cannot come to describe a different set of releases from the screen it was
 // taken from.
-func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
+func outOfSupport(ctx context.Context, in Deps, asked ScopeQuery,
 	within int) ([]RetiredBody, error) {
 	subject, err := reading(ctx)
 	if err != nil {

@@ -95,7 +95,7 @@ type HoldingBody struct {
 // and nothing else: one is the act the assigner right names, guarded at every
 // step, and the three lists are the ordinary question "what is mine" asked
 // three ways.
-func registerAssignment(api huma.API, in Ingest) {
+func registerAssignment(api huma.API, in Deps) {
 	registerAssigning(api, in)
 	registerAssignmentReading(api, in)
 }
@@ -105,7 +105,7 @@ func registerAssignment(api huma.API, in Ingest) {
 // The two writes. Taking work nobody owns and handing back your own is
 // triage; giving it to somebody else, or taking what they are holding, is the
 // assigner right — and doing either to yourself is still doing it.
-func registerAssigning(api huma.API, in Ingest) {
+func registerAssigning(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "assign-finding", Method: http.MethodPut,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
@@ -368,7 +368,7 @@ func registerAssigning(api huma.API, in Ingest) {
 // Three lists, each narrowed by what the reader may see: work nobody owns
 // across every product they can see, one person's or team's holdings, and the
 // per-holder totals the assignments screen is built on.
-func registerAssignmentReading(api huma.API, in Ingest) {
+func registerAssignmentReading(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-unassigned", Method: http.MethodGet, Path: "/v1/unassigned",
 		Summary: "List findings nobody is dealing with",
@@ -604,7 +604,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 // finding is recorded there" for one is wrong twice over: the finding is
 // there, and the caller has just read it on a screen that resolved the same
 // name.
-func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
+func locateFinding(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant, vulnerability, component string,
 	which graph.Choice) (int64, int64, int64, int64, error) {
 
@@ -646,7 +646,7 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 // their request was wrong and puts a driver's error text — table names,
 // statement fragments — in the response body. Anything other than a recognized
 // refusal is logged and answered as ours.
-func refusedFinding(in Ingest, err error) error {
+func refusedFinding(in Deps, err error) error {
 	switch {
 	case errors.Is(err, access.ErrDenied):
 		return noSuchFinding()
@@ -670,7 +670,7 @@ func refusedFinding(in Ingest, err error) error {
 // of a finding nobody has announced, in a product they hold nothing
 // undisclosed on. Seeing that a product exists is not reading its embargoed
 // work.
-func seenBy(ctx context.Context, in Ingest, identity string, productID int64, undisclosed bool) bool {
+func seenBy(ctx context.Context, in Deps, identity string, productID int64, undisclosed bool) bool {
 	them, err := access.NewStore(in.DB.DB).Resolve(ctx, identity)
 	if err != nil {
 		return false

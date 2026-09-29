@@ -71,7 +71,7 @@ func TestARegisterWhoseProvenanceCouldNotBeReadIsAFault(t *testing.T) {
 		t.Fatal(err)
 	}
 	logged := &tally{}
-	in := Ingest{DB: gone, Logger: slog.New(logged)}
+	in := Deps{DB: gone, Logger: slog.New(logged)}
 	measured, err := measuredWith(t.Context(), in, access.Everything("a test"), 1,
 		"mine", "master", "broadcom")
 	if err == nil {

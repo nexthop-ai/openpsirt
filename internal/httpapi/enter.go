@@ -59,7 +59,7 @@ type EnteredBody struct {
 	Places int `json:"places" doc:"The number of findings that opened. One per place the component sits in, in each build"`
 }
 
-func registerEntry(api huma.API, in Ingest) {
+func registerEntry(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "record-finding", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/findings",
@@ -239,7 +239,7 @@ type ResolvedBody struct {
 	At     string `json:"at" doc:"The moment it closed"`
 }
 
-func registerResolution(api huma.API, in Ingest) {
+func registerResolution(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "resolve-finding", Method: http.MethodPost,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
@@ -307,7 +307,7 @@ func registerResolution(api huma.API, in Ingest) {
 	})
 }
 
-func registerDisclosure(api huma.API, in Ingest) {
+func registerDisclosure(api huma.API, in Deps) {
 	huma.Register(api, answering(huma.Operation{
 		OperationID: "list-approaching-disclosure", Method: http.MethodGet,
 		Path:    "/v1/disclosing",
@@ -419,7 +419,7 @@ type PendingMovementBody struct {
 	Mine bool `json:"mine,omitempty" doc:"You asked for this, so you may not be the second person"`
 }
 
-func registerMovements(api huma.API, in Ingest) {
+func registerMovements(api huma.API, in Deps) {
 	const path = "/v1/products/{product}/issues/{vulnerability}/disclosure"
 
 	// One handler for both acts. What differs between them is the act
@@ -709,7 +709,7 @@ func registerMovements(api huma.API, in Ingest) {
 // After the write rather than inside it. A notice that could not be written
 // leaves the disclosure standing, and a disclosure rolled back for want of a
 // notice is the embargo held on a mail queue.
-func toldDisclosed(ctx context.Context, in Ingest, store *finding.Store,
+func toldDisclosed(ctx context.Context, in Deps, store *finding.Store,
 	by access.Subject, product, issue int64) {
 
 	told, err := store.ToTell(ctx, by, product, issue)
@@ -734,7 +734,7 @@ func toldDisclosed(ctx context.Context, in Ingest, store *finding.Store,
 
 // refusedMovement is the answer to a movement of an embargo the store turned
 // away. A reason missing or refused by the text policy is the caller's to fix.
-func refusedMovement(in Ingest, err error) error {
+func refusedMovement(in Deps, err error) error {
 	var faults markdown.Faults
 	if errors.As(err, &faults) {
 		return refusedText(faults)
@@ -752,7 +752,7 @@ func refusedMovement(in Ingest, err error) error {
 }
 
 // embargoAt resolves a product and an issue for the disclosure endpoints.
-func embargoAt(ctx context.Context, in Ingest, productName, issueName string) (
+func embargoAt(ctx context.Context, in Deps, productName, issueName string) (
 	access.Subject, *finding.Store, int64, int64, error) {
 
 	subject, err := reading(ctx)
@@ -776,7 +776,7 @@ func embargoAt(ctx context.Context, in Ingest, productName, issueName string) (
 
 // movementBody names the people a movement record refers to by the identity
 // they sign in under, with the display name beside it.
-func movementBody(ctx context.Context, in Ingest, rows []finding.Movement) ([]MovementBody, error) {
+func movementBody(ctx context.Context, in Deps, rows []finding.Movement) ([]MovementBody, error) {
 	people := make([]int64, 0, len(rows)*2)
 	for _, row := range rows {
 		people = append(people, row.AskedBy)
@@ -815,7 +815,7 @@ type AffectsBody struct {
 	Closed int `json:"closed" doc:"Builds taken back out, closed as invalid because they were never affected"`
 }
 
-func registerAffects(api huma.API, in Ingest) {
+func registerAffects(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-affected-builds", Method: http.MethodPut,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/builds",

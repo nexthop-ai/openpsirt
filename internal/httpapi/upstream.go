@@ -53,7 +53,7 @@ type UnansweredOutput struct {
 // with no label beside it that explains why — which is the answer REQ-42
 // leaves, and the alternative is a product name reaching somebody it was never
 // announced to.
-func registerUpstream(api huma.API, in Ingest) {
+func registerUpstream(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-unanswered-upstream", Method: http.MethodGet,
 		Path:    "/v1/upstream/unanswered",

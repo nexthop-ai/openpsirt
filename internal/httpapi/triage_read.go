@@ -178,7 +178,7 @@ type CommentBody struct {
 	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, if they did"`
 }
 
-func registerTriageReading(api huma.API, in Ingest) {
+func registerTriageReading(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-decisions", Method: http.MethodGet, Path: "/v1/decisions",
 		Summary: "List triage decisions",
@@ -464,7 +464,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 // A row saying product 4, issue 91 is a row somebody has to make two more
 // requests to understand, and the lists this feeds are exactly where that
 // happens fifty times.
-func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
+func describeDecisions(ctx context.Context, in Deps, store *triage.Store,
 	decisions []triage.Decision, reasoning map[int64]string) ([]DecisionDetail, error) {
 
 	people := make([]int64, 0, len(decisions))
@@ -572,7 +572,7 @@ type StandingBody struct {
 	Previously []DecisionDetail `json:"previously"`
 }
 
-func registerPlaceDecisions(api huma.API, in Ingest) {
+func registerPlaceDecisions(api huma.API, in Deps) {
 	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 		"/findings/{vulnerability}/places/{place}/decision"
 

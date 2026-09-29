@@ -81,7 +81,7 @@ func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
 	}
 }
 
-func registerBundles(api huma.API, in Ingest) {
+func registerBundles(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-fix-bundles", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/fix-bundles",
@@ -265,7 +265,7 @@ type PlannedBody struct {
 	ClaimID int64 `json:"claim_id,omitempty" doc:"The claim that argued for it, where one did: its reasoning, its approval and its comments"`
 }
 
-func registerPendingUpgrades(api huma.API, in Ingest) {
+func registerPendingUpgrades(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-pending-upgrades", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades",

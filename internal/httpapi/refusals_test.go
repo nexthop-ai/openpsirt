@@ -146,7 +146,7 @@ func TestAStoresRefusalIsPublishedByTheCatchAllMappers(t *testing.T) {
 // everyMapper is what each refusal mapper in this package answers err with.
 func everyMapper(lost error) map[string]error {
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	in := Ingest{Logger: quiet}
+	in := Deps{Logger: quiet}
 	nowhere := func() error { return huma.Error404NotFound("nothing goes by that") }
 	return map[string]error{
 		"asked":              asked(quiet, lost),

@@ -58,7 +58,7 @@ type AssessmentBody struct {
 	Mine bool `json:"mine,omitempty" doc:"You made this rating, so you may not be the one who agrees"`
 }
 
-func registerAssessment(api huma.API, in Ingest) {
+func registerAssessment(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "assess-issue", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/assessment",
@@ -302,7 +302,7 @@ func assessmentBody(a finding.Assessment, identifier string, asking int64) Asses
 // on the operation that records a rating and what the filter beside this one
 // takes. One field spelled two ways by two operations hands a client "SONiC"
 // where "sonic" was wanted.
-func productsNamed(ctx context.Context, in Ingest,
+func productsNamed(ctx context.Context, in Deps,
 	claims []finding.Assessment) (called, shown map[int64]string, err error) {
 
 	if len(claims) == 0 {
@@ -327,7 +327,7 @@ func productsNamed(ctx context.Context, in Ingest,
 // fails to mark stands until the next scan with the issue open sweeps again.
 // Whoever the sweep did name is told even when it failed after naming them:
 // their rows lapsed and were committed.
-func outgrown(ctx context.Context, in Ingest, productID, vulnerabilityID int64) {
+func outgrown(ctx context.Context, in Deps, productID, vulnerabilityID int64) {
 	worse, err := triage.NewStore(in.DB.DB).LapseRatedWorse(ctx, triage.RatedWorseWhere{
 		ProductID: productID, Vulnerabilities: []int64{vulnerabilityID},
 	})

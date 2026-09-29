@@ -492,7 +492,7 @@ func reachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		handler, api := httpapi.New(quiet, nil, httpapi.Ingest{
+		handler, api := httpapi.New(quiet, nil, httpapi.Deps{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
 			// The identity this deployment publishes as, which an advisory
@@ -1259,7 +1259,7 @@ func deriving(t *testing.T, r *reach, groups bool) *reach {
 	// deadlock, which is the difference between testing what the guard decides
 	// and testing where it reads from.
 	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
-		httpapi.Ingest{
+		httpapi.Deps{
 			DB: r.db, Queue: queue.New(r.db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(r.rights,
 				access.Trust{Header: testHeader, From: sources}),
@@ -1289,7 +1289,7 @@ func withProvider(t *testing.T, r *reach, groups bool) http.Handler {
 		t.Fatal(err)
 	}
 	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
-		httpapi.Ingest{
+		httpapi.Deps{
 			DB: r.db, Queue: queue.New(r.db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(r.rights,
 				access.Trust{Header: testHeader, From: sources}),

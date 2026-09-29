@@ -67,7 +67,7 @@ type MatchBody struct {
 	Here bool `json:"here,omitempty" doc:"This is another version in the same build, not another build"`
 }
 
-func registerElsewhere(api huma.API, in Ingest) {
+func registerElsewhere(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-decision-reach", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/reach",
@@ -112,7 +112,7 @@ func registerElsewhere(api huma.API, in Ingest) {
 	})
 }
 
-func registerReachAcross(api huma.API, in Ingest) {
+func registerReachAcross(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-finding-reach", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +

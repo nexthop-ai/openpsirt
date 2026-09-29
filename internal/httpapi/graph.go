@@ -64,7 +64,7 @@ type AroundBody struct {
 	Below []NeighborBody `json:"below" doc:"The components it pulls in, downward"`
 }
 
-func registerGraph(api huma.API, in Ingest) {
+func registerGraph(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-top-level-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/components",
@@ -226,7 +226,7 @@ func banded(by map[string]int) map[string]int {
 }
 
 // browsing resolves a build somebody may look at.
-func browsing(ctx context.Context, in Ingest, product, stream, variant string) (access.Subject, int64, error) {
+func browsing(ctx context.Context, in Deps, product, stream, variant string) (access.Subject, int64, error) {
 	subject, err := reading(ctx)
 	if err != nil {
 		return access.Subject{}, 0, err

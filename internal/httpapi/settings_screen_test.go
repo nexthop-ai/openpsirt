@@ -131,7 +131,7 @@ func TestEverySettingOfferedReportsWhatIsInForce(t *testing.T) {
 		}
 		// The environment is what a sign-in's length falls back to before the
 		// built-in, so the row is asked with one that has it set.
-		value := each.shipped(Ingest{SessionLifetime: 5 * time.Hour})
+		value := each.shipped(Deps{SessionLifetime: 5 * time.Hour})
 		if strings.TrimSpace(value) == "" {
 			t.Errorf("%s reports an empty shipped value, which reads as nothing applying",
 				each.name)
@@ -175,10 +175,10 @@ func TestASignInsLengthReportsWhatTheDeploymentSet(t *testing.T) {
 	if !found {
 		t.Fatal("a sign-in's length is not offered")
 	}
-	if got := settable[row].shipped(Ingest{SessionLifetime: 5 * time.Hour}); got != "5h0m0s" {
+	if got := settable[row].shipped(Deps{SessionLifetime: 5 * time.Hour}); got != "5h0m0s" {
 		t.Errorf("with the environment set to 5h, the screen reports %q", got)
 	}
-	if got := settable[row].shipped(Ingest{}); got != access.DefaultSessionLifetime.String() {
+	if got := settable[row].shipped(Deps{}); got != access.DefaultSessionLifetime.String() {
 		t.Errorf("with nothing set, the screen reports %q rather than the built-in", got)
 	}
 }
@@ -197,9 +197,9 @@ func TestAWordSettingOffersTheListItIsCheckedAgainst(t *testing.T) {
 			}
 			// The shipped value has to be one of them, or an operator
 			// pressing their own default back is refused it.
-			if !slices.Contains(each.words, each.shipped(Ingest{})) {
+			if !slices.Contains(each.words, each.shipped(Deps{})) {
 				t.Errorf("%s ships %q, which is not one of %v",
-					each.name, each.shipped(Ingest{}), each.words)
+					each.name, each.shipped(Deps{}), each.words)
 			}
 		default:
 			if len(each.words) != 0 {

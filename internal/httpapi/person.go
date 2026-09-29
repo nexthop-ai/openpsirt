@@ -89,7 +89,7 @@ type ToldBody struct {
 	Cleared bool   `json:"cleared,omitempty" doc:"The condition it was about stopped being true"`
 }
 
-func registerPerson(api huma.API, in Ingest, a Administering) {
+func registerPerson(api huma.API, in Deps, a Administering) {
 	registerDeactivation(api, a)
 
 	huma.Register(api, requiring(huma.Operation{
@@ -207,7 +207,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 // The trail holds who by number, and a page naming numbers is a page nobody
 // can read. Looked up together rather than per row, because a screen showing
 // fifty changes made by two people would otherwise ask fifty times.
-func whoChanged(ctx context.Context, in Ingest, a Administering, changes []trail.Change) (map[int64]string, error) {
+func whoChanged(ctx context.Context, in Deps, a Administering, changes []trail.Change) (map[int64]string, error) {
 	who := map[int64]string{}
 	for _, change := range changes {
 		if person := change.Person(); person != 0 {

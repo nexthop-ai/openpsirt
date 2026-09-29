@@ -46,7 +46,7 @@ type PreparedBody struct {
 	DeferDays int    `json:"defer_days,omitempty" minimum:"1" maximum:"3650" doc:"The deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else"`
 }
 
-func registerSaved(api huma.API, in Ingest) {
+func registerSaved(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-saved-filters", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/saved-filters",
@@ -187,7 +187,7 @@ func registerSaved(api huma.API, in Ingest) {
 // A person rather than a subject: a saved filter belongs to somebody, and a
 // pipeline's key is not somebody. A credential minted by a person keeps its
 // owner's, which is what "personal" means when the person has two ways in.
-func keeping(ctx context.Context, in Ingest) (access.Subject, *saved.Store, error) {
+func keeping(ctx context.Context, in Deps) (access.Subject, *saved.Store, error) {
 	who, err := reading(ctx)
 	if err != nil {
 		return access.Subject{}, nil, err
@@ -210,7 +210,7 @@ func keeping(ctx context.Context, in Ingest) (access.Subject, *saved.Store, erro
 // product holds — the filters are personal — but the address still names one,
 // and an address that answers differently for a name somebody holds nothing on
 // is a way to read the product list.
-func filtersFor(ctx context.Context, in Ingest, name string) (int64, error) {
+func filtersFor(ctx context.Context, in Deps, name string) (int64, error) {
 	subject, err := reading(ctx)
 	if err != nil {
 		return 0, err

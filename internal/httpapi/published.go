@@ -38,7 +38,7 @@ type WentBody struct {
 // what is published is still what we would generate, which is what somebody
 // about to publish a revision asks. A period asks something else: what went
 // out at all, and what went out more than once.
-func registerPublished(api huma.API, in Ingest) {
+func registerPublished(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-published-advisories", Method: http.MethodGet,
 		// A period's report rather than the advisories themselves, which is

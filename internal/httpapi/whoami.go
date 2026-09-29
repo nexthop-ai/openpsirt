@@ -87,7 +87,7 @@ type WhoBody struct {
 	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
 }
 
-func registerWhoAmI(api huma.API, in Ingest) {
+func registerWhoAmI(api huma.API, in Deps) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-current-subject", Method: http.MethodGet, Path: "/v1/session/me",
 		Summary: "Describe the current subject",
