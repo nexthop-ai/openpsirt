@@ -103,6 +103,10 @@ type Server struct {
 type DB struct {
 	*bun.DB
 	Server Server
+	// Pool is the settings last applied to the handle. The standard pool
+	// reports its open limit and not its idle one, so a caller that narrows
+	// the pool for a while reads what to put back here.
+	Pool Pool
 }
 
 // OpenWithPool connects using specific pool settings.

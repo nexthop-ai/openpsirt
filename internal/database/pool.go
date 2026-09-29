@@ -65,6 +65,7 @@ func DefaultPool() Pool {
 
 // apply sets the pool on an open database.
 func (p Pool) apply(db *DB, target Target) {
+	db.Pool = p
 	if db.Server.Engine == SQLite {
 		// Readers of a file in WAL mode do not block each other or the writer,
 		// so the pool is as wide as configured: one connection makes every

@@ -143,7 +143,8 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 }
 
 // servers is each on the three server engines alone, for a test whose subject
-// is two transactions open at once, which SQLite's one connection cannot hold.
+// is two transactions open at once, which the one connection the harness holds
+// SQLite to cannot hold.
 func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	castSeed.Servers(t, func(t *testing.T, db *database.DB, c cast) {

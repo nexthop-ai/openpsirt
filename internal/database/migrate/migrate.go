@@ -214,10 +214,19 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 	// transaction, and on a wider pool the transaction can land on a
 	// connection where they are still on — and the one it turned off goes back
 	// into the pool that way. The pool is put back as it was afterwards.
+	//
+	// Both limits, because narrowing the open limit lowers the idle limit to
+	// match and widening it again does not raise it: left at one, the pool
+	// closes all but one connection after every burst.
 	if db.Server.Engine == database.SQLite {
 		width := db.Stats().MaxOpenConnections
 		db.SetMaxOpenConns(1)
-		defer db.SetMaxOpenConns(width)
+		defer func() {
+			db.SetMaxOpenConns(width)
+			if db.Pool.MaxIdle > 0 {
+				db.SetMaxIdleConns(db.Pool.MaxIdle)
+			}
+		}()
 	}
 
 	release, err := acquire(ctx, db)

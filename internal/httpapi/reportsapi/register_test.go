@@ -150,8 +150,8 @@ func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
 		if refused.header.Get("Retry-After") == "" {
 			t.Error("an export past the slots was not told when to ask again")
 		}
-		// A fifth of the pool, and at least one: SQLite's pool is one
-		// connection, so there it is one.
+		// A fifth of the pool, and at least one: the harness holds SQLite to
+		// one connection, so there it is one.
 		if open := r.DB.DB.DB.Stats().MaxOpenConnections; open > 0 && len(held) != max(1, open/5) {
 			t.Errorf("%d exports held open at once over a pool of %d", len(held), open)
 		}

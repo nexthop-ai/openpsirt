@@ -5,6 +5,7 @@ package migrate
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -270,8 +271,8 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 
 func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 	// The other three engines take a lock in the database. SQLite could not:
-	// its handle is capped at one connection, which the migration itself
-	// needs, so every in-database spelling deadlocks against that — and what
+	// it migrates on one connection, which the migration itself needs, so
+	// every in-database spelling deadlocks against that — and what
 	// stood instead was a comment saying SQLite "is only ever used by a single
 	// process", enforced by one Helm template while the binary accepts a
 	// SQLite URL with a warning.
@@ -489,5 +490,23 @@ func TestSQLiteMigratesOnOneConnectionAndGetsItsPoolBack(t *testing.T) {
 	}
 	if after := db.Stats().MaxOpenConnections; after != width {
 		t.Errorf("the pool was %d wide after migrating, want %d as before", after, width)
+	}
+
+	// The idle limit is not reported, so it is read from what the pool keeps:
+	// connections held at once and then returned stay open up to it.
+	const held = 4
+	conns := make([]*sql.Conn, 0, held)
+	for range held {
+		conn, err := db.DB.DB.Conn(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		conns = append(conns, conn)
+	}
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
+	if idle := db.Stats().Idle; idle != held {
+		t.Errorf("%d of %d returned connections stayed open after migrating, want all of them", idle, held)
 	}
 }
