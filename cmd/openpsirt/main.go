@@ -203,6 +203,11 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
 		return startupFailed(err, "checking the schema version", cfg)
 	}
+	// A database last opened by a release that kept no statistics, or copied
+	// in from elsewhere, has none until a scan applies.
+	if err := database.RefreshStatistics(ctx, db); err != nil {
+		logger.Error("could not refresh the planner's statistics", "error", err)
+	}
 
 	// Named administrators are granted at every start, which is what makes
 	// this the way back in rather than a one-time setup step.

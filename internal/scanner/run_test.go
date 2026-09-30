@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -79,30 +81,36 @@ type runFixture struct {
 func eachRun(t *testing.T, fn func(t *testing.T, f *runFixture)) {
 	t.Helper()
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
-		ctx := t.Context()
-		db := w.DB
-		target := w.Target
-
-		// The inventory the build shipped, already read and stored.
-		scan, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "hash-1",
-			BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
-		})
-		if err != nil || outcome != ingest.Accept {
-			t.Fatalf("record scan: %v %v", outcome, err)
-		}
-		_, err = graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
-			Root: root, Components: []graph.Described{swss, libnl},
-			Dependencies: []graph.Dependency{
-				{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		fn(t, &runFixture{db: db, world: w, queue: queue.New(db, queue.DefaultOptions()), target: target.ID})
+		fn(t, newRun(t, w))
 	})
+}
+
+// newRun stores the inventory the build shipped in the world w seeded.
+func newRun(t *testing.T, w *fixture.World) *runFixture {
+	t.Helper()
+	ctx := t.Context()
+	db := w.DB
+	target := w.Target
+
+	// The inventory the build shipped, already read and stored.
+	scan, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "hash-1",
+		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	_, err = graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+		Root: root, Components: []graph.Described{swss, libnl},
+		Dependencies: []graph.Dependency{
+			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &runFixture{db: db, world: w, queue: queue.New(db, queue.DefaultOptions()), target: target.ID}
 }
 
 // waiting leaves the work behind that an arriving inventory would.
@@ -713,4 +721,31 @@ func waitFor(t *testing.T, done func() bool, what string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("waited for %s and it did not happen", what)
+}
+
+// A scan is where the tables move furthest, and SQLite gathers no statistics
+// unless asked, so a scan leaves the finding table with statistics behind it.
+// Without them the review queue walks every finding under one component.
+func TestAScanLeavesSQLiteWithStatisticsForTheFindings(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		f := newRun(t, fixture.New(t, db))
+		var reported []finding.Reported
+		for i := range 50 {
+			reported = append(reported, finding.Reported{
+				Issue:     finding.Named{Identifier: fmt.Sprintf("CVE-2026-%d", 1000+i), Severity: "high"},
+				Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
+			})
+		}
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewRunner(f.db, f.queue, &stub{reported: reported}, quiet, "test").
+			Once(t.Context()); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		var n int
+		if err := f.db.QueryRowContext(t.Context(),
+			`SELECT COUNT(*) FROM "sqlite_stat1" WHERE "tbl" = 'finding'`).Scan(&n); err != nil || n == 0 {
+			t.Errorf("a scan left the finding table without statistics (%d rows, %v)", n, err)
+		}
+	})
 }

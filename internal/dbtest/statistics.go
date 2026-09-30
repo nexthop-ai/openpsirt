@@ -22,16 +22,17 @@ import (
 // estimates — minutes where the settled plan takes a second. This asks each
 // server to do now what it does on its own shortly after.
 //
-// SQLite is left as it is. It gathers statistics only when asked, and nothing
-// in a deployment asks, so a SQLite deployment plans without them for as long
-// as it runs; a measurement with them would describe a database nobody has.
+// SQLite gathers statistics only when asked, and a deployment asks after every
+// scan applies, so it is asked the same way here.
 func SettleStatistics(t *testing.T, db *database.DB) {
 	t.Helper()
 	ctx := t.Context()
 	started := time.Now()
 	switch db.Server.Engine {
 	case database.SQLite:
-		return
+		if err := database.RefreshStatistics(ctx, db); err != nil {
+			t.Fatal(err)
+		}
 	case database.Postgres:
 		for _, table := range tables {
 			if _, err := db.ExecContext(ctx, "ANALYZE ?", bun.Ident(table)); err != nil {
