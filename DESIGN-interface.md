@@ -1301,6 +1301,7 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | Files are attached from the report's page and held at once | A report carries no text a reference could be written into |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
 | Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |
+| The change history sits below the record, over its period, and narrows to one kind of change | The judgment filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
 ## Disclosure and advisories
 

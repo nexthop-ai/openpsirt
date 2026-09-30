@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Audit, CHANGES_MOST, outcomesSaid, periodSent } from "./Audit";
+import { Audit, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./Audit";
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
@@ -47,6 +47,34 @@ describe("the change history on the record", () => {
     expect(Math.max(...asked)).toBe(CHANGES_MOST);
     expect(more()).toBeUndefined();
     expect(mount.host().textContent).not.toContain("could not be read");
+  });
+});
+
+describe("the change history's kind", () => {
+  it("asks the list and the file for the kind the address names", async () => {
+    const kinds: unknown[] = [];
+    serve((path, init) => {
+      if (path === "/v1/session/me") {
+        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+      }
+      if (path === "/v1/administration/changes") {
+        kinds.push((init as { params: { query: { kind?: string } } }).params.query.kind);
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Audit />, "/audit?change=role"));
+    await settle();
+    expect(kinds).toContain("role");
+    const file = Array.from(mount.host().querySelectorAll("a"))
+      .map((each) => each.getAttribute("href") ?? "")
+      .find((href) => href.startsWith("/v1/administration/changes.csv"));
+    expect(file).toContain("kind=role");
+    expect(mount.host().textContent).toContain("No changes of that kind");
+  });
+
+  it("leaves out a kind the server does not take", () => {
+    expect(changeKind(new URLSearchParams("change=everything"))).toBe("");
+    expect(changeKind(new URLSearchParams("change=credential"))).toBe("credential");
   });
 });
 
