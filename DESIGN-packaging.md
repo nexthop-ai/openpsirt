@@ -505,7 +505,7 @@ Everything after the tag is the `Release` workflow.
 
    ```
    make engines-up
-   for from in v0.1.0 v0.2.0 v0.3.0; do for engine in sqlite postgres mysql mariadb; do
+   for from in v0.1.0 v0.2.0 v0.3.0 v0.4.0; do for engine in sqlite postgres mysql mariadb; do
      make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
    done; done
    ```
@@ -515,9 +515,9 @@ Everything after the tag is the `Release` workflow.
    what it holds.
 
    ```
-   git switch main && git pull && git switch -c freeze-v0.3.0
+   git switch main && git pull && git switch -c freeze-v0.5.0
    make engines-up
-   make release-freeze VERSION=v0.3.0
+   make release-freeze VERSION=v0.5.0
    ```
 
 3. Tag the commit the merge queue put on `main`.
@@ -525,9 +525,9 @@ Everything after the tag is the `Release` workflow.
    ```
    git switch main && git pull
    make gate full
-   make release-check VERSION=v0.3.0
-   git tag -a v0.3.0 -m "0.3.0"
-   git push origin v0.3.0
+   make release-check VERSION=v0.5.0
+   git tag -a v0.5.0 -m "0.5.0"
+   git push origin v0.5.0
    ```
 
 | The workflow then | |
