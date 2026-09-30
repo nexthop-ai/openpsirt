@@ -1130,6 +1130,17 @@
 .card.standing.lapsed {
   border-left-color: var(--sev-high);
 }
+/* The conversation about a decision, at the foot of its card. */
+.standing .within {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.standing .within h4 {
+  margin: 0 0 8px;
+  font-size: var(--step-0);
+  font-weight: 600;
+}
 .dhead {
   display: flex;
   flex-wrap: wrap;
@@ -1450,10 +1461,23 @@
   font-weight: 600;
 }
 
+/* ---------- the review queue's filters ---------- */
+
+/* One row: each list is as wide as its longest choice. */
+.queuefilters select {
+  width: auto;
+}
+
 /* ---------- settings ---------- */
 
+/* More tabs than one row holds at a narrow width, so they wrap. A scrolling
+   row scrolls both ways: the selected tab's underline sits a pixel below the
+   box, and a box scrolling on one axis clips the other. */
 .settingtabs {
-  overflow-x: auto;
+  flex-wrap: wrap;
+}
+.settingtabs .tab2 {
+  white-space: nowrap;
 }
 .settinggroup {
   border: 1px solid var(--line);

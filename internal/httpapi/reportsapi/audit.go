@@ -32,6 +32,7 @@ type AgreedBody struct {
 // JudgedBody is one judgment as an auditor reads it.
 type JudgedBody struct {
 	ID      int64  `json:"id"`
+	ClaimID int64  `json:"claim_id" doc:"The claim this decision belongs to. Every decision one act wrote shares it"`
 	Issue   string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
 	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
@@ -63,6 +64,48 @@ type JudgedBody struct {
 	// report that said the rule was satisfied because the rule exists would be
 	// reporting on itself.
 	TwoPeople bool `json:"two_people" doc:"Whether somebody other than the proposer has a standing agreement on it"`
+}
+
+// StatesBody is how many decisions are in each state.
+type StatesBody struct {
+	Proposed  int `json:"proposed"`
+	Approved  int `json:"approved"`
+	Withdrawn int `json:"withdrawn"`
+	Lapsed    int `json:"lapsed"`
+}
+
+// JudgedClaimBody is one claim as the record lists it. Every count is of the
+// decisions the filters matched and the caller may read.
+type JudgedClaimBody struct {
+	Claim int64 `json:"claim" doc:"The claim's identifier"`
+
+	Issue       string `json:"issue" doc:"The vulnerability the earliest matching decision is about, under the name it is filed here"`
+	Issues      int    `json:"issues" doc:"How many vulnerabilities the matching decisions are about"`
+	Product     string `json:"product" doc:"The product of the earliest matching decision, by the name that addresses it"`
+	ProductName string `json:"product_name,omitempty" doc:"That product's display name, or its name where it has none"`
+	Products    int    `json:"products" doc:"How many products the matching decisions are in"`
+	Component   string `json:"component" doc:"The component the earliest matching decision is about"`
+	Version     string `json:"version,omitempty"`
+	Consumer    string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
+	Components  int    `json:"components" doc:"How many component names sit at the matching places, counted through the findings you may read"`
+	Decisions   int    `json:"decisions" doc:"How many decisions match"`
+	Places      int    `json:"places" doc:"How many places the matching decisions are at"`
+
+	Outcome       core.Outcome       `json:"outcome"`
+	Justification core.Justification `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Mitigation    string             `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
+	DeferredUntil string             `json:"deferred_until,omitempty"`
+	FixedVersion  string             `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in"`
+	Reasoning     string             `json:"reasoning" doc:"The words the claim currently rests on. Editing them withdraws every agreement"`
+
+	State    core.ClaimStates `json:"state" doc:"The state the matching decisions share, or mixed where they differ"`
+	States   StatesBody       `json:"states" doc:"How many matching decisions are in each state"`
+	Standing int              `json:"standing" doc:"How many matching decisions apply now"`
+
+	ProposedBy string       `json:"proposed_by"`
+	ProposedAt string       `json:"proposed_at"`
+	Approvals  []AgreedBody `json:"approvals"`
+	TwoPeople  bool         `json:"two_people" doc:"Whether somebody other than the proposer has a standing agreement on it"`
 }
 
 // Auditing is the narrowing the record takes, for the screen and for the
@@ -173,6 +216,7 @@ func (a Auditing) narrow(ctx context.Context, in core.Deps,
 }
 
 func registerAudit(api huma.API, in core.Deps) {
+	registerAuditClaims(api, in)
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-audit", Method: http.MethodGet, Path: "/v1/audit",
 		Summary: "List judgments with who made them and who agreed",
@@ -235,41 +279,126 @@ func registerAudit(api huma.API, in core.Deps) {
 
 // judgedBody is one judgment as an auditor reads it.
 func judgedBody(row triage.Judged) JudgedBody {
-	{
-		{
-			body := JudgedBody{
-				ID: row.ID, Issue: row.Issue, Product: row.Product,
-				ProductName: row.ProductName,
-				Component:   row.Component, Version: row.Version, Consumer: row.Consumer,
-				Outcome: core.Outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
-				State: core.ClaimState(row.State), Standing: row.Standing(),
-				ProposedBy: row.ProposedByName, ProposedAt: core.Stamp(row.ProposedAt),
-				TwoPeople: row.BySomebodyElse(),
-				Approvals: make([]AgreedBody, 0, len(row.Approvals)),
-			}
-			if row.Claim.Justification != nil {
-				body.Justification = core.Justification(*row.Claim.Justification)
-			}
-			if row.Claim.Mitigation != nil {
-				body.Mitigation = *row.Claim.Mitigation
-			}
-			if row.Claim.DeferredUntil != nil {
-				body.DeferredUntil = row.Claim.DeferredUntil.UTC().Format(time.DateOnly)
-			}
-			if row.Claim.FixedVersion != nil {
-				body.FixedVersion = *row.Claim.FixedVersion
-			}
-			if row.EndedAt != nil {
-				body.EndedAt = core.Stamp(*row.EndedAt)
-			}
-			for _, agreed := range row.Approvals {
-				one := AgreedBody{By: agreed.By, At: core.Stamp(agreed.At), Carried: agreed.Carried}
-				if agreed.WithdrawnAt != nil {
-					one.WithdrawnAt = core.Stamp(*agreed.WithdrawnAt)
-				}
-				body.Approvals = append(body.Approvals, one)
-			}
-			return body
-		}
+	body := JudgedBody{
+		ID: row.ID, ClaimID: row.ClaimID, Issue: row.Issue, Product: row.Product,
+		ProductName: row.ProductName,
+		Component:   row.Component, Version: row.Version, Consumer: row.Consumer,
+		Outcome: core.Outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
+		State: core.ClaimState(row.State), Standing: row.Standing(),
+		ProposedBy: row.ProposedByName, ProposedAt: core.Stamp(row.ProposedAt),
+		TwoPeople: row.BySomebodyElse(),
+		Approvals: agreedBodies(row.Approvals),
 	}
+	body.Justification, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(row.Claim)
+	if row.EndedAt != nil {
+		body.EndedAt = core.Stamp(*row.EndedAt)
+	}
+	return body
+}
+
+// argued is what a claim says beyond its outcome, as the record writes it.
+func argued(claim *triage.Claim) (justification core.Justification, mitigation, deferred, fixed string) {
+	if claim == nil {
+		return "", "", "", ""
+	}
+	if claim.Justification != nil {
+		justification = core.Justification(*claim.Justification)
+	}
+	if claim.Mitigation != nil {
+		mitigation = *claim.Mitigation
+	}
+	if claim.DeferredUntil != nil {
+		deferred = claim.DeferredUntil.UTC().Format(time.DateOnly)
+	}
+	if claim.FixedVersion != nil {
+		fixed = *claim.FixedVersion
+	}
+	return justification, mitigation, deferred, fixed
+}
+
+func registerAuditClaims(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-audit-claims", Method: http.MethodGet, Path: "/v1/audit/claims",
+		Summary: "List judgments by claim",
+		Description: "The record one claim at a time, newest first: every claim with a decision " +
+			"the filters match, once, however many places it covers.\n\n" +
+			"Takes every filter the per-decision record takes, with the same meaning. A claim is " +
+			"listed where any of its decisions match, and every count on it is of the decisions " +
+			"that match and that you may read. Asked for `state=lapsed`, a claim with one " +
+			"lapsed decision of forty reads as one decision, lapsed. `total` counts claims.\n\n" +
+			"What the claim is about is named from its earliest matching decision, beside how " +
+			"many issues, products, components and places the matching decisions reach.\n\n" +
+			"Each decision on its own is `GET /v1/audit`, and the file is one row per decision " +
+			"with the claim it belongs to.",
+		Tags: []string{"Reports"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Auditing
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0"`
+	}) (*struct {
+		Body struct {
+			Items []JudgedClaimBody `json:"items"`
+			Total int               `json:"total"`
+		}
+	}, error) {
+		subject, store, err := core.Triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		filter, since, until, err := input.narrow(ctx, in, subject)
+		if err != nil {
+			return nil, err
+		}
+		rows, total, err := store.AuditClaims(ctx, subject, filter, since, until, input.Limit, input.Offset)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
+		}
+		out := &struct {
+			Body struct {
+				Items []JudgedClaimBody `json:"items"`
+				Total int               `json:"total"`
+			}
+		}{}
+		out.Body.Items = make([]JudgedClaimBody, 0, len(rows))
+		for _, row := range rows {
+			out.Body.Items = append(out.Body.Items, judgedClaimBody(row))
+		}
+		out.Body.Total = total
+		return out, nil
+	})
+}
+
+// judgedClaimBody is one claim as the record lists it.
+func judgedClaimBody(row triage.JudgedClaim) JudgedClaimBody {
+	body := JudgedClaimBody{
+		Claim: row.Claim.ID, Issue: row.Issue, Issues: row.Issues,
+		Product: row.Product, ProductName: row.ProductName, Products: row.Products,
+		Component: row.Component, Version: row.Version, Consumer: row.Consumer,
+		Components: row.Components, Decisions: row.Decisions, Places: row.Places,
+		Outcome: core.Outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
+		State: core.ClaimStates(row.State()),
+		States: StatesBody{
+			Proposed: row.States[triage.Proposed], Approved: row.States[triage.Approved],
+			Withdrawn: row.States[triage.Withdrawn], Lapsed: row.States[triage.LapsedState],
+		},
+		Standing:   row.Standing,
+		ProposedBy: row.ProposedByName, ProposedAt: core.Stamp(row.ProposedAt),
+		TwoPeople: row.BySomebodyElse(),
+		Approvals: agreedBodies(row.Approvals),
+	}
+	body.Justification, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(&row.Claim)
+	return body
+}
+
+// agreedBodies is every agreement on a claim, taken back or not.
+func agreedBodies(approvals []triage.Agreed) []AgreedBody {
+	out := make([]AgreedBody, 0, len(approvals))
+	for _, agreed := range approvals {
+		one := AgreedBody{By: agreed.By, At: core.Stamp(agreed.At), Carried: agreed.Carried}
+		if agreed.WithdrawnAt != nil {
+			one.WithdrawnAt = core.Stamp(*agreed.WithdrawnAt)
+		}
+		out = append(out, one)
+	}
+	return out
 }

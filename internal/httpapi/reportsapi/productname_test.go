@@ -26,7 +26,7 @@ func TestAListNamesAProductByTheNameThatAddressesIt(t *testing.T) {
 			ProductName string `json:"product_name"`
 		}
 		for _, path := range []string{
-			"/v1/audit", "/v1/effort", "/v1/running-out?days=365",
+			"/v1/audit", "/v1/audit/claims", "/v1/effort", "/v1/running-out?days=365",
 		} {
 			var list struct {
 				Items []row `json:"items"`
@@ -193,6 +193,7 @@ func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
 			{"/v1/running-out?days=365", true},
 			{"/v1/unassigned", true},
 			{"/v1/audit", false},
+			{"/v1/audit/claims", false},
 			{"/v1/effort", false},
 		} {
 			var got struct {

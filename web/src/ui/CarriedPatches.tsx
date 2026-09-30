@@ -58,7 +58,7 @@ export function CarriedPatches({
     <section
       className="panel"
       style={{ marginTop: 14 }}
-      title="Fixes applied without a version change"
+      title="Patches and VEX statements this build's own inventory declares. A fixed or not-affected status suppresses matching findings"
     >
       <h3>
         <button
@@ -67,7 +67,7 @@ export function CarriedPatches({
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >
-          {open ? "▾" : "▸"} Backported patches
+          {open ? "▾" : "▸"} Declared patches and VEX
         </button>
       </h3>
       {!open ? null : carried.isError ? (
@@ -75,27 +75,22 @@ export function CarriedPatches({
       ) : (
         <>
           <div className="filters">
-            <label className="field">
-              <span>About one package</span>
-              <input
-                {...notACredential}
-                type="text"
-                value={component}
-                placeholder="the name the claim gives"
-                onChange={(event) => {
-                  setComponent(event.target.value);
-                  setOffset(0);
-                }}
-              />
-              <span className="hint">
-                Matched on what the claim names, not on what the build still carries.
-              </span>
-            </label>
+            <input
+              {...notACredential}
+              type="text"
+              value={component}
+              placeholder="Package"
+              aria-label="Package"
+              title="The package name as the declaration gives it"
+              style={{ width: 220 }}
+              onChange={(event) => {
+                setComponent(event.target.value);
+                setOffset(0);
+              }}
+            />
           </div>
           {rows.length === 0 ? (
-            <p className="hint">
-              Nothing declared. These arrive with the inventory, never derived.
-            </p>
+            <p className="hint">{component ? "None for that package" : "None declared"}</p>
           ) : (
             <>
               <Wide>
@@ -103,11 +98,11 @@ export function CarriedPatches({
                   <thead>
                     <tr>
                       <th>Issue</th>
-                      <th>About</th>
+                      <th>Package</th>
                       <th>Kind</th>
-                      <th>Said</th>
-                      <th>Since</th>
-                      <th>Until</th>
+                      <th>Status</th>
+                      <th>Declared</th>
+                      <th>Dropped</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -119,25 +114,34 @@ export function CarriedPatches({
                         </td>
                         <td>
                           {row.pedigree ? (
-                            <span className="state agreed" title="A patch carried in the package">
-                              carried patch
+                            <span
+                              className="state agreed"
+                              title="A patch in the package's pedigree"
+                            >
+                              patch
                             </span>
                           ) : (
-                            <span className="hint">statement</span>
+                            <span className="hint" title="A VEX statement sent with the build">
+                              VEX
+                            </span>
                           )}
                         </td>
                         <td>
                           {(row.status ?? "").replaceAll("_", " ")}
-                          {!row.suppresses && <span className="hint"> · answers nothing</span>}
+                          {!row.suppresses && (
+                            <span className="hint" title="This status suppresses no finding">
+                              {" "}
+                              · no effect
+                            </span>
+                          )}
                           {row.justification && (
                             <>
                               <br />
                               <span className="hint">{row.justification.replaceAll("_", " ")}</span>
                             </>
                           )}
-                          {/* The build's own prose, shown and never rendered
-: it arrives in a document somebody else
-                              wrote. */}
+                          {/* The build's own prose, shown and never rendered: it
+                              arrives in a document somebody else wrote. */}
                           {row.statement && (
                             <>
                               <br />
@@ -150,11 +154,14 @@ export function CarriedPatches({
                         <td className="hint">{on(row.since)}</td>
                         <td>
                           {row.until ? (
-                            <span className="state lapsed" title="The build stopped saying it">
+                            <span
+                              className="state lapsed"
+                              title="A later inventory stopped declaring it"
+                            >
                               {on(row.until)}
                             </span>
                           ) : (
-                            <span className="hint">still</span>
+                            <span className="hint">—</span>
                           )}
                         </td>
                       </tr>

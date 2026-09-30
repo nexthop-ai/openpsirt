@@ -34,7 +34,6 @@ build is recreated.
 | Area | Not built |
 |---|---|
 | Ingest | Findings from a static analyzer or a fuzzer, and a producer's own vulnerability report uploaded beside an inventory |
-| Supplier advisories | A publisher that serves its directory from a second host. Its advisories are uploaded instead |
 | Patch branches | Asking a forge's API in place of cloning, and fetching through an outbound HTTP proxy |
 | Triage | Narrowing a judgment to some of the places it covers |
 | Disclosure | Coordinating an embargo with a peer vendor or a coordinator |

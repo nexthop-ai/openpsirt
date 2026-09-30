@@ -486,8 +486,8 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Approved in this window, newest first. {byProduct(at.product)}, one row per place, as in{" "}
-          <Link to="/audit">the record</Link>.
+          Approved in this window, newest first. {byProduct(at.product)}, one row per place.{" "}
+          <Link to="/audit">The record</Link> groups them by claim.
         </p>
         {argued.isPending ? (
           <Loading />

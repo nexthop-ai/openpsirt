@@ -716,8 +716,8 @@ The finding is the working screen after a decision as well as before it.
 | | Carries |
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
-| **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
-| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, the actions that fit the state, and the comments on it at the foot of its card |
+| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
 The dependency path shows the first six ways down, with a row beneath it.
 
@@ -726,13 +726,14 @@ The dependency path shows the first six ways down, with a row beneath it.
 | The rest unfold from a secondary button that names what it adds | "Show 24 more", then "Show fewer". A total says how many there are, and what somebody deciding whether to click wants is how many they have not seen |
 | The link into the tree sits apart from it, at the row's far end | Two inline controls side by side read as one run of text. The row wraps at a phone's width rather than squeezing them together |
 
-The notes thread and the claim's comments are two threads, rendered near each
-other (REQ-29).
+The notes thread and the claim's comments are two threads (REQ-29). The
+comments sit on the decision's card they are about, and the notes in a card of
+their own. Two editors in two cards, one above the other, read as one form.
 
 | | Shown | Says |
 |---|---|---|
 | Notes | Always | What it is about, in words: this issue in this product, every build of it, and no other product. Read beside a row that may be one of several the same issue sits on, so "not this component" is the part a reader has to be told |
-| Comments | Only where a claim exists | What was said about the argument somebody made, at this place |
+| Comments | Only where a claim exists, one thread on each decision's card | What was said about the argument somebody made, at this place |
 
 The notes thread is the one somebody can write in before anybody has decided
 anything, which is why it is not gated on a claim. Nothing about writing one
@@ -1069,7 +1070,7 @@ agree, send it back, hold rows back, and say where the work is happening.
 | **What it covers is what it covers now** | A claim reaches by matching, so it grows as builds appear with nobody acting. What somebody agreed to covering is on the approval, in the revision history below |
 | **What stopped is labeled apart** | "Reach when withdrawn" and "Reach when it lapsed" sit beside the present reach, one each where the claim has such rows, as places and builds on the date they stopped. Places, because a row that stopped is keyed on its place and matches no version. A partly lapsed claim shows both the lapsed part and what is still in force |
 | **What stopped links to what sits there now** | Each part opens the findings list narrowed to those places and that state, across every release and planned or not, because the list's own defaults would hide a tag or an ended branch the claim covered. The narrowing is one chip that removes itself |
-| **A decision's address resolves here** | Notifications, the record, the reports and the evidence list all name a decision by identifier. Each of those is somebody being sent to read what was decided, and what was decided belongs to the claim. The address is replaced rather than pushed, so going back does not land on it again |
+| **A decision's address resolves here** | Notifications, the reports and the evidence list all name a decision by identifier, and the record names the claim itself. Each of those is somebody being sent to read what was decided, and what was decided belongs to the claim. The address is replaced rather than pushed, so going back does not land on it again |
 | **Reaffirming is not here** | It is a claim about one place in one build, and this screen is about an argument that may cover many. It happens on the finding, where the places are |
 
 Which acts are offered follows the act-and-needs table in `DESIGN-triage.md`,
@@ -1300,7 +1301,9 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | The Inbox's control for a new report opens the flaw entry form | With the product picked. One form for every report, so a flaw found here and one sent in are filed the same way |
 | Files are attached from the report's page and held at once | A report carries no text a reference could be written into |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
+| The record draws one card per claim | The issue, the outcome, the state in one word, what it is about or how many components, and how many places it covers, with the states counted where they differ. The issue opens the claim page, and "Findings there now" opens the findings list narrowed to the claim and the states asked for. `DESIGN-reporting.md` § Dismissals and scan coverage holds what is counted |
 | Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |
+| The change history sits below the record, over its period, and narrows to one kind of change | The judgment filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
 ## Disclosure and advisories
 
@@ -1679,7 +1682,7 @@ since a person only ever sees products they hold a role on.
 | **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
 | **A setting's control is identified by a generated id, never by its key** | The prose moved off the control and the key stayed on it as `id`, and `signin.claim-window` is a sign-in field to a manager reading attributes however many ignore flags sit beside it. `name` was already pinned to a constant for this; `id` was the half that was missed. Generated rather than sanitized, because sanitizing moves the problem to the next key somebody adds |
 | **Webhooks are configured here** | Adding one is administration and this is where a deployment is set to things. Administrators only, and the panel as a whole rather than its controls: the endpoint refuses anybody else, so drawn for an auditor it is a table that can only fail to load. Whether they arrive is the system screen's |
-| **Advisory sources are configured here** | Naming a supplier is administration, and the panel is administrator-only for the reason the one above it is: the endpoint refuses anybody else. It takes a product before it takes an address, because a claim is recorded against a product and a supplier feeding two is two rows |
+| **Suppliers are configured here** | Naming a supplier is administration, and the panel is administrator-only for the reason the one above it is: the endpoint refuses anybody else. It takes a product before it takes an address, because a claim is recorded against a product and a supplier feeding two is two rows |
 | **A publisher's document is uploaded on the same panel** | An advisory and a statement set, each to the endpoint a script uses. The panel says what each does to what the publisher said before — an advisory adds, a statement set replaces — because that is the difference somebody holding a file needs, and the endpoint refusing the other kind names the one that takes it |
 | **A supplier nothing has reached reads differently from one that failed** | "Not yet" and "failed three days ago" are different facts, and a single last-read moment collapses them. What stopped the last attempt is on hover, where the address is not — a publisher unreachable for a week is otherwise invisible |
 

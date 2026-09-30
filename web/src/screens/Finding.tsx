@@ -778,7 +778,17 @@ export function Finding() {
             onRevised={() => void finding.refetch()}
             about={{ product, vulnerability }}
             undisclosed={!!it.undisclosed}
-          />
+          >
+            {claim.decision?.claim_id && (
+              <Comments
+                claimId={claim.decision.claim_id}
+                mine={mine}
+                about={{ product, vulnerability }}
+                undisclosed={!!it.undisclosed}
+                within
+              />
+            )}
+          </Standing>
         ))}
 
         {/* Above the VEX statements: a write-up is what somebody deciding
@@ -1040,9 +1050,8 @@ export function Finding() {
 
       <div className="deciding">
         {/* Keyed on the issue in this product, so it is here whether or not
-            anybody has decided anything. It sits above the claim's own thread
-            because it is the one somebody can write in before there is a
-            claim — which is what it exists for. The two stay apart: a claim is
+            anybody has decided anything, and apart from the comments on a
+            decision, which sit on the decision's card. The two stay apart: a claim is
             keyed on a place and a note on an issue, so they cannot become one
             record, and merging them would put text an approval never saw into
             the record an approval points at. */}
@@ -1053,8 +1062,9 @@ export function Finding() {
           undisclosed={!!it.undisclosed}
         />
 
-        {/* Keyed on the claim, not on the row: the reasoning, the agreement
-            and the conversation belong to the action that made the judgment. */}
+        {/* Keyed on the claim, not on the row: the reasoning and the
+            agreement belong to the action that made the judgment. The
+            conversation about it is on the decision's own card. */}
         {pairs[0]?.claim.decision?.claim_id && (
           <>
             <Activity
@@ -1064,12 +1074,6 @@ export function Finding() {
               previous={previous}
             />
             <Revisions claimId={pairs[0].claim.decision.claim_id} />
-            <Comments
-              claimId={pairs[0].claim.decision.claim_id}
-              mine={mine}
-              about={{ product, vulnerability }}
-              undisclosed={!!it.undisclosed}
-            />
           </>
         )}
         <Attachments about={{ product, vulnerability }} admin={!!who.data?.admin} />

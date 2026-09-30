@@ -172,6 +172,19 @@ type ClaimState string
 // Schema offers every state a decision row can reach.
 func (ClaimState) Schema(huma.Registry) *huma.Schema { return words(triage.States()) }
 
+// ClaimStates is the state a set of decision rows shares, or the word for rows
+// that do not share one.
+type ClaimStates string
+
+// Schema offers every state a decision row can reach, and the word for several.
+func (ClaimStates) Schema(huma.Registry) *huma.Schema {
+	all := make([]string, 0, len(triage.States())+1)
+	for _, state := range triage.States() {
+		all = append(all, string(state))
+	}
+	return words(append(all, triage.SeveralStates))
+}
+
 // ClaimStateLive is a state in which a row still holds its key.
 type ClaimStateLive string
 

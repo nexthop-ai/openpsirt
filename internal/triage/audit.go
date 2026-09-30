@@ -82,9 +82,13 @@ func (j Judged) Standing() bool {
 //
 // Read from the names rather than trusted: an audit that reported the rule as
 // satisfied because the rule exists would be reporting on itself.
-func (j Judged) BySomebodyElse() bool {
-	for _, agreed := range j.Approvals {
-		if agreed.WithdrawnAt == nil && agreed.By != j.ProposedByName {
+func (j Judged) BySomebodyElse() bool { return bySomebodyElse(j.Approvals, j.ProposedByName) }
+
+// bySomebodyElse reports whether an agreement still standing is held by
+// somebody other than the proposer.
+func bySomebodyElse(approvals []Agreed, proposer string) bool {
+	for _, agreed := range approvals {
+		if agreed.WithdrawnAt == nil && agreed.By != proposer {
 			return true
 		}
 	}
@@ -144,19 +148,11 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 	return q
 }
 
-// Audit returns the judgments made in a period, newest first, with everything
-// needed to read one without opening it.
-//
-// Narrowed by what the reader may see, like everything else here. An auditor
-// holding one product's findings sees that product's judgments; nothing about
-// this view is exempt from the visibility rules, because a report that showed
-// more than the screens it summarizes would be a way around them.
-func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
-	from, to time.Time, limit, offset int) ([]Judged, int, error) {
-
-	limit = database.InBulk.Of(limit)
-
-	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+// auditedBy is the narrowing the record takes, written once for the page of
+// decisions, the page of claims and the file, so none of them answers a
+// question the others do not.
+func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.SelectQuery) *bun.SelectQuery {
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = readableBy(q, subject, "de")
 		if len(f.ProductIDs) > 0 {
 			q = q.Where("de.product_id IN (?)", bun.List(f.ProductIDs))
@@ -213,6 +209,20 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		q = aboutTheSamePlaces(q, subject, f)
 		return q
 	}
+}
+
+// Audit returns the judgments made in a period, newest first, with everything
+// needed to read one without opening it.
+//
+// Narrowed by what the reader may see, like everything else here. An auditor
+// holding one product's findings sees that product's judgments; nothing about
+// this view is exempt from the visibility rules, because a report that showed
+// more than the screens it summarizes would be a way around them.
+func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
+	from, to time.Time, limit, offset int) ([]Judged, int, error) {
+
+	limit = database.InBulk.Of(limit)
+	narrow := auditedBy(subject, f, from, to)
 
 	total, err := narrow(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)
 	if err != nil {
@@ -232,40 +242,17 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 	if err != nil {
 		return nil, 0, err
 	}
-	people := map[int64]bool{}
+	proposers := make([]int64, 0, len(decisions))
 	for _, decision := range decisions {
-		people[decision.ProposedBy] = true
+		proposers = append(proposers, decision.ProposedBy)
 	}
-
-	// Every approval for the page in one statement, not one per row. A year of
-	// judgments is a page of a hundred, and a query each would make the cost
-	// of the report a count of rows rather than a count of pages.
-	var approvals []Approval
-	if err := s.db.NewSelect().Model(&approvals).
-		Where("claim_id IN (?)", bun.List(claimsOf(decisions))).
-		Order("claim_id ASC", "id ASC").Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read who agreed: %w", err)
-	}
-	for _, approval := range approvals {
-		people[approval.ApprovedBy] = true
-	}
-
-	named, err := s.namesOf(ctx, people)
+	agreed, named, err := s.agreedAndNamed(ctx, claimsOf(decisions), proposers)
 	if err != nil {
 		return nil, 0, err
 	}
 	about, err := s.aboutEach(ctx, decisions)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	agreed := make(map[int64][]Agreed, len(decisions))
-	for _, approval := range approvals {
-		agreed[approval.ClaimID] = append(agreed[approval.ClaimID], Agreed{
-			By: named[approval.ApprovedBy], At: approval.ApprovedAt,
-			WithdrawnAt: approval.WithdrawnAt,
-			Carried:     approval.CarriedFrom != nil,
-		})
 	}
 
 	out := make([]Judged, 0, len(decisions))
@@ -282,6 +269,45 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		out = append(out, row)
 	}
 	return out, total, nil
+}
+
+// agreedAndNamed reads every agreement on these claims and the sign-in
+// identity of everybody involved, the proposers given included.
+//
+// Every approval for the page in one statement, not one per row. A year of
+// judgments is a page of a hundred, and a query each would make the cost of the
+// report a count of rows rather than a count of pages.
+func (s *Store) agreedAndNamed(ctx context.Context, claims, proposers []int64) (
+	map[int64][]Agreed, map[int64]string, error) {
+
+	people := map[int64]bool{}
+	for _, id := range proposers {
+		people[id] = true
+	}
+	var approvals []Approval
+	if len(claims) > 0 {
+		if err := s.db.NewSelect().Model(&approvals).
+			Where("claim_id IN (?)", bun.List(claims)).
+			Order("claim_id ASC", "id ASC").Scan(ctx); err != nil {
+			return nil, nil, fmt.Errorf("read who agreed: %w", err)
+		}
+	}
+	for _, approval := range approvals {
+		people[approval.ApprovedBy] = true
+	}
+	named, err := s.namesOf(ctx, people)
+	if err != nil {
+		return nil, nil, err
+	}
+	agreed := make(map[int64][]Agreed, len(claims))
+	for _, approval := range approvals {
+		agreed[approval.ClaimID] = append(agreed[approval.ClaimID], Agreed{
+			By: named[approval.ApprovedBy], At: approval.ApprovedAt,
+			WithdrawnAt: approval.WithdrawnAt,
+			Carried:     approval.CarriedFrom != nil,
+		})
+	}
+	return agreed, named, nil
 }
 
 // namesOf reads sign-in identities for a set of people.

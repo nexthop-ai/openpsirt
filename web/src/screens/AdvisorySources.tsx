@@ -29,6 +29,49 @@ import { since } from "../ui/when";
 
 type Source = Body<"AdvisorySourceBody">;
 
+// Publishers whose CSAF provider directory is public, offered as a fill for
+// the form rather than configured: which product reads a publisher is still
+// the administrator's choice. Each address answers without a redirect, which
+// the fetcher refuses.
+export const KNOWN_SUPPLIERS = [
+  {
+    name: "redhat",
+    label: "Red Hat",
+    covers: "RHEL, UBI images and other Red Hat products",
+    url: "https://security.access.redhat.com/data/csaf/v2/provider-metadata.json",
+  },
+  {
+    name: "suse",
+    label: "SUSE",
+    covers: "SUSE Linux Enterprise, openSUSE and other SUSE products",
+    url: "https://www.suse.com/.well-known/csaf/provider-metadata.json",
+  },
+  {
+    name: "cisco",
+    label: "Cisco",
+    covers: "Cisco products",
+    url: "https://www.cisco.com/.well-known/csaf/provider-metadata.json",
+  },
+  {
+    name: "siemens",
+    label: "Siemens",
+    covers: "Siemens industrial products",
+    url: "https://cert-portal.siemens.com/productcert/csaf/provider-metadata.json",
+  },
+  {
+    name: "ncsc-nl",
+    label: "NCSC-NL",
+    covers: "Advisories the Dutch national CERT issues about third-party products",
+    url: "https://advisories.ncsc.nl/.well-known/csaf/provider-metadata.json",
+  },
+] as const;
+
+// Whether a well-known publisher is already configured on the product, by
+// either the name it would be added under or the address it is read from.
+function configured(known: { name: string; url: string }, rows: readonly Source[]) {
+  return rows.some((row) => (row.name ?? "").toLowerCase() === known.name || row.url === known.url);
+}
+
 // The suppliers configured against one product. Asked only once a product is
 // chosen, because the endpoint is per product and there is no list across them.
 function useSources(product: string) {
@@ -106,19 +149,18 @@ export function AdvisorySources() {
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div className="screen-head">
-        <h3>Advisory sources</h3>
-        {product !== "" && <AddButton label="Add supplier" onClick={() => setAdding(true)} />}
+        <h3>Supplier advisories</h3>
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
-        Read on the scan schedule, as evidence. Upload anything older below.
+        CSAF and VEX from the vendors whose code a product ships, shown as evidence on its findings.
       </p>
 
-      <div className="field">
-        <label htmlFor="advisory-sources-product">Product</label>
+      <div className="filters">
         <select
-          id="advisory-sources-product"
+          aria-label="Product"
           value={product}
           onChange={(event) => setProduct(event.target.value)}
+          style={{ width: "auto" }}
         >
           {/* An unchosen state, so the first product in the list is not the
               one a supplier is added to by default. Which product reads a
@@ -132,17 +174,27 @@ export function AdvisorySources() {
         </select>
       </div>
 
+      {product !== "" && (
+        <div className="screen-head" style={{ marginTop: 16 }}>
+          <h4 style={{ margin: 0 }} title="Read on the scan schedule">
+            Fetched automatically
+          </h4>
+          <AddButton label="Add supplier" onClick={() => setAdding(true)} />
+        </div>
+      )}
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That supplier could not be withdrawn." />
       )}
-      {product === "" ? null : sources.isPending ? (
+      {product === "" ? (
+        <Empty title="Pick a product" detail="Suppliers are set up per product." />
+      ) : sources.isPending ? (
         <Loading />
       ) : sources.isError ? (
         <Failed error={sources.error} what="The suppliers could not be read." />
       ) : rows.length === 0 ? (
         <Empty
-          title="No suppliers."
-          detail="Nothing is fetched. A supplier advisory can still be uploaded one at a time."
+          title="No suppliers"
+          detail="Add one by its CSAF provider directory, or upload a document below."
         />
       ) : (
         <Wide>
@@ -195,6 +247,30 @@ export function AdvisorySources() {
         ok="Add supplier"
         hint="https only, on the host the address names. A redirect is refused rather than followed."
       >
+        <div className="field">
+          <span>Well-known</span>
+          <div className="filters" style={{ margin: 0 }}>
+            {KNOWN_SUPPLIERS.map((known) => {
+              const added = configured(known, rows);
+              return (
+                <button
+                  key={known.name}
+                  type="button"
+                  className="chip"
+                  aria-pressed={name === known.name && url === known.url}
+                  disabled={added}
+                  title={added ? "Already added to this product" : known.covers}
+                  onClick={() => {
+                    setName(known.name);
+                    setUrl(known.url);
+                  }}
+                >
+                  {known.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <Field
           label="Name"
           value={name}
@@ -262,7 +338,7 @@ function Upload({ product }: { product: string }) {
 
   return (
     <>
-      <h3 style={{ marginTop: 16 }}>Upload a document</h3>
+      <h4 style={{ marginTop: 20 }}>Upload a document</h4>
       <div className="filters">
         <label className="field">
           <span>Kind</span>

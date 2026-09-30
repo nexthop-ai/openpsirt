@@ -975,6 +975,7 @@ document has been read.
 | A supplier unread for longer than a set time is raised with administrators | One that stopped answering looks exactly like one that published nothing. Measured from the last read that worked, or from when it was configured where none has, and never shorter than two scan intervals, since a supplier is read once each. `DESIGN-notifications.md` holds the condition |
 | What stopped an attempt is kept bounded | The text carries a publisher's own address and a server's own reason phrase, neither of which they have agreed to bound. Unbounded, the write fails on two of the four engines, which leaves the attempt unrecorded and the supplier fetched again on every wake |
 | A feed entry nobody can date is left alone | It cannot be placed against the mark, so taking it would mean taking it again on every pass for ever |
+| Five publishers with a public CSAF provider description are offered as a fill for the form, and none is configured | Red Hat, SUSE, Cisco, Siemens and NCSC-NL. Choosing the publisher and the product is the deliberate act, so a preset fills the name and the address and the administrator adds it. One the product already reads, by name or by address, is not offered |
 | A claim is recorded as the administrator who configured the supplier | Configuring one is the act that admitted this publisher's judgment, and it is the only decision anybody made. Nothing chose the individual document, which is the whole difference from an upload |
 
 What a year costs was measured against five publishers on 2026-09-23, by
@@ -1061,6 +1062,7 @@ to retrofit were settled early.
 | Only the first ancestor supplies upstream identity | Anything further back is history, and a scanner matches against the fork point |
 | Fixed-width character columns are not used | They blank-pad on some engines, so a hash read back carries trailing spaces that make an exact-match lookup fail |
 | A component with no distribution context in its identifier is one nothing will match | And that is invisible rather than an error |
+| The well-known publishers' addresses are shipped in the interface | They are the publishers' own and move when a publisher reorganizes its site. Each answered without a redirect on 2026-09-30; one that moves fails its first read and is raised the way any unreadable supplier is. Debian publishes no CSAF provider description, so a Debian-based product has no preset to take |
 
 A lifecycle scope is read the way that keeps a component, and the
 two errors it sits between are not equal. Keeping too much adds something to
