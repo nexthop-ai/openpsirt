@@ -60,6 +60,43 @@ func TestSQLiteChoosesAnIndexByTheRowsBehindItOnceStatisticsAreRefreshed(t *test
 	})
 }
 
+// A scan changes how the rows divide more than how many there are: a second
+// build adds a tenth to the findings and a second value to the column they
+// are divided by. The statistics have to follow that, not only growth.
+func TestSQLiteStatisticsFollowANewValueAfterSmallGrowth(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		scratchTable(t, db, "divided", `"target" INTEGER, "n" INTEGER`)
+		insert := func(target, rows int) {
+			t.Helper()
+			if _, err := db.ExecContext(ctx, `WITH RECURSIVE s(x) AS
+				(SELECT 1 UNION ALL SELECT x + 1 FROM s WHERE x < ?)
+				INSERT INTO "divided" SELECT ?, x FROM s`, rows, target); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := db.ExecContext(ctx, `CREATE INDEX "divided_target" ON "divided" ("target")`); err != nil {
+			t.Fatal(err)
+		}
+		insert(1, 5000)
+		if err := database.RefreshStatistics(ctx, db); err != nil {
+			t.Fatal(err)
+		}
+		insert(2, 500)
+		if err := database.RefreshStatistics(ctx, db); err != nil {
+			t.Fatal(err)
+		}
+		var stat string
+		if err := db.QueryRowContext(ctx,
+			`SELECT "stat" FROM "sqlite_stat1" WHERE "idx" = 'divided_target'`).Scan(&stat); err != nil {
+			t.Fatal(err)
+		}
+		if stat != "5500 2750" {
+			t.Errorf("the statistics read %q after a second target arrived, want %q", stat, "5500 2750")
+		}
+	})
+}
+
 func TestRefreshingStatisticsSucceedsOnEveryEngine(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		if err := database.RefreshStatistics(t.Context(), db); err != nil {

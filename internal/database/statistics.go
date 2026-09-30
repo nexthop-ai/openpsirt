@@ -19,15 +19,19 @@ import (
 // running out took 2.5 s where it takes 0.13 s. The servers keep statistics
 // current on their own, so on them this does nothing.
 //
-// The form that checks every table rather than those this connection has
-// queried, because a pooled connection may have queried none. It analyzes a
-// table only where the statistics are missing or the table has grown well
-// past them: 5 ms where nothing moved, 0.7 s for the demo with none at all.
+// A whole ANALYZE rather than the pragma that analyzes only a table that has
+// grown several times over. A scan changes the shape of the tables more than
+// their size: the demo's second build added a tenth to the findings, so the
+// statistics went on describing every finding as under one build, and the
+// findings list took 2.1 s where it takes 0.57 s. 0.66 s for the demo's
+// 361,429 findings. Sampling the first rows of each index instead took 71 ms
+// and misjudged which rows were assigned, which cost the assignments count
+// 0.68 s.
 func RefreshStatistics(ctx context.Context, db *DB) error {
 	if db.Server.Engine != SQLite {
 		return nil
 	}
-	if _, err := db.ExecContext(ctx, "PRAGMA optimize=0x10002"); err != nil {
+	if _, err := db.ExecContext(ctx, "ANALYZE"); err != nil {
 		return fmt.Errorf("refresh the planner's statistics: %w", err)
 	}
 	return nil
