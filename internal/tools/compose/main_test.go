@@ -451,3 +451,26 @@ func TestARootOrPlacementNamingNoInputIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// The placement is named by path on the command line, and reaches the part
+// read from that path.
+func TestAPlacementNamedByPathReachesThatPart(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for name, body := range map[string]string{"server.json": theServer, "web.json": theInterface} {
+		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	opts := options{name: "openpsirt-image", within: map[string]string{"web.json": server}}
+	if err := run(opts, "out.json", []string{"server.json", "web.json"}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile("out.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	composed := read(t, string(body))
+	if got := kids(t, &composed, server); !slices.Contains(got, "pkg:npm/openpsirt-web") {
+		t.Errorf("the server holds %v, and the interface it embeds is not among them", got)
+	}
+}

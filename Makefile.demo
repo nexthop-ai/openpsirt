@@ -768,6 +768,10 @@ dev-seed:
 	@# inventory of what an image ships does not exist to upload. Naming the
 	@# one that does exist the same thing it is called there keeps the two
 	@# loops describing one product rather than two that look alike.
+	@#
+	@# It holds the Go modules and not the interface's packages, which the
+	@# image build reads with a cataloger this loop does not install. So an
+	@# advisory against one of those shows in the demo and not here.
 	@$(MAKE) --no-print-directory sbom >/dev/null
 	@for spec in \
 	  '/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \

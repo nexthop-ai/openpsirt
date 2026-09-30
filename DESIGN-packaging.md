@@ -347,9 +347,8 @@ into one: the module reader reads Go build information, and a directory scan
 finds npm packages by their manifests, which bundling leaves behind. So its
 packages are read from the lock file it was installed from, with development
 dependencies left out, because the build tools and the test runner do not ship.
-Measured: 65 packages, eleven of them named by the interface directly, and none
-of its development dependencies. In the image inventory they sit inside the
-server's main module, because the server is the binary that embeds them.
+In the image inventory they sit inside the server's main module, because the
+server is the binary that embeds them.
 
 The image inventory is read off the assembled filesystem rather than by scanning
 a published image, because the image being described does not exist until the
@@ -358,9 +357,9 @@ build finishes.
 Packages, not files. The file catalogers add a component per path with no
 version and no package identifier — eight hundred of them here — which no
 scanner can match and no finding can hang off, and they carry the build-time
-scan path into a shipped document. With them off the count is 357 components:
-seventeen Alpine packages, the operating system, and the modules of both
-binaries.
+scan path into a shipped document. With them off, what is left is the Alpine
+packages, the operating system, the modules of both binaries, and the
+interface's packages inside the server.
 
 ## Inventory composition
 

@@ -166,8 +166,8 @@ RUN apk add --no-cache curl ca-certificates \
  && tar -xzf /tmp/grype.tar.gz -C /out grype \
  && chmod 0755 /out/grype
 
-# The generator for the second inventory: what the whole image ships, rather
-# than what the binary was linked from.
+# The generator for the image inventory, and for the interface's part of the
+# binary's.
 #
 # Pinned by version and checksum, the same way the scanner is, and from the
 # same project — a build that fetches an unpinned tool over the network is a
