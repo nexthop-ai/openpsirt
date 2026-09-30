@@ -381,10 +381,10 @@ demo-seed:
 	@# anything, and this one costs nobody a build pipeline.
 	@#
 	@# Two variants, and the difference between them is the point. "binary" is
-	@# what the program was linked from — every Go module, and nothing else.
+	@# what the program ships — every Go module and the interface's packages.
 	@# "container" is what the image actually ships: musl, busybox, the
-	@# certificate bundle, the scanner that rides along, and the modules of
-	@# both binaries. A tool whose subject is knowing what is inside what you
+	@# certificate bundle, the scanner that rides along, the modules of both
+	@# binaries, and the interface inside the server. A tool whose subject is knowing what is inside what you
 	@# ship should be able to show somebody that those are not the same list,
 	@# on itself, on the first screen they open.
 	@$(DOCKER) cp openpsirt-demo:/usr/share/openpsirt/openpsirt.cdx.json $(DEMO_DIR)/openpsirt-binary.cdx.json
@@ -768,6 +768,10 @@ dev-seed:
 	@# inventory of what an image ships does not exist to upload. Naming the
 	@# one that does exist the same thing it is called there keeps the two
 	@# loops describing one product rather than two that look alike.
+	@#
+	@# It holds the Go modules and not the interface's packages, which the
+	@# image build reads with a cataloger this loop does not install. So an
+	@# advisory against one of those shows in the demo and not here.
 	@$(MAKE) --no-print-directory sbom >/dev/null
 	@for spec in \
 	  '/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \

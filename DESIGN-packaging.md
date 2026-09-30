@@ -336,11 +336,19 @@ The image ships two inventories, because they are not the same list (REQ-04).
 
 | File | Describes | Produced by |
 |---|---|---|
-| `openpsirt.cdx.json` | What the binary was linked from | Reading the built binary in the build stage. Its build information names every module, so no checkout is needed; the version is passed in, because a binary built here is from no module the proxy has seen |
+| `openpsirt.cdx.json` | What the binary ships: the modules it was linked from and the interface it embeds | Reading the built binary for its modules, and the interface's lock file for its packages, composed under the application. The binary's build information names every module, so no checkout is needed; the version is passed in, because a binary built here is from no module the proxy has seen |
 | `image.cdx.json` | What the image ships | Cataloging the assembled filesystem in a later stage |
 
 musl, busybox, the certificate bundle and the bundled scanner are shipped by this
 image and appear in neither the first list nor any module graph.
+
+The interface is embedded in the binary as a bundle, and neither cataloger sees
+into one: the module reader reads Go build information, and a directory scan
+finds npm packages by their manifests, which bundling leaves behind. So its
+packages are read from the lock file it was installed from, with development
+dependencies left out, because the build tools and the test runner do not ship.
+In the image inventory they sit inside the server's main module, because the
+server is the binary that embeds them.
 
 The image inventory is read off the assembled filesystem rather than by scanning
 a published image, because the image being described does not exist until the
@@ -349,9 +357,9 @@ build finishes.
 Packages, not files. The file catalogers add a component per path with no
 version and no package identifier — eight hundred of them here — which no
 scanner can match and no finding can hang off, and they carry the build-time
-scan path into a shipped document. With them off the count is 357 components:
-seventeen Alpine packages, the operating system, and the modules of both
-binaries.
+scan path into a shipped document. With them off, what is left is the Alpine
+packages, the operating system, the modules of both binaries, and the
+interface's packages inside the server.
 
 ## Inventory composition
 
@@ -374,6 +382,8 @@ After, the root has ten and every module sits under the binary it came from.
 |---|---|
 | A component is identified by its package identifier with the producer's qualifiers cut | A module two binaries both link gets a different reference in each catalog. One component with two parents is the truth; two components is a count saying the image ships it twice, and a decision to be made twice |
 | Everything else a producer recorded is carried through untouched | Licenses, hashes, and the properties stating where something was found. Composing rewrites references and adds one edge |
+| A part can be placed inside a component another part describes | The interface's packages are inside the server binary, and a finding against one should say so. Placed inside a component no input describes, composing is refused |
+| The root can be one part's own root | The binary's inventory stays rooted at the application its module reader named, with the interface beside the modules, rather than at a container the composer made up |
 
 The generator is pinned by version and checksum, as the scanner is.
 
@@ -391,7 +401,7 @@ with its leading `v` removed (REQ-01 and REQ-02).
 | Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it. `linux/amd64` today — see below |
 | Helm chart | `openpsirt-<version>.tgz`, pushed to `oci://ghcr.io/nexthop-ai/charts` | The registry that already holds the image, rather than an index somebody has to host and keep |
 | Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. The interface is inside the binary, so the archive serves the same pages the image does. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
-| Binary inventory | `openpsirt_<version>.cdx.json` | What the binary was linked from |
+| Binary inventory | `openpsirt_<version>.cdx.json` | What the binary ships: the modules it was linked from and the interface it embeds |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
 | Checksums | `SHA256SUMS` | Every file above, so a download is checkable without holding a signature |
 | Signature | `SHA256SUMS.cosign.bundle` | One signature over the checksum file rather than one per asset: the file already covers every asset, so a verifier checks one signature and then the hashes |

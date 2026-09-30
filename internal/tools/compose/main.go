@@ -253,24 +253,56 @@ func identity(c component) string {
 	return c.Name + "@" + c.Version
 }
 
+// part is one input and where its top-level components hang: under the
+// component another input describes with the identity within, or under the
+// composed root where within is empty.
+type part struct {
+	doc    document
+	within string
+}
+
 func main() {
 	name := flag.String("name", "", "what the composed inventory is of")
 	version := flag.String("version", "", "the version of that thing")
+	rootFrom := flag.String("root", "", "an input whose own root is the composed root, in place of -name")
 	out := flag.String("out", "", "where to write the result")
+	within := map[string]string{}
+	flag.Func("within", "INPUT=IDENTITY: that input sits inside the component with that identity",
+		func(v string) error {
+			input, identity, ok := strings.Cut(v, "=")
+			if !ok || input == "" || identity == "" {
+				return fmt.Errorf("want INPUT=IDENTITY")
+			}
+			within[input] = identity
+			return nil
+		})
 	flag.Parse()
-	if *name == "" || *out == "" || flag.NArg() == 0 {
-		fmt.Fprintln(os.Stderr, "usage: compose -name NAME [-version V] -out FILE INPUT...")
+	if (*name == "") == (*rootFrom == "") || *out == "" || flag.NArg() == 0 {
+		fmt.Fprintln(os.Stderr, "usage: compose (-name NAME [-version V] | -root INPUT) "+
+			"[-within INPUT=IDENTITY]... -out FILE INPUT...")
 		os.Exit(2)
 	}
-	if err := run(*name, *version, *out, flag.Args()); err != nil {
+	if err := run(options{name: *name, version: *version, rootFrom: *rootFrom, within: within},
+		*out, flag.Args()); err != nil {
 		fmt.Fprintln(os.Stderr, "compose:", err)
 		os.Exit(1)
 	}
 }
 
-func run(name, version, out string, inputs []string) error {
+// options is how the inputs are put together: what the composed root is, and
+// which inputs sit inside a component rather than directly under it.
+type options struct {
+	name, version string
+	rootFrom      string
+	within        map[string]string
+}
+
+func run(opts options, out string, inputs []string) error {
 	here := os.DirFS(".")
-	docs := make([]document, 0, len(inputs))
+	parts := make([]part, 0, len(inputs))
+	root := component{Ref: "root", Type: "container", Name: opts.name, Version: opts.version}
+	rooted := opts.rootFrom == ""
+	placedWithin := 0
 	for _, path := range inputs {
 		// Read below the working directory and nowhere else. A path that
 		// directory cannot address is refused in words, rather than an
@@ -287,10 +319,30 @@ func run(name, version, out string, inputs []string) error {
 		if err := json.Unmarshal(body, &doc); err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		docs = append(docs, doc)
+		if path == opts.rootFrom {
+			if doc.Metadata == nil || doc.Metadata.Component == nil {
+				return fmt.Errorf("%s: names no root to compose under", path)
+			}
+			root = *doc.Metadata.Component
+			root.Ref = "root"
+			rooted = true
+		}
+		within, inside := opts.within[path]
+		if inside {
+			placedWithin++
+		}
+		parts = append(parts, part{doc: doc, within: within})
+	}
+	// A root or a placement naming a path that is not an input would compose
+	// something other than what was asked, and say nothing.
+	if !rooted {
+		return fmt.Errorf("-root %s is not one of the inputs", opts.rootFrom)
+	}
+	if placedWithin != len(opts.within) {
+		return fmt.Errorf("-within names an input that is not one of the inputs")
 	}
 
-	composed, err := compose(name, version, docs)
+	composed, err := compose(root, parts)
 	if err != nil {
 		return err
 	}
@@ -311,15 +363,15 @@ func run(name, version, out string, inputs []string) error {
 }
 
 // compose merges the documents under one root.
-func compose(name, version string, docs []document) (*document, error) {
-	if len(docs) == 0 {
+func compose(root component, parts []part) (*document, error) {
+	if len(parts) == 0 {
 		return nil, fmt.Errorf("nothing to compose")
 	}
 
-	root := component{Ref: "root", Type: "container", Name: name, Version: version}
+	first := parts[0].doc
 	composed := &document{
-		BOMFormat: "CycloneDX", SpecVersion: docs[0].SpecVersion, Version: 1,
-		Metadata: &metadata{Timestamp: docs[0].metaTimestamp(), Component: &root},
+		BOMFormat: "CycloneDX", SpecVersion: first.SpecVersion, Version: 1,
+		Metadata: &metadata{Timestamp: first.metaTimestamp(), Component: &root},
 	}
 	if composed.SpecVersion == "" {
 		composed.SpecVersion = "1.6"
@@ -336,8 +388,12 @@ func compose(name, version string, docs []document) (*document, error) {
 	// answered no, and the image then claimed to contain directly what
 	// actually sits inside a binary.
 	placed := map[string]bool{}
+	// The part that first described each component, which says where it
+	// hangs when nothing places it.
+	owner := map[string]int{}
 
-	for _, doc := range docs {
+	for index, p := range parts {
+		doc := p.doc
 		// This document's own name for a thing, mapped to what the composed one
 		// does. The root of an input is not carried over: it describes the
 		// part rather than the whole, and the whole is the root here.
@@ -361,6 +417,7 @@ func compose(name, version string, docs []document) (*document, error) {
 				merge(&components[at], c)
 			} else {
 				byIdentity[id] = len(components)
+				owner[id] = index
 				c.Ref = id
 				components = append(components, c)
 			}
@@ -415,11 +472,27 @@ func compose(name, version string, docs []document) (*document, error) {
 	// The root contains everything nothing else placed, asked once over
 	// everything composed rather than once per input: a component the first
 	// document described and the second placed is not a child of the image.
+	//
+	// A part that sits inside a component hangs its unplaced components there
+	// instead: the interface's packages are inside the binary that embeds
+	// them, not beside it in the image.
 	var children []string
 	for _, c := range components {
-		if !placed[c.Ref] {
-			children = append(children, c.Ref)
+		if placed[c.Ref] {
+			continue
 		}
+		within := parts[owner[c.Ref]].within
+		if within == "" {
+			children = append(children, c.Ref)
+			continue
+		}
+		if _, known := byIdentity[within]; !known {
+			return nil, fmt.Errorf("a part sits inside %s, which no input describes", within)
+		}
+		if edges[within] == nil {
+			edges[within] = map[string]bool{}
+		}
+		edges[within][c.Ref] = true
 	}
 	sort.Strings(children)
 
