@@ -22,7 +22,7 @@ import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
 import { allFindingsAt, claimAt } from "../app/routes";
 
-// The share of the record one page holds. The server's own ceiling is five
+// The share of the record one page holds. The server's own ceiling is two
 // hundred; a page is what somebody reads, and the rest is a click away rather
 // than behind a narrower search.
 const PAGE = 100;
@@ -485,6 +485,12 @@ function Administered() {
         Settings, roles, support dates, credentials, accounts and teams, with what each held before.
         {stated({ from, to }) ? ` Over ${coveringPeriod({ from, to }, 0)}.` : ""}
       </p>
+      {/* The picker does not print, so the sheet says what it was set to. */}
+      {kind && (
+        <div className="printhead">
+          <p>Only {CHANGE_SAID[kind].toLowerCase()}.</p>
+        </div>
+      )}
       <div className="filters noprint">
         <select
           value={kind}
@@ -839,6 +845,9 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
 function recordAt(params: URLSearchParams, format: string): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
+  // The change history's own filter, which the record's route does not take
+  // and refuses.
+  asked.delete("change");
   const sent = periodSent(params);
   for (const name of ["from", "to"] as const) {
     if (sent[name]) asked.set(name, sent[name]);

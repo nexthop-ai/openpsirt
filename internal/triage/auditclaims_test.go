@@ -137,3 +137,71 @@ func TestTheRecordCountsOnlyTheRowsTheFiltersMatch(t *testing.T) {
 		}
 	})
 }
+
+func TestTheRecordCountsWhatStillAppliesAndDatesTheRowsItMatched(t *testing.T) {
+	// Standing is the matching rows that apply now: an agreed claim with one
+	// row ended applies at the rest. The date is the earliest matching row's
+	// proposal, which the period filter reads, never the claim's own stamp: a
+	// claim made by setting rows aside is stamped later than the rows it took.
+	each(t, func(t *testing.T, f *fixture) {
+		bulk := f.proposes(t, f.triager,
+			f.placeIn(f.product, "place-a", access.Public),
+			f.placeIn(f.product, "place-b", access.Public),
+			f.placeIn(f.product, "place-c", access.Public))
+		if err := agreeTo(t.Context(), f.store, f.reviewer, bulk.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		rows := f.rowsOf(t, bulk.ClaimID)
+		f.ends(t, rows[0].ID, time.Now().UTC())
+		later := rows[0].ProposedAt.Add(72 * time.Hour)
+		if _, err := f.db.DB.NewUpdate().Table("claim").Set("proposed_at = ?", later).
+			Where("id = ?", bulk.ClaimID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		got, _ := f.auditedClaims(t, f.reviewer, triage.Filter{})
+		if len(got) != 1 {
+			t.Fatalf("the record lists %d claims, want 1", len(got))
+		}
+		if got[0].Standing != 2 {
+			t.Errorf("an agreed claim with one of three rows ended reads %d standing, want 2", got[0].Standing)
+		}
+		if !got[0].ProposedAt.Equal(rows[0].ProposedAt) {
+			t.Errorf("the claim is dated %v, want its earliest row's proposal, %v",
+				got[0].ProposedAt, rows[0].ProposedAt)
+		}
+	})
+}
+
+func TestTheRecordCountsNamesThatMergedAsOneIssue(t *testing.T) {
+	// A decision stays filed under the name it was made against when two
+	// names are later found to be one issue, so the count is of the issue
+	// each row is read as.
+	each(t, func(t *testing.T, f *fixture) {
+		second := f.secondIssue(t)
+		other := f.placeIn(f.product, "place-b", access.Public)
+		other.VulnerabilityID = second
+		bulk := f.proposes(t, f.triager, f.placeIn(f.product, "place-a", access.Public), other)
+
+		issues := func() int {
+			got, _ := f.auditedClaims(t, f.reviewer, triage.Filter{})
+			for _, row := range got {
+				if row.Claim.ID == bulk.ClaimID {
+					return row.Issues
+				}
+			}
+			t.Fatalf("the claim is not in the record")
+			return 0
+		}
+		if n := issues(); n != 2 {
+			t.Fatalf("a claim over two issues reads %d issues", n)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set("issue_id = ?", f.issue).
+			Where("id = ?", second).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if n := issues(); n != 1 {
+			t.Errorf("once the two names are one issue, the claim reads %d issues, want 1", n)
+		}
+	})
+}

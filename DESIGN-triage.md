@@ -1258,8 +1258,8 @@ message either: it takes a person or a team and nothing else.
 They are not merged, and cannot be. A claim is keyed on a place and a note on
 an issue, so one record cannot hold both — and the claim's record stays exactly
 what people wrote about the claim, which is what lets an approval point at one
-revision of a justification (REQ-28). Two threads are rendered near each other
-instead.
+revision of a justification (REQ-28). Where each is drawn is
+`DESIGN-interface.md` § The finding screen.
 
 Something true of one copy and not another is a comment, not a note. "We do
 not call that function in the vendored build" is about a judgment at a place,

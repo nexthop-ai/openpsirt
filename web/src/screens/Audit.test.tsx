@@ -69,6 +69,12 @@ describe("the change history's kind", () => {
       .map((each) => each.getAttribute("href") ?? "")
       .find((href) => href.startsWith("/v1/administration/changes.csv"));
     expect(file).toContain("kind=role");
+    // The record's own file takes no kind of change, and refuses one.
+    const record = Array.from(mount.host().querySelectorAll("a"))
+      .map((each) => each.getAttribute("href") ?? "")
+      .filter((href) => href.startsWith("/v1/audit."));
+    expect(record.length).toBeGreaterThan(0);
+    for (const href of record) expect(href).not.toContain("change=");
     expect(mount.host().textContent).toContain("No changes of that kind");
   });
 

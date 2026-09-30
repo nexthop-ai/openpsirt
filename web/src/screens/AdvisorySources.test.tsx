@@ -4,6 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdvisorySources, KNOWN_SUPPLIERS } from "./AdvisorySources";
+import { api } from "../api/client";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
@@ -49,13 +50,15 @@ function field(label: string) {
 }
 
 describe("the well-known suppliers", () => {
-  it("fills the form with the publisher's name and directory", async () => {
+  it("fills the form with the publisher's name and directory, and adds nothing", async () => {
     await adding([]);
+    const sent = vi.spyOn(api, "POST");
     const suse = KNOWN_SUPPLIERS.find((each) => each.name === "suse");
     act(() => preset("SUSE")?.click());
     await settle();
     expect(field("Name")?.value).toBe("suse");
     expect(field("Provider directory")?.value).toBe(suse?.url);
+    expect(sent).not.toHaveBeenCalled();
   });
 
   it("offers no publisher the product already reads, by name or by address", async () => {

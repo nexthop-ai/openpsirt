@@ -382,7 +382,7 @@ func judgedClaimBody(row triage.JudgedClaim) JudgedClaimBody {
 			Withdrawn: row.States[triage.Withdrawn], Lapsed: row.States[triage.LapsedState],
 		},
 		Standing:   row.Standing,
-		ProposedBy: row.ProposedByName, ProposedAt: core.Stamp(row.Claim.ProposedAt),
+		ProposedBy: row.ProposedByName, ProposedAt: core.Stamp(row.ProposedAt),
 		TwoPeople: row.BySomebodyElse(),
 		Approvals: agreedBodies(row.Approvals),
 	}

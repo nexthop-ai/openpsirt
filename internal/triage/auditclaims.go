@@ -39,8 +39,14 @@ type JudgedClaim struct {
 	// representative that is.
 	Issue, Component, Version, Consumer string
 	Product, ProductName                string
+	// ProposedAt is when the earliest matching row was proposed, which is the
+	// moment a period filter asked about. A claim made by setting rows aside is
+	// stamped when that happened, later than the rows it took.
+	ProposedAt time.Time
 	// Decisions is the matching rows; Issues, Places and Products are the
-	// distinct issues, places and products among them. Components is the
+	// distinct issues, places and products among them. An issue is counted as
+	// the issue its rows are read as, so rows filed under two names that were
+	// merged are one issue. Components is the
 	// distinct component names at those places, counted through the findings
 	// the reader may read.
 	Decisions, Issues, Places, Products, Components int
@@ -119,14 +125,18 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		Places    int   `bun:"places"`
 		Products  int   `bun:"products"`
 		Earliest  int64 `bun:"earliest"`
+		// Proposed is a pointer because an aggregate reads as nullable.
+		Proposed *time.Time `bun:"proposed"`
 	}
 	if err := matching().
+		Join(finding.DecisionIssue).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
-		ColumnExpr(`COUNT(DISTINCT de.vulnerability_id) AS "issues"`).
+		ColumnExpr(`COUNT(DISTINCT dv.issue_id) AS "issues"`).
 		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
 		ColumnExpr(`COUNT(DISTINCT de.product_id) AS "products"`).
 		ColumnExpr(`MIN(de.id) AS "earliest"`).
+		ColumnExpr(`MIN(de.proposed_at) AS "proposed"`).
 		Where("de.claim_id IN (?)", bun.List(ids)).
 		GroupExpr("de.claim_id").Scan(ctx, &sizes); err != nil {
 		return nil, 0, fmt.Errorf("count what each claim covers: %w", err)
@@ -226,6 +236,9 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		}
 		entry.Decisions, entry.Issues, entry.Places = size.Decisions, size.Issues, size.Places
 		entry.Products = size.Products
+		if size.Proposed != nil {
+			entry.ProposedAt = *size.Proposed
+		}
 		if what, known := about[size.Earliest]; known {
 			entry.Issue, entry.Component, entry.Version = what.Issue, what.Component, what.Version
 			entry.Consumer, entry.Product, entry.ProductName = what.Consumer, what.Product, what.ProductName
