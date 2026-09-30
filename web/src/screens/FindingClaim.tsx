@@ -10,7 +10,7 @@
 // did it come to say that.
 
 import { FLOORS } from "../ui/severities";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { at, on } from "../ui/when";
 import { initials } from "../ui/initials";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -85,6 +85,7 @@ export function Standing({
   onRevised,
   about,
   undisclosed,
+  children,
 }: {
   claim: Detail;
   summary?: Body<"StandingClaimBody">;
@@ -94,6 +95,9 @@ export function Standing({
   onRevised: () => void;
   about: { product: string; vulnerability: string };
   undisclosed?: boolean;
+  // Drawn at the foot of the card: what belongs to this decision and is not
+  // its judgment, such as the conversation about it.
+  children?: ReactNode;
 }) {
   // The claim, not the row. What a judgment says — its reasoning, the
   // agreement given for it, the conversation about it — belongs to the action
@@ -284,6 +288,7 @@ export function Standing({
         where={summary?.elsewhere ?? ""}
         onSet={() => void queries.invalidateQueries({ queryKey: ["finding"] })}
       />
+      {children}
     </div>
   );
 }
@@ -477,8 +482,11 @@ export function Comments({
   mine,
   about,
   undisclosed,
+  within,
 }: {
   claimId: number;
+  // Drawn inside the decision's own card rather than as a card of its own.
+  within?: boolean;
   mine: (who: string) => boolean;
   // The issue a file would be attached to. Comments are written about one, so
   // the control can say what it is attaching to rather than guessing.
@@ -497,8 +505,8 @@ export function Comments({
   });
 
   return (
-    <div className="card">
-      <h3>Comments</h3>
+    <div className={within ? "within" : "card"}>
+      {within ? <h4>Comments on this decision</h4> : <h3>Comments</h3>}
       <Thread
         items={comments.data?.items ?? []}
         mine={mine}

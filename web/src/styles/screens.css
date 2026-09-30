@@ -1130,6 +1130,17 @@
 .card.standing.lapsed {
   border-left-color: var(--sev-high);
 }
+/* The conversation about a decision, at the foot of its card. */
+.standing .within {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.standing .within h4 {
+  margin: 0 0 8px;
+  font-size: var(--step-0);
+  font-weight: 600;
+}
 .dhead {
   display: flex;
   flex-wrap: wrap;

@@ -716,8 +716,8 @@ The finding is the working screen after a decision as well as before it.
 | | Carries |
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
-| **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
-| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, the actions that fit the state, and the comments on it at the foot of its card |
+| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
 The dependency path shows the first six ways down, with a row beneath it.
 
@@ -726,13 +726,14 @@ The dependency path shows the first six ways down, with a row beneath it.
 | The rest unfold from a secondary button that names what it adds | "Show 24 more", then "Show fewer". A total says how many there are, and what somebody deciding whether to click wants is how many they have not seen |
 | The link into the tree sits apart from it, at the row's far end | Two inline controls side by side read as one run of text. The row wraps at a phone's width rather than squeezing them together |
 
-The notes thread and the claim's comments are two threads, rendered near each
-other (REQ-29).
+The notes thread and the claim's comments are two threads (REQ-29). The
+comments sit on the decision's card they are about, and the notes in a card of
+their own. Two editors in two cards, one above the other, read as one form.
 
 | | Shown | Says |
 |---|---|---|
 | Notes | Always | What it is about, in words: this issue in this product, every build of it, and no other product. Read beside a row that may be one of several the same issue sits on, so "not this component" is the part a reader has to be told |
-| Comments | Only where a claim exists | What was said about the argument somebody made, at this place |
+| Comments | Only where a claim exists, one thread on each decision's card | What was said about the argument somebody made, at this place |
 
 The notes thread is the one somebody can write in before anybody has decided
 anything, which is why it is not gated on a claim. Nothing about writing one
