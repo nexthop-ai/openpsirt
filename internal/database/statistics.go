@@ -39,6 +39,11 @@ func RefreshStatistics(ctx context.Context, db *DB) error {
 	// connection from the old. So the idle ones are closed and the next
 	// request opens one that reads these. The ones in use now are retired by
 	// the connection lifetime the pool sets.
+	// One connection ran the analysis and has nothing else to reach, and
+	// closing it would drop an in-memory database with everything in it.
+	if db.Stats().MaxOpenConnections == 1 {
+		return nil
+	}
 	idle := db.Pool.MaxIdle
 	if idle <= 0 {
 		idle = db.Stats().MaxOpenConnections

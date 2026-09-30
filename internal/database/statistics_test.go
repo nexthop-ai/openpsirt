@@ -158,6 +158,34 @@ func TestEverySQLiteConnectionPlansFromRefreshedStatistics(t *testing.T) {
 	}
 }
 
+// An in-memory database lives on its one connection, so a refresh that
+// closed it would take the database with it.
+func TestRefreshingStatisticsKeepsAnInMemoryDatabase(t *testing.T) {
+	target, err := database.ParseURL("sqlite://:memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.OpenWithPool(t.Context(), target, database.DefaultPool())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	ctx := t.Context()
+	if _, err := db.ExecContext(ctx, `CREATE TABLE "kept" ("n" INTEGER)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO "kept" ("n") VALUES (1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.RefreshStatistics(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT "n" FROM "kept"`).Scan(&n); err != nil {
+		t.Errorf("an in-memory database lost its tables to a refresh: %v", err)
+	}
+}
+
 func TestRefreshingStatisticsSucceedsOnEveryEngine(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		if err := database.RefreshStatistics(t.Context(), db); err != nil {
