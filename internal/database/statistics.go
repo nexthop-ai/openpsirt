@@ -34,5 +34,19 @@ func RefreshStatistics(ctx context.Context, db *DB) error {
 	if _, err := db.ExecContext(ctx, "ANALYZE"); err != nil {
 		return fmt.Errorf("refresh the planner's statistics: %w", err)
 	}
+	// A connection reads the statistics when it opens and never again: the
+	// one that ran the analysis plans from the new ones and every other open
+	// connection from the old. So the idle ones are closed and the next
+	// request opens one that reads these. The ones in use now are retired by
+	// the connection lifetime the pool sets.
+	idle := db.Pool.MaxIdle
+	if idle <= 0 {
+		idle = db.Stats().MaxOpenConnections
+	}
+	if idle <= 0 {
+		idle = 2 // the standard pool's own default
+	}
+	db.SetMaxIdleConns(0)
+	db.SetMaxIdleConns(idle)
 	return nil
 }
