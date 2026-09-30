@@ -128,8 +128,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -o /out/compose ./internal/tools/compose
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} \
-      bin -json -version "${VERSION}" -output /out/openpsirt.cdx.json /out/openpsirt
+    mkdir -p /out/parts \
+ && go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} \
+      bin -json -version "${VERSION}" -output /out/parts/modules.cdx.json /out/openpsirt
 
 # Run.
 #
@@ -188,6 +189,33 @@ RUN apk add --no-cache curl ca-certificates \
  && tar -xzf /tmp/syft.tar.gz -C /out syft \
  && chmod 0755 /out/syft
 
+# The interface's packages, read from its lock file.
+#
+# The binary embeds the interface as a bundle, and neither inventory above can
+# see into one: the module inventory reads Go build information, and the
+# directory scan finds npm packages by their manifests, which bundling leaves
+# behind. So they are read from the lock file the interface was installed
+# from, which names every package the bundle was built of. Development
+# dependencies are left out, because the build tools and the test runner are
+# not shipped.
+FROM inventory-tool AS web-inventory
+ARG VERSION=dev
+COPY web/package.json web/package-lock.json /web/
+RUN /out/syft scan dir:/web \
+      --select-catalogers "-file" \
+      --source-name openpsirt-web --source-version "${VERSION}" \
+      -o cyclonedx-json=/web.cdx.json \
+ && test -s /web.cdx.json
+
+# What the binary ships: the modules it was linked from and the interface it
+# embeds, both directly under the application.
+FROM build AS binary-inventory
+COPY --from=web-inventory /web.cdx.json /out/parts/web.cdx.json
+WORKDIR /out
+RUN ./compose -root parts/modules.cdx.json -out openpsirt.cdx.json \
+      parts/modules.cdx.json parts/web.cdx.json \
+ && chmod 0644 openpsirt.cdx.json
+
 FROM ${ALPINE_IMAGE} AS runtime
 
 # The packages this inherits from the base are upgraded before anything is
@@ -225,7 +253,7 @@ RUN addgroup -g 65532 -S openpsirt \
  && adduser -u 65532 -S -G openpsirt -H -s /sbin/nologin openpsirt
 
 COPY --from=build /out/openpsirt /usr/local/bin/openpsirt
-COPY --from=build /out/openpsirt.cdx.json /usr/share/openpsirt/openpsirt.cdx.json
+COPY --from=binary-inventory /out/openpsirt.cdx.json /usr/share/openpsirt/openpsirt.cdx.json
 COPY --from=scanner /out/grype /usr/local/bin/grype
 
 # Where the scanner keeps its vulnerability data. The scanner itself is on the
@@ -250,8 +278,8 @@ RUN mkdir -p /var/cache/openpsirt/grype /var/cache/openpsirt/repositories \
 
 # What the whole image ships, read off the assembled filesystem.
 #
-# The other inventory describes the binary — every module it was linked from —
-# and that is not what this image is. musl, busybox, the certificate bundle and
+# The other inventory describes the binary — every module it was linked from
+# and the interface it embeds — and that is not what this image is. musl, busybox, the certificate bundle and
 # the bundled scanner are all shipped here and appear in none of it. For a tool
 # whose subject is knowing what is inside what you ship, carrying one inventory
 # that leaves out most of the image is the wrong half to carry alone.
@@ -266,7 +294,7 @@ FROM inventory-tool AS image-inventory
 ARG VERSION=dev
 COPY --from=runtime / /rootfs
 COPY --from=build /out/compose /out/compose
-RUN mkdir -p /parts
+COPY --from=web-inventory /web.cdx.json /parts/web.cdx.json
 # Packages, not files. The file catalogers add a component per path with no
 # version and no package identifier — eight hundred of them here — and nothing
 # downstream can do anything with those: a scanner matches packages, so they
@@ -284,7 +312,8 @@ ENV SYFT_FILE_METADATA_SELECTION=none
 #
 # So each is asked what it can answer, and the parts are composed. The
 # directory scan is told to leave the binaries alone, since the file scans
-# below cover them properly.
+# below cover them properly. The interface's packages are placed inside the
+# server's main module, because the server is the binary that embeds them.
 RUN /out/syft scan dir:/rootfs \
       --select-catalogers "-file,-go-module-binary-cataloger" \
       --source-name openpsirt-image --source-version "${VERSION}" \
@@ -295,8 +324,10 @@ RUN /out/syft scan dir:/rootfs \
         -o "cyclonedx-json=/parts/$binary.cdx.json"; \
     done \
  && /out/compose -name openpsirt-image -version "${VERSION}" \
+      -within parts/web.cdx.json=pkg:golang/github.com/nexthop-ai/openpsirt \
       -out /image.cdx.json \
       parts/filesystem.cdx.json parts/openpsirt.cdx.json parts/grype.cdx.json \
+      parts/web.cdx.json \
  && test -s /image.cdx.json \
  && chmod 0644 /image.cdx.json
 

@@ -381,10 +381,10 @@ demo-seed:
 	@# anything, and this one costs nobody a build pipeline.
 	@#
 	@# Two variants, and the difference between them is the point. "binary" is
-	@# what the program was linked from — every Go module, and nothing else.
+	@# what the program ships — every Go module and the interface's packages.
 	@# "container" is what the image actually ships: musl, busybox, the
-	@# certificate bundle, the scanner that rides along, and the modules of
-	@# both binaries. A tool whose subject is knowing what is inside what you
+	@# certificate bundle, the scanner that rides along, the modules of both
+	@# binaries, and the interface inside the server. A tool whose subject is knowing what is inside what you
 	@# ship should be able to show somebody that those are not the same list,
 	@# on itself, on the first screen they open.
 	@$(DOCKER) cp openpsirt-demo:/usr/share/openpsirt/openpsirt.cdx.json $(DEMO_DIR)/openpsirt-binary.cdx.json

@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -51,6 +52,16 @@ const theFilesystem = `{
   "dependencies": [{"ref": "b", "dependsOn": ["m"]}]
 }`
 
+// image composes documents the way the image inventory is composed: under a
+// root of its own, each part's top-level components directly beneath it.
+func image(docs ...document) (*document, error) {
+	parts := make([]part, 0, len(docs))
+	for _, doc := range docs {
+		parts = append(parts, part{doc: doc})
+	}
+	return compose(component{Ref: "root", Type: "container", Name: "openpsirt-image", Version: "1.0"}, parts)
+}
+
 func kids(t *testing.T, doc *document, ref string) []string {
 	t.Helper()
 	for _, dep := range doc.Dependencies {
@@ -66,8 +77,7 @@ func TestEachPartsOwnGraphSurvivesAndTheImageIsAboveIt(t *testing.T) {
 	// binary; cataloging a binary loses the image around it. Composing keeps
 	// both, and adds only the edge that "this image contains that" already
 	// means.
-	composed, err := compose("openpsirt-image", "1.0",
-		[]document{read(t, theFilesystem), read(t, oneBinary)})
+	composed, err := image(read(t, theFilesystem), read(t, oneBinary))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,8 +132,7 @@ func TestAModuleTwoBinariesShareAppearsOnceWithBothParents(t *testing.T) {
 	  ],
 	  "dependencies": [{"ref": "o", "dependsOn": ["c2"]}]
 	}`
-	composed, err := compose("openpsirt-image", "1.0",
-		[]document{read(t, oneBinary), read(t, second)})
+	composed, err := image(read(t, oneBinary), read(t, second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +181,7 @@ func TestWhatTheProducerSaidIsCarriedThrough(t *testing.T) {
 	     "properties": [{"name": "syft:location:0:path", "value": "/lib/ld-musl.so"}]}
 	  ]
 	}`
-	composed, err := compose("openpsirt-image", "1.0", []document{read(t, rich)})
+	composed, err := image(read(t, rich))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,8 +231,7 @@ func TestWhatASecondProducerSaidAboutOneComponentIsKeptToo(t *testing.T) {
 	     "properties": [{"name": "syft:location:0:path", "value": "/usr/bin/openpsirt"}]}
 	  ]
 	}`
-	composed, err := compose("openpsirt-image", "1.0",
-		[]document{read(t, filesystem), read(t, binary)})
+	composed, err := image(read(t, filesystem), read(t, binary))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,8 +288,7 @@ func TestAComponentTheNextInputPlacesIsNotAlsoHungOffTheImage(t *testing.T) {
 	  ],
 	  "dependencies": [{"ref": "app", "dependsOn": ["lib"]}]
 	}`
-	composed, err := compose("openpsirt-image", "1.0",
-		[]document{read(t, described), read(t, places)})
+	composed, err := image(read(t, described), read(t, places))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +321,7 @@ func TestAComponentPlacedOnlyByItsOwnDocumentsRootIsInTheImage(t *testing.T) {
 	  ],
 	  "dependencies": [{"ref": "self", "dependsOn": ["mod"]}]
 	}`
-	composed, err := compose("openpsirt-image", "1.0", []document{read(t, binary)})
+	composed, err := image(read(t, binary))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,9 +335,119 @@ func TestAComponentPlacedOnlyByItsOwnDocumentsRootIsInTheImage(t *testing.T) {
 // cannot address is refused in words rather than read somewhere else.
 func TestAnInputOutsideTheWorkingDirectoryIsRefusedInWords(t *testing.T) {
 	for _, path := range []string{"/tmp/a.cdx.json", "../a.cdx.json", "parts/../../a.cdx.json"} {
-		err := run("x", "1", t.TempDir()+"/out.json", []string{path})
+		err := run(options{name: "x", version: "1"}, t.TempDir()+"/out.json", []string{path})
 		if err == nil || !strings.Contains(err.Error(), "relative to the working directory") {
 			t.Errorf("%s: answered %v", path, err)
+		}
+	}
+}
+
+// The interface as its lock file describes it: the package itself above what
+// it depends on, with no knowledge of the binary that embeds the bundle.
+const theInterface = `{
+  "bomFormat": "CycloneDX", "specVersion": "1.6",
+  "metadata": {"component": {"bom-ref": "web-dir", "type": "file", "name": "/web"}},
+  "components": [
+    {"bom-ref": "w", "type": "library", "name": "openpsirt-web",
+     "purl": "pkg:npm/openpsirt-web"},
+    {"bom-ref": "r", "type": "library", "name": "react", "version": "19.2.8",
+     "purl": "pkg:npm/react@19.2.8"}
+  ],
+  "dependencies": [{"ref": "w", "dependsOn": ["r"]}]
+}`
+
+// The binary the interface is embedded in, cataloged as a file.
+const theServer = `{
+  "bomFormat": "CycloneDX", "specVersion": "1.6",
+  "metadata": {"component": {"bom-ref": "file", "type": "file", "name": "openpsirt"}},
+  "components": [
+    {"bom-ref": "s", "type": "library", "name": "github.com/nexthop-ai/openpsirt",
+     "purl": "pkg:golang/github.com/nexthop-ai/openpsirt"},
+    {"bom-ref": "n", "type": "library", "name": "golang.org/x/net", "version": "0.4.0",
+     "purl": "pkg:golang/golang.org/x/net@0.4.0"}
+  ],
+  "dependencies": [{"ref": "s", "dependsOn": ["n"]}]
+}`
+
+const server = "pkg:golang/github.com/nexthop-ai/openpsirt"
+
+func TestAPartInsideAComponentHangsBeneathItRatherThanTheImage(t *testing.T) {
+	composed, err := compose(component{Ref: "root", Type: "container", Name: "openpsirt-image"},
+		[]part{{doc: read(t, theServer)}, {doc: read(t, theInterface), within: server}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := kids(t, composed, "root"); !slices.Equal(got, []string{server}) {
+		t.Errorf("the image holds %v directly, want the server alone", got)
+	}
+	if got := kids(t, composed, server); !slices.Contains(got, "pkg:npm/openpsirt-web") {
+		t.Errorf("the server holds %v, and the interface it embeds is not among them", got)
+	}
+	if got := kids(t, composed, "pkg:npm/openpsirt-web"); !slices.Equal(got, []string{"pkg:npm/react@19.2.8"}) {
+		t.Errorf("the interface's own graph came through as %v", got)
+	}
+}
+
+func TestAPartInsideAComponentNothingDescribesIsRefused(t *testing.T) {
+	_, err := compose(component{Ref: "root", Type: "container", Name: "openpsirt-image"},
+		[]part{{doc: read(t, theFilesystem)}, {doc: read(t, theInterface), within: server}})
+	if err == nil || !strings.Contains(err.Error(), "which no input describes") {
+		t.Errorf("composing inside a component nobody described answered %v", err)
+	}
+}
+
+// The binary's inventory keeps the application at its root, with the modules
+// it was linked from and the interface it embeds both directly beneath it.
+func TestARootTakenFromAnInputKeepsWhatThatInputSaysItIs(t *testing.T) {
+	const modules = `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "metadata": {"component": {"bom-ref": "app", "type": "application",
+	    "name": "github.com/nexthop-ai/openpsirt", "version": "v1.2.3",
+	    "purl": "pkg:golang/github.com/nexthop-ai/openpsirt@v1.2.3"}},
+	  "components": [
+	    {"bom-ref": "n", "type": "library", "name": "golang.org/x/net", "version": "0.4.0",
+	     "purl": "pkg:golang/golang.org/x/net@0.4.0"}
+	  ],
+	  "dependencies": [{"ref": "app", "dependsOn": ["n"]}]
+	}`
+	t.Chdir(t.TempDir())
+	for name, body := range map[string]string{"modules.json": modules, "web.json": theInterface} {
+		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := run(options{rootFrom: "modules.json"}, "out.json", []string{"modules.json", "web.json"}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile("out.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	composed := read(t, string(body))
+	root := composed.Metadata.Component
+	if root.Type != "application" || root.Purl != "pkg:golang/github.com/nexthop-ai/openpsirt@v1.2.3" {
+		t.Errorf("the root is a %s at %q, want the application the module inventory named", root.Type, root.Purl)
+	}
+	got := kids(t, &composed, "root")
+	for _, want := range []string{"pkg:golang/golang.org/x/net@0.4.0", "pkg:npm/openpsirt-web"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("the application holds %v, and %s is not among them", got, want)
+		}
+	}
+}
+
+func TestARootOrPlacementNamingNoInputIsRefused(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("web.json", []byte(theInterface), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, opts := range []options{
+		{rootFrom: "modules.json"},
+		{name: "x", within: map[string]string{"modules.json": server}},
+	} {
+		if err := run(opts, "out.json", []string{"web.json"}); err == nil ||
+			!strings.Contains(err.Error(), "not one of the inputs") {
+			t.Errorf("%+v answered %v", opts, err)
 		}
 	}
 }
