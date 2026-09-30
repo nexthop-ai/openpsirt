@@ -1450,10 +1450,23 @@
   font-weight: 600;
 }
 
+/* ---------- the review queue's filters ---------- */
+
+/* One row: each list is as wide as its longest choice. */
+.queuefilters select {
+  width: auto;
+}
+
 /* ---------- settings ---------- */
 
+/* More tabs than one row holds at a narrow width, so they wrap. A scrolling
+   row scrolls both ways: the selected tab's underline sits a pixel below the
+   box, and a box scrolling on one axis clips the other. */
 .settingtabs {
-  overflow-x: auto;
+  flex-wrap: wrap;
+}
+.settingtabs .tab2 {
+  white-space: nowrap;
 }
 .settinggroup {
   border: 1px solid var(--line);

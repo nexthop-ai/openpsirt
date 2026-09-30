@@ -71,7 +71,7 @@ export function QueueFilters({
 
   const on = narrowedBy(params);
   return (
-    <div className="filters" style={{ marginBottom: 10 }}>
+    <div className="filters queuefilters" style={{ marginBottom: 10 }}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -135,8 +135,9 @@ export function QueueFilters({
           value={release}
           onChange={(event) => setRelease(event.target.value)}
           onBlur={() => set("release", release)}
-          placeholder="Release"
-          aria-label="Release, by branch or tag name"
+          placeholder="Branch or tag"
+          aria-label="Branch or tag name"
+          title="Claims covering an open finding in a branch or tag of this name"
           style={{ width: 130 }}
         />
       </form>
