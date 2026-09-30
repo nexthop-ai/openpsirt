@@ -607,7 +607,7 @@ export interface paths {
          * Export the record of judgments
          * @description The audit list as a file: every judgment the same filters would show, not one page of them.
          *
-         *     One row per judgment, with who proposed it, who has a standing agreement on it, and whether a second person does. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
+         *     One row per decision, with the claim it belongs to, who proposed it, who has a standing agreement on it, and whether a second person does. Every decision one act wrote shares a claim, and `GET /v1/audit/claims` lists them grouped by it. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
          *
          *     `agreements` is the whole of the record, with dates: who agreed, when, whether the agreement was carried from an earlier claim, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
          *
@@ -618,6 +618,34 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List judgments by claim
+         * @description The record one claim at a time, newest first: every claim with a decision the filters match, once, however many places it covers.
+         *
+         *     Takes every filter the per-decision record takes, with the same meaning. A claim is listed where any of its decisions match, and every count on it is of the decisions that match and that you may read. Asked for `state=lapsed`, a claim with one lapsed decision of forty reads as one decision, lapsed. `total` counts claims.
+         *
+         *     What the claim is about is named from its earliest matching decision, beside how many issues, products, components and places the matching decisions reach.
+         *
+         *     Each decision on its own is `GET /v1/audit`, and the file is one row per decision with the claim it belongs to.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-audit-claims"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8701,6 +8729,11 @@ export interface components {
         };
         JudgedBody: {
             approvals: components["schemas"]["AgreedBody"][] | null;
+            /**
+             * Format: int64
+             * @description The claim this decision belongs to. Every decision one act wrote shares it
+             */
+            claim_id: number;
             component: string;
             /** @description The consumer that pulls the component in. Absent where the build holds it directly */
             consumer?: string;
@@ -8734,6 +8767,80 @@ export interface components {
             standing: boolean;
             /** @enum {string} */
             state: "proposed" | "approved" | "withdrawn" | "lapsed";
+            /** @description Whether somebody other than the proposer has a standing agreement on it */
+            two_people: boolean;
+            version?: string;
+        };
+        JudgedClaimBody: {
+            approvals: components["schemas"]["AgreedBody"][] | null;
+            /**
+             * Format: int64
+             * @description The claim's identifier
+             */
+            claim: number;
+            /** @description The component the earliest matching decision is about */
+            component: string;
+            /**
+             * Format: int64
+             * @description How many component names sit at the matching places, counted through the findings you may read
+             */
+            components: number;
+            /** @description The consumer that pulls the component in. Absent where the build holds it directly */
+            consumer?: string;
+            /**
+             * Format: int64
+             * @description How many decisions match
+             */
+            decisions: number;
+            deferred_until?: string;
+            /** @description The package version the claim says the fix arrived in */
+            fixed_version?: string;
+            /** @description The vulnerability the earliest matching decision is about, under the name it is filed here */
+            issue: string;
+            /**
+             * Format: int64
+             * @description How many vulnerabilities the matching decisions are about
+             */
+            issues: number;
+            /**
+             * @description The recognized reason it does not apply
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
+            /** @description The mitigation a holder can apply */
+            mitigation?: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            /**
+             * Format: int64
+             * @description How many places the matching decisions are at
+             */
+            places: number;
+            /** @description The product of the earliest matching decision, by the name that addresses it */
+            product: string;
+            /** @description That product's display name, or its name where it has none */
+            product_name?: string;
+            /**
+             * Format: int64
+             * @description How many products the matching decisions are in
+             */
+            products: number;
+            proposed_at: string;
+            proposed_by: string;
+            /** @description The words the claim currently rests on. Editing them withdraws every agreement */
+            reasoning: string;
+            /**
+             * Format: int64
+             * @description How many matching decisions apply now
+             */
+            standing: number;
+            /**
+             * @description The state the matching decisions share, or mixed where they differ
+             * @enum {string}
+             */
+            state: "proposed" | "approved" | "withdrawn" | "lapsed" | "mixed";
+            /** @description How many matching decisions are in each state */
+            states: components["schemas"]["StatesBody"];
             /** @description Whether somebody other than the proposer has a standing agreement on it */
             two_people: boolean;
             version?: string;
@@ -8839,6 +8946,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AttachmentBody"][] | null;
+        };
+        "List-audit-claimsResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-audit-claimsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["JudgedClaimBody"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         "List-auditResponse": {
             /**
@@ -11929,6 +12047,16 @@ export interface components {
              */
             superseded: number;
         };
+        StatesBody: {
+            /** Format: int64 */
+            approved: number;
+            /** Format: int64 */
+            lapsed: number;
+            /** Format: int64 */
+            proposed: number;
+            /** Format: int64 */
+            withdrawn: number;
+        };
         Status: {
             fixed?: string[] | null;
             known_affected?: string[] | null;
@@ -13557,6 +13685,64 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-audit-claims": {
+        parameters: {
+            query?: {
+                /** @description Limit to these products, by name. Repeatable; any of them matches */
+                product?: string[] | null;
+                /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Limit to these states. Repeatable; any of them matches */
+                state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
+                from?: string;
+                /** @description Only judgments proposed before this date, as YYYY-MM-DD */
+                to?: string;
+                /** @description Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing */
+                alone?: boolean;
+                /** @description Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to */
+                in_force?: boolean;
+                /** @description Only judgments this person proposed, by sign-in identity */
+                proposed_by?: string;
+                /** @description Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match */
+                approved_by?: string;
+                /** @description Only judgments about this vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Only judgments about this component, by name */
+                component?: string;
+                /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
+                stream?: string;
+                /** @description The build of that stream. Needs exactly one product and a stream */
+                variant?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-audit-claimsResponse"];
+                };
             };
             /** @description Error */
             default: {

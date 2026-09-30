@@ -273,9 +273,10 @@ func registerAuditExport(api huma.API, in core.Deps) {
 		Summary: "Export the record of judgments",
 		Description: "The audit list as a file: every judgment the same filters would show, " +
 			"not one page of them.\n\n" +
-			"One row per judgment, with who proposed it, who has a standing agreement on " +
-			"it, and whether a second person does. Approvals are joined with `;` in the CSV " +
-			"because a spreadsheet has one cell per column and an auditor reads them as a " +
+			"One row per decision, with the claim it belongs to, who proposed it, who has a " +
+			"standing agreement on it, and whether a second person does. Every decision one " +
+			"act wrote shares a claim, and `GET /v1/audit/claims` lists them grouped by it. " +
+			"Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a " +
 			"list; the JSON keeps them as one field of the same shape.\n\n" +
 			"`agreements` is the whole of the record, with dates: who agreed, when, " +
 			"whether the agreement was carried from an earlier claim, and when it was taken " +
@@ -310,7 +311,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 			What:  "the record of judgments",
 			About: about,
 			Header: []string{
-				"id", "proposed", "product", "product name", "issue", "component", "version",
+				"id", "claim", "proposed", "product", "product name", "issue", "component", "version",
 				"consumer",
 				"outcome", "justification", "deferred until", "fixed version",
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
@@ -351,7 +352,8 @@ func registerAuditExport(api huma.API, in core.Deps) {
 						every = append(every, said)
 					}
 					rows = append(rows, []string{
-						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
+						strconv.FormatInt(body.ID, 10), strconv.FormatInt(body.ClaimID, 10),
+						body.ProposedAt, body.Product,
 						body.ProductName, body.Issue, body.Component, body.Version, body.Consumer,
 						string(body.Outcome), string(body.Justification), body.DeferredUntil,
 						body.FixedVersion, string(body.State),

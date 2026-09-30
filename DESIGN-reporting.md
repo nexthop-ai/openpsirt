@@ -521,9 +521,10 @@ report that exists to find it.
 
 Dismissals are a reportable dataset in their own right. Answered two ways: the
 findings list filters on outcome and on whether a rating was changed, and the
-record screen lists every judgment with its reasoning, its approvals and the
-dates. Which of the five reasons applied is on the row rather than a filter,
-because it is what an auditor reads on the row they stopped at.
+record screen lists every claim with its reasoning, its approvals, the dates
+and how much it covers. Which of the five reasons applied is on the entry
+rather than a filter, because it is what an auditor reads on the entry they
+stopped at.
 
 A dismissal is any of four outcomes, and anything counting or listing them
 asks for all four:
@@ -539,9 +540,21 @@ What they have in common is that nothing was changed, which is why they are the
 four that need a second person. Asked of one, a program that dismisses
 everything as "will not fix" reads as a program that has argued nothing away.
 
-Where a dismissal is listed, the place is named. A judgment covering forty
-places is forty rows in the record, and rows differing only in something the
-screen does not draw read as the same dismissal recorded forty times.
+The record lists one entry per claim. Its file is one row per decision.
+
+| Rule | |
+|---|---|
+| One entry per claim, ordered by its newest matching decision | A judgment covering forty places is one argument by one person. The group is derived when read (REQ-17) |
+| The total counts claims | The heading, the printed sheet and the pages count one thing |
+| A claim is listed where any of its decisions match the filters | Every filter keeps its meaning, the period and the build included |
+| Every count on an entry is of the decisions that match | Asked for what lapsed, a claim with one lapsed decision of forty reads as one decision, lapsed |
+| Every count is of decisions the reader may read, the total included | A count of undisclosed decisions is the disclosure (REQ-42, REQ-43) |
+| What an entry is about is named from its earliest matching decision | Beside how many issues, products, component names and places the matching decisions reach. Component names are counted through the findings the reader may read |
+| An entry's state is one word | The state its matching decisions share, or mixed, with the count in each state beside it |
+| An entry stands where every matching decision applies now | Otherwise it says how many do |
+| An entry links to its places on the findings list | Narrowed to the claim and the states the record asked for, across every release, planned or not. The claim page's own link asks the same |
+| The file is one row per decision, naming the place and the claim | An auditor reconciles a file against places, and the claim column groups the rows in a spreadsheet |
+| The per-decision list stays | The reports overview reads the newest dismissals from it, and an issue's document lists the decisions about that issue |
 
 What is being scanned, and when each build was last seen, is its own view. The
 shape is in `DESIGN-ingest.md`. A product silently dropping out of scanning is

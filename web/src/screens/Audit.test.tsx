@@ -91,7 +91,7 @@ describe("the period on the record", () => {
     });
     mount.render(screen(<Audit />, "/audit?from=2026-01-01&to=2026-03-31"));
     await settle();
-    expect(ends["/v1/audit"]).toBe("2026-04-01");
+    expect(ends["/v1/audit/claims"]).toBe("2026-04-01");
     expect(ends["/v1/administration/changes"]).toBe("2026-04-01");
     const files = Array.from(mount.host().querySelectorAll("a"))
       .map((each) => each.getAttribute("href") ?? "")
@@ -117,5 +117,63 @@ describe("the outcomes the record is filtered by", () => {
       each.outcome === "wont-fix" ? { ...each, dismisses: false } : each,
     );
     expect(new Map(outcomesSaid(classesOf(moved).dismisses)).get("wont-fix")).toBe("will not fix");
+  });
+});
+
+describe("the record's list", () => {
+  it("draws one card per claim and links to where its decisions sit", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+      }
+      if (path === "/v1/audit/claims") {
+        return {
+          data: {
+            total: 1,
+            items: [
+              {
+                claim: 7,
+                issue: "CVE-2026-1",
+                issues: 1,
+                product: "mine",
+                products: 1,
+                component: "openssl",
+                version: "3.0.2",
+                components: 1,
+                decisions: 40,
+                places: 40,
+                outcome: "upgrade-needed",
+                reasoning: "Moving to 3.0.15.",
+                state: "mixed",
+                states: { proposed: 0, approved: 39, withdrawn: 0, lapsed: 1 },
+                standing: 39,
+                proposed_by: "ana",
+                proposed_at: "2026-09-01T00:00:00Z",
+                approvals: [],
+                two_people: false,
+              },
+            ],
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Audit />, "/audit?state=approved&state=lapsed"));
+    await settle();
+    const cards = mount.host().querySelectorAll(".judgment");
+    expect(cards.length).toBe(1);
+    const card = cards.item(0);
+    const text = card.textContent ?? "";
+    expect(text).toContain("40 places");
+    expect(text).toContain("39 agreed · 1 lapsed");
+    const hrefs = Array.from(card.querySelectorAll("a")).map(
+      (each) => each.getAttribute("href") ?? "",
+    );
+    expect(hrefs).toContain("/claims/7");
+    const there = hrefs.find((href) => href.startsWith("/findings?"));
+    expect(there).toBeDefined();
+    const asked = new URLSearchParams(there?.split("?")[1]);
+    expect(asked.get("claim")).toBe("7");
+    expect(asked.getAll("claim_state")).toEqual(["approved", "lapsed"]);
   });
 });

@@ -103,3 +103,82 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 		}
 	})
 }
+
+func TestTheRecordListsOneEntryPerClaimAndTheFileOneRowPerDecision(t *testing.T) {
+	// One act across a fold writes a decision per place. The screen's list is
+	// the act, once, saying how much it covers; the file is every decision,
+	// each carrying the claim it belongs to so a spreadsheet can group them.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		claim := r.AgreedAcrossTheFold(t, "CVE-2026-CURL1", "vulnerable_code_not_present")
+
+		var decisions struct {
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "reviewer", "/v1/audit", &decisions)
+		if decisions.Total < 2 {
+			t.Fatalf("the act wrote %d decisions, want one per place across the fold", decisions.Total)
+		}
+
+		var claims struct {
+			Items []struct {
+				Claim     int64  `json:"claim"`
+				Decisions int    `json:"decisions"`
+				Places    int    `json:"places"`
+				State     string `json:"state"`
+				Standing  int    `json:"standing"`
+				TwoPeople bool   `json:"two_people"`
+				States    struct {
+					Approved int `json:"approved"`
+				} `json:"states"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "reviewer", "/v1/audit/claims", &claims)
+		if claims.Total != 1 || len(claims.Items) != 1 || claims.Items[0].Claim != claim {
+			t.Fatalf("the record by claim lists %+v, want claim %d once", claims, claim)
+		}
+		got := claims.Items[0]
+		if got.Decisions != decisions.Total || got.Places != decisions.Total ||
+			got.States.Approved != decisions.Total || got.Standing != decisions.Total {
+			t.Errorf("the claim reads %+v, want all %d decisions, approved and standing",
+				got, decisions.Total)
+		}
+		if got.State != "approved" || !got.TwoPeople {
+			t.Errorf("an agreed claim reads %q, two people %v", got.State, got.TwoPeople)
+		}
+
+		// Narrowed to a state none of its decisions is in, the claim is absent
+		// and the total says so.
+		var lapsed struct {
+			Items []struct{} `json:"items"`
+			Total int        `json:"total"`
+		}
+		httpapitest.Read(t, r, "reviewer", "/v1/audit/claims?state=lapsed", &lapsed)
+		if lapsed.Total != 0 || len(lapsed.Items) != 0 {
+			t.Errorf("asked for what lapsed, the record lists %d claims", lapsed.Total)
+		}
+
+		file := httpapitest.AsPerson(t, r, "reviewer", http.MethodGet, "/v1/audit.csv", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d", file.Code)
+		}
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := httpapitest.RowsUnder(lines)
+		at := httpapitest.IndexOf(body[0], "claim")
+		if at < 0 {
+			t.Fatalf("the file has no claim column: %v", body[0])
+		}
+		if len(body)-1 != decisions.Total {
+			t.Fatalf("the file holds %d rows, want one per decision: %d", len(body)-1, decisions.Total)
+		}
+		for _, row := range body[1:] {
+			if row[at] != fmt.Sprint(claim) {
+				t.Errorf("a decision of claim %d is filed under claim %q", claim, row[at])
+			}
+		}
+	})
+}

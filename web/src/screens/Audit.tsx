@@ -20,14 +20,14 @@ import { Wide } from "../ui/Wide";
 import { calendarDay, coveringPeriod, endExclusive, stated } from "./reports/Window";
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
-import { decisionAt } from "../app/routes";
+import { allFindingsAt, claimAt } from "../app/routes";
 
 // The share of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
 // than behind a narrower search.
 const PAGE = 100;
 
-type Judged = Body<"JudgedBody">;
+type Judged = Body<"JudgedClaimBody">;
 
 // Nothing ticked is every judgment, so there is no entry for it: "any" is an
 // empty set rather than a value somebody picks.
@@ -135,7 +135,7 @@ export function Audit() {
     queryKey: ["audit", products, outcomes, states, sent.from, sent.to, alone, inForce, offset],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/audit", {
+        await api.GET("/v1/audit/claims", {
           params: {
             query: {
               limit: PAGE,
@@ -283,11 +283,11 @@ export function Audit() {
       <div className="printhead">
         <h1>OpenPSIRT — record of judgments</h1>
         <p>
-          {asked} · {total.toLocaleString()} {total === 1 ? "judgment" : "judgments"} · taken{" "}
+          {asked} · {total.toLocaleString()} {total === 1 ? "claim" : "claims"} · taken{" "}
           {at(new Date().toISOString())}
         </p>
         {/* Which of them this sheet holds. A printed page that says "1,842
-            judgments" over a hundred rows is a page nobody can check against
+            claims" over a hundred rows is a page nobody can check against
             anything, and the number is the one an auditor quotes. */}
         {total > rows.length && (
           <p>
@@ -326,7 +326,7 @@ export function Audit() {
             </p>
           )}
           {rows.map((row) => (
-            <Judgment key={row.id} row={row} />
+            <Judgment key={row.claim} row={row} states={states} />
           ))}
           {/* Printed copies carry the page they are of, because a page of
               judgments that does not say which page it is cannot be checked
@@ -650,23 +650,48 @@ function changesAt(params: URLSearchParams, format: string): string {
   return `/v1/administration/changes.${format}${query ? `?${query}` : ""}`;
 }
 
-function Judgment({ row }: { row: Judged }) {
+// The states a claim's matching decisions are in, as the state filter names
+// them.
+function statesSaid(row: Judged): string {
+  return STATES.map(([state, said]) => [row.states[state], said] as const)
+    .filter(([n]) => n > 0)
+    .map(([n, said]) => `${n.toLocaleString()} ${said}`)
+    .join(" · ");
+}
+
+// Where a claim's decisions sit, as the findings list shows it: every release,
+// planned or not, and only the states the record is narrowed to.
+function placesOf(row: Judged, states: string[]): string {
+  const query = new URLSearchParams([
+    ["claim", String(row.claim)],
+    ["planned", "either"],
+    ["on", "branch"],
+    ["on", "tag"],
+    ["support", "in-support"],
+    ["support", "past-eol"],
+  ]);
+  for (const state of states) query.append("claim_state", state);
+  return allFindingsAt(query);
+}
+
+// One claim: the argument once, with how much of what was asked it covers.
+function Judgment({ row, states }: { row: Judged; states: string[] }) {
   const standing = row.approvals?.filter((a) => !a.withdrawn_at) ?? [];
   const withdrawn = row.approvals?.filter((a) => a.withdrawn_at) ?? [];
+  const stands = row.standing > 0 && row.standing === row.decisions;
 
   return (
     <div className="judgment">
       <header>
-        {/* A row that names a judgment and cannot be opened is one an auditor
-            reads and then hunts for by hand. It prints as its own text, so the
-            paper record is unchanged. */}
-        <Link className="id" to={decisionAt(row.id)}>
+        {/* The claim is where a judgment is read whole. It prints as its own
+            text, so the paper record is unchanged. */}
+        <Link className="id" to={claimAt(row.claim)}>
           {row.issue}
         </Link>
+        {row.issues > 1 && (
+          <span className="hint">+{(row.issues - 1).toLocaleString()} issues</span>
+        )}
         <span className={`claimed ${row.outcome}`}>
-          {/* The word, not the token. The justification beside it has been said
-              in words for a while and this had not caught up, so a record read
-              "upgrade-needed · The vulnerable code never runs". */}
           <b>{labeled(row.outcome)}</b>
           {row.justification && (
             <span className="why">
@@ -674,25 +699,48 @@ function Judgment({ row }: { row: Judged }) {
             </span>
           )}
         </span>
-        <span className={`state ${row.standing ? "agreed" : "open"}`}>
-          {row.standing ? "stands" : row.state}
+        <span className={`state ${stands ? "agreed" : "open"}`}>
+          {stands ? "stands" : row.state}
         </span>
       </header>
 
       <dl className="facts">
         <dt>About</dt>
         <dd>
-          <span className="id">{row.component}</span>{" "}
-          <span className="id" style={{ color: "var(--faint)" }}>
-            {row.version}
-          </span>
-          {row.consumer && (
+          {row.components > 1 ? (
+            <span>{row.components.toLocaleString()} components</span>
+          ) : (
             <>
-              {" "}
-              in <span className="id">{row.consumer}</span>
+              <span className="id">{row.component}</span>{" "}
+              <span className="id" style={{ color: "var(--faint)" }}>
+                {row.version}
+              </span>
+              {row.consumer && row.places === 1 && (
+                <>
+                  {" "}
+                  in <span className="id">{row.consumer}</span>
+                </>
+              )}
             </>
           )}{" "}
-          · {row.product_name || row.product}
+          ·{" "}
+          {row.products > 1
+            ? `${row.products.toLocaleString()} products`
+            : row.product_name || row.product}
+        </dd>
+
+        <dt>Covers</dt>
+        <dd>
+          <span title={`${row.decisions.toLocaleString()} decisions`}>
+            {row.places.toLocaleString()} {row.places === 1 ? "place" : "places"}
+          </span>
+          {row.state === "mixed" && <span className="hint"> · {statesSaid(row)}</span>}
+          {!stands && row.standing > 0 && (
+            <span className="hint"> · {row.standing.toLocaleString()} standing</span>
+          )}{" "}
+          <Link className="linkish noprint" to={placesOf(row, states)}>
+            Findings there now →
+          </Link>
         </dd>
 
         <dt>Proposed</dt>
@@ -709,9 +757,7 @@ function Judgment({ row }: { row: Judged }) {
               <span key={i}>
                 {i > 0 && ", "}
                 <b>{a.by}</b> · {on(a.at)}
-                {/* They read the earlier claim's words, not these. Shown
-                    because a name with no mark beside it says they read
-                    what is on the screen above it. */}
+                {/* They read the earlier claim's words, not these. */}
                 {a.carried && <span className="hint"> (carried forward)</span>}
               </span>
             ))
@@ -769,18 +815,8 @@ function Judgment({ row }: { row: Judged }) {
             <dt>Control named</dt>
             <dd>
               {row.mitigation}
-              {/* Said here rather than left implicit. This is the one claim
-                  nothing here can notice going away. */}
+              {/* This is the one claim nothing here can notice going away. */}
               <span className="hint"> — nothing here notices this being removed</span>
-            </dd>
-          </>
-        )}
-
-        {row.ended_at && (
-          <>
-            <dt>Stopped applying</dt>
-            <dd>
-              {on(row.ended_at)} · {row.state}
             </dd>
           </>
         )}
