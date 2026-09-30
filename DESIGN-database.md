@@ -250,7 +250,7 @@ The chain is one part per release.
 | 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. A database v0.3.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | None | v0.4.0 changes no schema. Its record carries migration 38 as its last |
-| 39 | The untagged release: v0.4.0's schema changed into its own, and the rows moved with it. § The v0.5.0 upgrade says what it does. It is edited until the release tags it |
+| 39 | v0.5.0: v0.4.0's schema changed into v0.5.0's, and the rows moved with it. § The v0.5.0 upgrade says what it does. A database v0.5.0 built has applied it as the release tagged it, so it and every declaration it reads never change again. The next schema change is migration 40 |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -317,7 +317,7 @@ check-engines` fails when either did not run it.
 Each release after v0.1.0 that changes the schema carries one migration that
 changes the schema the release before it built into its own, and moves the rows
 with it: 37 carries a database from v0.1.0 to v0.2.0, 38 from v0.2.0 to v0.3.0,
-and 39 from v0.4.0 to the release after it. v0.4.0 changes no schema and
+and 39 from v0.4.0 to v0.5.0. v0.4.0 changes no schema and
 carries none. A database a release built applies the ones after its own; a
 fresh install walks the whole chain. They are shaped the way every migration after 1.0 will be.
 
