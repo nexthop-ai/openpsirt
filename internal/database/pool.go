@@ -63,6 +63,10 @@ func DefaultPool() Pool {
 	}
 }
 
+// sqliteConnLifetime bounds how long a SQLite connection plans from
+// statistics a refresh has replaced.
+const sqliteConnLifetime = time.Minute
+
 // apply sets the pool on an open database.
 func (p Pool) apply(db *DB, target Target) {
 	db.Pool = p
@@ -76,12 +80,18 @@ func (p Pool) apply(db *DB, target Target) {
 		// An in-memory database is one connection, because every connection
 		// to one opens a database of its own. The timeouts are about a network
 		// path, which a local file does not have.
+		//
+		// A connection lives a minute. It reads the planner's statistics when
+		// it opens and never again, so one open across a refresh plans from
+		// the old ones for as long as it lives. RefreshStatistics closes the
+		// idle ones; this bounds the ones in use at the time.
 		if target.DSN == ":memory:" || strings.HasPrefix(target.DSN, ":memory:?") {
 			db.SetMaxOpenConns(1)
 			return
 		}
 		db.SetMaxOpenConns(p.MaxOpen)
 		db.SetMaxIdleConns(p.MaxIdle)
+		db.SetConnMaxLifetime(sqliteConnLifetime)
 		return
 	}
 	db.SetMaxOpenConns(p.MaxOpen)
