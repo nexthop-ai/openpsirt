@@ -45,6 +45,7 @@ Satisfies REQ-32 and REQ-77.
 | Only the third is a reportable event | It is also the one nothing computes |
 | A feed's exploitation flag is evidence that an issue deserves attention | It is a statement about the world, and says nothing about whether this deployment's product was the thing exploited |
 | The first and the third are kept apart in name as well as in meaning | Both are called exploited, both press for action, and one of them arrives automatically. Reading the first as the third is the failure this area exists to prevent |
+| On screen the third is the filled badge, "Exploited here", and the first the outline, "Known exploited" | The rarer, attested fact is the louder one. `DESIGN-interface.md` § The ordering signals holds the rest |
 | Each is a column of its own on a finding | `DESIGN-findings.md` § Urgency has why the stored order cannot tell them apart |
 
 ## Stored facts

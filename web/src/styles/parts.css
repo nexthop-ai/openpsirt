@@ -333,18 +333,20 @@ a.kpi:hover {
   text-transform: uppercase;
   padding: 1px 6px;
   border-radius: 4px;
-  background: var(--sev-exploited);
-  color: var(--on-exploited);
-  vertical-align: 1px;
-}
-/* The record kept here, which is not the feed's word about the world. Drawn
-   as an outline of the same color so the two read as the same kind of fact at
-   a glance and never as the same fact: a filled badge beside a filled badge is
-   two words a reader has to actually read to tell apart. */
-.kev.here {
   background: transparent;
   color: var(--sev-exploited);
-  box-shadow: inset 0 0 0 1.5px var(--sev-exploited);
+  box-shadow: inset 0 0 0 1px var(--sev-exploited);
+  vertical-align: 1px;
+}
+/* The feed's flag is the outline and the record kept here is the fill. The
+   record is the rarer fact and the one a person attested about this product,
+   so it is the louder badge; the feed's flag lands on many rows at once and
+   says nothing about whether this product was attacked. One color for both,
+   so they read as the same kind of fact, and the fill tells them apart. */
+.kev.here {
+  background: var(--sev-exploited);
+  color: var(--on-exploited);
+  box-shadow: none;
 }
 
 .state {

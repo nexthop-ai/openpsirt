@@ -38,16 +38,18 @@ export function Severity({ word }: { word?: string }) {
   );
 }
 
-// Known-exploited, said outright rather than left to a color. It is a fact
-// about the world rather than a judgment, and it is what decides the order.
+// A feed's word that the issue is exploited somewhere in the world, said
+// outright rather than left to a color. A fact rather than a judgment, and it
+// is what decides the order. The quieter of the two exploitation badges: it
+// arrives on its own on many rows and says nothing about this product.
 export function Exploited({ when }: { when?: boolean }) {
   if (!when) return null;
   return (
     <span
       className="kev"
-      title="Somebody is known to be using this. It sorts above everything else, whatever the severity says"
+      title="A feed lists this as exploited somewhere. Not, on its own, a sign this product was attacked. Sorts above everything else, whatever the severity"
     >
-      Exploited
+      Known exploited
     </span>
   );
 }
@@ -57,13 +59,13 @@ export function Exploited({ when }: { when?: boolean }) {
 // A badge of its own beside the one above, never instead of it. The one above
 // is a feed saying the world is using this; this is a person saying it was
 // used against us, and a reader who takes one for the other has the wrong
-// answer to the only question a regulator asks.
+// answer to the only question a regulator asks. This is the louder badge.
 export function ExploitedHere({ when }: { when?: boolean }) {
   if (!when) return null;
   return (
     <span
       className="kev here"
-      title="Somebody recorded that this product was attacked through this issue. It sorts above everything, including a feed saying the world is exploiting it"
+      title="Somebody recorded that this product was attacked through this issue. Sorts above everything, including a feed listing it as exploited"
     >
       Exploited here
     </span>

@@ -547,7 +547,7 @@ export function Finding() {
             </div>
             <div className="score">
               <span className="n">{it.exploited ? "Yes" : "No"}</span>
-              <span className="l">Exploited</span>
+              <span className="l">Known exploited</span>
             </div>
           </div>
           {/* What kind of flaw this is, all of it. One identifier was shown

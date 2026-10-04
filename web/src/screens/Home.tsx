@@ -166,7 +166,7 @@ export function Home({ who }: { who: Who }) {
             </span>
           </header>
           <Ring point={points[points.length - 1]} />
-          <p className="reading">Exploited is counted with what it is rated.</p>
+          <p className="reading">Known exploited is counted with what it is rated.</p>
         </div>
 
         <Readiness at={at} />
@@ -399,6 +399,13 @@ function Figures({
         }),
       ),
   });
+  // Standing records that a product was attacked through an issue. The shelf
+  // is unpaged and narrowed record by record, so its length is the count, and
+  // the scope is applied here: a record belongs to a product and no build.
+  const shelf = useQuery({
+    queryKey: ["obligations"],
+    queryFn: async () => unwrap(await api.GET("/v1/obligations", {})),
+  });
   // This person's holdings, and what has come back to them: Home answers
   // "what do I do next" as well as "how much is there".
   const assigned = useQuery({
@@ -481,6 +488,9 @@ function Figures({
   // something about: overdue is a report and this is a working list.
   const soon = running.filter((row) => (row.days_left ?? 0) >= 0);
   const soonExploited = soon.filter((row) => row.exploited).length;
+  const attacked = (shelf.data?.items ?? []).filter(
+    (record) => record.standing && (!at.product || record.product === at.product),
+  ).length;
   const allRunning = allLate.data?.items ?? [];
   const allPoints = allOpen.data?.items ?? [];
   // A page in hand that is the whole list. The two tiles below split one
@@ -548,6 +558,22 @@ function Figures({
           <span className="d">distinct issues, not findings</span>
         )}
       </button>
+      {/* A person's record that a product was attacked, as a count of its
+          own beside the feed's. The feed's figure says nothing about this
+          product, so the two are never one number. Drawn only where there is
+          a record, and counted in issues: a record is against an issue and a
+          product. */}
+      {attacked > 0 && (
+        <button type="button" className="kpi urgent" onClick={() => navigate("/obligations")}>
+          <span className="l">
+            <i style={{ background: "var(--sev-exploited)" }} /> Exploited here
+          </span>
+          <span className="n">{attacked.toLocaleString()}</span>
+          <span className="d">
+            {at.stream || at.variant ? `all of ${at.product}` : "recorded attacks"}
+          </span>
+        </button>
+      )}
       {!!at.product && (
         <button
           type="button"
@@ -615,8 +641,8 @@ function Figures({
             cutEverywhere,
           )) || (
           <span className="d">
-            {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
-            deadline
+            {overdueExploited > 0 ? `${overdueExploited} known exploited · ` : ""}undecided, past
+            the deadline
             {cut ? " · at least" : ""}
           </span>
         )}
@@ -641,7 +667,7 @@ function Figures({
             cutEverywhere,
           )) || (
           <span className="d">
-            {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
+            {soonExploited > 0 ? `${soonExploited} known exploited · ` : ""}undecided, due within{" "}
             {SOON_DAYS} days
             {cut ? " · at least" : ""}
           </span>
