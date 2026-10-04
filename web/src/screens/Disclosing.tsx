@@ -182,8 +182,9 @@ export function Disclosing() {
             <option value="90">Within 90 days</option>
           </select>
         </label>
-        {/* The one way a flaw gets a date here, as a shortcut to the form every
-            flaw is reported through. */}
+        {/* A shortcut to the form every flaw is reported through. Reporting a
+            flaw from outside starts a date; the other way is a claim from
+            outside ruled a duplicate, which is made on the report. */}
         {mayRecord && (
           <Link className="btn" to={recordAt(scope.product ?? "", undefined, "outside")}>
             Record a reported flaw
@@ -218,7 +219,7 @@ export function Disclosing() {
       {items.length === 0 ? (
         <Empty
           title="Nothing is approaching a disclosure date."
-          detail="Flaws sent in from outside get a disclosure date and appear here. Flaws found here get none."
+          detail="Flaws sent in from outside get a disclosure date and appear here, as do flaws an outside report duplicates."
         />
       ) : (
         <Wide>
