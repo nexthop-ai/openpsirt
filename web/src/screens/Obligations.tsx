@@ -501,7 +501,9 @@ function WindowForm({
 
 // Record is the screen's way into the act a finding offers: the same request,
 // with the product and the issue asked for rather than read off the finding.
-// The issue is typed, with what the product carries offered as it is typed.
+// The issue is typed, with what the product carries offered as it is typed:
+// every release kind, every state of support and every row under the triage
+// line, because an attack is often on a shipped tag or a release past its end.
 // An identifier the list does not hold is still the server's to decide.
 function Record({
   products,
@@ -520,7 +522,16 @@ function Record({
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/findings", {
-          params: { path: { product }, query: { q: term, limit: 50 } },
+          params: {
+            path: { product },
+            query: {
+              q: term,
+              limit: 50,
+              on: ["branch", "tag"],
+              support: ["in-support", "past-eol"],
+              below_floor: true,
+            },
+          },
         }),
       ),
   });

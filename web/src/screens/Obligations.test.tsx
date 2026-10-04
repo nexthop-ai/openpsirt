@@ -4,7 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Obligations } from "./Obligations";
-import { accept, screen, serve, settle, mounted } from "../test/mount";
+import { accept, screen, serve, settle, mounted, type Sent } from "../test/mount";
 
 const mount = mounted();
 
@@ -68,7 +68,7 @@ const can = (product: string, mayTriage: boolean) => ({
 });
 
 function serving(reach: ReturnType<typeof can>[]) {
-  serve((path) =>
+  return serve((path) =>
     path === "/v1/session/me"
       ? { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach } }
       : { data: { items: [], total: 0 } },
@@ -97,7 +97,7 @@ function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
 
 describe("recording exploited here from its own screen", () => {
   it("sends the request a finding sends, for the product and issue picked", async () => {
-    serving([can("sonic", true), can("other", false)]);
+    const asked = serving([can("sonic", true), can("other", false)]);
     const sent = accept(() => ({ status: 201, data: {} }));
     mount.render(screen(<Obligations />));
     await settle();
@@ -108,6 +108,23 @@ describe("recording exploited here from its own screen", () => {
     expect(Array.from(select?.options ?? []).map((each) => each.value)).toEqual(["", "sonic"]);
     act(() => pick(select!, "sonic"));
     act(() => type(mount.host().querySelector<HTMLInputElement>("input[list]")!, " CVE-2026-1 "));
+    await settle();
+    // An attack is often on a shipped tag or a release past its end, so the
+    // suggestions ask past every default the findings list applies.
+    const suggested = (asked.mock.calls as unknown as Sent[]).find(
+      ([path]) => path === "/v1/products/{product}/findings",
+    );
+    expect(suggested?.[1]).toMatchObject({
+      params: {
+        path: { product: "sonic" },
+        query: {
+          q: "CVE-2026-1",
+          on: ["branch", "tag"],
+          support: ["in-support", "past-eol"],
+          below_floor: true,
+        },
+      },
+    });
     act(() =>
       type(mount.host().querySelector<HTMLTextAreaElement>("#grounds")!, "A customer saw it"),
     );
