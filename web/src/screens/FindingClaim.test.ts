@@ -29,6 +29,13 @@ describe("the state a finding is said to be in", () => {
     );
   });
 
+  it("is pending where its one claim is proposed and waits for a second person", () => {
+    expect(stateOf(claims("proposed"), 1, 1, [])).toEqual({
+      label: "Pending approval",
+      cls: "waiting",
+    });
+  });
+
   it("is in force where a proposed claim needs nobody", () => {
     const affected = [
       { decision: { state: "proposed", outcome: "affected" } },

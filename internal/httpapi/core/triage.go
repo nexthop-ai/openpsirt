@@ -241,6 +241,10 @@ func DecisionBodyOf(d triage.Decision) DecisionBody {
 	// row adds what belongs to it.
 	body := ClaimArgument(*d.Claim, "")
 	body.ID, body.ClaimID, body.State = d.ID, d.ClaimID, ClaimState(d.State)
+	// Whether it waits for a second person is the row's, and every read
+	// carries it. A reader told nothing takes a claim nobody agreed to as in
+	// force.
+	body.NeedsApproval = d.NeedsApproval
 	if d.SentBackAt != nil {
 		body.SentBackAt = d.SentBackAt.UTC().Format(time.RFC3339)
 	}

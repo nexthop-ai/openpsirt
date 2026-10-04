@@ -544,7 +544,6 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 
 		body := core.DecisionBodyOf(*made)
 		body.Reasoning = input.Body.Reasoning
-		body.NeedsApproval = made.NeedsApproval
 		return &struct{ Body core.DecisionBody }{Body: body}, nil
 	})
 }

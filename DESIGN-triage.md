@@ -1484,3 +1484,4 @@ affected.
 | The names in a request are resolved against what was scanned, never taken as given | A caller who could name a place freely would be choosing which decisions apply where, and the versions a decision is keyed on come from the rows for the same reason |
 | An issue is named by any identifier it is known under | Somebody who read a national identifier in an advisory and somebody looking at a report that used a database's own identifier are asking about the same thing |
 | Whether a claim is waiting for a second person is answered when it is made | A short deferral takes effect at once, and somebody who has just written one should be told rather than left watching a queue |
+| Every read of a decision says whether it waits for a second person | A screen reads a proposed claim that says nothing about a wait as in force, which shows a dismissal nobody agreed to as settled (REQ-24) |
