@@ -43,7 +43,7 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 	}
 
 	// The sheet each report slug names, by the address the catalog gives it.
-	sheets := map[string]string{"rubber-stamp": "../../web/src/screens/reports/Scrutiny.tsx"}
+	sheets := map[string]string{"approval-quality": "../../web/src/screens/reports/Scrutiny.tsx"}
 	offers := regexp.MustCompile(`const WINDOWS = \[([0-9, ]+)\]`)
 
 	for _, link := range links {

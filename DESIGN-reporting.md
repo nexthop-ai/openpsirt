@@ -261,7 +261,7 @@ named beside the number (REQ-30).
 ## Holder workload
 
 How much work each person has, and how much of it is past its deadline. Read on
-the assignments screen, and listed in the report catalog from there.
+the assignments screen, which the report catalog lists under the screens it also names.
 
 The figure that matters is not how many findings exist but how many are stuck
 behind somebody: an idle account holding nothing is harmless. The overdue count
@@ -441,7 +441,7 @@ where it can be taken off.
 
 What a build still carries, with what stands about each. The comparison
 already answers it, so this is that screen's third column rather than a page
-of its own, and the catalog carries it with the selection made.
+of its own, and the catalog reaches it through the release comparison entry.
 
 | Rule | Reason |
 |---|---|
@@ -489,7 +489,7 @@ read only after something has already gone wrong. `DESIGN-notifications.md`
 § Reports that must come back empty holds the rest, including why the
 condition carries a count and a link and never these rows.
 
-The rubber-stamp report is not the same shape, despite asking the same
+The approval quality report is not the same shape, despite asking the same
 question in one of its sections. Only what stands with nobody agreeing has to
 be empty. Bulk agreement is the control working at the grain somebody acted at,
 and an approval from a role since withdrawn is correct behavior, so neither
@@ -647,15 +647,30 @@ holds the files that are reachable nowhere else.
 | The frame does not print | The rail, the tab bar, the floating action and the menu go, and the grid that places them is flattened, so a page carries no empty column where the rail was. The narrow-screen shape applies to a screen and not to a sheet of paper narrower than it |
 | What is about to go out of support is asked for, and comes back as its own list | The day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, with nobody having decided anything. A warning and an exposure are two things: one is a date somebody can still act before. Asked for, because a second population appearing unasked changes what every figure on the report counts |
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
-| An entry may point at a screen rather than owning a page | Eleven do: release readiness, upgrade plan status, match coverage, carried patches, holder workload, embargo and disclosure, the exception report, standing corrections, administrative changes, shipping with known issues, and release comparison. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
-| An entry that points at a build's screen asks for a whole build | Six screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing, so it says which picker to touch instead |
+| An entry may point at a screen rather than owning a page | Release comparison, release readiness, match coverage, carried patches, the exception report, standing corrections and administrative changes do. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
+| The catalog is grouped by the question each report answers | The groups are below. A report is looked for by its question, and a flat list of names hides which of them answer the same one |
+| A rail screen that answers a named question is listed apart, under "Also on screens" | Assignments answers holder workload, Disclosing answers what is running out of embargo, and pending upgrades answers what a build is waiting on. Each is a screen somebody already works in, under the name the rail gives it, and listed among the reports it reads as reporting that does not exist |
+| One address is one entry | Two names over one screen read as two reports, and the reader opens both to find the same page. Known issues at release is the comparison's third column, so it is part of the release comparison entry |
+| An entry that points at a build's screen asks for a whole build | Those screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing |
+| An entry that needs a scope says so beside its name, and its name opens the scope picker | "Needs a product" or "Needs a build". Appended to the description it reads as part of it, and a name drawn as plain text reads as a broken link |
+| A report's address follows its name, and an earlier address opens the report under its name now | A link to a report sits in mail and chat messages already sent and in notifications already stored. The window it asked for travels with it, because that window is what makes the page hold what raised an alert |
 | The question with no name is asked on the findings list, not on a panel of the catalog's own | A panel offering the findings list's filter panel and the findings list's query is that screen at a second address, and the copy is the poorer one: it passed an empty tag list, so it offered fewer filters than the screen it copied. The catalog points at the list instead |
 | The catalog offers only the files reachable nowhere else | Two are: what is running out of time, and the VEX document. Every other file is offered on the screen that answers for it and carries that screen's filters, so a second unfiltered link beside it is a worse copy of the same answer |
 
+### Catalog groups
+
+| Group | Entries |
+|---|---|
+| Program | Program overview, backlog over time, deadline compliance, effort by component |
+| Controls | Approval quality, the exception report, standing corrections, administrative changes |
+| Coverage | Scan coverage, match coverage, carried patches |
+| Releases | Release comparison, release readiness, releases out of support |
+| Records | Disposition register, advisories issued |
+| Also on screens | Assignments, Disclosing, pending upgrades |
+
 ### Pages of the catalog's own
 
-Eight, in the order the catalog lists them. Deadline compliance and the
-disposition register have sections above.
+Deadline compliance and the disposition register have sections above.
 
 | Page | What it answers |
 |---|---|
@@ -663,8 +678,8 @@ disposition register have sections above.
 | Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support or taken out of use is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. Each build is in one of five states: out of support, out of use, never scanned, quiet, or scanned. "Being scanned" counts the last of those among the builds in support and in use, on this page and on the front page alike. Gone quiet also counts a build never scanned that has been declared longer than the quiet span, and its tile says so. The front page names the three quietest and the inventories screen answers for one product; this answers for the estate |
 | Releases out of support | The releases whose date has passed, and — asked for — the ones about to, how long ago or how long there is left, and how many issues are still open against each, ordered by what is open. Past end-of-life the deadline is removed from every open finding, so none of that pile is overdue, none is due soon, and none of it reaches a figure built on either. That is correct — no work will land there — and it is what makes asking the only way to see it. A date inherited from the product says so: a release following a date and one that stated the same date are different, and only the first moves when the product changes its mind |
 | Backlog over time | Whether the backlog is growing, and what kind of thing is making it grow: what arrived, what was answered and what stood open at the end of each step, each split by severity. Only the open count was split, and ten arriving against ten answered is a team keeping pace where both are low and a team losing ground where what arrives is critical and what leaves is not — which a line of totals draws as flat. A resolved issue is counted at the severity it held while it was open, because the step it left in no longer has one |
-| Rubber-stamp | How much a second pair of eyes actually did. Its sections are below |
-| The destination of the effort | The subjects of the judgments in a period, most argued first, with what came out of them. It has a section of its own above |
+| Approval quality | How much a second pair of eyes actually did. Its sections are below |
+| Effort by component | The subjects of the judgments in a period, most argued first, with what came out of them. Effort by subject, above, holds the rest |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
 | Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
@@ -692,7 +707,7 @@ Applying now is not the same question as having been approved. A judgment is
 approved and lapses afterwards when the code moves out from under it, so the
 state filter answers what was once agreed to.
 
-### Rubber-stamp
+### Approval quality
 
 It is not a list of people who broke the rule, because the rule cannot be
 broken: approving refuses the proposer, refuses the author of the revision being

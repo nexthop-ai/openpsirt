@@ -133,6 +133,23 @@ export function remember(scope: Scoped) {
   }
 }
 
+// The event that opens the scope picker from somewhere other than its own
+// buttons. The picker is drawn once, in the frame, and holds its own open
+// state; a screen asking somebody to pick a scope opens that picker rather
+// than drawing a second one.
+const PICK = "openpsirt:pick-scope";
+
+// Open the scope picker.
+export function askForScope() {
+  window.dispatchEvent(new Event(PICK));
+}
+
+// Call `open` whenever a screen asks for the scope picker.
+export function onAskForScope(open: () => void): () => void {
+  window.addEventListener(PICK, open);
+  return () => window.removeEventListener(PICK, open);
+}
+
 // The kept selection, checked rather than asserted.
 //
 // The value reaches a URL path segment and a request's query string, and it

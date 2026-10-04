@@ -2305,6 +2305,78 @@ select.triageline {
   gap: 2px;
 }
 
+/* A catalog row's name line, which may carry the tag of what it needs. */
+.catalog-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap);
+}
+
+/* The catalog's groups, two abreast where there is room. A group is short,
+   and one column of them leaves most of a wide screen empty. */
+.catalog-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: 6px 28px;
+  margin-top: 6px;
+}
+.catalog-group h4 {
+  margin: 10px 0 2px;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* The screens the catalog also names, side by side: three short rows stacked
+   read as more reports. Named under the panel, whose own lists are a ruled
+   column. */
+.panel .catalog-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 8px 28px;
+}
+.panel .catalog-strip > li {
+  border-top: 0;
+  border-bottom: 0;
+  padding: 0;
+}
+
+/* The name of an entry waiting on a scope. Drawn as the name it is, with a
+   tag saying what it needs, because a name in plain bold reads as broken. */
+.catalog .pick {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--gap);
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.catalog .pick .name {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.catalog .pick:hover .name {
+  text-decoration-style: solid;
+}
+.catalog .pick .needs {
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: var(--step--1);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.catalog .pick:hover .needs {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* An image attached to a finding, inside rendered text. Bounded so that a
    screenshot somebody took on a large display does not push the reasoning it
    belongs to off the screen. */

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { CATALOG, leadsTo, scopeWords } from "./catalog";
+import { GROUPS, ON_SCREENS, leadsTo, scopeWords } from "./catalog";
 import { PAGES } from "./Report";
 import { matchPath } from "react-router-dom";
 import { ROUTES as NAMED } from "../../app/routes";
@@ -10,6 +10,9 @@ import { ROUTES as NAMED } from "../../app/routes";
 // The router's patterns as a list, because what is asked here is whether an
 // address matches any of them rather than which.
 const ROUTES = Object.values(NAMED);
+
+// Every entry the catalog screen draws, in either of its two lists.
+const CATALOG = [...GROUPS.flatMap((group) => group.reports), ...ON_SCREENS];
 
 describe("the catalog and the addresses that answer it", () => {
   // A name in the list with nothing behind it is a link that goes nowhere,
@@ -24,29 +27,45 @@ describe("the catalog and the addresses that answer it", () => {
       expect(Boolean(report.slug) || Boolean(report.to)).toBe(true);
     }
   });
+
+  // Two names over one screen read as two reports, and somebody opens both to
+  // find the same page.
+  it("lists each address once", () => {
+    const whole = { product: "sonic", stream: "master", variant: "broadcom" };
+    const addresses = CATALOG.map((report) => leadsTo(report, whole).to);
+    expect(addresses.length).toBeGreaterThan(0);
+    expect(new Set(addresses).size).toBe(addresses.length);
+  });
+
+  it("names each entry once", () => {
+    const names = CATALOG.map((report) => report.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
 });
 
 describe("where a catalog row leads", () => {
   it("addresses a report the catalog owns by its name", () => {
     const overview = CATALOG.find((report) => report.slug === "program-overview");
     expect(overview).toBeDefined();
-    expect(leadsTo(overview!, {})).toEqual({ to: "/reports/program-overview", why: null });
+    expect(leadsTo(overview!, {})).toEqual({ to: "/reports/program-overview", needs: null });
   });
 
   it("says what to pick rather than leading nowhere", () => {
     const compare = CATALOG.find((report) => report.name === "Release comparison")!;
-    expect(leadsTo(compare, {}).to).toBeNull();
-    expect(leadsTo(compare, {}).why).toContain("product");
-    expect(leadsTo(compare, { product: "sonic" }).to).toBe("/products/sonic/comparison");
+    expect(leadsTo(compare, {})).toEqual({ to: null, needs: "product" });
+    expect(leadsTo(compare, { product: "sonic" })).toEqual({
+      to: "/products/sonic/comparison",
+      needs: null,
+    });
   });
 
   it("asks for a whole build where the screen it points at needs one", () => {
-    const upgrades = CATALOG.find((report) => report.name === "Upgrade plan status")!;
+    const upgrades = CATALOG.find((report) => report.name === "Pending upgrades")!;
     // A product alone is not enough: the screen exists for one build and no
     // other, so an entry into it on a partial scope would open on a selection
     // that means nothing.
-    expect(leadsTo(upgrades, { product: "sonic" }).to).toBeNull();
-    expect(leadsTo(upgrades, { product: "sonic", stream: "master" }).to).toBeNull();
+    expect(leadsTo(upgrades, { product: "sonic" })).toEqual({ to: null, needs: "build" });
+    expect(leadsTo(upgrades, { product: "sonic", stream: "master" }).needs).toBe("build");
     const whole = { product: "sonic", stream: "master", variant: "broadcom" };
     expect(leadsTo(upgrades, whole).to).toBe(
       "/products/sonic/streams/master/variants/broadcom/pending-upgrades",
@@ -54,7 +73,7 @@ describe("where a catalog row leads", () => {
   });
 
   it("leads somewhere that needs nothing picked", () => {
-    const disclosing = CATALOG.find((report) => report.name === "Embargo and disclosure")!;
+    const disclosing = CATALOG.find((report) => report.name === "Disclosing")!;
     expect(leadsTo(disclosing, {}).to).toBe("/disclosing");
   });
 });
