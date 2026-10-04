@@ -18,6 +18,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Pinned pairs](#pinned-pairs)
 - [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
+- [Known vulnerabilities](#known-vulnerabilities)
 - [Gate inputs](#gate-inputs)
 - [Licenses](#licenses)
 - [The API document](#the-api-document)
@@ -114,9 +115,9 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
-| `make govulncheck` | Known vulnerabilities in dependencies |
+| `make govulncheck` | Known vulnerabilities in Go modules and the toolchain, failing only what the change introduced |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
-| `make web-audit` | Known vulnerabilities in what the interface installs |
+| `make web-audit` | Known vulnerabilities in what the interface installs, failing only what the change introduced |
 | `make secrets` | Credentials in what a commit could carry — tracked files as they stand and untracked files git does not ignore — with a pinned scanner |
 | `make openapi` | Regenerates the API document from the code |
 | `make openapi-current` | The committed API document against what the code generates |
@@ -693,6 +694,34 @@ time, where `go vet` alone would name both.
 The linter must be built with a Go release at least as new as the code, or it
 cannot read the compiler's export data and fails on every file with a message
 about import versions. The pinned version moves when the language version does.
+
+## Known vulnerabilities
+
+`make govulncheck` and `make web-audit` fail a change for a known vulnerability
+it introduces, and report one already on the branch it targets without failing
+it (REQ-75).
+
+| Rule | |
+|---|---|
+| The base is where this branch left the branch it targets | `AUDIT_BASE` names that branch, `origin/main` unless set. CI fetches the whole history so the common commit is there to find |
+| An advisory is present when the base was already affected by it, and introduced otherwise | A bump that fixes one advisory and leaves another introduces nothing, so the automated security update for it stays green |
+| A Go finding is present when the version the base's `go.mod` requires, or its declared toolchain for the standard library, falls in the advisory's affected ranges | `go.mod` names every module a build uses, and each advisory govulncheck reports carries its ranges |
+| An npm advisory is present when npm's audit of the base's lockfile names the same advisory against the same package | npm's range syntax is npm's to read. A package moved to another place in the tree, or bumped to a version still affected, was affected before |
+| Anything the base does not hold is introduced | A new dependency arrives with whatever is known against it |
+| A Go finding gates when a called function reaches it | The same line govulncheck draws on its own |
+| An npm advisory gates at high and above | The same line `npm audit --audit-level=high` draws |
+| A package listed only because something beneath it is affected carries no advisory | npm lists every package on the path to an affected one, and counting those counts one advisory many times |
+| No common commit with the base refuses, in words | Without a base every advisory reads as introduced, or every one as not |
+| A govulncheck run that exits non-zero refuses, with what it printed to standard error | Its JSON mode exits zero whatever it finds, and it prints its configuration before it loads anything, so a failed scan can read as a clean one |
+| An npm run refuses when its output is not a report, with npm's own message where it gave one | npm exits non-zero whenever it finds anything, and without the registry it prints a message in place of a report |
+| On the base branch itself nothing is introduced | The common commit is the commit checked, so a push to `main` reports and does not fail |
+
+An advisory already on the base reaches a fix through the repository's
+dependency alerts and the automated security updates, which open the bump as a
+pull request of its own.
+
+A new call into an affected function of an unchanged module is not introduced
+by this rule. The module was already affected and already reported.
 
 ## Gate inputs
 

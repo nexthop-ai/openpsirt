@@ -306,8 +306,13 @@ lint:
 fmt:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) fmt
 
+# Known vulnerabilities in Go modules and the toolchain. A change fails for one
+# the branch it targets was not already affected by; one it was is reported and
+# does not fail it (REQ-75). AUDIT_BASE names that branch, origin/main unless
+# set. DESIGN-build.md § Known vulnerabilities has the rules.
 govulncheck:
-	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) $(PACKAGES)
+	$(GO) run ./internal/tools/advisories go -- \
+	  $(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -format json $(PACKAGES)
 
 # Both halves of what ships, against one allowlist.
 #
@@ -700,12 +705,15 @@ secrets:
 # The advisory data is the registry's, so this needs a network and says so
 # rather than passing when it cannot reach one.
 #
-# High and above fails. Everything is reported, because "one moderate" and
-# "forty moderates" are different facts and only one of them is worth a look.
+# High and above fails, where the change introduced it: the branch it targets
+# was not already affected, which is asked by auditing that branch's lockfile
+# as well. One it was is reported and does not fail it (REQ-75). Everything is
+# reported, because "one moderate" and "forty moderates" are different facts
+# and only one of them is worth a look.
 web-audit:
 	@command -v $(NPM) >/dev/null 2>&1 \
 	  || { echo "npm not found, so the interface's dependencies are unscanned here"; exit 1; }
-	$(NPM) --prefix web audit --audit-level=high
+	$(GO) run ./internal/tools/advisories npm -- $(NPM) audit --json
 
 # Exported code nothing reaches. The analysis gate only reports unexported
 # symbols, which left ten real defects invisible in one review — a store method
