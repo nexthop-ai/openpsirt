@@ -28,6 +28,9 @@ local.mk
 # behind in somebody's home directory.
 .demo/
 .DS_Store
+# A local tool's working directory. Its worktrees are whole copies of this
+# checkout.
+.claude/worktrees/
 # Docs build
 /site/
 __pycache__/
@@ -39,9 +42,11 @@ __pycache__/
 # checkout, and a pattern matching them would also match a directory somebody
 # means to keep. A command added under internal/tools is added here too.
 /openpsirt
+/advisories
 /attached
 /compose
 /confined
+/dbclean
 /engines
 /gate
 /granted
@@ -49,6 +54,8 @@ __pycache__/
 /negatives
 /provenance
 /readable
+/rehearsal
+/release
 /reserved
 /spdx
 /unclaimed

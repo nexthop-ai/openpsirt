@@ -32,8 +32,10 @@ import (
 // Skipped is the directories no gate reads.
 //
 //   - .git holds the history rather than the tree, and .demo and .vite hold
-//     what a local run wrote. A dot-prefixed directory is not skipped as a
-//     class: .github is the workflows, which are checked.
+//     what a local run wrote. .claude is a local tool's working directory,
+//     whose worktrees are whole copies of this checkout: read, every gate
+//     reports each finding once per copy. A dot-prefixed directory is not
+//     skipped as a class: .github is the workflows, which are checked.
 //   - node_modules is somebody else's code.
 //   - dist, site and bin are output: what is in them was built from what is
 //     checked, so reading them checks the same thing twice and fails on
@@ -42,7 +44,7 @@ import (
 // A fresh slice each time, because callers append their own names to it and a
 // shared backing array would let one caller's extra reach another's walk.
 func Skipped() []string {
-	return []string{".git", ".demo", ".vite", "node_modules", "dist", "site", "bin"}
+	return []string{".git", ".demo", ".vite", ".claude", "node_modules", "dist", "site", "bin"}
 }
 
 // Sources visits every file under the working directory whose name ends in
