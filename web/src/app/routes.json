@@ -141,7 +141,7 @@
   "audit": { "path": "/audit", "query": ["alone", "from", "in_force", "outcome", "product", "to"] },
   "reports": { "path": "/reports" },
   "report": { "path": "/reports/:report", "query": ["days"] },
-  "record": { "path": "/record", "query": ["from", "product"] },
+  "record": { "path": "/record", "query": ["from", "product", "source"] },
   "disclosing": { "path": "/disclosing" },
   "obligations": { "path": "/obligations", "query": ["product"] },
   "advisories": { "path": "/advisories" },

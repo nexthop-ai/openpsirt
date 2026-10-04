@@ -92,8 +92,11 @@ export function Record() {
   const [received, setReceived] = useState("");
   // Where it came from. No default: a report from outside carries a
   // disclosure date and one found here does not, and a preselected answer is
-  // a choice nobody made.
-  const [origin, setOrigin] = useState<"" | "here" | "outside">("");
+  // a choice nobody made. A link naming the source is that choice, made by
+  // whoever followed a shortcut labelled with it.
+  const [origin, setOrigin] = useState<"" | "here" | "outside">(
+    params.get("source") === "outside" ? "outside" : "",
+  );
   // Whether to record it as a flaw now rather than file it for judging. The
   // button somebody pressed, and nothing until they press one.
   const [now, setNow] = useState<boolean | null>(null);

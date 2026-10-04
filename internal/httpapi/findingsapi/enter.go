@@ -23,25 +23,31 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// EmbargoedBody is one finding nobody has announced, and when that ends.
+// EmbargoedBody is one issue nobody has announced in one product, and when
+// that ends.
 type EmbargoedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Summary       string `json:"summary,omitempty"`
-	Component     string `json:"component"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Stream      string `json:"stream"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Severity    string `json:"severity,omitempty"`
-	DiscloseAt  string `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
+	ProductName string               `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	Components  []string             `json:"components" doc:"The components carrying the issue in the builds listed, by name"`
+	Builds      []EmbargoedBuildBody `json:"builds" doc:"The builds carrying the issue, within the scope asked for"`
+	Severity    string               `json:"severity,omitempty"`
+	DiscloseAt  string               `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
 	// Passed says the date has arrived. It is a date to answer rather than a
 	// trigger, so this is a row somebody has to act on rather than a record of
 	// something that happened.
 	Passed bool `json:"passed" doc:"Whether the date has already arrived"`
-	Places int  `json:"places" doc:"The number of findings this covers"`
+	Places int  `json:"places" doc:"The number of findings this covers, across every build listed"`
+}
+
+// EmbargoedBuildBody is one build an embargoed issue sits in.
+type EmbargoedBuildBody struct {
+	Stream      string `json:"stream"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant     string `json:"variant"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 }
 
 // EnteredBody is the record of a flaw entered.
@@ -313,14 +319,17 @@ func registerDisclosure(api huma.API, in core.Deps) {
 		OperationID: "list-approaching-disclosure", Method: http.MethodGet,
 		Path:    "/v1/disclosing",
 		Summary: "List what is approaching disclosure",
-		Description: "Returns findings nobody has announced whose embargo is running out, " +
-			"soonest first, and the ones whose date has already arrived.\n\n" +
+		Description: "Returns issues nobody has announced whose embargo is running out, " +
+			"soonest first, and the ones whose date has already arrived. One item is one " +
+			"issue in one product, the unit an embargo is moved and disclosed in, with the " +
+			"builds and components carrying it and the findings counted across them.\n\n" +
 			"Nothing here discloses anything. Reaching the date escalates: the row appears " +
 			"and the people who can act on it are told.\n\n" +
 			"A product you may not read undisclosed work in contributes nothing to it, not " +
 			"even a count.\n\n" +
 			"`within` is how many days ahead to look. Left off, it is this deployment's own " +
-			"embargo length.",
+			"embargo length. `product`, `stream` and `variant` narrow it to a scope, and " +
+			"the builds an item lists are the ones inside that scope.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "A product you may not read undisclosed work in contributes "+
 		"nothing, not even a count.", core.PrivateRights()...), func(ctx context.Context, input *struct {
@@ -368,14 +377,22 @@ func registerDisclosure(api huma.API, in core.Deps) {
 		out.Body.Total = total
 		out.Body.Items = make([]EmbargoedBody, 0, len(rows))
 		for _, row := range rows {
+			builds := make([]EmbargoedBuildBody, 0, len(row.Builds))
+			for _, b := range row.Builds {
+				builds = append(builds, EmbargoedBuildBody{
+					Stream: b.Stream, StreamName: b.StreamName,
+					Variant: b.Variant, VariantName: b.VariantName,
+				})
+			}
+			components := row.Components
+			if components == nil {
+				components = []string{}
+			}
 			out.Body.Items = append(out.Body.Items, EmbargoedBody{
 				Vulnerability: row.Vulnerability, Summary: row.Summary,
-				Component: row.Component, Product: row.Product,
-				ProductName: row.ProductName,
-				Stream:      row.Stream, Variant: row.Variant, Severity: row.Severity,
-				StreamName:  row.StreamName,
-				VariantName: row.VariantName,
-				DiscloseAt:  core.Stamp(row.DiscloseAt), Passed: row.Passed(now),
+				Product: row.Product, ProductName: row.ProductName,
+				Components: components, Builds: builds, Severity: row.Severity,
+				DiscloseAt: core.Stamp(row.DiscloseAt), Passed: row.Passed(now),
 				Places: row.Places,
 			})
 		}
