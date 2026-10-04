@@ -912,7 +912,7 @@ same program on a host of your own. The interface is built into it.</p>
 scanner, a database, a configuration file, and a reverse proxy for TLS.</p>
 <h2 id="the-release-archive">The release archive<a class="headerlink" href="#the-release-archive" title="Permanent link">&para;</a></h2>
 <p>Download three files from the release page,
-<code>https://github.com/nexthop-ai/openpsirt/releases/tag/v0.4.0</code>:</p>
+<code>https://github.com/nexthop-ai/openpsirt/releases/tag/v0.5.0</code>:</p>
 <table>
 <thead>
 <tr>
@@ -922,7 +922,7 @@ scanner, a database, a configuration file, and a reverse proxy for TLS.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>openpsirt_0.4.0_linux_amd64.tar.gz</code>, or <code>_arm64</code></td>
+<td><code>openpsirt_0.5.0_linux_amd64.tar.gz</code>, or <code>_arm64</code></td>
 <td>The binary, with <code>LICENSE</code>, <code>NOTICE</code> and <code>README.md</code></td>
 </tr>
 <tr>
@@ -939,11 +939,11 @@ scanner, a database, a configuration file, and a reverse proxy for TLS.</p>
 <pre><code>cosign verify-blob \
   --bundle SHA256SUMS.cosign.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity https://github.com/nexthop-ai/openpsirt/.github/workflows/release.yml@refs/tags/v0.4.0 \
+  --certificate-identity https://github.com/nexthop-ai/openpsirt/.github/workflows/release.yml@refs/tags/v0.5.0 \
   SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
-tar -xzf openpsirt_0.4.0_linux_amd64.tar.gz
-sudo install -m 0755 openpsirt_0.4.0_linux_amd64/openpsirt /usr/local/bin/openpsirt
+tar -xzf openpsirt_0.5.0_linux_amd64.tar.gz
+sudo install -m 0755 openpsirt_0.5.0_linux_amd64/openpsirt /usr/local/bin/openpsirt
 openpsirt -version
 </code></pre>
 <p>The signature says the file came from this repository's release workflow at
