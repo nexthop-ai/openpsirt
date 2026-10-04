@@ -23,6 +23,7 @@ func mappers(err error) map[string]error {
 	in := core.Deps{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	return map[string]error{
 		"refusedWindow": refusedWindow(in, err),
+		"refusedFix":    refusedFix(in, err),
 	}
 }
 

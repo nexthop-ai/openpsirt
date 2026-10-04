@@ -15,6 +15,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
@@ -26,6 +27,7 @@ type seeded struct {
 	rule   string
 	record string
 	window string
+	fix    string
 }
 
 // fill puts what has been seeded into a path, a body or an expected name.
@@ -33,6 +35,7 @@ func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{issue}", s.issue)
 	text = strings.ReplaceAll(text, "{record}", s.record)
 	text = strings.ReplaceAll(text, "{window}", s.window)
+	text = strings.ReplaceAll(text, "{fix}", s.fix)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
 
@@ -449,6 +452,42 @@ var administrativeActs = []trailedAct{
 			}
 			seen.record = strconv.FormatInt(kept.ID, 10)
 		},
+	},
+	{
+		// Naming the tag that carries the fix decides when a window counting
+		// from the fix starts, which is the layer the record sits in.
+		id: "name-fix-release", what: "a tag carrying the fix",
+		who: "private-triage", method: http.MethodPost,
+		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
+		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
+			t.Helper()
+			names := catalog.NewStore(r.DB.DB)
+			product, err := names.ProductByName(t.Context(), "mine")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := names.DeclareStream(t.Context(), product.ID, "v9.0.1", catalog.Tag, nil); err != nil {
+				t.Fatal(err)
+			}
+			return httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+				seen.fill("/v1/exploited-here/{record}/fixes"), `{"release":"v9.0.1"}`)
+		},
+		keep: func(t *testing.T, seen *seeded, answered []byte) {
+			t.Helper()
+			var named struct {
+				ID int64 `json:"id"`
+			}
+			if err := json.Unmarshal(answered, &named); err != nil {
+				t.Fatal(err)
+			}
+			seen.fix = strconv.FormatInt(named.ID, 10)
+		},
+	},
+	{
+		id: "withdraw-fix-release", what: "a tag carrying the fix withdrawn",
+		who: "private-triage", method: http.MethodDelete,
+		path: "/v1/exploited-here/{record}/fixes/{fix}",
+		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
 	},
 	{
 		id: "clear-exploited-here", what: "a record of being exploited cleared",

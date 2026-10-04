@@ -60,6 +60,30 @@ export function at(moment: string | null | undefined): string {
   return `${then.toISOString().slice(0, 10)} ${then.toISOString().slice(11, 16)} UTC`;
 }
 
+// The minute a datetime-local input holds is read and written in UTC.
+//
+// The input carries no zone of its own, and every moment on screen is drawn in
+// UTC, so the input is too: the minute typed is the minute the record shows
+// afterwards. The label beside it says UTC, because the control alone reads
+// as the reader's local time.
+const TYPED = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$/;
+
+// typedNow is this minute as the input takes it, in UTC: most moments are
+// recorded as they happen, so now is a default somebody corrects rather than
+// a blank they guess at.
+export function typedNow(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 16);
+}
+
+// typedMoment is the minute an input holds, as a stored moment in UTC, or
+// nothing where the input holds no minute.
+export function typedMoment(typed: string): string {
+  const minute = TYPED.exec(typed)?.[1];
+  if (!minute) return "";
+  const then = new Date(`${minute}:00Z`);
+  return Number.isNaN(then.getTime()) ? "" : then.toISOString();
+}
+
 // since is the relative form: how long ago, in the coarsest unit that still
 // says something.
 //

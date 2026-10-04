@@ -280,10 +280,15 @@ says what turns each on.
 - That record outranks every feed in the queue, refuses a claim that the issue
   does not apply, and sends a standing claim of that kind back for review
 - An administrator declares the windows an attack may oblige a notice within,
-  in hours from when it became known. A window covers every product or the
-  ones it names
+  in hours from when it became known, from the first notice for another
+  window, or from the release date of a tag named as carrying the fix. A
+  window covers every product or the ones it names
 - Notices given to somebody outside are recorded, append-only, against the
-  window they answer
+  window they answer, with the recipient's reference, the places named and
+  what was said about malice where the notice carried them
+- The tags carrying the fix are named on the record, each showing whether its
+  latest scans still hold the issue open
+- Moments are typed in UTC, the zone every moment is shown in
 - The Exploited here screen lists every standing record, and records one for
   a product and issue picked there. An alert is raised as each window opens,
   at the warning a window declares, and as it passes

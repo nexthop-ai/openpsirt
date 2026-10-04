@@ -22,6 +22,7 @@ func Register(api huma.API, in core.Deps) {
 	registerAssessment(api, in)
 	registerExploitedHere(api, in)
 	registerObligations(api, in)
+	registerFixes(api, in)
 	registerTriageReading(api, in)
 	registerComments(api, in)
 	registerClaims(api, in)

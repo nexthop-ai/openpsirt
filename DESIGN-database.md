@@ -250,7 +250,8 @@ The chain is one part per release.
 | 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. A database v0.3.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | None | v0.4.0 changes no schema. Its record carries migration 38 as its last |
-| 39 | v0.5.0: v0.4.0's schema changed into v0.5.0's, and the rows moved with it. § The v0.5.0 upgrade says what it does. A database v0.5.0 built has applied it as the release tagged it, so it and every declaration it reads never change again. The next schema change is migration 40 |
+| 39 | v0.5.0: v0.4.0's schema changed into v0.5.0's, and the rows moved with it. § The v0.5.0 upgrade says what it does. A database v0.5.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| 40 | The untagged release: v0.5.0's schema changed into the next release's. § The untagged upgrade says what it does. Edited until a tag ships it, and every schema change before that tag edits it rather than adding a migration beside it |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -271,7 +272,7 @@ migration that upgrades a database the last 0.x release built. A database an
 earlier 0.x release built is upgraded to that release first.
 
 Migrations 1 to 36 each create something, which is why rolling one back is
-dropping what it made. Migrations 37, 38 and 39 change existing tables, and
+dropping what it made. Migrations 37 to 40 change existing tables, and
 rolling one back changes the tables back.
 
 A migration is its statements and nothing else. What every one of them does
@@ -545,6 +546,25 @@ of what a check costs, so the checks share the build.
 | A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing, and none states a version. Rolled back, the table is described as v0.4.0 built it and the producer's spelling remains |
 | A v0.4.0 database with an undated flaw and a dated one under duplicate rulings — one covering a claim found here beside one from outside, one withdrawn, one bringing the date in within the threshold and one past it — and an exploited issue | Upgraded, the undated flaw is dated by the first and moved by the one within the threshold, the one past it waits, each is a movement naming its ruling and proposer, the dated flaw keeps its date, and the issue is listed on no day. Rolled back, the movements go, the date stays and the listing day's column is gone. Upgraded again, the same movements are recorded and the date is the same |
 | A v0.4.0 claim | Upgraded, it records no build it was made on. Rolled back, the table goes and the claim remains. Upgraded again, it still records none |
+
+### The untagged upgrade
+
+Migration 40. A window gains the window it counts from, a column that holds a
+null, with a reference to the window table, and whether it counts from the
+release of the fix, a column every existing window fills as false; SQLite
+rebuilds the table from the release's declaration. A notice gains the reference
+its recipient gave it and what it said about malice, two columns that hold a
+null and that every engine adds where the table stands. The places a notice
+named and the releases a record names as carrying its fix are new tables.
+
+Rolled back, the places and the fix releases go with their tables, and the
+reference and what a notice said about malice go with their columns. A window
+counting from another window's notice or from the fix counts from the moment
+the attack became known again, which is the only start v0.5.0 has.
+
+| Check, on each of the four engines | What it holds |
+|---|---|
+| A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built. Rolled back with a window counting from it, a window counting from the fix, a place on the notice and a fix release on the record, the windows and the notice remain and the new columns and tables are gone |
 
 ### Release records
 

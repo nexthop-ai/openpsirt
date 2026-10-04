@@ -1,8 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, it } from "vitest";
-import { at, lasted, on, since } from "./when";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { at, lasted, on, since, typedMoment, typedNow } from "./when";
 
 // Two forms and no others. A stored string shown with its time and offset is
 // the tool displaying its storage rather than answering the question.
@@ -109,5 +109,37 @@ describe("how long something took", () => {
     // A run that finished before it started is a clock nobody should be told
     // a duration from.
     expect(lasted("2026-03-01T01:00:00Z", "2026-03-01T00:00:00Z")).toBe("");
+  });
+});
+
+// A typed minute and the moment the record shows afterwards are the same
+// minute, because both are UTC.
+describe("how a typed minute is read", () => {
+  // A zone seven hours behind UTC, so a minute read as local time lands on a
+  // different minute from the one typed. Under UTC the two readings agree and
+  // nothing here could fail.
+  beforeAll(() => {
+    vi.stubEnv("TZ", "America/Los_Angeles");
+  });
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("reads the minute typed as UTC, whatever zone the reader is in", () => {
+    expect(new Date("2026-10-03T22:00").getTimezoneOffset()).not.toBe(0);
+    expect(typedMoment("2026-10-03T22:00")).toBe("2026-10-03T22:00:00.000Z");
+    expect(at(typedMoment("2026-10-03T22:00"))).toBe("2026-10-03 22:00 UTC");
+    // A browser that offers seconds hands them over, and the minute is kept.
+    expect(typedMoment("2026-10-03T22:00:30")).toBe("2026-10-03T22:00:00.000Z");
+  });
+
+  it("offers now as the minute it is in UTC", () => {
+    expect(typedNow(new Date("2026-10-04T02:45:59Z"))).toBe("2026-10-04T02:45");
+  });
+
+  it("reads nothing from an input holding no minute", () => {
+    expect(typedMoment("")).toBe("");
+    expect(typedMoment("2026-10-03")).toBe("");
+    expect(typedMoment("2026-13-40T99:99")).toBe("");
   });
 });

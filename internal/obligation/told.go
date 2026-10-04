@@ -6,6 +6,7 @@ package obligation
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -49,7 +50,53 @@ type Told struct {
 	Said       string    `bun:"said,notnull"`
 	RecordedBy int64     `bun:"recorded_by,notnull"`
 	RecordedAt time.Time `bun:"recorded_at,notnull"`
+	// Reference is what the recipient called the notice, where they gave it
+	// a reference: a case number, a submission identifier.
+	Reference *string `bun:"reference"`
+	// Malicious is what the notice said about whether the attack was
+	// malicious, one of the Malice words, or nil where it said nothing.
+	Malicious *string `bun:"suspected_malicious"`
+	// Places is the places the notice named, in the order they were given.
+	Places []string `bun:"-"`
 }
+
+// ToldPlace is one place a notice named.
+type ToldPlace struct {
+	bun.BaseModel `bun:"table:told_place,alias:tpl"`
+
+	ToldID   int64  `bun:"told_id,pk"`
+	Position int    `bun:"position,pk"`
+	Place    string `bun:"place,notnull"`
+}
+
+// Details is what a notice may say beyond who, when and what. Each is
+// optional, and each is the statement of whoever recorded the notice.
+type Details struct {
+	// Reference is what the recipient called the notice.
+	Reference string
+	// Places is the places the notice named.
+	Places []string
+	// Malicious is one of the Malice words, or empty where the notice said
+	// nothing about malice.
+	Malicious string
+}
+
+// What a notice may say about whether an attack was malicious. Unknown is a
+// statement of its own: a notice saying malice is not known says something a
+// notice silent on it does not.
+const (
+	MaliciousYes     = "yes"
+	MaliciousNo      = "no"
+	MaliciousUnknown = "unknown"
+)
+
+// Malice is every word a notice may say about malice, in the order a form
+// offers them.
+var Malice = []string{MaliciousYes, MaliciousNo, MaliciousUnknown}
+
+// PlacesLimit is how many places one notice may name: every country in the
+// world, with room to spare, and a bound on what one request writes.
+const PlacesLimit = 250
 
 // RecipientLimit is how long a recipient's name may be, in characters: a name
 // rather than an address book.
@@ -67,7 +114,8 @@ var ErrNoSuchRecord = refusal.New("no record of being exploited is kept there")
 // record since cleared, because a notice given before the clearing is still a
 // thing that happened.
 func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID int64,
-	windowID *int64, recipient string, toldAt time.Time, said string) (*Told, error) {
+	windowID *int64, recipient string, toldAt time.Time, said string,
+	details Details) (*Told, error) {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, refusal.New("a notice is recorded against whoever recorded it")
@@ -93,12 +141,16 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 	if toldAt.IsZero() {
 		return nil, refusal.New("say when they were told")
 	}
+	reference, malicious, places, err := detailsSaid(details)
+	if err != nil {
+		return nil, err
+	}
 	if toldAt.After(s.now()) {
 		return nil, refusal.New("say when they were told. A moment still to come is not one anybody was told at")
 	}
 
 	told := new(Told)
-	err := s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
+	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
 		*told = Told{}
 		record := new(triage.ExploitedHere)
 		if err := tx.NewSelect().Model(record).Where("eh.id = ?", recordID).
@@ -146,9 +198,20 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 			Recipient: recipient, ToldAt: toldAt.UTC().Truncate(time.Microsecond),
 			Said: said, RecordedBy: subject.ID,
 			RecordedAt: s.now().Truncate(time.Microsecond),
+			Reference:  reference, Malicious: malicious, Places: places,
 		}
 		if _, err := tx.NewInsert().Model(told).Exec(ctx); err != nil {
 			return fmt.Errorf("record that somebody outside was told: %w", err)
+		}
+		if len(places) == 0 {
+			return nil
+		}
+		rows := make([]ToldPlace, 0, len(places))
+		for i, place := range places {
+			rows = append(rows, ToldPlace{ToldID: told.ID, Position: i, Place: place})
+		}
+		if _, err := tx.NewInsert().Model(&rows).Exec(ctx); err != nil {
+			return fmt.Errorf("record the places a notice named: %w", err)
 		}
 		return nil
 	})
@@ -156,6 +219,48 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 		return nil, err
 	}
 	return told, nil
+}
+
+// detailsSaid checks what a notice says beyond who, when and what, before any
+// of it is stored.
+//
+// A place named twice, in any capitals, is kept once, as it was first typed.
+// A blank place is refused rather than dropped: it is a slip in what was
+// typed, and the rest of the list may be wrong with it.
+func detailsSaid(details Details) (reference, malicious *string, places []string, err error) {
+	if typed := strings.TrimSpace(details.Reference); typed != "" {
+		if utf8.RuneCountInString(typed) > database.NameWidth {
+			return nil, nil, nil, refusal.Errorf("a reference is at most %d characters", database.NameWidth)
+		}
+		reference = &typed
+	}
+	if details.Malicious != "" {
+		if !slices.Contains(Malice, details.Malicious) {
+			return nil, nil, nil, refusal.Errorf("say whether it was malicious as one of %s, or leave it out",
+				strings.Join(Malice, ", "))
+		}
+		said := details.Malicious
+		malicious = &said
+	}
+	if len(details.Places) > PlacesLimit {
+		return nil, nil, nil, refusal.Errorf("a notice names at most %d places", PlacesLimit)
+	}
+	seen := map[string]bool{}
+	for _, typed := range details.Places {
+		place := strings.TrimSpace(typed)
+		if place == "" {
+			return nil, nil, nil, refusal.New("a place named is not blank")
+		}
+		if utf8.RuneCountInString(place) > database.NameWidth {
+			return nil, nil, nil, refusal.Errorf("a place's name is at most %d characters", database.NameWidth)
+		}
+		if seen[strings.ToLower(place)] {
+			continue
+		}
+		seen[strings.ToLower(place)] = true
+		places = append(places, place)
+	}
+	return reference, malicious, places, nil
 }
 
 // ToldAbout is every notice recorded about these records that this subject
@@ -198,10 +303,39 @@ func (s *Store) ToldAbout(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, fmt.Errorf("read who outside was told: %w", err)
 	}
+	if err := withPlaces(ctx, s.db, rows); err != nil {
+		return nil, err
+	}
 	for _, row := range rows {
 		out[row.ExploitedHereID] = append(out[row.ExploitedHereID], row)
 	}
 	return out, nil
+}
+
+// withPlaces fills in the places each notice named, which the notice row
+// itself does not carry.
+func withPlaces(ctx context.Context, db bun.IDB, told []Told) error {
+	if len(told) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(told))
+	at := make(map[int64]int, len(told))
+	for i, one := range told {
+		ids = append(ids, one.ID)
+		at[one.ID] = i
+	}
+	var places []ToldPlace
+	if err := db.NewSelect().Model(&places).
+		Where("tpl.told_id IN (?)", bun.List(ids)).
+		Order("tpl.told_id ASC", "tpl.position ASC").
+		Scan(ctx); err != nil {
+		return fmt.Errorf("read the places notices named: %w", err)
+	}
+	for _, place := range places {
+		one := &told[at[place.ToldID]]
+		one.Places = append(one.Places, place.Place)
+	}
+	return nil
 }
 
 // WindowsNamed is the name of every window these notices point at that this
