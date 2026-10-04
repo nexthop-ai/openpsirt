@@ -56,6 +56,7 @@ asks, which is why they are stored rather than worked out again.
 | | |
 |---|---|
 | That this product was exploited through an issue, here | Person-recorded, append-only, on any finding regardless of kind. An inherited flaw used against our product is the case, and it needs no flaw of our own |
+| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one place across every variant (`DESIGN-findings.md` § Recorded flaws), so the record needs no kind of its own |
 | The moment it became known | What a window counts from, directly or through the notices given after it. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
