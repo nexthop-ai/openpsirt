@@ -547,6 +547,8 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
       <header className="dhead">
         <h3>Rows that do not match the rest</h3>
         <span className="hint">
+          {(claim.outliers?.exploited_here ?? 0) > 0 &&
+            `${claim.outliers?.exploited_here} exploited here · `}
           {claim.outliers?.exploited ?? 0} known exploited · {claim.outliers?.severe ?? 0} severe ·{" "}
           {claim.outliers?.fixable ?? 0} fixable · {claim.outliers?.unmatched ?? 0} off the term
         </span>

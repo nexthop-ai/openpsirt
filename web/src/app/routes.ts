@@ -213,6 +213,10 @@ export const reviewQueueAt = (
 export const recordAt = (product: string, from?: string) =>
   at("record", {}, { product, from: from || undefined });
 
+// The shelf of standing attacks, narrowed to one product where one is named.
+export const obligationsAt = (product?: string) =>
+  at("obligations", {}, { product: product || undefined });
+
 // The record of judgments, asked a question.
 export const auditAt = (query?: Query) => at("audit", {}, query);
 

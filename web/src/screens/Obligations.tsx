@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
@@ -12,7 +12,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { at, since } from "../ui/when";
-import { issueAt } from "../app/routes";
+import { issueAt, obligationsAt } from "../app/routes";
 
 // Every standing attack on a product, with the windows this deployment counts
 // from the moment each became known and the notices given.
@@ -26,6 +26,12 @@ type Window = Body<"WindowBody">;
 
 export function Obligations() {
   const who = useWho();
+  // A product in the address narrows the shelf to that product's records, so a
+  // count taken over one product opens the records it counted. The shelf is
+  // unpaged and already narrowed to what the reader may see, so this is a
+  // filter over what came back.
+  const [params] = useSearchParams();
+  const product = params.get("product") ?? "";
   const shelf = useQuery({
     queryKey: ["obligations"],
     queryFn: async () => unwrap(await api.GET("/v1/obligations", {})),
@@ -39,7 +45,10 @@ export function Obligations() {
   if (shelf.isError) {
     return <Failed error={shelf.error} what="The standing attacks could not be read." />;
   }
-  const items = shelf.data?.items ?? [];
+  const items = (shelf.data?.items ?? []).filter(
+    (incident) => !product || incident.product === product,
+  );
+  const productName = items[0]?.product_name || product;
   const inForce = windows.data?.items ?? [];
   // A failed read of the windows is not a deployment with none declared, and
   // a notice for a window nobody could read is not one for a retired window.
@@ -52,7 +61,13 @@ export function Obligations() {
           Standing attacks <span className="n">{items.length.toLocaleString()}</span>
         </h2>
         <p>
-          Products attacked through an issue, and the windows counted from when each became known.
+          {product ? (
+            <>
+              Attacks on {productName} · <Link to={obligationsAt()}>every product</Link>
+            </>
+          ) : (
+            "Products attacked through an issue, and the windows counted from when each became known."
+          )}
         </p>
       </div>
 
@@ -64,7 +79,11 @@ export function Obligations() {
 
       {items.length === 0 ? (
         <Empty
-          title="No product records being exploited."
+          title={
+            product
+              ? `No records of ${productName} being exploited.`
+              : "No product records being exploited."
+          }
           detail="A record kept on a finding appears here until somebody clears it."
         />
       ) : (

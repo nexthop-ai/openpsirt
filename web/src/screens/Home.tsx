@@ -22,6 +22,7 @@ import {
   allFindingsAt,
   comparisonAt,
   inventoriesAt,
+  obligationsAt,
   productFindingsAt,
   reviewQueueAt,
 } from "../app/routes";
@@ -561,10 +562,14 @@ function Figures({
       {/* A person's record that a product was attacked, as a count of its
           own beside the feed's. The feed's figure says nothing about this
           product, so the two are never one number. Drawn only where there is
-          a record, and counted in issues: a record is against an issue and a
-          product. */}
+          a record, and counted in records: one is against an issue and a
+          product. It opens the shelf narrowed to the product it counted. */}
       {attacked > 0 && (
-        <button type="button" className="kpi urgent" onClick={() => navigate("/obligations")}>
+        <button
+          type="button"
+          className="kpi urgent"
+          onClick={() => navigate(obligationsAt(at.product))}
+        >
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Exploited here
           </span>

@@ -1,10 +1,37 @@
 {
   "home": { "path": "/" },
-  "reviewQueue": { "path": "/review-queue", "query": ["mine", "own", "product", "reaffirm", "reason"] },
+  "reviewQueue": {
+    "path": "/review-queue",
+    "query": ["mine", "own", "product", "reaffirm", "reason"]
+  },
   "unassigned": { "path": "/unassigned" },
   "findings": {
     "path": "/findings",
-    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "exploited", "fixable", "on", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+    "query": [
+      "assigned",
+      "below",
+      "beneath",
+      "beneath_ecosystem",
+      "beneath_namespace",
+      "beneath_version",
+      "claim",
+      "claim_state",
+      "component",
+      "exploited",
+      "fixable",
+      "on",
+      "open_for",
+      "open_under",
+      "opened_by_run",
+      "origin",
+      "planned",
+      "q",
+      "running",
+      "state",
+      "stream",
+      "support",
+      "variant"
+    ]
   },
   "claim": { "path": "/claims/:id" },
   "decision": { "path": "/decisions/:id" },
@@ -16,7 +43,31 @@
   "variants": { "path": "/products/:product/variants" },
   "productFindings": {
     "path": "/products/:product/findings",
-    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "exploited", "fixable", "on", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+    "query": [
+      "assigned",
+      "below",
+      "beneath",
+      "beneath_ecosystem",
+      "beneath_namespace",
+      "beneath_version",
+      "claim",
+      "claim_state",
+      "component",
+      "exploited",
+      "fixable",
+      "on",
+      "open_for",
+      "open_under",
+      "opened_by_run",
+      "origin",
+      "planned",
+      "q",
+      "running",
+      "state",
+      "stream",
+      "support",
+      "variant"
+    ]
   },
   "productComponent": {
     "path": "/products/:product/components/:component",
@@ -24,7 +75,31 @@
   },
   "buildFindings": {
     "path": "/products/:product/streams/:stream/variants/:variant/findings",
-    "query": ["assigned", "below", "beneath", "beneath_ecosystem", "beneath_namespace", "beneath_version", "claim", "claim_state", "component", "exploited", "fixable", "on", "open_for", "open_under", "opened_by_run", "origin", "planned", "q", "running", "state", "stream", "support", "variant"]
+    "query": [
+      "assigned",
+      "below",
+      "beneath",
+      "beneath_ecosystem",
+      "beneath_namespace",
+      "beneath_version",
+      "claim",
+      "claim_state",
+      "component",
+      "exploited",
+      "fixable",
+      "on",
+      "open_for",
+      "open_under",
+      "opened_by_run",
+      "origin",
+      "planned",
+      "q",
+      "running",
+      "state",
+      "stream",
+      "support",
+      "variant"
+    ]
   },
   "finding": {
     "path": "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component",
@@ -68,7 +143,7 @@
   "report": { "path": "/reports/:report", "query": ["days"] },
   "record": { "path": "/record", "query": ["from", "product"] },
   "disclosing": { "path": "/disclosing" },
-  "obligations": { "path": "/obligations" },
+  "obligations": { "path": "/obligations", "query": ["product"] },
   "advisories": { "path": "/advisories" },
   "advisory": { "path": "/advisories/:advisory" },
   "autoAssignment": { "path": "/auto-assignment" },

@@ -158,6 +158,7 @@ filter over the overdue list, and never reached by one.
 |---|---|
 | A missed remediation deadline has no counterparty and one of these does | So they are different surfaces. The failure to design against is an obligation rendering as row 4,782 among four thousand unpenalized hygiene findings |
 | Each record is narrowed by the question that authorizes one issue in one product | The same question the record's own finding asks. Nothing is counted before the narrowing, so no total says how many records exist to somebody shown fewer |
+| A product named in the address narrows the shelf to that product's records, and the screen says so with the way back to every product | A figure counted over one product opens what it counted. The narrowing is over what the reader was already shown, so it reveals nothing |
 | Unpaged | The set is what this deployment's products have been attacked through and nobody has cleared. A deployment where that is long has a problem no paging would help with |
 | A window shows when it ends, whether its warning has come, whether that end has passed, and whether a notice names it | Times and parties. No row says an obligation applies or was met |
 | A cleared record leaves the shelf | It stays readable at its finding, with who cleared it and why |
