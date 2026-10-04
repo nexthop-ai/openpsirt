@@ -683,7 +683,6 @@ func registerProposing(api huma.API, in core.Deps) {
 
 		body := core.DecisionBodyOf(*decision)
 		body.Reasoning = input.Body.Reasoning
-		body.NeedsApproval = decision.NeedsApproval
 		// The reach of this one judgment, so nobody discovers afterwards
 		// that they answered for sixty-two modules or for two versions of the
 		// same package.

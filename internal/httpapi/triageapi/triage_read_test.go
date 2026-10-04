@@ -1154,3 +1154,75 @@ func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
 		}
 	})
 }
+
+func TestADecisionReadBackSaysWhetherItWaitsForASecondPerson(t *testing.T) {
+	// The finding screen reads a claim's state from the decision. Told nothing
+	// about the wait, it shows a dismissal nobody has agreed to as in force,
+	// which undoes the second person for anybody not reading the queue.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		dismissed, _ := r.DecidedAt(t, place)
+
+		var detail struct {
+			Decision struct {
+				State         string `json:"state"`
+				NeedsApproval *bool  `json:"needs_approval"`
+			} `json:"decision"`
+		}
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", dismissed), &detail)
+		if detail.Decision.State != "proposed" {
+			t.Fatalf("the dismissal reads as %q, want proposed", detail.Decision.State)
+		}
+		if detail.Decision.NeedsApproval == nil || !*detail.Decision.NeedsApproval {
+			t.Error("a proposed dismissal reads back without saying it waits for a second person")
+		}
+
+		// The review queue's rows are drawn the same way, and say the same.
+		var queue struct {
+			Items []struct {
+				Decision struct {
+					ID            int64 `json:"id"`
+					NeedsApproval bool  `json:"needs_approval"`
+				} `json:"decision"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &queue)
+		if len(queue.Items) != 1 || queue.Items[0].Decision.ID != dismissed ||
+			!queue.Items[0].Decision.NeedsApproval {
+			t.Errorf("the review queue lists %+v, want the dismissal waiting", queue.Items)
+		}
+	})
+}
+
+func TestADecisionNeedingNobodyReadsBackWithoutAWait(t *testing.T) {
+	// The wait is read off the row rather than assumed: an affected answer is
+	// in force when made, and its decision says nothing waits on it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		at := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/places/%s/decision", place)
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"affected","reasoning":"We ship the vulnerable parser."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording affected answered %d: %s", got.Code, got.Body.String())
+		}
+		var made struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+
+		var detail struct {
+			Decision struct {
+				State         string `json:"state"`
+				NeedsApproval bool   `json:"needs_approval"`
+			} `json:"decision"`
+		}
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ID), &detail)
+		if detail.Decision.State != "proposed" || detail.Decision.NeedsApproval {
+			t.Errorf("an affected answer reads back as %+v, want proposed and waiting on nobody",
+				detail.Decision)
+		}
+	})
+}
