@@ -704,14 +704,16 @@ it (REQ-75).
 | Rule | |
 |---|---|
 | The base is where this branch left the branch it targets | `AUDIT_BASE` names that branch, `origin/main` unless set. CI fetches the whole history so the common commit is there to find |
-| A Go finding is introduced when its module's required version, or the declared toolchain for the standard library, differs from the base's `go.mod` | govulncheck reports one version per module, and `go.mod` names every module a build uses |
-| An npm advisory is introduced when the version locked at its place in the tree differs from the base's lockfile | A package can be installed at several places at different versions, and each is its own fact |
+| An advisory is present when the base was already affected by it, and introduced otherwise | A bump that fixes one advisory and leaves another introduces nothing, so the automated security update for it stays green |
+| A Go finding is present when the version the base's `go.mod` requires, or its declared toolchain for the standard library, falls in the advisory's affected ranges | `go.mod` names every module a build uses, and each advisory govulncheck reports carries its ranges |
+| An npm advisory is present when npm's audit of the base's lockfile names the same advisory against the same package | npm's range syntax is npm's to read. A package moved to another place in the tree, or bumped to a version still affected, was affected before |
 | Anything the base does not hold is introduced | A new dependency arrives with whatever is known against it |
 | A Go finding gates when a called function reaches it | The same line govulncheck draws on its own |
 | An npm advisory gates at high and above | The same line `npm audit --audit-level=high` draws |
 | A package listed only because something beneath it is affected carries no advisory | npm lists every package on the path to an affected one, and counting those counts one advisory many times |
 | No common commit with the base refuses, in words | Without a base every advisory reads as introduced, or every one as not |
-| A scanner output that does not read refuses | Both scanners exit non-zero for reasons that are not findings, so what decides is whether the output is a report |
+| A govulncheck run that exits non-zero refuses, with what it printed to standard error | Its JSON mode exits zero whatever it finds, and it prints its configuration before it loads anything, so a failed scan can read as a clean one |
+| An npm run refuses when its output is not a report, with npm's own message where it gave one | npm exits non-zero whenever it finds anything, and without the registry it prints a message in place of a report |
 | On the base branch itself nothing is introduced | The common commit is the commit checked, so a push to `main` reports and does not fail |
 
 An advisory already on the base reaches a fix through the repository's
