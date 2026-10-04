@@ -98,9 +98,10 @@ func TestANoticesDetailsAreBoundedAndMaliceIsOneOfThreeWords(t *testing.T) {
 }
 
 // A window counting from another window's notice has no start and no end
-// until that notice is recorded, and then counts from the first one given:
-// a correction recorded beside it later does not move it.
-func TestAWindowCountingFromANoticeStartsAtTheFirstOne(t *testing.T) {
+// until that notice is recorded, and then counts from the earliest one by the
+// moment it was given: a notice recorded later naming a later moment does not
+// move it, and one naming an earlier moment moves it back.
+func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		notification := f.window(t, "Notification", 72)
@@ -154,6 +155,16 @@ func TestAWindowCountingFromANoticeStartsAtTheFirstOne(t *testing.T) {
 		}
 		if started.Answered {
 			t.Error("a notice for the window it counts from answers it")
+		}
+
+		earlier := told.Add(-5 * time.Hour)
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &notification.ID, "A regulator",
+			earlier, "Notified, as first sent.", obligation.Details{}); err != nil {
+			t.Fatal(err)
+		}
+		if moved := due(t); !moved.StartsAt.Equal(earlier) {
+			t.Errorf("after a notice given earlier was recorded the window starts %s, want %s",
+				moved.StartsAt, earlier)
 		}
 	})
 }
@@ -229,10 +240,34 @@ func TestAWindowCountsFromAnotherOnlyWhereThatOneAlwaysStartsIt(t *testing.T) {
 		if err := f.store.RetireWindow(ctx, f.admin, limited.ID); err != nil {
 			t.Errorf("a window nothing counts from any more was not retired: %v", err)
 		}
+		// Over the same product, so only the rule that the window counted from
+		// is in force can refuse it.
 		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, obligation.WindowSaid{
-			Name: "Final report", Hours: 720, From: &limited.ID,
-		}); err == nil {
-			t.Error("a window counts from a retired one")
+			Name: "Final report", Hours: 720, Products: []string{world.ProductName}, From: &limited.ID,
+		}); err == nil || errors.Is(err, obligation.ErrNoSuchWindow) {
+			t.Errorf("a window counting from a retired one answered %v", err)
+		}
+	})
+}
+
+// A loop through three windows is refused as one through two is: the walk
+// follows every window back, not one step.
+func TestALoopThroughThreeWindowsIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		a := f.window(t, "A", 24)
+		b, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{Name: "B", Hours: 24, From: &a.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{Name: "C", Hours: 24, From: &b.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.ChangeWindow(ctx, f.admin, a.ID, obligation.WindowSaid{
+			Name: "A", Hours: 24, From: &c.ID,
+		}); err == nil || !strings.Contains(err.Error(), "counting from it") {
+			t.Errorf("closing a loop through three windows answered %v", err)
 		}
 	})
 }

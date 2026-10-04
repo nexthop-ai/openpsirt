@@ -98,50 +98,7 @@ func theV050DeclarationsAreTheTablesTheMigrationsBuild() upgradeCheck {
 	return upgradeCheck{
 		name: "TheV050DeclarationsAreTheTablesTheMigrationsBuild",
 		upgraded: func(t *testing.T, ctx context.Context, db *database.DB) {
-			declared := migrations.StatementsV050(db.Server.Engine)
-			var made []string
-			// Dropped however the comparison ends, so the checks after this
-			// one read a database holding only what the migrations built.
-			t.Cleanup(func() {
-				for _, table := range made {
-					if _, err := db.ExecContext(context.WithoutCancel(ctx), `DROP TABLE "`+table+`"`); err != nil {
-						t.Errorf("drop %s: %v", table, err)
-					}
-				}
-			})
-			for table, statements := range declared {
-				made = append(made, scratchPrefix+table)
-				for _, stmt := range statements {
-					if _, err := db.ExecContext(ctx, scratch(table, stmt)); err != nil {
-						t.Fatalf("build %s's declaration under a scratch name: %v\n%s", table, err, stmt)
-					}
-				}
-			}
-			described := describe(t, ctx, db)
-			compared := 0
-			for table := range declared {
-				built := linesOf(described, table, "")
-				fromDeclaration := linesOf(described, scratchPrefix+table, scratchPrefix)
-				if len(built) == 0 || len(fromDeclaration) == 0 {
-					t.Errorf("%s described as %d lines built and %d declared, so nothing was compared",
-						table, len(built), len(fromDeclaration))
-					continue
-				}
-				compared++
-				for _, line := range fromDeclaration {
-					if !slices.Contains(built, line) {
-						t.Errorf("%s is declared with %q and the migrations do not build it", table, line)
-					}
-				}
-				for _, line := range built {
-					if !slices.Contains(fromDeclaration, line) {
-						t.Errorf("the migrations build %q on %s and v0.5.0 does not declare it", line, table)
-					}
-				}
-			}
-			if compared == 0 || compared != len(declared) {
-				t.Errorf("compared %d of the %d tables v0.5.0 declares", compared, len(declared))
-			}
+			declarationsAreBuilt(t, ctx, db, migrations.StatementsV050(db.Server.Engine), nil)
 		},
 	}
 }

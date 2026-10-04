@@ -160,9 +160,33 @@ var ErrNoSuchWindow = refusal.New("no window in force goes by that")
 var ErrWindowNamed = refusal.New("a window in force already has that name")
 
 // ErrCountedFrom is returned where a window another window in force counts
-// from would be retired.
-var ErrCountedFrom = refusal.New("another window in force counts from this one. " +
-	"Change or retire that window first")
+// from would be retired. The refusal names that window.
+var ErrCountedFrom = refusal.New("another window in force counts from this one")
+
+// holdWindows takes every window in force for the rest of the transaction,
+// before anything is read.
+//
+// What one window counts from is a rule over several rows: the window it
+// counts from is in force, covers its products, and leads back to no loop,
+// and nothing counting from a window is left uncovered by changing or
+// retiring it. Each write here checks those by reading rows it does not
+// write, and a transaction is not a lock (`DESIGN-database.md` § Reads a
+// write depends on). So every declaration counting from another window, every
+// change and every retirement first writes every window in force, unchanged.
+// Two of them wait for each other, and the second reads what the first
+// committed: MySQL and MariaDB fix the snapshot at the first plain read, which
+// comes after this. The windows in force are a handful, so the whole set is
+// held rather than the rows one act happens to walk: a loop closed by two
+// changes can pass through no row either one names.
+func holdWindows(ctx context.Context, tx bun.IDB) error {
+	if _, err := tx.NewUpdate().Model((*Window)(nil)).
+		Set("live_name = live_name").
+		Where("retired_at IS NULL").
+		Exec(ctx); err != nil {
+		return fmt.Errorf("hold the windows in force: %w", err)
+	}
+	return nil
+}
 
 // Store reads and writes obligations.
 type Store struct {
@@ -499,6 +523,11 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 	}
 	window := new(Window)
 	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
+		if said.From != nil {
+			if err := holdWindows(ctx, tx); err != nil {
+				return err
+			}
+		}
 		products, names, err := productsNamed(ctx, tx, said.Products)
 		if err != nil {
 			return err
@@ -551,6 +580,9 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 	}
 	window := new(Window)
 	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
+		if err := holdWindows(ctx, tx); err != nil {
+			return err
+		}
 		before, err := inForce(ctx, tx, id)
 		if err != nil {
 			return err
@@ -637,6 +669,9 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 		return err
 	}
 	return s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
+		if err := holdWindows(ctx, tx); err != nil {
+			return err
+		}
 		window, err := inForce(ctx, tx, id)
 		if err != nil {
 			return err
@@ -646,7 +681,7 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 			return err
 		}
 		if len(counting) > 0 {
-			return ErrCountedFrom
+			return fmt.Errorf("%w: %q. Change or retire it first", ErrCountedFrom, counting[0].Name)
 		}
 		named, err := withFrom(ctx, tx, []Window{*window})
 		if err != nil {

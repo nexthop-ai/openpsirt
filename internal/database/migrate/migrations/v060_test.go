@@ -59,7 +59,7 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 			t.Errorf("upgraded, a v0.5.0 notice says %v and %v", reference, malicious)
 		}
 		t.Run("TheDeclarationsAreTheTablesTheMigrationsBuild", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV060(db.Server.Engine))
+			declarationsAreBuilt(t, ctx, db, migrations.StatementsV060(db.Server.Engine), nil)
 		})
 
 		// What the untagged release holds that v0.5.0 cannot.
@@ -192,18 +192,25 @@ func seedV050Obligation(t *testing.T, ctx context.Context, db *database.DB) (win
 
 // declarationsAreBuilt builds each declaration under a scratch name and
 // compares its description with the table the migrations built, line for line
-// in both directions.
+// in both directions. A built line madeElsewhere answers true for is one a
+// later migration added, and is not held against the declaration.
+//
+// The scratch tables are dropped before it returns, and however the
+// comparison ends, so what follows reads only what the migrations built.
 func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
-	declared map[string][]string) {
+	declared map[string][]string, madeElsewhere func(table, line string) bool) {
 	t.Helper()
 	var made []string
-	t.Cleanup(func() {
+	drop := func(ctx context.Context) {
 		for _, table := range made {
-			if _, err := db.ExecContext(context.WithoutCancel(ctx), `DROP TABLE "`+table+`"`); err != nil {
+			if _, err := db.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
 				t.Errorf("drop %s: %v", table, err)
 			}
 		}
-	})
+		made = nil
+	}
+	t.Cleanup(func() { drop(context.WithoutCancel(ctx)) })
+	defer drop(ctx)
 	for table, statements := range declared {
 		made = append(made, scratchPrefix+table)
 		for _, stmt := range statements {
@@ -229,7 +236,8 @@ func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
 			}
 		}
 		for _, line := range built {
-			if !slices.Contains(fromDeclaration, line) {
+			if !slices.Contains(fromDeclaration, line) &&
+				(madeElsewhere == nil || !madeElsewhere(table, line)) {
 				t.Errorf("the migrations build %q on %s and it is not declared", line, table)
 			}
 		}

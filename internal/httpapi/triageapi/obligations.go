@@ -230,8 +230,9 @@ func registerObligations(api huma.API, in core.Deps) {
 			"A name another window in force holds is refused with 409. A retired or " +
 			"unknown window answers 404. A product nobody declared is refused with 422 " +
 			"naming it, as is a warning at or past the window's own length, a from window " +
-			"that would start a loop, and a product list leaving out a product a window " +
-			"starting from this one applies to.",
+			"that is not in force, does not apply to every product this one does or would " +
+			"start a loop, from sent with from_fix, and a product list leaving out a product " +
+			"a window starting from this one applies to.",
 		Tags: []string{"Obligations"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
@@ -260,7 +261,8 @@ func registerObligations(api huma.API, in core.Deps) {
 		Description: "Stops counting a window. Notices recorded against it keep naming it, " +
 			"and its name may be declared again. Recorded in the administrative trail.\n\n" +
 			"A window already retired, or never declared, answers 404. A window another " +
-			"window in force starts from answers 409: change or retire that one first.",
+			"window in force starts from answers 409 naming that window: change or retire " +
+			"it first.",
 		Tags: []string{"Obligations"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`

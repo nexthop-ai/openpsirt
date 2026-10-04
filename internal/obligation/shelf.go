@@ -187,11 +187,10 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 // runs for one incident, with whether it has started, whether its warning has
 // come, whether it has passed and whether a notice names it.
 //
-// A window counts from the moment the attack became known, from the first
-// notice on the incident naming the window it counts from, or from fixed: the
-// moment FixAvailable gives, and zero where it gives none. The earliest such
-// notice, because a correction recorded beside a notice does not move when
-// the first one was given.
+// A window counts from the moment the attack became known, from the earliest
+// notice on the incident naming the window it counts from, by the moment it
+// was given rather than the order it was recorded in, or from fixed: the
+// moment FixAvailable gives, and zero where it gives none.
 //
 // Worked out when asked rather than stored. A window changed by an
 // administrator moves every end with it, which is what changing it means. A

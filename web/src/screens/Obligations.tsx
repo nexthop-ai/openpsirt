@@ -395,6 +395,19 @@ function NameFix({
   );
 }
 
+// placesTyped is the places a notice named, one per line as typed.
+//
+// A line per place, because a place's own name may hold a comma. Only a
+// trailing empty line is dropped, which is where a newline after the last
+// place leaves one: a blank between two places goes to the server, which
+// refuses it as a slip in what was typed.
+export function placesTyped(text: string): string[] {
+  if (text.trim() === "") return [];
+  const lines = text.split("\n");
+  if (lines.length > 1 && lines[lines.length - 1]?.trim() === "") lines.pop();
+  return lines;
+}
+
 // What a notice carried beyond who, when and what, where it carried any.
 function Particulars({ notice }: { notice: Notice }) {
   const parts = [
@@ -427,10 +440,7 @@ function Tell({
   const [reference, setReference] = useState("");
   const [places, setPlaces] = useState("");
   const [malice, setMalice] = useState("");
-  const named = places
-    .split(/[,\n]/)
-    .map((place) => place.trim())
-    .filter((place) => place);
+  const named = placesTyped(places);
 
   const tell = useMutation({
     mutationFn: async () =>
@@ -504,11 +514,11 @@ function Tell({
       </div>
       <div className="field" style={{ marginBottom: 8 }}>
         <label htmlFor="places">Places named</label>
-        <input
+        <textarea
           id="places"
-          type="text"
+          style={{ minHeight: 48 }}
           value={places}
-          placeholder="Separated by commas"
+          placeholder="One per line"
           onChange={(event) => setPlaces(event.target.value)}
         />
       </div>

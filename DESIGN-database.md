@@ -272,7 +272,7 @@ migration that upgrades a database the last 0.x release built. A database an
 earlier 0.x release built is upgraded to that release first.
 
 Migrations 1 to 36 each create something, which is why rolling one back is
-dropping what it made. Migrations 37, 38 and 39 change existing tables, and
+dropping what it made. Migrations 37 to 40 change existing tables, and
 rolling one back changes the tables back.
 
 A migration is its statements and nothing else. What every one of them does

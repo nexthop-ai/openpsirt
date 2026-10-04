@@ -128,3 +128,21 @@ func TestANoticeCarriesItsReferencePlacesAndWordOnMalice(t *testing.T) {
 		}
 	})
 }
+
+// Retiring a window another window in force counts from answers 409 naming
+// that window.
+func TestRetiringAWindowAnotherCountsFromConflictsNamingIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		notification := r.Declared(t, "Notification", 72)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+			fmt.Sprintf(`{"name":"Final report","hours":720,"from":%d}`, notification),
+		); got.Code != http.StatusCreated {
+			t.Fatalf("declaring a window counting from a notice answered %d: %s", got.Code, got.Body.String())
+		}
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			fmt.Sprintf("/v1/obligation-windows/%d", notification), "")
+		if got.Code != http.StatusConflict || !httpapitest.Contains(got.Body.String(), "Final report") {
+			t.Errorf("retiring a window another counts from answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}

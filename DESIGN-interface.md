@@ -1399,6 +1399,7 @@ One card per standing record that a product was exploited through an issue.
 | Fix releases are listed under the windows, each with its release date and its latest scans | "no release date" where none is stated, because such a tag starts nothing. The scans read "not scanned", "open in its latest scans" or "not found in its latest scans", which are facts; no word says fixed |
 | A fix release is named by typing a tag, offered from the product's tags in use | A tag declared before any scan of it is among them, which is the usual case. The server refuses a branch or a retired tag in its own sentence |
 | Withdraw sits beside each named tag, and a withdrawn one stays listed, struck through, with who withdrew it | A tag named in error is corrected here, and what was said stays readable |
+| A notice's places are typed one per line | A place's own name may hold a comma. Only a trailing empty line is dropped; a blank between two places goes to the server, which refuses it |
 | The finding shows the standing record's named tags, with neither form | Naming and withdrawing happen on this screen, beside the notices |
 
 ## The editor

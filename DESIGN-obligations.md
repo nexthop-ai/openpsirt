@@ -114,7 +114,7 @@ window, or the release of the fix.
 | A deployment declares its own, and none ships | A shipped window is an interpretation, which is the one thing this area refuses to encode |
 | Declaring, changing and retiring one is an administrator's act, in the administrative trail | A window decides what every standing attack is watched against, which is the layer a setting sits in |
 | A name and a length in whole hours, from one hour to a year | The shortest windows in force anywhere are a day, and a day is too coarse to count one in. Zero reads as unset everywhere, so it is refused rather than stored |
-| A warning, where the window names one: whole hours before the end, at least one and fewer than the window runs | A day's window and a fortnight's want warnings of different sizes, so each says its own. A warning at or before the window opens says nothing the condition raised when the record stands has not |
+| A warning, where the window names one: whole hours before the end, at least one and fewer than the window runs | A day's window and a fortnight's want warnings of different sizes, so each says its own. A warning at or before the window opens says nothing the condition raised when the window starts has not |
 | Limited to named products, or every product where it names none | Which window applies where is the administrator's statement. One deployment can ship a product under an obligation beside one that is under none, and a window over both raises alerts for the product it never applied to |
 | A product nobody declared refuses the whole window, naming it | A window silently applying to fewer products than were named is quiet about the one that was meant. A blank name is one nobody declared; dropped, a list of blanks declares a window over every product |
 | A change restates the whole window | Name, length, warning, products and what it counts from are all replaced, so any of them left off is removed |
@@ -128,7 +128,7 @@ window, or the release of the fix.
 | A window counting from the fix with no named tag carrying a stated date has no start and no end | The handling a window waiting on a notice has, for the same reason |
 | A release date still to come is a start that has not arrived | The window shows when it starts, and nothing is near, passed or raised before then |
 | The release date is read when asked | Correcting a tag's date, naming a tag or withdrawing one moves the start of every window counting from the fix |
-| The first such notice, and no later one | A correction recorded beside a notice does not move when the notice was given |
+| The earliest such notice by the moment it was given, whenever it was recorded | The start is when somebody was first told. A notice recorded later naming an earlier moment moves the start back; one naming a later moment moves nothing. Notices are append-only, so a notice given a moment too early is answered beside it and still holds the start |
 | A window waiting on a notice, or on the release of the fix, has no start and no end | Nothing is counting, so nothing is near, passed or raised |
 | It counts only from a window in force that applies to every product it does | A notice names a window only on a product the window applies to, so a product outside it would hold a window that never starts. A reader who may read the one may read the other |
 | Not from itself, and not from a window counting back to it | A loop of windows each waiting on another's notice never starts |
@@ -216,10 +216,11 @@ filter over the overdue list, and never reached by one.
 | A cleared record leaves the shelf | It stays readable at its finding, with who cleared it and why |
 | Hygiene deadlines stay soft | Correct as it is, and stated here so nobody hardens the wrong half |
 
-Each window raises a condition from the moment the record stands until a
-notice names it, a second once its warning has come where it names one, and a
-third once its end has passed. `DESIGN-notifications.md`
-§ Obligation notices holds who hears and when each clears.
+Each window raises a condition from the moment it starts until a notice names
+it, a second once its warning has come where it names one, and a third once its
+end has passed. Each says the time, what the window counts from, and that no
+notice is recorded. `DESIGN-notifications.md` § Obligation notices holds who
+hears and when each clears.
 
 ## Bulk acts
 
@@ -255,13 +256,15 @@ a particular incident is a judgment this software does not hold. A window
 judged not to apply to one incident on a product it covers goes on raising its
 condition until a notice names it, the record is cleared or the window is
 retired. The condition says only what is true: the
-time, and that nothing is recorded.
+time, what the window counts from, and that nothing is recorded.
 
 A window counts from the moment the attack became known, from a notice, or from
 the release of the fix, and from no other event. The release of the fix is a
 person's statement: a tag named on the record and a release date somebody
 stated for it. Nothing here decides that a fix is available, and the scans of a
-named tag do not decide it either.
+named tag do not decide it either. An incident not tied to a published issue,
+such as a compromised build or update channel, is recorded against a flaw found
+here, carried by the build itself (§ Stored facts).
 
 The shelf stores no end and no state. Every end is worked out from the record's
 moment and the window as it stands when somebody asks, so a window changed

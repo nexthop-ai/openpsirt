@@ -5,7 +5,6 @@ package migrations_test
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"testing"
 
@@ -102,45 +101,10 @@ func TestTheV030DeclarationsAreTheTablesTheMigrationsBuild(t *testing.T) {
 		rollBack(t, ctx, db)
 		dbtest.MigrateTo(t, db, v030)
 		declared := migrations.StatementsV030(db.Server.Engine)
-		var made []string
-		for table, statements := range declared {
-			for _, stmt := range statements {
-				if _, err := db.ExecContext(ctx, scratch(table, stmt)); err != nil {
-					t.Fatalf("build %s's declaration under a scratch name: %v\n%s", table, err, stmt)
-				}
-			}
-			made = append(made, scratchPrefix+table)
+		if len(declared) != 3 {
+			t.Errorf("v0.3.0 declares %d tables, want 3", len(declared))
 		}
-		described := describe(t, ctx, db)
-		compared := 0
-		for table := range declared {
-			built := linesOf(described, table, "")
-			fromDeclaration := linesOf(described, scratchPrefix+table, scratchPrefix)
-			if len(built) == 0 || len(fromDeclaration) == 0 {
-				t.Errorf("%s described as %d lines built and %d declared, so nothing was compared",
-					table, len(built), len(fromDeclaration))
-				continue
-			}
-			compared++
-			for _, line := range fromDeclaration {
-				if !slices.Contains(built, line) {
-					t.Errorf("%s is declared with %q and the migrations do not build it", table, line)
-				}
-			}
-			for _, line := range built {
-				if !slices.Contains(fromDeclaration, line) && !madeElsewhere(table, line) {
-					t.Errorf("the migrations build %q on %s and v0.3.0 does not declare it", line, table)
-				}
-			}
-		}
-		if compared != len(declared) || compared != 3 {
-			t.Errorf("compared %d of the tables v0.3.0 declares, want 3", compared)
-		}
-		for _, table := range made {
-			if _, err := db.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
-				t.Fatalf("drop %s: %v", table, err)
-			}
-		}
+		declarationsAreBuilt(t, ctx, db, declared, madeElsewhere)
 		leaveAtLatest(t, ctx, db)
 	})
 }

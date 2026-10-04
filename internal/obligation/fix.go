@@ -209,9 +209,22 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 
 // standingFor reads a record this subject may act on, inside the write that
 // acts on it, and refuses one that is cleared.
+//
+// The record is written first, unchanged, while it stands, before anything
+// is read. Clearing writes the same row, so a clearing and a naming wait for
+// each other, and the one that goes second reads what the first committed: a
+// naming never lands on a record cleared after it was read
+// (`DESIGN-database.md` § Reads a write depends on). The write changes
+// nothing, so it says nothing to a subject the reads below then refuse.
 func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
 	recordID int64) (*triage.ExploitedHere, error) {
 
+	if _, err := tx.NewUpdate().Model((*triage.ExploitedHere)(nil)).
+		Set("cleared_at = cleared_at").
+		Where("id = ?", recordID).Where("cleared_at IS NULL").
+		Exec(ctx); err != nil {
+		return nil, fmt.Errorf("hold the record of being exploited: %w", err)
+	}
 	record := new(triage.ExploitedHere)
 	if err := tx.NewSelect().Model(record).Where("eh.id = ?", recordID).
 		Scan(ctx); err != nil {

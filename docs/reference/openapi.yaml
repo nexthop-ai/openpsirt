@@ -16510,7 +16510,7 @@ paths:
       description: |-
         Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
 
-        A window already retired, or never declared, answers 404. A window another window in force starts from answers 409: change or retire that one first.
+        A window already retired, or never declared, answers 404. A window another window in force starts from answers 409 naming that window: change or retire it first.
 
         Requires: administrator
       operationId: retire-obligation-window
@@ -16539,7 +16539,7 @@ paths:
       description: |-
         Restates a window in force: its name, how long it runs, its warning, the products it applies to and what it starts from. Each field is replaced by what is sent, so a warning, a product list, a from window or from_fix left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
 
-        A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that would start a loop, and a product list leaving out a product a window starting from this one applies to.
+        A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that is not in force, does not apply to every product this one does or would start a loop, from sent with from_fix, and a product list leaving out a product a window starting from this one applies to.
 
         Requires: administrator
       operationId: change-obligation-window

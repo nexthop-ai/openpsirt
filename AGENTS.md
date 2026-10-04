@@ -374,8 +374,8 @@ in the API path is the shape it will have, not a promise anybody may hold us to.
 Migrations 1 to 36 are kept because a database v0.1.0 built has applied them,
 migration 37 because it upgrades one, and migration 38 because it upgrades a
 database v0.2.0 built, and migration 39 because it upgrades a database v0.3.0
-or v0.4.0 built. The next schema change is migration 40, the untagged release's
-own, edited until a tag ships it. They collapse into one before 1.0, beside one migration that
+or v0.4.0 built. Migration 40 is the untagged release's own, and a schema
+change edits it until a tag ships it. They collapse into one before 1.0, beside one migration that
 upgrades a database the last 0.x release built, which `TODO.md` records so it
 happens rather than being remembered.
 
