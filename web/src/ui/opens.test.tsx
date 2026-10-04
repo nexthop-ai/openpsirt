@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { act } from "react";
+import { act, useState } from "react";
 import { Link } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { location, mounted, screen } from "../test/mount";
@@ -13,6 +13,7 @@ afterEach(() => window.getSelection()?.removeAllRanges());
 
 function Row() {
   const opener = useRowOpener();
+  const [picked, setPicked] = useState(false);
   return (
     <table>
       <tbody>
@@ -20,16 +21,29 @@ function Row() {
           <td data-part="plain">
             <span data-part="text">plain words</span>
           </td>
-          <td>
+          <td data-part="linkcell">
             <Link data-part="other" to="/elsewhere">
               another
             </Link>
           </td>
           <td>
+            <a data-part="raw" href="#raw">
+              raw
+            </a>
+          </td>
+          <td data-part="actcell">
             <button type="button" data-part="act">
               Act
             </button>
-            <input type="checkbox" data-part="pick" aria-label="Pick" />
+          </td>
+          <td data-part="pickcell">
+            <input
+              type="checkbox"
+              data-part="pick"
+              aria-label="Pick"
+              checked={picked}
+              onChange={(event) => setPicked(event.target.checked)}
+            />
           </td>
         </tr>
       </tbody>
@@ -56,6 +70,32 @@ describe("a row that opens its target", () => {
     mount.render(screen(<Row />, "/list"));
     click("[data-part=other]");
     expect(location()).toBe("/elsewhere");
+  });
+
+  it("leaves a plain link in the row to the link", () => {
+    mount.render(screen(<Row />, "/list"));
+    click("[data-part=raw]");
+    expect(location()).toBe("/list");
+  });
+
+  it("opens the target on a click beside the link in its cell", () => {
+    mount.render(screen(<Row />, "/list"));
+    click("[data-part=linkcell]");
+    expect(location()).toBe("/target");
+  });
+
+  it("opens the target on a click that misses a button in its cell", () => {
+    mount.render(screen(<Row />, "/list"));
+    click("[data-part=actcell]");
+    expect(location()).toBe("/target");
+  });
+
+  it("keeps the selection on a click that misses a checkbox in its cell", () => {
+    mount.render(screen(<Row />, "/list"));
+    click("[data-part=pick]");
+    click("[data-part=pickcell]");
+    expect(location()).toBe("/list");
+    expect(mount.host().querySelector<HTMLInputElement>("[data-part=pick]")?.checked).toBe(true);
   });
 
   it("leaves a click on a button or a checkbox to that control", () => {

@@ -143,7 +143,10 @@ export function Coverage() {
                         <td>
                           {/* The build's own inventories screen, which is where
                               somebody goes to see what did arrive and when. */}
-                          <Link to={scansAt(build.product, build.stream, build.variant)}>
+                          <Link
+                            className="id"
+                            to={scansAt(build.product, build.stream, build.variant)}
+                          >
                             {build.stream}
                           </Link>{" "}
                           <span className="hint">{build.stream_kind}</span>

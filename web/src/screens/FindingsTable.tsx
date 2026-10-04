@@ -586,7 +586,7 @@ export function FindingsTable({
               role="link"
               tabIndex={0}
               aria-label={`${row.vulnerability} in ${row.component}`}
-              onClick={() => navigate(at)}
+              onClick={opener(at)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
