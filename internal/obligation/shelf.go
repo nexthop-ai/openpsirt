@@ -32,7 +32,15 @@ type Standing struct {
 // Due is one window as it runs for one incident.
 type Due struct {
 	Window Window
-	// EndsAt is the moment the incident became known, plus the window.
+	// Started says the window is counting. A window counting from the first
+	// notice for another starts when that notice is recorded, and until then
+	// has no start and no end.
+	Started bool
+	// StartsAt is the moment the window counts from: when the incident
+	// became known, or when the first notice for the window it counts from
+	// was given.
+	StartsAt time.Time
+	// EndsAt is that moment plus the window.
 	EndsAt time.Time
 	// Passed says that moment has gone.
 	Passed bool
@@ -164,8 +172,13 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 }
 
 // Running is every window that applies to an attack on this product, as it
-// runs from one moment, with whether its warning has come, whether it has
-// passed and whether a notice names it.
+// runs for one incident, with whether it has started, whether its warning has
+// come, whether it has passed and whether a notice names it.
+//
+// A window counts from the moment the attack became known, or from the first
+// notice on the incident naming the window it counts from. The earliest such
+// notice, because a correction recorded beside a notice does not move when
+// the first one was given.
 //
 // Worked out when asked rather than stored. A window changed by an
 // administrator moves every end with it, which is what changing it means. A
@@ -174,9 +187,14 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 func Running(windows []Window, productID int64, knownAt time.Time, told []Told,
 	now time.Time) []Due {
 	answered := map[int64]bool{}
+	first := map[int64]time.Time{}
 	for _, one := range told {
-		if one.WindowID != nil {
-			answered[*one.WindowID] = true
+		if one.WindowID == nil {
+			continue
+		}
+		answered[*one.WindowID] = true
+		if at, ok := first[*one.WindowID]; !ok || one.ToldAt.Before(at) {
+			first[*one.WindowID] = one.ToldAt
 		}
 	}
 	out := make([]Due, 0, len(windows))
@@ -184,14 +202,22 @@ func Running(windows []Window, productID int64, knownAt time.Time, told []Told,
 		if !window.AppliesTo(productID) {
 			continue
 		}
-		ends := window.EndsAt(knownAt)
+		start, started := knownAt, true
+		if window.FromID != nil {
+			start, started = first[*window.FromID]
+		}
+		if !started {
+			out = append(out, Due{Window: window, Answered: answered[window.ID]})
+			continue
+		}
+		ends := window.EndsAt(start)
 		passed := !now.Before(ends)
 		near := false
-		if at, warns := window.NearAt(knownAt); warns {
+		if at, warns := window.NearAt(start); warns {
 			near = !passed && !now.Before(at)
 		}
 		out = append(out, Due{
-			Window: window, EndsAt: ends,
+			Window: window, Started: true, StartsAt: start, EndsAt: ends,
 			Passed: passed, Near: near, Answered: answered[window.ID],
 		})
 	}

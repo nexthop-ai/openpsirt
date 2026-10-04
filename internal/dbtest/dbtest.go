@@ -920,6 +920,8 @@ var tables = []string{
 	"issue_note_revision",
 	// Before person, product and vulnerability, all of which it points at.
 	"issue_note",
+	// Before the notice it belongs to.
+	"told_place",
 	// Before the record of being exploited and the window it points at.
 	"told_outside",
 	// Before the window and the product it points at.
@@ -1095,6 +1097,7 @@ func clear(ctx context.Context, db *database.DB) error {
 var addedAt = map[string]int64{
 	"chat_delivery":   39,
 	"chat_preference": 39,
+	"told_place":      40,
 }
 
 // clearOf empties the named tables, which are in the order tables holds them.
@@ -1127,6 +1130,14 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 		if occupied["claim"] {
 			if _, err := tx.ExecContext(ctx, `UPDATE "claim" SET "derived_from" = NULL`); err != nil {
 				return fmt.Errorf("detach derived claims: %w", err)
+			}
+		}
+		// A window points at the window it counts from, the same shape again.
+		// The column arrived with the notice's places, so a database rolled
+		// back before them has neither.
+		if occupied["obligation_window"] && slices.Contains(tables, "told_place") {
+			if _, err := tx.ExecContext(ctx, `UPDATE "obligation_window" SET "from_window_id" = NULL`); err != nil {
+				return fmt.Errorf("detach windows counting from others: %w", err)
 			}
 		}
 		for _, table := range tables {

@@ -21,15 +21,16 @@ import (
 // as it stands.
 //
 // Every window this deployment declares, counted from the moment each
-// standing record says the attack became known. Nothing here decides whether
-// a window applies to an incident; a deployment under none declares none, and
-// hears nothing.
+// standing record says the attack became known, or from the first notice for
+// the window it counts from. Nothing here decides whether a window applies to
+// an incident; a deployment under none declares none, and hears nothing.
 
 // windowsOpen is every window still running with no notice named against it,
 // against the people who may act on the product.
 //
-// From the moment the attack became known, rather than from a lead time
-// before the end. The windows in force anywhere are a day to a fortnight, and
+// From the moment the window starts, rather than from a lead time before the
+// end. A window waiting on another window's notice raises nothing until that
+// notice is recorded. The windows in force anywhere are a day to a fortnight, and
 // an incident is rare: a warning that waits for most of a day to pass gives
 // back the hours it exists to save.
 func (w *Watch) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
@@ -93,7 +94,7 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 		for _, due := range obligation.Running(windows, one.Record.ProductID,
 			one.Record.KnownAt, told[one.Record.ID], now) {
 
-			if due.Answered {
+			if due.Answered || !due.Started {
 				continue
 			}
 			var verb string
@@ -108,11 +109,15 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 				continue
 			}
 			about := string(kind)
+			from := "when this became known"
+			if due.Window.FromID != nil {
+				from = fmt.Sprintf("the first notice for %q", due.Window.FromName)
+			}
 			holds := Holds{
 				About: identify(fmt.Sprintf("%s %d %d", about, one.Record.ID, due.Window.ID)),
-				Body: fmt.Sprintf("%s in %s: the window %q, counted from when this became "+
-					"known, %s %s. No notice outside is recorded against it.",
-					one.Issue, one.ProductName, due.Window.Name, verb,
+				Body: fmt.Sprintf("%s in %s: the window %q, counted from %s, %s %s. "+
+					"No notice outside is recorded against it.",
+					one.Issue, one.ProductName, due.Window.Name, from, verb,
 					due.EndsAt.Format("2006-01-02 15:04 MST")),
 				Link:            weblink.Obligations(),
 				Private:         one.Private,

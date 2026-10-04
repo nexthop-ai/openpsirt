@@ -45,6 +45,17 @@ func StatementsV050(engine database.Engine) map[string][]string {
 	}
 }
 
+// StatementsV060 is the untagged release's declaration of each table it
+// creates or changes.
+func StatementsV060(engine database.Engine) map[string][]string {
+	obligation := obligationV060(typesFor(engine))
+	return map[string][]string{
+		"obligation_window": obligation[:1],
+		"told_outside":      obligation[1:3],
+		"told_place":        obligation[3:],
+	}
+}
+
 // Respelled is one kept findings-list query in v0.5.0's words.
 var Respelled = respelled
 

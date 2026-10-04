@@ -1293,9 +1293,9 @@ export interface paths {
         put?: never;
         /**
          * Record that somebody outside was told
-         * @description Records who was told about an attack, when, and what they were told. Append-only: a notice recorded in error is corrected by recording another beside it.
+         * @description Records who was told about an attack, when, and what they were told, with the recipient's reference, the places named and what was said about malice where the notice carried them. Append-only: a notice recorded in error is corrected by recording another beside it.
          *
-         *     Name a window to say this notice answers it. The window then stops raising its notification for this incident.
+         *     Name a window to say this notice answers it. The window then stops raising its notification for this incident, and a window starting from it starts at the first such notice.
          *
          *     Allowed on a cleared record, because a notice given before the clearing still happened.
          *
@@ -1681,7 +1681,7 @@ export interface paths {
         };
         /**
          * List obligation windows
-         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
+         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known, or from the first notice for another window. None ships: a deployment declares the windows it answers to.
          *
          *     A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
          *
@@ -1691,9 +1691,9 @@ export interface paths {
         put?: never;
         /**
          * Declare an obligation window
-         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known. Recorded in the administrative trail.
+         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from. Recorded in the administrative trail.
          *
-         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does.
          *
          *     Requires: administrator
          */
@@ -1714,9 +1714,9 @@ export interface paths {
         get?: never;
         /**
          * Change an obligation window
-         * @description Restates a window in force: its name, how long it runs, its warning and the products it applies to. Each field is replaced by what is sent, so a warning or a product list left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         * @description Restates a window in force: its name, how long it runs, its warning, the products it applies to and the window it starts from. Each field is replaced by what is sent, so a warning, a product list or a from window left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
          *
-         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
+         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that would start a loop, and a product list leaving out a product a window starting from this one applies to.
          *
          *     Requires: administrator
          */
@@ -1726,7 +1726,7 @@ export interface paths {
          * Retire an obligation window
          * @description Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
          *
-         *     A window already retired, or never declared, answers 404.
+         *     A window already retired, or never declared, answers 404. A window another window in force starts from answers 409: change or retire that one first.
          *
          *     Requires: administrator
          */
@@ -1745,7 +1745,7 @@ export interface paths {
         };
         /**
          * List standing attacks and their windows
-         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs from the moment the attack became known, and every notice recorded about it.
+         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, and every notice recorded about it. A window starts when the attack became known, or at the first notice for the window it starts from, and has no end until then.
          *
          *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
          *
@@ -7735,13 +7735,20 @@ export interface components {
             answered: boolean;
             /**
              * Format: date-time
-             * @description When the attack became known, plus the window
+             * @description When the window started, plus the window. Absent until it starts
              */
-            ends_at: string;
+            ends_at?: string;
             /** @description Whether the window's warning has come and its end has not */
             near: boolean;
             /** @description Whether that moment has gone */
             passed: boolean;
+            /** @description Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded */
+            started: boolean;
+            /**
+             * Format: date-time
+             * @description When the window started: when the attack became known, or when the first notice for the window it starts from was given. Absent until it starts
+             */
+            starts_at?: string;
             window: components["schemas"]["WindowBody"];
         };
         DuplicateDisclosureBody: {
@@ -9811,14 +9818,23 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             id: number;
+            /** @description The places the notice named, in order */
+            places?: string[] | null;
             /** @description Who was told */
             recipient: string;
             /** Format: date-time */
             recorded_at: string;
             /** @description Who recorded the notice */
             recorded_by?: string;
+            /** @description What the recipient called the notice. Absent where none was recorded */
+            reference?: string;
             /** @description What they were told */
             said: string;
+            /**
+             * @description What the notice said about whether the attack was malicious. Absent where it said nothing
+             * @enum {string}
+             */
+            suspected_malicious?: "yes" | "no" | "unknown";
             /**
              * Format: date-time
              * @description When they were told
@@ -9839,10 +9855,19 @@ export interface components {
              * @example https://example.com/schemas/NoticeSaid.json
              */
             readonly $schema?: string;
+            /** @description The places the notice named, in order. Each is up to 191 characters and not blank; one named twice, in any capitals, is kept once */
+            places?: string[] | null;
             /** @description Who was told: a regulator, a customer, a response team */
             recipient: string;
+            /** @description What the recipient called the notice, such as a case number. Left off, none */
+            reference?: string;
             /** @description What they were told */
             said: string;
+            /**
+             * @description What the notice said about whether the attack was malicious. Left off, it said nothing
+             * @enum {string}
+             */
+            suspected_malicious?: "yes" | "no" | "unknown";
             /**
              * Format: date-time
              * @description When they were told. Not before the attack became known, and not in the future
@@ -9929,7 +9954,7 @@ export interface components {
             undone?: number;
             /** @description The issue this is about */
             vulnerability?: string;
-            /** @description Every window in force that applies to this product, shortest first, as it runs from when the attack became known */
+            /** @description Every window in force that applies to this product, shortest first, as it runs for this incident */
             windows: components["schemas"]["DueBody"][] | null;
         };
         ObligationsBody: {
@@ -12685,7 +12710,14 @@ export interface components {
             declared_at: string;
             /**
              * Format: int64
-             * @description How long the window runs, in hours, from the moment an attack became known
+             * @description The window whose first notice on an incident this one starts at. Absent where it starts when the attack became known
+             */
+            from?: number;
+            /** @description That window's name */
+            from_name?: string;
+            /**
+             * Format: int64
+             * @description How long the window runs, in hours, from the moment it starts
              */
             hours: number;
             /** Format: int64 */
@@ -12709,7 +12741,12 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How long the window runs, in hours, from the moment an attack became known
+             * @description A window in force whose first notice on an incident this one starts at. It applies to every product this window does, and neither it nor anything it starts from starts from this window. Left off or zero, the window starts when the attack became known
+             */
+            from?: number;
+            /**
+             * Format: int64
+             * @description How long the window runs, in hours, from the moment it starts
              */
             hours: number;
             /**

@@ -12,15 +12,15 @@ import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
-import { at, since } from "../ui/when";
+import { at, since, typedMoment, typedNow } from "../ui/when";
 import { issueAt, obligationsAt } from "../app/routes";
 import { notACredential } from "../ui/noautofill";
 import { Keep } from "./FindingExploited";
 
 // Every standing record that a product was exploited here, with the windows
-// this deployment counts from the moment each became known and the notices
-// given. Called "Exploited here" on screen: the words of the record, the
-// finding's badge and the act, so the three read as one thing.
+// this deployment counts for each and the notices given. Called "Exploited
+// here" on screen: the words of the record, the finding's badge and the act,
+// so the three read as one thing.
 //
 // Its own screen rather than a filter over the overdue list: a window here has
 // somebody outside waiting on it, and a remediation deadline has nobody. What
@@ -28,6 +28,15 @@ import { Keep } from "./FindingExploited";
 // the tool's answer to give, so no row says so.
 type Incident = Body<"ObligationBody">;
 type Window = Body<"WindowBody">;
+type Notice = Body<"NoticeBody">;
+
+// What a notice may say about malice, as the form offers it and a notice
+// reads back. The server holds the words; these are their labels.
+const MALICE: Record<string, string> = {
+  yes: "Suspected malicious",
+  no: "Not malicious",
+  unknown: "Malice unknown",
+};
 
 export function Obligations() {
   const who = useWho();
@@ -76,7 +85,7 @@ export function Obligations() {
               Exploited here on {productName} · <Link to={obligationsAt()}>every product</Link>
             </>
           ) : (
-            "Attacks on our own products, not a feed flag, and the windows counted from when each became known."
+            "Attacks on our own products, not a feed flag, and the windows counted for each."
           )}
         </p>
         {triaged.length > 0 && (
@@ -153,17 +162,23 @@ function Incident({
             {(incident.windows ?? []).map((due) => (
               <tr key={due.window.id}>
                 <td>{due.window.name}</td>
-                <td title={at(due.ends_at)}>
-                  <span className={due.answered ? "" : due.passed ? "due over" : "due soon"}>
-                    {at(due.ends_at)}
-                  </span>
-                </td>
+                {due.started ? (
+                  <td title={`From ${at(due.starts_at)}`}>
+                    <span className={due.answered ? "" : due.passed ? "due over" : "due soon"}>
+                      {at(due.ends_at)}
+                    </span>
+                  </td>
+                ) : (
+                  <td className="hint">Not started</td>
+                )}
                 <td className="hint">
                   {due.answered
                     ? "notice recorded"
-                    : due.passed
-                      ? since(due.ends_at)
-                      : `${due.near ? "ending soon · " : ""}ends ${since(due.ends_at)}`}
+                    : !due.started
+                      ? `starts at the first notice for ${due.window.from_name ?? "another window"}`
+                      : due.passed
+                        ? since(due.ends_at)
+                        : `${due.near ? "ending soon · " : ""}ends ${since(due.ends_at)}`}
                 </td>
               </tr>
             ))}
@@ -186,6 +201,7 @@ function Incident({
                   {known && !windows.some((each) => each.id === one.window_id) && " (retired)"}
                 </span>
               )}
+              <Particulars notice={one} />
               <br />
               <span className="hint">{one.said}</span>
             </p>
@@ -212,6 +228,17 @@ function Incident({
   );
 }
 
+// What a notice carried beyond who, when and what, where it carried any.
+function Particulars({ notice }: { notice: Notice }) {
+  const parts = [
+    notice.reference,
+    (notice.places ?? []).join(", "),
+    notice.suspected_malicious ? MALICE[notice.suspected_malicious] : "",
+  ].filter((part) => part);
+  if (parts.length === 0) return null;
+  return <span className="hint"> · {parts.join(" · ")}</span>;
+}
+
 function Tell({
   id,
   knownAt,
@@ -224,15 +251,19 @@ function Tell({
   onClose: () => void;
 }) {
   const queries = useQueryClient();
-  // Local wall-clock, which is what the input shows and returns, defaulting to
-  // now: most notices are recorded as they are sent.
-  const [toldAt, setToldAt] = useState(() => {
-    const now = new Date();
-    return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  });
+  // Typed in UTC, as the card draws every moment, and defaulting to now: most
+  // notices are recorded as they are sent.
+  const [toldAt, setToldAt] = useState(() => typedNow());
   const [recipient, setRecipient] = useState("");
   const [said, setSaid] = useState("");
   const [answers, setAnswers] = useState("");
+  const [reference, setReference] = useState("");
+  const [places, setPlaces] = useState("");
+  const [malice, setMalice] = useState("");
+  const named = places
+    .split(/[,\n]/)
+    .map((place) => place.trim())
+    .filter((place) => place);
 
   const tell = useMutation({
     mutationFn: async () =>
@@ -241,9 +272,12 @@ function Tell({
           params: { path: { id } },
           body: {
             recipient,
-            told_at: new Date(toldAt).toISOString(),
+            told_at: typedMoment(toldAt),
             said,
             ...(answers ? { window: Number(answers) } : {}),
+            ...(reference.trim() ? { reference: reference.trim() } : {}),
+            ...(named.length > 0 ? { places: named } : {}),
+            ...(malice ? { suspected_malicious: malice as "yes" | "no" | "unknown" } : {}),
           },
         }),
       ),
@@ -268,7 +302,7 @@ function Tell({
         />
       </div>
       <div className="field" style={{ marginBottom: 8 }}>
-        <label htmlFor="toldat">Told at</label>
+        <label htmlFor="toldat">Told at (UTC)</label>
         <input
           id="toldat"
           type="datetime-local"
@@ -291,6 +325,35 @@ function Tell({
           </select>
         </div>
       )}
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label htmlFor="reference">Reference</label>
+        <input
+          id="reference"
+          type="text"
+          value={reference}
+          placeholder="Their case or submission number"
+          onChange={(event) => setReference(event.target.value)}
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label htmlFor="places">Places named</label>
+        <input
+          id="places"
+          type="text"
+          value={places}
+          placeholder="Separated by commas"
+          onChange={(event) => setPlaces(event.target.value)}
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label htmlFor="malice">Malicious</label>
+        <select id="malice" value={malice} onChange={(event) => setMalice(event.target.value)}>
+          <option value="">Not said</option>
+          <option value="yes">Suspected</option>
+          <option value="no">No</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
       <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
         <label htmlFor="said">Message</label>
         <textarea
@@ -304,7 +367,7 @@ function Tell({
         <button
           type="button"
           className="btn"
-          disabled={!recipient.trim() || !said.trim() || !toldAt || tell.isPending}
+          disabled={!recipient.trim() || !said.trim() || !typedMoment(toldAt) || tell.isPending}
           onClick={() => tell.mutate()}
         >
           Record
@@ -339,12 +402,19 @@ function Windows({ windows }: { windows: Window[] }) {
       {windows.length === 0 && <p className="hint">None declared.</p>}
       {windows.map((each) =>
         editing === each.id ? (
-          <WindowForm key={each.id} window={each} onDone={done} onCancel={() => setEditing(null)} />
+          <WindowForm
+            key={each.id}
+            window={each}
+            windows={windows}
+            onDone={done}
+            onCancel={() => setEditing(null)}
+          />
         ) : (
           <p key={each.id}>
             {each.name}{" "}
             <span className="hint">
               · {each.hours} hours
+              {each.from_name ? ` from the first notice for ${each.from_name}` : ""}
               {each.lead_hours ? ` · warned ${each.lead_hours} hours before` : ""}
               {" · "}
               {(each.products ?? []).length > 0
@@ -366,7 +436,7 @@ function Windows({ windows }: { windows: Window[] }) {
         ),
       )}
       {retire.error != null && <Failed error={retire.error} what="That window was not retired." />}
-      {editing === null && <WindowForm onDone={done} />}
+      {editing === null && <WindowForm windows={windows} onDone={done} />}
     </div>
   );
 }
@@ -375,10 +445,12 @@ function Windows({ windows }: { windows: Window[] }) {
 // field is sent, because a change replaces what the window says.
 function WindowForm({
   window,
+  windows,
   onDone,
   onCancel,
 }: {
   window?: Window;
+  windows: Window[];
   onDone: () => void;
   onCancel?: () => void;
 }) {
@@ -386,6 +458,7 @@ function WindowForm({
   const [hours, setHours] = useState(window ? String(window.hours) : "");
   const [lead, setLead] = useState(window?.lead_hours ? String(window.lead_hours) : "");
   const [limited, setLimited] = useState<string[]>(window?.products ?? []);
+  const [from, setFrom] = useState(window?.from ? String(window.from) : "");
   const products = useQuery({
     queryKey: ["products"],
     queryFn: async () => unwrap(await api.GET("/v1/products", {})),
@@ -396,6 +469,7 @@ function WindowForm({
     hours: Number(hours),
     ...(Number(lead) > 0 ? { lead_hours: Number(lead) } : {}),
     ...(limited.length > 0 ? { products: limited } : {}),
+    ...(from ? { from: Number(from) } : {}),
   });
   const save = useMutation({
     mutationFn: async () =>
@@ -413,6 +487,7 @@ function WindowForm({
         setHours("");
         setLead("");
         setLimited([]);
+        setFrom("");
       }
       onDone();
     },
@@ -434,7 +509,7 @@ function WindowForm({
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <label className="field" title="Counted from when the attack became known">
+        <label className="field" title="Counted from the moment Counted from names">
           <span>Length, hours</span>
           <input
             type="number"
@@ -456,6 +531,23 @@ function WindowForm({
             value={lead}
             onChange={(event) => setLead(event.target.value)}
           />
+        </label>
+        <label className="field">
+          <span>Counted from</span>
+          <select
+            style={{ width: "auto" }}
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+          >
+            <option value="">When it became known</option>
+            {windows
+              .filter((each) => each.id !== window?.id)
+              .map((each) => (
+                <option key={each.id} value={each.id}>
+                  The first notice for {each.name}
+                </option>
+              ))}
+          </select>
         </label>
       </div>
       {(products.data?.items ?? []).length > 0 && (

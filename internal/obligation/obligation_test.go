@@ -228,7 +228,7 @@ func TestANoticeNamingAWindowAnswersThatWindowAlone(t *testing.T) {
 		record := f.attacked(t)
 
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
-			knownAt.Add(19*time.Hour), "An attack through the management socket."); err != nil {
+			knownAt.Add(19*time.Hour), "An attack through the management socket.", obligation.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		shelf, err := f.store.Shelf(ctx, f.triager)
@@ -317,11 +317,11 @@ func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
 		}
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &elsewhere.ID, "ENISA",
-			knownAt.Add(time.Hour), "Told."); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			knownAt.Add(time.Hour), "Told.", obligation.Details{}); !errors.Is(err, obligation.ErrNoSuchWindow) {
 			t.Errorf("a notice naming a window limited to another product answered %v", err)
 		}
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &here.ID, "ENISA",
-			knownAt.Add(time.Hour), "Told."); err != nil {
+			knownAt.Add(time.Hour), "Told.", obligation.Details{}); err != nil {
 			t.Fatalf("a notice naming a window limited to its own product answered %v", err)
 		}
 
@@ -362,11 +362,11 @@ func TestANoticeIsNotBeforeTheAttackBecameKnown(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
-			knownAt.Add(-time.Hour), "An attack."); err == nil {
+			knownAt.Add(-time.Hour), "An attack.", obligation.Details{}); err == nil {
 			t.Error("a notice before the attack became known was recorded")
 		}
 		if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
-			time.Now().Add(time.Hour), "An attack."); err == nil {
+			time.Now().Add(time.Hour), "An attack.", obligation.Details{}); err == nil {
 			t.Error("a notice still to come was recorded")
 		}
 	})
@@ -378,12 +378,12 @@ func TestANoticeIsRecordedOnlyByWhoeverMayTriageTheProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		_, err := f.store.RecordTold(t.Context(), f.outsider, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.")
+			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
 		if !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Fatalf("somebody with nothing on the product recording a notice answered %v", err)
 		}
 		_, err = f.store.RecordTold(t.Context(), f.outsider, record.ID+1000, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.")
+			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
 		if !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Fatalf("a record nobody kept answered %v", err)
 		}
@@ -481,7 +481,7 @@ func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
 		early := f.window(t, "Early warning", 24)
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
-			knownAt.Add(time.Hour), "An attack."); err != nil {
+			knownAt.Add(time.Hour), "An attack.", obligation.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.RetireWindow(ctx, f.admin, early.ID); err != nil {
@@ -497,7 +497,7 @@ func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
 			t.Errorf("retiring a window twice answered %v", err)
 		}
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
-			knownAt.Add(2*time.Hour), "More."); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			knownAt.Add(2*time.Hour), "More.", obligation.Details{}); !errors.Is(err, obligation.ErrNoSuchWindow) {
 			t.Errorf("a notice naming a retired window answered %v", err)
 		}
 
@@ -537,7 +537,7 @@ func TestANoticeSaysWhoWhenAndWhat(t *testing.T) {
 			{"more said than the bound", "ENISA", strings.Repeat("x", triage.GroundsLimit+1), when},
 		} {
 			if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil,
-				tc.recipient, tc.at, tc.said); err == nil {
+				tc.recipient, tc.at, tc.said, obligation.Details{}); err == nil {
 				t.Errorf("a notice with %s was recorded", tc.name)
 			}
 		}
@@ -551,7 +551,7 @@ func TestANoticeIsRecordedAgainstAPerson(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		_, err := f.store.RecordTold(t.Context(), access.Everything("a background pass"),
-			record.ID, nil, "ENISA", knownAt.Add(time.Hour), "An attack.")
+			record.ID, nil, "ENISA", knownAt.Add(time.Hour), "An attack.", obligation.Details{})
 		if err == nil || !strings.Contains(err.Error(), "against whoever recorded it") {
 			t.Errorf("a notice recorded by no person answered %v, want the refusal naming who records one", err)
 		}
@@ -657,7 +657,7 @@ func TestANoticeAboutAnUndisclosedIssueIsRefusedToWhoMayNotReadIt(t *testing.T) 
 			t.Fatal(err)
 		}
 		_, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.")
+			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
 		if !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Fatalf("a public triager recording a notice of an undisclosed attack answered %v", err)
 		}
@@ -732,7 +732,7 @@ func TestANoticeIsReadOnlyByWhoMayBeToldOfTheAttack(t *testing.T) {
 		ctx := t.Context()
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack."); err != nil {
+			knownAt.Add(time.Hour), "An attack.", obligation.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		told, err := f.store.ToldAbout(ctx, f.outsider, []int64{record.ID})

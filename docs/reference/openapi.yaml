@@ -2879,7 +2879,7 @@ components:
           description: Whether a notice recorded against this incident names this window
           type: boolean
         ends_at:
-          description: When the attack became known, plus the window
+          description: When the window started, plus the window. Absent until it starts
           format: date-time
           type: string
         near:
@@ -2888,11 +2888,18 @@ components:
         passed:
           description: Whether that moment has gone
           type: boolean
+        started:
+          description: Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded
+          type: boolean
+        starts_at:
+          description: "When the window started: when the attack became known, or when the first notice for the window it starts from was given. Absent until it starts"
+          format: date-time
+          type: string
         window:
           $ref: "#/components/schemas/WindowBody"
       required:
         - window
-        - ends_at
+        - started
         - passed
         - near
         - answered
@@ -6725,6 +6732,13 @@ components:
         id:
           format: int64
           type: integer
+        places:
+          description: The places the notice named, in order
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         recipient:
           description: Who was told
           type: string
@@ -6734,8 +6748,18 @@ components:
         recorded_by:
           description: Who recorded the notice
           type: string
+        reference:
+          description: What the recipient called the notice. Absent where none was recorded
+          type: string
         said:
           description: What they were told
+          type: string
+        suspected_malicious:
+          description: What the notice said about whether the attack was malicious. Absent where it said nothing
+          enum:
+            - "yes"
+            - "no"
+            - unknown
           type: string
         told_at:
           description: When they were told
@@ -6765,15 +6789,34 @@ components:
           format: uri
           readOnly: true
           type: string
+        places:
+          description: The places the notice named, in order. Each is up to 191 characters and not blank; one named twice, in any capitals, is kept once
+          items:
+            type: string
+          maxItems: 250
+          type:
+            - array
+            - "null"
         recipient:
           description: "Who was told: a regulator, a customer, a response team"
           maxLength: 200
           minLength: 1
           type: string
+        reference:
+          description: What the recipient called the notice, such as a case number. Left off, none
+          maxLength: 191
+          type: string
         said:
           description: What they were told
           maxLength: 65536
           minLength: 1
+          type: string
+        suspected_malicious:
+          description: What the notice said about whether the attack was malicious. Left off, it said nothing
+          enum:
+            - "yes"
+            - "no"
+            - unknown
           type: string
         told_at:
           description: When they were told. Not before the attack became known, and not in the future
@@ -6905,7 +6948,7 @@ components:
           description: The issue this is about
           type: string
         windows:
-          description: Every window in force that applies to this product, shortest first, as it runs from when the attack became known
+          description: Every window in force that applies to this product, shortest first, as it runs for this incident
           items:
             $ref: "#/components/schemas/DueBody"
           type:
@@ -11607,8 +11650,15 @@ components:
         declared_at:
           format: date-time
           type: string
+        from:
+          description: The window whose first notice on an incident this one starts at. Absent where it starts when the attack became known
+          format: int64
+          type: integer
+        from_name:
+          description: That window's name
+          type: string
         hours:
-          description: How long the window runs, in hours, from the moment an attack became known
+          description: How long the window runs, in hours, from the moment it starts
           format: int64
           type: integer
         id:
@@ -11645,8 +11695,13 @@ components:
           format: uri
           readOnly: true
           type: string
+        from:
+          description: A window in force whose first notice on an incident this one starts at. It applies to every product this window does, and neither it nor anything it starts from starts from this window. Left off or zero, the window starts when the attack became known
+          format: int64
+          minimum: 0
+          type: integer
         hours:
-          description: How long the window runs, in hours, from the moment an attack became known
+          description: How long the window runs, in hours, from the moment it starts
           format: int64
           maximum: 8784
           minimum: 1
@@ -14681,9 +14736,9 @@ paths:
   /v1/exploited-here/{id}/told:
     post:
       description: |-
-        Records who was told about an attack, when, and what they were told. Append-only: a notice recorded in error is corrected by recording another beside it.
+        Records who was told about an attack, when, and what they were told, with the recipient's reference, the places named and what was said about malice where the notice carried them. Append-only: a notice recorded in error is corrected by recording another beside it.
 
-        Name a window to say this notice answers it. The window then stops raising its notification for this incident.
+        Name a window to say this notice answers it. The window then stops raising its notification for this incident, and a window starting from it starts at the first such notice.
 
         Allowed on a cleared record, because a notice given before the clearing still happened.
 
@@ -16221,7 +16276,7 @@ paths:
   /v1/obligation-windows:
     get:
       description: |-
-        Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
+        Every window in force, shortest first. Each runs from the moment an attack on a product became known, or from the first notice for another window. None ships: a deployment declares the windows it answers to.
 
         A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
 
@@ -16247,9 +16302,9 @@ paths:
         scope: person
     post:
       description: |-
-        Adds a window every standing attack on the products it names is watched against, counted from the moment each became known. Recorded in the administrative trail.
+        Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from. Recorded in the administrative trail.
 
-        A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
+        A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does.
 
         Requires: administrator
       operationId: declare-obligation-window
@@ -16282,7 +16337,7 @@ paths:
       description: |-
         Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
 
-        A window already retired, or never declared, answers 404.
+        A window already retired, or never declared, answers 404. A window another window in force starts from answers 409: change or retire that one first.
 
         Requires: administrator
       operationId: retire-obligation-window
@@ -16309,9 +16364,9 @@ paths:
         scope: deployment
     put:
       description: |-
-        Restates a window in force: its name, how long it runs, its warning and the products it applies to. Each field is replaced by what is sent, so a warning or a product list left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+        Restates a window in force: its name, how long it runs, its warning, the products it applies to and the window it starts from. Each field is replaced by what is sent, so a warning, a product list or a from window left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
 
-        A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
+        A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that would start a loop, and a product list leaving out a product a window starting from this one applies to.
 
         Requires: administrator
       operationId: change-obligation-window
@@ -16349,7 +16404,7 @@ paths:
   /v1/obligations:
     get:
       description: |-
-        Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs from the moment the attack became known, and every notice recorded about it.
+        Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, and every notice recorded about it. A window starts when the attack became known, or at the first notice for the window it starts from, and has no end until then.
 
         A window is answered where a notice names it. Nothing here says whether a notice met anything.
 

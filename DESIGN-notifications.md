@@ -719,20 +719,21 @@ happens to have spoken about.
 ## Obligation notices
 
 A window a deployment declares runs from the moment a record says its product
-was attacked (REQ-77). `DESIGN-obligations.md` holds the windows and the
+was attacked, or from the first notice for the window it counts from (REQ-77). `DESIGN-obligations.md` holds the windows and the
 notices; what is said about them is here.
 
 | Rule | Reason |
 |---|---|
 | Three conditions: running, near its end, and passed | They clear differently, the way the embargo conditions do. The running one and the near one clear when the end arrives, and the passed one opens |
-| Running is raised from the moment the record stands | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| Running is raised from the moment the window starts | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| A window waiting on another window's notice raises nothing until that notice is recorded | It has no end to say, and saying it is running would be false |
 | Near is raised at the warning the window names, and not at all where it names none | Beside the running one rather than instead of it. The first says an attack is being counted; the second says the count is nearly out |
 | Only for a product the window applies to | A window limited to other products raises nothing for this one |
 | One per record and window | Each window is answered separately, so each is said separately |
 | Cleared by a notice naming the window, by clearing the record, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
 | To whoever may triage the product, at the issue's visibility | The people who may record the notice. An undisclosed issue reaches nobody who may not read undisclosed work there, and what leaves the deployment about it is a link |
 | No window declared, nothing said | None ships. A deployment under no obligation hears nothing |
-| The sentence says the time and that nothing is recorded | Both are facts. Whether anybody owed anything is not the tool's answer to give |
+| The sentence says the time, what the window counts from, and that nothing is recorded | All three are facts. Whether anybody owed anything is not the tool's answer to give |
 
 ## Ownership of a notification
 

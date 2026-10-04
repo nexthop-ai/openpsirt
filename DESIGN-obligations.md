@@ -56,7 +56,7 @@ asks, which is why they are stored rather than worked out again.
 | | |
 |---|---|
 | That this product was exploited through an issue, here | Person-recorded, append-only, on any finding regardless of kind. An inherited flaw used against our product is the case, and it needs no flaw of our own |
-| The moment it became known | What every window a deployment might be under counts from. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
+| The moment it became known | What a window counts from, directly or through the notices given after it. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
 | Clearing the exploitation record | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `DESIGN-findings.md` § Merged issues holds the rule |
@@ -103,7 +103,7 @@ deadline.
 ## Windows
 
 A window is a period a deployment says it answers within, counted from the
-moment an attack became known.
+moment an attack became known or from the first notice naming another window.
 
 | Rule | Reason |
 |---|---|
@@ -113,11 +113,16 @@ moment an attack became known.
 | A warning, where the window names one: whole hours before the end, at least one and fewer than the window runs | A day's window and a fortnight's want warnings of different sizes, so each says its own. A warning at or before the window opens says nothing the condition raised when the record stands has not |
 | Limited to named products, or every product where it names none | Which window applies where is the administrator's statement. One deployment can ship a product under an obligation beside one that is under none, and a window over both raises alerts for the product it never applied to |
 | A product nobody declared refuses the whole window, naming it | A window silently applying to fewer products than were named is quiet about the one that was meant. A blank name is one nobody declared; dropped, a list of blanks declares a window over every product |
-| A change restates the whole window | Name, length, warning and products are all replaced, so a warning or a product list left off is removed |
+| A change restates the whole window | Name, length, warning, products and the window it counts from are all replaced, so any of them left off is removed |
 | Names are unique among the windows in force, without regard to capitals | A notice names the window it answers, and two in force under one name make that ambiguous |
 | Retired rather than deleted | A notice keeps naming the window it answered. Retiring releases the name, so it may be declared again |
 | An end is worked out when asked, from the window as it stands | Changing a window's length moves every incident's end with it, which is what changing it means |
-| The clock runs from the moment the record says the attack became known | It is not the remediation deadline and is not derived from it |
+| The clock runs from the moment the record says the attack became known, or from the first notice on the incident naming the window it counts from | It is not the remediation deadline and is not derived from it. A later stage of a report counts from an earlier notice, and both moments are already recorded |
+| The first such notice, and no later one | A correction recorded beside a notice does not move when the notice was given |
+| A window waiting on a notice has no start and no end | Nothing is counting, so nothing is near, passed or raised |
+| It counts only from a window in force that applies to every product it does | A notice names a window only on a product the window applies to, so a product outside it would hold a window that never starts. A reader who may read the one may read the other |
+| Not from itself, and not from a window counting back to it | A loop of windows each waiting on another's notice never starts |
+| A window another counts from is neither retired nor narrowed past it | Either would leave the other waiting on a notice nobody can record. Refused, naming the window to change first |
 | The remediation computation is not reused | That deadline stops where nothing upstream would close the finding, which is exactly the population a flaw of our own falls into, so reuse leaves the obligation with no clock at all. `DESIGN-remediation.md` § Deadlines has why that rule is right where it is |
 | Declared once for the deployment | What a deployment answers to is a fact about the organization running it. Declared per product, one rule would be restated for every product it covers |
 | Its products are named only to whoever may know they exist | The list of windows is readable by anybody signed in, and the list of products is itself a statement about what an organization ships. A window limited to products the reader may not know exist is left out of what they read |
@@ -135,11 +140,17 @@ A record that somebody outside was told about an attack.
 | When they were told | Supplied rather than taken from the clock, for the reason the moment an attack became known is |
 | What they were told | Required, and held to the policy every typed field goes through |
 | The window it answers | Where whoever recorded it names one. Their statement; nothing here judges whether a notice met a window |
+| The recipient's reference | Where they gave one: a case or submission number. Up to a name's width |
+| The places it named | Free text, in the order given. Which places a deployment names is its own business, and nothing matches them against a list |
+| What it said about malice | Suspected, not malicious, or unknown, where it said anything. Unknown is a statement of its own, which silence is not |
 | Who recorded it, and when | Written on the notice, so it is not also a row in the administrative trail |
 
 | Rule | Reason |
 |---|---|
 | Append-only, with no edit and no withdrawal | What was said to a regulator is not unsaid by editing a row. A notice recorded in error is answered by recording the correction beside it |
+| A stage is the window a notice answers | A deployment names its windows for the stages it reports in. A second list of stages would name the same thing twice |
+| A place named twice, in any capitals, is kept once, as first typed. A blank place is refused | A blank is a slip in what was typed, and the rest of the list may be wrong with it |
+| At most two hundred and fifty places, each up to a name's width | Every country in the world with room to spare, and a bound on what one request writes |
 | Asked of triage on the record's product | Recording a notice is part of answering the attack, which is what recording it asks |
 | Refused before the attack became known, and in the future | One of two moments is wrong, and the record is the one already kept |
 | Allowed on a cleared record | A notice given before the clearing still happened |
@@ -151,7 +162,7 @@ A record that somebody outside was told about an attack.
 ## The shelf
 
 Every standing record, earliest known first, with every window in force that
-applies to its product as it runs from that record, and every notice given. Its own screen rather than a
+applies to its product as it runs for that incident, and every notice given. Its own screen rather than a
 filter over the overdue list, and never reached by one.
 
 | Rule | Reason |
@@ -164,7 +175,8 @@ filter over the overdue list, and never reached by one.
 | Each record is narrowed by the question that authorizes one issue in one product | The same question the record's own finding asks. Nothing is counted before the narrowing, so no total says how many records exist to somebody shown fewer |
 | A product named in the address narrows the shelf to that product's records, and the screen says so with the way back to every product | A figure counted over one product opens what it counted. The narrowing is over what the reader was already shown, so it reveals nothing |
 | Unpaged | The set is what this deployment's products have been attacked through and nobody has cleared. A deployment where that is long has a problem no paging would help with |
-| A window shows when it ends, whether its warning has come, whether that end has passed, and whether a notice names it | Times and parties. No row says an obligation applies or was met |
+| A window shows when it started, when it ends, whether its warning has come, whether that end has passed, and whether a notice names it | Times and parties. No row says an obligation applies or was met |
+| A window waiting on a notice says which window's notice starts it | It has no end to show, and an empty cell reads as a window nobody counts |
 | A cleared record leaves the shelf | It stays readable at its finding, with who cleared it and why |
 | Hygiene deadlines stay soft | Correct as it is, and stated here so nobody hardens the wrong half |
 
@@ -208,6 +220,12 @@ judged not to apply to one incident on a product it covers goes on raising its
 condition until a notice names it, the record is cleared or the window is
 retired. The condition says only what is true: the
 time, and that nothing is recorded.
+
+A window counts from the moment the attack became known or from a notice, and
+from no other event. A fix becoming available is not a moment the record
+holds, so a window cannot count from one. A record is about one issue in one
+product, so an incident not tied to an issue, such as a compromised build or
+update channel, has no record here.
 
 The shelf stores no end and no state. Every end is worked out from the record's
 moment and the window as it stands when somebody asks, so a window changed

@@ -14,6 +14,7 @@ package obligation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,7 +31,8 @@ import (
 )
 
 // Window is a period a deployment says it answers within, counted from the
-// moment an attack became known.
+// moment an attack became known or from the first notice naming another
+// window.
 //
 // None ships. A window is somebody's reading of rules this software does not
 // know, and a default would be that reading made for every deployment by
@@ -57,6 +59,11 @@ type Window struct {
 	// force, and null once it is retired. Unique, so two windows in force
 	// cannot share a name and a retired one does not hold its name back.
 	LiveName *string `bun:"live_name"`
+	// FromID is the window whose first notice on an incident this one counts
+	// from, or nil where it counts from the moment the attack became known.
+	FromID *int64 `bun:"from_window_id"`
+	// FromName is that window's name.
+	FromName string `bun:"-"`
 
 	// Products is the products the window is limited to, by identifier and
 	// by the name an address takes. Empty is every product.
@@ -82,6 +89,9 @@ type WindowSaid struct {
 	// Products names the products the window applies to. Empty is every
 	// product.
 	Products []string
+	// From is the window in force whose first notice on an incident this one
+	// counts from, or nil to count from the moment the attack became known.
+	From *int64
 }
 
 // AppliesTo is whether the window counts for an attack on this product.
@@ -97,20 +107,39 @@ func (w Window) AppliesTo(productID int64) bool {
 	return false
 }
 
-// NearAt is when the second notice for an incident known at this moment is
-// raised, where the window names a lead time.
-func (w Window) NearAt(knownAt time.Time) (time.Time, bool) {
+// Covers is whether this window applies to every product the other does. A
+// window counting from another's notice is held to it: a notice can name a
+// window only on a product the window applies to, so a product outside it
+// would hold a window that never starts.
+func (w Window) Covers(other Window) bool {
+	if len(w.Products) == 0 {
+		return true
+	}
+	if len(other.Products) == 0 {
+		return false
+	}
+	for _, id := range other.Products {
+		if !w.AppliesTo(id) {
+			return false
+		}
+	}
+	return true
+}
+
+// NearAt is when the second notice for an incident is raised, where the
+// window names a lead time, for a window that started at this moment.
+func (w Window) NearAt(start time.Time) (time.Time, bool) {
 	if w.LeadHours == nil {
 		return time.Time{}, false
 	}
-	return w.EndsAt(knownAt).Add(-time.Duration(*w.LeadHours) * time.Hour), true
+	return w.EndsAt(start).Add(-time.Duration(*w.LeadHours) * time.Hour), true
 }
 
 // Length is how long the window runs.
 func (w Window) Length() time.Duration { return time.Duration(w.Hours) * time.Hour }
 
 // EndsAt is when the window counted from this moment closes.
-func (w Window) EndsAt(knownAt time.Time) time.Time { return knownAt.Add(w.Length()) }
+func (w Window) EndsAt(start time.Time) time.Time { return start.Add(w.Length()) }
 
 // LongestHours bounds a window at a year. A window longer than that is not
 // one anybody is watched against, and the bound keeps the arithmetic of an
@@ -122,6 +151,11 @@ var ErrNoSuchWindow = refusal.New("no window in force goes by that")
 
 // ErrWindowNamed is returned where a window in force already has the name.
 var ErrWindowNamed = refusal.New("a window in force already has that name")
+
+// ErrCountedFrom is returned where a window another window in force counts
+// from would be retired.
+var ErrCountedFrom = refusal.New("another window in force counts from this one. " +
+	"Change or retire that window first")
 
 // Store reads and writes obligations.
 type Store struct {
@@ -234,7 +268,94 @@ func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 	if len(windows) == 0 {
 		return windows, nil
 	}
-	return withLimits(ctx, s.db, windows)
+	windows, err = withLimits(ctx, s.db, windows)
+	if err != nil {
+		return nil, err
+	}
+	return withFrom(ctx, s.db, windows)
+}
+
+// withFrom fills in the name of the window each window counts from, which the
+// window row itself does not carry. Read as the window stands: what a window
+// counts from is never retired while it does.
+func withFrom(ctx context.Context, db bun.IDB, windows []Window) ([]Window, error) {
+	wanted := map[int64]bool{}
+	for _, window := range windows {
+		if window.FromID != nil {
+			wanted[*window.FromID] = true
+		}
+	}
+	if len(wanted) == 0 {
+		return windows, nil
+	}
+	ids := make([]int64, 0, len(wanted))
+	for id := range wanted {
+		ids = append(ids, id)
+	}
+	var named []Window
+	if err := db.NewSelect().Model(&named).Column("ow.id", "ow.name").
+		Where("ow.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the windows others count from: %w", err)
+	}
+	names := make(map[int64]string, len(named))
+	for _, window := range named {
+		names[window.ID] = window.Name
+	}
+	for i, window := range windows {
+		if window.FromID != nil {
+			windows[i].FromName = names[*window.FromID]
+		}
+	}
+	return windows, nil
+}
+
+// countsFrom checks the window one declared or changed would count from,
+// inside the write that stores it, and returns its name.
+//
+// It is a window in force that applies to every product this one does. It is
+// not this window, and nothing it counts from, followed back, is this window:
+// a loop of windows each waiting on another's notice never starts.
+func countsFrom(ctx context.Context, tx bun.IDB, self int64, from int64,
+	window Window) (string, error) {
+	anchor, err := inForce(ctx, tx, from)
+	if errors.Is(err, ErrNoSuchWindow) {
+		return "", refusal.New("a window counts from a window in force, or from when the attack became known")
+	}
+	if err != nil {
+		return "", err
+	}
+	if !anchor.Covers(window) {
+		return "", refusal.Errorf("%q does not apply to every product this window does, "+
+			"so a notice for it could not start this one everywhere", anchor.Name)
+	}
+	seen := map[int64]bool{}
+	for at := anchor; ; {
+		if at.ID == self {
+			return "", refusal.New("a window cannot count from itself, or from a window counting from it")
+		}
+		if at.FromID == nil || seen[at.ID] {
+			break
+		}
+		seen[at.ID] = true
+		next := new(Window)
+		if err := tx.NewSelect().Model(next).Where("ow.id = ?", *at.FromID).Scan(ctx); err != nil {
+			return "", fmt.Errorf("read the window another counts from: %w", err)
+		}
+		at = next
+	}
+	return anchor.Name, nil
+}
+
+// dependents is every window in force counting from this one, with the
+// products each is limited to.
+func dependents(ctx context.Context, tx bun.IDB, id int64) ([]Window, error) {
+	var windows []Window
+	if err := tx.NewSelect().Model(&windows).
+		Where("ow.from_window_id = ?", id).Where("ow.retired_at IS NULL").
+		Order("ow.id ASC").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the windows counting from a window: %w", err)
+	}
+	return withLimits(ctx, tx, windows)
 }
 
 // withLimits fills in the products each window is limited to, which the
@@ -376,6 +497,12 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 			Name: said.Name, Hours: said.Hours, LeadHours: said.LeadHours,
 			DeclaredBy: subject.ID,
 			DeclaredAt: s.now().Truncate(time.Microsecond), LiveName: &live,
+			FromID: said.From, Products: products, ProductNames: names,
+		}
+		if said.From != nil {
+			if window.FromName, err = countsFrom(ctx, tx, 0, *said.From, *window); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.NewInsert().Model(window).Exec(ctx); err != nil {
 			if database.IsDuplicate(err) {
@@ -417,11 +544,35 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 		if err != nil {
 			return err
 		}
-		*window = *before
+		named, err := withFrom(ctx, tx, []Window{*before})
+		if err != nil {
+			return err
+		}
+		*window = named[0]
 		was := describe(*window)
 		products, names, err := productsNamed(ctx, tx, said.Products)
 		if err != nil {
 			return err
+		}
+		after := *window
+		after.Products, after.ProductNames, after.FromID, after.FromName =
+			products, names, said.From, ""
+		if said.From != nil {
+			if after.FromName, err = countsFrom(ctx, tx, id, *said.From, after); err != nil {
+				return err
+			}
+		}
+		// Every window counting from this one still applies only where this
+		// one does.
+		counting, err := dependents(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		for _, other := range counting {
+			if !after.Covers(other) {
+				return refusal.Errorf("%q counts from this window and applies to a product "+
+					"this one would not", other.Name)
+			}
 		}
 		live := folded(said.Name)
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
@@ -429,6 +580,7 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 			Set("length_hours = ?", said.Hours).
 			Set("lead_hours = ?", said.LeadHours).
 			Set("live_name = ?", live).
+			Set("from_window_id = ?", said.From).
 			Where("id = ?", id).
 			// Still in force when this lands. A retirement committed since the
 			// read above leaves nothing to change, and a trail row saying it
@@ -454,6 +606,7 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 		window.Name, window.Hours, window.LeadHours, window.LiveName =
 			said.Name, said.Hours, said.LeadHours, &live
 		window.Products, window.ProductNames = products, names
+		window.FromID, window.FromName = after.FromID, after.FromName
 		return noteWindow(ctx, tx, subject, said.Name, was, describe(*window))
 	})
 	if err != nil {
@@ -475,6 +628,18 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 		if err != nil {
 			return err
 		}
+		counting, err := dependents(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if len(counting) > 0 {
+			return ErrCountedFrom
+		}
+		named, err := withFrom(ctx, tx, []Window{*window})
+		if err != nil {
+			return err
+		}
+		window = &named[0]
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
 			Set("retired_at = ?", s.now().Truncate(time.Microsecond)).
 			Set("live_name = ?", nil).
@@ -535,6 +700,9 @@ func (s *Store) writing(ctx context.Context,
 // the products it is limited to.
 func describe(w Window) *string {
 	text := strconv.Itoa(w.Hours) + "h"
+	if w.FromID != nil {
+		text += " from the first notice for " + w.FromName
+	}
 	if w.LeadHours != nil {
 		text += ", warned " + strconv.Itoa(*w.LeadHours) + "h before"
 	}
