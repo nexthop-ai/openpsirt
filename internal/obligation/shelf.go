@@ -33,14 +33,18 @@ type Standing struct {
 type Due struct {
 	Window Window
 	// Started says the window is counting. A window counting from the first
-	// notice for another starts when that notice is recorded, and until then
-	// has no start and no end.
+	// notice for another starts when that notice is recorded, and one counting
+	// from the fix when a release named as carrying it has a stated release
+	// date that has arrived. Until then it raises nothing.
 	Started bool
 	// StartsAt is the moment the window counts from: when the incident
-	// became known, or when the first notice for the window it counts from
-	// was given.
+	// became known, when the first notice for the window it counts from was
+	// given, or the start of the earliest release date stated for a release
+	// the record names as carrying the fix. Zero where there is none yet. A
+	// release date still to come is a start that has not arrived, so the
+	// window has a start and has not started.
 	StartsAt time.Time
-	// EndsAt is that moment plus the window.
+	// EndsAt is that moment plus the window, and zero where there is no start.
 	EndsAt time.Time
 	// Passed says that moment has gone.
 	Passed bool
@@ -54,11 +58,13 @@ type Due struct {
 }
 
 // Entry is one incident on the shelf: the record, every window this
-// deployment counts as it runs from that record, and every notice given.
+// deployment counts as it runs from that record, every notice given, and
+// every release named as carrying the fix.
 type Entry struct {
 	Standing
 	Windows []Due
 	Told    []Told
+	Fixes   []Fix
 }
 
 // Standings is every record of being exploited still standing that this
@@ -158,14 +164,20 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 	if err != nil {
 		return nil, err
 	}
+	fixes, err := s.FixesOf(ctx, subject, ids)
+	if err != nil {
+		return nil, err
+	}
 	now := s.now()
 	entries := make([]Entry, 0, len(kept))
 	for _, one := range kept {
+		fixed, _ := FixAvailable(fixes[one.Record.ID])
 		entries = append(entries, Entry{
 			Standing: one,
 			Windows: Running(windows, one.Record.ProductID, one.Record.KnownAt,
-				told[one.Record.ID], now),
-			Told: told[one.Record.ID],
+				told[one.Record.ID], fixed, now),
+			Told:  told[one.Record.ID],
+			Fixes: fixes[one.Record.ID],
 		})
 	}
 	return entries, nil
@@ -175,8 +187,9 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 // runs for one incident, with whether it has started, whether its warning has
 // come, whether it has passed and whether a notice names it.
 //
-// A window counts from the moment the attack became known, or from the first
-// notice on the incident naming the window it counts from. The earliest such
+// A window counts from the moment the attack became known, from the first
+// notice on the incident naming the window it counts from, or from fixed: the
+// moment FixAvailable gives, and zero where it gives none. The earliest such
 // notice, because a correction recorded beside a notice does not move when
 // the first one was given.
 //
@@ -185,7 +198,7 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 // window limited to other products is left out: which window applies where is
 // the administrator's statement, and nothing here second-guesses it.
 func Running(windows []Window, productID int64, knownAt time.Time, told []Told,
-	now time.Time) []Due {
+	fixed, now time.Time) []Due {
 	answered := map[int64]bool{}
 	first := map[int64]time.Time{}
 	for _, one := range told {
@@ -202,15 +215,24 @@ func Running(windows []Window, productID int64, knownAt time.Time, told []Told,
 		if !window.AppliesTo(productID) {
 			continue
 		}
-		start, started := knownAt, true
-		if window.FromID != nil {
-			start, started = first[*window.FromID]
+		start, has := knownAt, true
+		switch {
+		case window.FromID != nil:
+			start, has = first[*window.FromID]
+		case window.FromFix:
+			start, has = fixed, !fixed.IsZero()
 		}
-		if !started {
+		if !has {
 			out = append(out, Due{Window: window, Answered: answered[window.ID]})
 			continue
 		}
 		ends := window.EndsAt(start)
+		if now.Before(start) {
+			out = append(out, Due{
+				Window: window, StartsAt: start, EndsAt: ends, Answered: answered[window.ID],
+			})
+			continue
+		}
 		passed := !now.Before(ends)
 		near := false
 		if at, warns := window.NearAt(start); warns {

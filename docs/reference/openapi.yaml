@@ -2879,7 +2879,7 @@ components:
           description: Whether a notice recorded against this incident names this window
           type: boolean
         ends_at:
-          description: When the window started, plus the window. Absent until it starts
+          description: When the window starts, plus the window. Absent while it has no start
           format: date-time
           type: string
         near:
@@ -2889,10 +2889,10 @@ components:
           description: Whether that moment has gone
           type: boolean
         started:
-          description: Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded
+          description: Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded, and one starting at the fix until a stated release date of a tag named as carrying it has come
           type: boolean
         starts_at:
-          description: "When the window started: when the attack became known, or when the first notice for the window it starts from was given. Absent until it starts"
+          description: "When the window starts: when the attack became known, when the first notice for the window it starts from was given, or the start of the earliest release date stated for a tag named as carrying the fix, in UTC. Absent while there is none"
           format: date-time
           type: string
         window:
@@ -3558,6 +3558,13 @@ components:
         cleared_by:
           description: Who cleared it
           type: string
+        fixes:
+          description: The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom
+          items:
+            $ref: "#/components/schemas/FixBody"
+          type:
+            - array
+            - "null"
         grounds:
           description: What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has
           type: string
@@ -4006,6 +4013,73 @@ components:
       required:
         - items
         - total
+      type: object
+    FixBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/FixBody.json
+          format: uri
+          readOnly: true
+          type: string
+        id:
+          format: int64
+          type: integer
+        named_at:
+          format: date-time
+          type: string
+        named_by:
+          description: Who named it
+          type: string
+        open:
+          description: Whether a finding of the issue is open in a build of the tag, among the findings you may read. Nothing is concluded from it
+          type: boolean
+        release:
+          description: The tag, by the name an address takes
+          type: string
+        release_name:
+          description: That tag's spelling on screen
+          type: string
+        released_on:
+          description: The release date stated for the tag, as YYYY-MM-DD. Absent where nobody has stated one, and then the tag starts no window
+          type: string
+        scanned:
+          description: Whether any build of the tag has been scanned
+          type: boolean
+        withdrawn_at:
+          description: When it was withdrawn. Absent while it stands
+          format: date-time
+          type: string
+        withdrawn_by:
+          description: Who withdrew it
+          type: string
+      required:
+        - id
+        - release
+        - release_name
+        - named_at
+        - scanned
+        - open
+      type: object
+    FixNamed:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/FixNamed.json
+          format: uri
+          readOnly: true
+          type: string
+        release:
+          description: A tag of the record's product, by the name scans use for it. One declared before any scan of it is accepted
+          maxLength: 191
+          minLength: 1
+          type: string
+      required:
+        - release
       type: object
     Flag:
       additionalProperties: false
@@ -6902,6 +6976,13 @@ components:
         cleared_by:
           description: Who cleared it
           type: string
+        fixes:
+          description: The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom
+          items:
+            $ref: "#/components/schemas/FixBody"
+          type:
+            - array
+            - "null"
         grounds:
           description: What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has
           type: string
@@ -6913,7 +6994,7 @@ components:
           format: date-time
           type: string
         may_tell:
-          description: Whether you may record a notice about this record
+          description: Whether you may record a notice about this record, and name or withdraw a tag carrying its fix
           type: boolean
         product:
           description: The product this record belongs to, by the name an address takes
@@ -11654,6 +11735,9 @@ components:
           description: The window whose first notice on an incident this one starts at. Absent where it starts when the attack became known
           format: int64
           type: integer
+        from_fix:
+          description: Whether the window starts at the earliest release date stated for a tag the record names as carrying the fix
+          type: boolean
         from_name:
           description: That window's name
           type: string
@@ -11700,6 +11784,9 @@ components:
           format: int64
           minimum: 0
           type: integer
+        from_fix:
+          description: Start the window at the earliest release date stated for a tag the record names as carrying the fix. A record naming no tag with a stated release date leaves it unstarted. Not with from
+          type: boolean
         hours:
           description: How long the window runs, in hours, from the moment it starts
           format: int64
@@ -14733,6 +14820,92 @@ paths:
           - public-triage
           - private-triage
         note: The product is the record's own, not one in the path.
+  /v1/exploited-here/{id}/fixes:
+    post:
+      description: |-
+        Records that a tag of the record's product carries the fix for the attack. Name each tag as it is cut; a tag declared before any scan of it is the ordinary case. Recorded in the administrative trail.
+
+        A window starting from the fix starts at the earliest release date stated for a tag the record names. A tag with no stated release date starts nothing.
+
+        A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
+
+        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+      operationId: name-fix-release
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FixNamed"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FixBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Name a release carrying the fix
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: The product is the record's own, not one in the path.
+  /v1/exploited-here/{id}/fixes/{fix}:
+    delete:
+      description: |-
+        Takes back a tag named in error. The naming stays readable with who withdrew it and when, and the tag may be named again. A window starting from the fix moves to the earliest release date the record still names, or stops where none is stated. Recorded in the administrative trail.
+
+        A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
+
+        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+      operationId: withdraw-fix-release
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+        - in: path
+          name: fix
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Withdraw a release named as carrying the fix
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: The product is the record's own, not one in the path.
   /v1/exploited-here/{id}/told:
     post:
       description: |-
@@ -16276,7 +16449,7 @@ paths:
   /v1/obligation-windows:
     get:
       description: |-
-        Every window in force, shortest first. Each runs from the moment an attack on a product became known, or from the first notice for another window. None ships: a deployment declares the windows it answers to.
+        Every window in force, shortest first. Each runs from the moment an attack on a product became known, from the first notice for another window, or from the release of the fix. None ships: a deployment declares the windows it answers to.
 
         A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
 
@@ -16302,9 +16475,9 @@ paths:
         scope: person
     post:
       description: |-
-        Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from. Recorded in the administrative trail.
+        Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from, or from the release of the fix with from_fix. Recorded in the administrative trail.
 
-        A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does.
+        A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does, and from sent with from_fix.
 
         Requires: administrator
       operationId: declare-obligation-window
@@ -16364,7 +16537,7 @@ paths:
         scope: deployment
     put:
       description: |-
-        Restates a window in force: its name, how long it runs, its warning, the products it applies to and the window it starts from. Each field is replaced by what is sent, so a warning, a product list or a from window left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+        Restates a window in force: its name, how long it runs, its warning, the products it applies to and what it starts from. Each field is replaced by what is sent, so a warning, a product list, a from window or from_fix left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
 
         A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that would start a loop, and a product list leaving out a product a window starting from this one applies to.
 
@@ -16404,7 +16577,7 @@ paths:
   /v1/obligations:
     get:
       description: |-
-        Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, and every notice recorded about it. A window starts when the attack became known, or at the first notice for the window it starts from, and has no end until then.
+        Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, every notice recorded about it, and every tag named as carrying the fix. A window starts when the attack became known, at the first notice for the window it starts from, or at the earliest release date stated for a tag named as carrying the fix, and has no end until then.
 
         A window is answered where a notice names it. Nothing here says whether a notice met anything.
 

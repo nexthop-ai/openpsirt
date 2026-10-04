@@ -21,8 +21,8 @@ import (
 // as it stands.
 //
 // Every window this deployment declares, counted from the moment each
-// standing record says the attack became known, or from the first notice for
-// the window it counts from. Nothing here decides whether a window applies to
+// standing record says the attack became known, from the first notice for
+// the window it counts from, or from the release of a fix the record names. Nothing here decides whether a window applies to
 // an incident; a deployment under none declares none, and hears nothing.
 
 // windowsOpen is every window still running with no notice named against it,
@@ -30,7 +30,8 @@ import (
 //
 // From the moment the window starts, rather than from a lead time before the
 // end. A window waiting on another window's notice raises nothing until that
-// notice is recorded. The windows in force anywhere are a day to a fortnight, and
+// notice is recorded, and one counting from the fix nothing until a release
+// date stated for a release the record names has arrived. The windows in force anywhere are a day to a fortnight, and
 // an incident is rare: a warning that waits for most of a day to pass gives
 // back the hours it exists to save.
 func (w *Watch) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
@@ -88,11 +89,16 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 	if err != nil {
 		return nil, err
 	}
+	fixes, err := store.FixesOf(ctx, everything, ids)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now().UTC()
 	for _, one := range standing {
+		fixed, _ := obligation.FixAvailable(fixes[one.Record.ID])
 		for _, due := range obligation.Running(windows, one.Record.ProductID,
-			one.Record.KnownAt, told[one.Record.ID], now) {
+			one.Record.KnownAt, told[one.Record.ID], fixed, now) {
 
 			if due.Answered || !due.Started {
 				continue
@@ -110,8 +116,11 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 			}
 			about := string(kind)
 			from := "when this became known"
-			if due.Window.FromID != nil {
+			switch {
+			case due.Window.FromID != nil:
 				from = fmt.Sprintf("the first notice for %q", due.Window.FromName)
+			case due.Window.FromFix:
+				from = "the release of the fix, " + due.StartsAt.Format("2006-01-02")
 			}
 			holds := Holds{
 				About: identify(fmt.Sprintf("%s %d %d", about, one.Record.ID, due.Window.ID)),

@@ -19,7 +19,25 @@ const standing = (id: number, product: string, vulnerability: string) => ({
   known_at: "2026-09-01T00:00:00Z",
   grounds: "Seen in the field.",
   windows: [],
-  told: [],
+  told: [
+    {
+      id,
+      recipient: `${product} regulator`,
+      told_at: "2026-09-02T00:00:00Z",
+      said: "Reported.",
+    },
+  ],
+  fixes: [
+    {
+      id,
+      release: `${product}-2.0`,
+      release_name: `${product}-2.0`,
+      released_on: "2026-09-10",
+      named_at: "2026-09-03T00:00:00Z",
+      open: false,
+      scanned: false,
+    },
+  ],
 });
 
 function shelf() {
@@ -46,6 +64,12 @@ describe("the exploited-here shelf", () => {
     const text = mount.host().textContent ?? "";
     expect(text).toContain("CVE-2026-0001");
     expect(text).not.toContain("CVE-2026-0002");
+    // A record is narrowed whole: the notices and fix releases it carries go
+    // with it.
+    expect(text).toContain("sonic regulator");
+    expect(text).toContain("sonic-2.0");
+    expect(text).not.toContain("edge regulator");
+    expect(text).not.toContain("edge-2.0");
     expect(text).toContain("Exploited here on SONIC");
     expect(mount.host().querySelector('a[href="/obligations"]')?.textContent).toBe("every product");
   });

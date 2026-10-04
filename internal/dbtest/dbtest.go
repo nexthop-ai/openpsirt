@@ -922,6 +922,9 @@ var tables = []string{
 	"issue_note",
 	// Before the notice it belongs to.
 	"told_place",
+	// Before the record of being exploited, the release and the people it
+	// points at.
+	"exploited_fix",
 	// Before the record of being exploited and the window it points at.
 	"told_outside",
 	// Before the window and the product it points at.
@@ -1098,6 +1101,7 @@ var addedAt = map[string]int64{
 	"chat_delivery":   39,
 	"chat_preference": 39,
 	"told_place":      40,
+	"exploited_fix":   40,
 }
 
 // clearOf empties the named tables, which are in the order tables holds them.

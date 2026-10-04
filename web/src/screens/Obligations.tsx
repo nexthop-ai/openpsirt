@@ -12,6 +12,7 @@ import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
+import { scanState } from "../ui/fixes";
 import { at, since, typedMoment, typedNow } from "../ui/when";
 import { issueAt, obligationsAt } from "../app/routes";
 import { notACredential } from "../ui/noautofill";
@@ -29,6 +30,8 @@ import { Keep } from "./FindingExploited";
 type Incident = Body<"ObligationBody">;
 type Window = Body<"WindowBody">;
 type Notice = Body<"NoticeBody">;
+type Fix = Body<"FixBody">;
+type Due = Body<"DueBody">;
 
 // What a notice may say about malice, as the form offers it and a notice
 // reads back. The server holds the words; these are their labels.
@@ -175,7 +178,7 @@ function Incident({
                   {due.answered
                     ? "notice recorded"
                     : !due.started
-                      ? `starts at the first notice for ${due.window.from_name ?? "another window"}`
+                      ? waiting(due)
                       : due.passed
                         ? since(due.ends_at)
                         : `${due.near ? "ending soon · " : ""}ends ${since(due.ends_at)}`}
@@ -209,6 +212,8 @@ function Incident({
         </>
       )}
 
+      <Fixes incident={incident} />
+
       {incident.may_tell &&
         (telling ? (
           <Tell
@@ -224,6 +229,168 @@ function Incident({
             </button>
           </p>
         ))}
+    </div>
+  );
+}
+
+// What a window that has not started is waiting on.
+function waiting(due: Due): string {
+  if (due.starts_at) return `starts ${at(due.starts_at)}`;
+  if (due.window.from_fix) return "starts at the release date of a named fix release";
+  return `starts at the first notice for ${due.window.from_name ?? "another window"}`;
+}
+
+// The tags named as carrying the fix, with what each one's latest scans say,
+// and the form for naming another.
+function Fixes({ incident }: { incident: Incident }) {
+  const queries = useQueryClient();
+  const [naming, setNaming] = useState(false);
+  const fixes = incident.fixes ?? [];
+  const standing = fixes.filter((fix) => !fix.withdrawn_at);
+  const withdrawn = fixes.filter((fix) => fix.withdrawn_at);
+  const done = () => {
+    void queries.invalidateQueries({ queryKey: ["obligations"] });
+    void queries.invalidateQueries({ queryKey: ["finding"] });
+  };
+  const withdraw = useMutation({
+    mutationFn: async (fix: number) =>
+      unwrap(
+        await api.DELETE("/v1/exploited-here/{id}/fixes/{fix}", {
+          params: { path: { id: incident.id ?? 0, fix } },
+        }),
+      ),
+    onSuccess: done,
+  });
+  if (fixes.length === 0 && !incident.may_tell) return null;
+
+  return (
+    <>
+      <h3 style={{ marginTop: 12 }}>Fix releases</h3>
+      {standing.length === 0 && <p className="hint">None named.</p>}
+      {standing.map((fix) => (
+        <p key={fix.id}>
+          <b style={{ color: "var(--ink)" }}>{fix.release_name}</b>{" "}
+          <span className="hint">
+            · {fix.released_on ? `released ${fix.released_on}` : "no release date"} ·{" "}
+            {scanState(fix)}
+            {fix.named_by && <> · named by {fix.named_by}</>}
+          </span>{" "}
+          {incident.may_tell && (
+            <button
+              type="button"
+              className="linkish"
+              disabled={withdraw.isPending}
+              onClick={() => withdraw.mutate(fix.id)}
+            >
+              Withdraw
+            </button>
+          )}
+        </p>
+      ))}
+      {withdrawn.map((fix) => (
+        <Withdrawn key={fix.id} fix={fix} />
+      ))}
+      {withdraw.error != null && (
+        <Failed error={withdraw.error} what="That release was not withdrawn." />
+      )}
+      {incident.may_tell &&
+        (naming ? (
+          <NameFix
+            id={incident.id ?? 0}
+            product={incident.product ?? ""}
+            onClose={() => setNaming(false)}
+            done={done}
+          />
+        ) : (
+          <p>
+            <button type="button" className="linkish" onClick={() => setNaming(true)}>
+              Name a fix release
+            </button>
+          </p>
+        ))}
+    </>
+  );
+}
+
+function Withdrawn({ fix }: { fix: Fix }) {
+  return (
+    <p className="hint">
+      <s>{fix.release_name}</s> · withdrawn {at(fix.withdrawn_at)}
+      {fix.withdrawn_by && <> by {fix.withdrawn_by}</>}
+    </p>
+  );
+}
+
+function NameFix({
+  id,
+  product,
+  onClose,
+  done,
+}: {
+  id: number;
+  product: string;
+  onClose: () => void;
+  done: () => void;
+}) {
+  const [release, setRelease] = useState("");
+  // The product's tags, offered while typing. A tag declared before any scan
+  // of it is among them, which is the usual case.
+  const tags = useQuery({
+    queryKey: ["streams", product],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
+    enabled: product !== "",
+  });
+  const name = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST("/v1/exploited-here/{id}/fixes", {
+          params: { path: { id } },
+          body: { release: release.trim() },
+        }),
+      ),
+    onSuccess: () => {
+      onClose();
+      done();
+    },
+  });
+  const listed = `fix-tags-${id}`;
+
+  return (
+    <div className="rating">
+      {name.error != null && <Failed error={name.error} what="That release was not named." />}
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label htmlFor={`fix-${id}`}>Tag</label>
+        <input
+          id={`fix-${id}`}
+          type="text"
+          list={listed}
+          value={release}
+          onChange={(event) => setRelease(event.target.value)}
+        />
+        <datalist id={listed}>
+          {(tags.data?.items ?? [])
+            .filter((each) => each.kind === "tag" && !each.retired)
+            .map((each) => (
+              <option key={each.name} value={each.name}>
+                {each.display_name || each.name}
+              </option>
+            ))}
+        </datalist>
+      </div>
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={!release.trim() || name.isPending}
+          onClick={() => name.mutate()}
+        >
+          Name
+        </button>
+        <button type="button" className="btn quiet" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
@@ -415,6 +582,7 @@ function Windows({ windows }: { windows: Window[] }) {
             <span className="hint">
               · {each.hours} hours
               {each.from_name ? ` from the first notice for ${each.from_name}` : ""}
+              {each.from_fix ? " from the release of the fix" : ""}
               {each.lead_hours ? ` · warned ${each.lead_hours} hours before` : ""}
               {" · "}
               {(each.products ?? []).length > 0
@@ -458,7 +626,11 @@ function WindowForm({
   const [hours, setHours] = useState(window ? String(window.hours) : "");
   const [lead, setLead] = useState(window?.lead_hours ? String(window.lead_hours) : "");
   const [limited, setLimited] = useState<string[]>(window?.products ?? []);
-  const [from, setFrom] = useState(window?.from ? String(window.from) : "");
+  // "fix" for the release of the fix, a window's identifier for its first
+  // notice, and empty for when the attack became known.
+  const [from, setFrom] = useState(
+    window?.from_fix ? "fix" : window?.from ? String(window.from) : "",
+  );
   const products = useQuery({
     queryKey: ["products"],
     queryFn: async () => unwrap(await api.GET("/v1/products", {})),
@@ -469,7 +641,7 @@ function WindowForm({
     hours: Number(hours),
     ...(Number(lead) > 0 ? { lead_hours: Number(lead) } : {}),
     ...(limited.length > 0 ? { products: limited } : {}),
-    ...(from ? { from: Number(from) } : {}),
+    ...(from === "fix" ? { from_fix: true } : from ? { from: Number(from) } : {}),
   });
   const save = useMutation({
     mutationFn: async () =>
@@ -509,7 +681,7 @@ function WindowForm({
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <label className="field" title="Counted from the moment Counted from names">
+        <label className="field" title="From the moment named under Counted from">
           <span>Length, hours</span>
           <input
             type="number"
@@ -540,6 +712,7 @@ function WindowForm({
             onChange={(event) => setFrom(event.target.value)}
           >
             <option value="">When it became known</option>
+            <option value="fix">The release of the fix</option>
             {windows
               .filter((each) => each.id !== window?.id)
               .map((each) => (

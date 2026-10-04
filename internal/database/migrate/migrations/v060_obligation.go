@@ -6,9 +6,10 @@ package migrations
 // obligationV060 is the untagged release's declaration of the windows a
 // deployment counts and the notices given after an attack.
 //
-// v0.2.0's, with the window a window counts from, the reference and the
-// statement about malice a notice carries, and the places a notice named in a
-// table of their own.
+// v0.2.0's, with the window a window counts from or whether it counts from a
+// fix, the reference and the statement about malice a notice carries, the
+// places a notice named in a table of their own, and the releases a record
+// names as carrying the fix.
 func obligationV060(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "obligation_window" (
@@ -34,6 +35,11 @@ func obligationV060(t *columnTypes) []string {
 			-- The window whose first notice this one counts from. Null
 			-- counts from the moment the attack became known.
 			"from_window_id" ` + t.refNull + ` NULL,
+			-- Whether the window counts from the earliest release date
+			-- stated for a release the record names as carrying the fix.
+			-- Never true beside from_window_id: a window counts from one
+			-- moment.
+			"from_fix" ` + t.boolean + ` NOT NULL,
 			CONSTRAINT "obligation_window_live_unique" UNIQUE ("live_name"),
 			CONSTRAINT "obligation_window_declarer_fk" FOREIGN KEY ("declared_by")
 				REFERENCES "person"("id"),
@@ -84,6 +90,34 @@ func obligationV060(t *columnTypes) []string {
 			CONSTRAINT "told_place_pk" PRIMARY KEY ("told_id", "position"),
 			CONSTRAINT "told_place_told_fk" FOREIGN KEY ("told_id")
 				REFERENCES "told_outside"("id")
+		)` + t.suffix,
+
+		// The releases a person names on a record as carrying the fix. Each
+		// is a tag of the record's product, often one declared before any
+		// scan of it. Withdrawn rather than deleted, so a release named in
+		// error stays readable with who took it back.
+		`CREATE TABLE "exploited_fix" (
+			"id"                ` + t.id + `,
+			"exploited_here_id" ` + t.ref + ` NOT NULL,
+			"stream_id"         ` + t.ref + ` NOT NULL,
+			"named_by"          ` + t.ref + ` NOT NULL,
+			"named_at"          ` + t.timestamp + ` NOT NULL,
+			"withdrawn_by"      ` + t.refNull + ` NULL,
+			"withdrawn_at"      ` + t.timestamp + ` NULL,
+			-- The release while the naming stands, and null once it is
+			-- withdrawn, so a record names a release once at a time and a
+			-- withdrawn naming does not hold it back. The same mechanism a
+			-- standing record of being exploited uses.
+			"live_stream_id"    ` + t.refNull + ` NULL,
+			CONSTRAINT "exploited_fix_live_unique" UNIQUE ("exploited_here_id", "live_stream_id"),
+			CONSTRAINT "exploited_fix_record_fk" FOREIGN KEY ("exploited_here_id")
+				REFERENCES "exploited_here"("id"),
+			CONSTRAINT "exploited_fix_stream_fk" FOREIGN KEY ("stream_id")
+				REFERENCES "stream"("id"),
+			CONSTRAINT "exploited_fix_namer_fk" FOREIGN KEY ("named_by")
+				REFERENCES "person"("id"),
+			CONSTRAINT "exploited_fix_withdrawer_fk" FOREIGN KEY ("withdrawn_by")
+				REFERENCES "person"("id")
 		)` + t.suffix,
 	}
 }

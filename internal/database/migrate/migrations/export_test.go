@@ -52,7 +52,8 @@ func StatementsV060(engine database.Engine) map[string][]string {
 	return map[string][]string{
 		"obligation_window": obligation[:1],
 		"told_outside":      obligation[1:3],
-		"told_place":        obligation[3:],
+		"told_place":        obligation[3:4],
+		"exploited_fix":     obligation[4:],
 	}
 }
 

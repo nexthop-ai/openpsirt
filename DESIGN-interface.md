@@ -40,6 +40,7 @@ end rather than left to be found by clicking.
 - [Flaw entry](#flaw-entry)
 - [The inbox](#the-inbox)
 - [Disclosure and advisories](#disclosure-and-advisories)
+- [The Exploited here screen](#the-exploited-here-screen)
 - [The editor](#the-editor)
 - [Reachable from a keyboard](#reachable-from-a-keyboard)
 - [A read that failed](#a-read-that-failed)
@@ -1385,6 +1386,20 @@ this product on it, read what it generates, and open it.
 | Where each advisory covering this flaw stands is shown beside its name | Whether one is agreed to and whether it has gone out is what somebody asks before starting a second |
 | A flaw in somebody else's component is refused when it is named | The refusal names the issue somebody chose, and is shown rather than swallowed |
 | The panel hands over once there is a draft | Everything after it is the advisory's own, starting with the agreement. Whoever reaches this panel started the advisory a moment ago and is the person agreeing refuses, so a control here for agreeing, or for recording an issuance that needs one, could only ever reach a refusal |
+
+## The Exploited here screen
+
+One card per standing record that a product was exploited through an issue.
+`DESIGN-obligations.md` holds what the card's parts are.
+
+| Rule | |
+|---|---|
+| A window's row shows its end, or "Not started" and what it waits on | A window waiting on a notice names that window. One waiting on the fix says it starts at the release date of a named fix release, or when it starts where that date is still to come |
+| The response window form offers three starts in one control, labeled Counted from | When it became known, the release of the fix, and the first notice for each other window in force. One control, because a window counts from one moment |
+| Fix releases are listed under the windows, each with its release date and its latest scans | "no release date" where none is stated, because such a tag starts nothing. The scans read "not scanned", "open in its latest scans" or "not found in its latest scans", which are facts; no word says fixed |
+| A fix release is named by typing a tag, offered from the product's tags in use | A tag declared before any scan of it is among them, which is the usual case. The server refuses a branch or a retired tag in its own sentence |
+| Withdraw sits beside each named tag, and a withdrawn one stays listed, struck through, with who withdrew it | A tag named in error is corrected here, and what was said stays readable |
+| The finding shows the standing record's named tags, with neither form | Naming and withdrawing happen on this screen, beside the notices |
 
 ## The editor
 

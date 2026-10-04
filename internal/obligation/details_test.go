@@ -166,7 +166,7 @@ func TestAWindowWaitingOnANoticeIsNeitherNearNorPast(t *testing.T) {
 		{ID: anchor, Name: "Notification", Hours: 72},
 		{ID: 2, Name: "Final report", Hours: 24, LeadHours: ptr(1), FromID: &anchor},
 	}
-	due := obligation.Running(windows, 7, knownAt, nil, knownAt.Add(365*24*time.Hour))
+	due := obligation.Running(windows, 7, knownAt, nil, time.Time{}, knownAt.Add(365*24*time.Hour))
 	if len(due) != 2 {
 		t.Fatalf("%d windows run, want 2", len(due))
 	}

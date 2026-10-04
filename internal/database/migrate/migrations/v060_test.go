@@ -23,8 +23,9 @@ const v060 = 40
 
 // A v0.5.0 database holding a window and a notice is upgraded, rolled back and
 // upgraded again. Upgraded, the window counts from the moment the attack
-// became known and the notice says none of what a notice may now carry.
-// Rolled back, both are still there and what v0.5.0 cannot hold is gone.
+// became known rather than from a notice or a fix, the notice says none of
+// what a notice may now carry, and the record names no fix release. Rolled
+// back, both are still there and what v0.5.0 cannot hold is gone.
 func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -34,12 +35,20 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 
 		dbtest.MigrateTo(t, db, v060)
 		var from sql.NullInt64
-		if err := db.DB.NewRaw(`SELECT "from_window_id" FROM "obligation_window" WHERE "id" = ?`,
-			window).Scan(ctx, &from); err != nil {
+		var fromFix bool
+		if err := db.DB.NewRaw(`SELECT "from_window_id", "from_fix" FROM "obligation_window" WHERE "id" = ?`,
+			window).Scan(ctx, &from, &fromFix); err != nil {
 			t.Fatal(err)
 		}
-		if from.Valid {
-			t.Errorf("upgraded, a v0.5.0 window counts from window %d", from.Int64)
+		if from.Valid || fromFix {
+			t.Errorf("upgraded, a v0.5.0 window counts from window %d or from a fix (%v)", from.Int64, fromFix)
+		}
+		var fixes int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "exploited_fix"`).Scan(ctx, &fixes); err != nil {
+			t.Fatal(err)
+		}
+		if fixes != 0 {
+			t.Errorf("upgraded, v0.5.0's record names %d fix releases", fixes)
 		}
 		var reference, malicious sql.NullString
 		if err := db.DB.NewRaw(`SELECT "reference", "suspected_malicious" FROM "told_outside"`+
@@ -55,13 +64,32 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 
 		// What the untagged release holds that v0.5.0 cannot.
 		if _, err := db.DB.NewRaw(`INSERT INTO "obligation_window" ("name", "length_hours",`+
-			` "declared_by", "declared_at", "live_name", "from_window_id")`+
-			` SELECT ?, ?, "declared_by", "declared_at", ?, "id" FROM "obligation_window" WHERE "id" = ?`,
-			"Final report", 24*30, "final report", window).Exec(ctx); err != nil {
+			` "declared_by", "declared_at", "live_name", "from_window_id", "from_fix")`+
+			` SELECT ?, ?, "declared_by", "declared_at", ?, "id", ? FROM "obligation_window" WHERE "id" = ?`,
+			"Final report", 24*30, "final report", false, window).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := db.DB.NewRaw(`INSERT INTO "told_place" ("told_id", "position", "place")`+
 			` VALUES (?, ?, ?)`, notice, 0, "Ireland").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "obligation_window" ("name", "length_hours",`+
+			` "declared_by", "declared_at", "live_name", "from_fix")`+
+			` SELECT ?, ?, "declared_by", "declared_at", ?, ? FROM "obligation_window" WHERE "id" = ?`,
+			"Fix available", 24*14, "fix available", true, window).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "stream" ("product_id", "name", "display_name",`+
+			` "kind", "created_at") SELECT "product_id", ?, ?, ?, "recorded_at" FROM "exploited_here"`+
+			` WHERE "id" = (SELECT "exploited_here_id" FROM "told_outside" WHERE "id" = ?)`,
+			"v1.0.1", "v1.0.1", "tag", notice).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "exploited_fix" ("exploited_here_id", "stream_id",`+
+			` "named_by", "named_at", "live_stream_id")`+
+			` SELECT "tod"."exploited_here_id", "st"."id", "tod"."recorded_by", "tod"."recorded_at", "st"."id"`+
+			` FROM "told_outside" AS "tod", "stream" AS "st" WHERE "tod"."id" = ? AND "st"."name" = ?`,
+			notice, "v1.0.1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -75,8 +103,8 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "told_outside"`).Scan(ctx, &notices); err != nil {
 			t.Fatal(err)
 		}
-		if windows != 2 || notices != 1 {
-			t.Errorf("rolled back, %d windows and %d notices remain, want 2 and 1", windows, notices)
+		if windows != 3 || notices != 1 {
+			t.Errorf("rolled back, %d windows and %d notices remain, want 3 and 1", windows, notices)
 		}
 		// Qualified by the table. SQLite reads a bare quoted name that is no
 		// column as a string, and answers.
@@ -85,6 +113,8 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 			`SELECT "told_outside"."reference" FROM "told_outside"`,
 			`SELECT "told_outside"."suspected_malicious" FROM "told_outside"`,
 			`SELECT "place" FROM "told_place"`,
+			`SELECT "obligation_window"."from_fix" FROM "obligation_window"`,
+			`SELECT "stream_id" FROM "exploited_fix"`,
 		} {
 			if _, err := db.ExecContext(ctx, gone); err == nil {
 				t.Errorf("rolled back, %s still answers", gone)

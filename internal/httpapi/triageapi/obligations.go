@@ -26,6 +26,7 @@ type WindowBody struct {
 	Products   []string `json:"products" doc:"The products the window is limited to, among those you may know exist. Empty for a window that applies to every product"`
 	From       int64    `json:"from,omitempty" doc:"The window whose first notice on an incident this one starts at. Absent where it starts when the attack became known"`
 	FromName   string   `json:"from_name,omitempty" doc:"That window's name"`
+	FromFix    bool     `json:"from_fix,omitempty" doc:"Whether the window starts at the earliest release date stated for a tag the record names as carrying the fix"`
 	DeclaredAt string   `json:"declared_at" format:"date-time"`
 }
 
@@ -36,14 +37,15 @@ type WindowSaid struct {
 	LeadHours int      `json:"lead_hours,omitempty" minimum:"0" maximum:"8783" doc:"How many hours before the end a second notice is raised. Left off or zero, the window raises none. Fewer hours than the window runs"`
 	Products  []string `json:"products,omitempty" maxItems:"500" doc:"The products the window applies to, by name. Left off, it applies to every product"`
 	From      int64    `json:"from,omitempty" minimum:"0" doc:"A window in force whose first notice on an incident this one starts at. It applies to every product this window does, and neither it nor anything it starts from starts from this window. Left off or zero, the window starts when the attack became known"`
+	FromFix   bool     `json:"from_fix,omitempty" doc:"Start the window at the earliest release date stated for a tag the record names as carrying the fix. A record naming no tag with a stated release date leaves it unstarted. Not with from"`
 }
 
 // DueBody is one window as it runs for one incident.
 type DueBody struct {
 	Window   WindowBody `json:"window"`
-	Started  bool       `json:"started" doc:"Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded"`
-	StartsAt string     `json:"starts_at,omitempty" format:"date-time" doc:"When the window started: when the attack became known, or when the first notice for the window it starts from was given. Absent until it starts"`
-	EndsAt   string     `json:"ends_at,omitempty" format:"date-time" doc:"When the window started, plus the window. Absent until it starts"`
+	Started  bool       `json:"started" doc:"Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded, and one starting at the fix until a stated release date of a tag named as carrying it has come"`
+	StartsAt string     `json:"starts_at,omitempty" format:"date-time" doc:"When the window starts: when the attack became known, when the first notice for the window it starts from was given, or the start of the earliest release date stated for a tag named as carrying the fix, in UTC. Absent while there is none"`
+	EndsAt   string     `json:"ends_at,omitempty" format:"date-time" doc:"When the window starts, plus the window. Absent while it has no start"`
 	Passed   bool       `json:"passed" doc:"Whether that moment has gone"`
 	Near     bool       `json:"near" doc:"Whether the window's warning has come and its end has not"`
 	Answered bool       `json:"answered" doc:"Whether a notice recorded against this incident names this window"`
@@ -64,7 +66,7 @@ type NoticeSaid struct {
 type ObligationBody struct {
 	core.ExploitedHereBody
 	Undisclosed bool      `json:"undisclosed" doc:"Whether the issue is undisclosed somewhere in this product"`
-	MayTell     bool      `json:"may_tell" doc:"Whether you may record a notice about this record"`
+	MayTell     bool      `json:"may_tell" doc:"Whether you may record a notice about this record, and name or withdraw a tag carrying its fix"`
 	Windows     []DueBody `json:"windows" doc:"Every window in force that applies to this product, shortest first, as it runs for this incident"`
 }
 
@@ -84,9 +86,10 @@ func registerObligations(api huma.API, in core.Deps) {
 		Summary: "List standing attacks and their windows",
 		Description: "Every standing record that a product was exploited through an issue, " +
 			"earliest known first. Each carries every window this deployment counts, as it " +
-			"runs for that incident, and every notice recorded about it. A window starts " +
-			"when the attack became known, or at the first notice for the window it starts " +
-			"from, and has no end until then.\n\n" +
+			"runs for that incident, every notice recorded about it, and every tag named as " +
+			"carrying the fix. A window starts when the attack became known, at the first " +
+			"notice for the window it starts from, or at the earliest release date stated " +
+			"for a tag named as carrying the fix, and has no end until then.\n\n" +
 			"A window is answered where a notice names it. Nothing here says whether a " +
 			"notice met anything.\n\n" +
 			"Unpaged. A record you may not be told of is left out and counted nowhere.",
@@ -107,11 +110,14 @@ func registerObligations(api huma.API, in core.Deps) {
 		}
 		records := make([]triage.ExploitedHere, 0, len(shelf))
 		told := map[int64][]obligation.Told{}
+		fixes := map[int64][]obligation.Fix{}
 		for _, entry := range shelf {
 			records = append(records, entry.Record)
 			told[entry.Record.ID] = entry.Told
+			fixes[entry.Record.ID] = entry.Fixes
 		}
-		people, err := triage.NewStore(in.DB.DB).PeopleNamed(ctx, core.WhoToldOrTouched(records, told))
+		people, err := triage.NewStore(in.DB.DB).PeopleNamed(ctx,
+			core.WhoToldOrTouched(records, told, fixes))
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "who recorded these could not be read", err)
 		}
@@ -130,13 +136,14 @@ func registerObligations(api huma.API, in core.Deps) {
 			}
 			body.Product, body.ProductName = entry.Product, entry.ProductName
 			body.Told = core.ToldBodies(entry.Told, named, people)
+			body.Fixes = core.FixBodies(entry.Fixes, people)
 			for _, due := range entry.Windows {
 				window := windowFor(due.Window)
 				one := DueBody{
 					Window: window, Started: due.Started,
 					Passed: due.Passed, Near: due.Near, Answered: due.Answered,
 				}
-				if due.Started {
+				if !due.StartsAt.IsZero() {
 					one.StartsAt = due.StartsAt.UTC().Format(time.RFC3339)
 					one.EndsAt = due.EndsAt.UTC().Format(time.RFC3339)
 				}
@@ -152,7 +159,8 @@ func registerObligations(api huma.API, in core.Deps) {
 		Path:    "/v1/obligation-windows",
 		Summary: "List obligation windows",
 		Description: "Every window in force, shortest first. Each runs from the moment an " +
-			"attack on a product became known, or from the first notice for another window. " +
+			"attack on a product became known, from the first notice for another window, or " +
+			"from the release of the fix. " +
 			"None ships: a deployment declares the windows it answers to.\n\n" +
 			"A window limited to products you may not know exist is left out, and the " +
 			"products a window names are narrowed to those you may.",
@@ -183,11 +191,13 @@ func registerObligations(api huma.API, in core.Deps) {
 		Summary: "Declare an obligation window",
 		Description: "Adds a window every standing attack on the products it names is " +
 			"watched against, counted from the moment each became known, or from the first " +
-			"notice for the window named in from. Recorded in the administrative trail.\n\n" +
+			"notice for the window named in from, or from the release of the fix with from_fix. " +
+			"Recorded in the administrative trail.\n\n" +
 			"A name already in force, in any capitals, is refused with 409: retire that " +
 			"window or pick another name. A product nobody declared is refused with 422 " +
 			"naming it, as is a warning at or past the window's own length, and a from " +
-			"window that is not in force or does not apply to every product this one does.",
+			"window that is not in force or does not apply to every product this one does, " +
+			"and from sent with from_fix.",
 		Tags: []string{"Obligations"}, DefaultStatus: http.StatusCreated,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Body WindowSaid
@@ -213,9 +223,9 @@ func registerObligations(api huma.API, in core.Deps) {
 		Path:    "/v1/obligation-windows/{id}",
 		Summary: "Change an obligation window",
 		Description: "Restates a window in force: its name, how long it runs, its warning, " +
-			"the products it applies to and the window it starts from. Each field is replaced " +
-			"by what is sent, so a warning, a product list or a from window left off is " +
-			"removed. Every incident's end moves with it, and notices already recorded " +
+			"the products it applies to and what it starts from. Each field is replaced by " +
+			"what is sent, so a warning, a product list, a from window or from_fix left off " +
+			"is removed. Every incident's end moves with it, and notices already recorded " +
 			"against it keep naming it. Recorded in the administrative trail.\n\n" +
 			"A name another window in force holds is refused with 409. A retired or " +
 			"unknown window answers 404. A product nobody declared is refused with 422 " +
@@ -364,6 +374,7 @@ func windowFor(window obligation.Window) WindowBody {
 	if window.FromID != nil {
 		body.From, body.FromName = *window.FromID, window.FromName
 	}
+	body.FromFix = window.FromFix
 	body.Products = append(body.Products, window.ProductNames...)
 	return body
 }
@@ -371,7 +382,8 @@ func windowFor(window obligation.Window) WindowBody {
 // windowSaid is what a caller sent, as the store reads it. A warning of zero is
 // none, which is what leaving it off says.
 func windowSaid(said WindowSaid) obligation.WindowSaid {
-	out := obligation.WindowSaid{Name: said.Name, Hours: said.Hours, Products: said.Products}
+	out := obligation.WindowSaid{Name: said.Name, Hours: said.Hours, Products: said.Products,
+		FromFix: said.FromFix}
 	if said.From > 0 {
 		from := said.From
 		out.From = &from

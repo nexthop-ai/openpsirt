@@ -64,6 +64,10 @@ type Window struct {
 	FromID *int64 `bun:"from_window_id"`
 	// FromName is that window's name.
 	FromName string `bun:"-"`
+	// FromFix says the window counts from the earliest release date stated
+	// for a release the record names as carrying the fix. Never set beside
+	// FromID.
+	FromFix bool `bun:"from_fix,notnull"`
 
 	// Products is the products the window is limited to, by identifier and
 	// by the name an address takes. Empty is every product.
@@ -92,6 +96,9 @@ type WindowSaid struct {
 	// From is the window in force whose first notice on an incident this one
 	// counts from, or nil to count from the moment the attack became known.
 	From *int64
+	// FromFix counts the window from the earliest release date stated for a
+	// release the record names as carrying the fix. Refused beside From.
+	FromFix bool
 }
 
 // AppliesTo is whether the window counts for an attack on this product.
@@ -182,6 +189,10 @@ func windowSaid(said WindowSaid) (WindowSaid, error) {
 		return said, err
 	}
 	said.Name = name
+	if said.FromFix && said.From != nil {
+		return said, refusal.New("a window counts from one moment: a notice for another window, " +
+			"or the release of the fix, not both")
+	}
 	if said.LeadHours != nil {
 		// Zero reads as unset everywhere, so a lead of none is written by
 		// leaving it out rather than stored as a notice at the end itself.
@@ -497,7 +508,7 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 			Name: said.Name, Hours: said.Hours, LeadHours: said.LeadHours,
 			DeclaredBy: subject.ID,
 			DeclaredAt: s.now().Truncate(time.Microsecond), LiveName: &live,
-			FromID: said.From, Products: products, ProductNames: names,
+			FromID: said.From, FromFix: said.FromFix, Products: products, ProductNames: names,
 		}
 		if said.From != nil {
 			if window.FromName, err = countsFrom(ctx, tx, 0, *said.From, *window); err != nil {
@@ -581,6 +592,7 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 			Set("lead_hours = ?", said.LeadHours).
 			Set("live_name = ?", live).
 			Set("from_window_id = ?", said.From).
+			Set("from_fix = ?", said.FromFix).
 			Where("id = ?", id).
 			// Still in force when this lands. A retirement committed since the
 			// read above leaves nothing to change, and a trail row saying it
@@ -607,6 +619,7 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 			said.Name, said.Hours, said.LeadHours, &live
 		window.Products, window.ProductNames = products, names
 		window.FromID, window.FromName = after.FromID, after.FromName
+		window.FromFix = said.FromFix
 		return noteWindow(ctx, tx, subject, said.Name, was, describe(*window))
 	})
 	if err != nil {
@@ -702,6 +715,9 @@ func describe(w Window) *string {
 	text := strconv.Itoa(w.Hours) + "h"
 	if w.FromID != nil {
 		text += " from the first notice for " + w.FromName
+	}
+	if w.FromFix {
+		text += " from the release of the fix"
 	}
 	if w.LeadHours != nil {
 		text += ", warned " + strconv.Itoa(*w.LeadHours) + "h before"

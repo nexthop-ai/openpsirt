@@ -1282,6 +1282,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/exploited-here/{id}/fixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Name a release carrying the fix
+         * @description Records that a tag of the record's product carries the fix for the attack. Name each tag as it is cut; a tag declared before any scan of it is the ordinary case. Recorded in the administrative trail.
+         *
+         *     A window starting from the fix starts at the earliest release date stated for a tag the record names. A tag with no stated release date starts nothing.
+         *
+         *     A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
+         *
+         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         */
+        post: operations["name-fix-release"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/exploited-here/{id}/fixes/{fix}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a release named as carrying the fix
+         * @description Takes back a tag named in error. The naming stays readable with who withdrew it and when, and the tag may be named again. A window starting from the fix moves to the earliest release date the record still names, or stops where none is stated. Recorded in the administrative trail.
+         *
+         *     A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
+         *
+         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         */
+        delete: operations["withdraw-fix-release"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/exploited-here/{id}/told": {
         parameters: {
             query?: never;
@@ -1681,7 +1731,7 @@ export interface paths {
         };
         /**
          * List obligation windows
-         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known, or from the first notice for another window. None ships: a deployment declares the windows it answers to.
+         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known, from the first notice for another window, or from the release of the fix. None ships: a deployment declares the windows it answers to.
          *
          *     A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
          *
@@ -1691,9 +1741,9 @@ export interface paths {
         put?: never;
         /**
          * Declare an obligation window
-         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from. Recorded in the administrative trail.
+         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from, or from the release of the fix with from_fix. Recorded in the administrative trail.
          *
-         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does.
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does, and from sent with from_fix.
          *
          *     Requires: administrator
          */
@@ -1714,7 +1764,7 @@ export interface paths {
         get?: never;
         /**
          * Change an obligation window
-         * @description Restates a window in force: its name, how long it runs, its warning, the products it applies to and the window it starts from. Each field is replaced by what is sent, so a warning, a product list or a from window left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         * @description Restates a window in force: its name, how long it runs, its warning, the products it applies to and what it starts from. Each field is replaced by what is sent, so a warning, a product list, a from window or from_fix left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
          *
          *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that would start a loop, and a product list leaving out a product a window starting from this one applies to.
          *
@@ -1745,7 +1795,7 @@ export interface paths {
         };
         /**
          * List standing attacks and their windows
-         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, and every notice recorded about it. A window starts when the attack became known, or at the first notice for the window it starts from, and has no end until then.
+         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, every notice recorded about it, and every tag named as carrying the fix. A window starts when the attack became known, at the first notice for the window it starts from, or at the earliest release date stated for a tag named as carrying the fix, and has no end until then.
          *
          *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
          *
@@ -7735,18 +7785,18 @@ export interface components {
             answered: boolean;
             /**
              * Format: date-time
-             * @description When the window started, plus the window. Absent until it starts
+             * @description When the window starts, plus the window. Absent while it has no start
              */
             ends_at?: string;
             /** @description Whether the window's warning has come and its end has not */
             near: boolean;
             /** @description Whether that moment has gone */
             passed: boolean;
-            /** @description Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded */
+            /** @description Whether the window is counting. A window starting at another window's first notice has not started until that notice is recorded, and one starting at the fix until a stated release date of a tag named as carrying it has come */
             started: boolean;
             /**
              * Format: date-time
-             * @description When the window started: when the attack became known, or when the first notice for the window it starts from was given. Absent until it starts
+             * @description When the window starts: when the attack became known, when the first notice for the window it starts from was given, or the start of the earliest release date stated for a tag named as carrying the fix, in UTC. Absent while there is none
              */
             starts_at?: string;
             window: components["schemas"]["WindowBody"];
@@ -8106,6 +8156,8 @@ export interface components {
             cleared_because?: string;
             /** @description Who cleared it */
             cleared_by?: string;
+            /** @description The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom */
+            fixes?: components["schemas"]["FixBody"][] | null;
             /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
             grounds: string;
             /** Format: int64 */
@@ -8395,6 +8447,47 @@ export interface components {
             items: components["schemas"]["FindingBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        FixBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/FixBody.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            named_at: string;
+            /** @description Who named it */
+            named_by?: string;
+            /** @description Whether a finding of the issue is open in a build of the tag, among the findings you may read. Nothing is concluded from it */
+            open: boolean;
+            /** @description The tag, by the name an address takes */
+            release: string;
+            /** @description That tag's spelling on screen */
+            release_name: string;
+            /** @description The release date stated for the tag, as YYYY-MM-DD. Absent where nobody has stated one, and then the tag starts no window */
+            released_on?: string;
+            /** @description Whether any build of the tag has been scanned */
+            scanned: boolean;
+            /**
+             * Format: date-time
+             * @description When it was withdrawn. Absent while it stands
+             */
+            withdrawn_at?: string;
+            /** @description Who withdrew it */
+            withdrawn_by?: string;
+        };
+        FixNamed: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/FixNamed.json
+             */
+            readonly $schema?: string;
+            /** @description A tag of the record's product, by the name scans use for it. One declared before any scan of it is accepted */
+            release: string;
         };
         Flag: {
             label: string;
@@ -9922,6 +10015,8 @@ export interface components {
             cleared_because?: string;
             /** @description Who cleared it */
             cleared_by?: string;
+            /** @description The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom */
+            fixes?: components["schemas"]["FixBody"][] | null;
             /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
             grounds: string;
             /** Format: int64 */
@@ -9931,7 +10026,7 @@ export interface components {
              * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
              */
             known_at: string;
-            /** @description Whether you may record a notice about this record */
+            /** @description Whether you may record a notice about this record, and name or withdraw a tag carrying its fix */
             may_tell: boolean;
             /** @description The product this record belongs to, by the name an address takes */
             product?: string;
@@ -12713,6 +12808,8 @@ export interface components {
              * @description The window whose first notice on an incident this one starts at. Absent where it starts when the attack became known
              */
             from?: number;
+            /** @description Whether the window starts at the earliest release date stated for a tag the record names as carrying the fix */
+            from_fix?: boolean;
             /** @description That window's name */
             from_name?: string;
             /**
@@ -12744,6 +12841,8 @@ export interface components {
              * @description A window in force whose first notice on an incident this one starts at. It applies to every product this window does, and neither it nor anything it starts from starts from this window. Left off or zero, the window starts when the attack became known
              */
             from?: number;
+            /** @description Start the window at the earliest release date stated for a tag the record names as carrying the fix. A record naming no tag with a stated release date leaves it unstarted. Not with from */
+            from_fix?: boolean;
             /**
              * Format: int64
              * @description How long the window runs, in hours, from the moment it starts
@@ -14637,6 +14736,71 @@ export interface operations {
                 "application/json": components["schemas"]["Clear-exploited-hereRequest"];
             };
         };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "name-fix-release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FixNamed"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-fix-release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                fix: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description No Content */
             204: {
