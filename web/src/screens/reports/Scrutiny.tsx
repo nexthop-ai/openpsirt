@@ -94,7 +94,7 @@ export function Scrutiny() {
   return (
     <Sheet
       settled={got.isSuccess}
-      name="Rubber-stamp"
+      name="Approval quality"
       answers="how much a second pair of eyes actually did."
       asked={coveringPeriod(period, days)}
     >

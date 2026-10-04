@@ -305,6 +305,7 @@ screen answering the question just asked of it.
 | A selection the server would refuse is never sent | A branch or variant with no product above it is dropped on the way out |
 | **The variant column does not empty while it narrows** | Picking a branch swaps what the column offers from the product's variants to that release's, which is a different question and a different read. The first stands in until the second arrives: it is a superset, and a column that goes blank in front of somebody halfway through choosing reads as the picker losing what it had |
 | **The picker asks for no counts** | What is open against a row is the expensive half of a catalog read — a list of two products answered in 0.39s against 1ms for a liveness probe, and the time went with the findings rather than the rows. This panel draws names. So the counts are a parameter the two screens whose subject they are pass, and everybody else gets the cheap answer |
+| A screen saying what it needs picked opens this picker | One picker, in the bar. A report entry waiting on a product or a build opens it rather than drawing a second picker of its own, and brings the bar into view, since the bar does not follow the page down |
 
 ## Home
 
@@ -1600,7 +1601,7 @@ other, and two that could not be asked at all.
 | Section | What it answers |
 |---|---|
 | Grants in force | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
-| Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the rubber-stamp report asks across a program, asked about one person. Counted over every product, so it is sent to an administrator and absent for an auditor, whose grant reaches no product's decisions; the section is drawn only where it is sent |
+| Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the approval quality report asks across a program, asked about one person. Counted over every product, so it is sent to an administrator and absent for an auditor, whose grant reaches no product's decisions; the section is drawn only where it is sent |
 | Roles granted and withdrawn | Every change against them, newest first, with who made it. Absent before means nobody had set it; absent after means it was withdrawn, and a blank cannot tell the two apart |
 | Notifications sent | Everything sent to them, acknowledged and cleared included |
 
@@ -1657,7 +1658,10 @@ since a person only ever sees products they hold a role on.
 |---|---|
 | A report is a page of its own, at `/reports/<name>` | A page is printable, linkable and quotable; a section of a dashboard is none of those. The catalog screen holds the list and the files reachable nowhere else; a question with no name is asked on the findings list, which is where the filters live |
 | A report about the thing you are standing on stays on that screen and is listed in the catalog; one that spans things lives only in the catalog | The comparison of two releases is the screen where the two are picked, so it keeps its address and gains a catalog entry that arrives with the product already chosen |
-| An entry that cannot answer at the current selection is still listed, saying which picker to touch | A report missing from a list reads as a report that does not exist |
+| An entry that cannot answer at the current selection is still listed, with a tag saying whether it needs a product or a build | A report missing from a list reads as a report that does not exist. The tag sits beside the name rather than at the end of the line beneath, where it reads as part of the description. The name stays drawn as a name, and pressing it opens the scope picker |
+| The catalog is grouped by the question a report answers | Program, controls, coverage, releases and records. An entry leading to a filter on the record sits with the reports asking its question |
+| A rail screen answering a named question is listed apart, under "Also on screens", by the name the rail gives it | Listed among the reports, it reads as more reporting than there is |
+| One address is one catalog entry | Two names over one screen read as two reports. The comparison of two releases carries the known issues a build ships with, so it is one entry |
 | A name the catalog does not hold returns to the catalog, not to the front page | Somebody following a stale link is looking for a report, and the list of them is the nearest answer |
 | Every report states what it was asked of and when it was taken, and prints | The stylesheet is the record's: the shell, the rail and the controls drop out, and a row does not break across a page. A control that does not print has its value stated in the printed header instead |
 | **A figure opens the list it was counted with** | The findings list writes three narrowings into its own address when the address says nothing, and the figures on the home and product screens are counted with none of them — so every number opened a list with fewer rows in it than the number said. Those links carry the three turned off, and a sheet's figures carry its window and its product for the same reason |

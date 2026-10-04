@@ -81,7 +81,7 @@ export function Effort() {
   return (
     <Sheet
       settled={spent.isSuccess}
-      name="The destination of the effort"
+      name="Effort by component"
       answers="what the judgments in this period were about."
       asked={coveringPeriod(period, days)}
     >

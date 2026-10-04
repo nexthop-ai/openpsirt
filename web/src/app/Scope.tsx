@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useClickAway } from "../ui/away";
 import { useReseed } from "../ui/reseed";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { useCatalog, useReleaseVariants } from "../api/catalog";
 import {
   findingsPath,
   needsBuild,
+  onAskForScope,
   onFindings,
   remember,
   rescoped,
@@ -47,6 +48,17 @@ export function Scope() {
   });
 
   useClickAway(box, open, () => setOpen(false));
+
+  // A screen saying what it needs picked opens this panel, brought into view
+  // because the bar does not follow the page down.
+  useEffect(
+    () =>
+      onAskForScope(() => {
+        box.current?.scrollIntoView({ block: "nearest" });
+        setOpen(true);
+      }),
+    [],
+  );
 
   const { products, streams, variants: declared } = useCatalog(open, product);
   // The variants one release was built as. With a branch or tag chosen this is

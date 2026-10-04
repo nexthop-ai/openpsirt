@@ -674,7 +674,7 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 		}
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
-			Link: "/reports/rubber-stamp",
+			Link: "/reports/approval-quality",
 		}}
 		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
 		notify.TrustForTest(signal, server.Client())
@@ -742,7 +742,7 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 		}
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
-			Link: "/reports/rubber-stamp",
+			Link: "/reports/approval-quality",
 		}}
 		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
 		notify.TrustForTest(signal, server.Client())

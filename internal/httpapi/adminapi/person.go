@@ -24,7 +24,7 @@ import (
 // Four questions, answerable otherwise only by reading four screens against
 // each other, and two of them not at all: what somebody was told while holding
 // a role since withdrawn is what an investigation after a leak reads, and the
-// share of the record resting on one person is what the rubber-stamp report
+// share of the record resting on one person is what the approval quality report
 // counts across a program.
 type AboutPersonBody struct {
 	Identity    string `json:"identity"`

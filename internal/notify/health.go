@@ -244,7 +244,7 @@ func (w *Watch) riskUnagreed(ctx context.Context) ([]Holds, error) {
 		// shown a page with nothing on it, which is the alert nobody can clear
 		// that REQ-49 is about. The longest window the sheet offers reads as
 		// "everything" and is also the bound on what an address may ask for.
-		Link: weblink.Report("rubber-stamp", everythingBack),
+		Link: weblink.Report("approval-quality", everythingBack),
 	}}, nil
 }
 
@@ -259,7 +259,7 @@ func (w *Watch) riskUnagreed(ctx context.Context) ([]Holds, error) {
 const everythingBack = "3650"
 
 // pairsBack is how far back the agreements one pair gave each other are
-// counted, in days: the rubber-stamp report's own period, so the report the
+// counted, in days: the approval quality report's own period, so the report the
 // link opens holds what raised it.
 const pairsBack = "90"
 
@@ -388,7 +388,7 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 				"people who may approve that one pair doing most of it is worth a look.",
 				each.product.DisplayName, people[each.pair.First], people[each.pair.Second],
 				each.percent, days),
-			Link:      weblink.Report("rubber-stamp", pairsBack),
+			Link:      weblink.Report("approval-quality", pairsBack),
 			ProductID: &productID,
 		})
 	}

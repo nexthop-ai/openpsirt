@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type ReactElement } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
+import { reportAt } from "../../app/routes";
 import { Backlog } from "./Backlog";
 import { Compliance } from "./Compliance";
 import { Coverage } from "./Coverage";
@@ -25,16 +26,27 @@ export const PAGES: Record<string, ReactElement> = {
   "program-overview": <Overview />,
   "scan-coverage": <Coverage />,
   "releases-out-of-support": <Support />,
-  "rubber-stamp": <Scrutiny />,
+  "approval-quality": <Scrutiny />,
   "deadline-compliance": <Compliance />,
   "disposition-register": <Register />,
   "advisories-issued": <Published />,
-  "where-the-effort-went": <Effort />,
+  "effort-by-component": <Effort />,
   "backlog-over-time": <Backlog />,
+};
+
+// Addresses a report has been reached at under an earlier name. A link to one
+// sits in mail and chat messages already sent and in notifications already
+// stored, so it opens the report it named, with the window it asked for.
+const RENAMED: Record<string, string> = {
+  "rubber-stamp": "approval-quality",
+  "where-the-effort-went": "effort-by-component",
 };
 
 export function Report() {
   const { report = "" } = useParams();
+  const { search } = useLocation();
+  const now = own(RENAMED, report);
+  if (now) return <Navigate to={{ pathname: reportAt(now), search }} replace />;
   // A name this catalog does not hold goes back to the catalog rather than
   // home: somebody following a stale link is looking for a report, and the
   // list of them is the answer nearest to what they asked for.
