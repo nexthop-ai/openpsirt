@@ -11,7 +11,7 @@ import { useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Severity, Exploited } from "../ui/Severity";
+import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
@@ -404,7 +404,7 @@ function Held({
                   >
                     {row.vulnerability}
                   </Link>{" "}
-                  <Exploited when={row.exploited} />
+                  <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
                 </td>
                 <td>
                   <span className="id">{row.component}</span>{" "}

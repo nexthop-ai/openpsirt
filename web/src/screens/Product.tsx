@@ -150,7 +150,7 @@ export function Product() {
                   <th>Build</th>
                   <th className="num">Open</th>
                   <th className="num">Overdue</th>
-                  <th className="num">Exploited</th>
+                  <th className="num">Known exploited</th>
                   <th className="num">Undecided</th>
                   <th className="num">Decided</th>
                   <th>Last scanned</th>

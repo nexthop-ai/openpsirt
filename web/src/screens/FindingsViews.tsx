@@ -20,7 +20,7 @@ import { api } from "../api/client";
 import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Exploited, Severity } from "../ui/Severity";
+import { Exploited, ExploitedHere, Severity } from "../ui/Severity";
 
 import { PAGE, type Row } from "./list";
 import { Wide } from "../ui/Wide";
@@ -225,10 +225,11 @@ export function ByComponent({
                     >
                       {name}
                     </Link>
-                    {row.exploited && (
+                    {(row.exploited || row.exploited_here) && (
                       <>
                         {" "}
-                        <Exploited when />
+                        <ExploitedHere when={row.exploited_here} />{" "}
+                        <Exploited when={row.exploited} />
                       </>
                     )}
                     <br />
@@ -454,7 +455,8 @@ export function ByBump({
             {rows.map((row) => (
               <tr key={`${row.upstream} ${row.from} ${row.to}`} className="row">
                 <td>
-                  <span className="id">{row.upstream}</span> {row.exploited && <Exploited when />}
+                  <span className="id">{row.upstream}</span>{" "}
+                  <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
                   <br />
                   <span className="id" style={{ color: "var(--faint)" }}>
                     {row.from}

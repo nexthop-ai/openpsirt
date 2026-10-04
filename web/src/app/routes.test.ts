@@ -61,6 +61,7 @@ const SAMPLES: Record<string, () => string[]> = {
   settingsAt: () => [routes.settingsAt(odd)],
   reviewQueueAt: () => [routes.reviewQueueAt(), routes.reviewQueueAt({ product: odd, mine: true })],
   recordAt: () => [routes.recordAt(odd, odd)],
+  obligationsAt: () => [routes.obligationsAt(), routes.obligationsAt(odd)],
   auditAt: () => [routes.auditAt({ alone: "true", outcome: odd })],
   requeried: () => [
     routes.requeried(

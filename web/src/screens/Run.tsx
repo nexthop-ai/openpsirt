@@ -190,7 +190,7 @@ function Shape({
           </div>
           {(exploited ?? 0) > 0 && (
             <p className="alert" style={{ marginTop: 10 }}>
-              <strong>{exploited?.toLocaleString()} known to be exploited</strong>
+              <strong>{exploited?.toLocaleString()} known exploited</strong>
             </p>
           )}
         </>
