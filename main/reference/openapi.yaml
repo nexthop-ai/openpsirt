@@ -3068,8 +3068,20 @@ components:
     EmbargoedBody:
       additionalProperties: false
       properties:
-        component:
-          type: string
+        builds:
+          description: The builds carrying the issue, within the scope asked for
+          items:
+            $ref: "#/components/schemas/EmbargoedBuildBody"
+          type:
+            - array
+            - "null"
+        components:
+          description: The components carrying the issue in the builds listed, by name
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         disclose_at:
           description: The date the embargo ends. Reaching it discloses nothing
           type: string
@@ -3077,7 +3089,7 @@ components:
           description: Whether the date has already arrived
           type: boolean
         places:
-          description: The number of findings this covers
+          description: The number of findings this covers, across every build listed
           format: int64
           type: integer
         product:
@@ -3088,29 +3100,35 @@ components:
           type: string
         severity:
           type: string
+        summary:
+          type: string
+        vulnerability:
+          type: string
+      required:
+        - vulnerability
+        - product
+        - components
+        - builds
+        - disclose_at
+        - passed
+        - places
+      type: object
+    EmbargoedBuildBody:
+      additionalProperties: false
+      properties:
         stream:
           type: string
         stream_name:
           description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
-        summary:
           type: string
         variant:
           type: string
         variant_name:
           description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
-        vulnerability:
-          type: string
       required:
-        - vulnerability
-        - component
-        - product
         - stream
         - variant
-        - disclose_at
-        - passed
-        - places
       type: object
     EndOfLifeBody:
       additionalProperties: false
@@ -14358,13 +14376,13 @@ paths:
   /v1/disclosing:
     get:
       description: |-
-        Returns findings nobody has announced whose embargo is running out, soonest first, and the ones whose date has already arrived.
+        Returns issues nobody has announced whose embargo is running out, soonest first, and the ones whose date has already arrived. One item is one issue in one product, the unit an embargo is moved and disclosed in, with the builds and components carrying it and the findings counted across them.
 
         Nothing here discloses anything. Reaching the date escalates: the row appears and the people who can act on it are told.
 
         A product you may not read undisclosed work in contributes nothing to it, not even a count.
 
-        `within` is how many days ahead to look. Left off, it is this deployment's own embargo length.
+        `within` is how many days ahead to look. Left off, it is this deployment's own embargo length. `product`, `stream` and `variant` narrow it to a scope, and the builds an item lists are the ones inside that scope.
 
         Requires: private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
       operationId: list-approaching-disclosure
