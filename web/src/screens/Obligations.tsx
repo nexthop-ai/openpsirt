@@ -1,21 +1,26 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
+import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { at, since } from "../ui/when";
 import { issueAt, obligationsAt } from "../app/routes";
+import { notACredential } from "../ui/noautofill";
+import { Keep } from "./FindingExploited";
 
-// Every standing attack on a product, with the windows this deployment counts
-// from the moment each became known and the notices given.
+// Every standing record that a product was exploited here, with the windows
+// this deployment counts from the moment each became known and the notices
+// given. Called "Exploited here" on screen: the words of the record, the
+// finding's badge and the act, so the three read as one thing.
 //
 // Its own screen rather than a filter over the overdue list: a window here has
 // somebody outside waiting on it, and a remediation deadline has nobody. What
@@ -32,6 +37,7 @@ export function Obligations() {
   // filter over what came back.
   const [params] = useSearchParams();
   const product = params.get("product") ?? "";
+  const [recording, setRecording] = useState(false);
   const shelf = useQuery({
     queryKey: ["obligations"],
     queryFn: async () => unwrap(await api.GET("/v1/obligations", {})),
@@ -41,9 +47,13 @@ export function Obligations() {
     queryFn: async () => unwrap(await api.GET("/v1/obligation-windows", {})),
   });
 
+  // Recording asks for triage on the product, so the control is offered to
+  // whoever holds it somewhere and the picker offers only those products.
+  const triaged = (who.data?.reach ?? []).filter((each) => each.may_triage);
+
   if (shelf.isPending || windows.isPending) return <Loading />;
   if (shelf.isError) {
-    return <Failed error={shelf.error} what="The standing attacks could not be read." />;
+    return <Failed error={shelf.error} what="The exploited-here records could not be read." />;
   }
   const items = (shelf.data?.items ?? []).filter(
     (incident) => !product || incident.product === product,
@@ -58,18 +68,23 @@ export function Obligations() {
     <>
       <div className="screen-head">
         <h2>
-          Standing attacks <span className="n">{items.length.toLocaleString()}</span>
+          Exploited here <span className="n">{items.length.toLocaleString()}</span>
         </h2>
         <p>
           {product ? (
             <>
-              Attacks on {productName} · <Link to={obligationsAt()}>every product</Link>
+              Exploited here on {productName} · <Link to={obligationsAt()}>every product</Link>
             </>
           ) : (
-            "Products attacked through an issue, and the windows counted from when each became known."
+            "Attacks on our own products, not a feed flag, and the windows counted from when each became known."
           )}
         </p>
+        {triaged.length > 0 && (
+          <AddButton label="Record exploited here" onClick={() => setRecording((was) => !was)} />
+        )}
       </div>
+
+      {recording && <Record products={triaged} onClose={() => setRecording(false)} />}
 
       {unread && <Failed error={windows.error} what="The windows could not be read." />}
       {!unread && who.data?.admin && <Windows windows={inForce} />}
@@ -81,10 +96,14 @@ export function Obligations() {
         <Empty
           title={
             product
-              ? `No records of ${productName} being exploited.`
-              : "No product records being exploited."
+              ? `${productName} is not recorded as exploited.`
+              : "No products recorded as exploited."
           }
-          detail="A record kept on a finding appears here until somebody clears it."
+          detail={
+            triaged.length > 0
+              ? "Use Record exploited here, above or on the finding. A record stays until cleared."
+              : "Somebody who triages the product records one on its finding."
+          }
         />
       ) : (
         items.map((incident) => (
@@ -316,7 +335,7 @@ function Windows({ windows }: { windows: Window[] }) {
 
   return (
     <div className="card">
-      <h3>Windows</h3>
+      <h3>Response windows</h3>
       {windows.length === 0 && <p className="hint">None declared.</p>}
       {windows.map((each) =>
         editing === each.id ? (
@@ -405,34 +424,39 @@ function WindowForm({
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div className="actions">
-        <input
-          type="text"
-          aria-label="Name"
-          style={{ width: "32ch" }}
-          placeholder="Name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <input
-          aria-label="Hours"
-          type="number"
-          min={1}
-          placeholder="Hours"
-          style={{ width: "10ch" }}
-          value={hours}
-          onChange={(event) => setHours(event.target.value)}
-        />
-        <input
-          aria-label="Warn this many hours before the end"
+      <div className="filters">
+        <label className="field">
+          <span>Name</span>
+          <input
+            type="text"
+            style={{ width: "32ch" }}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label className="field" title="Counted from when the attack became known">
+          <span>Length, hours</span>
+          <input
+            type="number"
+            min={1}
+            style={{ width: "12ch" }}
+            value={hours}
+            onChange={(event) => setHours(event.target.value)}
+          />
+        </label>
+        <label
+          className="field"
           title="A second notice this many hours before the end. Leave empty for none"
-          type="number"
-          min={1}
-          placeholder="Warn at"
-          style={{ width: "10ch" }}
-          value={lead}
-          onChange={(event) => setLead(event.target.value)}
-        />
+        >
+          <span>Warn, hours before end</span>
+          <input
+            type="number"
+            min={1}
+            style={{ width: "12ch" }}
+            value={lead}
+            onChange={(event) => setLead(event.target.value)}
+          />
+        </label>
       </div>
       {(products.data?.items ?? []).length > 0 && (
         <p className="hint" title="None ticked is every product">
@@ -457,7 +481,7 @@ function WindowForm({
           disabled={!name.trim() || !(Number(hours) > 0) || save.isPending}
           onClick={() => save.mutate()}
         >
-          {window ? "Save" : "Declare"}
+          {window ? "Save" : "Add window"}
         </button>
         {onCancel && (
           <button type="button" className="btn quiet" onClick={onCancel}>
@@ -469,6 +493,106 @@ function WindowForm({
         <Failed
           error={save.error}
           what={window ? "That window was not changed." : "That window was not declared."}
+        />
+      )}
+    </div>
+  );
+}
+
+// Record is the screen's way into the act a finding offers: the same request,
+// with the product and the issue asked for rather than read off the finding.
+// The issue is typed, with what the product carries offered as it is typed:
+// every release kind, every state of support and every row under the triage
+// line, because an attack is often on a shipped tag or a release past its end.
+// An identifier the list does not hold is still the server's to decide.
+function Record({
+  products,
+  onClose,
+}: {
+  products: { product: string; name: string }[];
+  onClose: () => void;
+}) {
+  const queries = useQueryClient();
+  const [product, setProduct] = useState(products.length === 1 ? (products[0]?.product ?? "") : "");
+  const [issue, setIssue] = useState("");
+  const term = useDeferredValue(issue.trim());
+  const carried = useQuery({
+    enabled: product !== "" && term.length >= 3,
+    queryKey: ["exploitable", product, term],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/findings", {
+          params: {
+            path: { product },
+            query: {
+              q: term,
+              limit: 50,
+              on: ["branch", "tag"],
+              support: ["in-support", "past-eol"],
+              below_floor: true,
+            },
+          },
+        }),
+      ),
+  });
+  // The list is one row per issue and component, so an issue at three
+  // components is offered once.
+  const offered = useMemo(
+    () => [...new Set((carried.data?.items ?? []).map((row) => row.vulnerability))],
+    [carried.data],
+  );
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <h3>Record exploited here</h3>
+      <Keep
+        product={product}
+        vulnerability={issue}
+        onClose={onClose}
+        done={() => {
+          void queries.invalidateQueries({ queryKey: ["obligations"] });
+          void queries.invalidateQueries({ queryKey: ["finding"] });
+        }}
+        pick={
+          <div className="filters" style={{ marginBottom: 8 }}>
+            <label className="field">
+              <span>Product</span>
+              <select value={product} onChange={(event) => setProduct(event.target.value)}>
+                <option value="">Pick a product</option>
+                {products.map((each) => (
+                  <option key={each.product} value={each.product}>
+                    {each.name || each.product}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label
+              className="field"
+              style={{ flex: 1, minWidth: 220 }}
+              title="The issue our product was attacked through, by any name it is known under"
+            >
+              <span>Issue</span>
+              <input
+                type="text"
+                list="exploitable-issues"
+                value={issue}
+                placeholder="CVE-2026-31431"
+                onChange={(event) => setIssue(event.target.value)}
+                {...notACredential}
+              />
+              <datalist id="exploitable-issues">
+                {offered.map((each) => (
+                  <option key={each} value={each} />
+                ))}
+              </datalist>
+            </label>
+          </div>
+        }
+      />
+      {carried.isError && (
+        <Failed
+          error={carried.error}
+          what="What that product carries could not be read. An identifier typed in full still works."
         />
       )}
     </div>

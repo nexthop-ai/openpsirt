@@ -284,8 +284,9 @@ says what turns each on.
   ones it names
 - Notices given to somebody outside are recorded, append-only, against the
   window they answer
-- A standing-attacks screen lists every record. An alert is raised as each
-  window opens, at the warning a window declares, and as it passes
+- The Exploited here screen lists every standing record, and records one for
+  a product and issue picked there. An alert is raised as each window opens,
+  at the warning a window declares, and as it passes
 - A bulk judgment that would dismiss or defer an attacked issue is refused.
   Nothing here decides whether an obligation applies or was met
 

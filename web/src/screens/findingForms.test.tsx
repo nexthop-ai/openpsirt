@@ -62,11 +62,11 @@ describe("recording that a product was exploited", () => {
       );
     draw("CVE-2026-1");
     const open = Array.from(mount.host().querySelectorAll("button")).find((each) =>
-      each.textContent?.includes("Record that this product was exploited"),
+      each.textContent?.includes("Record exploited here"),
     );
     act(() => open?.click());
     expect(mount.host().querySelector("textarea, input")).not.toBeNull();
     draw("CVE-2026-2");
-    expect(mount.host().textContent).toContain("Record that this product was exploited");
+    expect(mount.host().textContent).toContain("Record exploited here");
   });
 });

@@ -157,6 +157,10 @@ filter over the overdue list, and never reached by one.
 | Rule | Reason |
 |---|---|
 | A missed remediation deadline has no counterparty and one of these does | So they are different surfaces. The failure to design against is an obligation rendering as row 4,782 among four thousand unpenalized hygiene findings |
+| Named Exploited here on screen | The words of the record, the finding's mark and the act that keeps one, so the three read as one thing and apart from a feed's exploitation flag |
+| Its windows are headed response windows, never deadlines | A deadline on any other screen is the remediation deadline, which a window is not and is not derived from |
+| A record is kept from the shelf as well as from its finding | One act, one request and one form, named Record exploited here in both places. The shelf asks for the product and the issue as well, offers only the products the reader triages, and suggests the issues that product carries as one is typed, including one only in a tag, in a release past its end of support or below the triage line |
+| An empty shelf names the act that fills it | Somebody arriving here during an incident is pointed at the control rather than left at an empty list |
 | Each record is narrowed by the question that authorizes one issue in one product | The same question the record's own finding asks. Nothing is counted before the narrowing, so no total says how many records exist to somebody shown fewer |
 | A product named in the address narrows the shelf to that product's records, and the screen says so with the way back to every product | A figure counted over one product opens what it counted. The narrowing is over what the reader was already shown, so it reveals nothing |
 | Unpaged | The set is what this deployment's products have been attacked through and nobody has cleared. A deployment where that is long has a problem no paging would help with |

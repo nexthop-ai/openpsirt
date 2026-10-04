@@ -1,15 +1,16 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Obligations } from "./Obligations";
-import { screen, serve, settle, mounted } from "../test/mount";
+import { accept, screen, serve, settle, mounted, type Sent } from "../test/mount";
 
 const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const record = (id: number, product: string, vulnerability: string) => ({
+const standing = (id: number, product: string, vulnerability: string) => ({
   id,
   product,
   product_name: product.toUpperCase(),
@@ -26,7 +27,7 @@ function shelf() {
     if (asked === "/v1/obligations") {
       return {
         data: {
-          items: [record(1, "sonic", "CVE-2026-0001"), record(2, "edge", "CVE-2026-0002")],
+          items: [standing(1, "sonic", "CVE-2026-0001"), standing(2, "edge", "CVE-2026-0002")],
         },
       };
     }
@@ -37,7 +38,7 @@ function shelf() {
   });
 }
 
-describe("the shelf of standing attacks", () => {
+describe("the exploited-here shelf", () => {
   it("narrows to the product the address names, and offers every product back", async () => {
     shelf();
     mount.render(screen(<Obligations />, "/obligations?product=sonic"));
@@ -45,7 +46,7 @@ describe("the shelf of standing attacks", () => {
     const text = mount.host().textContent ?? "";
     expect(text).toContain("CVE-2026-0001");
     expect(text).not.toContain("CVE-2026-0002");
-    expect(text).toContain("Attacks on SONIC");
+    expect(text).toContain("Exploited here on SONIC");
     expect(mount.host().querySelector('a[href="/obligations"]')?.textContent).toBe("every product");
   });
 
@@ -56,5 +57,97 @@ describe("the shelf of standing attacks", () => {
     const text = mount.host().textContent ?? "";
     expect(text).toContain("CVE-2026-0001");
     expect(text).toContain("CVE-2026-0002");
+  });
+});
+
+const can = (product: string, mayTriage: boolean) => ({
+  product,
+  name: product.toUpperCase(),
+  may_see: true,
+  may_triage: mayTriage,
+});
+
+function serving(reach: ReturnType<typeof can>[]) {
+  return serve((path) =>
+    path === "/v1/session/me"
+      ? { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach } }
+      : { data: { items: [], total: 0 } },
+  );
+}
+
+function button(label: string): HTMLButtonElement | undefined {
+  return Array.from(mount.host().querySelectorAll<HTMLButtonElement>(".screen-head button")).find(
+    (each) => each.textContent?.trim() === label,
+  );
+}
+
+function pick(select: HTMLSelectElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, value);
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto =
+    field instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+describe("recording exploited here from its own screen", () => {
+  it("sends the request a finding sends, for the product and issue picked", async () => {
+    const asked = serving([can("sonic", true), can("other", false)]);
+    const sent = accept(() => ({ status: 201, data: {} }));
+    mount.render(screen(<Obligations />));
+    await settle();
+
+    act(() => button("Record exploited here")?.click());
+    const select = mount.host().querySelector<HTMLSelectElement>(".card select");
+    // Only a product the reader triages is offered: the server refuses the rest.
+    expect(Array.from(select?.options ?? []).map((each) => each.value)).toEqual(["", "sonic"]);
+    act(() => pick(select!, "sonic"));
+    act(() => type(mount.host().querySelector<HTMLInputElement>("input[list]")!, " CVE-2026-1 "));
+    await settle();
+    // An attack is often on a shipped tag or a release past its end, so the
+    // suggestions ask past every default the findings list applies.
+    const suggested = (asked.mock.calls as unknown as Sent[]).find(
+      ([path]) => path === "/v1/products/{product}/findings",
+    );
+    expect(suggested?.[1]).toMatchObject({
+      params: {
+        path: { product: "sonic" },
+        query: {
+          q: "CVE-2026-1",
+          on: ["branch", "tag"],
+          support: ["in-support", "past-eol"],
+          below_floor: true,
+        },
+      },
+    });
+    act(() =>
+      type(mount.host().querySelector<HTMLTextAreaElement>("#grounds")!, "A customer saw it"),
+    );
+    const record = Array.from(
+      mount.host().querySelectorAll<HTMLButtonElement>(".card button"),
+    ).find((each) => each.textContent === "Record");
+    expect(record?.disabled).toBe(false);
+    act(() => record?.click());
+    await settle();
+
+    const [path, init] = sent()[0] ?? [];
+    expect(path).toBe("/v1/products/{product}/issues/{vulnerability}/exploited-here");
+    expect(init).toMatchObject({
+      params: { path: { product: "sonic", vulnerability: "CVE-2026-1" } },
+      body: { grounds: "A customer saw it" },
+    });
+  });
+
+  it("offers the control to nobody who triages no product", async () => {
+    serving([can("sonic", false)]);
+    mount.render(screen(<Obligations />));
+    await settle();
+    expect(button("Record exploited here")).toBeUndefined();
+    expect(mount.host().textContent).toContain("No products recorded as exploited.");
   });
 });

@@ -213,7 +213,7 @@ export const reviewQueueAt = (
 export const recordAt = (product: string, from?: string, source?: "outside") =>
   at("record", {}, { product, from: from || undefined, source });
 
-// The shelf of standing attacks, narrowed to one product where one is named.
+// The Exploited here shelf, narrowed to one product where one is named.
 export const obligationsAt = (product?: string) =>
   at("obligations", {}, { product: product || undefined });
 
