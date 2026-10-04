@@ -727,8 +727,10 @@ by this rule. The module was already affected and already reported.
 
 Every gate program written here walks the repository through one reader, which
 holds the default set of directories none of them read: the version history, a
-local run's scratch, somebody else's code, and the three output directories,
-whose contents were built from what is checked anyway.
+local run's scratch, a local tool's working directory, somebody else's code,
+and the three output directories. The output directories were built from what
+is checked anyway, and the tool's working directory holds worktrees that are
+whole copies of the checkout.
 
 Each caller names what it adds, at the call site, with the reason beside it. The
 five Go gates add the interface, which is TypeScript; the text-encoding gate

@@ -121,6 +121,28 @@ func TestTheDefaultSkipSetIsMatchedByDirectoryName(t *testing.T) {
 	}
 }
 
+func TestACopyOfTheCheckoutInsideItIsNotRead(t *testing.T) {
+	// A local tool's worktree is a whole checkout inside this one. Read, it is
+	// every file a second time, and a gate that fails on one copy fails on all.
+	tree(t, map[string]string{
+		"internal/a.go": "package a",
+		".claude/worktrees/agent-1/internal/a.go":   "package a",
+		".claude/worktrees/agent-1/DESIGN-build.md": "# Build",
+	})
+
+	var seen []string
+	read, err := Sources(".go", func(path string, _ []byte) error {
+		seen = append(seen, filepath.ToSlash(path))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read != 1 || len(seen) != 1 || seen[0] != "internal/a.go" {
+		t.Errorf("read %v, want internal/a.go alone", seen)
+	}
+}
+
 func TestWhatACallerAddsIsSkippedToo(t *testing.T) {
 	// The five Go gates pass "web" and readable passes "vendor", each with
 	// the reason at the call site. If extra did not reach the walk they would
