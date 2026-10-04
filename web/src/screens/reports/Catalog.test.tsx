@@ -5,6 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { location, mounted, screen, serve, settle } from "../../test/mount";
 import { onAskForScope } from "../../app/scope";
+import { Scope } from "../../app/Scope";
 import { Catalog } from "./Catalog";
 import { Report } from "./Report";
 
@@ -35,6 +36,35 @@ describe("a catalog entry that needs a scope", () => {
     act(() => compare.click());
     stop();
     expect(opened).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the picker in the scope bar", async () => {
+    serve(() => undefined);
+    // The bar brings itself into view as it opens, and jsdom draws no layout
+    // to scroll.
+    const kept = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    try {
+      mount.render(
+        screen(
+          <>
+            <Scope />
+            <Catalog />
+          </>,
+          "/reports",
+        ),
+      );
+      act(() => row("Release comparison").click());
+      await settle();
+      const bar = mount.host().querySelector(".scopebar");
+      expect(bar?.querySelector(".scope")?.getAttribute("aria-expanded")).toBe("true");
+      expect(bar?.querySelector(".picker")?.classList.contains("open")).toBe(true);
+      expect(scroll).toHaveBeenCalledTimes(1);
+    } finally {
+      if (kept) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", kept);
+      else delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+    }
   });
 
   it("asks for a whole build where its screen is about one", () => {
