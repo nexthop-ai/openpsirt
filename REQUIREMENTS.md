@@ -219,7 +219,7 @@ inputs.
 | REQ-72 | The application creates and migrates its own schema at startup, with one instance migrating at a time | An operator should not have to run a migration step to get a working deployment |
 | REQ-73 | High-volume history ages out by dropping partitions, exported before it goes | Large deletes on a table this size are an outage |
 | REQ-74 | Nothing is made faster until it is measured slow. No cache, precomputed total or refresh job without a measurement behind it | A stale answer is a cost paid up front for a benefit nobody has demonstrated, and it brings invalidation, drift, and a number that is wrong in a way nothing reports |
-| REQ-75 | Static analysis, vulnerability scanning, dependency review, secret scanning and the license check gate every change, and every finding reproduces locally with one documented command | A gate that cannot be reproduced locally is a gate people learn to re-run until it passes |
+| REQ-75 | Static analysis, vulnerability scanning, dependency review, secret scanning and the license check gate every change, and every finding reproduces locally with one documented command. A change is failed for a vulnerability it introduces, and one already present on the branch it targets is reported without failing it | A gate that cannot be reproduced locally is a gate people learn to re-run until it passes, and a gate that fails a change for something it did not do is one people learn to override |
 
 ---
 
