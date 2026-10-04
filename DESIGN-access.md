@@ -1171,6 +1171,14 @@ That list is itself a disclosure. A product somebody may not read undisclosed
 work in contributes nothing to their copy of it — not a row and not a count,
 because a count says as much as a row.
 
+| List rule | Reason |
+|---|---|
+| A row is one issue in one product | The unit an embargo date is kept and moved in. A row per build repeats one embargo once per build that carries it |
+| A row names the builds and components carrying it, and counts its findings across them | What a person needs to see where the embargo reaches without opening each build |
+| The grouping is made in the query, before paging | A page holds whole embargoes and the total counts embargoes. A grouping made after paging splits one embargo across two pages |
+| The list is narrowed to a scope where one is asked for | A product, a branch and a variant narrow it as they narrow every other list. A row then names only the builds inside the scope, and counts only their findings |
+| The builds and components are read under the same narrowing as the rows | A build the reader's access or the scope leaves out is never named |
+
 The date arriving tells administrators, and whoever holds the finding where they
 may still read undisclosed work in that product. A condition rather than an
 event: it stands while the date is past and nothing has been decided.

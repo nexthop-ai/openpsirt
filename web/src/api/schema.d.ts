@@ -1155,13 +1155,13 @@ export interface paths {
         };
         /**
          * List what is approaching disclosure
-         * @description Returns findings nobody has announced whose embargo is running out, soonest first, and the ones whose date has already arrived.
+         * @description Returns issues nobody has announced whose embargo is running out, soonest first, and the ones whose date has already arrived. One item is one issue in one product, the unit an embargo is moved and disclosed in, with the builds and components carrying it and the findings counted across them.
          *
          *     Nothing here discloses anything. Reaching the date escalates: the row appears and the people who can act on it are told.
          *
          *     A product you may not read undisclosed work in contributes nothing to it, not even a count.
          *
-         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length.
+         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length. `product`, `stream` and `variant` narrow it to a scope, and the builds an item lists are the ones inside that scope.
          *
          *     Requires: private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
          */
@@ -7826,14 +7826,17 @@ export interface components {
             reasoning: string;
         };
         EmbargoedBody: {
-            component: string;
+            /** @description The builds carrying the issue, within the scope asked for */
+            builds: components["schemas"]["EmbargoedBuildBody"][] | null;
+            /** @description The components carrying the issue in the builds listed, by name */
+            components: string[] | null;
             /** @description The date the embargo ends. Reaching it discloses nothing */
             disclose_at: string;
             /** @description Whether the date has already arrived */
             passed: boolean;
             /**
              * Format: int64
-             * @description The number of findings this covers
+             * @description The number of findings this covers, across every build listed
              */
             places: number;
             /** @description The product, by the name that addresses it */
@@ -7841,14 +7844,16 @@ export interface components {
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
+            summary?: string;
+            vulnerability: string;
+        };
+        EmbargoedBuildBody: {
             stream: string;
             /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
             stream_name?: string;
-            summary?: string;
             variant: string;
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
-            vulnerability: string;
         };
         EndOfLifeBody: {
             /**

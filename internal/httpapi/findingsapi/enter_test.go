@@ -169,6 +169,68 @@ func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 	})
 }
 
+func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
+	// An embargo is kept and moved per issue per product, so a flaw recorded
+	// against two builds is one row naming both, with the findings counted
+	// across them. Narrowed to one build, it names that build and counts its
+	// findings alone.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		r.ScannedTag(t, "v1.0", "3.7.0")
+		const at = "/v1/products/mine/findings"
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"},{"stream":"v1.0","variant":"broadcom"}],`+
+				`"summary":"Not announced anywhere.","severity":"critical"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+
+		type listing struct {
+			Total int `json:"total"`
+			Items []struct {
+				Vulnerability string   `json:"vulnerability"`
+				Product       string   `json:"product"`
+				Components    []string `json:"components"`
+				Builds        []struct {
+					Stream  string `json:"stream"`
+					Variant string `json:"variant"`
+				} `json:"builds"`
+				Places int `json:"places"`
+			} `json:"items"`
+		}
+		var whole listing
+		httpapitest.Read(t, r, "private-triage", "/v1/disclosing?within=365", &whole)
+		if whole.Total != 1 || len(whole.Items) != 1 {
+			t.Fatalf("a flaw in two builds is %d rows of a total %d, want one of one",
+				len(whole.Items), whole.Total)
+		}
+		row := whole.Items[0]
+		if len(row.Builds) != 2 || row.Builds[0].Stream != "master" || row.Builds[1].Stream != "v1.0" {
+			t.Errorf("the row names the builds %+v, want master and v1.0", row.Builds)
+		}
+		if row.Places != 2 {
+			t.Errorf("the row counts %d findings, want one in each build", row.Places)
+		}
+		if len(row.Components) == 0 {
+			t.Error("the row names no component")
+		}
+
+		var narrowed listing
+		httpapitest.Read(t, r, "private-triage",
+			"/v1/disclosing?within=365&product=mine&stream=v1.0", &narrowed)
+		if len(narrowed.Items) != 1 {
+			t.Fatalf("narrowed to a build carrying it, %d rows, want 1", len(narrowed.Items))
+		}
+		if b := narrowed.Items[0].Builds; len(b) != 1 || b[0].Stream != "v1.0" {
+			t.Errorf("narrowed to v1.0 the row names %+v", b)
+		}
+		if narrowed.Items[0].Places != 1 {
+			t.Errorf("narrowed to one build the row counts %d findings, want 1",
+				narrowed.Items[0].Places)
+		}
+	})
+}
+
 func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing.T) {
 	// A short extension is ordinary triage; past the threshold it needs a
 	// second person, and until it has one the date has not moved. The request

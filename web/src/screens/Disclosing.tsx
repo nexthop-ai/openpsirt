@@ -15,7 +15,9 @@ import { Failed } from "../ui/Failed";
 import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
-import { findingAt } from "../app/routes";
+import { useReseed } from "../ui/reseed";
+import { issueAt, recordAt } from "../app/routes";
+import { scopeQuery, useScope } from "../app/scope";
 
 // The findings approaching disclosure, and the place an embargo is moved (a
 // finding saying whether it is disclosed, a movement needing agreement).
@@ -27,13 +29,42 @@ import { findingAt } from "../app/routes";
 // The list is itself a disclosure. Every row on it is undisclosed by
 // definition, so a product somebody may not read undisclosed work in
 // contributes nothing to it, not even a count. That narrowing is the server's.
+//
+// A row is one issue in one product, the unit an embargo is kept and moved in,
+// naming every build in scope that carries it. The server groups them, so a
+// page holds whole embargoes and the total counts embargoes.
+
 // The rows one request carries. The server's own default, named here so
 // the pager and the request cannot disagree about where a page ends.
 const PAGE = 100;
 
+// Not a character a product name or an issue identifier can hold, so a key
+// cannot be two embargoes.
+const APART = "\u0000";
+
+// One embargo as a string a row, its open form and its answer are keyed on.
+export function embargoKey(row: { product?: string; vulnerability?: string }): string {
+  return [row.product ?? "", row.vulnerability ?? ""].join(APART);
+}
+
+// The builds a row names. The variant is said once where every build shares it,
+// which is the ordinary case of one image cut from several branches.
+export function buildsWords(
+  builds: { stream: string; stream_name?: string; variant: string; variant_name?: string }[],
+): string {
+  const variants = new Set(builds.map((b) => b.variant_name || b.variant));
+  if (variants.size === 1) {
+    return `${builds.map((b) => b.stream_name || b.stream).join(", ")} · ${[...variants][0]}`;
+  }
+  return builds
+    .map((b) => `${b.stream_name || b.stream} · ${b.variant_name || b.variant}`)
+    .join(", ");
+}
+
 export function Disclosing() {
   const queries = useQueryClient();
   const who = useWho().data;
+  const scope = scopeQuery(useScope());
   // The distance ahead to look. Empty is this deployment's own embargo length,
   // which the server supplies: a fixed window shorter than the policy leaves
   // the screen empty while embargoes are running, and an empty screen reads as
@@ -49,16 +80,26 @@ export function Disclosing() {
   // What the last act answered, on the row it was taken from.
   const [said, setSaid] = useState<{ key: string; text: string; waiting: boolean } | null>(null);
   const [offset, setOffset] = useState(0);
+  // A list moved to another scope starts at its own beginning.
+  useReseed(JSON.stringify(scope), () => setOffset(0));
 
   const rows = useQuery({
-    queryKey: ["disclosing", days, offset],
+    queryKey: ["disclosing", scope, days, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/disclosing", {
-          params: { query: { ...(days ? { within: Number(days) } : {}), limit: PAGE, offset } },
+          params: {
+            query: { ...scope, ...(days ? { within: Number(days) } : {}), limit: PAGE, offset },
+          },
         }),
       ),
   });
+  // The shortcut to the form that gives a flaw a disclosure date, offered to
+  // whoever may record an undisclosed one in the scope's product, or in any
+  // product where the scope names none.
+  const mayRecord = scope.product
+    ? !!mayOf(who, scope.product)?.may_hide
+    : !!who?.reach?.some((each) => each.may_hide);
 
   const move = useMutation({
     mutationFn: async (at: { product: string; vulnerability: string }) =>
@@ -83,7 +124,7 @@ export function Disclosing() {
       ),
     onSuccess: (asked, at) => {
       setSaid({
-        key: `${at.product} ${at.vulnerability}`,
+        key: embargoKey(at),
         text: asked.in_force
           ? act === "disclosure"
             ? "Disclosed. The findings and everything on them are public."
@@ -119,7 +160,12 @@ export function Disclosing() {
         <h2>
           Disclosing <span className="n">{(total ?? items.length).toLocaleString()}</span>
         </h2>
-        <p>Embargoes running out, soonest first. Reaching a date discloses nothing on its own.</p>
+        <p>
+          {scope.product
+            ? [scope.product, scope.stream, scope.variant].filter(Boolean).join(" · ")
+            : "Every product you can see"}{" "}
+          · embargoes running out, soonest first. Reaching a date discloses nothing on its own.
+        </p>
         <label className="field" style={{ marginLeft: "auto" }}>
           <span>Within</span>
           <select
@@ -136,11 +182,19 @@ export function Disclosing() {
             <option value="90">Within 90 days</option>
           </select>
         </label>
+        {/* A shortcut to the form every flaw is reported through. Reporting a
+            flaw from outside starts a date; the other way is a claim from
+            outside ruled a duplicate, which is made on the report. */}
+        {mayRecord && (
+          <Link className="btn" to={recordAt(scope.product ?? "", undefined, "outside")}>
+            Record a reported flaw
+          </Link>
+        )}
       </div>
 
       {/* Where the row the act was taken from has left the list: a
           disclosure in force at once, or a date moved past the window. */}
-      {said && !items.some((row) => `${row.product} ${row.vulnerability}` === said.key) && (
+      {said && !items.some((row) => embargoKey(row) === said.key) && (
         <div className="alert info" role="status" style={{ marginBottom: 12 }}>
           <strong>Asked</strong>
           <span>
@@ -165,7 +219,7 @@ export function Disclosing() {
       {items.length === 0 ? (
         <Empty
           title="Nothing is approaching a disclosure date."
-          detail="Recorded flaws under embargo appear here before their date, not on it."
+          detail="Flaws sent in from outside get a disclosure date and appear here, as do flaws an outside report duplicates."
         />
       ) : (
         <Wide>
@@ -182,30 +236,23 @@ export function Disclosing() {
             </thead>
             <tbody>
               {items.map((row) => {
-                const key = `${row.product} ${row.vulnerability}`;
+                const key = embargoKey(row);
                 return (
                   <tr key={key} className="row">
                     <td>
                       <Severity word={row.severity} />
                     </td>
                     <td>
-                      <Link
-                        className="id"
-                        to={findingAt(
-                          {
-                            product: row.product ?? "",
-                            stream: row.stream ?? "",
-                            variant: row.variant ?? "",
-                          },
-                          row,
-                        )}
-                      >
+                      <Link className="id" to={issueAt(row.vulnerability ?? "")}>
                         {row.vulnerability}
                       </Link>
                       {row.summary && <div className="hint">{row.summary}</div>}
                     </td>
                     <td className="hint">
-                      {row.product_name || row.product} · {row.component}
+                      {[row.product_name || row.product, (row.components ?? []).join(", ")]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      <div>{buildsWords(row.builds ?? [])}</div>
                     </td>
                     <td>
                       <span className={row.passed ? "due over" : "due soon"}>

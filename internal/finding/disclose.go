@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,24 +22,35 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// Embargoed is one finding nobody has announced, and when that ends.
+// Embargoed is one issue nobody has announced in one product, and when that
+// ends. One issue in one product is the unit an embargo is kept and moved in,
+// so it is one row however many builds and components carry it.
 type Embargoed struct {
-	Vulnerability string `bun:"vulnerability"`
-	Summary       string `bun:"summary"`
-	Component     string `bun:"component"`
-	Product       string `bun:"product"`
-	ProductName   string `bun:"product_name"`
-	Stream        string `bun:"stream"`
-	StreamName    string `bun:"stream_name"`
-	Variant       string `bun:"variant"`
-	VariantName   string `bun:"variant_name"`
-	Severity      string `bun:"severity"`
+	ProductID       int64  `bun:"product_id"`
+	VulnerabilityID int64  `bun:"vulnerability_id"`
+	Vulnerability   string `bun:"vulnerability"`
+	Summary         string `bun:"summary"`
+	Product         string `bun:"product"`
+	ProductName     string `bun:"product_name"`
+	Severity        string `bun:"severity"`
 	// DiscloseAt is when the embargo ends. Reaching it discloses nothing:
 	// it is a date to answer, not a trigger.
 	DiscloseAt time.Time `bun:"disclose_at"`
 	AssignedTo *int64    `bun:"assigned_to"`
-	// Places is how many findings this covers.
+	// Places is how many findings this covers, across every build named.
 	Places int `bun:"places"`
+	// Components are the components carrying it, by name.
+	Components []string `bun:"-"`
+	// Builds are the builds carrying it.
+	Builds []EmbargoedBuild `bun:"-"`
+}
+
+// EmbargoedBuild is one build an embargoed issue sits in.
+type EmbargoedBuild struct {
+	Stream      string `bun:"stream"`
+	StreamName  string `bun:"stream_name"`
+	Variant     string `bun:"variant"`
+	VariantName string `bun:"variant_name"`
 }
 
 // Passed says the date has arrived and nothing has been decided about it.
@@ -62,6 +74,10 @@ func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) 
 // in a product sees none of that product's. What that costs them is a shorter
 // list; what the alternative costs is the disclosure the whole split exists to
 // prevent.
+//
+// Grouped in the statement, so a page and the total both count embargoes. A
+// grouping made after paging splits one embargo across two pages and counts
+// it twice.
 //
 // Paged because a ceiling with no offset means what is past it cannot be read
 // through the API at all — not slowly, not at all — and the total because a
@@ -103,20 +119,35 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		}
 	}
 
-	query := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+	// The findings the list is drawn from, narrowed the same way for the
+	// grouped page and for the builds and components named on it.
+	until := s.now().UTC().Add(within)
+	approaching := func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Where("f.visibility = ?", access.Private).
+			Where("f.closed_at IS NULL").
+			Where("f.disclose_at IS NOT NULL").
+			Where("f.disclose_at <= ?", until)
+		if len(private) > 0 {
+			q = q.Where("st.product_id IN (?)", bun.List(private))
+		}
+		return scope.Narrow(q)
+	}
+
+	// The rating is the product's own, so it is one value for the group.
+	query := approaching(s.db.NewSelect()).
 		Join(rating.For(rating.OnStream)).
+		ColumnExpr(`p.id AS "product_id"`).
+		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`v.description AS "summary"`).
-		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-		ColumnExpr(`c.name AS "component"`).
-		Apply(catalog.BuildNames("p", "st", "va")).
+		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(catalog.ShownExpr("p") + ` AS "product_name"`).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Whoever is dealing with it, and nobody where the places disagree.
 		// A minimum named one of them: a partly assigned embargo read as one
@@ -127,20 +158,12 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 			AND MIN(f.assigned_to) = MAX(f.assigned_to)
 			THEN MIN(f.assigned_to) END AS "assigned_to"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		Where("f.visibility = ?", access.Private).
-		Where("f.closed_at IS NULL").
-		Where("f.disclose_at IS NOT NULL").
-		Where("f.disclose_at <= ?", s.now().UTC().Add(within)).
-		GroupExpr("v.identifier, v.description, " + rating.EffectiveExpr +
-			", c.name, p.name, p.display_name, st.name, st.display_name, va.name, va.display_name").
-		OrderExpr("disclose_at, v.identifier")
-	if len(private) > 0 {
-		query = query.Where("st.product_id IN (?)", bun.List(private))
-	}
-	query = scope.Narrow(query)
+		GroupExpr("p.id, p.name, p.display_name, v.id, v.identifier, v.description, " +
+			rating.EffectiveExpr).
+		OrderExpr("disclose_at, v.identifier, p.name")
 
 	// Counted over the grouping rather than the rows: a row here is an issue
-	// at a component however many places it sits at, and counting the places
+	// in a product however many places it sits at, and counting the places
 	// would say a number the list cannot show.
 	total, err := s.db.NewSelect().
 		TableExpr(`(?) AS "approaching"`, query).Count(ctx)
@@ -152,7 +175,96 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 	if err := query.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what is approaching disclosure: %w", err)
 	}
+	if len(rows) == 0 {
+		return rows, total, nil
+	}
+	if err := s.whereEmbargoed(ctx, approaching, rows); err != nil {
+		return nil, 0, err
+	}
 	return rows, total, nil
+}
+
+// whereEmbargoed fills in the builds and components each row sits in, read
+// under the same narrowing as the rows themselves, so a build the scope or the
+// reader's access leaves out is never named.
+func (s *Store) whereEmbargoed(ctx context.Context,
+	approaching func(*bun.SelectQuery) *bun.SelectQuery, rows []Embargoed) error {
+
+	type key struct{ product, vulnerability int64 }
+	at := make(map[key]int, len(rows))
+	var productIDs, issueIDs []int64
+	seenProduct, seenIssue := map[int64]bool{}, map[int64]bool{}
+	for i, row := range rows {
+		at[key{row.ProductID, row.VulnerabilityID}] = i
+		if !seenProduct[row.ProductID] {
+			seenProduct[row.ProductID] = true
+			productIDs = append(productIDs, row.ProductID)
+		}
+		if !seenIssue[row.VulnerabilityID] {
+			seenIssue[row.VulnerabilityID] = true
+			issueIDs = append(issueIDs, row.VulnerabilityID)
+		}
+	}
+
+	// The products and the issues of the page, each as a list. A pair that is
+	// not on the page is dropped below rather than excluded by a row
+	// comparison, which the four engines do not write alike.
+	var placed []struct {
+		ProductID       int64  `bun:"product_id"`
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Component       string `bun:"component"`
+		EmbargoedBuild
+	}
+	if err := approaching(s.db.NewSelect()).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
+		Where("st.product_id IN (?)", bun.List(productIDs)).
+		Where("f.vulnerability_id IN (?)", bun.List(issueIDs)).
+		Distinct().
+		Scan(ctx, &placed); err != nil {
+		return fmt.Errorf("read where what is approaching disclosure sits: %w", err)
+	}
+
+	type build struct{ stream, variant string }
+	builds := make([]map[build]bool, len(rows))
+	components := make([]map[string]bool, len(rows))
+	for _, p := range placed {
+		i, ok := at[key{p.ProductID, p.VulnerabilityID}]
+		if !ok {
+			continue
+		}
+		if builds[i] == nil {
+			builds[i], components[i] = map[build]bool{}, map[string]bool{}
+		}
+		if b := (build{p.Stream, p.Variant}); !builds[i][b] {
+			builds[i][b] = true
+			rows[i].Builds = append(rows[i].Builds, p.EmbargoedBuild)
+		}
+		if !components[i][p.Component] {
+			components[i][p.Component] = true
+			rows[i].Components = append(rows[i].Components, p.Component)
+		}
+	}
+	// Ordered here rather than in the statement, so that every engine names
+	// them in the same order whatever its collation.
+	for i := range rows {
+		sort.Strings(rows[i].Components)
+		sort.Slice(rows[i].Builds, func(a, b int) bool {
+			x, y := rows[i].Builds[a], rows[i].Builds[b]
+			if x.Stream != y.Stream {
+				return x.Stream < y.Stream
+			}
+			return x.Variant < y.Variant
+		})
+	}
+	return nil
 }
 
 // Act is which way a disclosure date was moved, and what that movement means.

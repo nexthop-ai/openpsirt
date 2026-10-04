@@ -61,7 +61,8 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 		if len(ahead) != 1 {
 			t.Fatalf("%d findings are approaching disclosure, want 1", len(ahead))
 		}
-		if ahead[0].Summary == "" || ahead[0].Product == "" || ahead[0].Component == "" {
+		if ahead[0].Summary == "" || ahead[0].Product == "" || len(ahead[0].Components) == 0 ||
+			len(ahead[0].Builds) == 0 {
 			t.Errorf("the row does not say enough to act on: %+v", ahead[0])
 		}
 		if ahead[0].Passed(time.Now().UTC()) {
@@ -121,6 +122,109 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 		}
 		if len(rows) != 1 {
 			t.Errorf("somebody who may read undisclosed work sees %d, want 1", len(rows))
+		}
+	})
+}
+
+func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T) {
+	// An embargo is kept and moved per issue per product. A flaw two builds
+	// carry is one row naming both builds, its findings counted across them,
+	// and a page and the total count rows rather than builds, so one embargo
+	// is never split across two pages.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		older := f.anotherBranch(t, "202411")
+		f.shippedTo(t, older, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		for _, summary := range []string{"The first flaw.", "The second flaw."} {
+			if _, _, err := f.store.Enter(ctx, who, finding.Entering{
+				TargetIDs: []int64{f.target, older}, Severity: "high", Summary: summary,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		year := 365 * 24 * time.Hour
+		rows, total, err := f.store.DisclosingPage(ctx, who, finding.Scope{}, year, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 || len(rows) != 2 {
+			t.Fatalf("two flaws in two builds each are %d rows of a total %d, want 2 of 2",
+				len(rows), total)
+		}
+		for _, row := range rows {
+			if len(row.Builds) != 2 || row.Builds[0].Stream != "202411" || row.Builds[1].Stream != "master" {
+				t.Errorf("%s names the builds %+v, want 202411 and master", row.Vulnerability, row.Builds)
+			}
+			if row.Places != 2 {
+				t.Errorf("%s counts %d findings, want one in each build", row.Vulnerability, row.Places)
+			}
+		}
+
+		// One row a page: the second page holds the other flaw, whole.
+		first, total, err := f.store.DisclosingPage(ctx, who, finding.Scope{}, year, 1, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		second, _, err := f.store.DisclosingPage(ctx, who, finding.Scope{}, year, 1, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 || len(first) != 1 || len(second) != 1 {
+			t.Fatalf("pages of one hold %d and %d rows of a total %d", len(first), len(second), total)
+		}
+		if first[0].Vulnerability == second[0].Vulnerability {
+			t.Errorf("both pages hold %s", first[0].Vulnerability)
+		}
+		if len(second[0].Builds) != 2 {
+			t.Errorf("the second page's row names %d builds, want 2", len(second[0].Builds))
+		}
+	})
+}
+
+func TestTheDisclosingListIsNarrowedToTheScopeAskedFor(t *testing.T) {
+	// The list answers for the scope picked like every other list. A row
+	// narrowed to one build names that build alone and counts its findings
+	// alone, and a scope that carries none of it holds no row.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		older := f.anotherBranch(t, "202411")
+		f.shippedTo(t, older, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		if _, _, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target, older}, Severity: "high", Summary: "In both builds.",
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		year := 365 * 24 * time.Hour
+		rows, total, err := f.store.DisclosingPage(ctx, who, f.scopeOf(t, older), year, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(rows) != 1 {
+			t.Fatalf("narrowed to a build carrying it, %d rows of a total %d, want 1 of 1",
+				len(rows), total)
+		}
+		if b := rows[0].Builds; len(b) != 1 || b[0].Stream != "202411" {
+			t.Errorf("narrowed to 202411 the row names %+v", b)
+		}
+		if rows[0].Places != 1 {
+			t.Errorf("narrowed to one build the row counts %d findings, want 1", rows[0].Places)
+		}
+
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		other := f.productOf(t, elsewhere)
+		none, total, err := f.store.DisclosingPage(ctx, who, finding.Scope{ProductID: &other},
+			year, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 0 || len(none) != 0 {
+			t.Errorf("narrowed to a product carrying nothing, %d rows of a total %d", len(none), total)
 		}
 	})
 }

@@ -209,9 +209,9 @@ export const reviewQueueAt = (
   );
 
 // The form that records a flaw in a product, started from a report where one
-// prompted it.
-export const recordAt = (product: string, from?: string) =>
-  at("record", {}, { product, from: from || undefined });
+// prompted it, or with where it came from already answered.
+export const recordAt = (product: string, from?: string, source?: "outside") =>
+  at("record", {}, { product, from: from || undefined, source });
 
 // The shelf of standing attacks, narrowed to one product where one is named.
 export const obligationsAt = (product?: string) =>
