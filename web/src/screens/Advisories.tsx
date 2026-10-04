@@ -13,6 +13,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { standing, statusLabel } from "./advisory";
@@ -31,6 +32,7 @@ import { advisoryAt } from "../app/routes";
 
 export function Advisories() {
   const navigate = useNavigate();
+  const opener = useRowOpener();
   const [offset, setOffset] = useState(0);
   const rows = useAdvisories(offset);
   const [starting, setStarting] = useState(false);
@@ -80,7 +82,11 @@ export function Advisories() {
             </thead>
             <tbody>
               {items.map((row) => (
-                <tr key={row.advisory} className="row">
+                <tr
+                  key={row.advisory}
+                  className="row opens"
+                  onClick={opener(advisoryAt(row.advisory))}
+                >
                   <td>
                     <Link className="id" to={advisoryAt(row.advisory)}>
                       {row.advisory}

@@ -27,6 +27,7 @@ import {
   stated,
   windowStart,
 } from "./Window";
+import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
 import { decisionAt } from "../../app/routes";
 
@@ -87,6 +88,7 @@ export function byProduct(product: string | undefined): string {
 // back to a finding is a number in a spreadsheet.
 export function Overview() {
   const at = useScope();
+  const opener = useRowOpener();
   const scope = scopeQuery(at);
   const [params] = useSearchParams();
   const days = daysAsked(params, 30);
@@ -519,7 +521,7 @@ export function Overview() {
               </thead>
               <tbody>
                 {(argued.data?.items ?? []).map((row) => (
-                  <tr key={row.id} className="row">
+                  <tr key={row.id} className="row opens" onClick={opener(decisionAt(row.id))}>
                     <td>
                       <Link to={decisionAt(row.id)} className="id">
                         {row.issue}

@@ -1196,10 +1196,13 @@ tbody td {
 tbody tr:last-child td {
   border-bottom: 0;
 }
-tbody tr.row {
+/* A row that opens its target on a click anywhere takes the pointer and the
+   hover fill. A row that does not is drawn flat, so its links are what reads
+   as clickable. */
+tbody tr.row.opens {
   cursor: pointer;
 }
-tbody tr.row:hover td {
+tbody tr.row.opens:hover td {
   background: var(--raised);
 }
 /* The row the keys are about. Drawn on the left edge rather than as a fill, so

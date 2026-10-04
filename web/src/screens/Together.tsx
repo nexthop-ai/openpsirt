@@ -15,6 +15,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import {
@@ -85,6 +86,7 @@ export function Together() {
   const [typed, setTyped] = useState(contains);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const queries = useQueryClient();
+  const opener = useRowOpener();
 
   const at = { product, stream, variant, component };
   // The whole build, not the product and the component, so the same component
@@ -336,7 +338,7 @@ export function Together() {
                   {items.map((issue) => {
                     const name = issue.vulnerability ?? "";
                     return (
-                      <tr key={name} className="row">
+                      <tr key={name} className="row opens" onClick={opener(issueAt(name))}>
                         <td>
                           <input
                             type="checkbox"

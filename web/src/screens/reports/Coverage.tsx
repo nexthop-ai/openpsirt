@@ -13,6 +13,7 @@ import { Loading } from "../../ui/Loading";
 import { Paged } from "../../ui/Paged";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
 import { inventoriesAt } from "../../app/routes";
 
@@ -34,6 +35,7 @@ const SHOWN = 200;
 
 export function Coverage() {
   const at = useScope();
+  const opener = useRowOpener();
   const scope = scopeQuery(at);
   const coverage = useQuery({
     queryKey: ["scanning", "report", scope],
@@ -132,12 +134,19 @@ export function Coverage() {
                   </thead>
                   <tbody>
                     {builds.map((build) => (
-                      <tr key={`${build.product} ${build.stream} ${build.variant}`} className="row">
+                      <tr
+                        key={`${build.product} ${build.stream} ${build.variant}`}
+                        className="row opens"
+                        onClick={opener(scansAt(build.product, build.stream, build.variant))}
+                      >
                         <td>{build.product}</td>
                         <td>
                           {/* The build's own inventories screen, which is where
                               somebody goes to see what did arrive and when. */}
-                          <Link to={scansAt(build.product, build.stream, build.variant)}>
+                          <Link
+                            className="id"
+                            to={scansAt(build.product, build.stream, build.variant)}
+                          >
                             {build.stream}
                           </Link>{" "}
                           <span className="hint">{build.stream_kind}</span>

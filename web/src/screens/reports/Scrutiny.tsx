@@ -23,6 +23,7 @@ import {
   stated,
   windowStart,
 } from "./Window";
+import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
 import { auditAt, claimAt } from "../../app/routes";
 
@@ -52,6 +53,7 @@ const SECTION = 100;
 // not apply, and where did it apply in form only.
 export function Scrutiny() {
   const at = useScope();
+  const opener = useRowOpener();
   const [params] = useSearchParams();
   const days = daysAsked(params, 90);
   const period = periodAsked(params);
@@ -300,7 +302,11 @@ export function Scrutiny() {
                   </thead>
                   <tbody>
                     {(got.data?.grew ?? []).map((row) => (
-                      <tr key={row.claim_id} className="row">
+                      <tr
+                        key={row.claim_id}
+                        className="row opens"
+                        onClick={opener(claimAt(row.claim_id))}
+                      >
                         <td>
                           <Link to={claimAt(row.claim_id)} className="id">
                             {row.claim_id}
@@ -342,7 +348,11 @@ export function Scrutiny() {
                   </thead>
                   <tbody>
                     {(got.data?.lapsed ?? []).map((row) => (
-                      <tr key={`${row.claim_id} ${row.approved_by}`} className="row">
+                      <tr
+                        key={`${row.claim_id} ${row.approved_by}`}
+                        className="row opens"
+                        onClick={opener(claimAt(row.claim_id))}
+                      >
                         <td>
                           <Link to={claimAt(row.claim_id)} className="id">
                             {row.claim_id}

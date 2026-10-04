@@ -22,6 +22,7 @@ import { Loading } from "../ui/Loading";
 import { Moved } from "../ui/Moved";
 import { notACredential } from "../ui/noautofill";
 import { useReseed } from "../ui/reseed";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import {
@@ -156,6 +157,7 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
   const [flaw, setFlaw] = useState("");
   const name = useNameAFlaw();
   const takeOff = useTakeAFlawOff();
+  const opener = useRowOpener();
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
@@ -176,7 +178,11 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
             </thead>
             <tbody>
               {covers.map((row) => (
-                <tr key={`${row.product} ${row.vulnerability}`} className="row">
+                <tr
+                  key={`${row.product} ${row.vulnerability}`}
+                  className="row opens"
+                  onClick={opener(issueAt(row.vulnerability))}
+                >
                   <td>
                     <Link className="id" to={issueAt(row.vulnerability)}>
                       {row.vulnerability}
