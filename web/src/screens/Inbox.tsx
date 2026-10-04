@@ -9,6 +9,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { rulable, standing } from "./inbox";
@@ -83,6 +84,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
   const [offset, setOffset] = useState(0);
   const [chosen, setChosen] = useState<string[]>([]);
   const listed = useReports(product, offset);
+  const opener = useRowOpener();
 
   if (listed.isPending) return <Loading />;
   if (listed.isError)
@@ -138,8 +140,9 @@ function Reports({ product, works }: { product: string; works: boolean }) {
           <tbody>
             {rows.map((row) => {
               const stands = standing(row);
+              const to = inboxReportAt(product, row.reference);
               return (
-                <tr key={row.reference} className="row">
+                <tr key={row.reference} className="row opens" onClick={opener(to)}>
                   <td hidden={!works}>
                     {rulable(row) && (
                       <input
@@ -151,7 +154,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <Link className="id" to={inboxReportAt(product, row.reference)}>
+                    <Link className="id" to={to}>
                       {row.reference}
                     </Link>
                   </td>

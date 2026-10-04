@@ -21,6 +21,15 @@ code,
   font-family: var(--mono);
   font-size: 0.95em;
 }
+/* An identifier that opens something is drawn as a link. The base stylesheet
+   takes a link's color and underline from the text around it, so nothing else
+   marks it. */
+a.id {
+  color: var(--accent);
+}
+a.id:hover {
+  text-decoration: underline;
+}
 /* Selecting a node in the tree is a button, so that it is reachable without a
    pointer. It has to keep looking like the name it is rather than like a
    control, which is the whole of what this undoes. */

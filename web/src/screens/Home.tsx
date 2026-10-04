@@ -493,13 +493,21 @@ function Figures({
     (record) => record.standing && (!at.product || record.product === at.product),
   ).length;
   const allRunning = allLate.data?.items ?? [];
+  const allOverdue = allRunning.filter((row) => (row.days_left ?? 0) < 0).length;
+  const allSoon = allRunning.length - allOverdue;
   const allPoints = allOpen.data?.items ?? [];
-  // A page in hand that is the whole list. The two tiles below split one
+  // Whether the page in hand is the whole list. The two tiles below split one
   // read into overdue and due-soon, so neither half can be compared against
   // the cap on its own. The server says how many rows the question has; that
   // is the test.
   const cut = (late.data?.total ?? running.length) > running.length;
   const cutEverywhere = (allLate.data?.total ?? allRunning.length) > allRunning.length;
+  // The list is ordered by deadline, soonest first, so every overdue row comes
+  // before any row still due. A cut page holding one row still due holds every
+  // overdue row, and the overdue count is a floor only where the whole page is
+  // overdue. Due soon is a floor wherever the page is cut.
+  const overdueCut = cut && soon.length === 0;
+  const overdueCutEverywhere = cutEverywhere && allSoon === 0;
 
   // The same figure without the scope. Nothing where no scope is
   // selected, because the two would be one number said twice.
@@ -635,20 +643,19 @@ function Figures({
         <span className="l">
           <i style={{ background: "var(--sev-critical)" }} /> Overdue
         </span>
-        {/* The list behind this is capped, so a full one is said to be a
-            floor rather than passed off as the count. */}
+        {/* The list behind this is capped, so a page cut before it reached
+            anything still due is said to be a floor rather than passed off as
+            the count. */}
         <span className="n">
-          <Count of={late}>{() => `${overdue.length.toLocaleString()}${cut ? "+" : ""}`}</Count>
+          <Count of={late}>
+            {() => `${overdue.length.toLocaleString()}${overdueCut ? "+" : ""}`}
+          </Count>
         </span>
-        {(known(allLate) &&
-          everywhereAtLeast(
-            allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
-            cutEverywhere,
-          )) || (
+        {(known(allLate) && everywhereAtLeast(allOverdue, overdueCutEverywhere)) || (
           <span className="d">
             {overdueExploited > 0 ? `${overdueExploited} known exploited · ` : ""}undecided, past
             the deadline
-            {cut ? " · at least" : ""}
+            {overdueCut ? " · at least" : ""}
           </span>
         )}
       </button>
@@ -666,11 +673,7 @@ function Figures({
         <span className="n">
           <Count of={late}>{() => `${soon.length.toLocaleString()}${cut ? "+" : ""}`}</Count>
         </span>
-        {(known(allLate) &&
-          everywhereAtLeast(
-            allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
-            cutEverywhere,
-          )) || (
+        {(known(allLate) && everywhereAtLeast(allSoon, cutEverywhere)) || (
           <span className="d">
             {soonExploited > 0 ? `${soonExploited} known exploited · ` : ""}undecided, due within{" "}
             {SOON_DAYS} days

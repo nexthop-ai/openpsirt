@@ -23,6 +23,7 @@ import { Failed } from "../ui/Failed";
 import { Exploited, ExploitedHere, Severity } from "../ui/Severity";
 
 import { PAGE, type Row } from "./list";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { cut } from "../ui/cut";
 import { componentAt } from "../app/routes";
@@ -123,6 +124,7 @@ export function ByComponent({
   size: number;
   onPage: (offset: number) => void;
 }) {
+  const opener = useRowOpener();
   const grouped = useQuery({
     queryKey: ["findings-by-component", at, query],
     queryFn: async () =>
@@ -213,16 +215,17 @@ export function ByComponent({
             {rows.map((row) => {
               const name = row.component ?? "";
               const share = most > 0 ? Math.round(((row.issues ?? 0) / most) * 100) : 0;
+              const to = componentAt(at.product, name, row.version, at);
               return (
-                <tr key={`${name} ${row.version} ${row.ecosystem ?? ""}`} className="row">
+                <tr
+                  key={`${name} ${row.version} ${row.ecosystem ?? ""}`}
+                  className="row opens"
+                  onClick={opener(to)}
+                >
                   <td>
                     {/* The name opens the component: the act sits on the
                         thing it acts on rather than in a column of its own. */}
-                    <Link
-                      className="linkish id"
-                      title={`Open ${name}`}
-                      to={componentAt(at.product, name, row.version, at)}
-                    >
+                    <Link className="linkish id" title={`Open ${name}`} to={to}>
                       {name}
                     </Link>
                     {(row.exploited || row.exploited_here) && (

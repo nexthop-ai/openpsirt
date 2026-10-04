@@ -13,6 +13,7 @@ import { Severity, Exploited } from "../ui/Severity";
 import { IssueAdvisory } from "./IssueAdvisory";
 import { IssueNotes } from "./FindingNotes";
 import { useWho } from "../app/session";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { findingAt } from "../app/routes";
 
@@ -28,6 +29,7 @@ import { findingAt } from "../app/routes";
 export function Issue() {
   const { vulnerability = "" } = useParams();
   const who = useWho();
+  const opener = useRowOpener();
   // The identity alone. A note records who wrote it by the name they sign in
   // under, and matching a display name as well made ownership turn on a label
   // anybody can be given.
@@ -158,58 +160,59 @@ export function Issue() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={`${row.product} ${row.stream} ${row.variant} ${row.component}`}
-                  className="row"
-                >
-                  <td>{row.product_name || row.product}</td>
-                  <td className="hint">
-                    {row.stream} · {row.variant}
-                  </td>
-                  <td>
-                    <Link
-                      to={findingAt(
-                        {
-                          product: row.product ?? "",
-                          stream: row.stream ?? "",
-                          variant: row.variant ?? "",
-                        },
-                        { ...row, vulnerability: it?.vulnerability },
+              {rows.map((row) => {
+                const to = findingAt(
+                  {
+                    product: row.product ?? "",
+                    stream: row.stream ?? "",
+                    variant: row.variant ?? "",
+                  },
+                  { ...row, vulnerability: it?.vulnerability },
+                );
+                return (
+                  <tr
+                    key={`${row.product} ${row.stream} ${row.variant} ${row.component}`}
+                    className="row opens"
+                    onClick={opener(to)}
+                  >
+                    <td>{row.product_name || row.product}</td>
+                    <td className="hint">
+                      {row.stream} · {row.variant}
+                    </td>
+                    <td>
+                      <Link to={to} className="id">
+                        {row.component}
+                      </Link>{" "}
+                      <span className="id" style={{ color: "var(--faint)" }}>
+                        {row.version}
+                      </span>
+                      {row.undisclosed && (
+                        <>
+                          {" "}
+                          <span className="state waiting" title="Not disclosed">
+                            undisclosed
+                          </span>
+                        </>
                       )}
-                      className="id"
-                    >
-                      {row.component}
-                    </Link>{" "}
-                    <span className="id" style={{ color: "var(--faint)" }}>
-                      {row.version}
-                    </span>
-                    {row.undisclosed && (
-                      <>
-                        {" "}
-                        <span className="state waiting" title="Not disclosed">
-                          undisclosed
-                        </span>
-                      </>
-                    )}
-                  </td>
-                  <td className="num">{row.places}</td>
-                  <td>
-                    <span className={`state ${decidedAs(row.state).cls}`}>
-                      {decidedAs(row.state).word}
-                    </span>
-                  </td>
-                  <td className="hint">
-                    {row.due ?? "—"}
-                    {row.fixed_in && (
-                      <>
-                        {" "}
-                        · fixed in <span className="id">{row.fixed_in}</span>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="num">{row.places}</td>
+                    <td>
+                      <span className={`state ${decidedAs(row.state).cls}`}>
+                        {decidedAs(row.state).word}
+                      </span>
+                    </td>
+                    <td className="hint">
+                      {row.due ?? "—"}
+                      {row.fixed_in && (
+                        <>
+                          {" "}
+                          · fixed in <span className="id">{row.fixed_in}</span>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Wide>

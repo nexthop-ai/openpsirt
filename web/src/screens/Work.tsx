@@ -12,6 +12,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
@@ -356,6 +357,7 @@ function Held({
   empty: string;
   detail: string;
 }) {
+  const opener = useRowOpener();
   if (query.isPending) return <Loading />;
   if (query.isError) {
     return <Failed error={query.error} what="The assigned work could not be read." />;
@@ -382,50 +384,51 @@ function Held({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={`${row.product} ${row.vulnerability} ${row.component} ${row.version}`}
-                className="row"
-              >
-                <td>
-                  <Severity word={row.severity} />
-                </td>
-                <td>
-                  <Link
-                    to={findingAt(
-                      {
-                        product: row.product ?? "",
-                        stream: row.stream ?? "",
-                        variant: row.variant ?? "",
-                      },
-                      row,
+            {rows.map((row) => {
+              const to = findingAt(
+                {
+                  product: row.product ?? "",
+                  stream: row.stream ?? "",
+                  variant: row.variant ?? "",
+                },
+                row,
+              );
+              return (
+                <tr
+                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version}`}
+                  className="row opens"
+                  onClick={opener(to)}
+                >
+                  <td>
+                    <Severity word={row.severity} />
+                  </td>
+                  <td>
+                    <Link to={to} className="id">
+                      {row.vulnerability}
+                    </Link>{" "}
+                    <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
+                  </td>
+                  <td>
+                    <span className="id">{row.component}</span>{" "}
+                    <span className="id" style={{ color: "var(--faint)" }}>
+                      {row.version}
+                    </span>
+                  </td>
+                  <td className="hint">
+                    {row.product_name || row.product}
+                    {(row.builds ?? 1) > 1 ? (
+                      <> · {row.builds} builds</>
+                    ) : (
+                      <>
+                        {" "}
+                        · {row.stream_name || row.stream} · {row.variant_name || row.variant}
+                      </>
                     )}
-                    className="id"
-                  >
-                    {row.vulnerability}
-                  </Link>{" "}
-                  <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
-                </td>
-                <td>
-                  <span className="id">{row.component}</span>{" "}
-                  <span className="id" style={{ color: "var(--faint)" }}>
-                    {row.version}
-                  </span>
-                </td>
-                <td className="hint">
-                  {row.product_name || row.product}
-                  {(row.builds ?? 1) > 1 ? (
-                    <> · {row.builds} builds</>
-                  ) : (
-                    <>
-                      {" "}
-                      · {row.stream_name || row.stream} · {row.variant_name || row.variant}
-                    </>
-                  )}
-                </td>
-                <td className="num">{row.places}</td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="num">{row.places}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Wide>

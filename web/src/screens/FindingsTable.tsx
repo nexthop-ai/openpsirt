@@ -5,6 +5,7 @@ import { Fragment } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
 import { DAY_MS, on } from "../ui/when";
@@ -173,6 +174,7 @@ export function FindingsTable({
   cursor: number;
 }) {
   const navigate = useNavigate();
+  const opener = useRowOpener();
   // The columns the header below draws, counted where it draws them, so the
   // preview row spans all of them, the product among them on a list spanning
   // every product.
@@ -243,10 +245,10 @@ export function FindingsTable({
                 <Fragment key={key}>
                   {!listed && decided?.next === key && answer}
                   <tr
-                    className={i === cursor ? "row at" : "row"}
+                    className={i === cursor ? "row opens at" : "row opens"}
                     data-i={i}
                     aria-current={i === cursor ? "true" : undefined}
-                    onClick={() => navigate(at)}
+                    onClick={opener(at)}
                   >
                     {/* The two controls that belong to the row rather than
                               to what is in it. Side by side in one narrow cell:

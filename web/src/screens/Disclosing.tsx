@@ -14,6 +14,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
+import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { useReseed } from "../ui/reseed";
 import { issueAt, recordAt } from "../app/routes";
@@ -65,6 +66,7 @@ export function Disclosing() {
   const queries = useQueryClient();
   const who = useWho().data;
   const scope = scopeQuery(useScope());
+  const opener = useRowOpener();
   // The distance ahead to look. Empty is this deployment's own embargo length,
   // which the server supplies: a fixed window shorter than the policy leaves
   // the screen empty while embargoes are running, and an empty screen reads as
@@ -237,13 +239,14 @@ export function Disclosing() {
             <tbody>
               {items.map((row) => {
                 const key = embargoKey(row);
+                const to = issueAt(row.vulnerability ?? "");
                 return (
-                  <tr key={key} className="row">
+                  <tr key={key} className="row opens" onClick={opener(to)}>
                     <td>
                       <Severity word={row.severity} />
                     </td>
                     <td>
-                      <Link className="id" to={issueAt(row.vulnerability ?? "")}>
+                      <Link className="id" to={to}>
                         {row.vulnerability}
                       </Link>
                       {row.summary && <div className="hint">{row.summary}</div>}
@@ -261,7 +264,9 @@ export function Disclosing() {
                       </span>
                     </td>
                     <td className="num">{row.places}</td>
-                    <td>
+                    {/* The form opens in this cell, and a click in it is the
+                        form's rather than the row's. */}
+                    <td onClick={(event) => event.stopPropagation()}>
                       {/* Moving a date and disclosing both need undisclosed
                           triage in the row's product, which reading this list
                           does not. */}
