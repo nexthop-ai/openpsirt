@@ -301,9 +301,11 @@ func (s Subject) narrowedTo(productID int64) Subject {
 // a read that could not be made: the first is a 404 and the second is a fault.
 var ErrNoSuchToken = refusal.New("no token is recorded under that name")
 
-// ErrTokenNamed refuses a token under a name its owner already holds a token
-// by, in any capitals.
-var ErrTokenNamed = refusal.New("you already hold a token in force by that name")
+// ErrTokenNamed refuses a token under a name one of its owner's tokens in force
+// already holds, in any capitals. A token that has run out is still in force
+// until it is withdrawn, so the refusal says how to free the name.
+var ErrTokenNamed = refusal.New("you already hold a token by that name that is not withdrawn; " +
+	"withdraw it to use the name again")
 
 // Tokens lists somebody's own credentials.
 func (s *Store) Tokens(ctx context.Context, personID int64) ([]Token, error) {

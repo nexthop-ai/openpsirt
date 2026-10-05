@@ -129,10 +129,10 @@ type Arriving struct {
 // Sender is how a scan records who sent it: the kind of subject and its
 // identifier, so a key and a person are never the same sender.
 //
-// Not the name. A key's name is unique among keys and a person's identity
-// among people, so one name can be both, and a key named like a person would
-// read that person's uploads back as its own. The identifier also outlives a
-// rename.
+// Not the name. A key's name is unique only among keys in force, so a new key
+// may hold a withdrawn one's name, and a key may share a name with a person;
+// recorded by name, either would read back uploads it never sent. The
+// identifier also outlives a rename.
 func Sender(subject access.Subject) string {
 	switch subject.Kind {
 	case access.Pipeline:

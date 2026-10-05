@@ -369,13 +369,13 @@ function Tokens() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.map((row, i) => (
                 // A withdrawn token is kept and dimmed rather than removed, so
                 // what used it stays answerable — and so that withdrawing is
                 // visibly something rather than a button that appears to do
                 // nothing.
                 <tr
-                  key={`${row.name} ${row.created_at}`}
+                  key={`${row.name} ${row.created_at} ${i}`}
                   className="row"
                   style={{ opacity: row.withdrawn ? 0.55 : 1 }}
                 >

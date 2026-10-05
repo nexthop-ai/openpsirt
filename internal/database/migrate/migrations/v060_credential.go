@@ -122,26 +122,46 @@ func (u *upgrader) dropUnique(table, name string) error {
 // own upgrade gives a withdrawn name it could not keep.
 func namesUnique(ctx context.Context, tx bun.Tx) error {
 	for _, kind := range []credentialKind{keysV050, tokensV050} {
-		var held []credential
-		if err := tx.NewRaw(`SELECT * FROM (`+kind.read+`) AS "credentials" ORDER BY "id"`).Scan(ctx, &held); err != nil {
+		var rows []credential
+		if err := tx.NewRaw(`SELECT * FROM (`+kind.read+`) AS "credentials" ORDER BY "id"`).Scan(ctx, &rows); err != nil {
 			return fmt.Errorf("read every %s: %w", kind.what, err)
 		}
+		held := func(owner int64, name string) string {
+			return strconv.FormatInt(owner, 10) + "\x00" + name
+		}
 		keeps := map[string]int64{}
-		for _, one := range held {
-			at := strconv.FormatInt(one.Owner, 10) + "\x00" + one.Name
+		for _, one := range rows {
+			at := held(one.Owner, one.Name)
 			if _, taken := keeps[at]; !taken || !one.Revoked.Valid {
 				keeps[at] = one.ID
 			}
 		}
-		for _, one := range held {
-			if keeps[strconv.FormatInt(one.Owner, 10)+"\x00"+one.Name] == one.ID {
+		// Every name a credential keeps is reserved before anybody is
+		// numbered, so a number never takes a name another holds.
+		taken := map[string]bool{}
+		for at := range keeps {
+			taken[at] = true
+		}
+		for _, one := range rows {
+			if keeps[held(one.Owner, one.Name)] == one.ID {
 				continue
 			}
-			suffix := " #" + strconv.FormatInt(one.ID, 10)
-			renamed := bound.HeadRunes(one.Name, database.NameWidth-len(suffix)) + suffix
-			if _, err := tx.NewRaw(`UPDATE "`+kind.table+`" SET "name" = ? WHERE "id" = ?`,
-				renamed, one.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("rename a withdrawn %s: %w", kind.what, err)
+			// One already named like a number keeps that name, so the number
+			// taken here moves past it.
+			id := strconv.FormatInt(one.ID, 10)
+			number := " #" + id
+			for again := 2; ; again++ {
+				renamed := bound.HeadRunes(one.Name, database.NameWidth-len(number)) + number
+				if taken[held(one.Owner, renamed)] {
+					number = " #" + id + "." + strconv.Itoa(again)
+					continue
+				}
+				taken[held(one.Owner, renamed)] = true
+				if _, err := tx.NewRaw(`UPDATE "`+kind.table+`" SET "name" = ? WHERE "id" = ?`,
+					renamed, one.ID).Exec(ctx); err != nil {
+					return fmt.Errorf("rename a withdrawn %s: %w", kind.what, err)
+				}
+				break
 			}
 		}
 	}

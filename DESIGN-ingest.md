@@ -778,7 +778,7 @@ done, or refused with the reason. A key sees the uploads it sent itself
 
 | Rule | Reason |
 |---|---|
-| A sender is recorded as a key or a person, and its identifier | A key's name is unique among keys and a person's identity among people, so one name can be both. Recorded as a name, a key named like a person reads that person's uploads back as its own |
+| A sender is recorded as a key or a person, and its identifier | A key's name is unique only among keys in force, so a new key may hold a withdrawn one's name, and a key may share a name with a person. Recorded as a name, either would read back uploads it never sent |
 | Which sender a key is narrowed to is decided in the store, from the subject | A narrowing a handler passes in is one the next handler forgets, and a pipeline sees its whole product, so the product check alone does not stop it |
 | A read whose job died is failed on the receipt, in fixed words | The scan row is not always marked: marking it can be what failed. The job's last error is whatever failed, a dropped connection's address included, and a refusal reaches the receipt through the scan row |
 
