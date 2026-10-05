@@ -276,7 +276,7 @@ tables.
 
 ### Forward only
 
-A database is only ever upgraded. Going back to an earlier release is restoring
+A database is only ever upgraded (REQ-72). Going back to an earlier release is restoring
 the backup taken before the upgrade, which works on every engine and is exact.
 
 | Rule | |
