@@ -7,6 +7,8 @@ import (
 	"context"
 	"database/sql"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -295,4 +297,142 @@ func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
 	if compared == 0 || compared != len(declared) {
 		t.Errorf("compared %d of the %d tables declared", compared, len(declared))
 	}
+}
+
+// Upgraded, a credential in force holds its name in force and a withdrawn one
+// holds none, so the withdrawn name may be given again. Rolled back, each
+// table is v0.5.0's again, and every name is unique: the one in force keeps a
+// shared name, the oldest keeps it where none is in force, a withdrawn name
+// nobody shares is kept, and the rest are renamed after their row, stepping
+// past a name already spelled like that number.
+func TestAV050CredentialsNameInForceSurvivesTheUpgradeAndBack(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		rollBack(t, ctx, db)
+		dbtest.MigrateTo(t, db, v050)
+		tables := []string{"api_key", "personal_token"}
+		built := map[string][]string{}
+		for _, table := range tables {
+			if built[table] = linesOf(describe(t, ctx, db), table, ""); len(built[table]) == 0 {
+				t.Fatalf("v0.5.0's %s described as nothing, so nothing is compared", table)
+			}
+		}
+
+		at := time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "token-holder", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "product" ("name", "display_name", "created_at")`+
+			` VALUES (?, ?, ?)`, "keyed", "Keyed", at).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var product int64
+		if err := db.DB.NewRaw(`SELECT "id" FROM "product" WHERE "name" = ?`, "keyed").Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		// insert writes one credential, with its name in force where the
+		// schema has one, and returns its row.
+		insert := func(table, name, secret string, revoked bool, live bool) int64 {
+			t.Helper()
+			var when any
+			if revoked {
+				when = at
+			}
+			columns := `"name", "secret_hash", "created_at", "revoked_at"`
+			values := []any{name, secret, at, when}
+			if table == "api_key" {
+				columns += `, "product_id"`
+				values = append(values, product)
+			} else {
+				columns += `, "person_id", "expires_at"`
+				values = append(values, person.ID, at.Add(time.Hour))
+			}
+			if live {
+				columns += `, "live_name"`
+				values = append(values, name)
+			}
+			marks := strings.TrimSuffix(strings.Repeat("?, ", len(values)), ", ")
+			if _, err := db.DB.NewRaw(`INSERT INTO "`+table+`" (`+columns+`) VALUES (`+marks+`)`,
+				values...).Exec(ctx); err != nil {
+				t.Fatalf("%s %q: %v", table, name, err)
+			}
+			var id int64
+			if err := db.DB.NewRaw(`SELECT "id" FROM "`+table+`" WHERE "secret_hash" = ?`, secret).
+				Scan(ctx, &id); err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		for _, table := range tables {
+			insert(table, "live", table+"-live", false, false)
+			insert(table, "gone", table+"-gone", true, false)
+			insert(table, "alone", table+"-alone", true, false)
+		}
+
+		dbtest.MigrateTo(t, db, v060)
+		gone := map[string]int64{}
+		twice := map[string]int64{}
+		for _, table := range tables {
+			for name, want := range map[string]sql.NullString{
+				"live": {String: "live", Valid: true}, "gone": {}, "alone": {},
+			} {
+				var got sql.NullString
+				if err := db.DB.NewRaw(`SELECT "live_name" FROM "`+table+`" WHERE "name" = ?`, name).
+					Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				if got != want {
+					t.Errorf("upgraded, %s %q holds %v in force, want %v", table, name, got, want)
+				}
+			}
+			var withdrawn int64
+			if err := db.DB.NewRaw(`SELECT "id" FROM "`+table+`" WHERE "secret_hash" = ?`, table+"-gone").
+				Scan(ctx, &withdrawn); err != nil {
+				t.Fatal(err)
+			}
+			gone[table] = withdrawn
+			// The withdrawn name given again, in force; a credential already
+			// spelled like the number the withdrawn one would take; and two
+			// withdrawn under one name with none in force.
+			insert(table, "gone", table+"-again", false, true)
+			insert(table, "gone #"+strconv.FormatInt(withdrawn, 10), table+"-numbered", false, true)
+			insert(table, "twice", table+"-twice-1", true, false)
+			twice[table] = insert(table, "twice", table+"-twice-2", true, false)
+		}
+
+		if err := schema.Down(ctx, db, quiet()); err != nil {
+			t.Fatalf("roll the upgrade back: %v", err)
+		}
+		for _, table := range tables {
+			if diff := setDiff(built[table], linesOf(describe(t, ctx, db), table, "")); diff != "" {
+				t.Errorf("rolled back, %s is not v0.5.0's:\n%s", table, diff)
+			}
+			name := func(secret string) string {
+				t.Helper()
+				var got string
+				if err := db.DB.NewRaw(`SELECT "name" FROM "`+table+`" WHERE "secret_hash" = ?`, secret).
+					Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				return got
+			}
+			number := strconv.FormatInt(gone[table], 10)
+			for secret, want := range map[string]string{
+				table + "-live":     "live",
+				table + "-alone":    "alone",
+				table + "-again":    "gone",
+				table + "-numbered": "gone #" + number,
+				table + "-gone":     "gone #" + number + ".2",
+				table + "-twice-1":  "twice",
+				table + "-twice-2":  "twice #" + strconv.FormatInt(twice[table], 10),
+			} {
+				if got := name(secret); got != want {
+					t.Errorf("rolled back, %s %s is named %q, want %q", table, secret, got, want)
+				}
+			}
+		}
+		dbtest.MigrateTo(t, db, v060)
+		leaveAtLatest(t, ctx, db)
+	})
 }

@@ -162,7 +162,7 @@ func registerTokens(api huma.API, in core.Deps) {
 			// is the same question as who minted a pipeline key — and the
 			// answer is asked for after somebody leaves, when they are not
 			// there to ask. Named by owner and token, because a name is unique
-			// to its owner.
+			// among its owner's tokens in force.
 			if err := core.Noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,
 				nil, trail.Said(narrowedTokenSays(input.Body.Product, holds), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)

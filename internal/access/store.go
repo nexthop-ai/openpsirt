@@ -798,7 +798,10 @@ func (s *Store) NewKey(ctx context.Context, name string, scope Scope) (*Key, str
 		ProductID: scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(key).Exec(ctx); err != nil {
+	// The name in force is written beside the name and cleared when the key
+	// is withdrawn, so a withdrawn name may be given to a new key. What a key
+	// sent is recorded against its row rather than its name.
+	if _, err := s.db.NewInsert().Model(key).Value("live_name", "?", name).Exec(ctx); err != nil {
 		return nil, "", fmt.Errorf("record a key: %w", err)
 	}
 	return key, secret, nil
@@ -845,6 +848,7 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 func (s *Store) Revoke(ctx context.Context, keyID int64) error {
 	result, err := s.db.NewUpdate().Model((*Key)(nil)).
 		Set("revoked_at = ?", s.now().Truncate(time.Microsecond)).
+		Set("live_name = NULL").
 		Where("id = ?", keyID).Where("revoked_at IS NULL").Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("revoke key %d: %w", keyID, err)

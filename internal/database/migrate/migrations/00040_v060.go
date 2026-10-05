@@ -51,6 +51,9 @@ func downV060(ctx context.Context, sqldb *sql.DB) error {
 //     across every product. Configuration is the only source of either and is
 //     applied at every start, so the role mappings v0.5.0 holds are dropped
 //     rather than carried. Mappings to admin and audit are left alone.
+//   - A key's or a token's name is unique among those in force, so a
+//     withdrawn name may be given again. Every credential v0.5.0 holds in
+//     force keeps its name in force.
 func upgradeV060(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -76,7 +79,10 @@ func upgradeV060(ctx context.Context, tx bun.Tx) error {
 	if err := dropTables(ctx, tx.Tx, "group_role"); err != nil {
 		return err
 	}
-	return u.create(groupRoleV060(t), "group_role", "group_role_all")
+	if err := u.create(groupRoleV060(t), "group_role", "group_role_all"); err != nil {
+		return err
+	}
+	return u.liveNames()
 }
 
 // downgradeV060 puts back what v0.5.0 reads.
@@ -87,8 +93,14 @@ func upgradeV060(ctx context.Context, tx bun.Tx) error {
 // a fix counts from the moment the attack became known again, which is the
 // only start v0.5.0 has. The role mappings configuration made go with their
 // tables, and so does any role a group derived on every product, which v0.5.0
-// would never clear. Mappings to admin and audit are left alone.
+// would never clear. Mappings to admin and audit are left alone. A credential
+// sharing its name with another is renamed after its row, as v0.5.0's own
+// upgrade renames one, unless it is the one in force or, with none in force,
+// the oldest.
 func downgradeV060(ctx context.Context, tx bun.Tx) error {
+	if err := namesUnique(ctx, tx); err != nil {
+		return err
+	}
 	if err := dropTables(ctx, tx.Tx, "told_place", "exploited_fix",
 		"group_role_all", "group_role"); err != nil {
 		return err
@@ -108,6 +120,9 @@ func downgradeV060(ctx context.Context, tx bun.Tx) error {
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
 	if err := u.create(groupRoleV050(t), "group_role"); err != nil {
+		return err
+	}
+	if err := u.everNames(); err != nil {
 		return err
 	}
 	return u.narrow(narrowing{table: "obligation_window",

@@ -561,7 +561,12 @@ group's role on every product is a new table. Configuration is the only source
 of either and is applied at every start, so the role mappings v0.5.0 holds are
 dropped rather than carried. Mappings to admin and audit are in a table this
 leaves alone in both directions, which keeps administration reachable after a
-rollback.
+rollback. A
+key and a token each gain the name in force, filled from the name for every
+credential not withdrawn, and the uniqueness of the name moves to it: a key's
+across the deployment, a token's within its owner. The new rule is made before
+the old one is dropped, because MySQL and MariaDB serve a token's owner key from
+whichever of the two leads with the owner; SQLite rebuilds both tables.
 
 Rolled back, the places and the fix releases go with their tables, and the
 reference and what a notice said about malice go with their columns. A window
@@ -569,12 +574,15 @@ counting from another window's notice or from the fix counts from the moment
 the attack became known again, which is the only start v0.5.0 has. The role
 mappings go with their tables, and v0.5.0's table naming a product by its row
 comes back empty. A role a group derived on every product is removed, because
-v0.5.0 derives none and would never clear it.
+v0.5.0 derives none and would never clear it. A key or a token sharing its name with another is renamed after its row, as `ci #7`,
+unless it is the one in force or, with none in force, the oldest; the name
+regains its uniqueness and the name in force goes.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built. Rolled back with a window counting from it, a window counting from the fix, a place on the notice and a fix release on the record, the windows and the notice remain and the new columns and tables are gone |
 | A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains. Rolled back with a role a group derived on every product, that role is gone, and a group can be mapped to a product by its row again |
+| A v0.5.0 key and token in force and one of each withdrawn | Upgraded, the one in force holds its name in force and the withdrawn one holds none, and the withdrawn name is accepted again. Rolled back, the one in force under the reused name keeps it, the withdrawn one is renamed after its row, and the name in force is gone |
 
 ### Release records
 

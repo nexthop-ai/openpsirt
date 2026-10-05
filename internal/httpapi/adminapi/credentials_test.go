@@ -51,8 +51,7 @@ func TestAnIngestKeyIsCreatedWithItsScope(t *testing.T) {
 			t.Error("the listing carries the secret")
 		}
 
-		// A name is what an upload records as its sender and what a
-		// revocation names, so two keys may not share one.
+		// A revocation names a key, so two in force may not share a name.
 		// Refused as the conflict it is, not as a fault at our end.
 		again := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
 			`{"name":"nightly-mine","product":"mine"}`)
@@ -204,6 +203,47 @@ func TestAdministrationIsGrantedAndWithdrawn(t *testing.T) {
 		}
 		if got := r.As(t, "reader", http.MethodGet, "/v1/people"); got != http.StatusForbidden {
 			t.Errorf("administration was not withdrawn: %d", got)
+		}
+	})
+}
+
+// A withdrawn key's name may be given to a new key, and withdrawing by the
+// name then reaches the new one. Both stay listed.
+func TestAWithdrawnKeysNameIsGivenToANewKey(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for round := 1; round <= 2; round++ {
+			made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+				`{"name":"reused","product":"mine"}`)
+			if made.Code != http.StatusCreated {
+				t.Fatalf("round %d: creating the key answered %d: %s", round, made.Code, made.Body.String())
+			}
+			withdrawn := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, "/v1/keys/reused", "")
+			if withdrawn.Code != http.StatusNoContent {
+				t.Fatalf("round %d: withdrawing it answered %d: %s", round, withdrawn.Code, withdrawn.Body.String())
+			}
+		}
+		again := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, "/v1/keys/reused", "")
+		if again.Code != http.StatusNotFound {
+			t.Errorf("withdrawing a name with none in force answered %d: %s", again.Code, again.Body.String())
+		}
+		var listed struct {
+			Items []struct {
+				Name      string `json:"name"`
+				Withdrawn bool   `json:"withdrawn"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/keys", &listed)
+		count := 0
+		for _, key := range listed.Items {
+			if key.Name == "reused" {
+				count++
+				if !key.Withdrawn {
+					t.Errorf("a key withdrawn twice over is listed in force: %+v", key)
+				}
+			}
+		}
+		if count != 2 {
+			t.Errorf("the list holds %d keys named reused, want both", count)
 		}
 	})
 }
