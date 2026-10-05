@@ -429,20 +429,10 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-result" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The result
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+    <nav class="md-nav" aria-label="The upload">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#github-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -452,12 +442,28 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#gitlab-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
         GitLab CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The result
       
     </span>
   </a>
@@ -498,6 +504,33 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helm
   
 
     
@@ -648,20 +681,10 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-result" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The result
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+    <nav class="md-nav" aria-label="The upload">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#github-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -671,12 +694,28 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#gitlab-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
         GitLab CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The result
       
     </span>
   </a>
@@ -822,6 +861,36 @@ grant of its own.</p>
 response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.</p>
+<h3 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Permanent link">&para;</a></h3>
+<pre><code class="language-yaml">- name: Send the inventory to OpenPSIRT
+  env:
+    OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
+    OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
+  run: |
+    curl --fail-with-body -X POST \
+      &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans&quot; \
+      -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
+      -F &quot;inventory=@sbom.cdx.json&quot;
+</code></pre>
+<p><code>--fail-with-body</code> rather than <code>--fail</code>, so a refusal prints why rather than
+only failing the step.</p>
+<h3 id="gitlab-ci">GitLab CI<a class="headerlink" href="#gitlab-ci" title="Permanent link">&para;</a></h3>
+<pre><code class="language-yaml">send-inventory:
+  stage: .post
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl --fail-with-body -X POST \
+        &quot;$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans&quot; \
+        -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
+        -F &quot;inventory=@sbom.cdx.json&quot;
+</code></pre>
+<p>Naming the stream from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: the
+stream has to have been declared. A pipeline running on a branch nobody
+declared is refused, every build, until somebody declares it — and the refusal
+says which part is missing rather than making you guess:</p>
+<pre><code>404  product &quot;sonic&quot;: stream &quot;nobody-declared-this&quot;: not declared
+</code></pre>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
 <p>Poll the scans for that build.</p>
 <pre><code class="language-bash">curl -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
@@ -863,36 +932,6 @@ names:</p>
 <p>Reading the inventory and scanning it are separate work with different rhythms:
 an inventory is read once, and scanned again whenever the vulnerability data
 moves. So a scan appearing is not the same as findings appearing.</p>
-<h2 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Permanent link">&para;</a></h2>
-<pre><code class="language-yaml">- name: Send the inventory to OpenPSIRT
-  env:
-    OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
-    OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
-  run: |
-    curl --fail-with-body -X POST \
-      &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans&quot; \
-      -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
-      -F &quot;inventory=@sbom.cdx.json&quot;
-</code></pre>
-<p><code>--fail-with-body</code> rather than <code>--fail</code>, so a refusal prints why rather than
-only failing the step.</p>
-<h2 id="gitlab-ci">GitLab CI<a class="headerlink" href="#gitlab-ci" title="Permanent link">&para;</a></h2>
-<pre><code class="language-yaml">send-inventory:
-  stage: .post
-  image: curlimages/curl:latest
-  script:
-    - |
-      curl --fail-with-body -X POST \
-        &quot;$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans&quot; \
-        -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
-        -F &quot;inventory=@sbom.cdx.json&quot;
-</code></pre>
-<p>Naming the stream from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: the
-stream has to have been declared. A pipeline running on a branch nobody
-declared is refused, every build, until somebody declares it — and the refusal
-says which part is missing rather than making you guess:</p>
-<pre><code>404  product &quot;sonic&quot;: stream &quot;nobody-declared-this&quot;: not declared
-</code></pre>
 <h2 id="out-of-a-pipelines-scope">Out of a pipeline's scope<a class="headerlink" href="#out-of-a-pipelines-scope" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

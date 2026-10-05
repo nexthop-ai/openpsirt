@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../configuration/">
+        <link rel="prev" href="../helm/">
       
       
         <link rel="next" href="../reference/api/">
@@ -390,6 +390,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -569,12 +596,7 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
+          <li class="md-nav__item">
   <a href="#trusted-header-sign-in" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -598,13 +620,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#apache-httpd_1" class="md-nav__link">
+  <a href="#apache-httpd-with-an-authentication-module" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Apache httpd
+        Apache httpd with an authentication module
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -829,12 +856,7 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
+          <li class="md-nav__item">
   <a href="#trusted-header-sign-in" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -858,13 +880,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#apache-httpd_1" class="md-nav__link">
+  <a href="#apache-httpd-with-an-authentication-module" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Apache httpd
+        Apache httpd with an authentication module
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1237,7 +1264,7 @@ export on as it arrives.</p>
     }
 }
 </code></pre>
-<h2 id="trusted-header-sign-in">Trusted-header sign-in<a class="headerlink" href="#trusted-header-sign-in" title="Permanent link">&para;</a></h2>
+<h3 id="trusted-header-sign-in">Trusted-header sign-in<a class="headerlink" href="#trusted-header-sign-in" title="Permanent link">&para;</a></h3>
 <p>The proxy authenticates each person, and tells the process who they are in a
 header. <a href="../configuration/#the-trusted-header">The trusted header</a> holds the
 settings.</p>
@@ -1297,7 +1324,7 @@ elsewhere:</p>
 <p>Save it as <code>/etc/nftables.d/openpsirt.nft</code> and load it with
 <code>sudo nft -f /etc/nftables.d/openpsirt.nft</code>, or wherever the host's firewall
 reads its rules at boot.</p>
-<h3 id="nginx-with-oauth2-proxy">nginx with oauth2-proxy<a class="headerlink" href="#nginx-with-oauth2-proxy" title="Permanent link">&para;</a></h3>
+<h4 id="nginx-with-oauth2-proxy">nginx with oauth2-proxy<a class="headerlink" href="#nginx-with-oauth2-proxy" title="Permanent link">&para;</a></h4>
 <p>oauth2-proxy runs on port 4180 with <code>--reverse-proxy</code> and <code>--set-xauthrequest</code>,
 which is what makes it answer with the user and groups headers read below.</p>
 <pre><code class="language-nginx">server {
@@ -1373,7 +1400,7 @@ server {
 </code></pre>
 <p><code>proxy_set_header</code> replaces a header of the same name from the client, and an
 empty value removes it.</p>
-<h3 id="apache-httpd_1">Apache httpd<a class="headerlink" href="#apache-httpd_1" title="Permanent link">&para;</a></h3>
+<h4 id="apache-httpd-with-an-authentication-module">Apache httpd with an authentication module<a class="headerlink" href="#apache-httpd-with-an-authentication-module" title="Permanent link">&para;</a></h4>
 <p>With <code>mod_headers</code> and an authentication module loaded as well.</p>
 <pre><code class="language-apache">&lt;VirtualHost *:80&gt;
     ServerName psirt.example.com
