@@ -555,16 +555,23 @@ release of the fix, a column every existing window fills as false; SQLite
 rebuilds the table from the release's declaration. A notice gains the reference
 its recipient gave it and what it said about malice, two columns that hold a
 null and that every engine adds where the table stands. The places a notice
-named and the releases a record names as carrying its fix are new tables.
+named and the releases a record names as carrying its fix are new tables. A
+group's role on a product is replaced by one naming its product by name, and a
+group's role on every product is a new table. Configuration is the only source
+of either and is applied at every start, so the mappings v0.5.0 holds are
+dropped rather than carried.
 
 Rolled back, the places and the fix releases go with their tables, and the
 reference and what a notice said about malice go with their columns. A window
 counting from another window's notice or from the fix counts from the moment
-the attack became known again, which is the only start v0.5.0 has.
+the attack became known again, which is the only start v0.5.0 has. The group
+mappings go with their tables, and v0.5.0's table naming a product by its row
+comes back empty.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built. Rolled back with a window counting from it, a window counting from the fix, a place on the notice and a fix release on the record, the windows and the notice remain and the new columns and tables are gone |
+| A v0.5.0 group mapping | Upgraded, no mapping remains. Rolled back, a group can be mapped to a product by its row again |
 
 ### Release records
 
