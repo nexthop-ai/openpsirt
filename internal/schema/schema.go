@@ -33,7 +33,13 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 	if err := NotAhead(ctx, db); err != nil {
 		return err
 	}
-	return migrate.Up(ctx, db, logger)
+	if err := migrate.Up(ctx, db, logger); err != nil {
+		return err
+	}
+	// Asked again once the lock is released: a later release may have
+	// migrated while this one waited on it, which leaves this one nothing to
+	// apply and a schema it cannot read.
+	return NotAhead(ctx, db)
 }
 
 // NotAhead refuses a database whose schema is newer than this build's.

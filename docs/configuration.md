@@ -1069,7 +1069,10 @@ from, and every section after it.
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
 Going back to the earlier release is restoring that backup and deploying the
-earlier release against it.
+earlier release against it. Every release before this one starts against a
+database a later release upgraded and serves it, failing on what changed, so
+redeploying one, `helm rollback` included, is not going back: restore the
+backup first.
 
 ### From v0.1.0
 

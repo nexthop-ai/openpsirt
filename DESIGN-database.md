@@ -283,7 +283,7 @@ the backup taken before the upgrade, which works on every engine and is exact.
 |---|---|
 | No migration is applied downward | There is no `openpsirt migrate down`, and the untagged release's migration registers no way back |
 | A database ahead of the binary is refused | At startup and by `openpsirt migrate up`, naming both versions and the backup. Its schema may hold what this binary cannot read |
-| The upgrade note says to take a backup first | `docs/configuration.md` § Every upgrade. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
+| The upgrade note says to take a backup first | `docs/configuration.md` § Every upgrade |
 | A migration a release tagged keeps the down function it shipped with | Its file is frozen by digest (§ Release records), so the function stays and nothing calls it. The collapse before 1.0 removes them |
 | Upgrade tests run one way | A test reaches an earlier release's schema by emptying the database and applying migrations up to that release's last, never by walking down |
 

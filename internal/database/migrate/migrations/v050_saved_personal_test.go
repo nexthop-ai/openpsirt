@@ -61,9 +61,7 @@ var longName = strings.Repeat("n", 118)
 // its product, numbered past a name the person already holds, and cut to the
 // width the endpoints take a name at. One that is an older one's twin once its
 // scope is gone is dropped. A name held once is left alone, and so is another
-// person's filter of the same name. The name is unique to the person. Rolled
-// back, each filter is kept in every product, under the name the upgrade left
-// it and with the claim it prepares.
+// person's filter of the same name. The name is unique to the person.
 func savedFiltersBecomeTheirPersons() upgradeCheck {
 	var ana, bo int64
 	ids := map[string]int64{}
