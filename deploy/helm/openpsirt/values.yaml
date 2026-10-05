@@ -74,7 +74,8 @@ database:
 # back in — editing the database by hand — and nobody discovers that at a good
 # moment.
 #
-# The minimum for a working install is bootstrapAdmins plus one provider.
+# The minimum for a working install is one provider, and bootstrapAdmins or a
+# group mapped to admin in groupRoles.
 auth:
   # Identities granted administration at every startup, not just the first.
   # That makes this the recovery path as well as the bootstrap: lose access,

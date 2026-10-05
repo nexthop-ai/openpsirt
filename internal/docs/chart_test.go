@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 var (
@@ -96,5 +98,45 @@ func TestChartVariableProblemsReportsEachDirection(t *testing.T) {
 	clean := "# Helm\n\n" + valuesSection + "\n\n| `one` | `OPENPSIRT_ONE` |\n| `two` | `OPENPSIRT_TWO` |\n"
 	if problems, _, _ := chartVariableProblems(template, clean); len(problems) != 0 {
 		t.Fatalf("a table listing exactly what the chart sets was reported: %v", problems)
+	}
+}
+
+// chartRoles matches the list of roles the chart checks group mappings against.
+var chartRoles = regexp.MustCompile(`\$roles := list((?: "[a-z-]+")+)`)
+
+// The chart refuses a group mapping naming a role it does not list, so its
+// list is the process's: a role the process grants and the chart refuses is a
+// mapping Helm cannot carry, and the reverse renders an install that refuses
+// to start.
+func TestTheChartGrantsTheRolesTheProcessDoes(t *testing.T) {
+	template, err := os.ReadFile(filepath.Join("..", "..", "deploy", "helm", "openpsirt", //nolint:gosec // this repository's own chart
+		"templates", "deployment.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := chartRoles.FindStringSubmatch(string(template))
+	if m == nil {
+		t.Fatal("the chart's list of roles was not found, so this checked nothing")
+	}
+	chart := map[string]bool{}
+	for _, word := range strings.Fields(m[1]) {
+		chart[strings.Trim(word, `"`)] = true
+	}
+	process := map[string]bool{}
+	for _, role := range access.Roles() {
+		process[string(role)] = true
+	}
+	for _, over := range access.OverTheDeployment() {
+		process[string(over)] = true
+	}
+	for word := range process {
+		if !chart[word] {
+			t.Errorf("%s is granted by the process and refused by the chart", word)
+		}
+	}
+	for word := range chart {
+		if !process[word] {
+			t.Errorf("%s is accepted by the chart and refused by the process", word)
+		}
 	}
 }

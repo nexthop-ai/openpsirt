@@ -241,8 +241,8 @@ func TestEverySettingNameThePackageDeclaresIsOfferedOrExempt(t *testing.T) {
 
 	// The two an operator does not set here, each for a reason.
 	exempt := map[string]string{
-		"roles.mode": "set through /v1/roles/mode, which refuses a mode nothing " +
-			"can derive roles in — a plain value write cannot ask that",
+		"roles.mode": "follows whether OPENPSIRT_GROUP_ROLES maps a group, applied at " +
+			"every start; nothing running sets it",
 		"signin.key": "generated and rotated by the deployment; an operator " +
 			"setting one would be choosing this deployment's signing key",
 	}

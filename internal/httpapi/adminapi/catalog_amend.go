@@ -13,6 +13,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -173,7 +174,9 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			"request omits them.\n\n" +
 			"The name is what scans, paths and published documents use. It is refused once a " +
 			"VEX document has gone out for any build of this product, or a published advisory " +
-			"covers it. Retire the product and declare the intended one instead.\n\n" +
+			"covers it. Retire the product and declare the intended one instead. It is also " +
+			"refused where a group mapping in configuration names the product or the new name; " +
+			"change the mapping first.\n\n" +
 			"The displayed name is what screens show and what a document names the product in " +
 			"prose. It may be corrected at any time.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
@@ -205,6 +208,18 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 				}
 				if issued {
 					return heldByReaders("product")
+				}
+				// A group mapping names its product by name, so a rename to or
+				// from a mapped name would change who holds the product from
+				// a running process.
+				mapped, err := access.NewStore(tx).MapsProduct(ctx, product.Name, name)
+				if err != nil {
+					return core.WentWrong(d.Logger, "that product could not be renamed", err)
+				}
+				if mapped {
+					return huma.Error409Conflict("OPENPSIRT_GROUP_ROLES maps a group to this " +
+						"product or to the new name. Change the mapping in configuration first, " +
+						"then rename the product")
 				}
 				if err := store.RenameProduct(ctx, product.ID, name); err != nil {
 					return declineRename(d.Logger, err)

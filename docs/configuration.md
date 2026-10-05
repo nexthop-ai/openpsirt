@@ -401,7 +401,7 @@ products = ["router-os", "switch-os"]
 | Part | Rule |
 |---|---|
 | Roles | `approver`, `assigner`, `public-read`, `private-read`, `public-triage`, `private-triage`, and `admin` and `audit`, which are held over the whole deployment |
-| Products | By name, in any capitals. None means every product, including one declared later. A product nobody has declared yet is accepted, and grants once a pipeline declares it. `admin` and `audit` take none |
+| Products | By name, in any capitals. None means every product, including one declared later. A product nobody has declared yet is accepted, and grants from each member's next sign-in after a pipeline declares it. `admin` and `audit` take none |
 | A name holding `%`, `;`, `=`, `+`, `@` or `,` | Written percent-encoded in the variable, as `%25`, `%3B`, `%3D`, `%2B`, `%40` and `%2C`: `security%40example.com=audit`. A file writes the name as it is |
 | A source of groups | Required. Mappings with none of `OPENPSIRT_OIDC_GROUPS_CLAIM` beside an issuer, `OPENPSIRT_GITHUB_ORG` beside a GitHub client, or `OPENPSIRT_TRUSTED_GROUPS_HEADER` beside a trusted header stop the process |
 | Administration | At least one entry grants `admin`, or `OPENPSIRT_BOOTSTRAP_ADMINS` names somebody. Otherwise the process stops |
@@ -1157,4 +1157,8 @@ going back to v0.4.0.
 
 | Change | What to do |
 |---|---|
-| Group mappings come from `OPENPSIRT_GROUP_ROLES` alone. v0.5.0 kept mappings made through `/v1/roles/bindings`, and the upgrade removes them. `POST` and `DELETE` on `/v1/roles/bindings` and `PUT` on `/v1/roles/mode` are gone | Before upgrading, list the mappings with `GET /v1/roles/bindings` and write them into `OPENPSIRT_GROUP_ROLES`. A deployment upgraded with none takes its roles from what administrators assigned |
+| Group mappings come from `OPENPSIRT_GROUP_ROLES` alone, and any mapping means roles come from groups. v0.5.0 kept mappings made through `/v1/roles/bindings`, and the upgrade removes those on a product. `POST` and `DELETE` on `/v1/roles/bindings` and `PUT` on `/v1/roles/mode` are gone | Before upgrading, read `GET /v1/roles/mode`. If it answers `group-bound`, list the mappings with `GET /v1/roles/bindings` and write them into `OPENPSIRT_GROUP_ROLES`. If it answers `direct`, leave the variable unset: a mapping would switch the deployment to roles from groups and set aside every role assigned under People |
+
+| After the upgrade from v0.5.0 | |
+|---|---|
+| Going back to v0.5.0 | Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's `POST /v1/roles/bindings` |

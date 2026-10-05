@@ -416,6 +416,33 @@ func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T
 			return changes
 		}
 		leads := access.Mapping{Group: "leads", Grants: string(access.Administers)}
+		// A role assigned under People, which the first mapping sets aside and
+		// the last one's removal restores.
+		product := w.DeclareProduct("assigned", "Assigned")
+		holder := w.DeclarePerson("holder@example.com", "Holder", false)
+		rights := access.NewStore(w.DB.DB)
+		if err := rights.GrantRole(ctx, holder.ID, product.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		active := func() bool {
+			t.Helper()
+			grants, err := rights.Grants(ctx, holder.ID)
+			if err != nil || len(grants) != 1 {
+				t.Fatalf("the assigned role read back as %+v (%v)", grants, err)
+			}
+			return grants[0].Active
+		}
+
+		// Mappings granting no administration, with nobody named, are refused,
+		// and the refusal changes nothing.
+		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{
+			{Group: "readers", Grants: string(access.PublicRead)},
+		}); !errors.Is(err, access.ErrNobodyAdministers) {
+			t.Errorf("mappings nobody could administer under answered %v", err)
+		}
+		if roles := of(trail.Role); len(roles) != 0 || !active() {
+			t.Errorf("a refused start recorded %+v, or set the assigned role aside", roles)
+		}
 
 		mapped, mode, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads})
 		if err != nil {
@@ -432,6 +459,9 @@ func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T
 			one.Name != "leads over this deployment" || one.Was != nil ||
 			one.Became == nil || *one.Became != "admin" {
 			t.Errorf("a mapping was recorded as %+v", one)
+		}
+		if active() {
+			t.Error("the first mapping left a role assigned under People in force")
 		}
 		settings := of(trail.Setting)
 		if len(settings) != 1 || settings[0].Actor != trail.ByConfiguration ||
@@ -451,6 +481,9 @@ func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T
 		}
 		if mode != access.Direct {
 			t.Errorf("no mappings answered %s", mode)
+		}
+		if !active() {
+			t.Error("removing the last mapping did not restore the role assigned under People")
 		}
 		roles = of(trail.Role)
 		if len(roles) != 2 || roles[0].Was == nil || *roles[0].Was != "admin" || roles[0].Became != nil {

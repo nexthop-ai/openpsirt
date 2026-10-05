@@ -5,7 +5,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -233,34 +232,32 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	// them. Each change is recorded in the administrative trail against
 	// configuration, and the whole map is logged, because a group whose
 	// spelling is wrong grants nothing and says nothing.
+	//
+	// A deployment that cannot reach its own administration has one route
+	// back — editing the database by hand — and nobody discovers that at a
+	// good moment. Applying the mappings refuses one, and changes nothing
+	// when it does.
 	mapped, mode, err := trail.MapGroups(ctx, db.DB, cfg.GroupRoles)
-	if err != nil {
+	switch {
+	case errors.Is(err, access.ErrNobodyAdministers) && len(cfg.GroupRoles) > 0:
+		return fmt.Errorf("nobody can administer this deployment: OPENPSIRT_GROUP_ROLES maps no " +
+			"group to admin, and OPENPSIRT_BOOTSTRAP_ADMINS names nobody who can. Map a group to " +
+			"admin or name somebody there, and start again")
+	case errors.Is(err, access.ErrNobodyAdministers):
+		return fmt.Errorf("nobody can administer this deployment: nobody holds administration, " +
+			"and OPENPSIRT_BOOTSTRAP_ADMINS names nobody who can. Name somebody there and start again")
+	case err != nil:
 		return startupFailed(err, "applying the group mappings named in configuration", cfg)
 	}
 	for _, mapping := range cfg.GroupRoles {
-		logger.Info("group mapped", "group", mapping.Group, "grants", mapping.Grants,
-			"product", cmp.Or(mapping.Product, "every product"))
+		logger.Info("group mapped", "mapping", mapping.String(), "grants", mapping.Grants)
 	}
 	for _, mapping := range mapped.Removed {
 		logger.Warn("group mapping withdrawn: configuration no longer states it",
-			"group", mapping.Group, "grants", mapping.Grants, "product", mapping.Product)
+			"mapping", mapping.String(), "grants", mapping.Grants)
 	}
-
-	// A deployment that cannot reach its own administration has one route
-	// back — editing the database by hand — and nobody discovers that at a
-	// good moment. Checked here rather than trusted to have been arranged.
 	settings := setting.NewStore(db.DB)
 	rights := access.NewStore(db.DB)
-	canAdminister, err := rights.CanAdminister(ctx, mode)
-	if err != nil {
-		return err
-	}
-	if !canAdminister {
-		return fmt.Errorf(
-			"nobody can administer this deployment: OPENPSIRT_GROUP_ROLES maps no group to " +
-				"admin, and OPENPSIRT_BOOTSTRAP_ADMINS names nobody. Map a group to admin or " +
-				"name somebody there, and start again")
-	}
 	logger.Info("roles are assigned", "mode", mode)
 
 	// Providers are built at startup so a misconfigured one stops the process

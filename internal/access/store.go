@@ -688,8 +688,8 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 // nothing. SAVEPOINT is plain SQL on all four engines.
 //
 // The predicate stays the caller's, because what "already holds" means is the
-// one part that genuinely differs: a grant asks whether it is in force, a
-// binding asks whether the row exists, and each says why beside itself.
+// one part that genuinely differs: a grant asks whether it is in force, and
+// each caller says why beside itself.
 //
 // With the row there and the predicate saying no, the caller hears what
 // happened rather than the driver's constraint message.

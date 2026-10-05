@@ -182,6 +182,25 @@ func (s *Store) ApplyMappings(ctx context.Context, wanted []Mapping) (Mapped, er
 	return mapped, nil
 }
 
+// MapsProduct reports whether a group mapping names any of these products,
+// in any capitals.
+//
+// A mapping names its product by name, so renaming a product to a name a
+// mapping holds would hand that group the product, and renaming one away
+// would strand the mapping. Both are configuration's to decide (REQ-41).
+func (s *Store) MapsProduct(ctx context.Context, names ...string) (bool, error) {
+	folded := make([]string, 0, len(names))
+	for _, name := range names {
+		folded = append(folded, strings.ToLower(strings.TrimSpace(name)))
+	}
+	held, err := s.db.NewSelect().Model((*Binding)(nil)).
+		Where("product_name IN (?)", bun.List(folded)).Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether a group mapping names a product: %w", err)
+	}
+	return held, nil
+}
+
 // mapOne writes one mapping into the table that holds its shape.
 func mapOne(ctx context.Context, db bun.IDB, mapping Mapping, now time.Time) error {
 	var row any
@@ -194,7 +213,11 @@ func mapOne(ctx context.Context, db bun.IDB, mapping Mapping, now time.Time) err
 		row = &Binding{GroupName: mapping.Group, ProductName: mapping.Product,
 			Role: Role(mapping.Grants), CreatedAt: now}
 	}
-	if _, err := db.NewInsert().Model(row).Exec(ctx); err != nil {
+	// Replicas start together, so another may apply the same mapping first.
+	// Going again reads it as held.
+	if _, err := db.NewInsert().Model(row).Exec(ctx); database.IsDuplicate(err) {
+		return fmt.Errorf("map %s to %q: %w", mapping, mapping.Grants, database.ErrGoAgain)
+	} else if err != nil {
 		return fmt.Errorf("map %s to %q: %w", mapping, mapping.Grants, err)
 	}
 	return nil
@@ -212,8 +235,18 @@ func unmap(ctx context.Context, db bun.IDB, mapping Mapping) error {
 		q = db.NewDelete().Model((*Binding)(nil)).
 			Where("product_name = ?", mapping.Product).Where("role = ?", mapping.Grants)
 	}
-	if _, err := q.Where("group_name = ?", mapping.Group).Exec(ctx); err != nil {
+	res, err := q.Where("group_name = ?", mapping.Group).Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, err)
+	}
+	// Matched nothing because another replica starting at the same moment
+	// removed it first. Going again reads it as gone, so the removal is
+	// recorded once.
+	switch n, err := database.Affected(res); {
+	case err != nil:
+		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, err)
+	case n == 0:
+		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, database.ErrGoAgain)
 	}
 	return nil
 }
@@ -637,6 +670,10 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	}
 	return nil
 }
+
+// ErrNobodyAdministers is a start refused because nothing in the mode it
+// would run in grants administration.
+var ErrNobodyAdministers = refusal.New("nobody can administer this deployment")
 
 // CanAdminister reports whether anybody could administer this deployment in
 // the mode given.

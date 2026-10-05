@@ -67,7 +67,13 @@ var escaped = strings.NewReplacer(
 func SpellGroupRoles(entries []GroupRoles) string {
 	spelled := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		one := escaped.Replace(entry.Group) + "=" + strings.Join(entry.Roles, "+")
+		// Roles are escaped too, so a separator inside one is refused as no
+		// role rather than read as structure.
+		roles := make([]string, 0, len(entry.Roles))
+		for _, role := range entry.Roles {
+			roles = append(roles, escaped.Replace(role))
+		}
+		one := escaped.Replace(entry.Group) + "=" + strings.Join(roles, "+")
 		if len(entry.Products) > 0 {
 			products := make([]string, 0, len(entry.Products))
 			for _, product := range entry.Products {

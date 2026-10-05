@@ -110,8 +110,8 @@ const (
 	// named beside it.
 	ByPerson Actor = "person"
 	// ByConfiguration is a change the deployment's startup configuration
-	// made, which names no person. Only the administrators configuration
-	// names are changed this way.
+	// made, which names no person: the administrators it names, the groups it
+	// maps, and where roles come from as a result.
 	ByConfiguration Actor = "configuration"
 	// ByMerge is a change a scan made by merging two issues its report named
 	// together, which names no person.
@@ -268,6 +268,10 @@ func NameAdministrators(ctx context.Context, db bun.IDB, identities []string) ([
 // Applied at every start, like the administrators configuration names. Any
 // mapping at all means roles come from groups; none means an administrator
 // assigns them. A start that states what the last one stated records nothing.
+//
+// A start that would leave nobody able to administer is refused with
+// access.ErrNobodyAdministers, inside the same transaction, so a configuration
+// no process serves changes nothing and records nothing.
 func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping) (access.Mapped, access.Mode, error) {
 	var mapped access.Mapped
 	var mode access.Mode
@@ -299,17 +303,25 @@ func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping) (acce
 		if err != nil {
 			return err
 		}
-		if access.AsMode(stored) == mode {
-			return nil
+		if access.AsMode(stored) != mode {
+			if err := access.NewStore(db).SwitchTo(ctx, mode); err != nil {
+				return err
+			}
+			if _, _, err := settings.Change(ctx, setting.RoleMode, string(mode)); err != nil {
+				return err
+			}
+			if err := store.RecordByConfiguration(ctx, Setting, setting.RoleMode,
+				Said(stored, had), Said(string(mode), true)); err != nil {
+				return err
+			}
 		}
-		if err := access.NewStore(db).SwitchTo(ctx, mode); err != nil {
+		switch can, err := access.NewStore(db).CanAdminister(ctx, mode); {
+		case err != nil:
 			return err
+		case !can:
+			return access.ErrNobodyAdministers
 		}
-		if _, _, err := settings.Change(ctx, setting.RoleMode, string(mode)); err != nil {
-			return err
-		}
-		return store.RecordByConfiguration(ctx, Setting, setting.RoleMode,
-			Said(stored, had), Said(string(mode), true))
+		return nil
 	})
 	if err != nil {
 		return access.Mapped{}, "", err

@@ -166,7 +166,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// somebody who signs in perfectly well and was never granted anything is
 	// refused.
 	//
-	// Derived: the mapping an administrator made *is* the advance
+	// Derived: the mapping configuration states *is* the advance
 	// authorization, so somebody arriving for the first time in a mapped group
 	// is admitted and recorded then — and somebody in no mapped group is
 	// refused exactly as a stranger is.

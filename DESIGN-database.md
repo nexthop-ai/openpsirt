@@ -190,7 +190,7 @@ worked.
 |---|---|
 | Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
 | Equal | Served, and the two versions are logged |
-| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migrations 37 and 39 are the exceptions. 37 reshapes what v0.1.0 reads, and 39 re-identifies every component v0.4.0 matches by, records senders in a form v0.4.0 does not read, gives a destination a platform v0.4.0 does not write, and keeps a saved filter with no product, which v0.4.0 reads by one. Going back to either release is rolling its migration back with the newer binary first |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migrations 37, 39 and 40 are the exceptions. 37 reshapes what v0.1.0 reads; 39 re-identifies every component v0.4.0 matches by, records senders in a form v0.4.0 does not read, gives a destination a platform v0.4.0 does not write, and keeps a saved filter with no product, which v0.4.0 reads by one; and 40 names a group's product by name where v0.5.0 joins on its row, so every group-bound sign-in fails. Going back to any of those releases is rolling its migration back with the newer binary first |
 
 What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
@@ -558,20 +558,23 @@ null and that every engine adds where the table stands. The places a notice
 named and the releases a record names as carrying its fix are new tables. A
 group's role on a product is replaced by one naming its product by name, and a
 group's role on every product is a new table. Configuration is the only source
-of either and is applied at every start, so the mappings v0.5.0 holds are
-dropped rather than carried.
+of either and is applied at every start, so the role mappings v0.5.0 holds are
+dropped rather than carried. Mappings to admin and audit are in a table this
+leaves alone in both directions, which keeps administration reachable after a
+rollback.
 
 Rolled back, the places and the fix releases go with their tables, and the
 reference and what a notice said about malice go with their columns. A window
 counting from another window's notice or from the fix counts from the moment
-the attack became known again, which is the only start v0.5.0 has. The group
+the attack became known again, which is the only start v0.5.0 has. The role
 mappings go with their tables, and v0.5.0's table naming a product by its row
-comes back empty.
+comes back empty. A role a group derived on every product is removed, because
+v0.5.0 derives none and would never clear it.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built. Rolled back with a window counting from it, a window counting from the fix, a place on the notice and a fix release on the record, the windows and the notice remain and the new columns and tables are gone |
-| A v0.5.0 group mapping | Upgraded, no mapping remains. Rolled back, a group can be mapped to a product by its row again |
+| A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains. Rolled back with a role a group derived on every product, that role is gone, and a group can be mapped to a product by its row again |
 
 ### Release records
 

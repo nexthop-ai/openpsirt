@@ -78,3 +78,37 @@ func TestTheBindingsListSaysWhereEachMappingIsHeld(t *testing.T) {
 		}
 	})
 }
+
+// A group mapping names its product by name, so a rename to or from a mapped
+// name would change who holds the product from a running process (REQ-41).
+func TestAProductIsNotRenamedToOrFromANameAGroupIsMappedTo(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if _, err := r.Rights.ApplyMappings(t.Context(), []access.Mapping{
+			{Group: "contractors", Grants: string(access.PublicRead), Product: "sandbox"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"Sandbox"}`); got.Code != http.StatusConflict {
+			t.Errorf("renaming a product to a mapped name answered %d: %s", got.Code, got.Body.String())
+		}
+
+		if _, err := r.Rights.ApplyMappings(t.Context(), []access.Mapping{
+			{Group: "contractors", Grants: string(access.PublicRead), Product: "mine"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"elsewhere"}`); got.Code != http.StatusConflict {
+			t.Errorf("renaming a mapped product away answered %d: %s", got.Code, got.Body.String())
+		}
+
+		if _, err := r.Rights.ApplyMappings(t.Context(), nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"elsewhere"}`); got.Code != http.StatusNoContent {
+			t.Errorf("renaming a product nothing maps answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}

@@ -262,6 +262,17 @@ func groupRolesEntry(table map[string]any) (access.GroupRoles, error) {
 			if !ok {
 				return entry, fmt.Errorf("%s: want a list of strings, got %s", key, typeOf(value))
 			}
+			// An empty list would read as no products, which is every
+			// product: a generated list that came out empty would grant on
+			// the whole estate.
+			switch {
+			case len(items) > 0:
+			case key == "products":
+				return entry, fmt.Errorf("products: an empty list names no product; leave " +
+					"products out for every product")
+			default:
+				return entry, fmt.Errorf("roles: an empty list grants nothing")
+			}
 			for _, item := range items {
 				name, ok := item.(string)
 				if !ok {

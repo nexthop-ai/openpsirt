@@ -85,8 +85,9 @@ type Deps struct {
 	// PatchBranches is whether the deployment turned the patch branch
 	// lookups on. The same value the fetching pass holds.
 	PatchBranches bool
-	// Mode says where roles come from. Read per request rather than held, so
-	// an administrator turning group binding off takes effect at once.
+	// Mode says where roles come from. Read per request rather than held,
+	// because replicas restart one at a time and the one that applied
+	// configuration last is what every replica answers by.
 	Mode func(context.Context) access.Mode
 	// Files is where attachments are kept. Nil is a deployment that holds
 	// none, which is ordinary: attachments are off and everything else

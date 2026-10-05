@@ -499,6 +499,10 @@ func TestAGroupRolesTableThatCannotBeReadIsRefusedNamingIt(t *testing.T) {
 		"[[signin.roles]]\ngroup = \"g\"\nroles = [1]\n":                                                         "one entry is a whole number",
 		"[[signin.roles]]\ngroup = \"g\"\nrole = \"admin\"\nteam = \"x\"\n":                                      "team is not part of an entry",
 		"[[signin.roles]]\ngroup = \"g\"\nrole = \"admin\"\n[[signin.roles]]\ngroup = \"h\"\nrole = \"owner\"\n": "entry 2: \"owner\" is not a role",
+		"[[signin.roles]]\ngroup = \"g\"\nrole = \"public-read\"\nproducts = []\n":                               "an empty list names no product",
+		"[[signin.roles]]\ngroup = \"g\"\nroles = []\n":                                                          "an empty list grants nothing",
+		"[[signin.roles]]\ngroup = \"g\"\nrole = \"public-read; leads=admin\"\n":                                 "is not a role",
+		"[[signin.roles]]\ngroup = \"g\"\nrole = \"private-triage@kernel\"\n":                                    "is not a role",
 	} {
 		_, err := LoadFile(writeFile(t, github+body), nil)
 		if err == nil || !strings.Contains(err.Error(), says) || !strings.Contains(err.Error(), "signin.roles") {

@@ -66,13 +66,6 @@ func DeclaredBody(method, path, name string) io.Reader {
 		return strings.NewReader(
 			`{"known_at": "2026-09-20T14:00:00Z", "grounds": "A customer sent captures."}`)
 	}
-	if strings.HasSuffix(path, "/roles/bindings") {
-		// A body the schema accepts, so that a refusal is about the asker
-		// rather than about the request. Validation runs before the handler,
-		// so an invalid body answers 422 whoever sends it — which measures
-		// nothing about who may bind a group to a role.
-		return strings.NewReader(`{"group": "` + name + `", "product": "mine", "role": "public-read"}`)
-	}
 	return strings.NewReader(`{"name": "` + name + `"}`)
 }
 

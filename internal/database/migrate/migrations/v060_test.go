@@ -32,9 +32,14 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 		rollBack(t, ctx, db)
 		dbtest.MigrateTo(t, db, v050)
 		window, notice := seedV050Obligation(t, ctx, db)
-		// A group mapped as v0.5.0 mapped one, against the product's row.
+		// A group mapped as v0.5.0 mapped one, against the product's row, and
+		// one mapped to administration.
 		if _, err := db.DB.NewRaw(`INSERT INTO "group_role" ("group_name", "product_id", "role", "created_at")`+
 			` SELECT ?, "id", ?, "created_at" FROM "product"`, "kernel", "public-read").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "group_admin" ("group_name", "grants", "created_at")`+
+			` VALUES (?, ?, ?)`, "leads", "admin", time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -62,7 +67,15 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 			t.Fatal(err)
 		}
 		if mapped != 0 {
-			t.Errorf("upgraded, %d of v0.5.0's group mappings remain", mapped)
+			t.Errorf("upgraded, %d of v0.5.0's role mappings remain", mapped)
+		}
+		// Administration stays reachable, in both directions.
+		var admins int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "group_admin"`).Scan(ctx, &admins); err != nil {
+			t.Fatal(err)
+		}
+		if admins != 1 {
+			t.Errorf("upgraded, %d of v0.5.0's administration mappings remain, want the one", admins)
 		}
 		var reference, malicious sql.NullString
 		if err := db.DB.NewRaw(`SELECT "reference", "suspected_malicious" FROM "told_outside"`+
@@ -107,8 +120,23 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// A role a group derived on every product, which v0.5.0 never clears.
+		if _, err := db.DB.NewRaw(`INSERT INTO "role_grant_all" ("person_id", "role", "source", "active", "created_at")`+
+			` SELECT "id", ?, ?, ?, "created_at" FROM "person" WHERE "identity" = ?`,
+			"private-read", "derived", true, "obligation-admin").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
 		if err := schema.Down(ctx, db, quiet()); err != nil {
 			t.Fatalf("roll the upgrade back: %v", err)
+		}
+		var derived int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "role_grant_all" WHERE "source" = ?`, "derived").
+			Scan(ctx, &derived); err != nil {
+			t.Fatal(err)
+		}
+		if derived != 0 {
+			t.Errorf("rolled back, %d roles a group derived on every product remain", derived)
 		}
 		var windows, notices int
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "obligation_window"`).Scan(ctx, &windows); err != nil {

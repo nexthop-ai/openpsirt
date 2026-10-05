@@ -49,8 +49,8 @@ func downV060(ctx context.Context, sqldb *sql.DB) error {
 //     names any.
 //   - A group's role names its product by name, and a group may hold a role
 //     across every product. Configuration is the only source of either and is
-//     applied at every start, so the mappings v0.5.0 holds are dropped rather
-//     than carried.
+//     applied at every start, so the role mappings v0.5.0 holds are dropped
+//     rather than carried. Mappings to admin and audit are left alone.
 func upgradeV060(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -85,14 +85,18 @@ func upgradeV060(ctx context.Context, tx bun.Tx) error {
 // fix go with their tables, and a notice's reference and what it said about
 // malice with their columns. A window counting from another's notice or from
 // a fix counts from the moment the attack became known again, which is the
-// only start v0.5.0 has. The groups configuration mapped go with their tables,
-// and v0.5.0 starts with none.
+// only start v0.5.0 has. The role mappings configuration made go with their
+// tables, and so does any role a group derived on every product, which v0.5.0
+// would never clear. Mappings to admin and audit are left alone.
 func downgradeV060(ctx context.Context, tx bun.Tx) error {
 	if err := dropTables(ctx, tx.Tx, "told_place", "exploited_fix",
 		"group_role_all", "group_role"); err != nil {
 		return err
 	}
 	if err := apply(ctx, tx.Tx, []string{
+		// v0.5.0 derives nothing across every product, so it never clears a
+		// role a group derived there, and the member would keep it for good.
+		`DELETE FROM "role_grant_all" WHERE "source" = 'derived'`,
 		`ALTER TABLE "told_outside" DROP COLUMN "reference"`,
 		`ALTER TABLE "told_outside" DROP COLUMN "suspected_malicious"`,
 	}); err != nil {

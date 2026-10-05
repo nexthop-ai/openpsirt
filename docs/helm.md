@@ -27,7 +27,7 @@ install needs and which setting each value sets.
 | `database.url` or `database.existingSecret` | The database. SQLite is for a single-pod trial, and the chart refuses it beside a second replica |
 | `auth.baseURL` | The address people reach the deployment on, in full: `https://psirt.example.com`. Required once a provider is configured |
 | `auth.oidc.issuer`, `auth.github.clientID` or `auth.trustedHeader.name` | One way to sign in |
-| `auth.bootstrapAdmins` | Who administers the deployment. Granted at every start, so it is also the way back in |
+| `auth.bootstrapAdmins`, or a group mapped to `admin` in `auth.groupRoles` | Who administers the deployment. A name here is granted at every start whatever the groups say, so it is also the way back in |
 
 ```yaml
 database:

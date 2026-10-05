@@ -1379,6 +1379,7 @@ else
 	  "a group role naming no group|names no group|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].roles={admin}" \
 	  "a group role granting nothing|names no roles|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g" \
 	  "a group role naming no role|is not a role|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={owner}" \
+	  "a group role with an empty product|names an empty product|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={public-read} --set auth.groupRoles[0].products={}" \
 	  "administration held on a product|takes no products|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={admin} --set auth.groupRoles[0].products={router-os}" \
 	  "group roles and nothing reporting groups|set a source of groups for auth.groupRoles|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={admin}" \
 	  "a trusted header fenced from everybody|set networkPolicy.ingressController or networkPolicy.from|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.enabled=false"; do \
@@ -1418,6 +1419,14 @@ else
 	case "$$out" in *'value: "sec%40example.com=public-triage+approver@router-os,switch-os"'*) ;; \
 	  *) echo "the group roles were not rendered as OPENPSIRT_GROUP_ROLES reads them:"; echo "$$out" | grep -A1 GROUP_ROLES; exit 1;; esac
 	@echo "the group roles render encoded, as the process reads them"
+	@# A group mapped to admin is somebody who can administer, so it stands in
+	@# for a named administrator.
+	@helm template t deploy/helm/openpsirt -s templates/deployment.yaml \
+	  --set database.existingSecret=s --set auth.baseURL=https://p.example.com \
+	  --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o \
+	  --set 'auth.groupRoles[0].group=leads' --set 'auth.groupRoles[0].roles={admin}' >/dev/null \
+	  || { echo "an install whose only administrator is a group mapped to admin was refused"; exit 1; }
+	@echo "a group mapped to admin stands in for a named administrator"
 	@# The refusals above assert that an install the chart cannot serve fails
 	@# at render. These assert the other half: that a legal one renders a
 	@# reference something answers. A secretKeyRef naming a Secret nothing
