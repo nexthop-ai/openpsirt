@@ -10,7 +10,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // settingsHeld is every stored setting, by name.
@@ -43,7 +42,7 @@ func TestASettingRenamedSinceV010IsCarriedAndAnUnreadOneRemoved(t *testing.T) {
 			name    string
 			version int64
 		}{{"v0.1.0", v010}, {"v0.2.0", v020}} {
-			rollBack(t, ctx, db)
+			dbtest.Empty(t, db)
 			dbtest.MigrateTo(t, db, from.version)
 			exec(t, ctx, db, `DELETE FROM "application_setting"`)
 			exec(t, ctx, db, `INSERT INTO "application_setting" ("name", "value", "updated_at")
@@ -64,7 +63,7 @@ func TestASettingRenamedSinceV010IsCarriedAndAnUnreadOneRemoved(t *testing.T) {
 		}
 
 		// Both names set: the new one is what v0.2.0 read, so it stands.
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v020)
 		exec(t, ctx, db, `DELETE FROM "application_setting"`)
 		exec(t, ctx, db, `INSERT INTO "application_setting" ("name", "value", "updated_at")
@@ -76,13 +75,6 @@ func TestASettingRenamedSinceV010IsCarriedAndAnUnreadOneRemoved(t *testing.T) {
 			t.Errorf("the threshold set under its new name was replaced by the old one: %q", got)
 		}
 
-		// Rolled back, the carried value stays under the name v0.2.0 reads.
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatal(err)
-		}
-		if got := settingsHeld(t, ctx, db)["disclosure.movement-threshold"]; got != "240h0m0s" {
-			t.Errorf("rolled back, the threshold v0.2.0 reads is %q", got)
-		}
 		exec(t, ctx, db, `DELETE FROM "application_setting"`)
 		leaveAtLatest(t, ctx, db)
 	})

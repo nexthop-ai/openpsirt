@@ -13,12 +13,9 @@ import (
 )
 
 // Upgraded, a claim v0.4.0 holds records no build it was made on: v0.4.0 kept
-// none, and the record is never guessed. Rolled back, the table is gone and
-// the claim stays. Upgraded again, it still records none.
+// none, and the record is never guessed.
 func claimsRecordNoBuildTheyWereMadeOn() upgradeCheck {
 	var claim int64
-	// Upgraded again after the roll back, the claim is still there and still
-	// records nothing: the table comes back empty.
 	recordsNone := func(t *testing.T, ctx context.Context, db *database.DB) {
 		t.Helper()
 		var held, recorded int
@@ -57,17 +54,6 @@ func claimsRecordNoBuildTheyWereMadeOn() upgradeCheck {
 				t.Fatal(err)
 			}
 		},
-		upgraded:      recordsNone,
-		upgradedAgain: recordsNone,
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var held int
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "claim" WHERE "id" = ?`, claim).
-				Scan(ctx, &held); err != nil {
-				t.Fatal(err)
-			}
-			if held != 1 {
-				t.Errorf("rolled back, the claim is gone")
-			}
-		},
+		upgraded: recordsNone,
 	}
 }

@@ -145,7 +145,7 @@ func TestAnArgumentAfterACommandIsRefused(t *testing.T) {
 	withoutOurVariables(t)
 	for _, args := range [][]string{
 		{"serve", "now"},
-		{"migrate", "up", "down"},
+		{"migrate", "up", "status"},
 	} {
 		if _, err := runOut(t, args...); err == nil || !strings.Contains(err.Error(), "unexpected argument") {
 			t.Errorf("%v: %v", args, err)

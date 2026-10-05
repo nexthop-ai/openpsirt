@@ -11,7 +11,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // ownClock is the migration that clocks a recorded flaw from its first
@@ -25,7 +24,7 @@ const ownClock = v030
 func TestAV020DatabaseMovesItsRecordedFlawsOntoTheirOwnClock(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v020)
 		tables := columns(t, ctx, db)
 
@@ -129,18 +128,6 @@ func TestAV020DatabaseMovesItsRecordedFlawsOntoTheirOwnClock(t *testing.T) {
 			t.Errorf("%d reports came across as found here; every v0.2.0 report came from outside", foundHere)
 		}
 
-		// Rolled back, the columns go; applied again, they return.
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll back: %v", err)
-		}
-		for table, column := range map[string]string{"finding": "rated_at", "flaw_report": "found_here"} {
-			for _, c := range columns(t, ctx, db)[table] {
-				if c.name == column {
-					t.Errorf("rolled back, %s still has %s", table, column)
-				}
-			}
-		}
-		dbtest.MigrateTo(t, db, ownClock)
 		leaveAtLatest(t, ctx, db)
 	})
 }

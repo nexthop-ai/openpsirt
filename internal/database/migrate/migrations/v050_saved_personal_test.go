@@ -6,7 +6,6 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -199,59 +198,6 @@ func savedFiltersBecomeTheirPersons() upgradeCheck {
 				("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
 				ana, "lonely", "", time.Now().UTC().Truncate(time.Microsecond)).Exec(ctx); !database.IsDuplicate(err) {
 				t.Errorf("upgraded, a second filter of one name for one person is %v, want refused as a duplicate", err)
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var products int
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "product"`).Scan(ctx, &products); err != nil {
-				t.Fatal(err)
-			}
-			for _, each := range []struct {
-				person int64
-				name   string
-			}{
-				{ana, "kernel"}, {ana, "kernel (switch)"}, {ana, "kernel (saved-edge) 2"},
-				{ana, "kernel (saved-edge)"}, {ana, strings.ToLower("kernel (" + longProduct[:60] + ")")},
-				{ana, "lonely"}, {ana, "claim"}, {bo, "kernel"},
-			} {
-				var in, distinct int
-				if err := db.DB.NewRaw(`SELECT COUNT(*), COUNT(DISTINCT "product_id") FROM "saved_filter"
-					WHERE "person_id" = ? AND "name" = ?`, each.person, each.name).
-					Scan(ctx, &in, &distinct); err != nil {
-					t.Fatal(err)
-				}
-				if in != products || distinct != products {
-					t.Errorf("rolled back, %q is kept %d times in %d products, want once in each of %d",
-						each.name, in, distinct, products)
-				}
-			}
-			for _, got := range preparedBy(t, ctx, db, `"person_id" = ? AND "name" = 'claim'`, ana) {
-				if got != claim {
-					t.Errorf("rolled back, the filter preparing a claim prepares %+v, want %+v", got, claim)
-				}
-			}
-		},
-		// Upgraded again, every copy the roll back made is the twin of the one
-		// in the first product and goes, so the person holds what the first
-		// upgrade left them and nothing is renamed twice.
-		upgradedAgain: func(t *testing.T, ctx context.Context, db *database.DB) {
-			want := []string{
-				"claim", "kernel", "kernel (saved-edge)", "kernel (saved-edge) 2",
-				strings.ToLower("kernel (" + longProduct[:60] + ")"), "kernel (switch)",
-				"lonely", longName, longName[:111] + " (switch)",
-			}
-			var names []string
-			if err := db.DB.NewRaw(`SELECT "name" FROM "saved_filter" WHERE "person_id" = ?`,
-				ana).Scan(ctx, &names); err != nil {
-				t.Fatal(err)
-			}
-			slices.Sort(names)
-			slices.Sort(want)
-			if !slices.Equal(names, want) {
-				t.Errorf("upgraded again, the person keeps %q, want %q", names, want)
-			}
-			if got := preparedBy(t, ctx, db, `"person_id" = ? AND "name" = 'claim'`, ana); len(got) != 1 || got[0] != claim {
-				t.Errorf("upgraded again, the filter preparing a claim prepares %+v, want %+v", got, claim)
 			}
 		},
 	}

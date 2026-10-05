@@ -39,23 +39,21 @@ const records = "../released"
 
 // A database the v0.1.0 release built, holding a row in every table, is
 // upgraded into exactly the schema a fresh install makes, and every value it
-// held is still there. Rolled back, it is v0.1.0's schema again, and upgraded
-// a second time it is the fresh install's.
+// held is still there.
 func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		// Held to v0.2.0 as it was tagged. What a later migration changes is
 		// that migration's test.
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v020)
 		fresh := describe(t, ctx, db)
 		if len(fresh) == 0 {
 			t.Fatal("the fresh schema described as nothing, so nothing is compared")
 		}
 
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v010)
-		released := describe(t, ctx, db)
 		seed(t, ctx, db)
 		before := snapshot(t, ctx, db)
 
@@ -78,52 +76,8 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		}
 		// A second run finds nothing to do.
 		dbtest.MigrateTo(t, db, v020)
-
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll the upgrade back: %v", err)
-		}
-		if diff := setDiff(released, describe(t, ctx, db)); diff != "" {
-			t.Errorf("rolled back, the schema differs from v0.1.0's:\n%s", diff)
-		}
-		returned(t, ctx, db, before)
-		dbtest.MigrateTo(t, db, v020)
-		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
-			t.Errorf("upgraded a second time, the schema differs from a fresh install's:\n%s", diff)
-		}
 		leaveAtLatest(t, ctx, db)
 	})
-}
-
-// rollBack takes a migrated database back to nothing.
-//
-// Emptied at the latest, because emptying asks every table the latest
-// migration makes, and a test may have left the database short of it.
-func rollBack(t *testing.T, ctx context.Context, db *database.DB) {
-	t.Helper()
-	// A test that fails before it migrates forward again leaves the schema
-	// short, and every later test in the package on this engine would fail
-	// in the harness's clear rather than here. Restored whatever happens.
-	t.Cleanup(func() {
-		if err := schema.Up(context.WithoutCancel(ctx), db, quiet()); err != nil {
-			t.Errorf("migrate back to the latest: %v", err)
-		}
-	})
-	if err := schema.Up(ctx, db, quiet()); err != nil {
-		t.Fatalf("migrate to the latest: %v", err)
-	}
-	dbtest.Reset(t, db)
-	for {
-		at, err := schema.Version(ctx, db)
-		if err != nil {
-			t.Fatalf("version: %v", err)
-		}
-		if at == 0 {
-			return
-		}
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll back from %d: %v", at, err)
-		}
-	}
 }
 
 // column is one column of the v0.1.0 schema as the engine reports it.
@@ -581,65 +535,6 @@ func moved(t *testing.T, ctx context.Context, db *database.DB) {
 		"added_at", "added_by") VALUES (?, 1, 1, ?, 1)`, second, time.Now())
 	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document",
 		"digest", "issued_by", "issued_at") VALUES (?, 1, ?, '{}', 'other', 1, ?)`, second, edition, time.Now())
-}
-
-// returned checks what the rollback put back in the tables it recreated: every
-// row the release held, as it held it, and identifiers generated past them.
-func returned(t *testing.T, ctx context.Context, db *database.DB, before map[string][]map[string]string) {
-	t.Helper()
-	for _, table := range []string{"disclosure_extension", "advisory_issuance"} {
-		was := before[table]
-		if len(was) == 0 {
-			t.Fatalf("%s held nothing before the upgrade, so nothing is checked", table)
-		}
-		now := read(t, ctx, db, table, sortedKeys(was[0]))
-		byID := map[string]map[string]string{}
-		for _, row := range now {
-			byID[row["id"]] = row
-		}
-		for _, row := range was {
-			back, ok := byID[row["id"]]
-			if !ok {
-				t.Errorf("%s %s did not come back", table, row["id"])
-				continue
-			}
-			for column, value := range row {
-				if back[column] != value {
-					t.Errorf("%s %s.%s was %q and came back %q", table, row["id"], column, value, back[column])
-				}
-			}
-		}
-	}
-	// The shortening has no place in v0.1.0, and the second advisory about
-	// the same issue gives way to the first; the first's third issuance comes
-	// back with it.
-	for table, want := range map[string]int{"disclosure_extension": 1, "advisory_issuance": 3} {
-		if got := len(read(t, ctx, db, table, []string{"id"})); got != want {
-			t.Errorf("%s holds %d rows after the rollback, not %d", table, got, want)
-		}
-	}
-	highest := map[string]string{}
-	for _, table := range []string{"disclosure_extension", "advisory_issuance"} {
-		var id any
-		if err := db.QueryRowContext(ctx, `SELECT MAX("id") FROM "`+table+`"`).Scan(&id); err != nil {
-			t.Fatal(err)
-		}
-		highest[table] = text(id)
-	}
-	exec(t, ctx, db, `INSERT INTO "disclosure_extension" ("vulnerability_id", "product_id", "was", "until",
-		"reason", "asked_by", "asked_at", "needs_approval") VALUES (1, 1, ?, ?, 'r', 1, ?, ?)`,
-		time.Now(), time.Now(), time.Now(), false)
-	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("product_id", "vulnerability_id", "ordinal", "digest",
-		"issued_by", "issued_at") VALUES (1, 1, 9, 'again', 1, ?)`, time.Now())
-	for table, top := range highest {
-		var past any
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`" WHERE "id" > ?`, top).Scan(&past); err != nil {
-			t.Fatal(err)
-		}
-		if text(past) != "1" {
-			t.Errorf("%s generated no identifier past the ones returned to it", table)
-		}
-	}
 }
 
 // taggedSchema holds what a release's migrations build to what they built

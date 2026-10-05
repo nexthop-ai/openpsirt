@@ -176,7 +176,7 @@ cleartext by a deployment that asked for it.
 
 Embedded in the binary and applied at startup by default, so a deployment is one
 artifact and an upgrade is deploying it. Automatic application can be disabled,
-and `openpsirt migrate up|down|status` runs them separately for an operator who
+and `openpsirt migrate up|status` runs them separately for an operator who
 would rather use different credentials at a time they choose.
 
 With automatic application off, the schema is compared before anything is
@@ -190,7 +190,7 @@ worked.
 |---|---|
 | Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
 | Equal | Served, and the two versions are logged |
-| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migrations 37, 39 and 40 are the exceptions. 37 reshapes what v0.1.0 reads; 39 re-identifies every component v0.4.0 matches by, records senders in a form v0.4.0 does not read, gives a destination a platform v0.4.0 does not write, and keeps a saved filter with no product, which v0.4.0 reads by one; and 40 names a group's product by name where v0.5.0 joins on its row, so every group-bound sign-in fails. Going back to any of those releases is rolling its migration back with the newer binary first |
+| Ahead | Refused at startup, and by `openpsirt migrate up`, naming both versions. A database is only ever upgraded (§ Forward only), so a later release's schema is one this binary may not read |
 
 What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
@@ -271,9 +271,21 @@ The chain collapses into a single initial migration before 1.0, beside one
 migration that upgrades a database the last 0.x release built. A database an
 earlier 0.x release built is upgraded to that release first.
 
-Migrations 1 to 36 each create something, which is why rolling one back is
-dropping what it made. Migrations 37 to 40 change existing tables, and
-rolling one back changes the tables back.
+Migrations 1 to 36 each create something. Migrations 37 to 40 change existing
+tables.
+
+### Forward only
+
+A database is only ever upgraded. Going back to an earlier release is restoring
+the backup taken before the upgrade, which works on every engine and is exact.
+
+| Rule | |
+|---|---|
+| No migration is applied downward | There is no `openpsirt migrate down`, and the untagged release's migration registers no way back |
+| A database ahead of the binary is refused | At startup and by `openpsirt migrate up`, naming both versions and the backup. Its schema may hold what this binary cannot read |
+| The upgrade note says to take a backup first | `docs/configuration.md` § Every upgrade. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
+| A migration a release tagged keeps the down function it shipped with | Its file is frozen by digest (§ Release records), so the function stays and nothing calls it. The collapse before 1.0 removes them |
+| Upgrade tests run one way | A test reaches an earlier release's schema by emptying the database and applying migrations up to that release's last, never by walking down |
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
@@ -352,25 +364,12 @@ What v0.1.0's rows become under migration 37:
 | A grant of undisclosed reading or triage | Carried unchanged, per product, across the estate, in a group binding and in a personal token's holds. It reaches undisclosed work alone, where in v0.1.0 it reached disclosed work too. Nothing grants the disclosed role on upgrade; the operator does, as the upgrade note in `docs/configuration.md` says |
 | The disclosure extension threshold, under the name v0.1.0 gave it | Left under that name by migration 37, which nothing reads since. Migration 38 carries it to the disclosure movement threshold where that is unset, and removes it |
 
-Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
-place for goes with the tables and columns that held it: an embargo shortened,
-an issue disclosed, whose findings stay public with nothing recording who
-disclosed it or why, a report that did not become an issue, judged or not, a file attached to a
-report, every issue an advisory covers but its first, and every later advisory
-about the same issue in the same product. On MySQL and MariaDB a foreign key served by an
-index v0.2.0 added is dropped and declared again, so that the engine makes the
-key an index of its own as it did in v0.1.0; one made by hand would outlive
-the next upgrade.
-
 A test on each of the four engines builds a database to migration 36, writes a
 row into every table, every column holding a value, plus the rows each move
 above reads, and applies migration 37. It compares every column, index and
 constraint against a database that walked the chain empty, compares every
 value the release held with what the upgrade left, and checks each move in the
-table above. It then rolls migration 37 back, compares against the schema
-migration 36 built and the rows the release held against what came back, checks
-that the tables it recreated generate identifiers past those rows, and applies
-it again.
+table above.
 
 The upgrade over a v0.1.0 database holding 524,288 findings, which is the
 largest table and one every engine changes:
@@ -406,23 +405,15 @@ What v0.2.0's rows become:
 | The disclosure extension threshold, under the name v0.1.0 gave it | Carried to the disclosure movement threshold where that is unset, and removed. Where both are set, the movement threshold is what v0.2.0 read, and it stands |
 | The patch branch switch | Removed. The deployment's configuration turns the lookups on in v0.3.0 |
 
-Rolled back, it drops the three columns. The deadlines and disclosure dates it
-moved stay where it moved them, because what they held before is not kept. The
-movement threshold stays under the name v0.2.0 reads. The patch branch switch
-is not put back, because nothing kept what it was, so v0.2.0 has the lookups
-off until somebody turns them on. A
-binary of v0.2.0 run against a database migration 38 left in place is served:
-the columns are additive.
-
 Tests on each of the four engines:
 
 | Test | What it holds |
 |---|---|
-| A v0.2.0 database, a row in every table | Upgraded, every column, index and constraint matches a database that walked the chain empty, and every value it held is still there. Rolled back, it is the schema the v0.2.0 tag built, still holding them. Upgraded again, it matches the empty one |
+| A v0.2.0 database, a row in every table | Upgraded, every column, index and constraint matches a database that walked the chain empty, and every value it held is still there |
 | A v0.1.0 database, a row in every table | Carried through migrations 37 and 38, it matches a database that walked the chain empty, and holds what it held |
 | Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
 | v0.3.0's declarations | Each table the release declares, each built beside the real one under a scratch name, are described exactly as the chain builds them: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
-| Renamed and unread settings | The threshold under v0.1.0's name, from a v0.1.0 and a v0.2.0 database, reads under the new name afterwards and the old row is gone; set under both names, the new one stands; the patch branch switch is gone; rolled back, the threshold is still under the name v0.2.0 reads |
+| Renamed and unread settings | The threshold under v0.1.0's name, from a v0.1.0 and a v0.2.0 database, reads under the new name afterwards and the old row is gone; set under both names, the new one stands; the patch branch switch is gone |
 
 ### The v0.5.0 upgrade
 
@@ -488,64 +479,28 @@ it withdrawn under its numbered name, and the trail row says when. The names
 move through placeholders nothing holds, so no step writes a name another row
 still has.
 
-Rolled back, the actor goes and the person refuses a null again. A row
-configuration or a merge wrote goes with it, because v0.4.0 has no place for a
-change no person made. The merge tables, the issue each row is read as and the
-reason a merge withdrew a rating claim go with their columns and tables. The
-findings a merge moved stay with the issue they moved to, which v0.4.0 reads as
-holding them, and what was decided under an absorbed issue stays filed under
-it, which v0.4.0 reads as an issue with no findings. Every named
-administrator's administration granted here is set again, which is where v0.4.0
-reads the name. Which names a person typed goes with its column, and the names
-stay. Each component takes v0.4.0's identity again, each sender is recorded by
-name, and the node columns go. Every chat channel goes, with what was delivered
-to it, because v0.4.0 reaches only a webhook; the two chat tables go, so what
-each person chose about chat is lost and a later upgrade starts them at the
-defaults again. A notification's team and a destination's new columns go. A
-saved filter stays in v0.5.0's words, which v0.4.0's list reads too, except
-that a hidden name holding a comma is read by v0.4.0 as several names, and
-upgrading again keeps them apart. Each saved filter is kept in every product,
-because nothing records the one it was kept in and v0.5.0 offered it in all of
-them, under the name the upgrade left it; a deployment with no product keeps
-none. The scope it lost stays lost. A claim's folded subject and its version go
-with their columns. The two advisory tables and the builds each claim was made
-on go: v0.4.0 states every release holding a flaw as known affected, whatever
-its decisions say. A key or token keeps the name it was folded or numbered to,
-which v0.4.0 matches as typed, and one the upgrade withdrew stays withdrawn. The
-trail rows recording those withdrawals go, because v0.4.0 has no place for a
-change no person made. The day an issue was listed goes with its column. A
-movement a ruling recorded goes, because v0.4.0 has no place for an act nobody
-asked for, and the date it set stays on the flaw's places.
-
-Two components v0.4.0 identifies alike refuse the roll back, and the refusal
-names both: a name shaped like a package identifier beside that package, or a
-name and a version that join to the same text. Nothing records which of the two
-a finding or a decision belongs to once they are one, so whoever rolls back
-removes one first. The refusal comes before any table changes, so the
-database is left as v0.5.0 left it on every engine.
-
 One v0.4.0 database per engine holds the rows every check below puts in it,
-and is upgraded once and rolled back once. Each check reads its own rows by
-what identifies them, and asserts each step as a subtest named for what it
-holds. Building v0.4.0 walks every migration down and up again, which is most
-of what a check costs, so the checks share the build.
+and is upgraded once. Each check reads its own rows by what identifies them,
+and asserts the upgrade as a subtest named for what it holds. Building v0.4.0
+empties the database and applies every migration up to v0.4.0's last, which is
+most of what a check costs, so the checks share the build.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.4.0 database with named, derived and granted administrators | Upgraded, only the named-only one's grant here is cleared, and they still administer. Rolled back, every named one's grant is set |
-| A v0.4.0 trail row | Upgraded, a person's, with its person. Rolled back after configuration wrote a row, the person's row alone remains and the table is described as v0.4.0 built it |
-| A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was. Rolled back, the column is gone and the names remain |
-| A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person. With a name shaped like a package's identifier beside it, the roll back is refused naming it and changes nothing. Without, rolled back, each is what v0.4.0 held |
-| A v0.4.0 destination | Upgraded, a webhook belonging to the deployment. Rolled back after a chat channel was added, the webhook alone remains |
-| v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it. The scratch tables are dropped before the roll back |
-| A v0.4.0 database holding issues | Upgraded, every issue is read as itself and the merge tables are empty. Rolled back, the schema is v0.4.0's and the issues remain |
-| A v0.4.0 saved filter in the old words, and one in the new | Upgraded, the first reads in the list's words and the second is unchanged. Rolled back, both stay as upgraded |
-| A v0.4.0 database with two people's saved filters: one name in several products with the oldest written after a younger one, a name the rename would take already held, a twin of the oldest once its branch goes, a product named longer than a filter may be, a filter named as long as one may be, a name held once with a scope and a grouping, a filter preparing a claim, and the other person's filter of the same name | Upgraded, the oldest keeps the name, one is renamed after its product and one is numbered past the name already held; the twin is dropped; both long renames fit the width the endpoints take; the name held once keeps its name and loses its scope and grouping; the claim is unchanged; the other person's is untouched; no filter names a product, and a second filter of one name for one person is refused. Rolled back, each is kept once in every product under the name the upgrade left it, and the claim is in every copy. Upgraded again, every copy the roll back made is a twin and goes, and the person keeps what the first upgrade left them |
-| A v0.4.0 database with keys named in mixed capitals, three pairs folding to one name | Upgraded, every name is folded, and the key in force and then the older keeps a shared name and authenticates, including one moving onto a name a withdrawn key still holds. The other in force is withdrawn and refused, with one trail row by the upgrade; those withdrawn already keep their withdrawal time. Each is numbered, past a key already named like the number. A spaces-only key is numbered and stays in force, and a scan sent under a mixed-case name reads as that key. Rolled back, the names and withdrawals stay and the trail row goes |
-| A v0.4.0 database with two people's tokens named in mixed capitals, three of one person's pairs folding to one name | Upgraded, as for keys, per person: the kept tokens authenticate, the duplicate in force is withdrawn and refused with one trail row naming its owner, those withdrawn already keep their withdrawal time, a spaces-only name and a name shaped like a number are handled as for keys, and the other person's token of the same name is untouched. Rolled back, the names and withdrawals stay and the trail row goes |
-| A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing, and none states a version. Rolled back, the table is described as v0.4.0 built it and the producer's spelling remains |
-| A v0.4.0 database with an undated flaw and a dated one under duplicate rulings — one covering a claim found here beside one from outside, one withdrawn, one bringing the date in within the threshold and one past it — and an exploited issue | Upgraded, the undated flaw is dated by the first and moved by the one within the threshold, the one past it waits, each is a movement naming its ruling and proposer, the dated flaw keeps its date, and the issue is listed on no day. Rolled back, the movements go, the date stays and the listing day's column is gone. Upgraded again, the same movements are recorded and the date is the same |
-| A v0.4.0 claim | Upgraded, it records no build it was made on. Rolled back, the table goes and the claim remains. Upgraded again, it still records none |
+| A v0.4.0 database with named, derived and granted administrators | Upgraded, only the named-only one's grant here is cleared, and they still administer |
+| A v0.4.0 trail row | Upgraded, a person's, with its person |
+| A v0.4.0 name for an issue | Upgraded, not typed by hand, and a name written after can say it was |
+| A v0.4.0 database with components, open and closed nodes, and scans sent by a key, a person and a name nobody holds | Upgraded, each identity is the graph's, the open node holds its component's identifiers, the closed one none, and each sender is a key or a person |
+| A v0.4.0 destination | Upgraded, a webhook belonging to the deployment |
+| v0.5.0's declarations | Every table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it |
+| A v0.4.0 database holding issues | Upgraded, every issue is read as itself and the merge tables are empty |
+| A v0.4.0 saved filter in the old words, and one in the new | Upgraded, the first reads in the list's words and the second is unchanged |
+| A v0.4.0 database with two people's saved filters: one name in several products with the oldest written after a younger one, a name the rename would take already held, a twin of the oldest once its branch goes, a product named longer than a filter may be, a filter named as long as one may be, a name held once with a scope and a grouping, a filter preparing a claim, and the other person's filter of the same name | Upgraded, the oldest keeps the name, one is renamed after its product and one is numbered past the name already held; the twin is dropped; both long renames fit the width the endpoints take; the name held once keeps its name and loses its scope and grouping; the claim is unchanged; the other person's is untouched; no filter names a product, and a second filter of one name for one person is refused |
+| A v0.4.0 database with keys named in mixed capitals, three pairs folding to one name | Upgraded, every name is folded, and the key in force and then the older keeps a shared name and authenticates, including one moving onto a name a withdrawn key still holds. The other in force is withdrawn and refused, with one trail row by the upgrade; those withdrawn already keep their withdrawal time. Each is numbered, past a key already named like the number. A spaces-only key is numbered and stays in force, and a scan sent under a mixed-case name reads as that key |
+| A v0.4.0 database with two people's tokens named in mixed capitals, three of one person's pairs folding to one name | Upgraded, as for keys, per person: the kept tokens authenticate, the duplicate in force is withdrawn and refused with one trail row naming its owner, those withdrawn already keep their withdrawal time, a spaces-only name and a name shaped like a number are handled as for keys, and the other person's token of the same name is untouched |
+| A v0.4.0 database with claims about a name with a capital outside ASCII, a lower-case name, and a package identifier alone | Upgraded, each named claim holds its name folded and the other holds nothing, and none states a version |
+| A v0.4.0 database with an undated flaw and a dated one under duplicate rulings — one covering a claim found here beside one from outside, one withdrawn, one bringing the date in within the threshold and one past it — and an exploited issue | Upgraded, the undated flaw is dated by the first and moved by the one within the threshold, the one past it waits, each is a movement naming its ruling and proposer, the dated flaw keeps its date, and the issue is listed on no day |
+| A v0.4.0 claim | Upgraded, it records no build it was made on |
 
 ### The untagged upgrade
 
@@ -560,29 +515,18 @@ group's role on a product is replaced by one naming its product by name, and a
 group's role on every product is a new table. Configuration is the only source
 of either and is applied at every start, so the role mappings v0.5.0 holds are
 dropped rather than carried. Mappings to admin and audit are in a table this
-leaves alone in both directions, which keeps administration reachable after a
-rollback. A
+leaves alone. A
 key and a token each gain the name in force, filled from the name for every
 credential not withdrawn, and the uniqueness of the name moves to it: a key's
 across the deployment, a token's within its owner. The new rule is made before
 the old one is dropped, because MySQL and MariaDB serve a token's owner key from
 whichever of the two leads with the owner; SQLite rebuilds both tables.
 
-Rolled back, the places and the fix releases go with their tables, and the
-reference and what a notice said about malice go with their columns. A window
-counting from another window's notice or from the fix counts from the moment
-the attack became known again, which is the only start v0.5.0 has. The role
-mappings go with their tables, and v0.5.0's table naming a product by its row
-comes back empty. A role a group derived on every product is removed, because
-v0.5.0 derives none and would never clear it. A key or a token sharing its name with another is renamed after its row, as `ci #7`,
-unless it is the one in force or, with none in force, the oldest; the name
-regains its uniqueness and the name in force goes.
-
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built. Rolled back with a window counting from it, a window counting from the fix, a place on the notice and a fix release on the record, the windows and the notice remain and the new columns and tables are gone |
-| A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains. Rolled back with a role a group derived on every product, that role is gone, and a group can be mapped to a product by its row again |
-| A v0.5.0 key and token in force and one of each withdrawn | Upgraded, the one in force holds its name in force and the withdrawn one holds none, and the withdrawn name is accepted again. Rolled back, the one in force under the reused name keeps it, the withdrawn one is renamed after its row, and the name in force is gone |
+| A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built |
+| A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains |
+| A v0.5.0 key and token in force and one of each withdrawn | Upgraded, the one in force holds its name in force and the withdrawn one holds none, and the withdrawn name is accepted again |
 
 ### Release records
 
@@ -635,7 +579,6 @@ in the gate.
 | What it held | Its status report's open findings per build, and every table's row count with it stopped |
 | The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
 | The rows | Each table's count against what the upgrade tables above say: a table both sides hold keeps its count, a table only the upgrade holds starts empty, and a table the upgrade fills or removes holds what that table says |
-| Rolled back and applied again | Down to the release's last migration, where every table holds what the release left, and up again, where every table holds what the first upgrade left |
 | What the upgrade note asks | From a release whose note asks an operator to act, the rehearsal acts as it says before serving. From v0.1.0, that is the disclosed role granted beside every undisclosed one |
 | Served | This tree's server on the upgraded database reports the same open findings per build, and no GET its API document lists answers 5xx. A GET with a path parameter the seed has no name for is skipped |
 
@@ -1251,7 +1194,7 @@ What the suite pins:
 - MariaDB is distinguished from MySQL by asking the server
 - A server below the floor is refused, proved against a real old server rather
   than against arithmetic
-- Migrations apply, are idempotent, and roll back on every engine
+- Migrations apply and are idempotent on every engine, and a database ahead of the binary is refused
 - The advisory lock excludes a second connection while held and admits it once
   released, driven directly from two pools
 - Reading the schema version performs no schema changes

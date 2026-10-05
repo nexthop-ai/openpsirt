@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,15 +17,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/uptrace/bun"
 )
 
 // Upgraded, a component is identified the way the graph identifies it now, an
 // open node holds its component's identifiers and a closed one holds none, and
-// a sender is a key or a person rather than a name. Two components v0.4.0
-// identifies alike refuse the roll back. Rolled back, each is what v0.4.0
-// held.
+// a sender is a key or a person rather than a name.
 func identitiesNodesAndSendersComeAcross() upgradeCheck {
 	// Two components with v0.4.0's identities, one at an open node and one at
 	// a closed one.
@@ -153,48 +149,6 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 			}
 			if got := columnOf(t, db, "scan_refusal", "credential", `"target_id" = ?`, targetID); !slices.Equal(got, wantSenders[1:2]) {
 				t.Errorf("upgraded, the refusal was sent by %v, want %v", got, wantSenders[1:2])
-			}
-		},
-		// A name shaped like the real package's identifier is its own
-		// component here and the real one to v0.4.0, which cannot hold both.
-		refused: func(t *testing.T, ctx context.Context, db *database.DB) {
-			shaped := graph.Described{Name: "pkg:npm/lodash", Version: "4.17.22"}
-			if _, err := db.DB.NewRaw(`INSERT INTO "component" ("identity", "name", "version",
-				"fold_key", "first_seen_at") VALUES (?, ?, ?, ?, ?)`,
-				shaped.Identity(), shaped.Name, shaped.Version, shaped.FoldKey(),
-				time.Now().UTC().Truncate(time.Second)).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-			err := schema.Down(ctx, db, quiet())
-			if err == nil || !strings.Contains(err.Error(), "one component") ||
-				!strings.Contains(err.Error(), "pkg:npm/lodash") {
-				t.Errorf("rolled back over two components v0.4.0 identifies alike: %v", err)
-			}
-			if got := readWhere(t, ctx, db, "component", []string{"id", "identity"},
-				`"id" IN (?) OR "identity" = ?`, bun.List(components), shaped.Identity()); len(got) != 3 ||
-				got[0]["identity"] != described[0].Identity() {
-				t.Errorf("a refused roll back left the components as %v", got)
-			}
-			if _, err := db.DB.NewRaw(`DELETE FROM "component" WHERE "identity" = ?`,
-				shaped.Identity()).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			back := readWhere(t, ctx, db, "component", []string{"id", "identity"},
-				`"id" IN (?)`, bun.List(components))
-			if len(back) != len(described) {
-				t.Fatalf("rolled back, %d of the %d components are left", len(back), len(described))
-			}
-			for i, row := range back {
-				if want := v040Identity(described[i]); row["identity"] != want {
-					t.Errorf("rolled back, %s is identified as %s, want v0.4.0's %s",
-						described[i].Name, row["identity"], want)
-				}
-			}
-			if got := columnOf(t, db, "scan", "credential", `"id" IN (?)`, bun.List(scans)); !slices.Equal(got,
-				[]string{"alice", "ci-nightly", "nobody-known"}) {
-				t.Errorf("rolled back, the scans were sent by %v, want the names", got)
 			}
 		},
 	}

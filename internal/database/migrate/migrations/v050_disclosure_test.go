@@ -20,8 +20,7 @@ import (
 // one bringing it in past the threshold is recorded waiting for a second
 // person. Each is a movement from its ruling. A claim found here, a withdrawn
 // ruling and a flaw already dated contribute nothing. An issue's listing day
-// starts empty. Rolled back, the movements go and the date stays; upgraded
-// again, the same movements are recorded and the date is the same.
+// starts empty.
 func duplicatesDateTheirFlaws() upgradeCheck {
 	var (
 		undated, dated, listed           int64
@@ -157,28 +156,6 @@ func duplicatesDateTheirFlaws() upgradeCheck {
 			if on != nil {
 				t.Errorf("upgraded, an exploited issue reads as listed on %s", on)
 			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var left int
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "disclosure_movement"
-				WHERE "vulnerability_id" = ?`, undated).Scan(ctx, &left); err != nil {
-				t.Fatal(err)
-			}
-			if left != 0 {
-				t.Errorf("rolled back, %d movements a ruling recorded remain", left)
-			}
-			if got := discloseAt(t, ctx, db, undatedPlace); got == nil || !got.Equal(withinAt) {
-				t.Errorf("rolled back, the flaw ends %v, want the %s it was given", got, withinAt)
-			}
-			if err := db.DB.NewRaw(`SELECT "exploited_on" FROM "vulnerability"`).
-				Scan(ctx, new(*time.Time)); err == nil {
-				t.Error("rolled back, the listing day is still there")
-			}
-		},
-		upgradedAgain: func(t *testing.T, ctx context.Context, db *database.DB) {
-			datedByRulings(t, ctx, db, "upgraded again", undated, undatedPlace, withinAt, person,
-				[]movedByRuling{{first, nil, firstAt, false}, {within, &firstAt, withinAt, false},
-					{past, &withinAt, pastAt, true}})
 		},
 	}
 }

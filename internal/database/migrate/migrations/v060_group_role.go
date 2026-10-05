@@ -37,19 +37,3 @@ func groupRoleV060(t *columnTypes) []string {
 		)` + t.suffix,
 	}
 }
-
-// groupRoleV050 is v0.5.0's declaration of a group's role on a product, which
-// names the product by its row.
-func groupRoleV050(t *columnTypes) []string {
-	return []string{
-		`CREATE TABLE "group_role" (
-			"id"         ` + t.id + `,
-			"group_name" ` + t.name + ` NOT NULL,
-			"product_id" ` + t.ref + ` NOT NULL,
-			"role"       ` + t.kind + ` NOT NULL,
-			"created_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "group_role_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "group_role_unique" UNIQUE ("group_name", "product_id", "role")
-		)` + t.suffix,
-	}
-}

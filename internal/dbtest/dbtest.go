@@ -1075,7 +1075,7 @@ func clear(ctx context.Context, db *database.DB) error {
 	if err == nil {
 		return nil
 	}
-	// A database a test rolled back to an earlier release lacks the tables a
+	// A database a test migrated to an earlier release's schema lacks the tables a
 	// later one added, and asking after one that is not there fails the whole
 	// statement. The version is asked only then, because the ordinary reset
 	// runs between every pair of tests and a round trip there is paid by all

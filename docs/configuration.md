@@ -1064,13 +1064,12 @@ from, and every section after it.
 
 | Step | |
 |---|---|
-| Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
+| Back the database up | It is the only way back to the earlier release: a database is only ever upgraded, and this release refuses to start against a database a later one upgraded. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
 | Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them |
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
-Going back is `openpsirt migrate down`, once for each release stepped back that
-carries a migration, run with this build before the earlier one is deployed.
-The section for the release gone back to says what else it needs.
+Going back to the earlier release is restoring that backup and deploying the
+earlier release against it.
 
 ### From v0.1.0
 
@@ -1083,9 +1082,6 @@ The section for the release gone back to says what else it needs.
 |---|---|
 | An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
 | A reported flaw | Has a reference, minted as one recorded today would be |
-
-v0.1.0 started against a schema that was not taken back down reports it
-current and cannot read it.
 
 ### From v0.2.0
 
@@ -1104,14 +1100,10 @@ current and cannot read it.
 | A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
 | A component | Has no license until a scan reads one from its inventory |
 
-Going back to v0.2.0 leaves patch branch lookups off, because v0.2.0 reads its
-own setting for them: turn them on again under its Settings.
-
 ### From v0.3.0
 
 v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
-one does, and going back to v0.3.0 takes the same `openpsirt migrate down` as
-going back to v0.4.0.
+one does.
 
 | Change | What to do |
 |---|---|
@@ -1151,15 +1143,14 @@ going back to v0.4.0.
 | A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
 | A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it |
 | One person's saved filters of one name in several products | The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
-| Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it |
 
 ### From v0.5.0
 
 | Change | What to do |
 |---|---|
 | Group mappings come from `OPENPSIRT_GROUP_ROLES` alone, and any mapping means roles come from groups. v0.5.0 kept mappings made through `/v1/roles/bindings`, and the upgrade removes those on a product. `POST` and `DELETE` on `/v1/roles/bindings` and `PUT` on `/v1/roles/mode` are gone | Before upgrading, read `GET /v1/roles/mode`. If it answers `group-bound`, list the mappings with `GET /v1/roles/bindings` and write them into `OPENPSIRT_GROUP_ROLES`. If it answers `direct`, leave the variable unset: a mapping would switch the deployment to roles from groups and set aside every role assigned under People |
+| `openpsirt migrate down` is gone, and a database a later release upgraded is refused at startup. v0.5.0 rolled a database back to an earlier release and served one ahead of it | Take a backup before every upgrade, as [Every upgrade](#every-upgrade) says; going back is restoring it |
 
 | After the upgrade from v0.5.0 | |
 |---|---|
 | A withdrawn API key's or personal token's name | May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it |
-| Going back to v0.5.0 | Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's `POST /v1/roles/bindings`. A withdrawn key or token sharing its name with another is renamed after its row, as `ci #7`; the one in force keeps the name, and with none in force the oldest does |

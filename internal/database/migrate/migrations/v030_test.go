@@ -16,23 +16,21 @@ import (
 
 // A database the v0.2.0 release built, holding a row in every table, is
 // upgraded into exactly the schema a fresh install makes, and every value it
-// held is still there. Rolled back, it is v0.2.0's schema again, still holding
-// them, and upgraded a second time it is the fresh install's.
+// held is still there.
 func TestAV020DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		// Held to v0.3.0 as it will be tagged. What a later migration changes
 		// is that migration's test.
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v030)
 		fresh := describe(t, ctx, db)
 		if len(fresh) == 0 {
 			t.Fatal("the fresh schema described as nothing, so nothing is compared")
 		}
 
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v020)
-		built := describe(t, ctx, db)
 		seedEvery(t, ctx, db)
 		before := snapshot(t, ctx, db)
 
@@ -47,18 +45,6 @@ func TestAV020DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		}
 		// A second run finds nothing to do.
 		dbtest.MigrateTo(t, db, v030)
-
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll the upgrade back: %v", err)
-		}
-		if diff := setDiff(built, describe(t, ctx, db)); diff != "" {
-			t.Errorf("rolled back, the schema differs from v0.2.0's:\n%s", diff)
-		}
-		survived(t, ctx, db, before, nil)
-		dbtest.MigrateTo(t, db, v030)
-		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
-			t.Errorf("upgraded a second time, the schema differs from a fresh install's:\n%s", diff)
-		}
 		leaveAtLatest(t, ctx, db)
 	})
 }
@@ -68,11 +54,11 @@ func TestAV020DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 func TestAV010DatabaseUpgradesThroughEveryReleaseKeepingItsRows(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v030)
 		fresh := describe(t, ctx, db)
 
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v010)
 		seed(t, ctx, db)
 		before := snapshot(t, ctx, db)
@@ -98,7 +84,7 @@ func TestAV010DatabaseUpgradesThroughEveryReleaseKeepingItsRows(t *testing.T) {
 func TestTheV030DeclarationsAreTheTablesTheMigrationsBuild(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v030)
 		declared := migrations.StatementsV030(db.Server.Engine)
 		if len(declared) != 3 {
