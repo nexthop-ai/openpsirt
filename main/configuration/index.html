@@ -3909,8 +3909,12 @@ going back to v0.4.0.</p>
 </thead>
 <tbody>
 <tr>
+<td>A withdrawn API key's or personal token's name</td>
+<td>May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it</td>
+</tr>
+<tr>
 <td>Going back to v0.5.0</td>
-<td>Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's <code>POST /v1/roles/bindings</code></td>
+<td>Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's <code>POST /v1/roles/bindings</code>. A withdrawn key or token sharing its name with another is renamed after its row, as <code>ci #7</code>; the one in force keeps the name, and with none in force the oldest does</td>
 </tr>
 </tbody>
 </table>
