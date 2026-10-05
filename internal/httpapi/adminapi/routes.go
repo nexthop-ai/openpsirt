@@ -28,7 +28,6 @@ func Register(api huma.API, in core.Deps) {
 	registerWhoAmI(api, in)
 	registerBindings(api, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
-		Groups: in.GroupsReachable,
 	}, in.Settings)
 	registerCatalog(api, core.Declaring{
 		DB: in.DB, Store: in.Catalog, Logger: in.Logger,

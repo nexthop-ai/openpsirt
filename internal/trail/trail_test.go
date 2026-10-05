@@ -396,3 +396,69 @@ func TestTheTrailPeriodIsHalfOpen(t *testing.T) {
 		}
 	})
 }
+
+// Each mapping configuration adds or stops stating is recorded against
+// configuration, and so is where roles come from when the first mapping
+// arrives and when the last one goes. A start stating what the last one stated
+// records nothing.
+func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T) {
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		ctx := t.Context()
+		admin := w.DeclarePerson("admin@example.com", "Alex Admin", true)
+		reader := access.NewPerson(admin.ID, admin.Identity, true, nil, 0)
+		s := trail.NewStore(w.DB.DB)
+		of := func(kind trail.Kind) []trail.Change {
+			t.Helper()
+			changes, _, err := s.Changes(ctx, reader, kind, trail.Over{}, 100, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return changes
+		}
+		leads := access.Mapping{Group: "leads", Grants: string(access.Administers)}
+
+		mapped, mode, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if mode != access.GroupBound || len(mapped.Added) != 1 {
+			t.Errorf("the first mapping answered %s and %+v", mode, mapped)
+		}
+		roles := of(trail.Role)
+		if len(roles) != 1 {
+			t.Fatalf("one mapping left %d rows, want 1", len(roles))
+		}
+		if one := roles[0]; one.Actor != trail.ByConfiguration || one.By != nil ||
+			one.Name != "leads over this deployment" || one.Was != nil ||
+			one.Became == nil || *one.Became != "admin" {
+			t.Errorf("a mapping was recorded as %+v", one)
+		}
+		settings := of(trail.Setting)
+		if len(settings) != 1 || settings[0].Actor != trail.ByConfiguration ||
+			settings[0].Became == nil || *settings[0].Became != string(access.GroupBound) {
+			t.Errorf("the switch to group-bound was recorded as %+v", settings)
+		}
+
+		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads}); err != nil {
+			t.Fatal(err)
+		}
+		if len(of(trail.Role)) != 1 || len(of(trail.Setting)) != 1 {
+			t.Error("a start stating the same mappings recorded something")
+		}
+
+		if _, mode, err = trail.MapGroups(ctx, w.DB.DB, nil); err != nil {
+			t.Fatal(err)
+		}
+		if mode != access.Direct {
+			t.Errorf("no mappings answered %s", mode)
+		}
+		roles = of(trail.Role)
+		if len(roles) != 2 || roles[0].Was == nil || *roles[0].Was != "admin" || roles[0].Became != nil {
+			t.Errorf("withdrawing the mapping was recorded as %+v", roles)
+		}
+		if settings = of(trail.Setting); len(settings) != 2 ||
+			*settings[0].Became != string(access.Direct) {
+			t.Errorf("the switch back to direct was recorded as %+v", settings)
+		}
+	})
+}

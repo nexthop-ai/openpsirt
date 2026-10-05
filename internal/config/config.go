@@ -161,6 +161,10 @@ type Config struct {
 	// It is a pre-authorization and not a bypass: being named grants the role,
 	// it does not admit anybody who has not authenticated.
 	BootstrapAdmins []string
+	// GroupRoles is what membership of each provider group grants. It is the
+	// only source of those mappings (REQ-41), applied at every start, and any
+	// mapping at all means roles come from groups.
+	GroupRoles []access.Mapping
 	// TrustedHeader is the header a reverse proxy sets to say who somebody is,
 	// and TrustedSources are the addresses it is honored from. Both are needed
 	// for either to do anything.
@@ -449,6 +453,25 @@ func load(given map[string]string) (Config, error) {
 	}
 
 	c.BootstrapAdmins = access.Identities(r.text("BOOTSTRAP_ADMINS", ""))
+
+	mappings, err := access.ParseGroupRoles(r.text("GROUP_ROLES", ""))
+	if err != nil {
+		return Config{}, fmt.Errorf("OPENPSIRT_GROUP_ROLES: %w", err)
+	}
+	c.GroupRoles = mappings
+	// A deployment taking roles from groups with nothing to say which groups
+	// somebody is in admits nobody, and looks like a working deployment while
+	// it does.
+	present := func(s string) bool { return strings.TrimSpace(s) != "" }
+	reported := (present(c.OIDCIssuer) && present(c.OIDCGroupsClaim)) ||
+		(present(c.GitHubClientID) && present(c.GitHubOrg)) ||
+		(present(c.TrustedHeader) && present(c.TrustedGroupsHeader))
+	if len(c.GroupRoles) > 0 && !reported {
+		return Config{}, fmt.Errorf("OPENPSIRT_GROUP_ROLES: nothing here says which groups somebody " +
+			"is in, so nobody would hold any role: set OPENPSIRT_OIDC_GROUPS_CLAIM with an issuer, " +
+			"OPENPSIRT_GITHUB_ORG with a GitHub client, or OPENPSIRT_TRUSTED_GROUPS_HEADER with " +
+			"a trusted header")
+	}
 
 	excluded, err := outward.ParseExcluded(r.text("OUTBOUND_EXCLUDED", ""))
 	if err != nil {

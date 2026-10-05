@@ -26,13 +26,13 @@ type ModeBody struct {
 
 // BindingBody is a provider group bound to a role.
 type BindingBody struct {
-	Group string `json:"group" minLength:"1" maxLength:"191" doc:"The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here"`
-	// Product is absent where the binding carries administration, which is
-	// global rather than held against a product.
-	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
+	Group string `json:"group" minLength:"1" maxLength:"191" doc:"The group exactly as the provider names it: a team slug, or a claim value. Matched with its capitals"`
+	// Product is absent where the binding is held on every product, and where
+	// it carries something held over the deployment rather than on a product.
+	Product string `json:"product,omitempty" doc:"The product the role is held on, by the name that addresses it. Absent for a role held on every product, and for admin and audit"`
 	// ProductDisplayName is the label shown beside it, for the reason HeldBody
-	// carries one: unbind resolves the field above.
-	ProductDisplayName string          `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	// carries one.
+	ProductDisplayName string          `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none. Absent where no product of that name is declared yet"`
 	Role               core.RoleOrOver `json:"role" doc:"The role membership of this group grants"`
 }
 
@@ -42,9 +42,8 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 		Summary: "Get the role assignment mode",
 		Description: "Says where roles come from here: assigned by an administrator, or derived " +
 			"from the groups an identity provider reports.\n\n" +
-			"One mode for the whole deployment, never both. A hybrid would need a precedence " +
-			"rule for somebody holding one role from a team and another directly, which is how a " +
-			"stale assignment outlives somebody's removal from the team it was shadowing.",
+			"One mode for the whole deployment, never both. It is group-bound exactly when " +
+			"`OPENPSIRT_GROUP_ROLES` maps a group, and changes only when that setting does.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ModeBody }, error) {
 		if _, _, err := readable(ctx, a, a.Handle()); err != nil {
@@ -62,84 +61,14 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "set-role-mode", Method: http.MethodPut, Path: "/v1/roles/mode",
-		Summary: "Set the role assignment mode",
-		Description: "Turning group binding on sets assignments aside rather than deleting them, " +
-			"and turning it off restores them — so trying it is not a one-way door. Refused if it " +
-			"would leave nobody able to administer this deployment.",
-		Tags: []string{"Administration"},
-	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct{ Body ModeBody }) (*struct{ Body ModeBody }, error) {
-		wanted := access.AsMode(in.Body.Mode)
-		if string(wanted) != in.Body.Mode {
-			return nil, huma.Error422UnprocessableEntity("that is not a way for roles to be assigned")
-		}
-
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-			rights, _, err := core.Administerable(ctx, a, tx)
-			if err != nil {
-				return err
-			}
-			store := settings(tx)
-			if store == nil {
-				return core.NoDatabase(a.Logger)
-			}
-
-			// Asked before the switch rather than after. A deployment that has
-			// locked itself out of its own administration has one route back —
-			// editing the database by hand — and refusing the change is
-			// cheaper than discovering that afterwards.
-			can, err := rights.CanAdminister(ctx, wanted)
-			if err != nil {
-				return core.WentWrong(a.Logger, "cannot tell who would administer", err)
-			}
-			if !can {
-				return huma.Error409Conflict(
-					"nothing would administer this deployment in that mode: bind a group to admin, " +
-						"or name somebody in configuration, before switching")
-			}
-			// And something has to be able to say what groups somebody is in.
-			// A provider configured without a source of groups reports every
-			// arrival as belonging to nothing, so in this mode nobody derives
-			// any role — which is the same lockout the check above prevents,
-			// arriving by the other door and looking like a working deployment
-			// that admits nobody.
-			if wanted == access.GroupBound && a.Groups != nil && !a.Groups() {
-				return huma.Error409Conflict(
-					"nothing here can say which groups somebody is in, so in that mode " +
-						"nobody would hold any role: configure a groups claim on the provider, " +
-						"an organization for GitHub sign-in, or a trusted proxy that reports " +
-						"groups, before switching")
-			}
-
-			if err := rights.SwitchTo(ctx, wanted); err != nil {
-				return core.WentWrong(a.Logger, "cannot change where roles come from", err)
-			}
-			// Changed rather than set, because the prior value is not
-			// derivable afterwards and is half of what the trail is asked:
-			// read in a statement of its own it would be the value at some
-			// earlier moment.
-			before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
-			if err != nil {
-				return recording(a.Logger, "cannot record where roles come from", err)
-			}
-			if err := core.Noted(ctx, tx, trail.Setting, setting.RoleMode,
-				trail.Said(before, had), trail.Said(string(wanted), true)); err != nil {
-				return core.NotRecorded(a.Logger, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(wanted)}}, nil
-	})
-
-	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-bindings", Method: http.MethodGet, Path: "/v1/roles/bindings",
 		Summary: "List group-to-role bindings",
 		Description: "Lists every group-to-role mapping, and the groups that administer or " +
 			"audit.\n\n" +
-			"In group-bound mode a mapping is the advance authorization: somebody arriving for " +
-			"the first time in a mapped group is admitted, and somebody in none is refused.",
+			"The mappings are the ones `OPENPSIRT_GROUP_ROLES` states, applied when the " +
+			"deployment starts. Nothing here changes them. In group-bound mode a mapping is the " +
+			"advance authorization: somebody arriving for the first time in a mapped group is " +
+			"admitted, and somebody in none is refused.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[BindingBody], error) {
 		rights, _, err := readable(ctx, a, a.Handle())
@@ -147,209 +76,43 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 			return nil, err
 		}
 
-		bindings, err := rights.Bindings(ctx)
+		mappings, err := rights.Mappings(ctx)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot list the group bindings", err)
 		}
-		products, err := productNames(ctx, a)
+		products, err := productLabels(ctx, a)
 		if err != nil {
 			return nil, err
 		}
 
 		out := &core.ListOutput[BindingBody]{}
-		out.Body.Items = make([]BindingBody, 0, len(bindings))
-		for _, binding := range bindings {
-			held := products[binding.ProductID]
+		out.Body.Items = make([]BindingBody, 0, len(mappings))
+		for _, mapping := range mappings {
 			out.Body.Items = append(out.Body.Items, BindingBody{
-				Group: binding.GroupName, Product: held.Address,
-				ProductDisplayName: held.Display, Role: core.RoleOrOver(binding.Role),
+				Group: mapping.Group, Product: mapping.Product,
+				ProductDisplayName: products[mapping.Product],
+				Role:               core.RoleOrOver(mapping.Grants),
 			})
-		}
-
-		// Listed after the per-product bindings, each under the word a
-		// request names it by.
-		for _, over := range access.OverTheDeployment() {
-			groups, err := rights.GroupsOver(ctx, over)
-			if err != nil {
-				return nil, core.WentWrong(a.Logger,
-					"cannot list what groups hold over this deployment", err)
-			}
-			for _, group := range groups {
-				out.Body.Items = append(out.Body.Items,
-					BindingBody{Group: group, Role: core.RoleOrOver(over)})
-			}
 		}
 		return out, nil
 	})
-
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "bind-group", Method: http.MethodPost, Path: "/v1/roles/bindings",
-		Summary: "Bind an identity-provider group to a role",
-		Description: "Maps one identity-provider group to one role, so that everybody in that " +
-			"group holds it from their next sign-in.\n\n" +
-			"Every role names the product it applies to. Administration and the audit " +
-			"permission are bound without one, because they are held over the deployment " +
-			"rather than against a product.\n\n" +
-			"The group is matched exactly, including its capitals. It is an identity the " +
-			"provider hands over rather than a name anybody here types, so it is stored as " +
-			"given and compared as given — `Security` and `security` are two bindings, and a " +
-			"binding whose capitals do not match what the provider sends grants nothing. The " +
-			"refusal somebody then meets says only that they are not authorized, so check the " +
-			"spelling against the provider rather than against what looks right.",
-		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
-	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct{ Body BindingBody }) (*struct{ Body BindingBody }, error) {
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-			rights, names, err := core.Administerable(ctx, a, tx)
-			if err != nil {
-				return err
-			}
-
-			if over, deployment := overTheDeployment(string(in.Body.Role)); deployment {
-				if in.Body.Product != "" {
-					return huma.Error422UnprocessableEntity(
-						"that is held over the deployment rather than against a product, " +
-							"so a group bound to it names none")
-				}
-				if err := rights.BindOver(ctx, in.Body.Group, over); err != nil {
-					return core.WentWrong(a.Logger,
-						"cannot bind a group to something held over this deployment", err)
-				}
-				if err := core.Noted(ctx, tx, trail.Role, in.Body.Group+" over this deployment",
-					nil, trail.Said(string(over), true)); err != nil {
-					return core.NotRecorded(a.Logger, err)
-				}
-				return nil
-			}
-
-			role := access.Role(in.Body.Role)
-			if !role.Valid() {
-				return huma.Error422UnprocessableEntity("that is not a role")
-			}
-			product, err := names.ProductByName(ctx, in.Body.Product)
-			if err != nil {
-				return core.Absent(a.Logger, err, "that product could not be looked up", core.NoSuchProduct)
-			}
-			if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
-				return core.WentWrong(a.Logger, "cannot bind a group", err)
-			}
-			// Named by the product's address rather than its display name,
-			// because that is what a binding states and what the withdrawal
-			// resolves.
-			if err := core.Noted(ctx, tx, trail.Role, in.Body.Group+" on "+product.Name,
-				nil, trail.Said(string(in.Body.Role), true)); err != nil {
-				return core.NotRecorded(a.Logger, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-		return &struct{ Body BindingBody }{Body: in.Body}, nil
-	})
-
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "unbind-group", Method: http.MethodDelete, Path: "/v1/roles/bindings",
-		Summary: "Remove a group-to-role binding",
-		Description: "Removes one group-to-role mapping.\n\n" +
-			"It takes effect at each member's next sign-in, because group membership is read at " +
-			"sign-in and never again. To cut somebody off now, end their sessions.",
-		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
-	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
-		Group   string `query:"group" required:"true"`
-		Product string `query:"product"`
-		Role    string `query:"role" required:"true"`
-	}) (*struct{}, error) {
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-			rights, names, err := core.Administerable(ctx, a, tx)
-			if err != nil {
-				return err
-			}
-
-			if over, deployment := overTheDeployment(in.Role); deployment {
-				// Refused as binding refuses it: a product named here asks
-				// about a grant on that product, which this is not.
-				if in.Product != "" {
-					return huma.Error422UnprocessableEntity(
-						"that is held over the deployment rather than against a product, " +
-							"so a group bound to it names none")
-				}
-				// Administration is refused where it would leave nobody able
-				// to administer, for the same reason the mode change is — and
-				// decided inside the write, so a refusal rolls the delete back
-				// rather than being undone by a second statement that could
-				// itself fail. Nothing else held over the deployment can lock
-				// anybody out, so nothing else is counted.
-				unbind := func() error { return rights.UnbindOver(ctx, in.Group, over) }
-				if over == access.Administers {
-					unbind = func() error {
-						return rights.UnbindAdminIfOthersRemain(ctx, in.Group, roleModeIn(settings))
-					}
-				}
-				switch err := unbind(); {
-				case errors.Is(err, access.ErrLastAdministrator):
-					return huma.Error409Conflict(
-						"that was the last thing granting administration: bind another group " +
-							"to admin, or name somebody in configuration, first")
-				case errors.Is(err, access.ErrNothingMatched):
-					// Nothing was bound, so nothing is withdrawn — and the
-					// check that would refuse this passes *because* the
-					// delete did nothing.
-					return core.NoSuchGrant()
-				case err != nil:
-					return core.WentWrong(a.Logger,
-						"cannot unbind a group from what it holds over this deployment", err)
-				}
-				if err := core.Noted(ctx, tx, trail.Role, in.Group+" over this deployment",
-					trail.Said(string(over), true), nil); err != nil {
-					return core.NotRecorded(a.Logger, err)
-				}
-				return nil
-			}
-
-			product, err := names.ProductByName(ctx, in.Product)
-			if err != nil {
-				return core.Absent(a.Logger, err, "that product could not be looked up", core.NoSuchProduct)
-			}
-			role := access.Role(in.Role)
-			if !role.Valid() {
-				return huma.Error422UnprocessableEntity("that is not a role")
-			}
-			switch err := rights.Unbind(ctx, in.Group, product.ID, role); {
-			case errors.Is(err, access.ErrNothingMatched):
-				return core.NoSuchGrant()
-			case err != nil:
-				return core.WentWrong(a.Logger, "cannot unbind a group", err)
-			}
-			if err := core.Noted(ctx, tx, trail.Role, in.Group+" on "+product.Name,
-				trail.Said(in.Role, true), nil); err != nil {
-				return core.NotRecorded(a.Logger, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-		return &struct{}{}, nil
-	})
 }
 
-// overTheDeployment reads a binding's role as something held over the
-// deployment, or says it is not one.
-//
-// Two words in the role field name nothing held against a product:
-// administering this deployment, and auditing what it is set to. They are in
-// that field because a binding maps a group to one thing somebody holds, and
-// splitting them out would make a caller decide which of two shapes to send.
-func overTheDeployment(role string) (access.Over, bool) {
-	over := access.Over(role)
-	return over, over.Valid()
+// productLabels maps each product's name to the label shown beside it.
+func productLabels(ctx context.Context, a core.Administering) (map[string]string, error) {
+	products, err := productNames(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	by := make(map[string]string, len(products))
+	for _, product := range products {
+		by[product.Address] = product.Display
+	}
+	return by, nil
 }
 
 // roleModeIn reads where roles actually come from, against whichever handle it
 // is given — which is the transaction deciding, rather than this.
-//
-// Asked because unbinding the last administrators' group matters while roles
-// are derived from groups and does not while they are assigned: refusing in
-// both would leave a deployment that has never turned group binding on unable
-// to tidy up a mapping it is not using.
 func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
 	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
 		if settings(db) == nil {
@@ -365,20 +128,18 @@ func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun
 
 // productNames maps product rows to the names bindings state them by.
 //
-// The address is the one a binding states and the one every matching write
+// The address is the one a grant states and the one every matching write
 // resolves. Publishing the display name there has the interface's Withdraw
 // send back a word that matches no row, so a role on a product whose display
 // name is more than a recapitalization is granted and not withdrawn.
 func productNames(ctx context.Context, a core.Administering) (map[int64]core.Named, error) {
 	names := a.Catalog(a.Handle())
-	// Every product, because this is naming the ones bindings already refer
-	// to rather than answering anybody about them. The caller is administering
-	// group bindings and was authorized for that before reaching here.
+	// Every product, because this is naming the ones grants already refer to
+	// rather than answering anybody about them. The caller was authorized for
+	// that before reaching here.
 	//
 	// Retired ones included: a role held against one is still held, and the
-	// offered list leaves them out — so read from that, a binding on a retired
-	// product came back with an empty name, which is how this same table
-	// spells a binding that names no product at all.
+	// offered list leaves them out.
 	products, err := names.EveryProduct(ctx)
 	if err != nil {
 		return nil, core.WentWrong(a.Logger, "cannot read the products roles are held against", err)

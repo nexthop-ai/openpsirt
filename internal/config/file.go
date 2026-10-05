@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // LoadFile reads configuration from a TOML file, refusing where the
@@ -190,8 +192,103 @@ func spell(one setting, value any) (string, error) {
 			names = append(names, s)
 		}
 		return strings.Join(names, ","), nil
+	case groupRoles:
+		return spellGroupRoles(value)
 	}
 	return "", fmt.Errorf("no reading for this setting's type")
+}
+
+// spellGroupRoles writes [[signin.roles]] tables the way the variable carries
+// them, reading each table the way the variable's own entry is read so that a
+// refusal names the table it is about.
+func spellGroupRoles(value any) (string, error) {
+	// Tables written [[signin.roles]] decode as one shape and tables written
+	// inline, roles = [{ ... }], as the other.
+	tables, ok := value.([]map[string]any)
+	if items, inline := value.([]any); inline {
+		ok = true
+		for _, item := range items {
+			table, isTable := item.(map[string]any)
+			if !isTable {
+				ok = false
+				break
+			}
+			tables = append(tables, table)
+		}
+	}
+	if !ok {
+		return "", fmt.Errorf("want tables written [[signin.roles]], each with a group and its roles, got %s",
+			typeOf(value))
+	}
+	entries := make([]access.GroupRoles, 0, len(tables))
+	for n, table := range tables {
+		entry, err := groupRolesEntry(table)
+		if err != nil {
+			return "", fmt.Errorf("entry %d: %w", n+1, err)
+		}
+		if _, err := access.ParseGroupRoles(access.SpellGroupRoles([]access.GroupRoles{entry})); err != nil {
+			return "", fmt.Errorf("entry %d: %w", n+1, stripEntry(err))
+		}
+		entries = append(entries, entry)
+	}
+	return access.SpellGroupRoles(entries), nil
+}
+
+// groupRolesEntry reads one [[signin.roles]] table.
+func groupRolesEntry(table map[string]any) (access.GroupRoles, error) {
+	var entry access.GroupRoles
+	keys := make([]string, 0, len(table))
+	for key := range table {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		value := table[key]
+		switch key {
+		case "group":
+			group, ok := value.(string)
+			if !ok {
+				return entry, fmt.Errorf("group: want a string, got %s", typeOf(value))
+			}
+			entry.Group = group
+		case "role":
+			role, ok := value.(string)
+			if !ok {
+				return entry, fmt.Errorf("role: want a string, got %s", typeOf(value))
+			}
+			entry.Roles = append(entry.Roles, role)
+		case "roles", "products":
+			items, ok := value.([]any)
+			if !ok {
+				return entry, fmt.Errorf("%s: want a list of strings, got %s", key, typeOf(value))
+			}
+			for _, item := range items {
+				name, ok := item.(string)
+				if !ok {
+					return entry, fmt.Errorf("%s: want a list of strings, and one entry is %s",
+						key, typeOf(item))
+				}
+				if key == "roles" {
+					entry.Roles = append(entry.Roles, name)
+				} else {
+					entry.Products = append(entry.Products, name)
+				}
+			}
+		default:
+			return entry, fmt.Errorf("%s is not part of an entry: an entry has a group, a role or "+
+				"roles, and optionally products", key)
+		}
+	}
+	return entry, nil
+}
+
+// stripEntry drops the entry number the variable's reader puts first, because
+// the file names the entry itself.
+func stripEntry(err error) error {
+	if _, after, found := strings.Cut(err.Error(), ": "); found && strings.HasPrefix(err.Error(), "entry ") {
+		return errors.New(after)
+	}
+	return err
 }
 
 // typeOf names a decoded value's type the way the file format does.

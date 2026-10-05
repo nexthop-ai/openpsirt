@@ -18,9 +18,8 @@ import (
 // the startup check reads.
 type labelled struct{ name, issuer string }
 
-func (p labelled) Name() string       { return p.name }
-func (p labelled) Issuer() string     { return p.issuer }
-func (p labelled) GroupsSource() bool { return false }
+func (p labelled) Name() string   { return p.name }
+func (p labelled) Issuer() string { return p.issuer }
 
 func (labelled) Begin(context.Context, string) (string, signin.Pending, error) {
 	return "", signin.Pending{}, nil

@@ -47,6 +47,10 @@ func downV060(ctx context.Context, sqldb *sql.DB) error {
 //     none of them.
 //   - A record names the releases carrying its fix. No record v0.5.0 holds
 //     names any.
+//   - A group's role names its product by name, and a group may hold a role
+//     across every product. Configuration is the only source of either and is
+//     applied at every start, so the mappings v0.5.0 holds are dropped rather
+//     than carried.
 func upgradeV060(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -66,7 +70,13 @@ func upgradeV060(ctx context.Context, tx bun.Tx) error {
 	if err := u.create(obligationV060(t), "told_place"); err != nil {
 		return err
 	}
-	return u.create(obligationV060(t), "exploited_fix")
+	if err := u.create(obligationV060(t), "exploited_fix"); err != nil {
+		return err
+	}
+	if err := dropTables(ctx, tx.Tx, "group_role"); err != nil {
+		return err
+	}
+	return u.create(groupRoleV060(t), "group_role", "group_role_all")
 }
 
 // downgradeV060 puts back what v0.5.0 reads.
@@ -75,9 +85,11 @@ func upgradeV060(ctx context.Context, tx bun.Tx) error {
 // fix go with their tables, and a notice's reference and what it said about
 // malice with their columns. A window counting from another's notice or from
 // a fix counts from the moment the attack became known again, which is the
-// only start v0.5.0 has.
+// only start v0.5.0 has. The groups configuration mapped go with their tables,
+// and v0.5.0 starts with none.
 func downgradeV060(ctx context.Context, tx bun.Tx) error {
-	if err := dropTables(ctx, tx.Tx, "told_place", "exploited_fix"); err != nil {
+	if err := dropTables(ctx, tx.Tx, "told_place", "exploited_fix",
+		"group_role_all", "group_role"); err != nil {
 		return err
 	}
 	if err := apply(ctx, tx.Tx, []string{
@@ -91,6 +103,9 @@ func downgradeV060(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+	if err := u.create(groupRoleV050(t), "group_role"); err != nil {
+		return err
+	}
 	return u.narrow(narrowing{table: "obligation_window",
 		keys: []string{"obligation_window_from_fk"}, columns: []string{"from_window_id", "from_fix"}})
 }

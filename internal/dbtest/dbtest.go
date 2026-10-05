@@ -942,6 +942,7 @@ var tables = []string{
 	"person_identity",
 	"group_admin",
 	"group_role",
+	"group_role_all",
 	"session",
 	"api_key",
 	"role_grant_all",

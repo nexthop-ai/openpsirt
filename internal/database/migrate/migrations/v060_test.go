@@ -32,6 +32,11 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 		rollBack(t, ctx, db)
 		dbtest.MigrateTo(t, db, v050)
 		window, notice := seedV050Obligation(t, ctx, db)
+		// A group mapped as v0.5.0 mapped one, against the product's row.
+		if _, err := db.DB.NewRaw(`INSERT INTO "group_role" ("group_name", "product_id", "role", "created_at")`+
+			` SELECT ?, "id", ?, "created_at" FROM "product"`, "kernel", "public-read").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
 
 		dbtest.MigrateTo(t, db, v060)
 		var from sql.NullInt64
@@ -49,6 +54,15 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 		}
 		if fixes != 0 {
 			t.Errorf("upgraded, v0.5.0's record names %d fix releases", fixes)
+		}
+		// Configuration is the only source of a mapping, so v0.5.0's go.
+		var mapped int
+		if err := db.DB.NewRaw(`SELECT (SELECT COUNT(*) FROM "group_role") + (SELECT COUNT(*) FROM "group_role_all")`).
+			Scan(ctx, &mapped); err != nil {
+			t.Fatal(err)
+		}
+		if mapped != 0 {
+			t.Errorf("upgraded, %d of v0.5.0's group mappings remain", mapped)
 		}
 		var reference, malicious sql.NullString
 		if err := db.DB.NewRaw(`SELECT "reference", "suspected_malicious" FROM "told_outside"`+
@@ -115,10 +129,18 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 			`SELECT "place" FROM "told_place"`,
 			`SELECT "obligation_window"."from_fix" FROM "obligation_window"`,
 			`SELECT "stream_id" FROM "exploited_fix"`,
+			`SELECT "role" FROM "group_role_all"`,
+			`SELECT "group_role"."product_name" FROM "group_role"`,
 		} {
 			if _, err := db.ExecContext(ctx, gone); err == nil {
 				t.Errorf("rolled back, %s still answers", gone)
 			}
+		}
+
+		// What v0.5.0 reads: a mapping names its product by row.
+		if _, err := db.DB.NewRaw(`INSERT INTO "group_role" ("group_name", "product_id", "role", "created_at")`+
+			` SELECT ?, "id", ?, "created_at" FROM "product"`, "kernel", "public-read").Exec(ctx); err != nil {
+			t.Errorf("rolled back, v0.5.0 cannot map a group: %v", err)
 		}
 
 		dbtest.MigrateTo(t, db, v060)

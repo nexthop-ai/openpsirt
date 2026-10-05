@@ -139,21 +139,6 @@ func (in Deps) Log() *slog.Logger {
 	return slog.New(slog.DiscardHandler)
 }
 
-// GroupsReachable reports a source of group membership: a provider carrying
-// one, or a trusted proxy that states it.
-//
-// Asked before roles are switched to group-bound. Without a source every
-// arrival belongs to nothing, so nobody derives any role and the deployment
-// locks itself out — including whoever made the change.
-func (in Deps) GroupsReachable() bool {
-	for _, provider := range in.Providers {
-		if provider.GroupsSource() {
-			return true
-		}
-	}
-	return in.Access != nil && in.Access.ReportsGroups()
-}
-
 // Rights returns a store over who may do what, built over the handle it is
 // given, or nothing where there is none.
 func (in Deps) Rights(db bun.IDB) *access.Store {

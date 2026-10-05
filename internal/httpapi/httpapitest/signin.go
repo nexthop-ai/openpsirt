@@ -15,13 +15,7 @@ type StubProvider struct {
 	Says   *signin.Identity
 	Fail   error
 	issuer string
-	// groups says whether this provider is configured to hand over group
-	// membership, which is what decides whether roles may be switched to
-	// group-bound at all.
-	groups bool
 }
-
-func (s *StubProvider) GroupsSource() bool { return s.groups }
 
 func (s *StubProvider) Name() string { return "stub" }
 

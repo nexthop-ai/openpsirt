@@ -74,8 +74,6 @@ var inside = map[string]string{
 	"internal/access/store.go:People":   "lists what everybody holds per product, beside EveryEstateGrant",
 	"internal/access/store.go:Grants":   "lists what one person holds per product, beside EstateGrants",
 	"internal/access/store.go:Withdraw": "withdraws a grant on one product, which is one row of that table",
-	"internal/access/binding.go:replaceDerived": "rewrites the grants a person's groups give, which are " +
-		"roles on products: a group grants nothing across the estate",
 }
 
 // reach is which grant tables a piece of source reaches.

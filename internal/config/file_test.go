@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // writeFile writes a configuration file only its owner may read, and returns
@@ -45,8 +48,44 @@ func literal(k kind, raw string) string {
 			items = append(items, strconv.Quote(item))
 		}
 		return "[" + strings.Join(items, ", ") + "]"
+	case groupRoles:
+		return groupRolesLiteral(raw)
 	}
 	return strconv.Quote(raw)
+}
+
+// groupRolesLiteral writes the variable's entries as the inline tables a file
+// writes them as, with each name's encoding undone.
+func groupRolesLiteral(raw string) string {
+	quote := func(s string) string {
+		name, err := url.PathUnescape(strings.TrimSpace(s))
+		if err != nil {
+			name = s
+		}
+		return strconv.Quote(name)
+	}
+	var tables []string
+	for entry := range strings.SplitSeq(raw, ";") {
+		if strings.TrimSpace(entry) == "" {
+			continue
+		}
+		group, rest, _ := strings.Cut(entry, "=")
+		roles, products, scoped := strings.Cut(rest, "@")
+		var quoted []string
+		for role := range strings.SplitSeq(roles, "+") {
+			quoted = append(quoted, quote(role))
+		}
+		table := "{ group = " + quote(group) + ", roles = [" + strings.Join(quoted, ", ") + "]"
+		if scoped {
+			var named []string
+			for product := range strings.SplitSeq(products, ",") {
+				named = append(named, quote(product))
+			}
+			table += ", products = [" + strings.Join(named, ", ") + "]"
+		}
+		tables = append(tables, table+" }")
+	}
+	return "[" + strings.Join(tables, ", ") + "]"
 }
 
 func lookup(t *testing.T, env string) setting {
@@ -96,7 +135,8 @@ var everySetting = map[string]string{
 	"PATCH_BRANCHES": "true", "PATCH_DIR": "/srv/copies", "PATCH_QUOTA": "1073741824",
 
 	"BOOTSTRAP_ADMINS": "ana,ben", "SESSION_LIFETIME": "8h",
-	"OIDC_NAME": "corp", "OIDC_ISSUER": "https://id.example.test", "OIDC_CLIENT_ID": "cid",
+	"GROUP_ROLES": "leads=admin; sec%40example.com=private-triage+approver@sonic,onie; all=public-read",
+	"OIDC_NAME":   "corp", "OIDC_ISSUER": "https://id.example.test", "OIDC_CLIENT_ID": "cid",
 	"OIDC_CLIENT_SECRET": "csecret", "OIDC_GROUPS_CLAIM": "groups",
 	"OIDC_USERNAME_CLAIM": "preferred_username",
 	"GITHUB_CLIENT_ID":    "gid", "GITHUB_CLIENT_SECRET": "gsecret", "GITHUB_ORG": "example",
@@ -415,5 +455,91 @@ func TestTheDocumentedFilesAreRead(t *testing.T) {
 	}
 	if shown == 0 {
 		t.Fatal("no configuration file was found in the documentation, so this checked nothing")
+	}
+}
+
+// A file writes mappings as tables, which is where a group holding a separator
+// is written as it is.
+func TestAFileWritesGroupRolesAsTables(t *testing.T) {
+	c, err := LoadFile(writeFile(t, `
+[signin.github]
+client_id = "gid"
+client_secret = "gs"
+org = "example"
+
+[[signin.roles]]
+group = "psirt-leads"
+role = "admin"
+
+[[signin.roles]]
+group = "sec@example.com;x"
+roles = ["private-triage", "approver"]
+products = ["Router-OS"]
+`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []access.Mapping{
+		{Group: "psirt-leads", Grants: "admin"},
+		{Group: "sec@example.com;x", Grants: "approver", Product: "router-os"},
+		{Group: "sec@example.com;x", Grants: "private-triage", Product: "router-os"},
+	}
+	if !reflect.DeepEqual(c.GroupRoles, want) {
+		t.Errorf("read %+v, want %+v", c.GroupRoles, want)
+	}
+}
+
+func TestAGroupRolesTableThatCannotBeReadIsRefusedNamingIt(t *testing.T) {
+	github := "[signin.github]\nclient_id = \"gid\"\nclient_secret = \"gs\"\norg = \"example\"\n"
+	for body, says := range map[string]string{
+		"[signin]\nroles = \"leads=admin\"\n":                                                                    "want tables written [[signin.roles]]",
+		"[[signin.roles]]\ngroup = 1\nrole = \"admin\"\n":                                                        "group: want a string",
+		"[[signin.roles]]\ngroup = \"g\"\nrole = [\"admin\"]\n":                                                  "role: want a string",
+		"[[signin.roles]]\ngroup = \"g\"\nroles = \"admin\"\n":                                                   "roles: want a list of strings",
+		"[[signin.roles]]\ngroup = \"g\"\nroles = [1]\n":                                                         "one entry is a whole number",
+		"[[signin.roles]]\ngroup = \"g\"\nrole = \"admin\"\nteam = \"x\"\n":                                      "team is not part of an entry",
+		"[[signin.roles]]\ngroup = \"g\"\nrole = \"admin\"\n[[signin.roles]]\ngroup = \"h\"\nrole = \"owner\"\n": "entry 2: \"owner\" is not a role",
+	} {
+		_, err := LoadFile(writeFile(t, github+body), nil)
+		if err == nil || !strings.Contains(err.Error(), says) || !strings.Contains(err.Error(), "signin.roles") {
+			t.Errorf("%q answered %v, want a refusal naming signin.roles and saying %q", body, err, says)
+		}
+	}
+}
+
+// Mappings with nothing to say which groups somebody is in admit nobody, and
+// a source counts only beside the provider it belongs to.
+func TestGroupRolesWithNoSourceOfGroupsAreRefused(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"no provider":                    {},
+		"a groups claim with no issuer":  {"OIDC_GROUPS_CLAIM": "groups"},
+		"an org with no GitHub client":   {"GITHUB_ORG": "example"},
+		"a groups header with no header": {"TRUSTED_GROUPS_HEADER": "X-Groups"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(envPrefix+"GROUP_ROLES", "leads=admin")
+			for key, value := range env {
+				t.Setenv(envPrefix+key, value)
+			}
+			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "nothing here says which groups") {
+				t.Errorf("answered %v", err)
+			}
+		})
+	}
+	for name, env := range map[string]map[string]string{
+		"OpenID Connect": {"OIDC_ISSUER": "https://id.example.test", "OIDC_GROUPS_CLAIM": "groups"},
+		"GitHub":         {"GITHUB_CLIENT_ID": "gid", "GITHUB_ORG": "example"},
+		"a trusted header": {"TRUSTED_HEADER": "X-User", "TRUSTED_SOURCES": "10.0.0.0/8",
+			"TRUSTED_GROUPS_HEADER": "X-Groups"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(envPrefix+"GROUP_ROLES", "leads=admin")
+			for key, value := range env {
+				t.Setenv(envPrefix+key, value)
+			}
+			if _, err := Load(); err != nil && strings.Contains(err.Error(), "nothing here says which groups") {
+				t.Errorf("a source of groups was not counted: %v", err)
+			}
+		})
 	}
 }

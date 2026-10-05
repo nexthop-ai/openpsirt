@@ -60,3 +60,27 @@ suffix the chart names its own Secret with, and the key it writes there.
 {{- .key }}
 {{- end }}
 {{- end }}
+
+{{/*
+The group roles as OPENPSIRT_GROUP_ROLES carries them: entries joined by
+"; ", each "group=role+role@product,product". The six characters the format
+separates on are percent-encoded inside a group or product name, "%" first so
+an encoding is never encoded again.
+*/}}
+{{- define "openpsirt.nameInRoles" -}}
+{{- . | replace "%" "%25" | replace ";" "%3B" | replace "=" "%3D" | replace "+" "%2B" | replace "@" "%40" | replace "," "%2C" }}
+{{- end }}
+
+{{- define "openpsirt.groupRoles" -}}
+{{- $entries := list }}
+{{- range .Values.auth.groupRoles }}
+{{- $entry := printf "%s=%s" (include "openpsirt.nameInRoles" (toString .group)) (join "+" .roles) }}
+{{- if .products }}
+{{- $products := list }}
+{{- range .products }}{{ $products = append $products (include "openpsirt.nameInRoles" (toString .)) }}{{ end }}
+{{- $entry = printf "%s@%s" $entry (join "," $products) }}
+{{- end }}
+{{- $entries = append $entries $entry }}
+{{- end }}
+{{- join "; " $entries }}
+{{- end }}

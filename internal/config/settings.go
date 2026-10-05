@@ -20,6 +20,10 @@ const (
 	// list is several names: an array of strings in a file, and the same
 	// names joined with commas in the environment.
 	list
+	// groupRoles is what groups grant: an array of tables in a file, each
+	// with a group, its roles and optionally its products, and the entries
+	// written the way the variable carries them in the environment.
+	groupRoles
 )
 
 // setting is one thing a deployment configures, under the one name it has in
@@ -103,6 +107,7 @@ var settings = []setting{
 	{"PATCH_QUOTA", "patch_branches.quota", number},
 
 	{"BOOTSTRAP_ADMINS", "signin.bootstrap_admins", list},
+	{"GROUP_ROLES", "signin.roles", groupRoles},
 	{"SESSION_LIFETIME", "signin.session_lifetime", duration},
 	{"OIDC_NAME", "signin.oidc.name", text},
 	{"OIDC_ISSUER", "signin.oidc.issuer", text},

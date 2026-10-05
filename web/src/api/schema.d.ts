@@ -5205,32 +5205,14 @@ export interface paths {
          * List group-to-role bindings
          * @description Lists every group-to-role mapping, and the groups that administer or audit.
          *
-         *     In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
+         *     The mappings are the ones `OPENPSIRT_GROUP_ROLES` states, applied when the deployment starts. Nothing here changes them. In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
          *
          *     Requires: administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-bindings"];
         put?: never;
-        /**
-         * Bind an identity-provider group to a role
-         * @description Maps one identity-provider group to one role, so that everybody in that group holds it from their next sign-in.
-         *
-         *     Every role names the product it applies to. Administration and the audit permission are bound without one, because they are held over the deployment rather than against a product.
-         *
-         *     The group is matched exactly, including its capitals. It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
-         *
-         *     Requires: administrator
-         */
-        post: operations["bind-group"];
-        /**
-         * Remove a group-to-role binding
-         * @description Removes one group-to-role mapping.
-         *
-         *     It takes effect at each member's next sign-in, because group membership is read at sign-in and never again. To cut somebody off now, end their sessions.
-         *
-         *     Requires: administrator
-         */
-        delete: operations["unbind-group"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5247,18 +5229,12 @@ export interface paths {
          * Get the role assignment mode
          * @description Says where roles come from here: assigned by an administrator, or derived from the groups an identity provider reports.
          *
-         *     One mode for the whole deployment, never both. A hybrid would need a precedence rule for somebody holding one role from a team and another directly, which is how a stale assignment outlives somebody's removal from the team it was shadowing.
+         *     One mode for the whole deployment, never both. It is group-bound exactly when `OPENPSIRT_GROUP_ROLES` maps a group, and changes only when that setting does.
          *
          *     Requires: administrator, or the audit permission over this deployment's own records
          */
         get: operations["get-role-mode"];
-        /**
-         * Set the role assignment mode
-         * @description Turning group binding on sets assignments aside rather than deleting them, and turning it off restores them — so trying it is not a one-way door. Refused if it would leave nobody able to administer this deployment.
-         *
-         *     Requires: administrator
-         */
-        put: operations["set-role-mode"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -6694,17 +6670,11 @@ export interface components {
             total: number;
         };
         BindingBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/BindingBody.json
-             */
-            readonly $schema?: string;
-            /** @description The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here */
+            /** @description The group exactly as the provider names it: a team slug, or a claim value. Matched with its capitals */
             group: string;
-            /** @description The product the role is held against, by the name that addresses it */
+            /** @description The product the role is held on, by the name that addresses it. Absent for a role held on every product, and for admin and audit */
             product?: string;
-            /** @description The product's display name, or its name where it has none */
+            /** @description The product's display name, or its name where it has none. Absent where no product of that name is declared yet */
             product_name?: string;
             /**
              * @description The role membership of this group grants
@@ -21175,70 +21145,6 @@ export interface operations {
             };
         };
     };
-    "bind-group": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BindingBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BindingBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "unbind-group": {
-        parameters: {
-            query: {
-                group: string;
-                product?: string;
-                role: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "get-role-mode": {
         parameters: {
             query?: never;
@@ -21247,39 +21153,6 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModeBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-role-mode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModeBody"];
-            };
-        };
         responses: {
             /** @description OK */
             200: {
