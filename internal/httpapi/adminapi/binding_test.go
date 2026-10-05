@@ -5,105 +5,110 @@ package adminapi_test
 
 import (
 	"net/http"
-	"net/http/httptest"
-	"strings"
+	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// TestUnbindingTheLastAdministratorsGroupIsRefusedAndChangesNothing drives the
-// guard through the route.
-//
-// It had never executed. Nothing drove the guard at all, and what stood behind
-// it was a delete, a count and a compensating re-insert — so a re-insert that
-// failed left the binding gone and nobody able to administer, a state whose
-// only route back is editing the database by hand.
-//
-// Group-bound, because that is the mode the question matters in: with roles
-// assigned directly the administrators are people, and a mapping nobody is
-// using should still be tidyable.
-func TestUnbindingTheLastAdministratorsGroupIsRefusedAndChangesNothing(t *testing.T) {
+// Configuration is the only source of what groups grant (REQ-41), so nothing
+// running changes it: not the mappings, and not where roles come from.
+func TestNothingRunningChangesWhatGroupsGrant(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if err := r.Rights.BindOver(t.Context(), "leads", access.Administers); err != nil {
+		mapped := []access.Mapping{{Group: "leads", Grants: string(access.Administers)}}
+		if _, err := r.Rights.ApplyMappings(t.Context(), mapped); err != nil {
 			t.Fatal(err)
 		}
-		// A provider with a source of groups, or the switch below is refused
-		// by the guard beside this one and this would prove nothing.
-		handler := httpapitest.WithProvider(t, r, true)
-		ask := func(method, path, body string) *httptest.ResponseRecorder {
-			t.Helper()
-			req := httptest.NewRequest(method, path, strings.NewReader(body))
-			if body != "" {
-				req.Header.Set("Content-Type", "application/json")
-			}
-			req.Header.Set(httpapitest.TestHeader, "admin")
-			httpapitest.FromOurOwnPage(req)
-			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, req)
-			return rec
-		}
-
-		if got := ask(http.MethodPut, "/v1/roles/mode",
-			`{"mode":"group-bound"}`); got.Code != http.StatusOK {
-			t.Fatalf("switching to group-bound answered %d: %s", got.Code, got.Body.String())
-		}
-
-		got := ask(http.MethodDelete, "/v1/roles/bindings?group=leads&role=admin", "")
-		if got.Code != http.StatusConflict {
-			t.Fatalf("unbinding the last administrators' group answered %d, want 409: %s",
-				got.Code, got.Body.String())
-		}
-
-		// And the binding is still there. The status alone passed while the
-		// re-insert put back a row with a fresh timestamp, and would pass
-		// again if the delete committed and the refusal came afterwards.
-		var listed struct {
-			Items []struct {
-				Group string `json:"group"`
-				Role  string `json:"role"`
-			} `json:"items"`
-		}
-		httpapitest.Read(t, r, "admin", "/v1/roles/bindings", &listed)
-		found := false
-		for _, row := range listed.Items {
-			if row.Group == "leads" && row.Role == "admin" {
-				found = true
+		for _, c := range []struct{ method, path, body string }{
+			{http.MethodPost, "/v1/roles/bindings", `{"group":"anybody","role":"admin"}`},
+			{http.MethodDelete, "/v1/roles/bindings?group=leads&role=admin", ""},
+			{http.MethodPut, "/v1/roles/mode", `{"mode":"direct"}`},
+		} {
+			got := httpapitest.AsPerson(t, r, "admin", c.method, c.path, c.body)
+			if got.Code != http.StatusMethodNotAllowed {
+				t.Errorf("%s %s answered an administrator %d, want 405: %s",
+					c.method, c.path, got.Code, got.Body.String())
 			}
 		}
-		if !found {
-			t.Errorf("a refused unbind took the binding away anyway: %+v", listed.Items)
+		held, err := r.Rights.Mappings(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(held, mapped) {
+			t.Errorf("the mappings became %+v", held)
 		}
 	})
 }
 
-// Unbinding something held over the deployment refuses a product, as binding
-// it does. A request naming a product asked about a grant on that product,
-// and answering it by removing the deployment-wide one removes something
-// nobody asked to have removed.
-func TestUnbindingOverTheDeploymentRefusesAProduct(t *testing.T) {
+// The list says where each mapping is held: on a product, which may not be
+// declared yet, on every product, or over the deployment.
+func TestTheBindingsListSaysWhereEachMappingIsHeld(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if err := r.Rights.BindOver(t.Context(), "auditors", access.Audits); err != nil {
+		if _, err := r.Rights.ApplyMappings(t.Context(), []access.Mapping{
+			{Group: "auditors", Grants: string(access.Audits)},
+			{Group: "kernel", Grants: string(access.PublicTriage), Product: "mine"},
+			{Group: "kernel", Grants: string(access.PublicTriage), Product: "not-yet"},
+			{Group: "psirt", Grants: string(access.PrivateRead)},
+		}); err != nil {
 			t.Fatal(err)
-		}
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
-			"/v1/roles/bindings?group=auditors&role=audit&product=mine", "")
-		if got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("unbinding with a product answered %d: %s", got.Code, got.Body.String())
 		}
 		var listed struct {
 			Items []struct {
-				Group string `json:"group"`
+				Group       string `json:"group"`
+				Product     string `json:"product"`
+				ProductName string `json:"product_name"`
+				Role        string `json:"role"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "admin", "/v1/roles/bindings", &listed)
-		found := false
-		for _, row := range listed.Items {
-			found = found || row.Group == "auditors"
+		type row = struct{ group, product, shown, role string }
+		var got []row
+		for _, item := range listed.Items {
+			got = append(got, row{item.Group, item.Product, item.ProductName, item.Role})
 		}
-		if !found {
-			t.Error("a refused unbind took the deployment-wide binding away")
+		want := []row{
+			{"auditors", "", "", "audit"},
+			{"kernel", "mine", "Shown as mine", "public-triage"},
+			{"kernel", "not-yet", "", "public-triage"},
+			{"psirt", "", "", "private-read"},
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("listed\n%+v\nwant\n%+v", got, want)
+		}
+	})
+}
+
+// A group mapping names its product by name, so a rename to or from a mapped
+// name would change who holds the product from a running process (REQ-41).
+func TestAProductIsNotRenamedToOrFromANameAGroupIsMappedTo(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if _, err := r.Rights.ApplyMappings(t.Context(), []access.Mapping{
+			{Group: "contractors", Grants: string(access.PublicRead), Product: "sandbox"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"Sandbox"}`); got.Code != http.StatusConflict {
+			t.Errorf("renaming a product to a mapped name answered %d: %s", got.Code, got.Body.String())
+		}
+
+		if _, err := r.Rights.ApplyMappings(t.Context(), []access.Mapping{
+			{Group: "contractors", Grants: string(access.PublicRead), Product: "mine"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"elsewhere"}`); got.Code != http.StatusConflict {
+			t.Errorf("renaming a mapped product away answered %d: %s", got.Code, got.Body.String())
+		}
+
+		if _, err := r.Rights.ApplyMappings(t.Context(), nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"elsewhere"}`); got.Code != http.StatusNoContent {
+			t.Errorf("renaming a product nothing maps answered %d: %s", got.Code, got.Body.String())
 		}
 	})
 }

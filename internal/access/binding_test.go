@@ -11,20 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uptrace/bun"
-
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 func TestAGroupBringsTheRolesItIsBoundTo(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.Bind(ctx, "security", f.products["sonic"], access.PrivateTriage); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
+		bind(t, f, access.Mapping{Group: "security", Grants: string(access.PrivateTriage), Product: "sonic"})
 
 		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform", "security"})
 		if err != nil {
@@ -46,9 +40,7 @@ func TestLosingAGroupLosesWhatItGranted(t *testing.T) {
 	// exactly the case an access review is meant to catch.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
 		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform"}); err != nil {
 			t.Fatal(err)
 		}
@@ -69,9 +61,7 @@ func TestSomebodyInNoMappedGroupIsRefusedAndNotRecorded(t *testing.T) {
 	// everybody who ever tried to sign in.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
 		for _, groups := range [][]string{nil, {}, {"unmapped"}, {""}} {
 			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "a-stranger"}, groups); err == nil {
 				t.Errorf("%v admitted somebody", groups)
@@ -102,9 +92,7 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
 		// The switch is what a deployment actually does before any of this
 		// runs, and it is what sets the assignment aside.
 		if err := f.store.SwitchTo(ctx, access.GroupBound); err != nil {
@@ -128,9 +116,7 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 func TestAGroupCanCarryAdministration(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.BindOver(ctx, "platform-leads", access.Administers); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform-leads", Grants: string(access.Administers)})
 		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "a-lead"}, []string{"platform-leads"})
 		if err != nil {
 			t.Fatal(err)
@@ -166,9 +152,7 @@ func TestAGroupDoesNotRedeemALapsedAuthorization(t *testing.T) {
 		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, waiting.ID, "alice"); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
 
 		for _, who := range []access.Arrival{
 			{Provider: "https://idp.example", Subject: "00u1a2b3", Username: "alice"},
@@ -216,9 +200,7 @@ func TestAGroupDoesNotHandOverAnAccountWithNoAuthorizationWaiting(t *testing.T) 
 		if _, err := f.store.MatchProvider(ctx, "https://idp.example", "S1", "robert"); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
 
 		arrival := access.Arrival{Provider: "https://idp.example", Subject: "S2", Username: "alice"}
 		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"platform"}); !errors.Is(err, access.ErrDenied) {
@@ -367,12 +349,8 @@ func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
 	// nobody assigned and nothing will ever withdraw.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.BindOver(ctx, "leads", access.Administers); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
+		bind(t, f, access.Mapping{Group: "leads", Grants: string(access.Administers)})
 		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform", "leads"}); err != nil {
 			t.Fatal(err)
 		}
@@ -393,10 +371,6 @@ func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
 	})
 }
 
-// groupBound is the mode read, for a test that is about the counting rather
-// than about where the mode comes from.
-func groupBound(context.Context, bun.IDB) (access.Mode, error) { return access.GroupBound, nil }
-
 func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 	// The only route back is editing the database by hand, and nobody
 	// discovers that at a good moment.
@@ -411,35 +385,17 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 			t.Error("group-bound mode with no admin group and nobody named looked survivable")
 		}
 
-		if err := f.store.BindOver(ctx, "leads", access.Administers); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "leads", Grants: string(access.Administers)})
 		if can, err = f.store.CanAdminister(ctx, access.GroupBound); err != nil || !can {
 			t.Errorf("a group bound to administration was not enough: %v %v", can, err)
 		}
 
-		// Unbinding it while it is the only thing granting administration is
-		// refused, and the row is still there afterwards. Refused inside the
-		// write rather than deleted and put back: a compensating re-insert
-		// that failed left the binding gone and nobody able to administer.
-		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); !errors.Is(
-			err, access.ErrLastAdministrator) {
-			t.Errorf("unbinding the last administrators' group answered %v, want a refusal", err)
-		}
-		groups, err := f.store.GroupsOver(ctx, access.Administers)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(groups) != 1 || groups[0] != "leads" {
-			t.Errorf("a refused unbind left %v, want the binding still there", groups)
-		}
-
 		// Naming somebody in configuration is enough in either mode, and with
-		// that in place the group can be unbound.
+		// that in place configuration may map no group to administration.
 		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); err != nil {
+		if _, err := f.store.ApplyMappings(ctx, nil); err != nil {
 			t.Fatal(err)
 		}
 		for _, mode := range []access.Mode{access.Direct, access.GroupBound} {
@@ -469,9 +425,7 @@ func TestAProxyCanReportMembershipToo(t *testing.T) {
 	// behind existing ingress authentication with no provider configured here.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
 		sources, err := access.ParseSources("192.0.2.1")
 		if err != nil {
 			t.Fatal(err)
@@ -526,9 +480,7 @@ func TestAProxyCanReportMembershipToo(t *testing.T) {
 func TestASignInWhoseNameIsSomebodyElsesIsRefusedAsAStranger(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.BindOver(ctx, "platform-admins", access.Administers); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform-admins", Grants: string(access.Administers)})
 		anna, err := f.store.Ensure(ctx, "anna", "Anna", access.Stated(false), nil)
 		if err != nil {
 			t.Fatal(err)
@@ -567,9 +519,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 		if err := f.store.Claim(ctx, person.ID, "bob"); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.BindOver(ctx, "platform-admins", access.Administers); err != nil {
-			t.Fatal(err)
-		}
+		bind(t, f, access.Mapping{Group: "platform-admins", Grants: string(access.Administers)})
 
 		arriving := access.Arrival{
 			ViaProxy: true, Username: "bob", DisplayName: "Bob",
@@ -596,33 +546,29 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	})
 }
 
-// TestUnbindingAGroupTakesTheRoleAtTheNextSignIn pins what withdrawing a
-// mapping does, which nothing demonstrated: Unbind was at 0.0%.
-//
-// Group membership is read at sign-in, so a mapping withdrawn takes effect at
-// each member's next one — which is what the endpoint's own description says,
-// and what "end their sessions" exists beside. The half worth pinning is that
-// it takes effect at all: the binding row goes, and the derived grant goes
+// Group membership is read at sign-in, so a mapping configuration stops
+// stating takes effect at each member's next one. The half worth pinning is
+// that it takes effect at all: the mapping goes, and the derived grant goes
 // with the next arrival rather than surviving it.
-func TestUnbindingAGroupTakesTheRoleAtTheNextSignIn(t *testing.T) {
+func TestAMappingConfigurationNoLongerStatesTakesTheRoleAtTheNextSignIn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		product := f.products["sonic"]
+		security := access.Mapping{Group: "security", Grants: string(access.PrivateRead), Product: "sonic"}
 
-		if err := f.store.Bind(ctx, "security", product, access.PrivateRead); err != nil {
-			t.Fatal(err)
-		}
-		// Binding what is already bound is not a failure — the branch
-		// DESIGN-access.md states in prose and nothing executed.
-		if err := f.store.Bind(ctx, "security", product, access.PrivateRead); err != nil {
-			t.Errorf("binding twice: %v", err)
-		}
-		bindings, err := f.store.Bindings(ctx)
+		mapped, err := f.store.ApplyMappings(ctx, []access.Mapping{security})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(bindings) != 1 {
-			t.Fatalf("binding twice left %d rows", len(bindings))
+		if len(mapped.Added) != 1 || len(mapped.Removed) != 0 {
+			t.Errorf("a first start reported %+v", mapped)
+		}
+		// A start stating what the last one stated changes nothing.
+		if mapped, err = f.store.ApplyMappings(ctx, []access.Mapping{security}); err != nil {
+			t.Fatal(err)
+		}
+		if len(mapped.Added) != 0 || len(mapped.Removed) != 0 {
+			t.Errorf("a start stating the same mappings reported %+v", mapped)
 		}
 
 		arrival := access.Arrival{ViaProxy: true, Username: "ana"}
@@ -631,57 +577,110 @@ func TestUnbindingAGroupTakesTheRoleAtTheNextSignIn(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !subject.Reads(access.Private, product) {
-			t.Fatal("arriving in a bound group granted nothing, so this proves nothing")
+			t.Fatal("arriving in a mapped group granted nothing, so this proves nothing")
 		}
 
-		// Withdrawn, and then they arrive again.
-		if err := f.store.Unbind(ctx, "security", product, access.PrivateRead); err != nil {
+		// Configuration stops stating it, and they arrive again.
+		if mapped, err = f.store.ApplyMappings(ctx, nil); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"security"}); !errors.Is(err, access.ErrDenied) {
-			t.Errorf("somebody whose only group was unbound was admitted: %v", err)
+		if len(mapped.Removed) != 1 || mapped.Removed[0] != security {
+			t.Errorf("withdrawing the mapping reported %+v", mapped)
 		}
-		// And nothing of theirs stands: a derived grant is replaced at every
-		// arrival, so the one the withdrawn binding made is gone.
+		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"security"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody whose only group is no longer mapped was admitted: %v", err)
+		}
 		held, err := f.store.Grants(ctx, mustPerson(t, f, "ana").ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, grant := range held {
 			if grant.Active {
-				t.Errorf("a role from a withdrawn binding still stands: %+v", grant)
+				t.Errorf("a role from a withdrawn mapping still stands: %+v", grant)
 			}
 		}
 	})
 }
 
-// TestABindingIsMatchedWithItsCapitals pins the cost the Bind doc comment
-// states: a group name is the provider's identity rather than a name typed
-// here, so it is matched exactly.
-func TestABindingIsMatchedWithItsCapitals(t *testing.T) {
+// A group name is the provider's identity rather than a name typed here, so it
+// is matched exactly.
+func TestAMappingIsMatchedWithItsCapitals(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		product := f.products["sonic"]
+		bind(t, f, access.Mapping{Group: "security", Grants: string(access.PrivateRead), Product: "sonic"})
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "ana"},
+			[]string{"Security"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a group spelled with other capitals was admitted: %v", err)
+		}
+	})
+}
 
-		if err := f.store.Bind(ctx, "security", product, access.PrivateRead); err != nil {
+// A product configuration names before any pipeline declares it is held, and
+// grants once the product exists, matched whatever capitals either wrote.
+func TestAMappingToAnUndeclaredProductGrantsOnceItIsDeclared(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "router-os"})
+		arrival := access.Arrival{ViaProxy: true, Username: "ana"}
+		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"platform"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a mapping to a product nobody declared admitted somebody: %v", err)
+		}
+
+		declared := declareProduct(t, f, "Router-OS")
+		subject, err := f.store.AdmitByGroups(ctx, arrival, []string{"platform"})
+		if err != nil {
+			t.Fatalf("declaring the product admitted nobody: %v", err)
+		}
+		if !subject.Reads(access.Public, declared) {
+			t.Error("the declared product was not reached")
+		}
+		if subject.Reads(access.Public, f.products["sonic"]) {
+			t.Error("a mapping to one product reached another")
+		}
+	})
+}
+
+// A mapping naming no product is a role on every product, including one
+// declared after the member signed in, and it goes when the mode does.
+func TestAMappingToEveryProductCoversAProductDeclaredLater(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bind(t, f, access.Mapping{Group: "psirt", Grants: string(access.PrivateTriage)})
+		arrival := access.Arrival{ViaProxy: true, Username: "ana"}
+		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"psirt"}); err != nil {
 			t.Fatal(err)
 		}
-		// A different name as far as a provider is concerned, so it withdraws
-		// nothing — and says so, rather than reporting a withdrawal that did
-		// not happen and leaving the row.
-		err := f.store.Unbind(ctx, "Security", product, access.PrivateRead)
-		if !errors.Is(err, access.ErrNothingMatched) {
-			t.Errorf("unbinding a differently spelled group answered %v, "+
-				"want a refusal saying it matched nothing", err)
-		}
-		bindings, err := f.store.Bindings(ctx)
+		later := declareProduct(t, f, "later")
+		subject, err := f.store.Resolve(ctx, "ana")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(bindings) != 1 || bindings[0].GroupName != "security" {
-			t.Errorf("unbinding a differently spelled group removed it: %+v", bindings)
+		for _, product := range []int64{f.products["sonic"], f.products["onie"], later} {
+			if !subject.Holds(access.PrivateTriage, product) {
+				t.Errorf("a role on every product did not reach product %d", product)
+			}
+		}
+
+		if err := f.store.SwitchTo(ctx, access.Direct); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Resolve(ctx, "ana"); err == nil {
+			t.Error("a role a group derived on every product outlived the switch to direct roles")
 		}
 	})
+}
+
+// bind adds one mapping to those in force, the way a start applying a
+// configuration that states it does.
+func bind(t *testing.T, f *fixture, mapping access.Mapping) {
+	t.Helper()
+	held, err := f.store.Mappings(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.ApplyMappings(t.Context(), append(held, mapping)); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // mustPerson reads somebody the fixture expects to exist.
@@ -692,4 +691,14 @@ func mustPerson(t *testing.T, f *fixture, identity string) *access.Account {
 		t.Fatal(err)
 	}
 	return person
+}
+
+// declareProduct declares one more product, the way a pipeline does.
+func declareProduct(t *testing.T, f *fixture, name string) int64 {
+	t.Helper()
+	product, err := f.catalog.DeclareProduct(t.Context(), name, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return product.ID
 }

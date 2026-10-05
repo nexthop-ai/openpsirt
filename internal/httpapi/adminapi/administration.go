@@ -381,7 +381,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			// Through the transaction's own handle. A read through the root
 			// handle is outside the transaction, and on a pool of one
 			// connection it waits for ever on the connection the closure
-			// holds. Unbinding a group reads the mode exactly this way.
+			// holds.
 			deriving, err := roleModeIn(a.Settings)(ctx, db)
 			if err != nil {
 				return core.WentWrong(a.Logger, "cannot read where roles come from", err)

@@ -80,11 +80,6 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "triage.floor",
 	},
 	{
-		id: "set-role-mode", what: "where roles come from", method: http.MethodPut,
-		path: "/v1/roles/mode", body: `{"mode":"direct"}`,
-		kind: "setting", about: "roles.mode",
-	},
-	{
 		id: "record-person", what: "an account", method: http.MethodPost,
 		path: "/v1/people", body: `{"identity":"newcomer"}`,
 		kind: "account", about: "newcomer",
@@ -124,43 +119,6 @@ var administrativeActs = []trailedAct{
 			_, _ = r.Rights.MatchProvider(t.Context(), "okta", "okta-newcomer", "newcomer")
 			return httpapitest.AsPerson(t, r, "admin", http.MethodDelete, "/v1/people/newcomer/identifier", "")
 		},
-	},
-	{
-		// A group bound to a role grants it to everybody in that group from
-		// their next sign-in, which is the widest grant anybody here makes
-		// and the one the trail had no record of at all.
-		id: "bind-group", what: "a group bound to a role", method: http.MethodPost,
-		path: "/v1/roles/bindings",
-		body: `{"group":"Security","product":"mine","role":"public-read"}`,
-		kind: "role", about: "Security on mine",
-	},
-	{
-		id: "unbind-group", what: "a group unbound from a role", method: http.MethodDelete,
-		path: "/v1/roles/bindings?group=Security&product=mine&role=public-read",
-		kind: "role", about: "Security on mine",
-	},
-	{
-		id: "bind-group", what: "a group bound to administration", method: http.MethodPost,
-		path: "/v1/roles/bindings", body: `{"group":"Owners","role":"admin"}`,
-		kind: "role", about: "Owners over this deployment",
-	},
-	{
-		id: "unbind-group", what: "a group unbound from administration",
-		method: http.MethodDelete, path: "/v1/roles/bindings?group=Owners&role=admin",
-		kind: "role", about: "Owners over this deployment",
-	},
-	{
-		// The other thing held over the deployment. It goes down the same
-		// route and is recorded the same way, which is the point of there
-		// being one route.
-		id: "bind-group", what: "a group bound to auditing", method: http.MethodPost,
-		path: "/v1/roles/bindings", body: `{"group":"Auditors","role":"audit"}`,
-		kind: "role", about: "Auditors over this deployment",
-	},
-	{
-		id: "unbind-group", what: "a group unbound from auditing",
-		method: http.MethodDelete, path: "/v1/roles/bindings?group=Auditors&role=audit",
-		kind: "role", about: "Auditors over this deployment",
 	},
 	{
 		// The one act that hands out a new way into the deployment, and the
@@ -978,8 +936,6 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 		}{
 			{http.MethodPut, "/v1/settings/triage.floor", `{"value":"high"}`},
 			{http.MethodPost, "/v1/people", `{"identity":"someone-else"}`},
-			{http.MethodPost, "/v1/roles/bindings", `{"group":"Owners","role":"admin"}`},
-			{http.MethodPut, "/v1/roles/mode", `{"mode":"direct"}`},
 		} {
 			got := httpapitest.AsPerson(t, r, "auditor", act.method, act.path, act.body)
 			if got.Code != http.StatusForbidden {

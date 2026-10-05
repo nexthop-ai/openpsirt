@@ -320,17 +320,12 @@ func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
 }
 
 func TestAGroupsClaimIsReadUnderTheNameItReports(t *testing.T) {
-	// Whether a provider reports groups decides whether roles may be switched
-	// to group-bound, so the claim it reports is the claim it reads. A name
-	// with stray spaces read as a source of groups and yielded none, which
-	// locks out every arrival once roles are group-bound.
+	// A name with stray spaces yielding no groups locks out every arrival once
+	// roles come from groups.
 	p := standing(t)
 	adapter, err := p.adapter(t, OIDCConfig{GroupsClaim: " groups "})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !adapter.GroupsSource() {
-		t.Fatal("a named groups claim is not a source of groups")
 	}
 	_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
 	if err != nil {
@@ -351,8 +346,17 @@ func TestAGroupsClaimIsReadUnderTheNameItReports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if blank.GroupsSource() {
-		t.Error("a groups claim of spaces is a source of groups")
+	_, pending, err = blank.Begin(t.Context(), "https://here.example/back")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.claims["nonce"] = pending.Nonce
+	who, err = blank.Complete(t.Context(), "a-code", pending, "https://here.example/back")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(who.Groups) != 0 {
+		t.Errorf("a groups claim of spaces yielded %v", who.Groups)
 	}
 }
 
@@ -478,9 +482,6 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 		if len(who.Groups) != 1 || who.Groups[0] != "kernel" {
 			t.Errorf("an organization typed %q and registered as %q derived groups %v, "+
 				"want the one team", typed, canonical, who.Groups)
-		}
-		if !adapter.GroupsSource() {
-			t.Errorf("an organization typed %q is not a source of groups", typed)
 		}
 		// The numeric identifier rather than the login: a login can be changed
 		// by its owner and then taken by somebody else.

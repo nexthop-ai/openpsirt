@@ -24,9 +24,11 @@ var Implied = map[string]string{
 
 // grantImplied does what the upgrade note asks of an operator coming from a
 // release whose undisclosed roles reached disclosed work: every grant of an
-// undisclosed role, per product, across the estate, in a group binding and in
-// a personal token's holds, gains the disclosed role beside it where it is not
-// already held. It returns how many rows it wrote.
+// undisclosed role, per product, across the estate and in a personal token's
+// holds, gains the disclosed role beside it where it is not already held. It
+// returns how many rows it wrote. A group's mapping is left alone: the upgrade
+// to the untagged release drops every mapping a database holds, because
+// configuration is their only source.
 func (r *run) grantImplied(ctx context.Context) (int, error) {
 	db, err := connect(ctx, r.hostURL)
 	if err != nil {
@@ -42,7 +44,6 @@ func (r *run) grantImplied(ctx context.Context) (int, error) {
 	}{
 		{"role_grant", `"person_id", "product_id", "source"`, []string{"active"}},
 		{"role_grant_all", `"person_id", "source"`, []string{"active"}},
-		{"group_role", `"group_name", "product_id"`, nil},
 	} {
 		n, err := implyIn(ctx, db, table.name, table.key, table.carried, now)
 		if err != nil {

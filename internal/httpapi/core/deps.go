@@ -85,8 +85,9 @@ type Deps struct {
 	// PatchBranches is whether the deployment turned the patch branch
 	// lookups on. The same value the fetching pass holds.
 	PatchBranches bool
-	// Mode says where roles come from. Read per request rather than held, so
-	// an administrator turning group binding off takes effect at once.
+	// Mode says where roles come from. Read per request rather than held,
+	// because replicas restart one at a time and the one that applied
+	// configuration last is what every replica answers by.
 	Mode func(context.Context) access.Mode
 	// Files is where attachments are kept. Nil is a deployment that holds
 	// none, which is ordinary: attachments are off and everything else
@@ -137,21 +138,6 @@ func (in Deps) Log() *slog.Logger {
 		return in.Logger
 	}
 	return slog.New(slog.DiscardHandler)
-}
-
-// GroupsReachable reports a source of group membership: a provider carrying
-// one, or a trusted proxy that states it.
-//
-// Asked before roles are switched to group-bound. Without a source every
-// arrival belongs to nothing, so nobody derives any role and the deployment
-// locks itself out — including whoever made the change.
-func (in Deps) GroupsReachable() bool {
-	for _, provider := range in.Providers {
-		if provider.GroupsSource() {
-			return true
-		}
-	}
-	return in.Access != nil && in.Access.ReportsGroups()
 }
 
 // Rights returns a store over who may do what, built over the handle it is

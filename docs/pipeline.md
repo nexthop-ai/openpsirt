@@ -102,6 +102,46 @@ response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.
 
+### GitHub Actions
+
+```yaml
+- name: Send the inventory to OpenPSIRT
+  env:
+    OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
+    OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
+  run: |
+    curl --fail-with-body -X POST \
+      "$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans" \
+      -H "Authorization: Bearer $OPENPSIRT_KEY" \
+      -F "inventory=@sbom.cdx.json"
+```
+
+`--fail-with-body` rather than `--fail`, so a refusal prints why rather than
+only failing the step.
+
+### GitLab CI
+
+```yaml
+send-inventory:
+  stage: .post
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl --fail-with-body -X POST \
+        "$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans" \
+        -H "Authorization: Bearer $OPENPSIRT_KEY" \
+        -F "inventory=@sbom.cdx.json"
+```
+
+Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: the
+stream has to have been declared. A pipeline running on a branch nobody
+declared is refused, every build, until somebody declares it — and the refusal
+says which part is missing rather than making you guess:
+
+```
+404  product "sonic": stream "nobody-declared-this": not declared
+```
+
 ## The result
 
 Poll the scans for that build.
@@ -161,46 +201,6 @@ Removals come first, then arrivals, then the names at new versions. Add
 Reading the inventory and scanning it are separate work with different rhythms:
 an inventory is read once, and scanned again whenever the vulnerability data
 moves. So a scan appearing is not the same as findings appearing.
-
-## GitHub Actions
-
-```yaml
-- name: Send the inventory to OpenPSIRT
-  env:
-    OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
-    OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
-  run: |
-    curl --fail-with-body -X POST \
-      "$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans" \
-      -H "Authorization: Bearer $OPENPSIRT_KEY" \
-      -F "inventory=@sbom.cdx.json"
-```
-
-`--fail-with-body` rather than `--fail`, so a refusal prints why rather than
-only failing the step.
-
-## GitLab CI
-
-```yaml
-send-inventory:
-  stage: .post
-  image: curlimages/curl:latest
-  script:
-    - |
-      curl --fail-with-body -X POST \
-        "$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans" \
-        -H "Authorization: Bearer $OPENPSIRT_KEY" \
-        -F "inventory=@sbom.cdx.json"
-```
-
-Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: the
-stream has to have been declared. A pipeline running on a branch nobody
-declared is refused, every build, until somebody declares it — and the refusal
-says which part is missing rather than making you guess:
-
-```
-404  product "sonic": stream "nobody-declared-this": not declared
-```
 
 ## Out of a pipeline's scope
 

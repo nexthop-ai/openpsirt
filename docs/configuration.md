@@ -111,109 +111,6 @@ starts read them, so they stay in the environment beside a file.
 | `AWS_` variables | The object store client, for a role, a region or a profile where the settings name no key |
 | `GRYPE_` variables | The scanner. [Scanning](#scanning) lists the ones that matter here |
 
-## Upgrading
-
-A database built by any release is upgraded in place, at startup or by
-`openpsirt migrate up`. One built by an earlier release passes through each
-later release's upgrade on the way. A database built by a release candidate or
-any build between releases is recreated.
-
-Read [Every upgrade](#every-upgrade), the section for the release you are coming
-from, and every section after it.
-
-### Every upgrade
-
-| Step | |
-|---|---|
-| Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
-| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them |
-| Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
-
-Going back is `openpsirt migrate down`, once for each release stepped back that
-carries a migration, run with this build before the earlier one is deployed.
-The section for the release gone back to says what else it needs.
-
-### From v0.1.0
-
-| Change | What to do |
-|---|---|
-| `private-read` and `private-triage` reach undisclosed findings only. In v0.1.0 they reached disclosed findings too | Grant `public-read` or `public-triage` beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade |
-| The setting `disclosure.extension-threshold` is `disclosure.movement-threshold` | Nothing. The value is carried across by the upgrade |
-
-| After the upgrade from v0.1.0 | |
-|---|---|
-| An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
-| A reported flaw | Has a reference, minted as one recorded today would be |
-
-v0.1.0 started against a schema that was not taken back down reports it
-current and cannot read it.
-
-### From v0.2.0
-
-| Change | What to do |
-|---|---|
-| `OPENPSIRT_PATCH_EXCLUDED` is `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's `patchBranches.excluded` is `outbound.excluded` | Move the list. The old name is refused at startup, and the chart refuses to render with the old key set |
-| The excluded list also keeps supplier directories out, and a supplier is read from every host its description names | Set `outbound.excluded` wherever suppliers are configured |
-| A threshold stored under its v0.1.0 name, `disclosure.extension-threshold`, is in force again as `disclosure.movement-threshold` where that was never set. v0.2.0 read only the new name, so it ran on the default | Check it under Settings, Disclosure |
-| Patch branch lookups are turned on in the deployment's configuration. The `patch.branches` setting is gone | Set `patchBranches.enabled: true` in the chart, or `OPENPSIRT_PATCH_BRANCHES=true`. A deployment that had the setting on has the lookups off until then. [What to set first](#enabling) |
-
-| After the upgrade from v0.2.0 | |
-|---|---|
-| A report | Sent in from outside |
-| A flaw recorded here with a severity in force in its product | Rated at its first recording in that product. Its deadline counts from there, on the windows for flaws in our own product |
-| A flaw recorded here with no severity in force | Not rated, and with no deadline |
-| A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
-| A component | Has no license until a scan reads one from its inventory |
-
-Going back to v0.2.0 leaves patch branch lookups off, because v0.2.0 reads its
-own setting for them: turn them on again under its Settings.
-
-### From v0.3.0
-
-v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
-one does, and going back to v0.3.0 takes the same `openpsirt migrate down` as
-going back to v0.4.0.
-
-| Change | What to do |
-|---|---|
-| `triage.together-cap` bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read `triage.review-issues` (200 issues) and `triage.agreed-issues` (2,000 issues). Those three, and recording a flaw or adding builds to one, read `triage.write-ceiling` (50,000 findings). A value set on `triage.together-cap` is not carried to them | Where `triage.together-cap` was changed, set the new limits under Settings, Triage |
-
-### From v0.4.0
-
-| Change | What to do |
-|---|---|
-| `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
-| Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
-| With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
-| A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels and namespace unless told otherwise | Where the controller is not ingress-nginx, or runs in a namespace other than `ingress-nginx`, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. Anything in the cluster that reaches the Service directly rather than through the ingress, such as a pipeline uploading with a key, is refused until it is named under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
-| `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
-| With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
-| Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
-| Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
-| Recording that an advisory went out takes a triage role on every product it covers. In v0.4.0 a triage role on any product was enough | Grant the publisher triage on each product their advisories cover |
-| A filter taking words from a set refuses a word named twice with a 422, and a filter of product names takes at most 200. A saved filter repeating a word opens as a 422 | Save the filter again without the repeat |
-| What somebody was told, read from their page by an administrator or an auditor, holds only lines about products the reader holds a role on. In v0.4.0 it also held the disclosed lines about every other product | Grant the reader the product where they investigate a person's notices |
-| Another name for an issue is recorded only on a flaw recorded here, and only as a CVE or a GitHub advisory. In v0.4.0 any text was taken on any issue | Nothing. A scanner's issue takes its other names from the scans |
-| Saved filters are read and kept at `/v1/session/me/saved-filters`. In v0.4.0 they were kept per product, under `/v1/products/{product}/saved-filters` | Point a script that keeps filters at the new address |
-| `saved.max-per-person` counts every saved filter one person keeps. In v0.4.0 it counted each product's | Nothing, unless somebody keeps more than it after the upgrade: they are refused a new filter until they forget enough, or it is raised under Settings, Limits |
-
-| After the upgrade from v0.4.0 | |
-|---|---|
-| A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
-| Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
-| An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
-| Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
-| A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
-| API keys whose names differ only in capitals or surrounding spaces, as `CI` and `ci` | One keeps the name in lower case and goes on working: a key in force before a withdrawn one, then the oldest. Every other key in force is withdrawn, so a pipeline sending with it is refused from the upgrade on and needs a new key. The key list shows each one as withdrawn under a numbered name, as `ci #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it and the moment it ran |
-| An API key's name | Stored in lower case. Withdraw it by that name in any capitals |
-| One person's API tokens whose names differ only in capitals or surrounding spaces | One keeps the name in lower case and goes on working: a token in force before a withdrawn one, then the oldest. Every other token in force is withdrawn, so a script using it is refused from the upgrade on and its owner needs to mint a new one. The owner's token list shows each one as withdrawn under a numbered name, as `laptop #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it |
-| An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
-| An exploited issue | Has no day it was listed in the known-exploited catalog. The first scan stating one moves every open exploited finding of the issue to count from that day, and some become overdue at once |
-| A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
-| A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it |
-| One person's saved filters of one name in several products | The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
-| Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it |
-
 ## Serving
 
 | Variable | File key | Meaning | Default |
@@ -276,6 +173,242 @@ read.
 | The server will not say which | Refused. What this asks for is certainty, and "we could not find out" is not it |
 | The database is SQLite | Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like |
 
+## Sign-in
+
+The process refuses to start until somebody can administer it, and naming
+somebody grants a role — it does not let anybody in without signing in.
+
+Configure at least one of the sign-in methods below, or nobody can reach it.
+The Helm chart refuses to render an install with none; the binary does not
+check, because a deployment being brought up in pieces is an ordinary state
+for a process and not for an install.
+
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_BOOTSTRAP_ADMINS` | `signin.bootstrap_admins` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked | unset |
+| `OPENPSIRT_SESSION_LIFETIME` | `signin.session_lifetime` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held | 12 hours |
+
+### An OpenID Connect provider
+
+One sign-in provider is configured at a time. Setting both an issuer here and a
+GitHub client id below stops the process, naming the two: an identity is a
+username, and two providers issuing them independently cannot be told apart.
+
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_OIDC_ISSUER` | `signin.oidc.issuer` | The provider's issuer address. Empty means no provider. **Every endpoint the provider publishes must be on this host** — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network | unset |
+| `OPENPSIRT_OIDC_NAME` | `signin.oidc.name` | What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise | `oidc` |
+| `OPENPSIRT_OIDC_CLIENT_ID` | `signin.oidc.client_id` | The client registered with the provider | unset |
+| `OPENPSIRT_OIDC_CLIENT_SECRET` | `signin.oidc.client_secret` | Its secret | unset |
+| `OPENPSIRT_OIDC_USERNAME_CLAIM` | `signin.oidc.username_claim` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
+| `OPENPSIRT_OIDC_GROUPS_CLAIM` | `signin.oidc.groups_claim` | The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored | unset |
+
+Register the client with the redirect URI `OPENPSIRT_BASE_URL` followed by
+`/v1/sign-in/`, the value of `OPENPSIRT_OIDC_NAME`, and `/callback`: with the
+default name, `https://psirt.example.com/v1/sign-in/oidc/callback`. The
+provider compares it exactly, so the scheme, the host and any port match the
+address people use.
+
+#### The username claim
+
+The claim is not the identity. The provider's subject is, and the first
+sign-in pins it; from then on the subject decides and a rename is followed as
+a label.
+
+This claim does one job: match an authorization an administrator wrote for
+somebody who has not arrived yet. That has to be a name a person can type, so
+the subject itself cannot serve — nobody knows it in advance. The property it
+needs is narrower than immutable:
+
+> An end user must not be able to set it to a name an administrator might
+> have authorized.
+
+The exposure runs from the moment a grant is written until somebody redeems
+it, which `signin.claim-window` also bounds.
+
+| Provider | Usually | Check before you trust it |
+|---|---|---|
+| Okta | `preferred_username` — the Okta login, normally the address the directory assigned | Self-service profile editing must not cover the username or the primary email. It does not by default |
+| Entra ID | `oid`, or `upn` where administrators want a name they recognize | `preferred_username` on Entra is not a good choice: it follows the mail nickname |
+| Keycloak | A custom claim mapped to an administrator-managed attribute | If self-registration is on, `preferred_username` is a name the account holder chose, and is the case this refusal exists for |
+| Anything else | Whatever the provider assigns rather than the person | Ask whether a user can edit it in the provider's own account settings |
+
+`preferred_username` rides on the `profile` scope rather than `email`. The
+scopes requested are `openid profile email` and are not configurable, so a
+claim carried by any of the three is available.
+
+A claim the provider does not send, or sends as something other than a string,
+reads as absent. The sign-in then falls back to the address the provider says
+it verified, and failing that to the subject — which matches no authorization
+anybody typed, so the person is refused rather than admitted. A claim name
+with a typo in it therefore reads as "this person was never granted access",
+not as a configuration error, so check the name against the provider's own
+token before deciding somebody's grant is missing.
+
+### GitHub
+
+One sign-in provider is configured at a time. Setting a GitHub client id
+beside an OpenID Connect issuer stops the process.
+
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_GITHUB_CLIENT_ID` | `signin.github.client_id` | The OAuth application's client id. Empty means GitHub sign-in is off | unset |
+| `OPENPSIRT_GITHUB_CLIENT_SECRET` | `signin.github.client_secret` | Its secret | unset |
+| `OPENPSIRT_GITHUB_ORG` | `signin.github.org` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
+
+The OAuth application's settings on GitHub:
+
+| GitHub setting | Value |
+|---|---|
+| Homepage URL | `OPENPSIRT_BASE_URL`, as `https://psirt.example.com` |
+| Authorization callback URL | `OPENPSIRT_BASE_URL` followed by `/v1/sign-in/github/callback`, as `https://psirt.example.com/v1/sign-in/github/callback`. GitHub compares it exactly |
+
+With an organization set, a group is one of its **teams**, named by the team's
+slug: `kernel-security` for a team displayed as Kernel Security. Sign-in asks
+GitHub for the `read:org` scope to read them. An organization that restricts
+third-party OAuth applications reports no teams to an application it has not
+approved, so everybody arrives in no group and is refused. An organization
+owner approves the application under the organization's third-party access
+settings.
+
+```sh
+OPENPSIRT_GITHUB_ORG=example-corp
+OPENPSIRT_GROUP_ROLES="psirt-leads=admin; security-team=private-triage+approver; kernel-maintainers=public-triage@router-os,switch-os"
+```
+
+[Roles from groups](#roles-from-groups) holds the whole of that setting.
+
+### Sign-in without a provider
+
+A header set by an identity-aware proxy in front of OpenPSIRT signs people in
+with no provider configured here, or beside one. It is also the way in while a
+provider is down, and what a provider change goes through: a pinned identifier
+does not refuse a proxy arrival, so everybody reaches what they already hold.
+
+#### The trusted header
+
+Both the header and the sources it is believed from are required together: a
+header named with nothing to trust it from is either a mistake or the first
+half of one, and the process stops rather than accept a header anybody can set.
+
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_TRUSTED_HEADER` | `signin.trusted_header.name` | The header an identity-aware proxy sets to say who somebody is | unset |
+| `OPENPSIRT_TRUSTED_SOURCES` | `signin.trusted_header.sources` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored | unset |
+| `OPENPSIRT_TRUSTED_GROUPS_HEADER` | `signin.trusted_header.groups_header` | Where that proxy reports group membership, if it does | unset |
+| `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | `signin.trusted_header.groups_delimiter` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
+
+The header is believed by address alone. In a cluster the sources are usually
+the pod network, which every pod is on, so the chart renders a NetworkPolicy
+admitting only the ingress controller wherever `auth.trustedHeader.name` is
+set.
+
+| Chart value | Meaning | Default |
+|---|---|---|
+| `networkPolicy.enabled` | Whether the policy is rendered for a trusted-header install. Turn it off only where something else keeps other pods from reaching this one | `true` |
+| `networkPolicy.ingressController.enabled` | Whether the ingress controller is admitted by its labels. Off, the policy admits `networkPolicy.from` alone | `true` |
+| `networkPolicy.ingressController.namespaceLabels` | The labels of the ingress controller's namespace. Set here or in `podLabels`, it replaces both of ingress-nginx's defaults | ingress-nginx's, where neither is set |
+| `networkPolicy.ingressController.podLabels` | The labels of its pods, replacing the defaults the same way | ingress-nginx's, where neither is set |
+| `networkPolicy.from` | Further peers, in the NetworkPolicy's own form: an `ipBlock` for a controller on the host network, or a namespace a metrics scraper runs in | none |
+
+A policy is enforced only where the cluster's network plugin supports
+NetworkPolicy.
+
+#### Provider outages and changes
+
+The provider is down and people must sign in.
+
+1. Unset `OPENPSIRT_OIDC_ISSUER`. A provider that cannot be discovered stops
+   the process at startup, so leaving it set means nothing starts at all.
+2. Set `OPENPSIRT_TRUSTED_HEADER` and `OPENPSIRT_TRUSTED_SOURCES`. Both are
+   needed; half a configuration stops the process.
+3. Restart. Sign-in is by the name the proxy asserts.
+
+The provider publishes an endpoint on another host. The process refuses to
+start, naming the endpoint and the host. Pinning the fetch to the issuer does
+not stop the document naming somewhere else inside itself, and an issuer naming
+an authorization endpoint elsewhere turns every sign-in into a redirect of its
+choosing. There is no way to allow it: the deployment reaches this provider
+through a proxy that serves the whole of it from one host, or it signs in
+through the trusted header instead.
+
+The provider is changing. An identifier belongs to the provider that
+issued it, and the same string names somebody else at another one, so a
+deployment configured for a provider its bound identities do not name refuses
+to start.
+
+1. Point `OPENPSIRT_OIDC_ISSUER` back at the **old** provider, or configure the
+   trusted header with no provider at all where the old one cannot be reached
+   either. A binding is withdrawn while the provider that made it is still
+   configured.
+2. `DELETE /v1/people/{identity}/identifier` for each person. The
+   authorization and the roles stay; only the pin goes.
+3. Configure the new provider and restart. Each name is redeemed again by
+   whoever next arrives holding it.
+
+Doing it the other way round — configuring the new provider first — leaves a
+process that will not start. The refusal names the old issuer and the steps, so
+the way out is to put that value back and start at step 1.
+
+What is compared is the **issuer**, not `OPENPSIRT_OIDC_NAME`. Renaming the
+button changes nothing, and repointing the issuer while leaving the button
+alone is caught.
+
+### Roles from groups
+
+Which groups grant which roles is set here and nowhere else. Nothing in the
+running application changes it, and the API and the People screen only show
+it. It is applied at every start.
+
+| Variable | File key | Meaning | Default |
+|---|---|---|---|
+| `OPENPSIRT_GROUP_ROLES` | `signin.roles` | What membership of each group grants. Any entry means roles come from groups, and people's roles are no longer assigned under People. Empty means an administrator assigns them | unset |
+
+A group is what the provider reports: a team slug for GitHub, a value of the
+groups claim for OpenID Connect, or a name in the trusted groups header. It is
+matched exactly, capitals included, and a group spelled differently grants
+nothing.
+
+The variable holds entries separated by `;`. Each is a group, `=`, its roles
+joined by `+`, and optionally `@` and products joined by `,`:
+
+```sh
+OPENPSIRT_GROUP_ROLES="psirt-leads=admin; security-team=private-triage+approver; kernel-maintainers=public-triage@router-os,switch-os"
+```
+
+A file writes each entry as a table:
+
+```toml
+[signin.github]
+client_id = "Iv1.0123456789abcdef"
+client_secret = "secret"
+org = "example-corp"
+
+[[signin.roles]]
+group = "psirt-leads"
+role = "admin"
+
+[[signin.roles]]
+group = "security-team"
+roles = ["private-triage", "approver"]
+
+[[signin.roles]]
+group = "kernel-maintainers"
+role = "public-triage"
+products = ["router-os", "switch-os"]
+```
+
+| Part | Rule |
+|---|---|
+| Roles | `approver`, `assigner`, `public-read`, `private-read`, `public-triage`, `private-triage`, and `admin` and `audit`, which are held over the whole deployment |
+| Products | By name, in any capitals. None means every product, including one declared later. A product nobody has declared yet is accepted, and grants from each member's next sign-in after a pipeline declares it. `admin` and `audit` take none |
+| A name holding `%`, `;`, `=`, `+`, `@` or `,` | Written percent-encoded in the variable, as `%25`, `%3B`, `%3D`, `%2B`, `%40` and `%2C`: `security%40example.com=audit`. A file writes the name as it is |
+| A source of groups | Required. Mappings with none of `OPENPSIRT_OIDC_GROUPS_CLAIM` beside an issuer, `OPENPSIRT_GITHUB_ORG` beside a GitHub client, or `OPENPSIRT_TRUSTED_GROUPS_HEADER` beside a trusted header stop the process |
+| Administration | At least one entry grants `admin`, or `OPENPSIRT_BOOTSTRAP_ADMINS` names somebody. Otherwise the process stops |
+| Membership | Read at sign-in. A change reaches each person at their next one, and ending their sessions under People makes it immediate |
+| Each start | Logs every mapping, and records each one added or removed in the administrative changes, by configuration |
+| Switching on or off | Adding the first entry sets aside the roles assigned under People, and removing the last restores them |
+
 ## Scanning
 
 | Variable | File key | Meaning | Default |
@@ -324,6 +457,45 @@ The verification is available there as well as here on purpose. "It built" and
 "it loads where it has to" are different claims, and the second is the one that
 matters where the bundle is all there is — in the one situation where trying it
 out first is not available.
+
+## Attachment storage
+
+Absent is ordinary: with none of this set, attachments are off and everything
+else works. An operator who wants none should not have to run a bucket.
+
+`OPENPSIRT_ATTACHMENT_BUCKET` is what turns the object store on. The endpoint
+is what a self-hosted store needs and a cloud one does not, and credentials are
+optional — a deployment on a cloud provider gets a rotating role from its
+environment rather than a key somebody stored.
+
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_ATTACHMENT_BUCKET` | `attachments.bucket` | The bucket files are kept in. Empty means attachments are off | unset |
+| `OPENPSIRT_ATTACHMENT_ENDPOINT` | `attachments.endpoint` | The address of a self-hosted store. A cloud provider needs none | unset |
+| `OPENPSIRT_ATTACHMENT_REGION` | `attachments.region` | The region, where the store wants one | unset |
+| `OPENPSIRT_ATTACHMENT_KEY` | `attachments.key` | Access key, where the environment supplies no role | unset |
+| `OPENPSIRT_ATTACHMENT_SECRET` | `attachments.secret` | Its secret. The key and the secret are set together or not at all | unset |
+| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | `attachments.session_token` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
+| `OPENPSIRT_ATTACHMENT_PATH_STYLE` | `attachments.path_style` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
+| `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | `attachments.allow_http` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
+| `OPENPSIRT_ATTACHMENT_DIR` | `attachments.dir` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |
+
+An endpoint that is not `https` is refused, because a file is handed over as a
+redirect to a signed address and that address is a bearer token: anybody on the
+path between the browser and the store may spend it for the file it names.
+Loopback is exempt, since nothing crosses a network.
+
+`OPENPSIRT_ATTACHMENT_ALLOW_HTTP` accepts one anyway, for a store on a network
+you are content to carry those addresses across. A deployment that sets it is
+told so at every start rather than only where it was configured:
+
+```
+WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
+```
+
+This is not `OPENPSIRT_PLAIN_HTTP`, which is about serving this application
+without TLS and loosens cookies. One is a file on the way out and the other a
+session on the way in; a deployment can want either without the other.
 
 ## Mail
 
@@ -450,7 +622,7 @@ validation after you have sent it.
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
 
-## The published advisory directory
+### The published advisory directory
 
 Absent is ordinary: with none of this set, advisories are generated and handed
 to you and nothing is written anywhere.
@@ -530,41 +702,6 @@ provider role adds, and key material is configuration of a kind this deployment
 does not yet take. The layout leaves room for it: a signature sits beside the
 document under the same name, and the feed already names the file beside each
 entry that answers for it.
-
-## Supplier advisories
-
-Off unless an administrator names a supplier, under Settings. Each is named
-against one product, and what is read lands as evidence beside a finding — a
-publisher's own judgment, never a decision taken here.
-
-Requests go to the host the configured address names, and to every host the
-publisher's description, its feeds and their entries name for listings,
-documents and digests: https on port 443 only, a redirect refused rather than
-followed, and an address inside this network or in
-[`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) refused. So an egress rule
-for this is every host a supplier publishes from, on 443.
-SUSE's description is on `www.suse.com` and its directory on `ftp.suse.com`.
-
-What leaves is the request itself. No component name, no build, no product,
-nothing about what this deployment holds — the narrowing to what a product
-ships happens here, after the document has arrived.
-
-How often each supplier is read again is `scanning.every`, the same setting
-that paces re-scans. Shortening it makes more requests to every configured
-supplier as well as more scans here.
-
-A new supplier is read from `scanning.supplier-history` days before it was
-added, 365 unless set. A publisher's listing holds everything they have ever
-issued, so this bounds how much of it is asked for: a year of Red Hat is about
-97,000 documents and takes about seventeen days to read, and a year of a vendor
-publishing a few hundred a year takes hours. To take an advisory published
-earlier, upload it. A supplier withdrawn and added again resumes where it
-stopped, no further back than the same window.
-
-Each document is checked against the SHA-256 or SHA-512 file its publisher
-serves beside it, and one that does not match is not read. A publisher serving
-neither is read unchecked.
-
 
 ## Upstream currency
 
@@ -663,6 +800,40 @@ OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
 
 The chart sets it from `outbound.excluded`.
 
+## Supplier advisories
+
+Off unless an administrator names a supplier, under Settings. Each is named
+against one product, and what is read lands as evidence beside a finding — a
+publisher's own judgment, never a decision taken here.
+
+Requests go to the host the configured address names, and to every host the
+publisher's description, its feeds and their entries name for listings,
+documents and digests: https on port 443 only, a redirect refused rather than
+followed, and an address inside this network or in
+[`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) refused. So an egress rule
+for this is every host a supplier publishes from, on 443.
+SUSE's description is on `www.suse.com` and its directory on `ftp.suse.com`.
+
+What leaves is the request itself. No component name, no build, no product,
+nothing about what this deployment holds — the narrowing to what a product
+ships happens here, after the document has arrived.
+
+How often each supplier is read again is `scanning.every`, the same setting
+that paces re-scans. Shortening it makes more requests to every configured
+supplier as well as more scans here.
+
+A new supplier is read from `scanning.supplier-history` days before it was
+added, 365 unless set. A publisher's listing holds everything they have ever
+issued, so this bounds how much of it is asked for: a year of Red Hat is about
+97,000 documents and takes about seventeen days to read, and a year of a vendor
+publishing a few hundred a year takes hours. To take an advisory published
+earlier, upload it. A supplier withdrawn and added again resumes where it
+stopped, no further back than the same window.
+
+Each document is checked against the SHA-256 or SHA-512 file its publisher
+serves beside it, and one that does not match is not read. A publisher serving
+neither is read unchecked.
+
 ## Patch branches
 
 A patch link to a commit is labeled with the branches of its repository that
@@ -674,6 +845,9 @@ Off unless the deployment turns it on. It fetches a copy of each repository a
 patch link names, from the host the link names, and asks the copy which
 branches hold each commit. Progress, failures and the size of each copy are on
 the System screen and at `/v1/patch-branches`.
+
+Only https is used, redirects are not followed, and git runs with no
+configuration, credentials or hooks from the environment.
 
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
@@ -700,9 +874,6 @@ the System screen and at `/v1/patch-branches`.
 | A ReadWriteOnce claim with several replicas | The replicas on other nodes stay Pending. The chart cannot refuse this, because it cannot see the access mode of a claim it did not make |
 | No claim | Each pod keeps its own scratch copy and fetches again when the lease moves to it |
 
-Only https is used, redirects are not followed, and git runs with no
-configuration, credentials or hooks from the environment.
-
 ### Sizing
 
 The Linux kernel is the largest repository reports link to, and git.kernel.org
@@ -728,195 +899,6 @@ retried a day later.
 
 Keep the copies on a persistent volume. Scratch space loses them on every
 restart, and the kernel is fetched again from the start.
-
-## Sign-in
-
-The process refuses to start until somebody can administer it, and naming
-somebody grants a role — it does not let anybody in without signing in.
-
-Configure at least one of the sign-in methods below, or nobody can reach it.
-The Helm chart refuses to render an install with none; the binary does not
-check, because a deployment being brought up in pieces is an ordinary state
-for a process and not for an install.
-
-| Variable | File key | Meaning | Default |
-|---|---|---|---|
-| `OPENPSIRT_BOOTSTRAP_ADMINS` | `signin.bootstrap_admins` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked | unset |
-| `OPENPSIRT_SESSION_LIFETIME` | `signin.session_lifetime` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held | 12 hours |
-
-### An OpenID Connect provider
-
-One sign-in provider is configured at a time. Setting both an issuer here and a
-GitHub client id below stops the process, naming the two: an identity is a
-username, and two providers issuing them independently cannot be told apart.
-
-| Variable | File key | Meaning | Default |
-|---|---|---|---|
-| `OPENPSIRT_OIDC_ISSUER` | `signin.oidc.issuer` | The provider's issuer address. Empty means no provider. **Every endpoint the provider publishes must be on this host** — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network | unset |
-| `OPENPSIRT_OIDC_NAME` | `signin.oidc.name` | What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise | `oidc` |
-| `OPENPSIRT_OIDC_CLIENT_ID` | `signin.oidc.client_id` | The client registered with the provider | unset |
-| `OPENPSIRT_OIDC_CLIENT_SECRET` | `signin.oidc.client_secret` | Its secret | unset |
-| `OPENPSIRT_OIDC_USERNAME_CLAIM` | `signin.oidc.username_claim` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
-| `OPENPSIRT_OIDC_GROUPS_CLAIM` | `signin.oidc.groups_claim` | The claim carrying group membership, if the provider asserts it. Surrounding spaces are ignored | unset |
-
-### The username claim
-
-The claim is not the identity. The provider's subject is, and the first
-sign-in pins it; from then on the subject decides and a rename is followed as
-a label.
-
-This claim does one job: match an authorization an administrator wrote for
-somebody who has not arrived yet. That has to be a name a person can type, so
-the subject itself cannot serve — nobody knows it in advance. The property it
-needs is narrower than immutable:
-
-> An end user must not be able to set it to a name an administrator might
-> have authorized.
-
-The exposure runs from the moment a grant is written until somebody redeems
-it, which `signin.claim-window` also bounds.
-
-| Provider | Usually | Check before you trust it |
-|---|---|---|
-| Okta | `preferred_username` — the Okta login, normally the address the directory assigned | Self-service profile editing must not cover the username or the primary email. It does not by default |
-| Entra ID | `oid`, or `upn` where administrators want a name they recognize | `preferred_username` on Entra is not a good choice: it follows the mail nickname |
-| Keycloak | A custom claim mapped to an administrator-managed attribute | If self-registration is on, `preferred_username` is a name the account holder chose, and is the case this refusal exists for |
-| Anything else | Whatever the provider assigns rather than the person | Ask whether a user can edit it in the provider's own account settings |
-
-`preferred_username` rides on the `profile` scope rather than `email`. The
-scopes requested are `openid profile email` and are not configurable, so a
-claim carried by any of the three is available.
-
-A claim the provider does not send, or sends as something other than a string,
-reads as absent. The sign-in then falls back to the address the provider says
-it verified, and failing that to the subject — which matches no authorization
-anybody typed, so the person is refused rather than admitted. A claim name
-with a typo in it therefore reads as "this person was never granted access",
-not as a configuration error, so check the name against the provider's own
-token before deciding somebody's grant is missing.
-
-### Sign-in without a provider
-
-The trusted header below is the way in that does not depend on the provider,
-and it is what a provider change goes through. A pinned identifier does not
-refuse a proxy arrival, so everybody reaches what they already hold.
-
-The provider is down and people must sign in.
-
-1. Unset `OPENPSIRT_OIDC_ISSUER`. A provider that cannot be discovered stops
-   the process at startup, so leaving it set means nothing starts at all.
-2. Set `OPENPSIRT_TRUSTED_HEADER` and `OPENPSIRT_TRUSTED_SOURCES`. Both are
-   needed; half a configuration stops the process.
-3. Restart. Sign-in is by the name the proxy asserts.
-
-The provider publishes an endpoint on another host. The process refuses to
-start, naming the endpoint and the host. Pinning the fetch to the issuer does
-not stop the document naming somewhere else inside itself, and an issuer naming
-an authorization endpoint elsewhere turns every sign-in into a redirect of its
-choosing. There is no way to allow it: the deployment reaches this provider
-through a proxy that serves the whole of it from one host, or it signs in
-through the trusted header instead.
-
-The provider is changing. An identifier belongs to the provider that
-issued it, and the same string names somebody else at another one, so a
-deployment configured for a provider its bound identities do not name refuses
-to start.
-
-1. Point `OPENPSIRT_OIDC_ISSUER` back at the **old** provider, or configure the
-   trusted header with no provider at all where the old one cannot be reached
-   either. A binding is withdrawn while the provider that made it is still
-   configured.
-2. `DELETE /v1/people/{identity}/identifier` for each person. The
-   authorization and the roles stay; only the pin goes.
-3. Configure the new provider and restart. Each name is redeemed again by
-   whoever next arrives holding it.
-
-Doing it the other way round — configuring the new provider first — leaves a
-process that will not start. The refusal names the old issuer and the steps, so
-the way out is to put that value back and start at step 1.
-
-What is compared is the **issuer**, not `OPENPSIRT_OIDC_NAME`. Renaming the
-button changes nothing, and repointing the issuer while leaving the button
-alone is caught.
-
-
-
-
-### GitHub
-
-| Variable | File key | Meaning | Default |
-|---|---|---|---|
-| `OPENPSIRT_GITHUB_CLIENT_ID` | `signin.github.client_id` | The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside `OPENPSIRT_OIDC_ISSUER` | unset |
-| `OPENPSIRT_GITHUB_CLIENT_SECRET` | `signin.github.client_secret` | Its secret | unset |
-| `OPENPSIRT_GITHUB_ORG` | `signin.github.org` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
-
-### The trusted header
-
-Both the header and the sources it is believed from are required together: a
-header named with nothing to trust it from is either a mistake or the first
-half of one, and the process stops rather than accept a header anybody can set.
-
-| Variable | File key | Meaning | Default |
-|---|---|---|---|
-| `OPENPSIRT_TRUSTED_HEADER` | `signin.trusted_header.name` | The header an identity-aware proxy sets to say who somebody is | unset |
-| `OPENPSIRT_TRUSTED_SOURCES` | `signin.trusted_header.sources` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored | unset |
-| `OPENPSIRT_TRUSTED_GROUPS_HEADER` | `signin.trusted_header.groups_header` | Where that proxy reports group membership, if it does | unset |
-| `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | `signin.trusted_header.groups_delimiter` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
-
-The header is believed by address alone. In a cluster the sources are usually
-the pod network, which every pod is on, so the chart renders a NetworkPolicy
-admitting only the ingress controller wherever `auth.trustedHeader.name` is
-set.
-
-| Chart value | Meaning | Default |
-|---|---|---|
-| `networkPolicy.enabled` | Whether the policy is rendered for a trusted-header install. Turn it off only where something else keeps other pods from reaching this one | `true` |
-| `networkPolicy.ingressController.enabled` | Whether the ingress controller is admitted by its labels. Off, the policy admits `networkPolicy.from` alone | `true` |
-| `networkPolicy.ingressController.namespaceLabels` | The labels of the ingress controller's namespace. Set here or in `podLabels`, it replaces both of ingress-nginx's defaults | ingress-nginx's, where neither is set |
-| `networkPolicy.ingressController.podLabels` | The labels of its pods, replacing the defaults the same way | ingress-nginx's, where neither is set |
-| `networkPolicy.from` | Further peers, in the NetworkPolicy's own form: an `ipBlock` for a controller on the host network, or a namespace a metrics scraper runs in | none |
-
-A policy is enforced only where the cluster's network plugin supports
-NetworkPolicy.
-
-## Attachment storage
-
-Absent is ordinary: with none of this set, attachments are off and everything
-else works. An operator who wants none should not have to run a bucket.
-
-`OPENPSIRT_ATTACHMENT_BUCKET` is what turns the object store on. The endpoint
-is what a self-hosted store needs and a cloud one does not, and credentials are
-optional — a deployment on a cloud provider gets a rotating role from its
-environment rather than a key somebody stored.
-
-| Variable | File key | What it does | Default |
-|---|---|---|---|
-| `OPENPSIRT_ATTACHMENT_BUCKET` | `attachments.bucket` | The bucket files are kept in. Empty means attachments are off | unset |
-| `OPENPSIRT_ATTACHMENT_ENDPOINT` | `attachments.endpoint` | The address of a self-hosted store. A cloud provider needs none | unset |
-| `OPENPSIRT_ATTACHMENT_REGION` | `attachments.region` | The region, where the store wants one | unset |
-| `OPENPSIRT_ATTACHMENT_KEY` | `attachments.key` | Access key, where the environment supplies no role | unset |
-| `OPENPSIRT_ATTACHMENT_SECRET` | `attachments.secret` | Its secret. The key and the secret are set together or not at all | unset |
-| `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | `attachments.session_token` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
-| `OPENPSIRT_ATTACHMENT_PATH_STYLE` | `attachments.path_style` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
-| `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | `attachments.allow_http` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
-| `OPENPSIRT_ATTACHMENT_DIR` | `attachments.dir` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |
-
-An endpoint that is not `https` is refused, because a file is handed over as a
-redirect to a signed address and that address is a bearer token: anybody on the
-path between the browser and the store may spend it for the file it names.
-Loopback is exempt, since nothing crosses a network.
-
-`OPENPSIRT_ATTACHMENT_ALLOW_HTTP` accepts one anyway, for a store on a network
-you are content to carry those addresses across. A deployment that sets it is
-told so at every start rather than only where it was configured:
-
-```
-WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
-```
-
-This is not `OPENPSIRT_PLAIN_HTTP`, which is about serving this application
-without TLS and loosens cookies. One is a file on the way out and the other a
-session on the way in; a deployment can want either without the other.
 
 ## The work queue
 
@@ -1015,6 +997,20 @@ resources:
 Raise the limit for a bigger inventory, for raised scan-file bounds, or where
 the database is imported on every start.
 
+### An exhausted limit
+
+The scanner is killed by the kernel rather than exiting, so the run fails with
+the signal in the message:
+
+```
+run /usr/local/bin/grype: signal: killed
+```
+
+The job is retried with backoff and set aside after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
+attempts, so the symptom is scans that will not complete rather than a pod that
+will not stay up. Where the pod itself is killed instead, a deployment without a
+kept database restarts into the import that exhausted it.
+
 ### Database persistence
 
 The scanner fetches its data at runtime, because a database built into an image
@@ -1054,16 +1050,115 @@ Naming both is refused. The claim the chart makes is kept when the release is
 uninstalled, because the data is re-downloadable and a claim is not worth
 deleting by surprise.
 
-### An exhausted limit
+## Upgrading
 
-The scanner is killed by the kernel rather than exiting, so the run fails with
-the signal in the message:
+A database built by any release is upgraded in place, at startup or by
+`openpsirt migrate up`. One built by an earlier release passes through each
+later release's upgrade on the way. A database built by a release candidate or
+any build between releases is recreated.
 
-```
-run /usr/local/bin/grype: signal: killed
-```
+Read [Every upgrade](#every-upgrade), the section for the release you are coming
+from, and every section after it.
 
-The job is retried with backoff and set aside after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
-attempts, so the symptom is scans that will not complete rather than a pod that
-will not stay up. Where the pod itself is killed instead, a deployment without a
-kept database restarts into the import that exhausted it.
+### Every upgrade
+
+| Step | |
+|---|---|
+| Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
+| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them |
+| Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
+
+Going back is `openpsirt migrate down`, once for each release stepped back that
+carries a migration, run with this build before the earlier one is deployed.
+The section for the release gone back to says what else it needs.
+
+### From v0.1.0
+
+| Change | What to do |
+|---|---|
+| `private-read` and `private-triage` reach undisclosed findings only. In v0.1.0 they reached disclosed findings too | Grant `public-read` or `public-triage` beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade |
+| The setting `disclosure.extension-threshold` is `disclosure.movement-threshold` | Nothing. The value is carried across by the upgrade |
+
+| After the upgrade from v0.1.0 | |
+|---|---|
+| An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
+| A reported flaw | Has a reference, minted as one recorded today would be |
+
+v0.1.0 started against a schema that was not taken back down reports it
+current and cannot read it.
+
+### From v0.2.0
+
+| Change | What to do |
+|---|---|
+| `OPENPSIRT_PATCH_EXCLUDED` is `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's `patchBranches.excluded` is `outbound.excluded` | Move the list. The old name is refused at startup, and the chart refuses to render with the old key set |
+| The excluded list also keeps supplier directories out, and a supplier is read from every host its description names | Set `outbound.excluded` wherever suppliers are configured |
+| A threshold stored under its v0.1.0 name, `disclosure.extension-threshold`, is in force again as `disclosure.movement-threshold` where that was never set. v0.2.0 read only the new name, so it ran on the default | Check it under Settings, Disclosure |
+| Patch branch lookups are turned on in the deployment's configuration. The `patch.branches` setting is gone | Set `patchBranches.enabled: true` in the chart, or `OPENPSIRT_PATCH_BRANCHES=true`. A deployment that had the setting on has the lookups off until then. [What to set first](#enabling) |
+
+| After the upgrade from v0.2.0 | |
+|---|---|
+| A report | Sent in from outside |
+| A flaw recorded here with a severity in force in its product | Rated at its first recording in that product. Its deadline counts from there, on the windows for flaws in our own product |
+| A flaw recorded here with no severity in force | Not rated, and with no deadline |
+| A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
+| A component | Has no license until a scan reads one from its inventory |
+
+Going back to v0.2.0 leaves patch branch lookups off, because v0.2.0 reads its
+own setting for them: turn them on again under its Settings.
+
+### From v0.3.0
+
+v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
+one does, and going back to v0.3.0 takes the same `openpsirt migrate down` as
+going back to v0.4.0.
+
+| Change | What to do |
+|---|---|
+| `triage.together-cap` bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read `triage.review-issues` (200 issues) and `triage.agreed-issues` (2,000 issues). Those three, and recording a flaw or adding builds to one, read `triage.write-ceiling` (50,000 findings). A value set on `triage.together-cap` is not carried to them | Where `triage.together-cap` was changed, set the new limits under Settings, Triage |
+
+### From v0.4.0
+
+| Change | What to do |
+|---|---|
+| `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
+| Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
+| With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
+| A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels and namespace unless told otherwise | Where the controller is not ingress-nginx, or runs in a namespace other than `ingress-nginx`, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. Anything in the cluster that reaches the Service directly rather than through the ingress, such as a pipeline uploading with a key, is refused until it is named under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
+| `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
+| With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
+| Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
+| Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
+| Recording that an advisory went out takes a triage role on every product it covers. In v0.4.0 a triage role on any product was enough | Grant the publisher triage on each product their advisories cover |
+| A filter taking words from a set refuses a word named twice with a 422, and a filter of product names takes at most 200. A saved filter repeating a word opens as a 422 | Save the filter again without the repeat |
+| What somebody was told, read from their page by an administrator or an auditor, holds only lines about products the reader holds a role on. In v0.4.0 it also held the disclosed lines about every other product | Grant the reader the product where they investigate a person's notices |
+| Another name for an issue is recorded only on a flaw recorded here, and only as a CVE or a GitHub advisory. In v0.4.0 any text was taken on any issue | Nothing. A scanner's issue takes its other names from the scans |
+| Saved filters are read and kept at `/v1/session/me/saved-filters`. In v0.4.0 they were kept per product, under `/v1/products/{product}/saved-filters` | Point a script that keeps filters at the new address |
+| `saved.max-per-person` counts every saved filter one person keeps. In v0.4.0 it counted each product's | Nothing, unless somebody keeps more than it after the upgrade: they are refused a new filter until they forget enough, or it is raised under Settings, Limits |
+
+| After the upgrade from v0.4.0 | |
+|---|---|
+| A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
+| Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
+| An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
+| Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
+| A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
+| API keys whose names differ only in capitals or surrounding spaces, as `CI` and `ci` | One keeps the name in lower case and goes on working: a key in force before a withdrawn one, then the oldest. Every other key in force is withdrawn, so a pipeline sending with it is refused from the upgrade on and needs a new key. The key list shows each one as withdrawn under a numbered name, as `ci #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it and the moment it ran |
+| An API key's name | Stored in lower case. Withdraw it by that name in any capitals |
+| One person's API tokens whose names differ only in capitals or surrounding spaces | One keeps the name in lower case and goes on working: a token in force before a withdrawn one, then the oldest. Every other token in force is withdrawn, so a script using it is refused from the upgrade on and its owner needs to mint a new one. The owner's token list shows each one as withdrawn under a numbered name, as `laptop #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it |
+| An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
+| An exploited issue | Has no day it was listed in the known-exploited catalog. The first scan stating one moves every open exploited finding of the issue to count from that day, and some become overdue at once |
+| A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
+| A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it |
+| One person's saved filters of one name in several products | The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
+| Going back to v0.4.0 | Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it |
+
+### From v0.5.0
+
+| Change | What to do |
+|---|---|
+| Group mappings come from `OPENPSIRT_GROUP_ROLES` alone, and any mapping means roles come from groups. v0.5.0 kept mappings made through `/v1/roles/bindings`, and the upgrade removes those on a product. `POST` and `DELETE` on `/v1/roles/bindings` and `PUT` on `/v1/roles/mode` are gone | Before upgrading, read `GET /v1/roles/mode`. If it answers `group-bound`, list the mappings with `GET /v1/roles/bindings` and write them into `OPENPSIRT_GROUP_ROLES`. If it answers `direct`, leave the variable unset: a mapping would switch the deployment to roles from groups and set aside every role assigned under People |
+
+| After the upgrade from v0.5.0 | |
+|---|---|
+| Going back to v0.5.0 | Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's `POST /v1/roles/bindings` |

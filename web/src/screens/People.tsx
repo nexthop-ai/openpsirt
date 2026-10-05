@@ -543,7 +543,7 @@ export function People({ who: me }: { who: Who }) {
       {derived && (
         <div className="alert" style={{ marginTop: 12 }}>
           <strong>Roles come from groups in this deployment</strong>
-          <span>Roles come from provider groups. Change the bindings below instead.</span>
+          <span>Roles come from provider groups, mapped in OPENPSIRT_GROUP_ROLES.</span>
         </div>
       )}
 
@@ -590,7 +590,13 @@ export function People({ who: me }: { who: Who }) {
                       <span className="id">{binding.group}</span>
                     </td>
                     <td>
-                      <span className="id">{binding.product}</span>
+                      {binding.product ? (
+                        <span className="id">{binding.product}</span>
+                      ) : binding.role === "admin" || binding.role === "audit" ? (
+                        "Whole deployment"
+                      ) : (
+                        "Every product"
+                      )}
                     </td>
                     <td>{binding.role}</td>
                   </tr>

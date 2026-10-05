@@ -256,7 +256,7 @@ psirt.example.com {
 }
 ```
 
-## Trusted-header sign-in
+### Trusted-header sign-in
 
 The proxy authenticates each person, and tells the process who they are in a
 header. [The trusted header](configuration.md#the-trusted-header) holds the
@@ -301,7 +301,7 @@ Save it as `/etc/nftables.d/openpsirt.nft` and load it with
 `sudo nft -f /etc/nftables.d/openpsirt.nft`, or wherever the host's firewall
 reads its rules at boot.
 
-### nginx with oauth2-proxy
+#### nginx with oauth2-proxy
 
 oauth2-proxy runs on port 4180 with `--reverse-proxy` and `--set-xauthrequest`,
 which is what makes it answer with the user and groups headers read below.
@@ -382,7 +382,7 @@ server {
 `proxy_set_header` replaces a header of the same name from the client, and an
 empty value removes it.
 
-### Apache httpd
+#### Apache httpd with an authentication module
 
 With `mod_headers` and an authentication module loaded as well.
 

@@ -42,13 +42,6 @@ type Administering struct {
 	// redeemable for is read. Nil where this process has no database, and
 	// then the built-in window applies.
 	Settings func(bun.IDB) *setting.Store
-	// Groups reports a source of group membership: a provider carrying one, or
-	// a trusted proxy that states it.
-	//
-	// Asked before roles are switched to group-bound. Without a source every
-	// arrival reports belonging to nothing, so nobody derives any role and the
-	// deployment locks itself out — including whoever made the change.
-	Groups func() bool
 }
 
 // Handle is the database a read-only route builds its stores over.

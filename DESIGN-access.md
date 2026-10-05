@@ -323,11 +323,10 @@ Its own column beside administration, not a role.
 | Rule | Reason |
 |---|---|
 | Not a role | A role is held against a product and this is held against none. Spread over every product it would grant nothing in a deployment with no products declared, and would appear in every product's grant list while reaching none of them |
-| Bound to a group the way administration is | Roles come from one place at a time, so in group-bound mode a capability with no binding path is one nobody can ever hold. The binding table says which of the two things over the deployment it grants |
+| Mapped to a group the way administration is | Roles come from one place at a time, so in group-bound mode a capability with no mapping is one nobody can ever hold. The mapping says which of the two things over the deployment it grants |
 | Derived and stamped like administration | Only what a group gave is taken back by a group, and the stamp is what bounds the flag for a credential that never signs in. Without it somebody a group made an auditor, who minted a year-long token and then left, would go on auditing through it |
 | No bootstrap arm | Configuration names an administrator, which is the documented way back into a deployment nobody can administer. Nobody is locked out by holding no audit permission |
-| Unbinding it counts nothing | Administration is refused where it would leave nobody able to administer. Nothing else held over the deployment can lock anybody out |
-| Binding or unbinding it names no product | A product named asks about a grant on that product, and one held over the deployment is not. Both refuse it rather than acting on the deployment-wide grant |
+| Its mapping names no product | A product named asks about a grant on that product, and one held over the deployment is not. Configuration naming one beside it is refused at startup |
 
 ## Somebody who has left
 
@@ -344,11 +343,11 @@ Recorded by an administrator, as a date on the person.
 | Their roles are left where they are | What somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it from memory. What stops them is the date |
 | Read once, where every way in already passes | A session, a personal token and a group-bound sign-in all resolve by identity. A second spelling of the check is a second rule to keep in step with the first |
 | **Every question of the form "may this person do this" excludes them** | The grants are left in place on purpose, so a query reading only grants answers that somebody who has left is still cleared. Three did: two of them decide whether an undisclosed finding may be handed to a person or a team, where the assignment itself is the disclosure, and the third decides whether their work is released |
-| A departed administrator does not satisfy the startup check | Otherwise the last admin group can be unbound and the deployment starts cleanly with nobody able to administer it — which is the state that check exists to prevent |
+| A departed administrator does not satisfy the startup check | Otherwise configuration can map no group to admin and the deployment starts cleanly with nobody able to administer it — which is the state that check exists to prevent |
 | Naming somebody in configuration readmits them | It is the documented way back into a deployment nobody can administer, and nothing else clears the date. Done there rather than wherever a person is recorded: an administrator re-recording a departed colleague must not silently readmit them |
 | Sessions are ended rather than left to expire | Roles are re-read at sign-in, so withdrawing one takes effect then. This is what makes leaving immediate instead |
 | Everything they held is handed back | Work held by somebody who is gone is work nobody is doing, and it does not look like it |
-| Granting what is already held succeeds, and only where the insert was refused as a duplicate | Five paths ran a second query on *any* insert failure and reported success if a row was there — including a failure caused by a concurrent insert that was then rolled back. What "already held" means is the part that differs, so it stays with each caller: a grant asks whether it is in force, a binding asks whether the row exists |
+| Granting what is already held succeeds, and only where the insert was refused as a duplicate | Five paths ran a second query on *any* insert failure and reported success if a row was there — including a failure caused by a concurrent insert that was then rolled back. What "already held" means is the part that differs, so it stays with each caller: a grant asks whether it is in force |
 | Deactivating somebody who has already left succeeds and moves no date | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted. It still hands back whatever they hold, because the hand-back runs after the deactivation commits, and asking again is how one that failed is finished |
 | An administrator may not deactivate themselves | It leaves nobody able to undo it, and the bootstrap account is often the one doing it |
 | Coming back does not return their work | Somebody else may have picked it up, and reassigning it would take it off them silently |
@@ -793,7 +792,7 @@ is no default.
 | The subject cannot serve as the claim | An authorization is written before anybody has arrived, so the name it is written for has to be one a person can type. The subject is not knowable then |
 | There is no safe default rather than a different default | OpenID Connect permits a provider to let people choose their own `preferred_username`; whether a given one does is a question only its operator can answer. On a provider where the login is assigned by an administrator it is the right answer, and on one with self-registration it is the attack |
 | A missing claim is refused before discovery | Like every other refusal of what configuration supplies, it names the setting to fix and needs no provider to be reachable |
-| The groups claim is named with surrounding spaces ignored, once | Whether a provider reports groups decides whether roles may be switched to group-bound, so the claim reported is the claim read. A name read with its spaces reports a source of groups that yields none, and every arrival is then refused |
+| The groups claim is named with surrounding spaces ignored, once | Whether a provider reports groups decides whether group mappings are accepted at startup, so the claim checked is the claim read. A name read with its spaces passes that check and yields no groups, and every arrival is then refused |
 
 ## Sessions and request forgery
 
@@ -827,8 +826,8 @@ somebody types here folded instead.
 
 | | |
 |---|---|
-| Two spellings are two bindings | The provider distinguishes them, and folding would take that from an administrator |
-| A binding whose capitals are wrong grants nothing, silently | The refusal somebody meets is the generic one, by design, so nothing says the binding was the problem. The endpoint says so instead, where the name is typed |
+| Two spellings are two mappings | The provider distinguishes them, and folding would take that from the operator |
+| A mapping whose capitals are wrong grants nothing, silently | The refusal somebody meets is the generic one, by design, so nothing says the mapping was the problem. Every start logs each mapping it applies, which is where the operator who wrote it is looking |
 
 ## Role assignment modes
 
@@ -849,11 +848,29 @@ lifetime. The deliberate case is handled at once by ending their sessions.
 | Rule | Reason |
 |---|---|
 | Missing or unreadable membership yields no roles, never unrestricted | That failure would otherwise be silent and total |
-| The mapping is the authorization | Somebody arriving for the first time in a mapped group is admitted and recorded then. An administrator made the mapping before anybody arrived. What is never true is somebody being admitted because a provider vouched for them and nothing else |
-| Switching modes is reversible | Turning group binding on marks assignments **inactive rather than deleting** them, and turning it off makes them active again. An inactive row grants nothing and is never counted as access — not in a query, not in a report, not in a review |
+| The mapping is the authorization | Somebody arriving for the first time in a mapped group is admitted and recorded then. The operator stated the mapping before anybody arrived. What is never true is somebody being admitted because a provider vouched for them and nothing else |
+| Switching modes is reversible | The first mapping marks assignments **inactive rather than deleting** them, and removing the last makes them active again. An inactive row grants nothing and is never counted as access — not in a query, not in a report, not in a review |
 | Derived grants are cleared on the way out | They are a cache of what a provider said at somebody's last sign-in |
 | What makes a grant unique includes where it came from | An assignment set aside and a live derived grant for the same role on the same product can exist at once |
 | Granting a role and reading one are different shapes (REQ-61) | A grant is written with which product and which role, and read back with two more the writer cannot decide: whether it is in force, and whether an administrator assigned it or a group derived it. A request refused the right to grant a role would otherwise be answered with its own claim that the role was granted and in force |
+
+### Group mappings
+
+Configuration states which groups grant which roles, and nothing else does
+(REQ-41). The mapping decides who holds every role in the deployment, so it
+changes the way the deployment does, and nothing running can widen it. The API
+and the People screen read it and offer no way to change it.
+
+| Rule | Reason |
+|---|---|
+| Applied at every start, writing only what changed | A mapping that stands keeps the moment it was first applied, and a start stating what the last one stated records nothing |
+| Any mapping means group-bound, and none means direct | The mode is a consequence of the mappings rather than a second setting that could disagree with them. A change of mode at startup is the reversible switch above, recorded against configuration |
+| Each mapping added or removed is recorded in the administrative trail, with configuration as the actor, and each start logs the whole map | An access review reads the trail; an operator who just edited the configuration reads the log |
+| A mapping names its product by name | A product configuration names before any pipeline declares it is held, and grants from each member's next sign-in after the product exists. The name is folded the way a product's name is |
+| A mapping naming no product is a role on every product | Derived as a role across the estate (REQ-42), so a product declared after somebody signed in is covered without anybody signing in again |
+| Mappings with no source of groups stop the process | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment admits nobody while looking like a working one. A source is a groups claim beside an issuer, an organization beside a GitHub client, or a groups header beside a trusted header |
+| A name holding a separator is percent-encoded in the environment variable | The variable is one line, and a group a provider reports may be an email address or a directory name. A file writes each name as it is |
+| The upgrade from v0.5.0 drops the mappings to a role on a product that v0.5.0 held | They were made through the API, and configuration is now their only source. Mappings to admin and audit are kept, and the first start removes any configuration does not state. The upgrade note says to carry them across first, only for a deployment taking roles from groups: a mapping switches a direct deployment to groups |
 
 Somebody named in configuration keeps administration, applied at **every**
 startup rather than the first. That makes it the way back in: lose
@@ -868,7 +885,7 @@ when any one of them holds.
 |---|---|---|
 | Named in configuration | The name, written at every startup | Removing the name and restarting |
 | Granted here | The administration flag | An administrator here |
-| Derived from a group | The administration flag, marked derived and stamped | Leaving the group, the stamp going stale, or switching to direct roles |
+| Derived from a group | The administration flag, marked derived and stamped | Leaving the group, the stamp going stale, or configuration mapping no group |
 
 | Rule | Reason |
 |---|---|
@@ -886,9 +903,8 @@ database by hand.
 
 | Rule | Reason |
 |---|---|
-| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that fails leaves the binding gone and nobody able to administer — and a restored row carries a fresh timestamp, so it is not the row that was there |
-| Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
-| A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
+| Checked at startup, after the mappings are applied | Configuration is the only thing that can change either input, so a start is the only moment the answer can change |
+| A departed administrator named in configuration is not counted | They are refused at sign-in, so counting them would let a deployment start that nobody can administer |
 
 The session lifetime has a ceiling of thirty days. It is the window in which a
 role a group withdrew can still be held, so left to whatever an administrator
@@ -942,7 +958,8 @@ re-granted anything (REQ-42).
 | The union is one builder, and what it attaches to is the caller's | Whether the question is about one person, a team's members, or everybody who may be mentioned differs; the two halves do not. The column naming the person comes from the code, because a placeholder cannot bind one |
 | Two EXISTS rather than a union | A union inside an EXISTS is a syntax error on SQLite, and this has to run on four engines |
 | Withdrawing one product from it is not offered | "All except one" is a third kind of fact, with its own storage, its own narrowing and its own meaning in an access review |
-| Set aside and restored by a change of role-assignment mode | It is an assignment, so the act that makes switching reversible covers it. Nothing derives one: a group binding names a product |
+| Set aside and restored by a change of role-assignment mode | It is an assignment, so the act that makes switching reversible covers it |
+| Derived from a group mapping that names no product | Replaced at each sign-in like any derived grant, and cleared when the deployment stops taking roles from groups |
 | Stored in its own table rather than as a grant with no product | All four engines treat NULLs in a unique key as distinct from each other, so a nullable product would let duplicate estate rows accumulate with the database enforcing nothing — and the partial index that fixes it is engine-specific (REQ-71) |
 
 A personal token narrowed to one product intersects with it the same way it
@@ -1077,13 +1094,13 @@ record, because it is the same question one layer up.
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the floor to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
-| Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or a record of being attacked it cleared, because another stood in its place in the same product (`DESIGN-findings.md` § Merged issues). An upgrade records only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does (`DESIGN-database.md` § The v0.5.0 upgrade). None is a person. A row by a person names the person |
+| Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, adds and removes the group mappings in `OPENPSIRT_GROUP_ROLES`, and sets where roles come from to match, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or a record of being attacked it cleared, because another stood in its place in the same product (`DESIGN-findings.md` § Merged issues). An upgrade records only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does (`DESIGN-database.md` § The v0.5.0 upgrade). None is a person. A row by a person names the person |
 | Configuration records a name when it starts or stops naming somebody | Administration moved with nobody in the application having moved it. A start naming the same people as the last records nothing, because nothing moved |
 | The record is written in the transaction that makes the change | Both are one act. Written afterwards, a change could succeed while the record of it silently failed, and a trail that is sometimes missing a line answers an auditor's question wrongly rather than not at all |
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
 | What follows the change is outside it | Deactivating somebody also ends their sessions and hands their work back. The sessions end inside, because they are what deactivation means; the work is handed back afterwards, bounded by how much they held rather than by the request |
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
-| A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration, a team membership, a place on a case, a personal token, a pipeline key and a pinned identifier all take something away, and all of them read what they matched. Revoking one already revoked, or unbinding somebody with nothing pinned, is refused as not found |
+| A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group mapping a start removes, a team membership, a place on a case, a personal token, a pipeline key and a pinned identifier all take something away, and all of them read what they matched. Revoking one already revoked, or unbinding somebody with nothing pinned, is refused as not found |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
 | **What a change is about is composed from the names it resolved to** | A person's history is read by the identity as stored, so a row composed from "Ana" as typed is missing from the history of "ana". A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
@@ -1097,7 +1114,7 @@ that is neither.
 
 | | |
 |---|---|
-| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group bindings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
+| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
 | **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because

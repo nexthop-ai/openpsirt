@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,8 +29,8 @@ type Mode string
 const (
 	// Direct means an administrator assigns roles to people.
 	Direct Mode = "direct"
-	// GroupBound means roles come from provider groups, through mappings an
-	// administrator manages. Per-person assignment is off while it is on.
+	// GroupBound means roles come from provider groups, through the mappings
+	// configuration states. Per-person assignment is off while it is on.
 	GroupBound Mode = "group-bound"
 )
 
@@ -56,13 +57,27 @@ const (
 	Derived Source = "derived"
 )
 
-// Binding is a provider group bound to a role on a product.
+// Binding is a provider group bound to a role on one product.
+//
+// The product is named rather than referenced, so a product configuration
+// names before any pipeline declares it is held and grants once it exists.
 type Binding struct {
 	bun.BaseModel `bun:"table:group_role,alias:gr"`
 
+	ID          int64     `bun:"id,pk,autoincrement"`
+	GroupName   string    `bun:"group_name,notnull"`
+	ProductName string    `bun:"product_name,notnull"`
+	Role        Role      `bun:"role,notnull"`
+	CreatedAt   time.Time `bun:"created_at,notnull"`
+}
+
+// EstateBinding is a provider group bound to a role on every product,
+// including one declared later (REQ-42).
+type EstateBinding struct {
+	bun.BaseModel `bun:"table:group_role_all,alias:gra"`
+
 	ID        int64     `bun:"id,pk,autoincrement"`
 	GroupName string    `bun:"group_name,notnull"`
-	ProductID int64     `bun:"product_id,notnull"`
 	Role      Role      `bun:"role,notnull"`
 	CreatedAt time.Time `bun:"created_at,notnull"`
 }
@@ -70,9 +85,8 @@ type Binding struct {
 // AdminBinding is a provider group bound to something held over the
 // deployment: administering it, or auditing what it is set to.
 //
-// Apart from the table above because that one names a product and these name
-// none. A uniqueness rule over a column that may be absent behaves differently
-// on each of the four engines, which is what a single table would need.
+// Apart from the tables above because those name a role and this names
+// neither a role nor a product.
 type AdminBinding struct {
 	bun.BaseModel `bun:"table:group_admin,alias:ga"`
 
@@ -82,199 +96,166 @@ type AdminBinding struct {
 	CreatedAt time.Time `bun:"created_at,notnull"`
 }
 
-// Bind maps a group to a role on a product.
-//
-// The name is stored as given and matched as given. A group name is an
-// identity the provider hands over rather than a name anybody here types, and
-// the rule for those is exact comparison — a folded column would make
-// "Security" and "security" one binding, when the provider means only one of
-// them. The cost is that a binding typed with the wrong capitals grants
-// nothing and the refusal says only "not authorized", which is what the
-// endpoint's description warns about; the alternative costs an administrator
-// the ability to bind two groups a provider genuinely distinguishes.
-func (s *Store) Bind(ctx context.Context, group string, productID int64, role Role) error {
-	group = strings.TrimSpace(group)
-	if group == "" {
-		return refusal.Errorf("a binding needs a group to bind")
-	}
-	if !role.Valid() {
-		return refusal.Errorf("%q is not a role", role)
-	}
-	binding := &Binding{
-		GroupName: group, ProductID: productID, Role: role,
-		CreatedAt: s.now().Truncate(time.Microsecond),
-	}
-	_, err := s.insertOnce(ctx, fmt.Sprintf("bind %q to %q", group, role), binding,
-		func(ctx context.Context) (bool, error) {
-			// The row's presence, which is what the index refused. A binding
-			// has nothing to be in force: it grants at each member's next
-			// sign-in and holds nothing of its own.
-			return s.db.NewSelect().Model((*Binding)(nil)).
-				Where("group_name = ?", group).Where("product_id = ?", productID).
-				Where("role = ?", role).Exists(ctx)
-		})
-	return err
+// Mappings lists every mapping in force, sorted as ParseGroupRoles sorts.
+func (s *Store) Mappings(ctx context.Context) ([]Mapping, error) {
+	return mappingsIn(ctx, s.db)
 }
 
-// Unbind removes one mapping.
-func (s *Store) Unbind(ctx context.Context, group string, productID int64, role Role) error {
-	// Trimmed the way Bind trims, so a name typed with a trailing space
-	// removes the row that name created rather than matching nothing.
-	group = strings.TrimSpace(group)
-	res, err := s.db.NewDelete().Model((*Binding)(nil)).
-		Where("group_name = ?", group).Where("product_id = ?", productID).
-		Where("role = ?", role).Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("unbind %q from %q: %w", group, role, err)
-	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("unbind %q from %q: %w", group, role, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%q is not bound to %q here: %w", group, role, ErrNothingMatched)
-	}
-	return nil
-}
-
-// Bindings lists every group-to-role mapping.
-func (s *Store) Bindings(ctx context.Context) ([]Binding, error) {
-	var bindings []Binding
-	if err := s.db.NewSelect().Model(&bindings).
-		Order("group_name ASC", "product_id ASC", "role ASC").Scan(ctx); err != nil {
+func mappingsIn(ctx context.Context, db bun.IDB) ([]Mapping, error) {
+	var out []Mapping
+	var onProducts []Binding
+	if err := db.NewSelect().Model(&onProducts).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the group bindings: %w", err)
 	}
-	return bindings, nil
+	for _, binding := range onProducts {
+		out = append(out, Mapping{Group: binding.GroupName, Grants: string(binding.Role),
+			Product: binding.ProductName})
+	}
+	var everywhere []EstateBinding
+	if err := db.NewSelect().Model(&everywhere).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the group bindings across every product: %w", err)
+	}
+	for _, binding := range everywhere {
+		out = append(out, Mapping{Group: binding.GroupName, Grants: string(binding.Role)})
+	}
+	var over []AdminBinding
+	if err := db.NewSelect().Model(&over).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what groups hold over this deployment: %w", err)
+	}
+	for _, binding := range over {
+		out = append(out, Mapping{Group: binding.GroupName, Grants: string(binding.Grants)})
+	}
+	slices.SortFunc(out, func(a, b Mapping) int {
+		return strings.Compare(a.Group+"\x00"+a.Product+"\x00"+a.Grants,
+			b.Group+"\x00"+b.Product+"\x00"+b.Grants)
+	})
+	return out, nil
 }
 
-// BindOver gives a group's members something held over the deployment.
-func (s *Store) BindOver(ctx context.Context, group string, over Over) error {
-	group = strings.TrimSpace(group)
-	if group == "" {
-		return refusal.Errorf("a binding needs a group to bind")
-	}
-	if !over.Valid() {
-		return refusal.Errorf("%q is not something held over this deployment", over)
-	}
-	binding := &AdminBinding{
-		GroupName: group, Grants: over,
-		CreatedAt: s.now().Truncate(time.Microsecond),
-	}
-	_, err := s.insertOnce(ctx, fmt.Sprintf("bind %q to %q", group, over), binding,
-		func(ctx context.Context) (bool, error) {
-			return s.db.NewSelect().Model((*AdminBinding)(nil)).
-				Where("group_name = ?", group).
-				Where("grants = ?", over).Exists(ctx)
-		})
-	return err
+// Mapped is what one application of configuration's mappings changed.
+type Mapped struct {
+	// Added is what configuration maps and did not before.
+	Added []Mapping
+	// Removed is what configuration mapped before and does not now.
+	Removed []Mapping
 }
 
-// UnbindOver takes one back, for the things unbinding cannot lock anybody out
-// of.
+// ApplyMappings makes the mappings in force exactly what configuration states.
 //
-// Administration is not one of them, and goes through the path below that
-// counts what would be left.
-func (s *Store) UnbindOver(ctx context.Context, group string, over Over) error {
-	group = strings.TrimSpace(group)
-	if over == Administers {
-		return refusal.Errorf("administration is unbound where what remains can be counted")
-	}
-	res, err := s.db.NewDelete().Model((*AdminBinding)(nil)).
-		Where("group_name = ?", group).Where("grants = ?", over).Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("unbind %q from %q: %w", group, over, err)
-	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("unbind %q from %q: %w", group, over, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%q is bound to %q here: %w", group, over, ErrNothingMatched)
-	}
-	return nil
-}
-
-// ErrLastAdministrator is what unbinding the last thing granting
-// administration comes back as.
-//
-// A sentinel, because the caller answers it differently from a failure: it is
-// a refusal somebody can act on rather than something that went wrong.
-var ErrLastAdministrator = refusal.New("nothing would be left to administer this deployment")
-
-// modeIn reads where roles come from, against whichever handle it is given.
-//
-// Taken as a function because this package does not read settings — the one
-// that does sits above it — and the mode has to be read inside the transaction
-// that acts on it rather than handed in already stale.
-type modeIn func(context.Context, bun.IDB) (Mode, error)
-
-// UnbindAdminIfOthersRemain stops a group's members being administrators,
-// unless they are the last thing granting it.
-//
-// One transaction, because the count has to see the delete. Written as a
-// delete, a count and a compensating re-insert, a re-insert that failed left
-// the binding gone and nobody able to administer — a state whose only route
-// back is editing the database by hand. Rolling back is also what puts the
-// original row back: BindAdmin stamps a fresh CreatedAt, so a "restored"
-// binding was not the row that had been there.
-func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mode modeIn) error {
-	group = strings.TrimSpace(group)
-	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		// Read here, not by the caller. A retry re-runs this closure against a
-		// database somebody else has moved, so a mode fetched before it began
-		// describes a world that is gone (REQ-71) — and judging by the old one
-		// keeps a delete that leaves nobody able to administer the deployment,
-		// which is the state this function exists to prevent.
-		in, err := mode(ctx, tx)
+// Applied at every start. Only what changed is written, so a mapping that
+// stands keeps the moment it was first applied, and what changed is returned
+// for the start to record.
+func (s *Store) ApplyMappings(ctx context.Context, wanted []Mapping) (Mapped, error) {
+	var mapped Mapped
+	err := database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
+		mapped = Mapped{}
+		held, err := mappingsIn(ctx, db)
 		if err != nil {
 			return err
 		}
-		res, err := tx.NewDelete().Model((*AdminBinding)(nil)).
-			Where("group_name = ?", group).
-			Where("grants = ?", Administers).Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("unbind %q from administration: %w", group, err)
+		for _, mapping := range held {
+			if !slices.Contains(wanted, mapping) {
+				mapped.Removed = append(mapped.Removed, mapping)
+			}
 		}
-		// Read, because a delete that matched nothing leaves the check below
-		// passing *because* the withdrawal did nothing — the deployment is
-		// still administrable, and the caller is told the binding is gone.
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("unbind %q from administration: %w", group, err)
+		for _, mapping := range wanted {
+			if !slices.Contains(held, mapping) {
+				mapped.Added = append(mapped.Added, mapping)
+			}
 		}
-		if n == 0 {
-			return fmt.Errorf("%q administers nothing here: %w", group, ErrNothingMatched)
+		for _, mapping := range mapped.Removed {
+			if err := unmap(ctx, db, mapping); err != nil {
+				return err
+			}
 		}
-		switch can, err := canAdminister(ctx, tx, in); {
-		case err != nil:
-			return err
-		case !can:
-			return ErrLastAdministrator
+		now := s.now().Truncate(time.Microsecond)
+		for _, mapping := range mapped.Added {
+			if err := mapOne(ctx, db, mapping, now); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		return Mapped{}, err
+	}
+	return mapped, nil
 }
 
-// GroupsOver lists the groups whose members hold one thing over this
-// deployment.
-func (s *Store) GroupsOver(ctx context.Context, over Over) ([]string, error) {
-	var bindings []AdminBinding
-	if err := s.db.NewSelect().Model(&bindings).
-		Where("grants = ?", over).Order("group_name ASC").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read what groups are bound to %q: %w", over, err)
+// MapsProduct reports whether a group mapping names any of these products,
+// in any capitals.
+//
+// A mapping names its product by name, so renaming a product to a name a
+// mapping holds would hand that group the product, and renaming one away
+// would strand the mapping. Both are configuration's to decide (REQ-41).
+func (s *Store) MapsProduct(ctx context.Context, names ...string) (bool, error) {
+	folded := make([]string, 0, len(names))
+	for _, name := range names {
+		folded = append(folded, strings.ToLower(strings.TrimSpace(name)))
 	}
-	names := make([]string, 0, len(bindings))
-	for _, binding := range bindings {
-		names = append(names, binding.GroupName)
+	held, err := s.db.NewSelect().Model((*Binding)(nil)).
+		Where("product_name IN (?)", bun.List(folded)).Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether a group mapping names a product: %w", err)
 	}
-	return names, nil
+	return held, nil
+}
+
+// mapOne writes one mapping into the table that holds its shape.
+func mapOne(ctx context.Context, db bun.IDB, mapping Mapping, now time.Time) error {
+	var row any
+	switch over, deployment := mapping.Over(); {
+	case deployment:
+		row = &AdminBinding{GroupName: mapping.Group, Grants: over, CreatedAt: now}
+	case mapping.Product == "":
+		row = &EstateBinding{GroupName: mapping.Group, Role: Role(mapping.Grants), CreatedAt: now}
+	default:
+		row = &Binding{GroupName: mapping.Group, ProductName: mapping.Product,
+			Role: Role(mapping.Grants), CreatedAt: now}
+	}
+	// Replicas start together, so another may apply the same mapping first.
+	// Going again reads it as held.
+	if _, err := db.NewInsert().Model(row).Exec(ctx); database.IsDuplicate(err) {
+		return fmt.Errorf("map %s to %q: %w", mapping, mapping.Grants, database.ErrGoAgain)
+	} else if err != nil {
+		return fmt.Errorf("map %s to %q: %w", mapping, mapping.Grants, err)
+	}
+	return nil
+}
+
+// unmap removes one mapping from the table that holds its shape.
+func unmap(ctx context.Context, db bun.IDB, mapping Mapping) error {
+	var q *bun.DeleteQuery
+	switch over, deployment := mapping.Over(); {
+	case deployment:
+		q = db.NewDelete().Model((*AdminBinding)(nil)).Where("grants = ?", over)
+	case mapping.Product == "":
+		q = db.NewDelete().Model((*EstateBinding)(nil)).Where("role = ?", mapping.Grants)
+	default:
+		q = db.NewDelete().Model((*Binding)(nil)).
+			Where("product_name = ?", mapping.Product).Where("role = ?", mapping.Grants)
+	}
+	res, err := q.Where("group_name = ?", mapping.Group).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, err)
+	}
+	// Matched nothing because another replica starting at the same moment
+	// removed it first. Going again reads it as gone, so the removal is
+	// recorded once.
+	switch n, err := database.Affected(res); {
+	case err != nil:
+		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, err)
+	case n == 0:
+		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, database.ErrGoAgain)
+	}
+	return nil
 }
 
 // AdmitByGroups signs somebody in against what a provider says they belong to.
 //
 // This is the one path that may record a person, and only in group-bound mode.
 // It does not contradict access being granted in advance: the mapping *is* the
-// advance authorization, made by an administrator before anybody arrived, and
+// advance authorization, stated in configuration before anybody arrived, and
 // somebody in no mapped group is refused exactly as a stranger is.
 //
 // Every derived grant is replaced rather than merged, so a group somebody left
@@ -354,7 +335,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// they left behind is not.
 	person, err := s.match(ctx, who)
 	known := err == nil
-	if !known && len(roles) == 0 && !admin.administers && !admin.audits {
+	if !known && len(roles) == 0 && len(admin.everywhere) == 0 && !admin.administers && !admin.audits {
 		return nil, ErrDenied
 	}
 
@@ -474,7 +455,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		person.AuditsDerivedAt = auditsAt
 	}
 
-	if err := s.replaceDerived(ctx, person.ID, roles); err != nil {
+	if err := s.replaceDerived(ctx, person.ID, roles, admin.everywhere); err != nil {
 		return nil, err
 	}
 
@@ -485,7 +466,8 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 //
 // Groups nobody bound contribute nothing, and no groups at all contribute
 // nothing — never everything. That is the failure which would otherwise be
-// silent and total.
+// silent and total. A mapping naming a product nobody has declared contributes
+// nothing until somebody does.
 func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role, held, error) {
 	named := make([]string, 0, len(groups))
 	for _, group := range groups {
@@ -497,17 +479,33 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 		return nil, held{}, nil
 	}
 
-	var bindings []Binding
-	if err := s.db.NewSelect().Model(&bindings).
-		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
+	var bound []struct {
+		ProductID int64 `bun:"product_id"`
+		Role      Role  `bun:"role"`
+	}
+	if err := s.db.NewSelect().TableExpr(`"group_role" AS "gr"`).
+		ColumnExpr(`"p"."id" AS "product_id"`).ColumnExpr(`"gr"."role"`).
+		Join(`JOIN "product" AS "p" ON "p"."name" = "gr"."product_name"`).
+		Where(`"gr"."group_name" IN (?)`, bun.List(named)).Scan(ctx, &bound); err != nil {
 		return nil, held{}, fmt.Errorf("read what these groups are bound to: %w", err)
 	}
 	roles := map[int64][]Role{}
-	for _, binding := range bindings {
-		if !binding.Role.Valid() {
-			continue
+	for _, binding := range bound {
+		if binding.Role.Valid() && !holds(roles[binding.ProductID], binding.Role) {
+			roles[binding.ProductID] = append(roles[binding.ProductID], binding.Role)
 		}
-		roles[binding.ProductID] = append(roles[binding.ProductID], binding.Role)
+	}
+
+	var everywhere []EstateBinding
+	if err := s.db.NewSelect().Model(&everywhere).
+		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
+		return nil, held{}, fmt.Errorf("read what these groups are bound to across every product: %w", err)
+	}
+	var deployment held
+	for _, binding := range everywhere {
+		if binding.Role.Valid() && !holds(deployment.everywhere, binding.Role) {
+			deployment.everywhere = append(deployment.everywhere, binding.Role)
+		}
 	}
 
 	var over []AdminBinding
@@ -515,7 +513,6 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
 		return nil, held{}, fmt.Errorf("read what these groups hold over this deployment: %w", err)
 	}
-	var deployment held
 	for _, binding := range over {
 		switch binding.Grants {
 		case Administers:
@@ -527,20 +524,26 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 	return roles, deployment, nil
 }
 
-// held is what a set of groups gives over the deployment itself.
-//
-// A pair rather than two returns, because every caller wants both and a second
-// bool beside the first is the argument order nobody reads twice.
+// held is what a set of groups gives beyond one product: over the deployment
+// itself, and across every product.
 type held struct {
 	administers bool
 	audits      bool
+	// everywhere is the roles held across every product.
+	everywhere []Role
 }
 
 // replaceDerived makes somebody's derived grants exactly what their groups say.
-func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[int64][]Role) error {
+func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[int64][]Role,
+	everywhere []Role) error {
+
 	if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 		Where("person_id = ?", personID).Where("source = ?", Derived).Exec(ctx); err != nil {
 		return fmt.Errorf("clear what was derived from groups: %w", err)
+	}
+	if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
+		Where("person_id = ?", personID).Where("source = ?", Derived).Exec(ctx); err != nil {
+		return fmt.Errorf("clear what was derived from groups across every product: %w", err)
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -553,11 +556,21 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 			})
 		}
 	}
-	if len(fresh) == 0 {
-		return nil
+	if len(fresh) > 0 {
+		if _, err := s.db.NewInsert().Model(&fresh).Exec(ctx); err != nil {
+			return fmt.Errorf("record what these groups grant: %w", err)
+		}
 	}
-	if _, err := s.db.NewInsert().Model(&fresh).Exec(ctx); err != nil {
-		return fmt.Errorf("record what these groups grant: %w", err)
+	estate := make([]EstateGrant, 0, len(everywhere))
+	for _, role := range everywhere {
+		estate = append(estate, EstateGrant{
+			PersonID: personID, Role: role, Source: Derived, Active: true, CreatedAt: now,
+		})
+	}
+	if len(estate) > 0 {
+		if _, err := s.db.NewInsert().Model(&estate).Exec(ctx); err != nil {
+			return fmt.Errorf("record what these groups grant across every product: %w", err)
+		}
 	}
 	return nil
 }
@@ -601,12 +614,13 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			return fmt.Errorf("set aside the assigned roles over every product: %w", err)
 		}
 	case Direct:
-		// Only the per-product table is cleared of derived rows, because only
-		// it holds any: a group binding names a product, so nothing derives a
-		// role across the estate.
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 			Where("source = ?", Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)
+		}
+		if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
+			Where("source = ?", Derived).Exec(ctx); err != nil {
+			return fmt.Errorf("clear what groups derived across every product: %w", err)
 		}
 		if _, err := s.db.NewUpdate().Model((*Grant)(nil)).
 			Set("active = ?", true).
@@ -657,6 +671,10 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	return nil
 }
 
+// ErrNobodyAdministers is a start refused because nothing in the mode it
+// would run in grants administration.
+var ErrNobodyAdministers = refusal.New("nobody can administer this deployment")
+
 // CanAdminister reports whether anybody could administer this deployment in
 // the mode given.
 //
@@ -667,15 +685,12 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 	return canAdminister(ctx, s.db, mode)
 }
 
-// canAdminister is the three counts, against whichever handle the caller is
-// asking through. Taken as a parameter so that a caller deciding whether to
-// keep a delete can ask inside the transaction that made it: asked outside,
-// the counts describe a database the delete has not reached.
+// canAdminister is the three counts, against whichever handle is given.
 func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	// Somebody who has left cannot administer anything: they are refused at
 	// sign-in. Counting a deactivated bootstrap administrator would let the
-	// last admin group be unbound and the deployment start with nobody able to
-	// administer it, which is what this check exists to prevent.
+	// deployment start with no group mapped to administration and nobody able
+	// to administer it, which is what this check exists to prevent.
 	bootstrapped, err := db.NewSelect().Model((*Account)(nil)).
 		Where("is_bootstrap = ?", true).
 		Where("deactivated_at IS NULL").Count(ctx)

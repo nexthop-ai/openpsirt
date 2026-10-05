@@ -12,7 +12,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -251,7 +250,6 @@ func TestWhoMayReachWhat(t *testing.T) {
 			// administration like everything else that decides access.
 			{"reader", http.MethodGet, "/v1/roles/mode", http.StatusForbidden},
 			{"triager", http.MethodGet, "/v1/roles/bindings", http.StatusForbidden},
-			{"approver", http.MethodPost, "/v1/roles/bindings", http.StatusForbidden},
 			{"", http.MethodGet, "/v1/roles/mode", http.StatusUnauthorized},
 			{"admin", http.MethodGet, "/v1/roles/mode", http.StatusOK},
 			{"admin", http.MethodGet, "/v1/roles/bindings", http.StatusOK},
@@ -650,49 +648,4 @@ func filled(path string) string {
 		path = strings.ReplaceAll(path, from, to)
 	}
 	return path
-}
-
-func TestRolesCannotBeBoundToGroupsNothingCanReport(t *testing.T) {
-	// The other door to the lockout the mode switch already guards. A provider
-	// configured without a source of groups reports every arrival as belonging
-	// to nothing, so in group-bound mode nobody derives any role — and the
-	// deployment looks like a working one that admits nobody, including
-	// whoever made the change.
-	//
-	// The OIDC adapter supplies a default for the username claim and none for
-	// the groups claim, so this is the default configuration rather than an
-	// exotic one.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		// Something has to administer in the new mode, or the check beside
-		// this one refuses first and this would prove nothing.
-		if err := r.Rights.BindOver(t.Context(), "admins", access.Administers); err != nil {
-			t.Fatal(err)
-		}
-		for _, c := range []struct {
-			what   string
-			groups bool
-			want   int
-		}{
-			{"a provider that reports no groups", false, http.StatusConflict},
-			{"a provider that does", true, http.StatusOK},
-		} {
-			handler := httpapitest.WithProvider(t, r, c.groups)
-			req := httptest.NewRequest(http.MethodPut, "/v1/roles/mode",
-				strings.NewReader(`{"mode":"group-bound"}`))
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set(httpapitest.TestHeader, "admin")
-			httpapitest.FromOurOwnPage(req)
-			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, req)
-
-			if rec.Code != c.want {
-				t.Errorf("%s: switching answered %d, want %d: %s",
-					c.what, rec.Code, c.want, rec.Body.String())
-			}
-			if c.want == http.StatusConflict && !httpapitest.Contains(rec.Body.String(), "groups") {
-				t.Errorf("%s: the refusal does not say what is missing: %s",
-					c.what, rec.Body.String())
-			}
-		}
-	})
 }

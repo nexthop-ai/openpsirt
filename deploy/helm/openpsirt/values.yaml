@@ -74,7 +74,8 @@ database:
 # back in — editing the database by hand — and nobody discovers that at a good
 # moment.
 #
-# The minimum for a working install is bootstrapAdmins plus one provider.
+# The minimum for a working install is one provider, and bootstrapAdmins or a
+# group mapped to admin in groupRoles.
 auth:
   # Identities granted administration at every startup, not just the first.
   # That makes this the recovery path as well as the bootstrap: lose access,
@@ -120,8 +121,8 @@ auth:
     # question only this deployment's operator can answer. The configuration
     # reference names the usual answer for each provider.
     usernameClaim: ""
-    # Which claim carries group membership. Empty means the provider's usual
-    # one.
+    # Which claim carries group membership. Empty means groups are not read,
+    # so auth.groupRoles grants nothing through this provider.
     groupsClaim: ""
 
   # Sign-in through GitHub. Leave clientID empty to skip. Not to be set
@@ -135,6 +136,32 @@ auth:
     # Restrict to members of one organization. Empty means anybody with a
     # GitHub account, which is rarely what you want.
     org: ""
+
+  # Which groups grant which roles. Any entry here means roles come from
+  # groups, and nothing in the running application can change this mapping;
+  # it changes with the release. Empty means an administrator assigns roles.
+  #
+  # A group is matched exactly, capitals included:
+  #   - signing in through GitHub, a team slug in github.org, such as
+  #     kernel-security rather than "Kernel Security"
+  #   - through OpenID Connect, a value of the oidc.groupsClaim claim
+  #   - through the trusted header, a name in trustedHeader.groupsHeader
+  # One of those three has to be configured, or the install fails at render.
+  #
+  # roles: approver, assigner, public-read, private-read, public-triage,
+  # private-triage, admin, audit. products names the products the roles are
+  # held on; leave it out for every product, including ones declared later.
+  # admin and audit are held over the deployment and take no products.
+  #
+  #   groupRoles:
+  #     - group: psirt-leads
+  #       roles: [admin]
+  #     - group: security-team
+  #       roles: [private-triage, approver]
+  #     - group: kernel-maintainers
+  #       roles: [public-triage]
+  #       products: [router-os, switch-os]
+  groupRoles: []
 
   # Sign-in asserted by something in front of this — an identity-aware proxy.
   # **Both parts are required together**: a header named with nothing to trust

@@ -735,7 +735,9 @@ func TestAVerifiedAddressIsRecordedInEitherMode(t *testing.T) {
 				twoSignIn(t, func(t *testing.T, r *signInReach) {
 					ctx := t.Context()
 					if mode == access.GroupBound {
-						if err := r.rights.Bind(ctx, "platform", r.product, access.PublicRead); err != nil {
+						if _, err := r.rights.ApplyMappings(ctx, []access.Mapping{
+							{Group: "platform", Grants: string(access.PublicRead)},
+						}); err != nil {
 							t.Fatal(err)
 						}
 						if err := r.rights.SwitchTo(ctx, access.GroupBound); err != nil {

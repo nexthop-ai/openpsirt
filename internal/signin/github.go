@@ -89,14 +89,6 @@ func NewGitHub(cfg GitHubConfig) (*GitHub, error) {
 // Name is how a sign-in path names this provider.
 func (g *GitHub) Name() string { return "github" }
 
-// GroupsSource reports whether an organization was named.
-//
-// Without one, every team in every organization somebody belongs to would map
-// to roles here, so empty means groups are not read — the right answer for a
-// deployment assigning roles directly, and a lockout for one about to switch
-// to group-bound roles.
-func (g *GitHub) GroupsSource() bool { return g.organization != "" }
-
 // Issuer is who mints the identifiers GitHub hands over.
 //
 // A constant, because there is one: an account identifier is GitHub's own and

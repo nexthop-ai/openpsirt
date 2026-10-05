@@ -227,27 +227,37 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 			"identity", identity)
 	}
 
+	// Group mappings are applied at every start, and decide where roles come
+	// from: any mapping means groups, none means an administrator assigns
+	// them. Each change is recorded in the administrative trail against
+	// configuration, and the whole map is logged, because a group whose
+	// spelling is wrong grants nothing and says nothing.
+	//
 	// A deployment that cannot reach its own administration has one route
 	// back — editing the database by hand — and nobody discovers that at a
-	// good moment. Checked here rather than trusted to have been arranged.
+	// good moment. Applying the mappings refuses one, and changes nothing
+	// when it does.
+	mapped, mode, err := trail.MapGroups(ctx, db.DB, cfg.GroupRoles)
+	switch {
+	case errors.Is(err, access.ErrNobodyAdministers) && len(cfg.GroupRoles) > 0:
+		return fmt.Errorf("nobody can administer this deployment: OPENPSIRT_GROUP_ROLES maps no " +
+			"group to admin, and OPENPSIRT_BOOTSTRAP_ADMINS names nobody who can. Map a group to " +
+			"admin or name somebody there, and start again")
+	case errors.Is(err, access.ErrNobodyAdministers):
+		return fmt.Errorf("nobody can administer this deployment: nobody holds administration, " +
+			"and OPENPSIRT_BOOTSTRAP_ADMINS names nobody who can. Name somebody there and start again")
+	case err != nil:
+		return startupFailed(err, "applying the group mappings named in configuration", cfg)
+	}
+	for _, mapping := range cfg.GroupRoles {
+		logger.Info("group mapped", "mapping", mapping.String(), "grants", mapping.Grants)
+	}
+	for _, mapping := range mapped.Removed {
+		logger.Warn("group mapping withdrawn: configuration no longer states it",
+			"mapping", mapping.String(), "grants", mapping.Grants)
+	}
 	settings := setting.NewStore(db.DB)
-	stored, _, err := settings.Get(ctx, setting.RoleMode)
-	if err != nil {
-		return err
-	}
-	mode := access.AsMode(stored)
 	rights := access.NewStore(db.DB)
-	canAdminister, err := rights.CanAdminister(ctx, mode)
-	if err != nil {
-		return err
-	}
-	if !canAdminister {
-		return fmt.Errorf(
-			"nobody can administer this deployment: %s mode is on with no group bound to "+
-				"administration, and OPENPSIRT_BOOTSTRAP_ADMINS names nobody. Name somebody "+
-				"there and start again",
-			mode)
-	}
 	logger.Info("roles are assigned", "mode", mode)
 
 	// Providers are built at startup so a misconfigured one stops the process
@@ -1019,10 +1029,10 @@ func signInProviders(ctx context.Context, cfg config.Config, logger *slog.Logger
 
 // roleMode reads where roles come from, per request.
 //
-// Read rather than held because an administrator can change it without a
-// restart, and a held copy would keep deriving roles from groups after they
-// turned that off. A read that fails answers with the mode that derives
-// nothing, which is the safe direction.
+// Read rather than held because replicas restart one at a time, and the one
+// that applied configuration last is what every replica has to answer by. A
+// read that fails answers with the mode that derives nothing, which is the
+// safe direction.
 func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 	return func(ctx context.Context) access.Mode {
 		stored, _, err := settings.Get(ctx, setting.RoleMode)

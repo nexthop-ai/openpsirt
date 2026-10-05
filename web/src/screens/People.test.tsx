@@ -51,6 +51,27 @@ describe("the access screen", () => {
     expect(mount.host().textContent).toContain("The group bindings could not be read.");
   });
 
+  it("says where each group mapping is held", async () => {
+    deployment({
+      "/v1/roles/bindings": {
+        data: {
+          items: [
+            { group: "leads", role: "admin" },
+            { group: "psirt", role: "private-read" },
+            { group: "kernel", product: "sonic", role: "public-triage" },
+          ],
+          total: 3,
+        },
+      },
+    });
+    mount.render(screen(<People who={admin} />));
+    await settle();
+    const rows = [...mount.host().querySelectorAll("tr")].map((row) => row.textContent ?? "");
+    expect(rows).toContain("leadsWhole deploymentadmin");
+    expect(rows).toContain("psirtEvery productprivate-read");
+    expect(rows).toContain("kernelsonicpublic-triage");
+  });
+
   it("offers withdrawing a role only to an administrator", async () => {
     deployment();
     mount.render(screen(<People who={admin} />));

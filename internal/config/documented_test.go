@@ -96,10 +96,12 @@ func loaderReads(t *testing.T) map[string]string {
 	return reads
 }
 
-// readBy is the reader a setting of each kind is read with. A list is read as
-// text and split, which is how the environment carries one.
+// readBy is the reader a setting of each kind is read with. A list and the
+// group mappings are read as text and split, which is how the environment
+// carries them.
 var readBy = map[kind]string{
 	text: "text", list: "text", number: "number", duration: "duration", boolean: "boolean",
+	groupRoles: "text",
 }
 
 // The table is what the loader reads, in both directions.

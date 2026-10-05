@@ -216,13 +216,6 @@ func (o *OIDC) Issuer() string { return o.issuer }
 // Name is how a sign-in path names this provider.
 func (o *OIDC) Name() string { return o.name }
 
-// GroupsSource reports whether a claim carrying group membership was named.
-//
-// Empty means groups are never read: the lookup is of a claim nobody sets, so
-// every claim set reads as having none. The name is trimmed where it is
-// stored, so the claim reported here is the claim a sign-in reads.
-func (o *OIDC) GroupsSource() bool { return o.groupsClaim != "" }
-
 // Begin returns where to send the browser.
 func (o *OIDC) Begin(_ context.Context, redirectURI string) (string, Pending, error) {
 	// The nonce is what ties the identity token that comes back to this

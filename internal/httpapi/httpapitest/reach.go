@@ -34,7 +34,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
-	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
 // DeclaredBody builds a body the endpoint would accept, so that what a test
@@ -66,13 +65,6 @@ func DeclaredBody(method, path, name string) io.Reader {
 	if strings.HasSuffix(path, "/exploited-here") {
 		return strings.NewReader(
 			`{"known_at": "2026-09-20T14:00:00Z", "grounds": "A customer sent captures."}`)
-	}
-	if strings.HasSuffix(path, "/roles/bindings") {
-		// A body the schema accepts, so that a refusal is about the asker
-		// rather than about the request. Validation runs before the handler,
-		// so an invalid body answers 422 whoever sends it — which measures
-		// nothing about who may bind a group to a role.
-		return strings.NewReader(`{"group": "` + name + `", "product": "mine", "role": "public-read"}`)
 	}
 	return strings.NewReader(`{"name": "` + name + `"}`)
 }
@@ -546,15 +538,6 @@ func DeclaredScope(t *testing.T, asks any) string {
 	return out.Scope
 }
 
-// saying is a provider that reports whether it has a source of groups, and
-// nothing else. What is under test is the answer to that one question.
-type saying struct {
-	*StubProvider
-	groups bool
-}
-
-func (s *saying) GroupsSource() bool { return s.groups }
-
 // Deriving is r with the role-assignment mode wired, answering group-bound or
 // direct.
 //
@@ -598,30 +581,6 @@ func Deriving(t *testing.T, r *Reach, groups bool) *Reach {
 	with := *r
 	with.Handler = handler
 	return &with
-}
-
-// WithProvider is the server again, with one sign-in provider that either has
-// a source of groups or has not.
-func WithProvider(t *testing.T, r *Reach, groups bool) http.Handler {
-	t.Helper()
-	files, err := attach.NewFiles(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	sources, err := access.ParseSources("192.0.2.1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
-		core.Deps{
-			DB: r.DB, Queue: queue.New(r.DB, queue.DefaultOptions()), Files: files,
-			Access: access.NewResolver(r.Rights,
-				access.Trust{Header: TestHeader, From: sources}),
-			Providers: map[string]signin.Provider{
-				"one": &saying{StubProvider: &StubProvider{}, groups: groups},
-			},
-		})
-	return handler
 }
 
 // ShownAs is the display name the cast is seeded with: never a

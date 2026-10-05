@@ -25,8 +25,10 @@
 {{- if and .Values.scanner.persistence.enabled .Values.scanner.persistence.existingClaim }}
 {{- fail "set scanner.persistence.enabled or scanner.persistence.existingClaim, not both: the claim this chart would make is not created when you name one of your own, so enabling it here would be silently ignored" }}
 {{- end }}
-{{- if not .Values.auth.bootstrapAdmins }}
-{{- fail "set auth.bootstrapAdmins: the process refuses to start until somebody can administer it, and a deployment nobody can administer has one route back in — editing the database by hand" }}
+{{- $adminGroup := false }}
+{{- range .Values.auth.groupRoles }}{{- if has "admin" (.roles | default list) }}{{- $adminGroup = true }}{{- end }}{{- end }}
+{{- if not (or .Values.auth.bootstrapAdmins $adminGroup) }}
+{{- fail "set auth.bootstrapAdmins, or map a group to admin in auth.groupRoles: the process refuses to start until somebody can administer it, and a deployment nobody can administer has one route back in — editing the database by hand" }}
 {{- end }}
 {{- $providers := 0 }}
 {{- if .Values.auth.oidc.issuer }}{{ $providers = add1 $providers }}{{ end }}
@@ -52,6 +54,39 @@
 {{- end }}
 {{- if and .Values.auth.trustedHeader.name (not .Values.auth.trustedHeader.sources) }}
 {{- fail "set auth.trustedHeader.sources: a header named with nothing to trust it from is a header anybody can set" }}
+{{- end }}
+{{- $roles := list "approver" "assigner" "public-read" "private-read" "public-triage" "private-triage" "admin" "audit" }}
+{{- range $i, $entry := .Values.auth.groupRoles }}
+{{- if not $entry.group }}
+{{- fail (printf "auth.groupRoles[%d] names no group: an entry grants its roles to the members of one group" $i) }}
+{{- end }}
+{{- if not $entry.roles }}
+{{- fail (printf "auth.groupRoles[%d] (%s) names no roles: an entry with none grants nothing" $i $entry.group) }}
+{{- end }}
+{{- if and (hasKey $entry "products") (not $entry.products) }}
+{{- fail (printf "auth.groupRoles[%d] (%s) names an empty products list, which would be every product: leave products out for every product" $i $entry.group) }}
+{{- end }}
+{{- range $entry.products }}
+{{- if not (toString .) }}
+{{- fail (printf "auth.groupRoles[%d] (%s) names an empty product" $i $entry.group) }}
+{{- end }}
+{{- end }}
+{{- range $entry.roles }}
+{{- if not (has . $roles) }}
+{{- fail (printf "auth.groupRoles[%d] (%s): %q is not a role. The roles are %s" $i $entry.group . (join ", " $roles)) }}
+{{- end }}
+{{- if and $entry.products (has . (list "admin" "audit")) }}
+{{- fail (printf "auth.groupRoles[%d] (%s): %s is held over the deployment rather than on a product, so it takes no products. Give it an entry of its own without them" $i $entry.group .) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.auth.groupRoles }}
+{{- $oidcGroups := and .Values.auth.oidc.issuer .Values.auth.oidc.groupsClaim }}
+{{- $githubTeams := and .Values.auth.github.clientID .Values.auth.github.org }}
+{{- $headerGroups := and .Values.auth.trustedHeader.name .Values.auth.trustedHeader.groupsHeader }}
+{{- if not (or $oidcGroups $githubTeams $headerGroups) }}
+{{- fail "set a source of groups for auth.groupRoles: auth.github.org, auth.oidc.groupsClaim, or auth.trustedHeader.groupsHeader. Without one every arrival belongs to no group, so nobody would hold any role" }}
+{{- end }}
 {{- end }}
 {{- if or (and .Values.mail.server (not .Values.mail.from)) (and .Values.mail.from (not .Values.mail.server)) }}
 {{- fail "set mail.server and mail.from together, or neither: a server with nobody to send as sends nothing, and nothing is what an operator who configured half of it would never find out" }}
@@ -190,6 +225,10 @@ spec:
             {{- end }}
             - name: OPENPSIRT_TRUSTED_GROUPS_DELIMITER
               value: {{ .Values.auth.trustedHeader.groupsDelimiter | quote }}
+            {{- end }}
+            {{- if .Values.auth.groupRoles }}
+            - name: OPENPSIRT_GROUP_ROLES
+              value: {{ include "openpsirt.groupRoles" . | quote }}
             {{- end }}
             {{- with .Values.outbound.excluded }}
             - name: OPENPSIRT_OUTBOUND_EXCLUDED
