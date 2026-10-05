@@ -374,7 +374,11 @@ function Tokens() {
                 // what used it stays answerable — and so that withdrawing is
                 // visibly something rather than a button that appears to do
                 // nothing.
-                <tr key={row.name} className="row" style={{ opacity: row.withdrawn ? 0.55 : 1 }}>
+                <tr
+                  key={`${row.name} ${row.created_at}`}
+                  className="row"
+                  style={{ opacity: row.withdrawn ? 0.55 : 1 }}
+                >
                   <td className="id">{row.name}</td>
                   <td>
                     {row.product ? (

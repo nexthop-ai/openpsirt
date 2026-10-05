@@ -134,7 +134,7 @@ func registerKeys(api huma.API, a core.Administering) {
 			key, minted, err := store.NewKey(ctx, in.Body.Name, scope)
 			switch {
 			case database.IsDuplicate(err):
-				return huma.Error409Conflict("a key already has that name")
+				return huma.Error409Conflict("a key in force already has that name")
 			case errors.Is(err, access.ErrNoKeyName):
 				return huma.Error422UnprocessableEntity(err.Error())
 			case err != nil:

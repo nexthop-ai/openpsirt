@@ -767,7 +767,7 @@ function Credentials({ me }: { me: Who }) {
             <tbody>
               {keyRows.map((key) => (
                 <tr
-                  key={`key ${key.name}`}
+                  key={`key ${key.name} ${key.created_at}`}
                   className="row"
                   style={{ opacity: key.withdrawn ? 0.55 : 1 }}
                 >
@@ -813,7 +813,7 @@ function Credentials({ me }: { me: Who }) {
               ))}
               {tokenRows.map((token) => (
                 <tr
-                  key={`token ${token.owner} ${token.name}`}
+                  key={`token ${token.owner} ${token.name} ${token.created_at}`}
                   className="row"
                   style={{ opacity: token.withdrawn ? 0.55 : 1 }}
                 >

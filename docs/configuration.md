@@ -1161,4 +1161,5 @@ going back to v0.4.0.
 
 | After the upgrade from v0.5.0 | |
 |---|---|
-| Going back to v0.5.0 | Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's `POST /v1/roles/bindings` |
+| A withdrawn API key's or personal token's name | May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it |
+| Going back to v0.5.0 | Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's `POST /v1/roles/bindings`. A withdrawn key or token sharing its name with another is renamed after its row, as `ci #7`; the one in force keeps the name, and with none in force the oldest does |

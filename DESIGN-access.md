@@ -605,6 +605,7 @@ being applied correctly to it.
 | A key reads back its own receipts and nothing else | The same holds for the documents it sent and what its own uploads changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many builds somebody else runs |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
+| A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so the new key reads back nothing the withdrawn one sent. Withdrawing by name reaches the key in force |
 
 ## Provider sign-in
 
@@ -981,7 +982,7 @@ for work it was never scoped for.
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration and the audit permission are dropped by narrowing to a product or to named roles, because both are held over the whole deployment, and a token narrowed to one product that still administered or read every record of the deployment would not be narrowed. An unnarrowed token keeps both |
 | A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and without this the only way to get one is to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
 | Expiry is not optional, with a maximum an administrator sets | A credential that never runs out is one nobody ever revokes. Revoking marks rather than deletes, so what used it stays answerable |
-| A token's name is stored folded and matched exactly, unique to its owner | Its owner types it to mint the token and again to withdraw it, the same reason a key's name is folded. A name taken in other capitals is refused as taken |
+| A token's name is stored folded and matched exactly, unique among its owner's tokens in force | Its owner types it to mint the token and again to withdraw it, the same reason a key's name is folded. A name taken in other capitals is refused as taken, and a withdrawn token's name may be given to a new one. Withdrawing by name reaches the token in force |
 
 Every credential says which kind it is. Pipeline keys and personal tokens carry
 distinct fixed prefixes, so resolution dispatches on the prefix rather than

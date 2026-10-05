@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -690,6 +691,75 @@ func TestAReadingTokenCannotWriteOnItsOwnersCase(t *testing.T) {
 			if got := subject.OnCaseToAct(f.products["sonic"], issue); got != c.acts {
 				t.Errorf("a token %s writes on the case: %v, want %v", c.what, got, c.acts)
 			}
+		}
+	})
+}
+
+// A name is unique among the keys in force, so a withdrawn key's name may be
+// given to a new one, and a key in force keeps it from a second.
+func TestAWithdrawnKeysNameMayBeGivenAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		scope := access.Scope{ProductID: f.products["sonic"]}
+		first, _, err := f.store.NewKey(ctx, "nightly", scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.NewKey(ctx, "Nightly", scope); !database.IsDuplicate(err) {
+			t.Errorf("a second key in force under the name answered %v", err)
+		}
+		if err := f.store.Revoke(ctx, first.ID); err != nil {
+			t.Fatal(err)
+		}
+		second, secret, err := f.store.NewKey(ctx, "nightly", scope)
+		if err != nil {
+			t.Fatalf("the withdrawn key's name was not given again: %v", err)
+		}
+		if _, err := f.store.ResolveKey(ctx, secret); err != nil {
+			t.Errorf("the new key does not authenticate: %v", err)
+		}
+		if _, _, err := f.store.NewKey(ctx, "nightly", scope); !database.IsDuplicate(err) {
+			t.Errorf("a key in force under a reused name was not protected: %v", err)
+		}
+		if err := f.store.Revoke(ctx, second.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.NewKey(ctx, "nightly", scope); err != nil {
+			t.Errorf("a name withdrawn twice was not given a third time: %v", err)
+		}
+	})
+}
+
+// A token's name is unique among its owner's tokens in force, and looking one
+// up by name finds the one in force over a withdrawn one of the same name.
+func TestAWithdrawnTokensNameMayBeGivenAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "someone", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		first, _, err := f.store.NewToken(ctx, person.ID, "laptop", nil, nil, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.RevokeToken(ctx, first.ID); err != nil {
+			t.Fatal(err)
+		}
+		withdrawn, err := f.store.TokenByName(ctx, person.ID, "laptop")
+		if err != nil || withdrawn.ID != first.ID {
+			t.Errorf("with none in force, the name found %+v (%v), want the withdrawn one", withdrawn, err)
+		}
+		second, _, err := f.store.NewToken(ctx, person.ID, "Laptop", nil, nil, time.Hour, 0)
+		if err != nil {
+			t.Fatalf("the withdrawn token's name was not given again: %v", err)
+		}
+		if _, _, err := f.store.NewToken(ctx, person.ID, "laptop", nil, nil, time.Hour, 0); !errors.Is(err, access.ErrTokenNamed) {
+			t.Errorf("a second token in force under the name answered %v", err)
+		}
+		found, err := f.store.TokenByName(ctx, person.ID, "laptop")
+		if err != nil || found.ID != second.ID {
+			t.Errorf("the name found %+v (%v), want the token in force", found, err)
 		}
 	})
 }

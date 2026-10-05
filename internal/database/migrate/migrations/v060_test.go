@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -295,4 +296,98 @@ func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
 	if compared == 0 || compared != len(declared) {
 		t.Errorf("compared %d of the %d tables declared", compared, len(declared))
 	}
+}
+
+// Upgraded, a credential in force holds its name in force and a withdrawn one
+// holds none, so the withdrawn name may be given again. Rolled back, the one in
+// force keeps the name and the withdrawn one sharing it is renamed after its
+// row, which is the only shape v0.5.0 can hold.
+func TestAV050CredentialsNameInForceSurvivesTheUpgradeAndBack(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		rollBack(t, ctx, db)
+		dbtest.MigrateTo(t, db, v050)
+		at := time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "token-holder", "", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "product" ("name", "display_name", "created_at")`+
+			` VALUES (?, ?, ?)`, "keyed", "Keyed", at).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var product int64
+		if err := db.DB.NewRaw(`SELECT "id" FROM "product" WHERE "name" = ?`, "keyed").Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range []struct {
+			name    string
+			revoked any
+		}{{"live", nil}, {"gone", at}} {
+			if _, err := db.DB.NewRaw(`INSERT INTO "api_key" ("name", "secret_hash", "product_id",`+
+				` "created_at", "revoked_at") VALUES (?, ?, ?, ?, ?)`,
+				k.name, "digest-"+k.name, product, at, k.revoked).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.DB.NewRaw(`INSERT INTO "personal_token" ("name", "secret_hash", "person_id",`+
+				` "created_at", "expires_at", "revoked_at") VALUES (?, ?, ?, ?, ?, ?)`,
+				k.name, "token-"+k.name, person.ID, at, at.Add(time.Hour), k.revoked).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		dbtest.MigrateTo(t, db, v060)
+		for _, table := range []string{"api_key", "personal_token"} {
+			for name, want := range map[string]sql.NullString{
+				"live": {String: "live", Valid: true}, "gone": {},
+			} {
+				var got sql.NullString
+				if err := db.DB.NewRaw(`SELECT "live_name" FROM "`+table+`" WHERE "name" = ?`, name).
+					Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				if got != want {
+					t.Errorf("upgraded, %s %q holds %v in force, want %v", table, name, got, want)
+				}
+			}
+			// The withdrawn name given again, in force.
+			columns, values := `"name", "secret_hash", "product_id", "created_at", "live_name"`,
+				[]any{"gone", "again-" + table, product, at, "gone"}
+			if table == "personal_token" {
+				columns, values = `"name", "secret_hash", "person_id", "created_at", "expires_at", "live_name"`,
+					[]any{"gone", "again-" + table, person.ID, at, at.Add(time.Hour), "gone"}
+			}
+			if _, err := db.DB.NewRaw(`INSERT INTO "`+table+`" (`+columns+`) VALUES (?, ?, ?, ?, ?`+
+				strings.Repeat(", ?", len(values)-5)+`)`, values...).Exec(ctx); err != nil {
+				t.Errorf("upgraded, %s refuses a withdrawn name given again: %v", table, err)
+			}
+		}
+
+		if err := schema.Down(ctx, db, quiet()); err != nil {
+			t.Fatalf("roll the upgrade back: %v", err)
+		}
+		for _, table := range []string{"api_key", "personal_token"} {
+			var names []string
+			if err := db.DB.NewRaw(`SELECT "name" FROM "`+table+`" WHERE "revoked_at" IS NULL`+
+				` AND "name" = ?`, "gone").Scan(ctx, &names); err != nil {
+				t.Fatal(err)
+			}
+			if len(names) != 1 {
+				t.Errorf("rolled back, %s holds %d in force named gone, want the one", table, len(names))
+			}
+			var renamed int
+			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "`+table+`" WHERE "revoked_at" IS NOT NULL`+
+				` AND "name" LIKE ?`, "gone #%").Scan(ctx, &renamed); err != nil {
+				t.Fatal(err)
+			}
+			if renamed != 1 {
+				t.Errorf("rolled back, %s renamed %d withdrawn credentials, want the one", table, renamed)
+			}
+			if _, err := db.ExecContext(ctx, `SELECT "`+table+`"."live_name" FROM "`+table+`"`); err == nil {
+				t.Errorf("rolled back, %s still has a name in force", table)
+			}
+		}
+		dbtest.MigrateTo(t, db, v060)
+		leaveAtLatest(t, ctx, db)
+	})
 }

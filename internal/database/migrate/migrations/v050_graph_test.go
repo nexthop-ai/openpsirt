@@ -67,11 +67,16 @@ func identitiesNodesAndSendersComeAcross() upgradeCheck {
 				t.Fatal(err)
 			}
 			person = alice.ID
-			made, _, err := people.NewKey(ctx, "ci-nightly", access.Scope{ProductID: product.ID})
-			if err != nil {
+			// Written as v0.4.0 holds a key, which has no name in force.
+			if _, err := db.DB.NewRaw(`INSERT INTO "api_key" ("name", "secret_hash", "product_id", "created_at")`+
+				` VALUES (?, ?, ?, ?)`, "ci-nightly", "v040-digest", product.ID,
+				time.Now().UTC().Truncate(time.Microsecond)).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			key = made.ID
+			if err := db.DB.NewRaw(`SELECT "id" FROM "api_key" WHERE "name" = ?`, "ci-nightly").
+				Scan(ctx, &key); err != nil {
+				t.Fatal(err)
+			}
 
 			// v0.4.0 recorded a sender by name.
 			now := time.Now().UTC().Truncate(time.Second)

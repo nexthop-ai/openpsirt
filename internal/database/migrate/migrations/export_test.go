@@ -57,6 +57,8 @@ func StatementsV060(engine database.Engine) map[string][]string {
 		"exploited_fix":     obligation[4:],
 		"group_role":        groups[:1],
 		"group_role_all":    groups[1:],
+		"api_key":           credentialV060(typesFor(engine))[:2],
+		"personal_token":    credentialV060(typesFor(engine))[2:],
 	}
 }
 

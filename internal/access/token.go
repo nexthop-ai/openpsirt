@@ -107,7 +107,9 @@ func (s *Store) NewToken(ctx context.Context, personID int64, name string, produ
 		Holds:     narrowed,
 		CreatedAt: now, ExpiresAt: now.Add(lifetime).Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(token).Exec(ctx); err != nil {
+	// The name in force is written beside the name and cleared when the token
+	// is withdrawn, so its owner may give a withdrawn name to a new one.
+	if _, err := s.db.NewInsert().Model(token).Value("live_name", "?", name).Exec(ctx); err != nil {
 		if database.IsDuplicate(err) {
 			return nil, "", ErrTokenNamed
 		}
@@ -301,7 +303,7 @@ var ErrNoSuchToken = refusal.New("no token is recorded under that name")
 
 // ErrTokenNamed refuses a token under a name its owner already holds a token
 // by, in any capitals.
-var ErrTokenNamed = refusal.New("you already hold a token by that name")
+var ErrTokenNamed = refusal.New("you already hold a token in force by that name")
 
 // Tokens lists somebody's own credentials.
 func (s *Store) Tokens(ctx context.Context, personID int64) ([]Token, error) {
@@ -331,6 +333,7 @@ func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 	revoked := s.now().Truncate(time.Microsecond)
 	result, err := s.db.NewUpdate().Model((*Token)(nil)).
 		Set("revoked_at = ?", revoked).
+		Set("live_name = NULL").
 		Where("id = ?", id).Where("revoked_at IS NULL").Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("revoke a token: %w", err)
@@ -341,11 +344,16 @@ func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 // TokenByName finds one of somebody's tokens.
 //
 // The name is matched the way it is stored, folded, so any capitals find it.
+// A withdrawn name may be held by a token in force as well, and that one is
+// the answer; with none in force it is the latest withdrawn, so withdrawing it
+// again says it is already withdrawn.
 func (s *Store) TokenByName(ctx context.Context, personID int64, name string) (*Token, error) {
 	name = credentialNamed(name)
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
-		Where("person_id = ?", personID).Where("name = ?", name).Scan(ctx); err != nil {
+		Where("person_id = ?", personID).Where("name = ?", name).
+		OrderExpr("CASE WHEN live_name IS NULL THEN 1 ELSE 0 END, id DESC").
+		Limit(1).Scan(ctx); err != nil {
 		return nil, database.FromRead(err,
 			fmt.Errorf("no token of yours is called %q: %w", name, ErrNoSuchToken),
 			fmt.Sprintf("look up the token called %q", name))
