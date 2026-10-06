@@ -80,6 +80,7 @@ type run struct {
 	image        string // this tree's image
 	hostURL      string // the rehearsal database, as this process reaches it
 	appURL       string // the same database, as a container reaches it
+	attached     string // the engine's container, joined to the rehearsal's network
 	base         string // where the proxy answers, as the administrator
 	log          *os.File
 }
@@ -337,8 +338,11 @@ func (r *run) database(ctx context.Context) error {
 	own.Path = "/" + dbName
 	r.hostURL = own.String()
 	inside := own
-	inside.Host = "host.docker.internal:" + u.Port()
+	inside.Host, r.attached = reachEngine(ctx, u)
 	r.appURL = inside.String()
+	if r.attached != "" {
+		r.note("reached as %s, on the rehearsal's network", inside.Host)
+	}
 
 	db, err := database.Open(ctx, target)
 	if err != nil {
@@ -708,6 +712,11 @@ func (r *run) get(ctx context.Context, path string) (int, []byte, error) {
 // of the release and the scanner's database are kept for the next run.
 func (r *run) clean(ctx context.Context) {
 	_ = exec.CommandContext(ctx, "docker", "rm", "-f", app, proxy).Run()
+	// The engine leaves the network rather than going with it: a network with
+	// a container on it is not removed.
+	if r.attached != "" {
+		_ = exec.CommandContext(ctx, "docker", "network", "disconnect", "-f", network, r.attached).Run() //nolint:gosec // G204: the container this run attached
+	}
 	_ = exec.CommandContext(ctx, "docker", "network", "rm", network).Run()
 	if r.engine != "sqlite" && r.adminURL != "" {
 		if db, err := connect(ctx, r.adminURL); err == nil {

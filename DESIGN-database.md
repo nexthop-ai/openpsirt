@@ -587,6 +587,7 @@ in the gate.
 | The release seeds itself | A fixture written today records what this tree thinks the release wrote. The release's own targets write what a deployment of it holds |
 | Only the docker command is wrapped | The containers, network and ports are renamed so a demo already running is untouched, and the application is pointed at the rehearsal's database. Nothing in the release's targets is edited |
 | Counted with nothing running | A server runs passes that write rows. Counted between the migrations alone, a changed count is the migration's |
+| An engine `make engines-up` made is joined to the rehearsal's network | It publishes its port on this machine's loopback alone, which no container reaches. The container publishing the port the URL names joins the rehearsal's network and is addressed by its name, which holds on Docker Desktop, rootless Docker and Podman alike. An engine on another host is reached through `host.docker.internal` |
 | Everything it made is removed | Pass or fail: its containers, network and database. The release's worktree, both images, the run's directory with its logs, and the scanner's database are kept. `-keep` leaves everything in place |
 
 ## Migration locks
