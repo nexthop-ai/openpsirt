@@ -715,7 +715,7 @@ func (r *run) clean(ctx context.Context) {
 	// The engine leaves the network rather than going with it: a network with
 	// a container on it is not removed.
 	if r.attached != "" {
-		_ = exec.CommandContext(ctx, "docker", "network", "disconnect", "-f", network, r.attached).Run()
+		_ = exec.CommandContext(ctx, "docker", "network", "disconnect", "-f", network, r.attached).Run() //nolint:gosec // G204: the container this run attached
 	}
 	_ = exec.CommandContext(ctx, "docker", "network", "rm", network).Run()
 	if r.engine != "sqlite" && r.adminURL != "" {

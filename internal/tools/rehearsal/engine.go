@@ -29,7 +29,7 @@ func reachEngine(ctx context.Context, u *url.URL) (host, attached string) {
 	if !loopback(u.Hostname()) || u.Port() == "" {
 		return fallback, ""
 	}
-	out, err := exec.CommandContext(ctx, "docker", "ps", "--filter", "publish="+u.Port(),
+	out, err := exec.CommandContext(ctx, "docker", "ps", "--filter", "publish="+u.Port(), //nolint:gosec // G204: a port from the engine URL this tool was given
 		"--format", "{{.Names}}").Output()
 	if err != nil {
 		return fallback, ""
@@ -38,7 +38,7 @@ func reachEngine(ctx context.Context, u *url.URL) (host, attached string) {
 	if len(names) != 1 {
 		return fallback, ""
 	}
-	ports, err := exec.CommandContext(ctx, "docker", "port", names[0]).Output()
+	ports, err := exec.CommandContext(ctx, "docker", "port", names[0]).Output() //nolint:gosec // G204: a container name docker just listed
 	if err != nil {
 		return fallback, ""
 	}
@@ -50,7 +50,7 @@ func reachEngine(ctx context.Context, u *url.URL) (host, attached string) {
 	// join it before the release's container starts. Every release's demo
 	// leaves a network that already exists alone.
 	_ = exec.CommandContext(ctx, "docker", "network", "create", "--subnet", subnet, network).Run()
-	if err := exec.CommandContext(ctx, "docker", "network", "connect", network, names[0]).Run(); err != nil &&
+	if err := exec.CommandContext(ctx, "docker", "network", "connect", network, names[0]).Run(); err != nil && //nolint:gosec // G204: a container name docker just listed
 		!connected(ctx, names[0]) {
 		return fallback, ""
 	}
@@ -85,7 +85,7 @@ func publishedAs(ports, hostPort string) string {
 // connected reports whether a container is on the rehearsal's network already,
 // which is what a second connect answers as an error.
 func connected(ctx context.Context, name string) bool {
-	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format",
+	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", //nolint:gosec // G204: a container name docker just listed
 		"{{range $n, $_ := .NetworkSettings.Networks}}{{$n}} {{end}}", name).Output()
 	return err == nil && strings.Contains(" "+string(out), " "+network+" ")
 }
