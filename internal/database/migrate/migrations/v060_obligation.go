@@ -3,7 +3,7 @@
 
 package migrations
 
-// obligationV060 is the untagged release's declaration of the windows a
+// obligationV060 is v0.6.0's declaration of the windows a
 // deployment counts and the notices given after an attack.
 //
 // v0.2.0's, with the window a window counts from or whether it counts from a

@@ -1,0 +1,6 @@
+# The migrations v0.6.0 tagged, and the digest of each file below its license header.
+last 40
+15e992da0ea361a98e2a03ecdd7ccc15b1e5462684b78b6301bbe5bb0defbfbd  00040_v060.go
+72947f6ccdef149de9867b552845a6f555c2df38e484ff03c23c5782939a290d  v060_credential.go
+aa62611c636d35a177e75efd572b480d60d6cfb2eec3b1d41d5f3aae489730c8  v060_group_role.go
+bd4207cbe617faecfdb4de5b57160c3bf313b229434a679c79845176b52f97e2  v060_obligation.go

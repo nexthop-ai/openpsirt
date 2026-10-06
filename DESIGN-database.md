@@ -251,7 +251,7 @@ The chain is one part per release.
 | 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. A database v0.3.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | None | v0.4.0 changes no schema. Its record carries migration 38 as its last |
 | 39 | v0.5.0: v0.4.0's schema changed into v0.5.0's, and the rows moved with it. § The v0.5.0 upgrade says what it does. A database v0.5.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
-| 40 | The untagged release: v0.5.0's schema changed into the next release's. § The untagged upgrade says what it does. Edited until a tag ships it, and every schema change before that tag edits it rather than adding a migration beside it |
+| 40 | v0.6.0: v0.5.0's schema changed into v0.6.0's, and the rows moved with it. § The v0.6.0 upgrade says what it does. A database v0.6.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -281,7 +281,7 @@ the backup taken before the upgrade, which works on every engine and is exact.
 
 | Rule | |
 |---|---|
-| No migration is applied downward | There is no `openpsirt migrate down`, and the untagged release's migration registers no way back |
+| No migration is applied downward | There is no `openpsirt migrate down`, and migration 40 and every migration after it register no way back |
 | A database ahead of the binary is refused | At startup and by `openpsirt migrate up`, naming both versions and the backup. Its schema may hold what this binary cannot read |
 | The upgrade note says to take a backup first | `docs/configuration.md` § Every upgrade |
 | A migration a release tagged keeps the down function it shipped with | Its file is frozen by digest (§ Release records), so the function stays and nothing calls it. The collapse before 1.0 removes them |
@@ -330,7 +330,7 @@ check-engines` fails when either did not run it.
 Each release after v0.1.0 that changes the schema carries one migration that
 changes the schema the release before it built into its own, and moves the rows
 with it: 37 carries a database from v0.1.0 to v0.2.0, 38 from v0.2.0 to v0.3.0,
-and 39 from v0.4.0 to v0.5.0. v0.4.0 changes no schema and
+39 from v0.4.0 to v0.5.0, and 40 from v0.5.0 to v0.6.0. v0.4.0 changes no schema and
 carries none. A database a release built applies the ones after its own; a
 fresh install walks the whole chain. They are shaped the way every migration after 1.0 will be.
 
@@ -502,7 +502,7 @@ most of what a check costs, so the checks share the build.
 | A v0.4.0 database with an undated flaw and a dated one under duplicate rulings — one covering a claim found here beside one from outside, one withdrawn, one bringing the date in within the threshold and one past it — and an exploited issue | Upgraded, the undated flaw is dated by the first and moved by the one within the threshold, the one past it waits, each is a movement naming its ruling and proposer, the dated flaw keeps its date, and the issue is listed on no day |
 | A v0.4.0 claim | Upgraded, it records no build it was made on |
 
-### The untagged upgrade
+### The v0.6.0 upgrade
 
 Migration 40. A window gains the window it counts from, a column that holds a
 null, with a reference to the window table, and whether it counts from the
