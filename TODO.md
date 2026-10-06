@@ -32,7 +32,7 @@ Required for 1.0, and wrong to do earlier.
 
 | | |
 |---|---|
-| Today | A new database is built by replaying every migration since v0.1.0. Migrations 1 to 36 build v0.1.0's schema, 37 upgrades v0.1.0 to v0.2.0, 38 upgrades v0.2.0 to v0.3.0, and 39 upgrades v0.4.0 to v0.5.0. v0.4.0 changed no schema. Each tagged release's migrations are frozen, and a test enforces it |
+| Today | A new database is built by replaying every migration since v0.1.0. Migrations 1 to 36 build v0.1.0's schema, 37 upgrades v0.1.0 to v0.2.0, 38 upgrades v0.2.0 to v0.3.0, 39 upgrades v0.4.0 to v0.5.0, and 40 upgrades v0.5.0 to v0.6.0. v0.4.0 changed no schema. Each tagged release's migrations are frozen, and a test enforces it |
 | Problem | At 1.0 a fresh install would still build v0.1.0's schema and then reshape it three times. Nobody needs that history |
 | Work | Replace every migration with one migration that creates the 1.0 schema directly, plus one that upgrades a database built by the last 0.x release. Document that a database from an older 0.x release is first upgraded to that last 0.x release |
 | Waits on | The 1.0 schema being final. Also open: what happens to the frozen records of v0.1.0 to v0.3.0, whose files still carry the down functions nothing calls (`DESIGN-database.md` § Forward only) |

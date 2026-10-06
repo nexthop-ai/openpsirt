@@ -3,7 +3,7 @@
 
 package migrations
 
-// groupRoleV060 is the untagged release's declaration of what configuration
+// groupRoleV060 is v0.6.0's declaration of what configuration
 // maps provider groups to.
 //
 // A mapping names its product by the name configuration states, so a product

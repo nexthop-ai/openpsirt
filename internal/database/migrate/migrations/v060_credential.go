@@ -7,7 +7,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// credentialV060 is the untagged release's declaration of pipeline keys and
+// credentialV060 is v0.6.0's declaration of pipeline keys and
 // personal tokens.
 //
 // v0.1.0's, with the name in force beside the name. A name is unique among the

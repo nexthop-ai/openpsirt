@@ -17,8 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// v060 is the migration the untagged release carries v0.5.0's schema across
-// with.
+// v060 is the migration v0.6.0 carries v0.5.0's schema across with.
 const v060 = 40
 
 // A v0.5.0 database holding a window, a notice and group mappings is upgraded.
@@ -26,7 +25,7 @@ const v060 = 40
 // a notice or a fix, the notice says none of what a notice may now carry, the
 // record names no fix release, the role mappings are gone and the
 // administration mapping remains.
-func TestAV050DatabaseUpgradesToTheUntaggedRelease(t *testing.T) {
+func TestAV050DatabaseUpgradesToV060(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)

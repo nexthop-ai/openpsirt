@@ -17,9 +17,9 @@ func init() {
 	goose.AddMigrationNoTxContext(upV060, nil)
 }
 
-// The v0.5.0 release's schema changed into the untagged release's.
+// The v0.5.0 release's schema changed into v0.6.0's.
 //
-// Edited until a tag ships it. Run in one transaction of its own, the way
+// Run in one transaction of its own, the way
 // migrations 37 to 39 are, and for the same reason: SQLite rebuilds the table
 // it cannot alter, and its foreign keys are switched off before the
 // transaction begins.
@@ -27,9 +27,9 @@ func upV060(ctx context.Context, sqldb *sql.DB) error {
 	return inV020(ctx, sqldb, upgradeV060)
 }
 
-// upgradeV060 changes the schema v0.5.0 built into the untagged release's.
+// upgradeV060 changes the schema v0.5.0 built into v0.6.0's.
 //
-// The v060 files beside this one hold the untagged release's declaration of
+// The v060 files beside this one hold v0.6.0's declaration of
 // every table this changes.
 //
 //   - A window may count from the first notice naming another window. Every
