@@ -13,39 +13,30 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
-	"github.com/uptrace/bun"
 )
 
 // v050 is the migration v0.5.0 carries v0.4.0's schema and rows across with.
 const v050 = 39
 
 // upgradeCheck is one thing the upgrade to v0.5.0 holds to: the rows it puts
-// in a v0.4.0 database, what it asserts once that database is upgraded, what
-// a roll back it expects to be refused, what it asserts once rolled back, and
-// what it asserts once upgraded again. A phase a check has nothing to say in is nil.
+// in a v0.4.0 database, and what it asserts once that database is upgraded. A
+// phase a check has nothing to say in is nil.
 //
 // Every check's rows sit in one database, so a check reads its own rows by
 // what identifies them rather than by counting a table. The checks are built
 // once and seeded once per engine, so a seed resets whatever state it keeps.
 type upgradeCheck struct {
-	name       string
-	seed       func(t *testing.T, ctx context.Context, db *database.DB)
-	upgraded   func(t *testing.T, ctx context.Context, db *database.DB)
-	refused    func(t *testing.T, ctx context.Context, db *database.DB)
-	rolledBack func(t *testing.T, ctx context.Context, db *database.DB)
-	// upgradedAgain asserts once the rolled back database is upgraded a
-	// second time.
-	upgradedAgain func(t *testing.T, ctx context.Context, db *database.DB)
+	name     string
+	seed     func(t *testing.T, ctx context.Context, db *database.DB)
+	upgraded func(t *testing.T, ctx context.Context, db *database.DB)
 }
 
-// A v0.4.0 database holding the rows every check puts in it is upgraded once
-// and rolled back once, and each check asserts its half at each step as a
-// subtest named for what it holds.
+// A v0.4.0 database holding the rows every check puts in it is upgraded once,
+// and each check asserts what it holds as a subtest named for it.
 //
-// One build serves every check. Building v0.4.0 walks every migration down and
-// up again, 1.4 s to 2.6 s on SQLite and most of what a check costs.
-func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
+// One build serves every check, because building v0.4.0 is most of what a
+// check costs.
+func TestAV040DatabaseUpgradesToV050(t *testing.T) {
 	checks := []upgradeCheck{
 		administrationIsLeftToTheName(),
 		everyNameIsMarkedAsNotRecordedByHand(),
@@ -63,7 +54,7 @@ func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
 	}
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v030)
 		for _, check := range checks {
 			if check.seed != nil {
@@ -73,19 +64,6 @@ func TestAV040DatabaseUpgradesToV050AndBack(t *testing.T) {
 
 		dbtest.MigrateTo(t, db, v050)
 		phase(t, ctx, db, "upgraded", checks, func(c upgradeCheck) phaseFunc { return c.upgraded })
-		phase(t, ctx, db, "refused", checks, func(c upgradeCheck) phaseFunc { return c.refused })
-		// A refusal that was not refused rolled the database back, and every
-		// check after it would fail for that rather than for what it names.
-		if at, err := schema.Version(ctx, db); err != nil || at != v050 {
-			t.Fatalf("after the refused roll backs the database is at %d, want %d: %v", at, v050, err)
-		}
-
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll the upgrade back: %v", err)
-		}
-		phase(t, ctx, db, "rolled back", checks, func(c upgradeCheck) phaseFunc { return c.rolledBack })
-		dbtest.MigrateTo(t, db, v050)
-		phase(t, ctx, db, "upgraded again", checks, func(c upgradeCheck) phaseFunc { return c.upgradedAgain })
 		leaveAtLatest(t, ctx, db)
 	})
 }
@@ -108,7 +86,7 @@ func phase(t *testing.T, ctx context.Context, db *database.DB, name string, chec
 // Upgraded, a name in configuration is administration of its own, and the
 // column administration granted here is written to holds only that. What a
 // group derived stays derived, and a grant made here with no name beside it
-// stays. Rolled back, the name is written back into the column v0.4.0 reads.
+// stays.
 func administrationIsLeftToTheName() upgradeCheck {
 	want := map[string]bool{"named": false, "named-and-derived": true, "granted-here": true}
 	return upgradeCheck{
@@ -145,13 +123,6 @@ func administrationIsLeftToTheName() upgradeCheck {
 				t.Errorf("upgraded, a named administrator does not administer: %v", err)
 			}
 		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			for identity := range want {
-				if !columnSaysAdministers(t, ctx, db, identity) {
-					t.Errorf("rolled back, %s's column no longer says they administer", identity)
-				}
-			}
-		},
 	}
 }
 
@@ -166,8 +137,7 @@ func columnSaysAdministers(t *testing.T, ctx context.Context, db *database.DB, i
 }
 
 // Upgraded, every name an issue answers to is marked as not recorded by hand,
-// and a name recorded afterwards can say it was. Rolled back, the column is
-// gone and the names are still there.
+// and a name recorded afterwards can say it was.
 func everyNameIsMarkedAsNotRecordedByHand() upgradeCheck {
 	var issue int64
 	return upgradeCheck{
@@ -191,19 +161,6 @@ func everyNameIsMarkedAsNotRecordedByHand() upgradeCheck {
 			}
 			if !byHand(t, ctx, db, "CVE-2026-0002") {
 				t.Error("upgraded, a name recorded by hand does not say so")
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var names int
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "vulnerability_alias" WHERE "vulnerability_id" = ?`,
-				issue).Scan(ctx, &names); err != nil {
-				t.Fatal(err)
-			}
-			if names != 2 {
-				t.Errorf("rolled back, %d names remain, want 2", names)
-			}
-			if err := db.DB.NewRaw(`SELECT "by_hand" FROM "vulnerability_alias"`).Scan(ctx, new(bool)); err == nil {
-				t.Error("rolled back, the column is still there")
 			}
 		},
 	}
@@ -237,8 +194,7 @@ func byHand(t *testing.T, ctx context.Context, db *database.DB, name string) boo
 }
 
 // Upgraded, every destination v0.4.0 held is a webhook belonging to the
-// deployment. Rolled back, a chat channel goes, because v0.4.0 cannot reach
-// one, and the webhook stays as it was.
+// deployment.
 func everyDestinationIsAWebhook() upgradeCheck {
 	// The webhook v0.4.0 held and the chat channel added once upgraded. Other
 	// checks may write destinations too, so these are the rows it reads.
@@ -275,16 +231,6 @@ func everyDestinationIsAWebhook() upgradeCheck {
 				destinations[1], "*", "", "", admin, time.Now().UTC().Truncate(time.Microsecond),
 				"slack", "C0123").Exec(ctx); err != nil {
 				t.Fatal(err)
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var names []string
-			if err := db.DB.NewRaw(`SELECT "name" FROM "outbound" WHERE "name" IN (?) ORDER BY "name"`,
-				bun.List(destinations)).Scan(ctx, &names); err != nil {
-				t.Fatal(err)
-			}
-			if len(names) != 1 || names[0] != destinations[0] {
-				t.Errorf("rolled back, the destinations are %v, want the webhook alone", names)
 			}
 		},
 	}

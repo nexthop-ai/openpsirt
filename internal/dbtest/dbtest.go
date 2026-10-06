@@ -854,11 +854,10 @@ func migrateFresh(url string) error {
 
 // Tables is every table the migrations make, in an order safe to delete from.
 //
-// Exported so that a test about the schema as a whole can be about the schema
-// as a whole. A test naming a handful of tables by hand catches a Down that
-// forgot its DROP only for the tables somebody thought of. The list this
-// returns is the one a test in this package holds to the migrated schema in
-// both directions, which makes it the whole of them.
+// Exported for the upgrade rehearsal, which counts the rows of every table a
+// database holds. The list this returns is the one a test in this package
+// holds to the migrated schema in both directions, which makes it the whole of
+// them.
 func Tables() []string { return slices.Clone(tables) }
 
 // tables lists every table, in an order safe to delete from: children before
@@ -1075,7 +1074,7 @@ func clear(ctx context.Context, db *database.DB) error {
 	if err == nil {
 		return nil
 	}
-	// A database a test rolled back to an earlier release lacks the tables a
+	// A database a test migrated to an earlier release's schema lacks the tables a
 	// later one added, and asking after one that is not there fails the whole
 	// statement. The version is asked only then, because the ordinary reset
 	// runs between every pair of tests and a round trip there is paid by all
@@ -1138,8 +1137,8 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 			}
 		}
 		// A window points at the window it counts from, the same shape again.
-		// The column arrived with the notice's places, so a database rolled
-		// back before them has neither.
+		// The column arrived with the notice's places, so a database migrated
+		// to a schema before them has neither.
 		if occupied["obligation_window"] && slices.Contains(tables, "told_place") {
 			if _, err := tx.ExecContext(ctx, `UPDATE "obligation_window" SET "from_window_id" = NULL`); err != nil {
 				return fmt.Errorf("detach windows counting from others: %w", err)

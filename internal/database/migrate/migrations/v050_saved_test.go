@@ -11,7 +11,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // A kept query is rewritten one parameter at a time, and a parameter the
@@ -40,12 +39,11 @@ func TestAKeptQueryIsRewrittenIntoTheWordsTheListReads(t *testing.T) {
 }
 
 // Upgraded, every kept filter reads in the words v0.5.0's list takes, and one
-// already in them is left alone. Rolled back, it stays in those words, which
-// v0.4.0's list reads too.
+// already in them is left alone.
 func TestAnUpgradeRewritesKeptFiltersIntoTheWordsTheListReads(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v030)
 
 		at := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -82,15 +80,6 @@ func TestAnUpgradeRewritesKeptFiltersIntoTheWordsTheListReads(t *testing.T) {
 		for name, query := range want {
 			if got := keptQuery(t, db, name); got != query {
 				t.Errorf("upgraded, %s reads %q, want %q", name, got, query)
-			}
-		}
-
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll the upgrade back: %v", err)
-		}
-		for name, query := range want {
-			if got := keptQuery(t, db, name); got != query {
-				t.Errorf("rolled back, %s reads %q, want %q", name, got, query)
 			}
 		}
 		leaveAtLatest(t, ctx, db)

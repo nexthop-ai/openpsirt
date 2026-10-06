@@ -24,9 +24,7 @@
 //  2. The migrations, applied on their own, and the version they reach.
 //  3. The counts again, against what the upgrade tables in the database
 //     design document say happens to each table's rows.
-//  4. Rolled back to the release's last migration and applied again, and the
-//     counts each time.
-//  5. The server started on it, the open findings of every build against
+//  4. The server started on it, the open findings of every build against
 //     what the release showed, and every GET its API document lists asked
 //     once, none of which may answer 5xx.
 //
@@ -174,8 +172,8 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 	}
-	record, err := released.Read(releases, r.from)
-	if err != nil {
+	// Read to refuse a release with no record, which has no schema to compare.
+	if _, err := released.Read(releases, r.from); err != nil {
 		return nil, fmt.Errorf("the release record for %s: %w", r.from, err)
 	}
 	current, err := schema.Expected()
@@ -269,33 +267,6 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	faults = append(faults, prefix("upgrade", Compare(held, upgraded, with(rules(r.from), dropped(removed))))...)
-
-	r.step("rolled back to %d and applied again", record.Last)
-	for i := record.Last; i < current; i++ {
-		if err := r.migrate(ctx, "down"); err != nil {
-			return nil, err
-		}
-	}
-	if applied, err := r.version(ctx); err != nil {
-		return nil, err
-	} else if applied != record.Last {
-		faults = append(faults, fmt.Sprintf("rolled back, the schema is at %d, and %s's last migration is %d", applied, r.from, record.Last))
-	}
-	rolled, err := r.count(ctx, fromTables)
-	if err != nil {
-		return nil, err
-	}
-	// Rolling back does not put the dropped settings back: nothing in the
-	// earlier release's schema says what they held once they are gone.
-	faults = append(faults, prefix("rollback", Compare(held, rolled, dropped(removed)))...)
-	if err := r.migrate(ctx, "up"); err != nil {
-		return nil, err
-	}
-	again, err := r.count(ctx, upgradedTables)
-	if err != nil {
-		return nil, err
-	}
-	faults = append(faults, prefix("reapplied", Compare(upgraded, again, nil))...)
 
 	if _, ok := notes[r.from]; ok {
 		r.step("what the upgrade note asks of an operator")

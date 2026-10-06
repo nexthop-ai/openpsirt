@@ -41,14 +41,14 @@ func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 		}
 
 		// One migration short, which is what a build deployed ahead of its
-		// migration step is looking at.
-		if err := schema.Down(ctx, db, silent()); err != nil {
-			t.Fatalf("roll back one: %v", err)
+		// migration step is looking at. Emptied and built up to it, and
+		// brought back to the latest when the test ends.
+		short, readErr := schema.Expected()
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
-		// Not the test's own context: it is canceled by the time a cleanup
-		// runs, so the repair would be issued against a dead context and the
-		// database would stay one migration short for every test after this.
-		t.Cleanup(func() { _ = schema.Up(context.WithoutCancel(ctx), db, silent()) })
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, short-1)
 
 		err := schemaIsCurrent(ctx, db, silent())
 		if err == nil {
@@ -89,12 +89,11 @@ func TestStartingWithoutMigratingChecksTheSchemaFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := schema.Up(t.Context(), db, silent()); err != nil {
-		t.Fatalf("migrate up: %v", err)
+	wanted, err := schema.Expected()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := schema.Down(t.Context(), db, silent()); err != nil {
-		t.Fatalf("roll back one: %v", err)
-	}
+	dbtest.MigrateTo(t, db, wanted-1)
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -120,11 +119,10 @@ func TestStartingWithoutMigratingChecksTheSchemaFirst(t *testing.T) {
 	}
 }
 
-func TestASchemaAheadOfThisBuildStillServes(t *testing.T) {
-	// A rollback has to keep working. The migrations a newer binary applied
-	// are additive, so the older one's queries still run — and refusing here
-	// would leave a bad deployment with no way back, which is the opposite of
-	// what a startup check is for.
+// A database is only ever upgraded, so a schema a later release applied is one
+// this build refuses, whether it is asked to serve it or to migrate it, and the
+// refusal says both versions and the way back.
+func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		if err := schema.Up(ctx, db, silent()); err != nil {
@@ -134,10 +132,9 @@ func TestASchemaAheadOfThisBuildStillServes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected: %v", err)
 		}
-		// Standing in for a newer binary's migration, recorded the way the
+		// Standing in for a later release's migration, recorded the way the
 		// library records one. The tables it would have made are beside the
-		// point: what is being pinned is that a higher applied version is not
-		// a refusal.
+		// point: what is pinned is that a higher applied version is refused.
 		if _, err := db.ExecContext(ctx,
 			`INSERT INTO "goose_db_version" ("version_id", "is_applied") VALUES (?, ?)`,
 			wanted+1, true); err != nil {
@@ -148,8 +145,19 @@ func TestASchemaAheadOfThisBuildStillServes(t *testing.T) {
 				`DELETE FROM "goose_db_version" WHERE "version_id" = ?`, wanted+1)
 		})
 
-		if err := schemaIsCurrent(ctx, db, silent()); err != nil {
-			t.Errorf("a rollback was refused its own schema: %v", err)
+		for what, err := range map[string]error{
+			"serving":   schemaIsCurrent(ctx, db, silent()),
+			"migrating": schema.Up(ctx, db, silent()),
+		} {
+			if err == nil {
+				t.Errorf("%s a schema ahead of this build was allowed", what)
+				continue
+			}
+			for _, want := range []string{itoa(wanted + 1), itoa(wanted), "restore the backup"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
+				}
+			}
 		}
 	})
 }

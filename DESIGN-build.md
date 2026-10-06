@@ -433,7 +433,8 @@ from, which the default world does not match.
 The harness empties the database before every test, so a test does not empty
 it again before it starts. Emptying it part way through is for a test that
 starts over within itself: one seeding a second world, one whose cases each need
-an empty table, and a migration test rolling the schema back.
+an empty table, and a migration test dropping the schema to apply an earlier
+release's.
 
 What the seed returns on SQLite is one value shared by every test copying the
 template, and those tests run beside each other, so a test reads it and does

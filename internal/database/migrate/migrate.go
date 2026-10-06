@@ -145,21 +145,6 @@ func UpTo(ctx context.Context, db *database.DB, logger *slog.Logger, version int
 	})
 }
 
-// Down rolls back the most recent migration.
-func Down(ctx context.Context, db *database.DB, logger *slog.Logger) error {
-	return withLock(ctx, db, logger, func(ctx context.Context) error {
-		if err := goose.DownContext(ctx, db.DB.DB, "."); err != nil {
-			return fmt.Errorf("roll back migration: %w", err)
-		}
-		version, err := goose.GetDBVersionContext(ctx, db.DB.DB)
-		if err != nil {
-			return fmt.Errorf("read schema version: %w", err)
-		}
-		logger.Info("schema rolled back", "version", version)
-		return nil
-	})
-}
-
 // Version reports the schema version currently applied.
 //
 // It performs no schema changes. Asking whether the bookkeeping table exists

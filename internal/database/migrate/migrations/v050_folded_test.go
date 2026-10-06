@@ -8,9 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -29,8 +27,7 @@ var credentialWithdrawnAt = time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
 // and goes on authenticating. Every other is withdrawn if it was in force,
 // with a trail row saying the upgrade did it, and left as it was if it was
 // withdrawn already; each is named by its number, since a name is unique
-// across withdrawn keys too. Rolled back, the names and the withdrawals stay
-// and the upgrade's trail rows go.
+// across withdrawn keys too.
 func keyNamesAreFoldedAndClashesWithdrawn() upgradeCheck {
 	ids := map[string]int64{}
 	var numbered string
@@ -167,12 +164,6 @@ func keyNamesAreFoldedAndClashesWithdrawn() upgradeCheck {
 				t.Errorf("upgraded, the scan sent as DEPLOY reads as sent by %q, want %s", credential, want)
 			}
 		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			check("rolled back", t, ctx, db)
-			if got := upgradeWithdrawals(t, ctx, db, want()["RELEASE"]); got != 0 {
-				t.Errorf("rolled back, %d trail rows record the upgrade's withdrawal, which v0.4.0 has no place for", got)
-			}
-		},
 	}
 }
 
@@ -182,8 +173,7 @@ func keyNamesAreFoldedAndClashesWithdrawn() upgradeCheck {
 // goes on authenticating. Every other is withdrawn if it was in force, with a
 // trail row by the upgrade naming its owner, and left as it was if it was
 // withdrawn already; each is named by its number. Another person's token of
-// the same name is theirs and untouched. Rolled back, the names and the
-// withdrawals stay and the upgrade's trail rows go.
+// the same name is theirs and untouched.
 func tokenNamesAreFoldedAndClashesWithdrawn() upgradeCheck {
 	type made struct {
 		owner int64
@@ -300,20 +290,12 @@ func tokenNamesAreFoldedAndClashesWithdrawn() upgradeCheck {
 					withdrawal(), got)
 			}
 		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			check("rolled back", t, ctx, db)
-			if got := upgradeWithdrawals(t, ctx, db, withdrawal()); got != 0 {
-				t.Errorf("rolled back, %d trail rows record the upgrade's withdrawal, which v0.4.0 has no place for", got)
-			}
-		},
 	}
 }
 
 // Upgraded, each claim a build made records the name it is about folded,
-// beside the name as the producer spelled it, and no version. Rolled back, the
-// columns are gone and the names are as they were.
+// beside the name as the producer spelled it, and no version.
 func claimSubjectsAreFolded() upgradeCheck {
-	var built []string
 	var target int64
 	// A capital outside ASCII, which the engines' own LOWER folds on three
 	// engines and not on SQLite.
@@ -321,10 +303,6 @@ func claimSubjectsAreFolded() upgradeCheck {
 	return upgradeCheck{
 		name: "AnUpgradeFoldsTheNameEachClaimIsAbout",
 		seed: func(t *testing.T, ctx context.Context, db *database.DB) {
-			built = linesOf(describe(t, ctx, db), "suppression", "")
-			if len(built) == 0 {
-				t.Fatal("the v0.4.0 claims table described as nothing, so nothing is compared")
-			}
 			cat := catalog.NewStore(db.DB)
 			product, err := cat.DeclareProduct(ctx, "claimant", "Claimant")
 			if err != nil {
@@ -396,21 +374,6 @@ func claimSubjectsAreFolded() upgradeCheck {
 					t.Errorf("upgraded, the claim about %q folds to %v, want %q",
 						*row.Name, row.Folded, subjects[*row.Name])
 				}
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			back := linesOf(describe(t, ctx, db), "suppression", "")
-			if !slices.Equal(built, back) {
-				t.Errorf("rolled back, the claims table is\n%s\nwhere v0.4.0 built\n%s",
-					strings.Join(back, "\n"), strings.Join(built, "\n"))
-			}
-			var named int
-			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "suppression" WHERE "target_id" = ? AND "subject_name" = ?`,
-				target, "ÉCLAIR-Lib").Scan(ctx, &named); err != nil {
-				t.Fatal(err)
-			}
-			if named != 1 {
-				t.Errorf("rolled back, %d claims carry the producer's spelling, want 1", named)
 			}
 		},
 	}

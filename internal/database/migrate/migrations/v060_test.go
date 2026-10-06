@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,22 +15,21 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // v060 is the migration the untagged release carries v0.5.0's schema across
 // with.
 const v060 = 40
 
-// A v0.5.0 database holding a window and a notice is upgraded, rolled back and
-// upgraded again. Upgraded, the window counts from the moment the attack
-// became known rather than from a notice or a fix, the notice says none of
-// what a notice may now carry, and the record names no fix release. Rolled
-// back, both are still there and what v0.5.0 cannot hold is gone.
-func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
+// A v0.5.0 database holding a window, a notice and group mappings is upgraded.
+// The window counts from the moment the attack became known rather than from
+// a notice or a fix, the notice says none of what a notice may now carry, the
+// record names no fix release, the role mappings are gone and the
+// administration mapping remains.
+func TestAV050DatabaseUpgradesToTheUntaggedRelease(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v050)
 		window, notice := seedV050Obligation(t, ctx, db)
 		// A group mapped as v0.5.0 mapped one, against the product's row, and
@@ -71,7 +69,7 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 		if mapped != 0 {
 			t.Errorf("upgraded, %d of v0.5.0's role mappings remain", mapped)
 		}
-		// Administration stays reachable, in both directions.
+		// Administration stays reachable.
 		var admins int
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "group_admin"`).Scan(ctx, &admins); err != nil {
 			t.Fatal(err)
@@ -91,89 +89,6 @@ func TestAV050DatabaseUpgradesToTheUntaggedReleaseAndBack(t *testing.T) {
 			declarationsAreBuilt(t, ctx, db, migrations.StatementsV060(db.Server.Engine), nil)
 		})
 
-		// What the untagged release holds that v0.5.0 cannot.
-		if _, err := db.DB.NewRaw(`INSERT INTO "obligation_window" ("name", "length_hours",`+
-			` "declared_by", "declared_at", "live_name", "from_window_id", "from_fix")`+
-			` SELECT ?, ?, "declared_by", "declared_at", ?, "id", ? FROM "obligation_window" WHERE "id" = ?`,
-			"Final report", 24*30, "final report", false, window).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.DB.NewRaw(`INSERT INTO "told_place" ("told_id", "position", "place")`+
-			` VALUES (?, ?, ?)`, notice, 0, "Ireland").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.DB.NewRaw(`INSERT INTO "obligation_window" ("name", "length_hours",`+
-			` "declared_by", "declared_at", "live_name", "from_fix")`+
-			` SELECT ?, ?, "declared_by", "declared_at", ?, ? FROM "obligation_window" WHERE "id" = ?`,
-			"Fix available", 24*14, "fix available", true, window).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.DB.NewRaw(`INSERT INTO "stream" ("product_id", "name", "display_name",`+
-			` "kind", "created_at") SELECT "product_id", ?, ?, ?, "recorded_at" FROM "exploited_here"`+
-			` WHERE "id" = (SELECT "exploited_here_id" FROM "told_outside" WHERE "id" = ?)`,
-			"v1.0.1", "v1.0.1", "tag", notice).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.DB.NewRaw(`INSERT INTO "exploited_fix" ("exploited_here_id", "stream_id",`+
-			` "named_by", "named_at", "live_stream_id")`+
-			` SELECT "tod"."exploited_here_id", "st"."id", "tod"."recorded_by", "tod"."recorded_at", "st"."id"`+
-			` FROM "told_outside" AS "tod", "stream" AS "st" WHERE "tod"."id" = ? AND "st"."name" = ?`,
-			notice, "v1.0.1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		// A role a group derived on every product, which v0.5.0 never clears.
-		if _, err := db.DB.NewRaw(`INSERT INTO "role_grant_all" ("person_id", "role", "source", "active", "created_at")`+
-			` SELECT "id", ?, ?, ?, "created_at" FROM "person" WHERE "identity" = ?`,
-			"private-read", "derived", true, "obligation-admin").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll the upgrade back: %v", err)
-		}
-		var derived int
-		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "role_grant_all" WHERE "source" = ?`, "derived").
-			Scan(ctx, &derived); err != nil {
-			t.Fatal(err)
-		}
-		if derived != 0 {
-			t.Errorf("rolled back, %d roles a group derived on every product remain", derived)
-		}
-		var windows, notices int
-		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "obligation_window"`).Scan(ctx, &windows); err != nil {
-			t.Fatal(err)
-		}
-		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "told_outside"`).Scan(ctx, &notices); err != nil {
-			t.Fatal(err)
-		}
-		if windows != 3 || notices != 1 {
-			t.Errorf("rolled back, %d windows and %d notices remain, want 3 and 1", windows, notices)
-		}
-		// Qualified by the table. SQLite reads a bare quoted name that is no
-		// column as a string, and answers.
-		for _, gone := range []string{
-			`SELECT "obligation_window"."from_window_id" FROM "obligation_window"`,
-			`SELECT "told_outside"."reference" FROM "told_outside"`,
-			`SELECT "told_outside"."suspected_malicious" FROM "told_outside"`,
-			`SELECT "place" FROM "told_place"`,
-			`SELECT "obligation_window"."from_fix" FROM "obligation_window"`,
-			`SELECT "stream_id" FROM "exploited_fix"`,
-			`SELECT "role" FROM "group_role_all"`,
-			`SELECT "group_role"."product_name" FROM "group_role"`,
-		} {
-			if _, err := db.ExecContext(ctx, gone); err == nil {
-				t.Errorf("rolled back, %s still answers", gone)
-			}
-		}
-
-		// What v0.5.0 reads: a mapping names its product by row.
-		if _, err := db.DB.NewRaw(`INSERT INTO "group_role" ("group_name", "product_id", "role", "created_at")`+
-			` SELECT ?, "id", ?, "created_at" FROM "product"`, "kernel", "public-read").Exec(ctx); err != nil {
-			t.Errorf("rolled back, v0.5.0 cannot map a group: %v", err)
-		}
-
-		dbtest.MigrateTo(t, db, v060)
 		leaveAtLatest(t, ctx, db)
 	})
 }
@@ -300,24 +215,13 @@ func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
 }
 
 // Upgraded, a credential in force holds its name in force and a withdrawn one
-// holds none, so the withdrawn name may be given again. Rolled back, each
-// table is v0.5.0's again, and every name is unique: the one in force keeps a
-// shared name, the oldest keeps it where none is in force, a withdrawn name
-// nobody shares is kept, and the rest are renamed after their row, stepping
-// past a name already spelled like that number.
-func TestAV050CredentialsNameInForceSurvivesTheUpgradeAndBack(t *testing.T) {
+// holds none, so the withdrawn name may be given again.
+func TestAV050CredentialsNameInForceSurvivesTheUpgrade(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v050)
 		tables := []string{"api_key", "personal_token"}
-		built := map[string][]string{}
-		for _, table := range tables {
-			if built[table] = linesOf(describe(t, ctx, db), table, ""); len(built[table]) == 0 {
-				t.Fatalf("v0.5.0's %s described as nothing, so nothing is compared", table)
-			}
-		}
-
 		at := time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
 		person, err := access.NewStore(db.DB).Ensure(ctx, "token-holder", "", access.Stated(true), nil)
 		if err != nil {
@@ -332,8 +236,8 @@ func TestAV050CredentialsNameInForceSurvivesTheUpgradeAndBack(t *testing.T) {
 			t.Fatal(err)
 		}
 		// insert writes one credential, with its name in force where the
-		// schema has one, and returns its row.
-		insert := func(table, name, secret string, revoked bool, live bool) int64 {
+		// schema has one.
+		insert := func(table, name, secret string, revoked bool, live bool) error {
 			t.Helper()
 			var when any
 			if revoked {
@@ -353,29 +257,25 @@ func TestAV050CredentialsNameInForceSurvivesTheUpgradeAndBack(t *testing.T) {
 				values = append(values, name)
 			}
 			marks := strings.TrimSuffix(strings.Repeat("?, ", len(values)), ", ")
-			if _, err := db.DB.NewRaw(`INSERT INTO "`+table+`" (`+columns+`) VALUES (`+marks+`)`,
-				values...).Exec(ctx); err != nil {
-				t.Fatalf("%s %q: %v", table, name, err)
-			}
-			var id int64
-			if err := db.DB.NewRaw(`SELECT "id" FROM "`+table+`" WHERE "secret_hash" = ?`, secret).
-				Scan(ctx, &id); err != nil {
-				t.Fatal(err)
-			}
-			return id
+			_, err := db.DB.NewRaw(`INSERT INTO "`+table+`" (`+columns+`) VALUES (`+marks+`)`,
+				values...).Exec(ctx)
+			return err
 		}
 		for _, table := range tables {
-			insert(table, "live", table+"-live", false, false)
-			insert(table, "gone", table+"-gone", true, false)
-			insert(table, "alone", table+"-alone", true, false)
+			for _, c := range []struct {
+				name    string
+				revoked bool
+			}{{"live", false}, {"gone", true}} {
+				if err := insert(table, c.name, table+"-"+c.name, c.revoked, false); err != nil {
+					t.Fatalf("%s %q: %v", table, c.name, err)
+				}
+			}
 		}
 
 		dbtest.MigrateTo(t, db, v060)
-		gone := map[string]int64{}
-		twice := map[string]int64{}
 		for _, table := range tables {
 			for name, want := range map[string]sql.NullString{
-				"live": {String: "live", Valid: true}, "gone": {}, "alone": {},
+				"live": {String: "live", Valid: true}, "gone": {},
 			} {
 				var got sql.NullString
 				if err := db.DB.NewRaw(`SELECT "live_name" FROM "`+table+`" WHERE "name" = ?`, name).
@@ -386,53 +286,13 @@ func TestAV050CredentialsNameInForceSurvivesTheUpgradeAndBack(t *testing.T) {
 					t.Errorf("upgraded, %s %q holds %v in force, want %v", table, name, got, want)
 				}
 			}
-			var withdrawn int64
-			if err := db.DB.NewRaw(`SELECT "id" FROM "`+table+`" WHERE "secret_hash" = ?`, table+"-gone").
-				Scan(ctx, &withdrawn); err != nil {
-				t.Fatal(err)
+			if err := insert(table, "gone", table+"-again", false, true); err != nil {
+				t.Errorf("upgraded, %s refuses a withdrawn name given again: %v", table, err)
 			}
-			gone[table] = withdrawn
-			// The withdrawn name given again, in force; a credential already
-			// spelled like the number the withdrawn one would take; and two
-			// withdrawn under one name with none in force.
-			insert(table, "gone", table+"-again", false, true)
-			insert(table, "gone #"+strconv.FormatInt(withdrawn, 10), table+"-numbered", false, true)
-			insert(table, "twice", table+"-twice-1", true, false)
-			twice[table] = insert(table, "twice", table+"-twice-2", true, false)
-		}
-
-		if err := schema.Down(ctx, db, quiet()); err != nil {
-			t.Fatalf("roll the upgrade back: %v", err)
-		}
-		for _, table := range tables {
-			if diff := setDiff(built[table], linesOf(describe(t, ctx, db), table, "")); diff != "" {
-				t.Errorf("rolled back, %s is not v0.5.0's:\n%s", table, diff)
-			}
-			name := func(secret string) string {
-				t.Helper()
-				var got string
-				if err := db.DB.NewRaw(`SELECT "name" FROM "`+table+`" WHERE "secret_hash" = ?`, secret).
-					Scan(ctx, &got); err != nil {
-					t.Fatal(err)
-				}
-				return got
-			}
-			number := strconv.FormatInt(gone[table], 10)
-			for secret, want := range map[string]string{
-				table + "-live":     "live",
-				table + "-alone":    "alone",
-				table + "-again":    "gone",
-				table + "-numbered": "gone #" + number,
-				table + "-gone":     "gone #" + number + ".2",
-				table + "-twice-1":  "twice",
-				table + "-twice-2":  "twice #" + strconv.FormatInt(twice[table], 10),
-			} {
-				if got := name(secret); got != want {
-					t.Errorf("rolled back, %s %s is named %q, want %q", table, secret, got, want)
-				}
+			if err := insert(table, "live", table+"-twice", false, true); err == nil {
+				t.Errorf("upgraded, %s gave a name in force to a second credential", table)
 			}
 		}
-		dbtest.MigrateTo(t, db, v060)
 		leaveAtLatest(t, ctx, db)
 	})
 }

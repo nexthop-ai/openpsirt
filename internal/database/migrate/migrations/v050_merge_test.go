@@ -11,19 +11,12 @@ import (
 )
 
 // Upgraded, every issue v0.4.0 held is read as itself, and the two tables that
-// record a merge exist and are empty. Rolled back, the column and the tables
-// are gone, the schema is v0.4.0's, and the issues are as v0.4.0 held them.
+// record a merge exist and are empty.
 func everyIssueIsReadAsItself() upgradeCheck {
-	var (
-		built  []string
-		issues []int64
-	)
+	var issues []int64
 	return upgradeCheck{
 		name: "AV040DatabaseReadsEveryIssueAsItself",
 		seed: func(t *testing.T, ctx context.Context, db *database.DB) {
-			// Rows change no schema, so this is v0.4.0's whatever the checks
-			// before it wrote.
-			built = describe(t, ctx, db)
 			issues = nil
 			for _, name := range []string{"CVE-2026-1", "GHSA-aaaa-bbbb-cccc"} {
 				issues = append(issues, insertIssue(t, ctx, db, name))
@@ -50,21 +43,6 @@ func everyIssueIsReadAsItself() upgradeCheck {
 			for _, table := range []string{"vulnerability_merge", "decision_superseded"} {
 				if rows := read(t, ctx, db, table, []string{"id"}); len(rows) != 0 {
 					t.Errorf("%s holds %d rows after the upgrade", table, len(rows))
-				}
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			if diff := setDiff(built, describe(t, ctx, db)); diff != "" {
-				t.Errorf("rolled back, the schema differs from v0.4.0's:\n%s", diff)
-			}
-			for _, id := range issues {
-				var left int
-				if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "vulnerability" WHERE "id" = ?`, id).
-					Scan(ctx, &left); err != nil {
-					t.Fatal(err)
-				}
-				if left != 1 {
-					t.Errorf("rolled back, issue %d is gone", id)
 				}
 			}
 		},

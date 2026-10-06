@@ -615,11 +615,9 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // Refused at startup rather than through readiness, which is where every other
 // startup condition is refused and what keeps the previous replica alive.
 //
-// Only when the database is behind. A schema ahead of this build is a
-// rollback, which has to keep working: the migrations a newer binary applied
-// are additive, and refusing here would leave a bad deployment with no way
-// back. The migration from v0.1.0 is not additive, and going back to v0.1.0 is
-// rolling it back with the newer binary first.
+// A schema ahead of this build is refused too. A database is only ever
+// upgraded, so a later release's schema is one this build may not read, and
+// the way back to an earlier release is the backup taken before the upgrade.
 //
 // It compares version numbers, which is less than it sounds. Below 1.0 a
 // schema change edits what declares the thing rather than adding a migration
@@ -643,18 +641,17 @@ func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) 
 				"run \"openpsirt migrate up\" with the same configuration, or set OPENPSIRT_AUTO_MIGRATE=true",
 			applied, wanted)
 	}
-	if applied > wanted {
-		logger.Info("automatic migration is off, and the schema is ahead of this build",
-			"applied", applied, "expected", wanted)
-		return nil
+	if err := schema.NotAhead(ctx, db); err != nil {
+		return err
 	}
 	logger.Info("automatic migration is off, and the schema version is the one this build expects",
 		"version", applied)
 	return nil
 }
 
-// runMigrate applies or rolls back schema changes on their own, so an operator
-// can run them under different credentials and at a time they choose.
+// runMigrate applies schema changes on their own, so an operator can run them
+// under different credentials and at a time they choose. There is no way back
+// down: a database is only ever upgraded.
 func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout *os.File, action string) error {
 	if action == "" {
 		action = "up"
@@ -669,8 +666,6 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 	switch action {
 	case "up":
 		return schema.Up(ctx, db, logger)
-	case "down":
-		return schema.Down(ctx, db, logger)
 	case "status":
 		applied, err := schema.Version(ctx, db)
 		if err != nil {
@@ -693,7 +688,7 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 			db.Server.Engine, db.Server.Version, applied, wanted, state)
 		return err
 	}
-	return fmt.Errorf("unknown migrate action %q: want up, down or status", action)
+	return fmt.Errorf("unknown migrate action %q: want up or status", action)
 }
 
 func newLogger(cfg config.Config, w *os.File) *slog.Logger {

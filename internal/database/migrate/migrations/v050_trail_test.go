@@ -5,7 +5,6 @@ package migrations_test
 
 import (
 	"context"
-	"slices"
 	"testing"
 	"time"
 
@@ -23,8 +22,6 @@ var trailRows = []string{"triage-floor", "operator"}
 
 // Upgraded, every trail row v0.4.0 wrote is a person's and keeps its person,
 // and configuration may then record a change with no person behind it.
-// Rolled back, a row configuration wrote goes, because v0.4.0 has no place
-// for a change nobody made, and the table is the one v0.4.0 built.
 func everyTrailRowIsAPersons() upgradeCheck {
 	var (
 		built []string
@@ -63,27 +60,6 @@ func everyTrailRowIsAPersons() upgradeCheck {
 			if err := trail.NewStore(db.DB).RecordByConfiguration(ctx, trail.Account, trailRows[1],
 				nil, trail.Said(trail.NamedInConfiguration, true)); err != nil {
 				t.Fatalf("upgraded, configuration could not record a change: %v", err)
-			}
-		},
-		rolledBack: func(t *testing.T, ctx context.Context, db *database.DB) {
-			var left []int64
-			if err := db.DB.NewRaw(`SELECT "by" FROM "admin_change" WHERE "about" IN (?)`,
-				bun.List(trailRows)).Scan(ctx, &left); err != nil {
-				t.Fatal(err)
-			}
-			if len(left) != 1 || left[0] != admin {
-				t.Errorf("rolled back, the trail holds rows by %v, want the person's alone", left)
-			}
-			back := linesOf(describe(t, ctx, db), "admin_change", "")
-			for _, line := range built {
-				if !slices.Contains(back, line) {
-					t.Errorf("rolled back, the trail lacks %q", line)
-				}
-			}
-			for _, line := range back {
-				if !slices.Contains(built, line) {
-					t.Errorf("rolled back, the trail has %q, which v0.4.0 did not build", line)
-				}
 			}
 		},
 	}

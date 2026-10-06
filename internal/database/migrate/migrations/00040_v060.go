@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	goose.AddMigrationNoTxContext(upV060, downV060)
+	goose.AddMigrationNoTxContext(upV060, nil)
 }
 
 // The v0.5.0 release's schema changed into the untagged release's.
@@ -25,11 +25,6 @@ func init() {
 // transaction begins.
 func upV060(ctx context.Context, sqldb *sql.DB) error {
 	return inV020(ctx, sqldb, upgradeV060)
-}
-
-// downV060 puts back the schema v0.5.0 built.
-func downV060(ctx context.Context, sqldb *sql.DB) error {
-	return inV020(ctx, sqldb, downgradeV060)
 }
 
 // upgradeV060 changes the schema v0.5.0 built into the untagged release's.
@@ -83,48 +78,4 @@ func upgradeV060(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	return u.liveNames()
-}
-
-// downgradeV060 puts back what v0.5.0 reads.
-//
-// The places a notice named and the releases a record named as carrying its
-// fix go with their tables, and a notice's reference and what it said about
-// malice with their columns. A window counting from another's notice or from
-// a fix counts from the moment the attack became known again, which is the
-// only start v0.5.0 has. The role mappings configuration made go with their
-// tables, and so does any role a group derived on every product, which v0.5.0
-// would never clear. Mappings to admin and audit are left alone. A credential
-// sharing its name with another is renamed after its row, as v0.5.0's own
-// upgrade renames one, unless it is the one in force or, with none in force,
-// the oldest.
-func downgradeV060(ctx context.Context, tx bun.Tx) error {
-	if err := namesUnique(ctx, tx); err != nil {
-		return err
-	}
-	if err := dropTables(ctx, tx.Tx, "told_place", "exploited_fix",
-		"group_role_all", "group_role"); err != nil {
-		return err
-	}
-	if err := apply(ctx, tx.Tx, []string{
-		// v0.5.0 derives nothing across every product, so it never clears a
-		// role a group derived there, and the member would keep it for good.
-		`DELETE FROM "role_grant_all" WHERE "source" = 'derived'`,
-		`ALTER TABLE "told_outside" DROP COLUMN "reference"`,
-		`ALTER TABLE "told_outside" DROP COLUMN "suspected_malicious"`,
-	}); err != nil {
-		return err
-	}
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
-	if err := u.create(groupRoleV050(t), "group_role"); err != nil {
-		return err
-	}
-	if err := u.everNames(); err != nil {
-		return err
-	}
-	return u.narrow(narrowing{table: "obligation_window",
-		keys: []string{"obligation_window_from_fk"}, columns: []string{"from_window_id", "from_fix"}})
 }

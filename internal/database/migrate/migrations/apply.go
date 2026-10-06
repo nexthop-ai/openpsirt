@@ -93,8 +93,8 @@ func apply(ctx context.Context, tx *sql.Tx, statements []string) error {
 	return nil
 }
 
-// dropTables drops tables in the order given, which is the order a rollback
-// needs: a table is dropped before anything it points at.
+// dropTables drops tables in the order given, which has to put a table before
+// anything it points at.
 func dropTables(ctx context.Context, tx *sql.Tx, names ...string) error {
 	for _, name := range names {
 		// Quoted, like every other identifier in the schema. A reserved word

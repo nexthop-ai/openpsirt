@@ -11,6 +11,7 @@ package schema
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -24,13 +25,39 @@ import (
 )
 
 // Up brings the database up to the schema this build expects.
+//
+// A database a later release has upgraded is refused. A database is only ever
+// upgraded, so this build has nothing it could do to one, and the way back to
+// an earlier release is the backup taken before the upgrade.
 func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
-	return migrate.Up(ctx, db, logger)
+	if err := NotAhead(ctx, db); err != nil {
+		return err
+	}
+	if err := migrate.Up(ctx, db, logger); err != nil {
+		return err
+	}
+	// Asked again once the lock is released: a later release may have
+	// migrated while this one waited on it, which leaves this one nothing to
+	// apply and a schema it cannot read.
+	return NotAhead(ctx, db)
 }
 
-// Down rolls back the most recent migration.
-func Down(ctx context.Context, db *database.DB, logger *slog.Logger) error {
-	return migrate.Down(ctx, db, logger)
+// NotAhead refuses a database whose schema is newer than this build's.
+func NotAhead(ctx context.Context, db *database.DB) error {
+	applied, err := Version(ctx, db)
+	if err != nil {
+		return err
+	}
+	wanted, err := Expected()
+	if err != nil {
+		return err
+	}
+	if applied > wanted {
+		return fmt.Errorf("the database is at schema version %d, which a later release applied, and "+
+			"this build carries %d: a database is only ever upgraded, so deploy the release that "+
+			"upgraded it, or restore the backup taken before that upgrade", applied, wanted)
+	}
+	return nil
 }
 
 // Version reports the schema version currently applied.

@@ -559,7 +559,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	grants := map[int64][]Role{}
 	for _, grant := range held {
 		// A row naming something that is not a role grants nothing. It can
-		// only get there by hand or by a downgrade, and reading it as "some
+		// only get there by hand, and reading it as "some
 		// role" would make it a grant of whatever the reader assumes.
 		if !grant.Role.Valid() {
 			continue

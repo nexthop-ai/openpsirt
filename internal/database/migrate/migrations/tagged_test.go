@@ -29,7 +29,7 @@ func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 	}
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rollBack(t, ctx, db)
+		dbtest.Empty(t, db)
 		for _, r := range tagged {
 			dbtest.MigrateTo(t, db, r.Last)
 			taggedSchema(t, r.Version, db.Server.Engine, describe(t, ctx, db))
@@ -71,7 +71,7 @@ func TestWriteTheSchemaAReleaseTags(t *testing.T) {
 	t.Run("engines", func(t *testing.T) {
 		dbtest.Each(t, func(t *testing.T, db *database.DB) {
 			ctx := t.Context()
-			rollBack(t, ctx, db)
+			dbtest.Empty(t, db)
 			if err := schema.Up(ctx, db, quiet()); err != nil {
 				t.Fatalf("migrate to the latest: %v", err)
 			}

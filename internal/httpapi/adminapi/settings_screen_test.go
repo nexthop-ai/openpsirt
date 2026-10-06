@@ -219,9 +219,8 @@ func TestEverySettingNameThePackageDeclaresIsOfferedOrExempt(t *testing.T) {
 	// be set, and nothing caught it because the test named them by hand — so
 	// the twenty-eighth would have gone the same way.
 	//
-	// Read out of the package that declares them, the way the rollback test in
-	// this same branch reads `dbtest.Tables()`: a name added there and left out
-	// of `settable` fails this rather than waiting for somebody to notice.
+	// Read out of the package that declares them: a name added there and left
+	// out of `settable` fails this rather than waiting for somebody to notice.
 	source, err := os.ReadFile(filepath.Join("..", "..", "setting", "setting.go"))
 	if err != nil {
 		t.Fatal(err)
