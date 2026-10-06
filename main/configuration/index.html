@@ -3621,7 +3621,7 @@ from, and every section after it.</p>
 <tbody>
 <tr>
 <td>Back the database up</td>
-<td>On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it</td>
+<td>It is the only way back to the earlier release: a database is only ever upgraded, and this release refuses to start against a database a later one upgraded. On MySQL and MariaDB it is also what recovers an upgrade that fails part way</td>
 </tr>
 <tr>
 <td>Stop every process of the earlier release</td>
@@ -3633,9 +3633,11 @@ from, and every section after it.</p>
 </tr>
 </tbody>
 </table>
-<p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back that
-carries a migration, run with this build before the earlier one is deployed.
-The section for the release gone back to says what else it needs.</p>
+<p>Going back to the earlier release is restoring that backup and deploying the
+earlier release against it. Every release before this one starts against a
+database a later release upgraded and serves it, failing on what changed, so
+redeploying one, <code>helm rollback</code> included, is not going back: restore the
+backup first.</p>
 <h3 id="from-v010">From v0.1.0<a class="headerlink" href="#from-v010" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3673,8 +3675,6 @@ The section for the release gone back to says what else it needs.</p>
 </tr>
 </tbody>
 </table>
-<p>v0.1.0 started against a schema that was not taken back down reports it
-current and cannot read it.</p>
 <h3 id="from-v020">From v0.2.0<a class="headerlink" href="#from-v020" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3732,12 +3732,9 @@ current and cannot read it.</p>
 </tr>
 </tbody>
 </table>
-<p>Going back to v0.2.0 leaves patch branch lookups off, because v0.2.0 reads its
-own setting for them: turn them on again under its Settings.</p>
 <h3 id="from-v030">From v0.3.0<a class="headerlink" href="#from-v030" title="Permanent link">&para;</a></h3>
 <p>v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
-one does, and going back to v0.3.0 takes the same <code>openpsirt migrate down</code> as
-going back to v0.4.0.</p>
+one does.</p>
 <table>
 <thead>
 <tr>
@@ -3879,10 +3876,6 @@ going back to v0.4.0.</p>
 <td>One person's saved filters of one name in several products</td>
 <td>The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as <code>Kernel (Router)</code>, with a number after it where that name is taken too</td>
 </tr>
-<tr>
-<td>Going back to v0.4.0</td>
-<td>Every key and token keeps its folded or numbered name, and one the upgrade withdrew stays withdrawn. The changes list's record of those withdrawals goes, because v0.4.0 has no place for a change no person made. Every saved filter is kept in every product, under the name the upgrade left it</td>
-</tr>
 </tbody>
 </table>
 <h3 id="from-v050">From v0.5.0<a class="headerlink" href="#from-v050" title="Permanent link">&para;</a></h3>
@@ -3898,6 +3891,10 @@ going back to v0.4.0.</p>
 <td>Group mappings come from <code>OPENPSIRT_GROUP_ROLES</code> alone, and any mapping means roles come from groups. v0.5.0 kept mappings made through <code>/v1/roles/bindings</code>, and the upgrade removes those on a product. <code>POST</code> and <code>DELETE</code> on <code>/v1/roles/bindings</code> and <code>PUT</code> on <code>/v1/roles/mode</code> are gone</td>
 <td>Before upgrading, read <code>GET /v1/roles/mode</code>. If it answers <code>group-bound</code>, list the mappings with <code>GET /v1/roles/bindings</code> and write them into <code>OPENPSIRT_GROUP_ROLES</code>. If it answers <code>direct</code>, leave the variable unset: a mapping would switch the deployment to roles from groups and set aside every role assigned under People</td>
 </tr>
+<tr>
+<td><code>openpsirt migrate down</code> is gone, and a database a later release upgraded is refused at startup. v0.5.0 rolled a database back to an earlier release and served one ahead of it</td>
+<td>Take a backup before every upgrade, as <a href="#every-upgrade">Every upgrade</a> says; going back is restoring it</td>
+</tr>
 </tbody>
 </table>
 <table>
@@ -3911,10 +3908,6 @@ going back to v0.4.0.</p>
 <tr>
 <td>A withdrawn API key's or personal token's name</td>
 <td>May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it</td>
-</tr>
-<tr>
-<td>Going back to v0.5.0</td>
-<td>Mappings to admin and audit are kept, so administration stays reachable. Mappings to a role on a product are gone, and a deployment that took roles from groups still does: re-create them through v0.5.0's <code>POST /v1/roles/bindings</code>. A withdrawn key or token sharing its name with another is renamed after its row, as <code>ci #7</code>; the one in force keeps the name, and with none in force the oldest does</td>
 </tr>
 </tbody>
 </table>
