@@ -516,18 +516,18 @@ func (s *Store) Begin(ctx context.Context, run Run) (*Run, error) {
 	return &run, nil
 }
 
-// LastRecordsVersion is the CVE record snapshot the newest finished run
-// against a build read, or empty where that run read none or none has
-// finished. A run that failed is not counted: it narrowed nothing, and a
-// snapshot it could not read is no evidence of what the build was scanned
-// with.
+// LastRecordsVersion is the newest CVE record snapshot any run against a build
+// read, or empty where none ever read one.
+//
+// Any run, finished or not and failed or not: one that applied what a record
+// closed and then failed has still closed it, and a later run that read none
+// does not undo that.
 func (s *Store) LastRecordsVersion(ctx context.Context, targetID int64) (string, error) {
 	var runs []Run
 	err := s.db.NewSelect().Model(&runs).
 		Column("records_version").
 		Where("target_id = ?", targetID).
-		Where("finished_at IS NOT NULL").
-		Where("failure = ?", "").
+		Where("records_version <> ?", "").
 		Order("id DESC").
 		Limit(1).
 		Scan(ctx)

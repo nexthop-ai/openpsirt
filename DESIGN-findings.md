@@ -1150,11 +1150,16 @@ The lines are kept on the closed row, because the snapshot the run read is
 replaced by the next. The run records which snapshot it read, beside the
 scanner's data version (REQ-13).
 
-| A run without a snapshot to read | |
+| A scan without a snapshot to read | |
 |---|---|
-| One that cannot be read | Fails, and says so |
-| None held, where the build's last finished run read one | Fails, naming the snapshot that run read. A replica restarted on scratch space holds none until its first fetch, and a scan then would open every finding a record closed, which the next scan would close again |
+| One that cannot be read | Waits, saying why |
+| None held, where any run of the build read one | Waits, naming the newest snapshot one read. A replica restarted on scratch space holds none until its first fetch, and a scan then would open every finding a record closed, which the next scan would close again. Any run rather than the last: one that closed findings and then failed has still closed them |
 | None held, where no run of the build has read one | Runs, and narrows nothing |
+
+A scan that waits is asked before its run begins, and its job goes back on the
+queue for five minutes without spending an attempt (`DESIGN-queue.md`
+§ Failure handling). Failed, the job would be set aside after a few minutes,
+and a run begun keeps the schedule from asking again for a day.
 
 The register lists the findings closed this way under their own reason, with
 the lines. A closure saying the issue was never present is in no deadline

@@ -96,12 +96,25 @@ func (r *Runner) Once(ctx context.Context) (*Outcome, error) {
 		return nil, err
 	}
 
+	// Asked before the run begins, and a scan that has to wait hands its job
+	// back untried: a failed attempt would set the job aside after a few
+	// minutes, and a run begun would keep the schedule from asking again for
+	// a day.
+	records, wait := r.narrowedWith(ctx, job.Reference)
+	if wait != nil {
+		r.logger.Warn("a scan waits for the CVE record snapshot", "target", job.Reference, "reason", wait)
+		if err := r.queue.Postpone(ctx, job.ID, r.name, untilRecords, wait.Error()); err != nil {
+			return nil, fmt.Errorf("hand back a scan waiting for the CVE record snapshot: %w", err)
+		}
+		return nil, nil
+	}
+
 	// The claim is renewed while the scan runs. A scan of a large image
 	// legitimately takes longer than a claim is honored for with nothing heard
 	// from the worker, and without renewal a second worker would take the job
 	// over and scan the same target alongside this one.
 	working, release := r.queue.Holding(ctx, job.ID, r.name, r.logger)
-	outcome, err := r.scan(working, job.Reference)
+	outcome, err := r.scan(working, job.Reference, records)
 	taken := release()
 
 	ending := r.queue.Settle(ctx, job, r.name, "target", r.logger, err, taken, nil)
@@ -167,8 +180,44 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 // somebody ignores.
 const unexplainedAlert = 5
 
+// untilRecords is how long a scan waiting for the CVE record snapshot is put
+// back for. A fetch takes minutes.
+const untilRecords = 5 * time.Minute
+
+// narrowedWith is the CVE record snapshot a scan of a target narrows with, or
+// why the scan has to wait for one.
+//
+// A snapshot that cannot be read is waited for: run without it, every finding
+// a record had closed opens again, and closes again on the next run that reads
+// one. So is a snapshot absent where any run of the build read one, which is
+// what a replica restarted on scratch space holds until its first fetch lands.
+// A build no run ever narrowed is scanned without one.
+func (r *Runner) narrowedWith(ctx context.Context, reference string) (*cverecord.Snapshot, error) {
+	records, err := r.records.Current()
+	if err != nil {
+		return nil, err
+	}
+	if records != nil || r.records == nil {
+		return records, nil
+	}
+	targetID, err := strconv.ParseInt(reference, 10, 64)
+	if err != nil {
+		// The scan reports a reference that is not a target, as it always has.
+		return nil, nil
+	}
+	last, err := finding.NewStore(r.db.DB).LastRecordsVersion(ctx, targetID)
+	switch {
+	case err != nil:
+		return nil, err
+	case last != "":
+		return nil, fmt.Errorf("no CVE record snapshot is held in %s, and this build was "+
+			"last scanned with the one of %s", r.records.Dir(), last)
+	}
+	return nil, nil
+}
+
 // scan runs the scanner over one target's contents.
-func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
+func (r *Runner) scan(ctx context.Context, reference string, records *cverecord.Snapshot) (*Outcome, error) {
 	targetID, err := strconv.ParseInt(reference, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("job names %q, which is not a target: %w", reference, err)
@@ -179,25 +228,7 @@ func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
 		return nil, err
 	}
 
-	// Read before the run begins, so the run records the snapshot it read.
-	// A snapshot that cannot be read fails the run rather than narrowing
-	// nothing: run without it, every finding a record had closed opens again,
-	// and closes again on the next run that reads one. A snapshot that is
-	// absent where the build's last run read one fails it for the same
-	// reason, which is what a replica restarted on scratch space holds until
-	// its first fetch lands.
 	findings := finding.NewStore(r.db.DB)
-	records, unreadable := r.records.Current()
-	if unreadable == nil && records == nil && r.records != nil {
-		last, err := findings.LastRecordsVersion(ctx, targetID)
-		switch {
-		case err != nil:
-			unreadable = err
-		case last != "":
-			unreadable = fmt.Errorf("no CVE record snapshot is held in %s, and this build's last "+
-				"run read the one of %s", r.records.Dir(), last)
-		}
-	}
 
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: targetID, Scanner: r.scanner.Name(), RanHere: true,
@@ -207,12 +238,7 @@ func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
 		return nil, err
 	}
 
-	var outcome *Outcome
-	var result Result
-	err = unreadable
-	if err == nil {
-		outcome, result, err = r.assess(ctx, targetID, run.ID, components, records, findings)
-	}
+	outcome, result, err := r.assess(ctx, targetID, run.ID, components, records, findings)
 	// The run is recorded as having ended either way. A scanner that stopped
 	// working is otherwise indistinguishable from a product that stopped
 	// having problems — and a shutdown that canceled the scan must not also

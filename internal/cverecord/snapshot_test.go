@@ -165,6 +165,34 @@ func TestAThirdPartysAffectedLineStopsTheAuthoritysNarrowing(t *testing.T) {
 	}
 }
 
+func TestALineWithStatusChangesReadFromAnArchiveNarrowsNothing(t *testing.T) {
+	// The record format's own spelling: a range unaffected from 1.0 that
+	// turns back to affected at 1.5. Read as a plain range, 1.7 would narrow.
+	body := published("CVE-2026-7", "PUBLISHED", "2026-10-07T00:00:00Z", map[string]any{
+		"vendor": "zlib", "product": "zlib", "cpes": []string{"cpe:2.3:a:zlib:zlib:*:*:*:*:*:*:*:*"},
+		"versions": []map[string]any{{
+			"version": "1.0", "lessThan": "2.0", "status": "unaffected", "versionType": "semver",
+			"changes": []map[string]any{{"at": "1.5", "status": "affected"}},
+		}},
+	})
+	dir := t.TempDir()
+	if err := cverecord.Build(listArchive(t, map[string][]byte{
+		"CVE-2026-7.json":     body,
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T00:00:00Z", kernelEntry),
+	}), dir, ""); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := cverecord.NewHeld(dir).Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	zlib := graph.Described{Name: "zlib", Version: "1.7", Purl: "pkg:generic/zlib@1.7",
+		CPE: "cpe:2.3:a:zlib:zlib:1.7:*:*:*:*:*:*:*"}
+	if snapshot.Decide([]string{"CVE-2026-7"}, zlib).Narrows() {
+		t.Error("a line whose status changes inside it narrowed a release")
+	}
+}
+
 func TestAnArchiveHoldingNoRecordsIsRefused(t *testing.T) {
 	archive := listArchive(t, map[string][]byte{"README.md": []byte("nothing")})
 	if err := cverecord.Build(archive, t.TempDir(), ""); err == nil {

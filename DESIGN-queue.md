@@ -63,6 +63,7 @@ afterwards.
 | A claim that can no longer be reclaimed is set aside by a pass of its own | A job left in the claimed state reads everywhere else as work somebody is doing, and a worker that died is not something any act by a person is the moment to notice. Folded into the claim instead, it is a range update every worker runs on every poll over the rows every other worker is claiming — which on MySQL deadlocks six workers against one another rather than handing out work |
 | One replica buries | Every replica running the same range update is the same contention between processes that folding it into the claim caused between workers |
 | Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
+| Work that cannot start yet is put back untried, with a delay and the reason | Something it needs has not arrived, which is not a failure of the work. The attempt the claim counted is given back, so waiting never sets a job aside, and the reason is kept where a failure's would be |
 
 ### Set-aside work
 

@@ -28,8 +28,8 @@ const format = 1
 // header is the first line of a snapshot.
 type header struct {
 	Format int `json:"format"`
-	// Taken is the newest moment any kept record was updated, which is the
-	// moment the snapshot describes.
+	// Taken is the newest moment any record read was updated, withdrawn and
+	// rejected ones included, which is the moment the snapshot describes.
 	Taken time.Time `json:"taken"`
 	// From is the published file the snapshot was read from, where it was
 	// fetched. The fetcher compares it with what is published now.

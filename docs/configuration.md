@@ -447,7 +447,7 @@ themselves, and a finding a record excludes closes as `unaffected`.
 | Which snapshot a run read | Recorded with the run, beside the scanner's data version |
 | A snapshot that stops moving | Raised with the same condition as the scanner's data, after the same span |
 | Fetching | The day's archive of every record, from the CVE List's releases on GitHub, checked hourly. About 620 MB to download, about 1.3 GB on the volume while it is read, and half a megabyte kept |
-| Without a snapshot | A build whose last scan read one is not scanned until one is held again, which on scratch space is until the first fetch after a restart. A build never scanned with one is scanned without |
+| Without a snapshot | A build any scan of which read one waits, its scan put back on the queue every five minutes without spending an attempt, until one is held again: on scratch space, until the first fetch after a restart. A build never scanned with one is scanned without |
 
 ### An air-gapped install
 
@@ -1197,10 +1197,12 @@ one does.
 | After the upgrade from v0.5.0 | |
 |---|---|
 | A withdrawn API key's or personal token's name | May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it |
+
 ### From v0.6.0
 
 | Change | What to do |
 |---|---|
 | Each replica fetches the CVE List's daily archive from `github.com`, which hands the download to `release-assets.githubusercontent.com` or `objects.githubusercontent.com`. About 620 MB a day, and about 1.3 GB on the scanner's volume while it is read | Where those hosts cannot be reached, set `OPENPSIRT_RECORDS_UPDATE=false` and place a snapshot from `make cve-records` in `OPENPSIRT_RECORDS_DIR`; otherwise the fetch logs a failure every hour and nothing narrows. Size the scanner's volume for the 1.3 GB beside the scanner's own data |
 | The first scan of each build after the snapshot arrives closes the findings the records exclude, as `unaffected` | Nothing. They are listed in the register under that reason, with the record's lines. A kernel build may close thousands at once |
+| Compliance rate and the register's met column | Nothing. A finding closed as invalid or unaffected is in neither, for every period, so a rate read before the upgrade may differ from the same period read after it |
 

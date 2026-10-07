@@ -776,32 +776,65 @@ func TestARunRecordsTheCVERecordSnapshotItRead(t *testing.T) {
 	})
 }
 
-func TestAnUnreadableSnapshotFailsTheRunAndSaysSo(t *testing.T) {
+func TestAScanWithAnUnreadableSnapshotWaitsWithoutSpendingAnAttempt(t *testing.T) {
 	// Run without it, every finding a record had closed would open again and
-	// close again on the next run that reads one.
+	// close again on the next run that reads one. Failed instead, the job
+	// would be set aside within minutes and the run would keep the schedule
+	// from asking again for a day.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), []byte("damaged"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		f.waiting(t)
+		before := f.runs(t)
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		s := &stub{reported: []finding.Reported{{Issue: finding.Named{Identifier: "CVE-2026-1"}, Component: libnl}}}
-		if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
-			Narrowing(cverecord.NewHeld(dir)).Once(t.Context()); err == nil {
-			t.Fatal("a scan with a damaged snapshot reported success")
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(dir)).Once(t.Context())
+		if err != nil || outcome != nil {
+			t.Fatalf("answered %v, %v; want the job handed back and nothing scanned", outcome, err)
 		}
-		var run finding.Run
-		if err := f.db.DB.NewSelect().Model(&run).Limit(1).Scan(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(run.Failure, "CVE record snapshot") || run.FinishedAt == nil {
-			t.Errorf("the run ended %v saying %q, want it ended naming the snapshot", run.FinishedAt, run.Failure)
-		}
+		f.waitingUntried(t, "CVE record snapshot", before)
 		if s.saw != nil {
 			t.Error("the scanner ran although the run could not narrow what it found")
 		}
 	})
+}
+
+// waitingUntried checks the build's scan is back on the queue with no attempt
+// spent, saying why, and that no run was begun.
+func (f *runFixture) waitingUntried(t *testing.T, why string, runsBefore int) {
+	t.Helper()
+	var job queue.Job
+	if err := f.db.DB.NewSelect().Model(&job).Where("kind = ?", queue.Scan).
+		Order("id DESC").Limit(1).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	said := ""
+	if job.LastError != nil {
+		said = *job.LastError
+	}
+	if job.State != queue.Pending || job.Attempts != 0 || !strings.Contains(said, why) {
+		t.Errorf("the job is %s after %d attempts saying %q, want pending, untried, naming %q",
+			job.State, job.Attempts, said, why)
+	}
+	if !job.RunAfter.After(time.Now()) {
+		t.Errorf("the job may run again at %v, want later than now", job.RunAfter)
+	}
+	if runs := f.runs(t); runs != runsBefore {
+		t.Errorf("%d runs after waiting, want the %d before it: none begun", runs, runsBefore)
+	}
+}
+
+// runs counts every run against the build.
+func (f *runFixture) runs(t *testing.T) int {
+	t.Helper()
+	n, err := f.db.DB.NewSelect().Model((*finding.Run)(nil)).Count(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
 
 // snapshotFile is a snapshot of no records, taken at a known moment.
@@ -890,7 +923,7 @@ func TestAScanClosesWhatTheIssuesRecordExcludes(t *testing.T) {
 	})
 }
 
-func TestABuildLastScannedWithASnapshotIsNotScannedWithoutOne(t *testing.T) {
+func TestABuildEverScannedWithASnapshotWaitsForOne(t *testing.T) {
 	// A replica restarted on scratch space holds none until its first fetch,
 	// and a scan then would open every finding a record had closed.
 	eachRun(t, func(t *testing.T, f *runFixture) {
@@ -900,25 +933,28 @@ func TestABuildLastScannedWithASnapshotIsNotScannedWithoutOne(t *testing.T) {
 			Narrowing(cverecord.NewHeld(fixedOn618(t))).Once(t.Context()); err != nil {
 			t.Fatal(err)
 		}
+		// A later run that read none — one begun by a build that does not
+		// narrow, or by hand — does not wear the wait off: the closures the
+		// first run made still stand.
+		if _, err := f.db.DB.NewInsert().Model(&finding.Run{
+			TargetID: f.target, Scanner: "stub", RanHere: true,
+			StartedAt: time.Now().UTC(), FinishedAt: func() *time.Time { n := time.Now().UTC(); return &n }(),
+		}).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 
-		empty := t.TempDir()
 		f.waiting(t)
+		before := f.runs(t)
 		s := &stub{}
-		if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
-			Narrowing(cverecord.NewHeld(empty)).Once(t.Context()); err == nil {
-			t.Fatal("a build last scanned with a snapshot was scanned without one")
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(t.TempDir())).Once(t.Context())
+		if err != nil || outcome != nil {
+			t.Fatalf("answered %v, %v; want the job handed back", outcome, err)
 		}
 		if s.saw != nil {
 			t.Error("the scanner ran although nothing could narrow what it found")
 		}
-
-		var refused finding.Run
-		if err := f.db.DB.NewSelect().Model(&refused).Order("id DESC").Limit(1).Scan(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(refused.Failure, "no CVE record snapshot") {
-			t.Errorf("the refused run says %q, want it to name the missing snapshot", refused.Failure)
-		}
+		f.waitingUntried(t, "no CVE record snapshot", before)
 	})
 }
 

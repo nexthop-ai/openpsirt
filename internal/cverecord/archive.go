@@ -41,8 +41,8 @@ const (
 // before it is read. An archive holding the records directly is read the same
 // way without that step.
 //
-// The moment returned is the newest any kept record was updated, which is what
-// the snapshot describes.
+// The moment returned is the newest any record read was updated, withdrawn
+// and rejected ones included, which is what the snapshot describes.
 func FromArchive(archive, scratch string) ([]Record, time.Time, error) {
 	outer, err := zip.OpenReader(archive)
 	if err != nil {
