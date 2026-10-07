@@ -622,6 +622,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#cve-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVE records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#an-air-gapped-install" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -953,6 +964,17 @@
     <span class="md-ellipsis">
       
         From v0.5.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.6.0
       
     </span>
   </a>
@@ -1303,6 +1325,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#cve-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVE records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#an-air-gapped-install" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1634,6 +1667,17 @@
     <span class="md-ellipsis">
       
         From v0.5.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.6.0
       
     </span>
   </a>
@@ -2532,6 +2576,18 @@ products = [&quot;router-os&quot;, &quot;switch-os&quot;]
 <td>Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured</td>
 <td><code>false</code></td>
 </tr>
+<tr>
+<td><code>OPENPSIRT_RECORDS_DIR</code></td>
+<td><code>cve_records.dir</code></td>
+<td>Where the CVE record snapshot is kept. It must be writable where fetching is on. The default sits inside the scanner's data volume, and the chart sets it from <code>scanner.cacheDir</code></td>
+<td><code>/var/cache/openpsirt/grype/cve-records</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_RECORDS_UPDATE</code></td>
+<td><code>cve_records.update</code></td>
+<td>Whether the deployment fetches the CVE record snapshot itself. Set it to <code>false</code> where the deployment cannot reach the network, and put the snapshot there yourself — see below. Read at startup</td>
+<td><code>true</code></td>
+</tr>
 </tbody>
 </table>
 <p>The scanner is given only part of this process's environment: <code>PATH</code>, <code>HOME</code>,
@@ -2540,6 +2596,59 @@ case, and every <code>GRYPE_</code> variable. None of the <code>OPENPSIRT_</code
 so a credential the scanner needs has to be given under a name of its own. The
 <code>GRYPE_</code> variables have no key in a configuration file: they are the scanner's,
 and stay in the environment in both modes.</p>
+<h3 id="cve-records">CVE records<a class="headerlink" href="#cve-records" title="Permanent link">&para;</a></h3>
+<p>A scanner matching by version range reports some versions the issue's own CVE
+record states are unaffected. A source keeps part of the record: NVD's range
+for a kernel issue runs to the next mainline release's fix and leaves out the
+fix on each stable branch, and Debian's tracker records where a release is
+fixed and leaves out where the bug arrived. Each scan reads the records
+themselves, and a finding a record excludes closes as <code>unaffected</code>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What narrows</td>
+<td>An upstream entry of the record tied to the component, with a line stating the component's upstream version is unaffected, and no line of those entries stating it is affected</td>
+</tr>
+<tr>
+<td>What never narrows</td>
+<td>A record saying nothing about the version, a distribution's or a vendor's line about its own package, and a line this cannot order</td>
+</tr>
+<tr>
+<td>What it never does</td>
+<td>Open a finding. A record can only remove a match a scanner made</td>
+</tr>
+<tr>
+<td>A finding closed this way</td>
+<td>Listed in the register with the record's lines, and opens again on the first scan that no longer reads them</td>
+</tr>
+<tr>
+<td>A fix on the component's own branch</td>
+<td>Replaces the scanner's fix on an upstream release, where the record names one</td>
+</tr>
+<tr>
+<td>Which snapshot a run read</td>
+<td>Recorded with the run, beside the scanner's data version</td>
+</tr>
+<tr>
+<td>A snapshot that stops moving</td>
+<td>Raised with the same condition as the scanner's data, after the same span</td>
+</tr>
+<tr>
+<td>Fetching</td>
+<td>The day's archive of every record, from the CVE List's releases on GitHub, checked hourly. About 620 MB to download, about 1.3 GB on the volume while it is read, and half a megabyte kept</td>
+</tr>
+<tr>
+<td>Without a snapshot</td>
+<td>A build any scan of which read one waits, its scan put back on the queue every five minutes without spending an attempt, until one is held again: on scratch space, until the first fetch after a restart. A build never scanned with one is scanned without</td>
+</tr>
+</tbody>
+</table>
 <h3 id="an-air-gapped-install">An air-gapped install<a class="headerlink" href="#an-air-gapped-install" title="Permanent link">&para;</a></h3>
 <p>The scanner's vulnerability data is not shipped in the image: it changes daily
 and the image does not. A deployment that can reach the network downloads it
@@ -2562,6 +2671,35 @@ gap: a bundle that merely exists is what the target refuses to produce.</p>
 "it loads where it has to" are different claims, and the second is the one that
 matters where the bundle is all there is — in the one situation where trying it
 out first is not available.</p>
+<p>The CVE record snapshot is carried the same way:</p>
+<pre><code>make cve-records
+</code></pre>
+<p>It produces <code>dist/cve-records.jsonl.gz</code> with the binary the image carries, and
+reads it back before it says it succeeded. On the far side, copy the file into
+<code>OPENPSIRT_RECORDS_DIR</code> and set <code>OPENPSIRT_RECORDS_UPDATE=false</code>. A snapshot
+is replaced in the same way: the file read is the newest one placed there.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>openpsirt records fetch</code></td>
+<td>Fetches the newest snapshot into <code>OPENPSIRT_RECORDS_DIR</code></td>
+</tr>
+<tr>
+<td><code>openpsirt records import &lt;archive&gt;</code></td>
+<td>Reads a CVE List archive downloaded some other way, a <code>_all_CVEs_at_midnight.zip.zip</code>, into the same place</td>
+</tr>
+<tr>
+<td><code>openpsirt records status</code></td>
+<td>Says which snapshot is held, and how many records it keeps</td>
+</tr>
+</tbody>
+</table>
 <h2 id="attachment-storage">Attachment storage<a class="headerlink" href="#attachment-storage" title="Permanent link">&para;</a></h2>
 <p>Absent is ordinary: with none of this set, attachments are off and everything
 else works. An operator who wants none should not have to run a bucket.</p>
@@ -3908,6 +4046,29 @@ one does.</p>
 <tr>
 <td>A withdrawn API key's or personal token's name</td>
 <td>May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v060">From v0.6.0<a class="headerlink" href="#from-v060" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Each replica fetches the CVE List's daily archive from <code>github.com</code>, which hands the download to <code>release-assets.githubusercontent.com</code> or <code>objects.githubusercontent.com</code>. About 620 MB a day, and about 1.3 GB on the scanner's volume while it is read</td>
+<td>Where those hosts cannot be reached, set <code>OPENPSIRT_RECORDS_UPDATE=false</code> and place a snapshot from <code>make cve-records</code> in <code>OPENPSIRT_RECORDS_DIR</code>; otherwise the fetch logs a failure every hour and nothing narrows. Size the scanner's volume for the 1.3 GB beside the scanner's own data</td>
+</tr>
+<tr>
+<td>The first scan of each build after the snapshot arrives closes the findings the records exclude, as <code>unaffected</code></td>
+<td>Nothing. They are listed in the register under that reason, with the record's lines. A kernel build may close thousands at once</td>
+</tr>
+<tr>
+<td>Compliance rate and the register's met column</td>
+<td>Nothing. A finding closed as invalid or unaffected is in neither, for every period, so a rate read before the upgrade may differ from the same period read after it</td>
 </tr>
 </tbody>
 </table>

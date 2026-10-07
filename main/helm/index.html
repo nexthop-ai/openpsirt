@@ -804,9 +804,9 @@ variable, and refuses at render any install that could not start or could not
 be signed into.</p>
 <h2 id="chart-installation">Chart installation<a class="headerlink" href="#chart-installation" title="Permanent link">&para;</a></h2>
 <p>The chart is published on each release beside the image, as
-<code>openpsirt-0.5.0.tgz</code>.</p>
+<code>openpsirt-0.6.0.tgz</code>.</p>
 <pre><code class="language-sh">helm install openpsirt \
-  https://github.com/nexthop-ai/openpsirt/releases/download/v0.5.0/openpsirt-0.5.0.tgz \
+  https://github.com/nexthop-ai/openpsirt/releases/download/v0.6.0/openpsirt-0.6.0.tgz \
   --namespace openpsirt --create-namespace \
   -f values.yaml
 </code></pre>
@@ -1123,6 +1123,11 @@ through <code>extraEnv</code>, which takes entries in the Kubernetes <code>env</
 <td><code>outbound.excluded</code></td>
 <td><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></td>
 <td><a href="../configuration/#outbound-exclusions">Outbound exclusions</a></td>
+</tr>
+<tr>
+<td><code>scanner.cacheDir</code>, as its <code>cve-records</code> directory</td>
+<td><code>OPENPSIRT_RECORDS_DIR</code></td>
+<td><a href="../configuration/#cve-records">CVE records</a></td>
 </tr>
 <tr>
 <td><code>patchBranches.enabled</code></td>
