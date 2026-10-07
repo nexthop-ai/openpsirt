@@ -30,6 +30,8 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"LOG_LEVEL", "chatty"},
 		{"LOG_FORMAT", "yaml"},
 		{"ADDR", "  "},
+		// Empty, the CVE record snapshot is never found and nothing narrows.
+		{"RECORDS_DIR", " "},
 		{"PLAIN_HTTP", "yes"},
 		{"AUTO_MIGRATE", "no"},
 		{"SHUTDOWN_GRACE", "soon"},

@@ -20182,6 +20182,8 @@ export interface operations {
                 issue?: string;
                 /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
                 standing?: "open" | "closed";
+                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed")[] | null;
                 limit?: number;
                 offset?: number;
             };
@@ -20228,6 +20230,8 @@ export interface operations {
                 issue?: string;
                 /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
                 standing?: "open" | "closed";
+                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed")[] | null;
             };
             header?: never;
             path: {

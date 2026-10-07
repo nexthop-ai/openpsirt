@@ -150,6 +150,7 @@ type Registering struct {
 	Component string          `query:"component" doc:"Keep one component, by name"`
 	Issue     string          `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
 	Standing  string          `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
+	Because   []closure       `query:"closed_because,explode" uniqueItems:"true" doc:"Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows"`
 }
 
 // narrow is the store's own filter, built from the request.
@@ -157,6 +158,9 @@ func (r Registering) narrow() finding.Registering {
 	only := finding.Registering{
 		Component: r.Component, Issue: r.Issue,
 		Open: r.Standing == "open", Closed: r.Standing == "closed",
+	}
+	for _, because := range r.Because {
+		only.Because = append(only.Because, finding.Closure(because))
 	}
 	for _, word := range r.State {
 		if word != "" {

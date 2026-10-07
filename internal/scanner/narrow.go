@@ -49,7 +49,7 @@ func narrow(snapshot *cverecord.Snapshot, components []graph.Described, reported
 			r.Unaffected = string(lines)
 			continue
 		}
-		if verdict.BranchFix != "" && upstreamRelease(component) {
+		if verdict.BranchFix != "" && !cverecord.Distribution(graph.PartsOfPurl(component.Purl).Type) {
 			r.FixState = finding.FixedUpstream
 			r.FixedIn = verdict.BranchFix
 			// The date the scanner gave is the other branch's fix, and the
@@ -58,15 +58,4 @@ func narrow(snapshot *cverecord.Snapshot, components []graph.Described, reported
 		}
 	}
 	return nil
-}
-
-// upstreamRelease reports whether a component is upstream's own release
-// rather than a distribution's package of it.
-func upstreamRelease(component graph.Described) bool {
-	switch graph.PartsOfPurl(component.Purl).Type {
-	case "deb", "rpm", "apk", "alpm":
-		return false
-	default:
-		return true
-	}
 }

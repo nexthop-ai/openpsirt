@@ -65,7 +65,7 @@ func (s *Snapshot) Len() int {
 // carried in by an operator, and the second is a file from outside.
 const (
 	// mostRecords is far above the records with ordered unaffected lines in
-	// the whole CVE List: 22,763 of 402,541 on 2026-10-07.
+	// the whole CVE List: 22,481 of 402,541 on 2026-10-07.
 	mostRecords = 1_000_000
 	// longestLine bounds one record. The largest kept on 2026-10-07 is a
 	// kernel record well under this.
@@ -154,6 +154,14 @@ type Held struct {
 // NewHeld returns the snapshot kept in dir.
 func NewHeld(dir string) *Held {
 	return &Held{dir: dir}
+}
+
+// Dir is where the snapshot is kept.
+func (h *Held) Dir() string {
+	if h == nil {
+		return ""
+	}
+	return h.dir
 }
 
 // Current is the snapshot in the directory, or nil where there is none.

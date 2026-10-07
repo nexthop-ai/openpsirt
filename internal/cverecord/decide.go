@@ -268,7 +268,7 @@ func upstreamVersion(component graph.Described) (string, bool) {
 	if version == "" {
 		version = strings.TrimSpace(component.Version)
 	}
-	if distribution(graph.PartsOfPurl(component.Purl).Type) {
+	if Distribution(graph.PartsOfPurl(component.Purl).Type) {
 		if _, rest, found := strings.Cut(version, ":"); found {
 			version = rest
 		}
@@ -291,9 +291,9 @@ func upstreamVersion(component graph.Described) (string, bool) {
 // cannot speak for.
 var releaseNumber = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
 
-// distribution reports whether a package type is a distribution's own
+// Distribution reports whether a package type is a distribution's own
 // packaging, whose versions carry a revision of the distribution's.
-func distribution(kind string) bool {
+func Distribution(kind string) bool {
 	switch kind {
 	case "deb", "rpm", "apk", "alpm":
 		return true

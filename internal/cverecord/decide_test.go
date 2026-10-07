@@ -147,6 +147,32 @@ func TestAnAffectedLineThisCannotOrderStopsNarrowing(t *testing.T) {
 	}
 }
 
+func TestALineWhoseStatusChangesInsideItIsNeverRead(t *testing.T) {
+	// 1.5 turned back to affected inside the range, which this does not
+	// follow: read as a plain range, 1.7 would narrow.
+	record := cverecord.Record{ID: "CVE-2026-6", Affected: []cverecord.Entry{
+		{Vendor: "Linux", Product: "Linux", Versions: []cverecord.Line{
+			{Version: "1.0", LessThan: "2.0", Status: "unaffected", VersionType: "semver", Changes: true},
+			{Version: "3.0", LessThanOrEqual: "3.*", Status: "affected", VersionType: "semver", Changes: true},
+			{Version: "4.2", LessThanOrEqual: "4.*", Status: "unaffected", VersionType: "semver", Changes: true},
+		}},
+	}}
+	snapshot := snapshotOf(t, record)
+	if snapshot.Decide([]string{"CVE-2026-6"}, kernel("1.7")).Narrows() {
+		t.Error("an unaffected line with changes inside it narrowed a release")
+	}
+	if verdict := snapshot.Decide([]string{"CVE-2026-6"}, kernel("4.1")); verdict.BranchFix != "" {
+		t.Errorf("a line with changes inside it named branch fix %q", verdict.BranchFix)
+	}
+	// An affected line with changes cannot be placed, so it stops another
+	// entry's unaffected line too.
+	record.Affected = append(record.Affected, cverecord.Entry{Vendor: "Linux", Product: "Linux",
+		Versions: []cverecord.Line{{Version: "3.1", LessThanOrEqual: "3.1.*", Status: "unaffected", VersionType: "semver"}}})
+	if snapshotOf(t, record).Decide([]string{"CVE-2026-6"}, kernel("3.1.4")).Narrows() {
+		t.Error("an affected line with changes inside it did not stop the narrowing")
+	}
+}
+
 func TestADefaultStatusAloneNeverNarrows(t *testing.T) {
 	record := cverecord.Record{ID: "CVE-2026-2", Affected: []cverecord.Entry{
 		{Vendor: "Linux", Product: "Linux", DefaultStatus: "unaffected", Versions: []cverecord.Line{

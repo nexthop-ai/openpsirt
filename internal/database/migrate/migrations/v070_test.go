@@ -15,7 +15,7 @@ import (
 const v070 = 41
 
 // A v0.6.0 database is upgraded. Its findings and runs gain the record lines
-// and the snapshot, holding none, and both can be written.
+// and the snapshot, holding none.
 func TestAV060DatabaseUpgradesToV070(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()

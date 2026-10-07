@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -279,6 +280,9 @@ type Registering struct {
 	// everything, which is what a register is.
 	Open   bool
 	Closed bool
+	// Because keeps rows closed for any of these reasons. A row still open
+	// closed for none, so naming any keeps only closed rows.
+	Because []Closure
 }
 
 // narrow applies it to the register's statement.
@@ -320,6 +324,9 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	if r.Closed && !r.Open {
 		q = q.Where("f.closed_at IS NOT NULL")
+	}
+	if len(r.Because) > 0 {
+		q = q.Where("f.closed_because IN (?)", bun.List(r.Because))
 	}
 	return q
 }
@@ -510,7 +517,10 @@ func disposedFrom(row registerRow) Disposed {
 	// that way — something open at its deadline instant is not yet
 	// overdue — and two screens that disagree about the same second are
 	// two screens that disagree.
-	if row.ClosedAt != nil && row.DueAt != nil {
+	//
+	// Never answered for a closure saying the issue was never present, which
+	// met or missed nothing.
+	if row.ClosedAt != nil && row.DueAt != nil && !slices.Contains(NeverPresent(), Closure(row.ClosedBecause)) {
 		met := !row.ClosedAt.After(*row.DueAt)
 		one.Met = &met
 	}

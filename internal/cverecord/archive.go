@@ -98,6 +98,11 @@ func unpack(member *zip.File, scratch string) (string, error) {
 }
 
 // published is the part of a CVE record this reads.
+//
+// The affected entries of every container: the numbering authority's, and
+// each one a third party added beside it. A third party's entry narrows as the
+// authority's does, and an affected line in it stops a narrowing as one in the
+// authority's would.
 type published struct {
 	Metadata struct {
 		ID      string    `json:"cveId"`
@@ -105,16 +110,20 @@ type published struct {
 		Updated time.Time `json:"dateUpdated"`
 	} `json:"cveMetadata"`
 	Containers struct {
-		CNA struct {
-			Affected []struct {
-				Entry
-				Versions []struct {
-					Line
-					Changes json.RawMessage `json:"changes"`
-				} `json:"versions"`
-			} `json:"affected"`
-		} `json:"cna"`
+		CNA container   `json:"cna"`
+		ADP []container `json:"adp"`
 	} `json:"containers"`
+}
+
+// container is one container of a record, as far as its affected entries.
+type container struct {
+	Affected []struct {
+		Entry
+		Versions []struct {
+			Line
+			Changes json.RawMessage `json:"changes"`
+		} `json:"versions"`
+	} `json:"affected"`
 }
 
 // records reads every record file among an archive's members and keeps those
@@ -136,12 +145,14 @@ func records(members []*zip.File) ([]Record, time.Time, error) {
 		if err != nil {
 			return nil, time.Time{}, fmt.Errorf("read %s from the CVE List archive: %w", name, err)
 		}
-		if !keep {
-			continue
-		}
-		kept = append(kept, record)
+		// Every record read, kept or not and withdrawn or not: a record
+		// withdrawn or changed so it no longer narrows changes what the
+		// snapshot does, and the moment has to move with it.
 		if updated.After(taken) {
 			taken = updated
+		}
+		if keep {
+			kept = append(kept, record)
 		}
 	}
 	if read == 0 {
@@ -166,31 +177,47 @@ func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 		return Record{}, time.Time{}, false, err
 	}
 	if !strings.EqualFold(doc.Metadata.State, "PUBLISHED") {
-		return Record{}, time.Time{}, false, nil
+		return Record{}, doc.Metadata.Updated, false, nil
 	}
 	record := Record{ID: strings.TrimSpace(doc.Metadata.ID)}
 	keep := false
-	for _, stated := range doc.Containers.CNA.Affected {
-		entry := stated.Entry
-		entry.Versions = nil
-		for _, version := range stated.Versions {
-			line := version.Line
-			line.Changes = len(version.Changes) > 0 && string(version.Changes) != "null" &&
-				string(version.Changes) != "[]"
-			// Commit ranges say what the release lines beside them say, in
-			// terms this does not order, so they are not kept.
-			if strings.EqualFold(line.VersionType, "git") ||
-				strings.EqualFold(line.VersionType, "original_commit_for_fix") {
-				continue
-			}
-			entry.Versions = append(entry.Versions, line)
-			if canNarrow(line) {
+	containers := append([]container{doc.Containers.CNA}, doc.Containers.ADP...)
+	for _, stated := range containers {
+		for _, entry := range stated.Affected {
+			if kept(&record, entry.Entry, entry.Versions) {
 				keep = true
 			}
 		}
-		record.Affected = append(record.Affected, entry)
 	}
 	return record, doc.Metadata.Updated, keep && record.ID != "", nil
+}
+
+// kept adds one entry to a record, without the lines it never reads, and
+// reports whether a line in it could narrow a match.
+func kept(record *Record, stated Entry, versions []struct {
+	Line
+	Changes json.RawMessage `json:"changes"`
+}) bool {
+	entry := stated
+	entry.Versions = nil
+	narrows := false
+	for _, version := range versions {
+		line := version.Line
+		line.Changes = len(version.Changes) > 0 && string(version.Changes) != "null" &&
+			string(version.Changes) != "[]"
+		// Commit ranges say what the release lines beside them say, in
+		// terms this does not order, so they are not kept.
+		if strings.EqualFold(line.VersionType, "git") ||
+			strings.EqualFold(line.VersionType, "original_commit_for_fix") {
+			continue
+		}
+		entry.Versions = append(entry.Versions, line)
+		if canNarrow(line) {
+			narrows = true
+		}
+	}
+	record.Affected = append(record.Affected, entry)
+	return narrows
 }
 
 // canNarrow reports whether a line is one that could ever narrow a match: an

@@ -813,3 +813,122 @@ func snapshotFile(t *testing.T) []byte {
 	}
 	return written.Bytes()
 }
+
+// kernelShipped replaces what the build ships with an upstream kernel, as a
+// build naming the tarball it built from describes it.
+func (f *runFixture) kernelShipped(t *testing.T, version string) graph.Described {
+	t.Helper()
+	ctx := t.Context()
+	kernel := graph.Described{
+		Name: "linux", Version: version, Purl: "pkg:generic/linux@" + version,
+		CPE: "cpe:2.3:o:linux:linux_kernel:" + version + ":*:*:*:*:*:*:*",
+	}
+	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: f.target, ContentHash: "hash-kernel-" + version,
+		BuiltAt: time.Now().UTC(), ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	if _, err := graph.NewStore(f.db.DB).Apply(ctx, f.target, scan.ID, graph.Snapshot{
+		Root: root, Components: []graph.Described{kernel},
+		Dependencies: []graph.Dependency{{Parent: root, Child: kernel}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return kernel
+}
+
+// fixedOn618 is a snapshot holding one kernel record, fixed on 6.18.y at
+// 6.18.27.
+func fixedOn618(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	var written bytes.Buffer
+	if err := cverecord.Write(&written, time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), "", []cverecord.Record{{
+		ID: "CVE-2026-31589", Affected: []cverecord.Entry{{Vendor: "Linux", Product: "Linux",
+			DefaultStatus: "affected", Versions: []cverecord.Line{
+				{Version: "6.14", Status: "affected"},
+				{Version: "6.18.27", LessThanOrEqual: "6.18.*", Status: "unaffected", VersionType: "semver"},
+			}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), written.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestAScanClosesWhatTheIssuesRecordExcludes(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		kernel := f.kernelShipped(t, "6.18.55")
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		// The scanner's account carries no CPE: what is tied is the build's
+		// own description of the component.
+		s := &stub{reported: []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-31589"},
+			Component: graph.Described{Name: kernel.Name, Version: kernel.Version, Purl: kernel.Purl},
+		}}}
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(fixedOn618(t))).Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outcome.Applied.Unaffected != 1 || outcome.Applied.Opened != 0 {
+			t.Errorf("unaffected %d and opened %d, want the one finding recorded unaffected",
+				outcome.Applied.Unaffected, outcome.Applied.Opened)
+		}
+		var rows []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&rows).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].ClosedBecause != finding.Unaffected || rows[0].UnaffectedBy == "" {
+			t.Errorf("recorded %+v, want one row closed as unaffected with the record's lines", rows)
+		}
+	})
+}
+
+func TestABuildLastScannedWithASnapshotIsNotScannedWithoutOne(t *testing.T) {
+	// A replica restarted on scratch space holds none until its first fetch,
+	// and a scan then would open every finding a record had closed.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		f.waiting(t)
+		if _, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
+			Narrowing(cverecord.NewHeld(fixedOn618(t))).Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		empty := t.TempDir()
+		f.waiting(t)
+		s := &stub{}
+		if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(empty)).Once(t.Context()); err == nil {
+			t.Fatal("a build last scanned with a snapshot was scanned without one")
+		}
+		if s.saw != nil {
+			t.Error("the scanner ran although nothing could narrow what it found")
+		}
+
+		var refused finding.Run
+		if err := f.db.DB.NewSelect().Model(&refused).Order("id DESC").Limit(1).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(refused.Failure, "no CVE record snapshot") {
+			t.Errorf("the refused run says %q, want it to name the missing snapshot", refused.Failure)
+		}
+	})
+}
+
+func TestABuildNeverScannedWithASnapshotIsScannedWithoutOne(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		f.waiting(t)
+		if _, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
+			Narrowing(cverecord.NewHeld(t.TempDir())).Once(t.Context()); err != nil {
+			t.Errorf("a build never narrowed was refused without a snapshot: %v", err)
+		}
+	})
+}

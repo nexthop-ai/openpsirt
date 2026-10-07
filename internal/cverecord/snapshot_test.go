@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/cverecord"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // published is a CVE record as the List publishes it, cut to what is read.
@@ -102,10 +103,10 @@ func TestAnArchiveKeepsOnlyRecordsThatCanNarrow(t *testing.T) {
 	if snapshot.Len() != 1 {
 		t.Fatalf("kept %d records, want only the one with an unaffected line it can order", snapshot.Len())
 	}
-	// The newest moment a kept record was updated, which is what the
-	// snapshot describes; records it dropped say nothing about that.
-	if snapshot.Version() != "2026-10-06T21:58:40Z" {
-		t.Errorf("taken %q, want the kept record's update", snapshot.Version())
+	// The newest moment any record read was updated, the withdrawn one
+	// included: withdrawing a record changes what the snapshot narrows.
+	if snapshot.Version() != "2026-10-07T02:00:00Z" {
+		t.Errorf("taken %q, want the withdrawn record's update", snapshot.Version())
 	}
 	if !snapshot.Decide([]string{"CVE-2026-31589"}, kernel("6.18.55")).Narrows() {
 		t.Error("the kept record does not narrow what it states")
@@ -121,6 +122,46 @@ func TestAnArchiveKeepsOnlyRecordsThatCanNarrow(t *testing.T) {
 			names = append(names, e.Name())
 		}
 		t.Errorf("the directory holds %v, want the snapshot alone", names)
+	}
+}
+
+func TestAThirdPartysAffectedLineStopsTheAuthoritysNarrowing(t *testing.T) {
+	// A third party adds its own entries beside the numbering authority's,
+	// and they are part of the record.
+	doc := map[string]any{
+		"cveMetadata": map[string]any{"cveId": "CVE-2026-5", "state": "PUBLISHED",
+			"dateUpdated": "2026-10-07T00:00:00Z"},
+		"containers": map[string]any{
+			"cna": map[string]any{"affected": []map[string]any{{
+				"vendor": "zlib", "product": "zlib", "cpes": []string{"cpe:2.3:a:zlib:zlib:*:*:*:*:*:*:*:*"},
+				"versions": []map[string]any{
+					{"version": "1.3.1", "lessThanOrEqual": "1.3.*", "status": "unaffected", "versionType": "semver"},
+				},
+			}}},
+			"adp": []map[string]any{{"affected": []map[string]any{{
+				"vendor": "zlib", "product": "zlib", "cpes": []string{"cpe:2.3:a:zlib:zlib:*:*:*:*:*:*:*:*"},
+				"versions": []map[string]any{
+					{"version": "0", "lessThan": "2.5", "status": "affected", "versionType": "semver"},
+				},
+			}}}},
+		},
+	}
+	body, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := cverecord.Build(listArchive(t, map[string][]byte{"CVE-2026-5.json": body}), dir, ""); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := cverecord.NewHeld(dir).Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	zlib := graph.Described{Name: "zlib", Version: "1.3.2", Purl: "pkg:generic/zlib@1.3.2",
+		CPE: "cpe:2.3:a:zlib:zlib:1.3.2:*:*:*:*:*:*:*"}
+	if snapshot.Decide([]string{"CVE-2026-5"}, zlib).Narrows() {
+		t.Error("a release a third party's entry states is affected was narrowed")
 	}
 }
 

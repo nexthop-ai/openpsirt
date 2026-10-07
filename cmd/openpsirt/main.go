@@ -425,9 +425,10 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		TellingSuperseded(notify.Superseded(db.DB, logger)).
 		Narrowing(cverecord.NewHeld(cfg.RecordsDir))
 	// Keeps the CVE record snapshot current with the CVE List, the way the
-	// scanner keeps its own data. Every replica keeps its own copy beside the
-	// scanner's, as the scanner does. Nil where fetching is off, which leaves
-	// the snapshot an operator placed there.
+	// scanner keeps its own data, in a directory on the scanner's volume: each
+	// replica's own on scratch space, shared where the replicas mount one
+	// claim, which the rename that replaces it keeps safe. Nil where fetching
+	// is off, which leaves the snapshot an operator placed there.
 	var records *cverecord.Fetcher
 	if cfg.RecordsUpdate {
 		records = cverecord.NewFetcher(cfg.RecordsDir, logger)

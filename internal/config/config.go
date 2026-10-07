@@ -609,6 +609,11 @@ func load(given map[string]string) (Config, error) {
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}
+	// Empty, the snapshot is never found and nothing is narrowed, and the
+	// fetcher fails every hour making a directory with no name.
+	if strings.TrimSpace(c.RecordsDir) == "" {
+		return Config{}, fmt.Errorf("OPENPSIRT_RECORDS_DIR: must not be empty")
+	}
 	// Refused at startup rather than at the first sign-in, on the bound the API
 	// write path applies. Unbounded here, a deployment starts cleanly and then
 	// fails every browser sign-in, and the way back needs an administrator's

@@ -1050,8 +1050,8 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 |---|---|
 | The CVE List | The public body of every CVE record, published as a repository whose hourly releases each carry an archive of every record as it stood at a midnight |
 | The archive read | The day's own, from the newest release; the release tagged for midnight carries the day before's instead, which is read where the day's is absent |
-| What is kept | Each record with an unaffected line it can order, whole: 22,481 of 402,541 on 2026-10-07, in a 534 KB snapshot |
-| What the snapshot describes | The newest moment a kept record was updated. A run records it as the snapshot it read |
+| What is kept | Each record with an unaffected line it can order, in any container, whole: 22,481 of 402,541 on 2026-10-07, in a 534 KB snapshot |
+| What the snapshot describes | The newest moment any record read was updated, kept or not and withdrawn or not: a record withdrawn, or changed so it no longer narrows, changes what the snapshot does. A run records it as the snapshot it read |
 
 | Rule | Reason |
 |---|---|
@@ -1061,7 +1061,8 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 | An archive downloaded some other way is read into the same place | `openpsirt records import`, for a deployment whose route out is not this one |
 | The snapshot is replaced by a rename | A scan reads the old file or the new one, never half of either |
 | A snapshot that cannot be read is an error, never no records | A damaged bundle read as none would close nothing and say so nowhere |
-| Each replica keeps its own | The scanner's data is kept the same way, on the same volume |
+| Kept on the scanner's volume | Each replica's own on scratch space, and one shared where the replicas mount one claim; the rename keeps that safe |
+| Scratch files older than two hours are removed at the start of a fetch | A fetch killed part way leaves an archive of hundreds of megabytes on the volume. A fetch takes minutes, so one younger than that may be an import still being written |
 
 | Bound | |
 |---|---|

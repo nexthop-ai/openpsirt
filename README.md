@@ -196,9 +196,11 @@ says what turns each on.
 - Each act is confirmed where it was taken, with a link to what comes next
 - A rating that disagrees with the published one, or a note for whoever
   decides, belongs to one product and applies to every build of it
-- A third party's word is evidence. A supplier's VEX and a supplier's advisory
-  are shown beside the finding, and offer a prefill only at the versions they
-  name
+- An issue's CVE record narrows a scanner's match. A finding whose release the
+  record states is unaffected closes, with the record's lines kept beside it,
+  and opens again if the record changes
+- A supplier's VEX and a supplier's advisory are shown beside the finding, and
+  offer a prefill only at the versions they name
 - A build's own patches close what they fix. Its claim that an issue does not
   apply is kept on the finding, which stays open
 - A deployment sets what it considers worth triaging, and a product may set

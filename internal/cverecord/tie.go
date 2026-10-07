@@ -15,7 +15,7 @@ import (
 // Three ways, and only these. An entry carrying a CPE is tied to an upstream
 // component whose CPE names the same vendor and product; an entry carrying a
 // package identifier is tied to an upstream component with the same one. An
-// entry that carries neither is tied through a name the deployment knows,
+// entry that carries neither is tied through a name listed in names,
 // which is the only way a distribution's package is tied at all.
 //
 // A distribution's package is never tied by its own CPE or identifier. Those
@@ -24,7 +24,7 @@ import (
 // distribution's numbering rather than upstream's.
 func tied(entry Entry, component graph.Described) bool {
 	parts := graph.PartsOfPurl(component.Purl)
-	if !distribution(parts.Type) {
+	if !Distribution(parts.Type) {
 		if vendor, product, ok := cpeProduct(component.CPE); ok {
 			for _, stated := range entry.CPEs {
 				v, p, ok := cpeProduct(stated)
@@ -88,7 +88,7 @@ func (n name) describes(entry Entry) bool {
 }
 
 func (n name) covers(component graph.Described, parts graph.Parts) bool {
-	if !distribution(parts.Type) {
+	if !Distribution(parts.Type) {
 		vendor, product, ok := cpeProduct(component.CPE)
 		if !ok {
 			return false

@@ -11,9 +11,10 @@
 // up one level — an administrator names the publisher, and this reads what they
 // publish from then on.
 //
-// Nothing it reads decides anything. What arrives lands in the same evidence
-// layer an uploaded document lands in: shown beside a finding, offered as a
-// prefill, and never standing as our judgment by itself (REQ-31). A pass
+// Nothing it reads closes anything. What arrives lands in the same evidence
+// layer an uploaded document lands in: shown beside a finding and offered as a
+// prefill. Applying a supplier's statement at the places its product occupies
+// is REQ-31's, and is not built. A pass
 // running on a schedule makes that easier to violate by accident than an upload
 // does, because nobody is watching each document arrive.
 //

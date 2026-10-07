@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
@@ -134,5 +136,31 @@ func TestTheFetcherReachesOnlyTheListsHosts(t *testing.T) {
 	_, err := f.Client.Get("https://downloads.example.test/archive.zip")
 	if !errors.Is(err, outward.ErrRefused) {
 		t.Errorf("a host not named answered %v, want a refusal", err)
+	}
+}
+
+func TestAFetchRemovesWhatAKilledOneLeftBehind(t *testing.T) {
+	// A fetch killed part way leaves hundreds of megabytes on the scanner's
+	// volume. One still being written, by an import beside the fetcher, is
+	// left alone.
+	dir := t.TempDir()
+	abandoned := filepath.Join(dir, ".archive-1.zip")
+	fresh := filepath.Join(dir, ".cves-2.zip")
+	for _, path := range []string{abandoned, fresh} {
+		if err := os.WriteFile(path, []byte("part"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-3 * time.Hour)
+	if err := os.Chtimes(abandoned, old, old); err != nil {
+		t.Fatal(err)
+	}
+	l := &list{tag: "cve_2026-10-07_0500Z", archives: map[string]string{}}
+	_, _ = fetcherFor(t, l.serve(t), dir).Once(t.Context())
+	if _, err := os.Stat(abandoned); !errors.Is(err, os.ErrNotExist) {
+		t.Error("an abandoned download was left on the volume")
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Error("a file still being written was removed")
 	}
 }

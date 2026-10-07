@@ -1089,8 +1089,11 @@ excludes as unaffected.
 
 ### Entries
 
-Each entry of a record names what it describes. An entry is read against a
-component where it is tied to it, and in no other case.
+Each entry of a record names what it describes. The entries read are the
+numbering authority's and every one a third party added in a container of its
+own: a third party's entry narrows as the authority's does, and an affected line
+in it stops a narrowing the same way. An entry is read against a component where
+it is tied to it, and in no other case.
 
 | Tie | Read against |
 |---|---|
@@ -1145,9 +1148,17 @@ changes on top of 6.18.55, and those changes are what a record cannot speak for.
 
 The lines are kept on the closed row, because the snapshot the run read is
 replaced by the next. The run records which snapshot it read, beside the
-scanner's data version (REQ-13). A run whose snapshot cannot be read fails, and
-says so: run without it, every finding a record closed would open, and close
-again on the next run that reads one.
+scanner's data version (REQ-13).
+
+| A run without a snapshot to read | |
+|---|---|
+| One that cannot be read | Fails, and says so |
+| None held, where the build's last finished run read one | Fails, naming the snapshot that run read. A replica restarted on scratch space holds none until its first fetch, and a scan then would open every finding a record closed, which the next scan would close again |
+| None held, where no run of the build has read one | Runs, and narrows nothing |
+
+The register lists the findings closed this way under their own reason, with
+the lines. A closure saying the issue was never present is in no deadline
+judgment: it met nothing and missed nothing.
 
 `DESIGN-ingest.md` § CVE records holds where the snapshot comes from.
 
@@ -1666,6 +1677,7 @@ question next year should find the answer rather than the question.
 | A vendor patch backporting a bug into a release older than the record says it arrived in is not seen | The record speaks for upstream's releases. Fix-version matching misses the same backport |
 | A corrected record reaches the findings at the next scan | The run is the one writer of what it closes. A snapshot arriving between scans writes nothing |
 | The finding screen reads open findings, and a finding closed as unaffected is read in the register with the record's lines | The screen is where a judgment is made, and the record has made this one |
+| A wrong record cannot be overridden here | Nothing records that a release is affected against a record saying it is not, and a run consults no decision before closing. The register lists every such closure so a wrong one can be found; correcting it is correcting the record, which the next snapshot carries. Not built |
 | The outbound VEX document says nothing about a finding closed as unaffected | A statement to customers that a release is not affected is a decision this deployment makes, and a closure is not one |
 | A merge is not undone | Two issues a report wrongly named together stay one. Nothing a report says is taken to unmerge, and unmerging would have to divide findings and decisions made since |
 | An issue absorbed keeps the name it was filed under | The kept issue is not refiled under a name the absorbed row holds. Where the best-known name is one the absorbed row holds, the kept issue stays filed where it is |

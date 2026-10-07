@@ -73,7 +73,7 @@ func NewFetcher(dir string, logger *slog.Logger) *Fetcher {
 // betweenLooks is how often the fetcher asks whether a newer archive is out
 // where the caller says nothing. The List publishes one archive a day, so an
 // hour finds a new one within an hour of it appearing and asks the
-// repository host's API twenty-four times a day.
+// repository host twenty-four times a day.
 const betweenLooks = time.Hour
 
 // Run keeps the snapshot current until the context ends.
@@ -90,6 +90,7 @@ func (f *Fetcher) Once(ctx context.Context) (bool, error) {
 	if err := os.MkdirAll(f.dir, 0o700); err != nil {
 		return false, fmt.Errorf("make the CVE record directory: %w", err)
 	}
+	sweep(f.dir, time.Now())
 	tag, day, err := f.latest(ctx)
 	if err != nil {
 		return false, err
@@ -123,6 +124,26 @@ func (f *Fetcher) Once(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	return false, fmt.Errorf("the CVE List release %s carries no archive of every record", tag)
+}
+
+// abandonedAfter is how old a scratch file is before it is taken to belong to a
+// fetch that will not finish. A fetch takes minutes; one killed part way
+// leaves an archive of hundreds of megabytes on the scanner's volume, and the
+// next tries an hour later.
+const abandonedAfter = 2 * time.Hour
+
+// sweep removes the scratch files fetches and imports killed part way left
+// in the directory. Only those past abandonedAfter, so one an import running
+// beside the fetcher is writing is left alone.
+func sweep(dir string, now time.Time) {
+	for _, pattern := range []string{".archive-*", ".cves-*", ".snapshot-*"} {
+		left, _ := filepath.Glob(filepath.Join(dir, pattern))
+		for _, path := range left {
+			if info, err := os.Stat(path); err == nil && now.Sub(info.ModTime()) > abandonedAfter {
+				_ = os.Remove(path)
+			}
+		}
+	}
 }
 
 // errAbsent says a release does not carry the file asked for.

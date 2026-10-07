@@ -182,10 +182,23 @@ func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
 	// Read before the run begins, so the run records the snapshot it read.
 	// A snapshot that cannot be read fails the run rather than narrowing
 	// nothing: run without it, every finding a record had closed opens again,
-	// and closes again on the next run that reads one.
-	records, unreadable := r.records.Current()
-
+	// and closes again on the next run that reads one. A snapshot that is
+	// absent where the build's last run read one fails it for the same
+	// reason, which is what a replica restarted on scratch space holds until
+	// its first fetch lands.
 	findings := finding.NewStore(r.db.DB)
+	records, unreadable := r.records.Current()
+	if unreadable == nil && records == nil && r.records != nil {
+		last, err := findings.LastRecordsVersion(ctx, targetID)
+		switch {
+		case err != nil:
+			unreadable = err
+		case last != "":
+			unreadable = fmt.Errorf("no CVE record snapshot is held in %s, and this build's last "+
+				"run read the one of %s", r.records.Dir(), last)
+		}
+	}
+
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: targetID, Scanner: r.scanner.Name(), RanHere: true,
 		RecordsVersion: records.Version(),

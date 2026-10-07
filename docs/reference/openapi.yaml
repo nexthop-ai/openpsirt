@@ -25393,6 +25393,28 @@ paths:
               - open
               - closed
             type: string
+        - description: Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows
+          explode: true
+          in: query
+          name: closed_because
+          schema:
+            description: Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows
+            items:
+              enum:
+                - removed
+                - upgraded
+                - revised
+                - patched
+                - superseded
+                - unexplained
+                - invalid
+                - unaffected
+                - fixed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - explode: false
           in: query
           name: limit
@@ -25521,6 +25543,28 @@ paths:
               - open
               - closed
             type: string
+        - description: Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows
+          explode: true
+          in: query
+          name: closed_because
+          schema:
+            description: Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows
+            items:
+              enum:
+                - removed
+                - upgraded
+                - revised
+                - patched
+                - superseded
+                - unexplained
+                - invalid
+                - unaffected
+                - fixed
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
       responses:
         "200":
           description: OK

@@ -5,7 +5,9 @@ package finding_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -187,6 +189,59 @@ func TestADeclaredPatchIsAskedBeforeTheRecord(t *testing.T) {
 		for _, row := range f.every(t) {
 			if row.ClosedBecause != finding.Patched || row.UnaffectedBy != "" {
 				t.Errorf("closed as %q with lines %q, want patched and none", row.ClosedBecause, row.UnaffectedBy)
+			}
+		}
+	})
+}
+
+func TestTheRegisterListsWhatTheRecordsClosedWithTheirLines(t *testing.T) {
+	// A wrong record hides a real finding, so what the records closed has to
+	// be listable on its own and readable against the record.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		f.reported(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
+		f.reported(t, unaffectedBy(libnl, recordSays), found("CVE-2026-2", libnl))
+
+		who := f.holding(t, access.PublicRead)
+		rows, err := f.store.RegisterPage(t.Context(), who, f.target,
+			finding.Registering{Because: []finding.Closure{finding.Unaffected}}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("kept %d rows, want the two places closed as unaffected", len(rows))
+		}
+		for _, row := range rows {
+			if row.Vulnerability != "CVE-2026-1" || row.UnaffectedBy != recordSays || row.Met != nil {
+				t.Errorf("kept %s with lines %q met %v, want CVE-2026-1, the record's lines and no deadline judged",
+					row.Vulnerability, row.UnaffectedBy, row.Met)
+			}
+		}
+	})
+}
+
+func TestAFindingTheRecordClosedMetAndMissedNoDeadline(t *testing.T) {
+	// It carried a deadline while it was believed to be present. Closing it
+	// says it never was, which is neither meeting the deadline nor missing it.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		f.reported(t, found("CVE-2026-1", libnl))
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("due_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("target_id = ?", f.target).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		f.reported(t, unaffectedBy(libnl, recordSays))
+
+		rates, err := f.store.Compliance(t.Context(), f.holding(t, access.PublicRead),
+			f.wholeProduct(), time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rates {
+			if r.Closed != 0 || r.Late != 0 {
+				t.Errorf("%s: %d closed and %d late against a deadline, for a release never affected",
+					r.Severity, r.Closed, r.Late)
 			}
 		}
 	})
