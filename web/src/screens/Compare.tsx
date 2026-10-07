@@ -258,6 +258,7 @@ const WENT: Record<string, string> = {
   removed: "Removed",
   superseded: "Superseded",
   unexplained: "Unexplained",
+  unaffected: "Not affected",
 };
 
 function Columns({

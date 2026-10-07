@@ -268,6 +268,11 @@ export function Register() {
                                 <span className="hint"> · {row.closed_because}</span>
                               )}
                               {row.closed_note && <div className="hint">{row.closed_note}</div>}
+                              {row.unaffected?.map((line, i) => (
+                                <div key={i} className="hint">
+                                  {recordLine(line)}
+                                </div>
+                              ))}
                             </>
                           ) : (
                             <span className="hint">—</span>
@@ -326,6 +331,7 @@ function MeasuredWith({
     scanner?: string;
     scanner_version?: string;
     database_version?: string;
+    records_version?: string;
     ran_at?: string;
     document_hash?: string;
     document_held?: boolean;
@@ -359,6 +365,14 @@ function MeasuredWith({
           </span>
         </>
       )}
+      {measured.records_version && (
+        <>
+          {" · "}
+          <span title="The CVE record snapshot matches were narrowed with">
+            CVE records <span className="id">{measured.records_version}</span>
+          </span>
+        </>
+      )}
     </p>
   );
 }
@@ -368,6 +382,21 @@ function MeasuredWith({
 // against what shipped, so a column of wire tokens is the tool showing its
 // storage rather than answering; a state the table does not know is still
 // shown as it arrived.
+// A CVE record's line as the words a reader checks a closure against: the
+// product the record names, and the versions it says are unaffected.
+function recordLine(line: {
+  entry: string;
+  version: string;
+  less_than?: string;
+  less_than_or_equal?: string;
+}): string {
+  if (line.less_than)
+    return `${line.entry}: unaffected from ${line.version}, before ${line.less_than}`;
+  if (line.less_than_or_equal)
+    return `${line.entry}: unaffected ${line.version} to ${line.less_than_or_equal}`;
+  return `${line.entry}: ${line.version} unaffected`;
+}
+
 function RegisterState({ state }: { state?: string }) {
   return state ? <span className={`state ${drawn(state)}`}>{said(state)}</span> : null;
 }
