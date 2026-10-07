@@ -165,6 +165,10 @@ spec:
             # extraEnv, so the two cannot name different places.
             - name: GRYPE_DB_CACHE_DIR
               value: {{ .Values.scanner.cacheDir | quote }}
+            # The CVE record snapshot beside the scanner's data, on the same
+            # volume, for the same reason.
+            - name: OPENPSIRT_RECORDS_DIR
+              value: {{ printf "%s/cve-records" (trimSuffix "/" .Values.scanner.cacheDir) | quote }}
             - name: OPENPSIRT_DATABASE_URL
               valueFrom:
                 secretKeyRef:

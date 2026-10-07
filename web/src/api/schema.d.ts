@@ -5983,6 +5983,8 @@ export interface paths {
          *
          *     Absent everywhere means nothing has finished a scan and stated a version, which is a deployment nobody has pointed at anything yet rather than data that has gone stale.
          *
+         *     `records` is the same for the CVE record snapshot the scans narrow their matches with. Its version is the moment the snapshot describes, and it is absent where no run has read one.
+         *
          *     Requires: administrator
          */
         get: operations["get-vulnerability-data"];
@@ -7006,7 +7008,7 @@ export interface components {
              * @description The reason it went. Only on fixed entries
              * @enum {string}
              */
-            because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained";
+            because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "unaffected";
             /**
              * Format: int64
              * @description The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
@@ -7705,7 +7707,7 @@ export interface components {
              * @description The reason it closed, in the tool's terms. Only on a closed row
              * @enum {string}
              */
-            closed_because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "fixed";
+            closed_because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed";
             /** @description The person's own reason for closing it. Only where a person did */
             closed_note?: string;
             component: string;
@@ -7733,6 +7735,8 @@ export interface components {
              * @enum {string}
              */
             state: "undecided" | "waiting" | "agreed" | "lapsed";
+            /** @description The CVE record lines stating this version is unaffected. Only on a row closed as unaffected */
+            unaffected?: components["schemas"]["RecordLineBody"][] | null;
             version?: string;
             vulnerability: string;
         };
@@ -9658,6 +9662,8 @@ export interface components {
             ran_at?: string;
             /** @description We ran the scanner, rather than the build sending what its own found */
             ran_here?: boolean;
+            /** @description The CVE record snapshot matches were narrowed with, as the moment it describes. Absent where the run read none */
+            records_version?: string;
             /**
              * Format: int64
              * @description The scanner run these came from
@@ -11060,6 +11066,32 @@ export interface components {
             /** @description The name for them here */
             identity: string;
         };
+        RecordLineBody: {
+            /** @description The product the record's line is about, as the record names it */
+            entry: string;
+            /** @description The version the line stops before */
+            less_than?: string;
+            /** @description The last version the line covers. A trailing * covers every version beginning with what precedes it */
+            less_than_or_equal?: string;
+            /**
+             * @description What the record says of the versions the line covers
+             * @enum {string}
+             */
+            status: "affected" | "unaffected";
+            /** @description The first version the line covers, or the one version where it names no bound */
+            version: string;
+        };
+        RecordsDataBody: {
+            /**
+             * Format: date-time
+             * @description The moment the snapshot last moved: the most recent time any snapshot was read for the first time
+             */
+            moved_at?: string;
+            /** @description Whether it has gone the same span without moving that counts as stopped for the scanner's data */
+            stale: boolean;
+            /** @description The snapshot the newest finished run read, as the moment it describes. Absent where no run has read one, and nothing is narrowed */
+            version?: string;
+        };
         "Redact-attachmentRequest": {
             /**
              * Format: uri
@@ -11557,6 +11589,8 @@ export interface components {
             opened_exploited?: number;
             /** @description We ran the scanner, rather than the build sending what its own found */
             ran_here?: boolean;
+            /** @description The CVE record snapshot matches were narrowed with, as the moment it describes. Absent where the run read none */
+            records_version?: string;
             /** Format: int64 */
             run_id: number;
             scanner: string;
@@ -12612,6 +12646,8 @@ export interface components {
              * @description The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change
              */
             moved_at?: string;
+            /** @description The CVE record snapshot the scans narrowed their matches with */
+            records: components["schemas"]["RecordsDataBody"];
             /** @description Whether it has been that long. The same question the condition told to administrators asks */
             stale: boolean;
             /** @description The span without moving that counts as stopped, as this deployment has it set */
@@ -20146,6 +20182,8 @@ export interface operations {
                 issue?: string;
                 /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
                 standing?: "open" | "closed";
+                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed")[] | null;
                 limit?: number;
                 offset?: number;
             };
@@ -20192,6 +20230,8 @@ export interface operations {
                 issue?: string;
                 /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
                 standing?: "open" | "closed";
+                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed")[] | null;
             };
             header?: never;
             path: {

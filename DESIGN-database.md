@@ -252,6 +252,7 @@ The chain is one part per release.
 | None | v0.4.0 changes no schema. Its record carries migration 38 as its last |
 | 39 | v0.5.0: v0.4.0's schema changed into v0.5.0's, and the rows moved with it. § The v0.5.0 upgrade says what it does. A database v0.5.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 40 | v0.6.0: v0.5.0's schema changed into v0.6.0's, and the rows moved with it. § The v0.6.0 upgrade says what it does. A database v0.6.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| 41 | The untagged release: v0.6.0's schema changed into the next release's. § The untagged upgrade says what it does. Edited until a tag ships it, and every schema change before that tag edits it rather than adding a migration beside it |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -271,7 +272,7 @@ The chain collapses into a single initial migration before 1.0, beside one
 migration that upgrades a database the last 0.x release built. A database an
 earlier 0.x release built is upgraded to that release first.
 
-Migrations 1 to 36 each create something. Migrations 37 to 40 change existing
+Migrations 1 to 36 each create something. Migrations 37 to 41 change existing
 tables.
 
 ### Forward only
@@ -527,6 +528,17 @@ whichever of the two leads with the owner; SQLite rebuilds both tables.
 | A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built |
 | A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains |
 | A v0.5.0 key and token in force and one of each withdrawn | Upgraded, the one in force holds its name in force and the withdrawn one holds none, and the withdrawn name is accepted again |
+
+### The untagged upgrade
+
+Migration 41. A finding gains the CVE record lines that closed it as
+unaffected, and a run the CVE record snapshot it read: two columns that hold a
+null and that every engine adds where the table stands. The release's
+declarations of the two tables are v0.3.0's and v0.2.0's with the column added.
+
+| Check, on each of the four engines | What it holds |
+|---|---|
+| A v0.6.0 database | Upgraded, no finding holds record lines and no run a snapshot, and each declaration describes the table the migrations built |
 
 ### Release records
 

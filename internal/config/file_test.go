@@ -133,6 +133,7 @@ var everySetting = map[string]string{
 
 	"UPSTREAM_INTERNAL": "corp,internal-lib", "OUTBOUND_EXCLUDED": "corp.example.test,203.0.113.0/24",
 	"PATCH_BRANCHES": "true", "PATCH_DIR": "/srv/copies", "PATCH_QUOTA": "1073741824",
+	"RECORDS_DIR": "/srv/records", "RECORDS_UPDATE": "false",
 
 	"BOOTSTRAP_ADMINS": "ana,ben", "SESSION_LIFETIME": "8h",
 	"GROUP_ROLES": "leads=admin; sec%40example.com=private-triage+approver@sonic,onie; all=public-read",

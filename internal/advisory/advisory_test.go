@@ -1126,3 +1126,43 @@ func TestAnIdentifierThatIsNotOneIsNotPublished(t *testing.T) {
 		})
 	}
 }
+
+func TestAReleaseTheRecordSaysWasNeverAffectedIsNotNamed(t *testing.T) {
+	// A release holding the issue only as a row closed unaffected never held
+	// it, and naming it, as fixed or otherwise, says it did.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		f.alsoIn(t, identifier, f.tagged)
+		issueID, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("closed_at = ?", time.Now().UTC()).
+			Set("closed_because = ?", finding.Unaffected).
+			Where("target_id = ?", f.tagged).Where("vulnerability_id = ?", issueID).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		doc, err := f.document(t, "sonic", identifier)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		status := doc.Vulnerabilities[0].Status
+		named := append(append([]string{}, status.KnownAffected...), status.Fixed...)
+		for _, vendor := range doc.ProductTree.Branches {
+			for _, product := range vendor.Branches {
+				for _, release := range product.Branches {
+					named = append(named, release.Product.ID)
+				}
+			}
+		}
+		for _, id := range named {
+			if strings.Contains(id, fixtures.TagName) {
+				t.Errorf("the document names %q, a release never affected", id)
+			}
+		}
+	})
+}

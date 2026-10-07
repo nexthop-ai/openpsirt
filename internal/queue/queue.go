@@ -654,6 +654,35 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	})
 }
 
+// Postpone hands work back to the queue untried, by the worker that holds it,
+// to be claimed again once the delay has passed.
+//
+// For work that cannot start yet for a reason outside it — something it needs
+// that has not arrived — rather than work that failed. The attempt the claim
+// counted is given back, so waiting never sets a job aside, and the reason is
+// kept where a failure's would be so whoever looks at the queue can read why it
+// is waiting.
+func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after time.Duration, why string) error {
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		now := q.now().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Pending).
+			Set("attempts = CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END").
+			Set("claimed_by = NULL").
+			Set("run_after = ?", now.Add(after)).
+			Set("last_error = ?", head(why, mostOfAnError)).
+			Set("updated_at = ?", now).
+			Where("id = ?", id).
+			Where("state = ?", Running).
+			Where("claimed_by = ?", worker).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		return held(res)
+	})
+}
+
 // mostOfAnError bounds what a failing job may write about itself.
 //
 // The string comes from whatever failed — a parser, a scanner's output, a

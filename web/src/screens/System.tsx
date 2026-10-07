@@ -170,6 +170,7 @@ function VulnerabilityData() {
   }
   const version = data.data?.version ?? "";
   const moved = data.data?.moved_at;
+  const records = data.data?.records;
 
   return (
     <section className="panel">
@@ -204,6 +205,32 @@ function VulnerabilityData() {
             <tr>
               <th scope="row">Counts as stopped after</th>
               <td className="hint">{data.data?.stale_after}</td>
+            </tr>
+            <tr>
+              <th
+                scope="row"
+                title="Closes matches whose CVE record says the version is unaffected"
+              >
+                CVE records
+              </th>
+              <td>
+                {records?.version ? (
+                  <>
+                    <span className="id">{records.version}</span>
+                    {records.moved_at && (
+                      <span className="hint"> · moved {since(records.moved_at)}</span>
+                    )}
+                    {records.stale && (
+                      <>
+                        {" "}
+                        <span className="state bad">stopped</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span className="hint">none read, so nothing is narrowed</span>
+                )}
+              </td>
             </tr>
           </tbody>
         </table>

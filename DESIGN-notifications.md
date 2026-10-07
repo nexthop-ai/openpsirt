@@ -307,6 +307,7 @@ than about anybody's work.
 | One key however the data moves | A deployment that fetched once and stalled again never stopped being stale, and a key carrying the version would clear and re-open while nothing about it had changed. What the condition says is rewritten as it changes, so the sentence names the data in force rather than the data the alert was first raised for |
 | The version in force is read apart from when it last moved | They are answers to different questions, and one statement answering both gets the age wrong |
 | The screen it links to shows both | Otherwise the link is the half that does not work: somebody told the data has stopped moving arrives at the job queue |
+| The CVE record snapshot a run read is asked the same, after the same span, in the same condition | It is the same kind of data and goes stale the same way. One condition saying which of the two stopped, rather than two conditions about one deployment's data. A deployment whose runs have never read a snapshot narrows nothing, and that is the screen's to say rather than an alert's |
 
 ## Absent holders
 

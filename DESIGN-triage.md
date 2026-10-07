@@ -499,7 +499,7 @@ made about it was reachable by nobody else.
 | Offered as a prefill for the reasoning, and the outcome is not carried across | The point of reading somebody else's argument is to judge whether it holds here. Carrying the outcome would make the screen decide |
 | Narrowed by what the subject may read, like every other query | A place identity spans products, so a join that did not carry the subject would hand somebody the reasoning, the approver and the existence of an embargoed judgment in a product they cannot see at all |
 | Approved claims only, and at most a handful | A proposal is nobody's conclusion yet, and a deployment carrying twenty products would otherwise put twenty blocks of somebody else's reasoning on a screen somebody is trying to decide on |
-| The same treatment a supplier's VEX statement gets | It is the same kind of thing: a judgment made by somebody else about code we also ship (REQ-31) |
+| Applied to nothing here | Another product's judgment speaks for that product, and a statement is applied only to what it speaks for (REQ-31) |
 
 ## Extensions
 
@@ -1280,8 +1280,12 @@ nothing and says why.
 It is a third layer, beside the claims a build supplies with its inventory and
 the decisions made here. The screen says what the build claims, what the
 distribution says, and what we decided — three statements, not one collapsed
-answer. Applying a VEX statement by itself would put a third party's claim into a
-number somebody here quotes.
+answer.
+
+A supplier's statement about its own product closes the finding at the places
+that product occupies (REQ-31). That is not built. What is built shows each
+statement and offers it as a prefill, and closes nothing; matching a statement
+to a place, rather than to the package it names, is the part that is missing.
 
 What the document adds is the reasoning. The status is already in the fix state
 the scanner reports; the reasoning is what a triager otherwise types from memory

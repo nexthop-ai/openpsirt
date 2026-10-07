@@ -149,9 +149,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// the opening side.
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
-		// A record taken back as invalid was never present, so it is in no
+		// A record taken back as invalid, and a version the issue's record
+		// states is unaffected, were never present, so neither is in any
 		// step's open set.
-		Where("COALESCE(f.closed_because, '') <> ?", Invalid).
+		Where("COALESCE(f.closed_because, '') NOT IN (?)", bun.List(NeverPresent())).
 		// Only what can fall in the range. A finding opened after the last
 		// point contributes to nothing, and one closed before the first
 		// contributes to nothing either — reading the whole table to discard

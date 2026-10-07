@@ -32,6 +32,7 @@ type RunBody struct {
 	Scanner         string `json:"scanner"`
 	ScannerVersion  string `json:"scanner_version,omitempty"`
 	DatabaseVersion string `json:"database_version,omitempty" doc:"The vulnerability database it read"`
+	RecordsVersion  string `json:"records_version,omitempty" doc:"The CVE record snapshot matches were narrowed with, as the moment it describes. Absent where the run read none"`
 	RanHere         bool   `json:"ran_here,omitempty" doc:"We ran the scanner, rather than the build sending what its own found"`
 	StartedAt       string `json:"started_at"`
 	FinishedAt      string `json:"finished_at,omitempty" doc:"Absent while it is still going"`
@@ -81,7 +82,8 @@ func registerRun(api huma.API, in core.Deps) {
 		}
 		body := RunBody{
 			RunID: ran.RunID, Scanner: ran.Scanner, ScannerVersion: ran.ScannerVersion,
-			DatabaseVersion: ran.DatabaseVersion, RanHere: ran.RanHere,
+			DatabaseVersion: ran.DatabaseVersion, RecordsVersion: ran.RecordsVersion,
+			RanHere:   ran.RanHere,
 			StartedAt: core.Stamp(ran.StartedAt),
 			Failure:   ran.Failure, Caution: ran.Caution,
 			Opened:          runChangeBody(ran.Opened, ran.OpenedBy),

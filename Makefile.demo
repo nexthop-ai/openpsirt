@@ -22,7 +22,7 @@
 # Included by the makefile beside it, so every target here is reached the same
 # way it was: `make demo`, `make dev`, `make scanner-db`, and the rest.
 
-.PHONY: scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status upgrade-rehearsal dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: scanner-db scanner-db-verify cve-records cve-records-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status upgrade-rehearsal dev dev-up dev-down dev-seed dev-reset dev-status
 
 # A throwaway deployment to click around in. Everything about it is
 # overridable, because the two settings people get wrong are the host they
@@ -173,6 +173,45 @@ endif
 	    || { echo "the bundle does not load with the network off, which is the" \
 	         "only place it is for"; exit 1; }
 	@echo "  the bundle loads with the network off and auto-update refused"
+
+# The CVE record snapshot, as a file an operator carries across the gap beside
+# the scanner's database. Fetched with the binary the image carries, which is
+# the reader on the far side, and read back before it is declared.
+CVE_RECORDS := $(SCANNER_DB_DIR)/cve-records.jsonl.gz
+
+cve-records: demo-image
+	@mkdir -p $(SCANNER_DB_DIR)
+	@work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
+	  echo "fetching the CVE record snapshot with the image's own binary"; \
+	  $(DOCKER) run --rm -u "$$(id -u):$$(id -g)" -v "$$work:/records" \
+	    -e OPENPSIRT_RECORDS_DIR=/records -e HOME=/tmp \
+	    --entrypoint /usr/local/bin/openpsirt $(DEMO_IMAGE) records fetch; \
+	  test -s "$$work/cve-records.jsonl.gz" \
+	    || { echo "the fetch wrote no snapshot"; exit 1; }; \
+	  cp "$$work/cve-records.jsonl.gz" "$(CVE_RECORDS)"; \
+	  ( cd $(SCANNER_DB_DIR) && sha256sum cve-records.jsonl.gz > cve-records.jsonl.gz.sha256 )
+	@$(MAKE) --no-print-directory cve-records-verify BUNDLE=$(CVE_RECORDS)
+	@echo "  $(CVE_RECORDS)"
+	@echo "  $(CVE_RECORDS).sha256"
+	@echo "  carry both across; verify on the far side with:"
+	@echo "    make cve-records-verify BUNDLE=<the snapshot>"
+	@echo "  then copy it into OPENPSIRT_RECORDS_DIR and set"
+	@echo "    OPENPSIRT_RECORDS_UPDATE=false"
+
+# Prove a snapshot reads with the network off, the way the scanner's bundle is
+# proved.
+cve-records-verify:
+ifndef BUNDLE
+	@echo "name the snapshot: make cve-records-verify BUNDLE=dist/cve-records.jsonl.gz"
+	@exit 1
+endif
+	@test -f "$(BUNDLE)" || { echo "no such snapshot: $(BUNDLE)"; exit 1; }
+	@work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
+	  cp "$(BUNDLE)" "$$work/cve-records.jsonl.gz"; \
+	  $(DOCKER) run --rm --network none -u "$$(id -u):$$(id -g)" -v "$$work:/records:ro" \
+	    -e OPENPSIRT_RECORDS_DIR=/records -e OPENPSIRT_RECORDS_UPDATE=false -e HOME=/tmp \
+	    --entrypoint /usr/local/bin/openpsirt $(DEMO_IMAGE) records status \
+	    || { echo "the snapshot does not read with the network off"; exit 1; }
 
 demo-image:
 	@command -v $(DOCKER) >/dev/null 2>&1 \

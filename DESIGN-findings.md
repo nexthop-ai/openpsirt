@@ -3,8 +3,8 @@
 What a scan run found, where it sits, and how it is ranked and closed.
 
 Satisfies REQ-08, REQ-11, REQ-13, REQ-14, REQ-15, REQ-17, REQ-18, REQ-19,
-REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-33, REQ-37,
-REQ-78.
+REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-31, REQ-32, REQ-33,
+REQ-37, REQ-78.
 
 ## Contents
 
@@ -31,6 +31,7 @@ REQ-78.
 - [Interval storage](#interval-storage)
 - [Closure reasons](#closure-reasons)
 - [Build-declared claims](#build-declared-claims)
+- [CVE record ranges](#cve-record-ranges)
 - [Fan-out cost](#fan-out-cost)
 - [Decision state on a row](#decision-state-on-a-row)
 - [Urgency](#urgency)
@@ -536,7 +537,9 @@ finding nobody has confirmed looking exactly like one the packagers have.
 
 The range and the source are kept with the finding, because "somebody has to
 look" is easier to act on with the thing to look at in hand. Neither is compared
-against anything, which would need an ordering per ecosystem.
+against anything, which would need an ordering per ecosystem. The issue's CVE
+record is read against an upstream release number instead, which is
+§ CVE record ranges.
 
 | Rule | Reason |
 |---|---|
@@ -997,14 +1000,16 @@ change" is counted by.
 | Fixed | Somebody declared a recorded flaw fixed here. The only closure a person writes |
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: this build never shipped it, the entry named the wrong product, or it duplicates an issue already tracked |
+| Unaffected | The issue's CVE record states the upstream release this place holds is not affected (§ CVE record ranges) |
 
 Superseded is told apart from Upgraded because they are opposite answers to "was
 this fixed", and conflating them put one issue in a release comparison as both
 fixed and newly present.
 
-Invalid is on a different axis. Every other reason answers "why did this stop
-being present"; this says it was never present, so it is neither a resolution
-nor a disappearance. It never means the finding exists but does not apply
+Invalid and Unaffected are on a different axis. Every other reason answers "why
+did this stop being present"; these say it was never present, so neither is a
+resolution or a disappearance. A trend leaves both out of every step's open set,
+and the releases an issue was in leave out a build holding nothing else. It never means the finding exists but does not apply
 here — that is a triage decision of `not-applicable` with the justification
 that fits, agreed by a second person and exported as VEX. Letting the closure
 absorb that case would route dismissals around approval.
@@ -1065,6 +1070,102 @@ claims are read in a stable order.
 
 `DESIGN-ingest.md` § Build-declared suppressions holds how a claim that names
 something is matched against a component.
+
+## CVE record ranges
+
+A source a scanner matches by version keeps part of the issue's CVE record
+(REQ-31). Each scan reads the record itself, and closes a finding the record
+excludes as unaffected.
+
+| Source | What it leaves out | False positive |
+|---|---|---|
+| NVD's CPE configuration | The fix on each stable branch: the kernel's ranges run to the next mainline release's fix | A release already carrying the backport |
+| A distribution's tracker | Where the bug arrived: it records where a release is fixed | A release older than the bug |
+
+| Measured against the CVE List on 2026-10-07 | Kernel issues open | Excluded | Findings closed |
+|---|---|---|---|
+| ONIE, upstream 6.18.55 | 183 | 37, 36 of them fixed on 6.18.y at or before 6.18.55 | 37 |
+| SONiC, Debian 6.12.41-1 and its `linux-perf` at 6.12.107-1 | 6,785 | 173 at one place or more, 121 of them at every place | 7,745 |
+
+### Entries
+
+Each entry of a record names what it describes. The entries read are the
+numbering authority's and every one a third party added in a container of its
+own: a third party's entry narrows as the authority's does, and an affected line
+in it stops a narrowing the same way. An entry is read against a component where
+it is tied to it, and in no other case.
+
+| Tie | Read against |
+|---|---|
+| The entry's CPE names the vendor and product a component's CPE names | That component, where it is upstream's own release |
+| The entry's package identifier names the component's type, namespace and name | The same |
+| The entry carries neither, and its vendor and product are a name this knows | The components that name is listed for |
+| A distribution's or a vendor's package, by its own CPE or identifier | Nothing. Those describe the distribution's build, and its lines are in the distribution's numbering |
+
+| Known name | Components |
+|---|---|
+| Vendor `Linux`, product `Linux`, which is how the kernel's numbering authority writes every entry | An upstream release whose CPE is `linux:linux_kernel`; Debian's packages of the `linux` source |
+
+Debian's kernel carries the stable release it was built from as its version.
+Ubuntu's and Red Hat's keep one base version while taking in stable releases,
+so their versions do not say which they carry and they are not listed.
+
+### Versions
+
+The version read is the upstream release: a distribution's package with its
+epoch and revision taken off, and anything else as given, less a leading `v`.
+It has to be release numbers and nothing else. `6.18.55-onie` is a vendor's
+changes on top of 6.18.55, and those changes are what a record cannot speak for.
+
+| A line | Read as |
+|---|---|
+| A version alone | That version |
+| A version and a strict upper bound | From the version up to the bound |
+| A version and an inclusive upper bound | From the version up to and including the bound. A bound ending in `.*` covers every release beginning with what precedes it; `*` alone covers every release |
+| Of no stated type, or `semver` | Ordered as release numbers (`DESIGN-remediation.md` § Version ordering) |
+| A commit range | Nothing. The kernel's records carry one beside every release range, saying the same thing |
+| Of any other type, or with status changes inside it | Not ordered. Where it states affected, nothing narrows |
+
+### Narrowing
+
+| Rule | |
+|---|---|
+| Closed where an unaffected line of a tied entry contains the version, and no line of a tied entry that could contain it states affected | Both are the record's own statements. A line this cannot order might contain the version |
+| An entry's default status is never read | The record states its lines; the default covers what it did not state |
+| Narrowing only | A record removes a match a scanner made and never adds one |
+| The record held under the issue's identifier, or under an alias where the identifier has none | A record is filed under the CVE identifier, and an issue may be filed under another |
+| A patch the build declares is asked first | Both close, and the build's word about its own code is already on record |
+| The fix on the component's own branch replaces the scanner's, on an upstream release | The scanner's range names the fix on whichever branch it was cut from. A distribution's package keeps its feed's, which is on its branch already |
+
+| Case | What is recorded |
+|---|---|
+| An open finding the record now excludes | Closed as unaffected by the run, with the lines that say so |
+| A finding first seen excluded | A row recorded closed as unaffected, so a release comparison says this build never held it. No deadline, and in no count of what a run opened |
+| A version bump onto a release the record excludes | The finding at the old version closes as upgraded, and the new version's is recorded closed as unaffected |
+| A re-scan with the record unchanged | Nothing |
+| A re-scan whose record still excludes the version on other lines | The closed row keeps the lines the record states now |
+| A record that stops excluding the version | The finding opens again on the next scan, as a new row |
+
+The lines are kept on the closed row, because the snapshot the run read is
+replaced by the next. The run records which snapshot it read, beside the
+scanner's data version (REQ-13).
+
+| A scan without a snapshot to read | |
+|---|---|
+| One that cannot be read | Waits, saying why |
+| None held, where any run of the build read one | Waits, naming the newest snapshot one read. A replica restarted on scratch space holds none until its first fetch, and a scan then would open every finding a record closed, which the next scan would close again. Any run rather than the last: one that closed findings and then failed has still closed them |
+| None held, where no run of the build has read one | Runs, and narrows nothing |
+
+A scan that waits is asked before its run begins, and its job goes back on the
+queue for five minutes without spending an attempt (`DESIGN-queue.md`
+§ Failure handling). Failed, the job would be set aside after a few minutes,
+and a run begun keeps the schedule from asking again for a day.
+
+The register lists the findings closed this way under their own reason, with
+the lines. A closure saying the issue was never present is in no deadline
+judgment: it met nothing and missed nothing.
+
+`DESIGN-ingest.md` § CVE records holds where the snapshot comes from.
 
 ## Fan-out cost
 
@@ -1577,5 +1678,11 @@ question next year should find the answer rather than the question.
 | A deployment that reaches the internet only through a proxy of its own fetches nothing | git is pointed at the loopback guard and at nothing else, so the guard is the one way out, and the guard dials directly |
 | A ruling carries one disposition and one reason for every report it covers | Reports needing different reasons are different rulings. Splitting one is withdrawing it and proposing two |
 | Accepting a report takes no ruling and no second person | Accepting re-exposes risk, and an issue already carries its own triage |
+| A CVE record is trusted equally whoever wrote it | The scanner's range is a reading of the same record by a third party. A wrong record hides a real finding, which a wrong fix version already does in the other direction |
+| A vendor patch backporting a bug into a release older than the record says it arrived in is not seen | The record speaks for upstream's releases. Fix-version matching misses the same backport |
+| A corrected record reaches the findings at the next scan | The run is the one writer of what it closes. A snapshot arriving between scans writes nothing |
+| The finding screen reads open findings, and a finding closed as unaffected is read in the register with the record's lines | The screen is where a judgment is made, and the record has made this one |
+| A wrong record cannot be overridden here | Nothing records that a release is affected against a record saying it is not, and a run consults no decision before closing. The register lists every such closure so a wrong one can be found; correcting it is correcting the record, which the next snapshot carries. Not built |
+| The outbound VEX document says nothing about a finding closed as unaffected | A statement to customers that a release is not affected is a decision this deployment makes, and a closure is not one |
 | A merge is not undone | Two issues a report wrongly named together stay one. Nothing a report says is taken to unmerge, and unmerging would have to divide findings and decisions made since |
 | An issue absorbed keeps the name it was filed under | The kept issue is not refiled under a name the absorbed row holds. Where the best-known name is one the absorbed row holds, the kept issue stays filed where it is |

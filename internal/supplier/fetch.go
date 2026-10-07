@@ -199,7 +199,8 @@ func (u unreadable) Unwrap() error { return u.err }
 //
 // The whole pass is bounded twice over: at most MostPerPass documents, and only
 // those the publisher listed past the mark. What comes back is evidence and a
-// prefill and decides nothing (REQ-31).
+// prefill and closes nothing; applying it where it speaks for a place is not
+// built (REQ-31).
 func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (Taken, error) {
 	var took Taken
 	if err := Reachable(source.URL); err != nil {

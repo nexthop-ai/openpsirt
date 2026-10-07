@@ -75,6 +75,7 @@ environment beside a configuration file.
 | `/etc/openpsirt/openpsirt.toml` | The configuration file | `openpsirt`, `0600`. Refused at startup when anybody else may read or write it |
 | `/var/lib/openpsirt` | A SQLite database, and attachments where `attachments.dir` names a directory here | `openpsirt`, `0700` |
 | `/var/cache/openpsirt/grype` | The scanner's vulnerability data | `openpsirt`, `0700` |
+| `/var/cache/openpsirt/grype/cve-records` | The CVE record snapshot, made inside the scanner's directory on first fetch | `openpsirt`, `0700` |
 | `/var/cache/openpsirt/repositories` | Copies of repositories, where patch branch lookups are on | `openpsirt`, `0700` |
 
 The process runs as its own unprivileged user:

@@ -20,6 +20,7 @@ func TestTheTrendCountsOnlyAFixAsResolved(t *testing.T) {
 		present bool
 	}{
 		{finding.Invalid, false},
+		{finding.Unaffected, false},
 		{finding.Superseded, true},
 	} {
 		t.Run(string(one.because), func(t *testing.T) {

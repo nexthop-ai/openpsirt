@@ -10,6 +10,7 @@ requires, and the storage REQ-78 needs.
 - [Image structure](#image-structure)
 - [Base version](#base-version)
 - [Bundled scanner](#bundled-scanner)
+- [CVE record snapshot](#cve-record-snapshot)
 - [Repository copies](#repository-copies)
 - [Pod sizing](#pod-sizing)
 - [Image and archive checks](#image-and-archive-checks)
@@ -103,6 +104,14 @@ value in the chart.
 Every replica mounts the one claim, because this is a Deployment rather than a
 set with a volume per pod. So the access mode has to allow as many nodes as
 there are replicas, and the pairing the chart can see it refuses at render time.
+
+## CVE record snapshot
+
+The CVE record snapshot is kept on the scanner's data volume, in a directory of
+its own inside the scanner's (`DESIGN-ingest.md` § CVE records). The chart names
+it from the scanner's directory, after anything given in `extraEnv`, so the two
+cannot name different volumes. The directory is made on the first fetch, so the
+image makes nothing for it.
 
 ## Repository copies
 

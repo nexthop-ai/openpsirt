@@ -61,9 +61,13 @@ export function Register() {
     .getAll("state")
     .filter((word): word is Stands => (STATES as readonly string[]).includes(word));
   const standing = params.get("standing") === "open";
+  // What the CVE records closed, listed on its own so a wrong record can be
+  // found.
+  const recordClosed = params.get("closed_because") === "unaffected";
   const narrowed = {
     ...(states.length > 0 ? { state: states } : {}),
     ...(standing ? { standing: "open" as const } : {}),
+    ...(recordClosed ? { closed_because: ["unaffected" as const] } : {}),
   };
   const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}\u0000${params.toString()}`;
   const [shown, setShown] = useState(showing);
@@ -91,6 +95,7 @@ export function Register() {
   const asked = new URLSearchParams();
   for (const word of states) asked.append("state", word);
   if (standing) asked.set("standing", "open");
+  if (recordClosed) asked.set("closed_because", "unaffected");
 
   const rows = register.data?.items ?? [];
   const total = register.data?.total ?? 0;
@@ -152,11 +157,26 @@ export function Register() {
               />{" "}
               Still open
             </label>
+            <label title="Closed because the issue's CVE record says this version is unaffected">
+              <input
+                type="checkbox"
+                checked={recordClosed}
+                onChange={(e) => {
+                  const next = new URLSearchParams(params);
+                  if (e.target.checked) next.set("closed_because", "unaffected");
+                  else next.delete("closed_because");
+                  setParams(next);
+                }}
+              />{" "}
+              Not affected, per CVE record
+            </label>
           </div>
 
           <h3>
             {total.toLocaleString()} {total === 1 ? "row" : "rows"}
-            {(states.length > 0 || standing) && <span className="hint"> narrowed</span>}
+            {(states.length > 0 || standing || recordClosed) && (
+              <span className="hint"> narrowed</span>
+            )}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
             One row per issue and place, open or closed, <b>no triage line</b>.{" "}
@@ -268,6 +288,11 @@ export function Register() {
                                 <span className="hint"> · {row.closed_because}</span>
                               )}
                               {row.closed_note && <div className="hint">{row.closed_note}</div>}
+                              {row.unaffected?.map((line, i) => (
+                                <div key={i} className="hint">
+                                  {recordLine(line)}
+                                </div>
+                              ))}
                             </>
                           ) : (
                             <span className="hint">—</span>
@@ -326,6 +351,7 @@ function MeasuredWith({
     scanner?: string;
     scanner_version?: string;
     database_version?: string;
+    records_version?: string;
     ran_at?: string;
     document_hash?: string;
     document_held?: boolean;
@@ -359,6 +385,14 @@ function MeasuredWith({
           </span>
         </>
       )}
+      {measured.records_version && (
+        <>
+          {" · "}
+          <span title="The CVE record snapshot matches were narrowed with">
+            CVE records <span className="id">{measured.records_version}</span>
+          </span>
+        </>
+      )}
     </p>
   );
 }
@@ -368,6 +402,21 @@ function MeasuredWith({
 // against what shipped, so a column of wire tokens is the tool showing its
 // storage rather than answering; a state the table does not know is still
 // shown as it arrived.
+// A CVE record's line as the words a reader checks a closure against: the
+// product the record names, and the versions it says are unaffected.
+function recordLine(line: {
+  entry: string;
+  version: string;
+  less_than?: string;
+  less_than_or_equal?: string;
+}): string {
+  if (line.less_than)
+    return `${line.entry}: unaffected from ${line.version}, before ${line.less_than}`;
+  if (line.less_than_or_equal)
+    return `${line.entry}: unaffected ${line.version} to ${line.less_than_or_equal}`;
+  return `${line.entry}: ${line.version} unaffected`;
+}
+
 function RegisterState({ state }: { state?: string }) {
   return state ? <span className={`state ${drawn(state)}`}>{said(state)}</span> : null;
 }

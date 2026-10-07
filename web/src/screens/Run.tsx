@@ -109,6 +109,10 @@ export function Run() {
             <span className="l">vulnerability data</span>
           </div>
           <div className="score">
+            <span className="n">{it.records_version || "—"}</span>
+            <span className="l">CVE records</span>
+          </div>
+          <div className="score">
             <span className="n">{it.ran_here ? "here" : "the build"}</span>
             <span className="l">ran it</span>
           </div>

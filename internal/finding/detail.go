@@ -34,6 +34,8 @@ type Measured struct {
 	Scanner         string
 	ScannerVersion  string
 	DatabaseVersion string
+	// RecordsVersion is the CVE record snapshot matches were narrowed with.
+	RecordsVersion string
 	// RanHere says we ran it, rather than a build sending us what its own
 	// scanner found. Counts are only comparable between builds measured the
 	// same way.
@@ -855,7 +857,7 @@ func (s *Store) measured(ctx context.Context, runID int64) (*Measured, error) {
 	}
 	return &Measured{
 		Scanner: run.Scanner, ScannerVersion: run.ScannerVersion,
-		DatabaseVersion: run.DatabaseVersion, RanHere: run.RanHere,
-		RanAt: run.FinishedAt,
+		DatabaseVersion: run.DatabaseVersion, RecordsVersion: run.RecordsVersion,
+		RanHere: run.RanHere, RanAt: run.FinishedAt,
 	}, nil
 }

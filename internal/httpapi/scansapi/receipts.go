@@ -271,7 +271,8 @@ func registerReceipts(api huma.API, in core.Deps) {
 				body.RunID = r.Measured.ID
 				body.Measured = &core.MeasuredBody{
 					Scanner: r.Measured.Scanner, ScannerVersion: r.Measured.ScannerVersion,
-					DatabaseVersion: r.Measured.DatabaseVersion, RanHere: r.Measured.RanHere,
+					DatabaseVersion: r.Measured.DatabaseVersion, RecordsVersion: r.Measured.RecordsVersion,
+					RanHere: r.Measured.RanHere,
 				}
 				if r.Measured.FinishedAt != nil {
 					body.Measured.RanAt = core.Stamp(*r.Measured.FinishedAt)
@@ -307,6 +308,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 				Scanner:         last.Scanner,
 				ScannerVersion:  last.ScannerVersion,
 				DatabaseVersion: last.DatabaseVersion,
+				RecordsVersion:  last.RecordsVersion,
 			}
 			if last.FinishedAt != nil {
 				out.Body.MeasuredAgainst.RanAt = core.Stamp(*last.FinishedAt)

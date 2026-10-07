@@ -17,6 +17,7 @@ type MeasuredBody struct {
 	Scanner         string `json:"scanner" doc:"The scanner that produced the findings"`
 	ScannerVersion  string `json:"scanner_version,omitempty"`
 	DatabaseVersion string `json:"database_version,omitempty" doc:"The vulnerability database it read"`
+	RecordsVersion  string `json:"records_version,omitempty" doc:"The CVE record snapshot matches were narrowed with, as the moment it describes. Absent where the run read none"`
 	RanAt           string `json:"ran_at,omitempty" doc:"The moment that run finished"`
 	// RanHere says we ran it rather than a build sending what its own scanner
 	// found. Counts are only comparable between builds measured the same way,
@@ -54,6 +55,7 @@ func (m *MeasuredBody) Stating() []Stated {
 		{"inventory hash", m.DocumentHash},
 		{"scanner", strings.TrimSpace(m.Scanner + " " + m.ScannerVersion)},
 		{"vulnerability data", m.DatabaseVersion},
+		{"CVE records", m.RecordsVersion},
 		{"run", stringOrNone(m.Run)},
 		{"measured at", m.RanAt},
 	}

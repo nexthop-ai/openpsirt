@@ -250,6 +250,11 @@ type Config struct {
 	// can do: the memory the fetches take, the volume the copies live on and
 	// the hosts they may not reach are all theirs.
 	PatchBranches bool
+	// RecordsDir is where the CVE record snapshot is kept, and RecordsUpdate
+	// is whether the deployment fetches it from the CVE List. With fetching
+	// off, the snapshot is whatever an operator placed there (REQ-12).
+	RecordsDir    string
+	RecordsUpdate bool
 	// OutboundExcluded is where nothing is fetched from — no repository a
 	// patch link names and no supplier's directory: host names, each
 	// covering the hosts under it, and networks. On top of this network,
@@ -415,6 +420,8 @@ func load(given map[string]string) (Config, error) {
 		PatchDir:               r.text("PATCH_DIR", "/var/cache/openpsirt/repositories"),
 		PatchQuota:             r.number("PATCH_QUOTA", patchbranch.DefaultQuota),
 		PatchBranches:          r.boolean("PATCH_BRANCHES", false),
+		RecordsDir:             r.text("RECORDS_DIR", "/var/cache/openpsirt/grype/cve-records"),
+		RecordsUpdate:          r.boolean("RECORDS_UPDATE", true),
 		TrustedGroupsHeader:    r.text("TRUSTED_GROUPS_HEADER", ""),
 		TrustedGroupsDelimiter: r.text("TRUSTED_GROUPS_DELIMITER", ","),
 		PlainHTTP:              r.boolean("PLAIN_HTTP", false),
@@ -601,6 +608,11 @@ func load(given map[string]string) (Config, error) {
 	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
+	}
+	// Empty, the snapshot is never found and nothing is narrowed, and the
+	// fetcher fails every hour making a directory with no name.
+	if strings.TrimSpace(c.RecordsDir) == "" {
+		return Config{}, fmt.Errorf("OPENPSIRT_RECORDS_DIR: must not be empty")
 	}
 	// Refused at startup rather than at the first sign-in, on the bound the API
 	// write path applies. Unbounded here, a deployment starts cleanly and then

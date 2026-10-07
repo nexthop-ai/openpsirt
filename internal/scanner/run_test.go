@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -746,6 +749,222 @@ func TestAScanLeavesSQLiteWithStatisticsForTheFindings(t *testing.T) {
 		if err := f.db.QueryRowContext(t.Context(),
 			`SELECT COUNT(*) FROM "sqlite_stat1" WHERE "tbl" = 'finding'`).Scan(&n); err != nil || n == 0 {
 			t.Errorf("a scan left the finding table without statistics (%d rows, %v)", n, err)
+		}
+	})
+}
+
+func TestARunRecordsTheCVERecordSnapshotItRead(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), snapshotFile(t), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		outcome, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
+			Narrowing(cverecord.NewHeld(dir)).Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var run finding.Run
+		if err := f.db.DB.NewSelect().Model(&run).Where("id = ?", outcome.RunID).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if run.RecordsVersion != "2026-10-07T00:00:00Z" {
+			t.Errorf("the run recorded snapshot %q, want the one it read", run.RecordsVersion)
+		}
+	})
+}
+
+func TestAScanWithAnUnreadableSnapshotWaitsWithoutSpendingAnAttempt(t *testing.T) {
+	// Run without it, every finding a record had closed would open again and
+	// close again on the next run that reads one. Failed instead, the job
+	// would be set aside within minutes and the run would keep the schedule
+	// from asking again for a day.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), []byte("damaged"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		f.waiting(t)
+		before := f.runs(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		s := &stub{reported: []finding.Reported{{Issue: finding.Named{Identifier: "CVE-2026-1"}, Component: libnl}}}
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(dir)).Once(t.Context())
+		if err != nil || outcome != nil {
+			t.Fatalf("answered %v, %v; want the job handed back and nothing scanned", outcome, err)
+		}
+		f.waitingUntried(t, "CVE record snapshot", before)
+		if s.saw != nil {
+			t.Error("the scanner ran although the run could not narrow what it found")
+		}
+	})
+}
+
+// waitingUntried checks the build's scan is back on the queue with no attempt
+// spent, saying why, and that no run was begun.
+func (f *runFixture) waitingUntried(t *testing.T, why string, runsBefore int) {
+	t.Helper()
+	var job queue.Job
+	if err := f.db.DB.NewSelect().Model(&job).Where("kind = ?", queue.Scan).
+		Order("id DESC").Limit(1).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	said := ""
+	if job.LastError != nil {
+		said = *job.LastError
+	}
+	if job.State != queue.Pending || job.Attempts != 0 || !strings.Contains(said, why) {
+		t.Errorf("the job is %s after %d attempts saying %q, want pending, untried, naming %q",
+			job.State, job.Attempts, said, why)
+	}
+	if !job.RunAfter.After(time.Now()) {
+		t.Errorf("the job may run again at %v, want later than now", job.RunAfter)
+	}
+	if runs := f.runs(t); runs != runsBefore {
+		t.Errorf("%d runs after waiting, want the %d before it: none begun", runs, runsBefore)
+	}
+}
+
+// runs counts every run against the build.
+func (f *runFixture) runs(t *testing.T) int {
+	t.Helper()
+	n, err := f.db.DB.NewSelect().Model((*finding.Run)(nil)).Count(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// snapshotFile is a snapshot of no records, taken at a known moment.
+func snapshotFile(t *testing.T) []byte {
+	t.Helper()
+	var written bytes.Buffer
+	if err := cverecord.Write(&written, time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	return written.Bytes()
+}
+
+// kernelShipped replaces what the build ships with an upstream kernel, as a
+// build naming the tarball it built from describes it.
+func (f *runFixture) kernelShipped(t *testing.T, version string) graph.Described {
+	t.Helper()
+	ctx := t.Context()
+	kernel := graph.Described{
+		Name: "linux", Version: version, Purl: "pkg:generic/linux@" + version,
+		CPE: "cpe:2.3:o:linux:linux_kernel:" + version + ":*:*:*:*:*:*:*",
+	}
+	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: f.target, ContentHash: "hash-kernel-" + version,
+		BuiltAt: time.Now().UTC(), ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	if _, err := graph.NewStore(f.db.DB).Apply(ctx, f.target, scan.ID, graph.Snapshot{
+		Root: root, Components: []graph.Described{kernel},
+		Dependencies: []graph.Dependency{{Parent: root, Child: kernel}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return kernel
+}
+
+// fixedOn618 is a snapshot holding one kernel record, fixed on 6.18.y at
+// 6.18.27.
+func fixedOn618(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	var written bytes.Buffer
+	if err := cverecord.Write(&written, time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), "", []cverecord.Record{{
+		ID: "CVE-2026-31589", Affected: []cverecord.Entry{{Vendor: "Linux", Product: "Linux",
+			DefaultStatus: "affected", Versions: []cverecord.Line{
+				{Version: "6.14", Status: "affected"},
+				{Version: "6.18.27", LessThanOrEqual: "6.18.*", Status: "unaffected", VersionType: "semver"},
+			}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), written.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestAScanClosesWhatTheIssuesRecordExcludes(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		kernel := f.kernelShipped(t, "6.18.55")
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		// The scanner's account carries no CPE: what is tied is the build's
+		// own description of the component.
+		s := &stub{reported: []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-31589"},
+			Component: graph.Described{Name: kernel.Name, Version: kernel.Version, Purl: kernel.Purl},
+		}}}
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(fixedOn618(t))).Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outcome.Applied.Unaffected != 1 || outcome.Applied.Opened != 0 {
+			t.Errorf("unaffected %d and opened %d, want the one finding recorded unaffected",
+				outcome.Applied.Unaffected, outcome.Applied.Opened)
+		}
+		var rows []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&rows).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].ClosedBecause != finding.Unaffected || rows[0].UnaffectedBy == "" {
+			t.Errorf("recorded %+v, want one row closed as unaffected with the record's lines", rows)
+		}
+	})
+}
+
+func TestABuildEverScannedWithASnapshotWaitsForOne(t *testing.T) {
+	// A replica restarted on scratch space holds none until its first fetch,
+	// and a scan then would open every finding a record had closed.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		f.waiting(t)
+		if _, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
+			Narrowing(cverecord.NewHeld(fixedOn618(t))).Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		// A later run that read none — one begun by a build that does not
+		// narrow, or by hand — does not wear the wait off: the closures the
+		// first run made still stand.
+		if _, err := f.db.DB.NewInsert().Model(&finding.Run{
+			TargetID: f.target, Scanner: "stub", RanHere: true,
+			StartedAt: time.Now().UTC(), FinishedAt: func() *time.Time { n := time.Now().UTC(); return &n }(),
+		}).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		f.waiting(t)
+		before := f.runs(t)
+		s := &stub{}
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(t.TempDir())).Once(t.Context())
+		if err != nil || outcome != nil {
+			t.Fatalf("answered %v, %v; want the job handed back", outcome, err)
+		}
+		if s.saw != nil {
+			t.Error("the scanner ran although nothing could narrow what it found")
+		}
+		f.waitingUntried(t, "no CVE record snapshot", before)
+	})
+}
+
+func TestABuildNeverScannedWithASnapshotIsScannedWithoutOne(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		f.waiting(t)
+		if _, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
+			Narrowing(cverecord.NewHeld(t.TempDir())).Once(t.Context()); err != nil {
+			t.Errorf("a build never narrowed was refused without a snapshot: %v", err)
 		}
 	})
 }
