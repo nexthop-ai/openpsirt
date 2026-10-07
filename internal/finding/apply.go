@@ -209,6 +209,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// the scanner still matches the component, and they close rather than
 		// open.
 		patched := map[key]bool{}
+		// Those the issue's CVE record states are unaffected, by the lines
+		// that say so. Wanted for the same reason, and closing for a different
+		// one: the release never held the issue.
+		cleared := map[key]string{}
 		// The time each of them has, where it is on the clock at all. Carried
 		// beside the finding rather than on it: a deadline is worked out from
 		// the finding's own opening, and one already open opened before this
@@ -237,6 +241,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				// later report at the same key replaces the finding below and
 				// the claim it names with it.
 				patched[key{vulnerabilityID, at}] = covering != nil && fixing[*covering]
+				// A patch the build declares is asked first. Both close the
+				// finding, and the build's word about its own code is the
+				// one already on record.
+				cleared[key{vulnerabilityID, at}] = ""
+				if !patched[key{vulnerabilityID, at}] {
+					cleared[key{vulnerabilityID, at}] = r.Unaffected
+				}
 				wanted[key{vulnerabilityID, at}] = Finding{
 					TargetID: targetID, Kind: Vulnerable,
 					// A scanner's finding in a shipped component is public
@@ -330,6 +341,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// one first seen already patched, whose record is read below.
 		patching := map[int64][]int64{}
 		var arrivedPatched []key
+		// The same two for a finding the issue's record states is unaffected,
+		// by the lines that say so.
+		clearing := map[string][]int64{}
+		var arrivedCleared []key
 		for k, f := range wanted {
 			if patched[k] {
 				if already, open := held[k]; open {
@@ -338,6 +353,16 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					applied.Patched++
 				} else {
 					arrivedPatched = append(arrivedPatched, k)
+				}
+				continue
+			}
+			if lines := cleared[k]; lines != "" {
+				if already, open := held[k]; open {
+					clearing[lines] = append(clearing[lines], already.ID)
+					applied.Closed++
+					applied.Unaffected++
+				} else {
+					arrivedCleared = append(arrivedCleared, k)
 				}
 				continue
 			}
@@ -429,6 +454,9 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		for _, k := range arrivedPatched {
 			reading = append(reading, k.vulnerabilityID)
 		}
+		for _, k := range arrivedCleared {
+			reading = append(reading, k.vulnerabilityID)
+		}
 		latest, latestAt, err := latestClosed(ctx, tx, targetID, reading)
 		if err != nil {
 			return err
@@ -489,6 +517,48 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			applied.Patched += len(recording)
 		}
+		// A finding first seen with its record stating it unaffected is
+		// recorded, closed, for the same reason: a release comparison against
+		// a build that held the issue says this one never did. Recorded once,
+		// and where the record's lines move, the row is pointed at the new
+		// ones.
+		var recordingCleared []Finding
+		restating := map[string][]int64{}
+		for _, k := range arrivedCleared {
+			f := wanted[k]
+			lines := cleared[k]
+			if was, recorded := latest[k]; recorded && was.ClosedBecause == Unaffected {
+				if was.UnaffectedBy != lines {
+					restating[lines] = append(restating[lines], was.ID)
+				}
+				continue
+			}
+			f.LastChangedAt = now
+			f.ClosedAt = &startedAt
+			f.ClosedRunID = &runID
+			f.ClosedBecause = Unaffected
+			f.UnaffectedBy = lines
+			f.DueAt = nil
+			recordingCleared = append(recordingCleared, f)
+		}
+		if len(recordingCleared) > 0 {
+			if err := database.InBatches(ctx, tx, recordingCleared); err != nil {
+				return fmt.Errorf("record %d findings their records state are unaffected: %w",
+					len(recordingCleared), err)
+			}
+			applied.Unaffected += len(recordingCleared)
+		}
+		for lines, ids := range restating {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set("unaffected_by = ?", lines).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("point %d unaffected findings at their record's lines: %w", len(ids), err)
+			}
+		}
 		for claimID, ids := range standsOn {
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Finding)(nil)).
@@ -509,6 +579,12 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// patched: the version moved and the issue did not come with it.
 		patchedAt := map[at]int64{}
 		for k, f := range wanted {
+			// A release the record states is unaffected is not one the issue
+			// came with: the row before it closes for what moved, which is
+			// the version reaching past the issue.
+			if cleared[k] != "" {
+				continue
+			}
 			wantedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = true
 			if patched[k] {
 				patchedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = *f.SuppressedBy
@@ -578,6 +654,21 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				return fmt.Errorf("close %d findings: %w", len(ids), err)
 			}
 		}
+		for lines, ids := range clearing {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set("closed_at = ?", startedAt).
+					Set("closed_run_id = ?", runID).
+					Set("closed_because = ?", Unaffected).
+					Set("moved_to = ?", "").
+					Set("unaffected_by = ?", lines).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("close %d findings their records state are unaffected: %w", len(ids), err)
+			}
+		}
 		for claimID, ids := range patching {
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Finding)(nil)).
@@ -632,7 +723,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		var rows []Finding
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
-				"place_identity", "closed_because", "suppressed_by").
+				"place_identity", "closed_because", "suppressed_by", "unaffected_by").
 			Where("target_id = ?", targetID).
 			Where("kind = ?", Vulnerable).
 			Where("closed_at IS NOT NULL").

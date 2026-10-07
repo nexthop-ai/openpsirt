@@ -771,7 +771,8 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 	if e.FoundBy != nil {
 		body.FoundBy = &core.MeasuredBody{
 			Scanner: e.FoundBy.Scanner, ScannerVersion: e.FoundBy.ScannerVersion,
-			DatabaseVersion: e.FoundBy.DatabaseVersion, RanHere: e.FoundBy.RanHere,
+			DatabaseVersion: e.FoundBy.DatabaseVersion, RecordsVersion: e.FoundBy.RecordsVersion,
+			RanHere: e.FoundBy.RanHere,
 		}
 		if e.FoundBy.RanAt != nil {
 			body.FoundBy.RanAt = core.Stamp(*e.FoundBy.RanAt)

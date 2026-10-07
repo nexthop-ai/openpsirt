@@ -57,7 +57,7 @@ summing:
 | Deferred | *Every* open place is covered by a standing deferral. One covering some of a group leaves the rest running |
 | Overdue | Anything open is past its date and uncovered |
 
-Three closure reasons are not resolutions, and a velocity figure counting them
+Four closure reasons are not resolutions, and a velocity figure counting them
 measures churn:
 
 | Reason | Why it is not a resolution |
@@ -65,6 +65,7 @@ measures churn:
 | `superseded` | The component's version moved and the issue came with it. Counting it as resolved draws a line saying work was completed while the same chart's new line rises by exactly as much |
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
 | `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
+| `unaffected` | The issue's CVE record states the release was never affected. Left out of every open set the same way |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.
@@ -412,7 +413,8 @@ deadline, and whether the deadline was met.
 | A judgment that lapsed is part of the record, and a superseded one is not | Who proposed and who approved a lapsed judgment is what a compliance reader comes for, and the findings list calls the same place lapsed |
 | A row reports the one decision on the record at its place: the live one covering the finding's versions, or where none does, the latest lapsed one | Decision rows are never deleted, so a place carries every withdrawn and lapsed judgment ever made at it, and one row per place is the rule above. A live decision covers a place at the versions it was keyed on and no other, which is the findings list's own test; a build shipping the place at other versions reads undecided on both surfaces. Where two live decisions cover one finding, a claim keyed on its versions and a correction covering the place at any version, the row names the one the finding's screen names: the correction in force, otherwise the older |
 | The row names what pulls the component in, beside the place identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
-| It names what it was measured with: the upload, the inventory in it, the run, the scanner and the vulnerability data | The chain an auditor follows is shipped artifact, inventory, run, scanner and database, disposition. The register is the last link, and naming none of the first four leaves what it says standing on nothing a reader can check — while all of them are recorded |
+| A row closed as unaffected carries the record's lines that closed it | The snapshot the run read is replaced by the next, and the lines are what a reader checks the closure against. A file carries them in one cell |
+| It names what it was measured with: the upload, the inventory in it, the run, the scanner, the vulnerability data and the CVE record snapshot | The chain an auditor follows is shipped artifact, inventory, run, scanner and database, disposition. The register is the last link, and naming none of the first four leaves what it says standing on nothing a reader can check — while all of them are recorded |
 | The inventory is a link, not a hash | A hash nobody can fetch the bytes for is a claim rather than evidence. A tagged release keeps its documents and a branch build does not, so an inventory that was let go says so instead of reading as an omission |
 | It narrows by what stands, by outcome, by component, by issue, and to one side of the history | An auditor asks "what has nobody decided" and "show me the dismissals", which are ways of reading the same complete answer rather than different questions. The count is of the narrowed list, because counted over the build a narrowed page says how many rows the build holds and every later offset is a page of a different list |
 | It still applies no triage line, whatever else is asked of it | That is what it is for, and a filter that could hide part of the build would make it the findings list at a second address |

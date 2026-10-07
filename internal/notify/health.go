@@ -7,7 +7,10 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -71,30 +74,42 @@ func (w *Watch) dataStale(ctx context.Context) ([]Holds, error) {
 		return nil, fmt.Errorf("read how long counts as stale: %w", err)
 	}
 
-	since, err := w.dataLastMoved(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if since == nil {
-		// Nothing has finished a scan and stated its data version. That is a
-		// deployment nobody has pointed at anything yet, which the quiet-build
-		// condition is what reports.
-		return nil, nil
-	}
-
 	// The wall clock, as every other condition here reads it. A sweep is a
 	// pass over what is true now rather than a computation a test pins to a
 	// moment, and the fixtures below place their rows relative to it.
 	now := time.Now().UTC()
-	if !(VulnerabilityData{Since: since, After: after}).StaleAt(now) {
+	var said []string
+	for _, data := range []struct {
+		column, sentence string
+	}{
+		{"database_version", "The vulnerability data has not moved in %s. Every scan " +
+			"since has answered against %s, so a finding that would have opened on newer " +
+			"data has not — and nothing has failed to say so."},
+		{"records_version", "The CVE record snapshot has not moved in %s. Every scan " +
+			"since has narrowed its matches with the records as they stood at %s, so a " +
+			"correction a record received since has not reached them."},
+	} {
+		since, err := w.lastMoved(ctx, data.column)
+		if err != nil {
+			return nil, err
+		}
+		// Nothing has finished a scan and stated a version of this. For the
+		// scanner's data that is a deployment nobody has pointed at anything
+		// yet, which the quiet-build condition is what reports; for the
+		// records it is a deployment that narrows nothing.
+		if since == nil || !(VulnerabilityData{Since: since, After: after}).StaleAt(now) {
+			continue
+		}
+		version, err := w.inForce(ctx, data.column)
+		if err != nil {
+			return nil, err
+		}
+		said = append(said, fmt.Sprintf(data.sentence,
+			plainly(int(now.Sub(*since).Hours()/24)), version))
+	}
+	if len(said) == 0 {
 		return nil, nil
 	}
-	stopped := now.Sub(*since)
-	version, err := w.dataInForce(ctx)
-	if err != nil {
-		return nil, err
-	}
-	days := int(stopped.Hours() / 24)
 	return []Holds{{
 		// One key however the data moves, because the condition is that it
 		// stopped moving and that either holds or does not. Keyed on the
@@ -103,10 +118,8 @@ func (w *Watch) dataStale(ctx context.Context) ([]Holds, error) {
 		// the sentence stays right either way, because a standing condition's
 		// body is rewritten as what it says changes.
 		About: identify("vulnerability-data"),
-		Body: fmt.Sprintf("The vulnerability data has not moved in %s. Every scan "+
-			"since has answered against %s, so a finding that would have opened on newer "+
-			"data has not — and nothing has failed to say so.", plainly(days), version),
-		Link: weblink.System(),
+		Body:  strings.Join(said, " "),
+		Link:  weblink.System(),
 	}}, nil
 }
 
@@ -123,6 +136,9 @@ type VulnerabilityData struct {
 	// Since is the most recent time any version was seen for the first time,
 	// which is when the data last moved. Nil alongside an empty version.
 	Since *time.Time
+	// Records is the same two facts about the CVE record snapshot the runs
+	// narrowed their matches with.
+	Records *VulnerabilityData
 	// After is how long counts as stopped, so a screen can say how close this
 	// is to being reported rather than only whether it has been.
 	After time.Duration
@@ -144,25 +160,42 @@ func (w *Watch) DataInForce(ctx context.Context) (VulnerabilityData, error) {
 	if err != nil {
 		return VulnerabilityData{}, fmt.Errorf("read how long counts as stale: %w", err)
 	}
-	since, err := w.dataLastMoved(ctx)
+	since, err := w.lastMoved(ctx, "database_version")
 	if err != nil {
 		return VulnerabilityData{}, err
 	}
-	version, err := w.dataInForce(ctx)
+	version, err := w.inForce(ctx, "database_version")
 	if err != nil {
 		return VulnerabilityData{}, err
 	}
-	return VulnerabilityData{Version: version, Since: since, After: after}, nil
+	recordsSince, err := w.lastMoved(ctx, "records_version")
+	if err != nil {
+		return VulnerabilityData{}, err
+	}
+	records, err := w.inForce(ctx, "records_version")
+	if err != nil {
+		return VulnerabilityData{}, err
+	}
+	return VulnerabilityData{Version: version, Since: since, After: after,
+		Records: &VulnerabilityData{Version: records, Since: recordsSince, After: after}}, nil
 }
 
-// dataLastMoved is the most recent time any data version was seen for the
-// first time, or nothing where no run has ever stated one.
+// versionColumns is every run column a version of the data is read from. A
+// column name cannot be bound as a value, so the two readers below take it
+// only from this list.
+var versionColumns = map[string]bool{"database_version": true, "records_version": true}
+
+// lastMoved is the most recent time any version in a run column was seen for
+// the first time, or nothing where no run has ever stated one.
 //
 // A pointer rather than a zero time, because the aggregate over an empty set
 // is null rather than no row at all: asked as one statement it answers once,
 // with nothing in it, and a zero time there would read as data that stopped
 // moving at the beginning of the era.
-func (w *Watch) dataLastMoved(ctx context.Context) (*time.Time, error) {
+func (w *Watch) lastMoved(ctx context.Context, column string) (*time.Time, error) {
+	if !versionColumns[column] {
+		return nil, fmt.Errorf("no run column %q holds a version", column)
+	}
 	var since *time.Time
 	err := w.db.NewSelect().
 		TableExpr(`(?) AS "firsts"`, w.db.NewSelect().
@@ -170,8 +203,8 @@ func (w *Watch) dataLastMoved(ctx context.Context) (*time.Time, error) {
 			ColumnExpr(`MIN(sr.started_at) AS "first_seen"`).
 			Where("sr.finished_at IS NOT NULL").
 			Where("sr.failure = ?", "").
-			Where("sr.database_version <> ?", "").
-			GroupExpr("sr.database_version")).
+			Where("? <> ?", bun.Ident("sr."+column), "").
+			GroupExpr("?", bun.Ident("sr."+column))).
 		ColumnExpr(`MAX(firsts.first_seen) AS "since"`).
 		Scan(ctx, &since)
 	if err != nil {
@@ -183,21 +216,24 @@ func (w *Watch) dataLastMoved(ctx context.Context) (*time.Time, error) {
 	return since, nil
 }
 
-// dataInForce is the version the newest finished run stated.
+// inForce is the version in a run column the newest finished run stated.
 //
 // Read apart from when the data last moved, because they are answers to
 // different questions and one statement answering both gets the age wrong:
 // what the newest run is carrying says nothing about when that string first
 // appeared, and on a deployment running two replicas with a cache each it is
 // whichever of them finished last.
-func (w *Watch) dataInForce(ctx context.Context) (string, error) {
+func (w *Watch) inForce(ctx context.Context, column string) (string, error) {
+	if !versionColumns[column] {
+		return "", fmt.Errorf("no run column %q holds a version", column)
+	}
 	var version string
 	err := w.db.NewSelect().
 		Model((*finding.Run)(nil)).
-		ColumnExpr(`sr.database_version`).
+		ColumnExpr("?", bun.Ident("sr."+column)).
 		Where("sr.finished_at IS NOT NULL").
 		Where("sr.failure = ?", "").
-		Where("sr.database_version <> ?", "").
+		Where("? <> ?", bun.Ident("sr."+column), "").
 		OrderExpr(`sr.started_at DESC`).
 		Limit(1).Scan(ctx, &version)
 	if err != nil && !database.IsNoRows(err) {

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -748,4 +751,65 @@ func TestAScanLeavesSQLiteWithStatisticsForTheFindings(t *testing.T) {
 			t.Errorf("a scan left the finding table without statistics (%d rows, %v)", n, err)
 		}
 	})
+}
+
+func TestARunRecordsTheCVERecordSnapshotItRead(t *testing.T) {
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), snapshotFile(t), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		outcome, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
+			Narrowing(cverecord.NewHeld(dir)).Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var run finding.Run
+		if err := f.db.DB.NewSelect().Model(&run).Where("id = ?", outcome.RunID).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if run.RecordsVersion != "2026-10-07T00:00:00Z" {
+			t.Errorf("the run recorded snapshot %q, want the one it read", run.RecordsVersion)
+		}
+	})
+}
+
+func TestAnUnreadableSnapshotFailsTheRunAndSaysSo(t *testing.T) {
+	// Run without it, every finding a record had closed would open again and
+	// close again on the next run that reads one.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), []byte("damaged"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		s := &stub{reported: []finding.Reported{{Issue: finding.Named{Identifier: "CVE-2026-1"}, Component: libnl}}}
+		if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(dir)).Once(t.Context()); err == nil {
+			t.Fatal("a scan with a damaged snapshot reported success")
+		}
+		var run finding.Run
+		if err := f.db.DB.NewSelect().Model(&run).Limit(1).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(run.Failure, "CVE record snapshot") || run.FinishedAt == nil {
+			t.Errorf("the run ended %v saying %q, want it ended naming the snapshot", run.FinishedAt, run.Failure)
+		}
+		if s.saw != nil {
+			t.Error("the scanner ran although the run could not narrow what it found")
+		}
+	})
+}
+
+// snapshotFile is a snapshot of no records, taken at a known moment.
+func snapshotFile(t *testing.T) []byte {
+	t.Helper()
+	var written bytes.Buffer
+	if err := cverecord.Write(&written, time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	return written.Bytes()
 }

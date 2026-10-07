@@ -154,6 +154,7 @@ through `extraEnv`, which takes entries in the Kubernetes `env` form.
 | `auth.trustedHeader.groupsHeader` | `OPENPSIRT_TRUSTED_GROUPS_HEADER` | [The trusted header](configuration.md#the-trusted-header) |
 | `auth.trustedHeader.groupsDelimiter` | `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | [The trusted header](configuration.md#the-trusted-header) |
 | `outbound.excluded` | `OPENPSIRT_OUTBOUND_EXCLUDED` | [Outbound exclusions](configuration.md#outbound-exclusions) |
+| `scanner.cacheDir`, as its `cve-records` directory | `OPENPSIRT_RECORDS_DIR` | [CVE records](configuration.md#cve-records) |
 | `patchBranches.enabled` | `OPENPSIRT_PATCH_BRANCHES` | [Patch branches](configuration.md#patch-branches) |
 | `patchBranches.quota` | `OPENPSIRT_PATCH_QUOTA` | [Patch branches](configuration.md#patch-branches) |
 | `mail.server` | `OPENPSIRT_MAIL_SERVER` | [Mail](configuration.md#mail) |

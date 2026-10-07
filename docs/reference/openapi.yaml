@@ -1581,6 +1581,7 @@ components:
             - patched
             - superseded
             - unexplained
+            - unaffected
           type: string
         closed_by_run:
           description: The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
@@ -2764,6 +2765,7 @@ components:
             - superseded
             - unexplained
             - invalid
+            - unaffected
             - fixed
           type: string
         closed_note:
@@ -2823,6 +2825,13 @@ components:
             - agreed
             - lapsed
           type: string
+        unaffected:
+          description: The CVE record lines stating this version is unaffected. Only on a row closed as unaffected
+          items:
+            $ref: "#/components/schemas/RecordLineBody"
+          type:
+            - array
+            - "null"
         version:
           type: string
         vulnerability:
@@ -6392,6 +6401,9 @@ components:
         ran_here:
           description: We ran the scanner, rather than the build sending what its own found
           type: boolean
+        records_version:
+          description: The CVE record snapshot matches were narrowed with, as the moment it describes. Absent where the run read none
+          type: string
         run:
           description: The scanner run these came from
           format: int64
@@ -8726,6 +8738,48 @@ components:
       required:
         - identity
       type: object
+    RecordLineBody:
+      additionalProperties: false
+      properties:
+        entry:
+          description: The product the record's line is about, as the record names it
+          type: string
+        less_than:
+          description: The version the line stops before
+          type: string
+        less_than_or_equal:
+          description: The last version the line covers. A trailing * covers every version beginning with what precedes it
+          type: string
+        status:
+          description: What the record says of the versions the line covers
+          enum:
+            - affected
+            - unaffected
+          type: string
+        version:
+          description: The first version the line covers, or the one version where it names no bound
+          type: string
+      required:
+        - entry
+        - status
+        - version
+      type: object
+    RecordsDataBody:
+      additionalProperties: false
+      properties:
+        moved_at:
+          description: "The moment the snapshot last moved: the most recent time any snapshot was read for the first time"
+          format: date-time
+          type: string
+        stale:
+          description: Whether it has gone the same span without moving that counts as stopped for the scanner's data
+          type: boolean
+        version:
+          description: The snapshot the newest finished run read, as the moment it describes. Absent where no run has read one, and nothing is narrowed
+          type: string
+      required:
+        - stale
+      type: object
     Redact-attachmentRequest:
       additionalProperties: false
       properties:
@@ -9544,6 +9598,9 @@ components:
         ran_here:
           description: We ran the scanner, rather than the build sending what its own found
           type: boolean
+        records_version:
+          description: The CVE record snapshot matches were narrowed with, as the moment it describes. Absent where the run read none
+          type: string
         run_id:
           format: int64
           type: integer
@@ -11459,6 +11516,9 @@ components:
           description: "The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"
           format: date-time
           type: string
+        records:
+          $ref: "#/components/schemas/RecordsDataBody"
+          description: The CVE record snapshot the scans narrowed their matches with
         stale:
           description: Whether it has been that long. The same question the condition told to administrators asks
           type: boolean
@@ -11471,6 +11531,7 @@ components:
       required:
         - stale_after
         - stale
+        - records
       type: object
     WaitingBody:
       additionalProperties: false
@@ -28461,6 +28522,8 @@ paths:
         `moved_at` is the most recent time any version was seen for the first time. A version that comes back was not a change the second time, which is what an air-gapped deployment re-importing an older bundle looks like.
 
         Absent everywhere means nothing has finished a scan and stated a version, which is a deployment nobody has pointed at anything yet rather than data that has gone stale.
+
+        `records` is the same for the CVE record snapshot the scans narrow their matches with. Its version is the moment the snapshot describes, and it is absent where no run has read one.
 
         Requires: administrator
       operationId: get-vulnerability-data

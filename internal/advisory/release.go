@@ -201,7 +201,7 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", issueID).
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("COALESCE(f.closed_because, '') <> ?", finding.Invalid).
+		Where("COALESCE(f.closed_because, '') NOT IN (?)", bun.List(finding.NeverPresent())).
 		GroupExpr("st.id, va.id, st.name, va.name").
 		Scan(ctx, &rows)
 	if err != nil {

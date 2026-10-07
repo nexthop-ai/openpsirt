@@ -75,6 +75,9 @@ type Disposed struct {
 	// nobody typed one — which is why the note is not required to be there.
 	ClosedBecause Closure
 	ClosedNote    string
+	// UnaffectedBy is the CVE record lines that closed this as unaffected, as
+	// JSON. Empty on every other row.
+	UnaffectedBy string
 }
 
 // Register is every known vulnerability in one build with its disposition .
@@ -253,6 +256,7 @@ type registerRow struct {
 	DueAt         *time.Time `bun:"due_at"`
 	ClosedBecause string     `bun:"closed_because"`
 	ClosedNote    string     `bun:"closed_note"`
+	UnaffectedBy  string     `bun:"unaffected_by"`
 }
 
 // Registering narrows the register.
@@ -470,6 +474,7 @@ func (s *Store) registerQuery(productID int64,
 		// the tool did not keep.
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
 		ColumnExpr(`COALESCE(f.closed_note, '') AS "closed_note"`).
+		ColumnExpr(`COALESCE(f.unaffected_by, '') AS "unaffected_by"`).
 		OrderExpr("v.identifier, c.name, f.place_identity")
 }
 
@@ -490,6 +495,7 @@ func disposedFrom(row registerRow) Disposed {
 		AgreementCarried: row.Carried,
 		OpenedAt:         row.OpenedAt, ClosedAt: row.ClosedAt, DueAt: row.DueAt,
 		ClosedBecause: Closure(row.ClosedBecause), ClosedNote: row.ClosedNote,
+		UnaffectedBy: row.UnaffectedBy,
 	}
 	// The same four words the state filter uses, at the grain of one
 	// place: a place has one standing decision or none, so there is no

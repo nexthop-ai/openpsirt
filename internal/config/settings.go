@@ -105,6 +105,8 @@ var settings = []setting{
 	{"PATCH_BRANCHES", "patch_branches.enabled", boolean},
 	{"PATCH_DIR", "patch_branches.dir", text},
 	{"PATCH_QUOTA", "patch_branches.quota", number},
+	{"RECORDS_DIR", "cve_records.dir", text},
+	{"RECORDS_UPDATE", "cve_records.update", boolean},
 
 	{"BOOTSTRAP_ADMINS", "signin.bootstrap_admins", list},
 	{"GROUP_ROLES", "signin.roles", groupRoles},

@@ -71,6 +71,17 @@ type VulnerabilityDataBody struct {
 	Since   *time.Time `json:"moved_at,omitempty" doc:"The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
 	StaleAt string     `json:"stale_after" doc:"The span without moving that counts as stopped, as this deployment has it set"`
 	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
+	// Records is the CVE record snapshot the runs narrowed matches with,
+	// which moves apart from the scanner's data and goes stale apart from it.
+	Records RecordsDataBody `json:"records" doc:"The CVE record snapshot the scans narrowed their matches with"`
+}
+
+// RecordsDataBody is the CVE record snapshot this deployment's scans narrow
+// their matches with.
+type RecordsDataBody struct {
+	Version string     `json:"version,omitempty" doc:"The snapshot the newest finished run read, as the moment it describes. Absent where no run has read one, and nothing is narrowed"`
+	Since   *time.Time `json:"moved_at,omitempty" doc:"The moment the snapshot last moved: the most recent time any snapshot was read for the first time"`
+	Stale   bool       `json:"stale" doc:"Whether it has gone the same span without moving that counts as stopped for the scanner's data"`
 }
 
 func registerWork(api huma.API, in core.Deps) {
@@ -89,7 +100,10 @@ func registerWork(api huma.API, in core.Deps) {
 			"air-gapped deployment re-importing an older bundle looks like.\n\n" +
 			"Absent everywhere means nothing has finished a scan and stated a version, which " +
 			"is a deployment nobody has pointed at anything yet rather than data that has " +
-			"gone stale.",
+			"gone stale.\n\n" +
+			"`records` is the same for the CVE record snapshot the scans narrow their matches " +
+			"with. Its version is the moment the snapshot describes, and it is absent where no " +
+			"run has read one.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct {
 		Body VulnerabilityDataBody
@@ -114,6 +128,12 @@ func registerWork(api huma.API, in core.Deps) {
 		// somebody opens after being told is a screen that has to agree with
 		// what told them.
 		out.Body.Stale = data.StaleAt(time.Now())
+		if data.Records != nil {
+			out.Body.Records = RecordsDataBody{
+				Version: data.Records.Version, Since: data.Records.Since,
+				Stale: data.Records.StaleAt(time.Now()),
+			}
+		}
 		return out, nil
 	})
 

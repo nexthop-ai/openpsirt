@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -43,6 +44,9 @@ type Runner struct {
 	// superseded carries the judgments a merge of two issues took out of
 	// force, for the same reason.
 	superseded func(context.Context, []finding.Displaced)
+	// records is the CVE record snapshot a match is narrowed with. Nil reads
+	// none and narrows nothing.
+	records *cverecord.Held
 }
 
 // NewRunner returns a runner over db.
@@ -75,6 +79,12 @@ func (r *Runner) Telling(tell func(context.Context, []triage.ForPerson)) *Runner
 // out of force because another said something different in the same product.
 func (r *Runner) TellingSuperseded(tell func(context.Context, []finding.Displaced)) *Runner {
 	r.superseded = tell
+	return r
+}
+
+// Narrowing is the CVE record snapshot matches are narrowed with.
+func (r *Runner) Narrowing(records *cverecord.Held) *Runner {
+	r.records = records
 	return r
 }
 
@@ -119,6 +129,7 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 			"findings_closed", outcome.Applied.Closed,
 			"suppressed", outcome.Applied.Suppressed,
 			"patched", outcome.Applied.Patched,
+			"unaffected", outcome.Applied.Unaffected,
 			"claims_reaching", outcome.Applied.ClaimsReaching,
 			"claims_reaching_nothing", outcome.Applied.ClaimsReachingNothing,
 			"updated", outcome.Applied.Updated,
@@ -168,15 +179,27 @@ func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
 		return nil, err
 	}
 
+	// Read before the run begins, so the run records the snapshot it read.
+	// A snapshot that cannot be read fails the run rather than narrowing
+	// nothing: run without it, every finding a record had closed opens again,
+	// and closes again on the next run that reads one.
+	records, unreadable := r.records.Current()
+
 	findings := finding.NewStore(r.db.DB)
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: targetID, Scanner: r.scanner.Name(), RanHere: true,
+		RecordsVersion: records.Version(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	outcome, result, err := r.assess(ctx, targetID, run.ID, components, findings)
+	var outcome *Outcome
+	var result Result
+	err = unreadable
+	if err == nil {
+		outcome, result, err = r.assess(ctx, targetID, run.ID, components, records, findings)
+	}
 	// The run is recorded as having ended either way. A scanner that stopped
 	// working is otherwise indistinguishable from a product that stopped
 	// having problems — and a shutdown that canceled the scan must not also
@@ -195,7 +218,8 @@ func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
 
 // assess writes the inventory, runs the scanner over it, and records what came
 // back.
-func (r *Runner) assess(ctx context.Context, targetID, runID int64, components []graph.Described, findings *finding.Store) (*Outcome, Result, error) {
+func (r *Runner) assess(ctx context.Context, targetID, runID int64, components []graph.Described,
+	records *cverecord.Snapshot, findings *finding.Store) (*Outcome, Result, error) {
 	// A build holding nothing but itself has nothing to scan, and the scanner
 	// is not asked. Handed an inventory of no components it exits with an
 	// error rather than answering none, and a run recorded as failed reads as
@@ -215,6 +239,9 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 		result = scanned
 	}
 
+	if err := narrow(records, components, result.Reported); err != nil {
+		return nil, result, err
+	}
 	applied, err := findings.Apply(ctx, targetID, runID, result.Reported)
 	if err != nil {
 		return nil, result, err

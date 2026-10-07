@@ -51,8 +51,12 @@ type DisposedBody struct {
 	// category and no note, because nobody typed one.
 	ClosedBecause closure `json:"closed_because,omitempty" doc:"The reason it closed, in the tool's terms. Only on a closed row"`
 	ClosedNote    string  `json:"closed_note,omitempty" doc:"The person's own reason for closing it. Only where a person did"`
-	Due           string  `json:"due,omitempty"`
-	Met           *bool   `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
+	// Unaffected is the record's own words for why a scan closed this, so a
+	// reader can check the closure against the record without the snapshot
+	// the run read, which the next replaces.
+	Unaffected []core.RecordLineBody `json:"unaffected,omitempty" doc:"The CVE record lines stating this version is unaffected. Only on a row closed as unaffected"`
+	Due        string                `json:"due,omitempty"`
+	Met        *bool                 `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
 }
 
 // closure is the query-side vocabulary of why a finding closed, taken from the
@@ -100,6 +104,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 		measured.Run, measured.Scanner = last.ID, last.Scanner
 		measured.ScannerVersion, measured.DatabaseVersion =
 			last.ScannerVersion, last.DatabaseVersion
+		measured.RecordsVersion = last.RecordsVersion
 		measured.RanHere = last.RanHere
 		if last.FinishedAt != nil {
 			measured.RanAt = last.FinishedAt.UTC().Format(time.RFC3339)
@@ -276,6 +281,7 @@ func registerRegister(api huma.API, in core.Deps) {
 				"outcome", "justification", "proposed by", "proposed at",
 				"approved by", "approved at", "agreement carried",
 				"opened", "closed", "closed because", "closed note", "due", "met",
+				"unaffected by",
 			},
 			// Streamed rather than paged, and neither counted. A file has no
 			// column for how many rows there are altogether, and every page
@@ -296,7 +302,7 @@ func registerRegister(api huma.API, in core.Deps) {
 							body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 							strconv.FormatBool(body.AgreementCarried),
 							body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
-							body.Due, met,
+							body.Due, met, saidLines(body.Unaffected),
 						})
 					})
 			},
@@ -311,6 +317,15 @@ func registerRegister(api huma.API, in core.Deps) {
 			core.WriteExport(writer, input.Format, name, out)
 		}}, nil
 	})
+}
+
+// saidLines writes a closure's record lines into one cell.
+func saidLines(lines []core.RecordLineBody) string {
+	said := make([]string, 0, len(lines))
+	for _, l := range lines {
+		said = append(said, l.Said())
+	}
+	return strings.Join(said, "; ")
 }
 
 func disposedBody(row finding.Disposed) DisposedBody {
@@ -334,6 +349,7 @@ func disposedBody(row finding.Disposed) DisposedBody {
 	if row.ClosedAt != nil {
 		body.Closed = row.ClosedAt.Format(time.DateOnly)
 		body.ClosedBecause, body.ClosedNote = closure(row.ClosedBecause), row.ClosedNote
+		body.Unaffected = core.RecordLines(row.UnaffectedBy)
 	}
 	if row.DueAt != nil {
 		body.Due = row.DueAt.Format(time.DateOnly)

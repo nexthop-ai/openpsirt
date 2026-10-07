@@ -68,3 +68,13 @@ var Respelled = respelled
 // Unscoped is one kept findings-list query without its scope, as v0.5.0's
 // upgrade leaves it.
 var Unscoped = unscopedV050
+
+// StatementsV070 is the untagged release's declaration of each table it
+// changes.
+func StatementsV070(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{
+		"finding":  findingV070(t),
+		"scan_run": scanRunV070(t),
+	}
+}

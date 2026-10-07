@@ -23,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/config"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -95,11 +96,11 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	//
 	// Each subcommand takes --config after its name as well as before it, so
 	// `openpsirt migrate up --config f` names the file where it is written.
-	command, action := "serve", ""
+	command, action, operand := "serve", "", ""
 	if fs.NArg() > 0 {
 		command = fs.Arg(0)
-		if command != "serve" && command != "migrate" {
-			return fmt.Errorf("unknown command %q: the commands are \"serve\" and \"migrate\"", command)
+		if command != "serve" && command != "migrate" && command != "records" {
+			return fmt.Errorf("unknown command %q: the commands are \"serve\", \"migrate\" and \"records\"", command)
 		}
 		rest := fs.Args()[1:]
 		for {
@@ -115,10 +116,19 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 			if sub.NArg() == 0 {
 				break
 			}
-			if command != "migrate" || action != "" {
+			switch {
+			case command == "serve":
+				return fmt.Errorf("openpsirt %s: unexpected argument %q", command, sub.Arg(0))
+			case action == "":
+				action = sub.Arg(0)
+			// Importing names the archive it reads, and nothing else takes a
+			// second argument.
+			case command == "records" && action == "import" && operand == "":
+				operand = sub.Arg(0)
+			default:
 				return fmt.Errorf("openpsirt %s: unexpected argument %q", command, sub.Arg(0))
 			}
-			action, rest = sub.Arg(0), sub.Args()[1:]
+			rest = sub.Args()[1:]
 		}
 	}
 
@@ -154,6 +164,9 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	ctx := context.Background()
 	if command == "migrate" {
 		return runMigrate(ctx, cfg, logger, stdout, action)
+	}
+	if command == "records" {
+		return runRecords(ctx, cfg, logger, stdout, action, operand)
 	}
 
 	// Everything below this line is contacted before the server listens, and
@@ -409,7 +422,16 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		Path: cfg.ScannerPath, Timeout: cfg.ScannerTimeout, Limits: cfg.ScannerLimits(),
 	}, logger, name).
 		Telling(notify.Lapses(db.DB, logger)).
-		TellingSuperseded(notify.Superseded(db.DB, logger))
+		TellingSuperseded(notify.Superseded(db.DB, logger)).
+		Narrowing(cverecord.NewHeld(cfg.RecordsDir))
+	// Keeps the CVE record snapshot current with the CVE List, the way the
+	// scanner keeps its own data. Every replica keeps its own copy beside the
+	// scanner's, as the scanner does. Nil where fetching is off, which leaves
+	// the snapshot an operator placed there.
+	var records *cverecord.Fetcher
+	if cfg.RecordsUpdate {
+		records = cverecord.NewFetcher(cfg.RecordsDir, logger)
+	}
 	// Asks public indexes what upstream has released. Started whatever the
 	// setting says and does nothing until it is turned on: the setting is
 	// read each cycle, so turning this off takes effect without a
@@ -490,6 +512,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing,
 		undertaker: undertaker, publish: writer, suppliers: suppliers,
 		branches: branches,
+		records:  records,
 	})
 }
 
@@ -649,6 +672,45 @@ func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) 
 	return nil
 }
 
+// runRecords keeps the CVE record snapshot by hand.
+//
+// What an air-gapped deployment uses instead of the fetcher: `fetch` on a
+// machine that reaches the CVE List writes the snapshot, which is carried
+// across and placed in the deployment's directory; `import` builds it from an
+// archive of the List somebody downloaded; `status` says what is held. None of
+// them needs a database.
+func runRecords(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout *os.File,
+	action, archive string) error {
+
+	switch action {
+	case "fetch":
+		if _, err := cverecord.NewFetcher(cfg.RecordsDir, logger).Once(ctx); err != nil {
+			return err
+		}
+	case "import":
+		if archive == "" {
+			return errors.New("openpsirt records import: name the CVE List archive to read")
+		}
+		if err := cverecord.Build(archive, cfg.RecordsDir, ""); err != nil {
+			return err
+		}
+	case "status", "":
+	default:
+		return fmt.Errorf("openpsirt records: unknown action %q: the actions are \"fetch\", \"import\" and \"status\"", action)
+	}
+	held, err := cverecord.NewHeld(cfg.RecordsDir).Current()
+	if err != nil {
+		return err
+	}
+	if held == nil {
+		_, err = fmt.Fprintf(stdout, "No CVE record snapshot in %s\n", cfg.RecordsDir)
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, "CVE record snapshot taken %s, %d records, in %s\n",
+		held.Version(), held.Len(), cfg.RecordsDir)
+	return err
+}
+
 // runMigrate applies schema changes on their own, so an operator can run them
 // under different credentials and at a time they choose. There is no way back
 // down: a database is only ever upgraded.
@@ -719,9 +781,12 @@ type passes struct {
 	suppliers *supplier.Pass
 	// branches looks up which branches the commits patch links name are on.
 	branches *patchbranch.Pass
-	watch    *notify.Watch
-	post     *notify.Post
-	outward  *notify.Signal
+	// records keeps the CVE record snapshot current. Nil where fetching is
+	// off.
+	records *cverecord.Fetcher
+	watch   *notify.Watch
+	post    *notify.Post
+	outward *notify.Signal
 	// talk carries notifications to chat. Nil where no platform is configured.
 	talk    *notify.Talk
 	keeper  *attach.Keeper
@@ -797,6 +862,11 @@ func (p passes) loops() []loop {
 	// for it is configured.
 	if p.publish != nil {
 		all = append(all, loop{"write the published advisory directory", p.publish.Run, 0})
+	}
+	// And the CVE record fetcher, nil where the deployment keeps
+	// the snapshot itself.
+	if p.records != nil {
+		all = append(all, loop{"fetch the CVE records", p.records.Run, 0})
 	}
 	return all
 }

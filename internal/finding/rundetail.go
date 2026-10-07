@@ -37,6 +37,7 @@ type RanDetail struct {
 	Scanner         string
 	ScannerVersion  string
 	DatabaseVersion string
+	RecordsVersion  string
 	RanHere         bool
 	StartedAt       time.Time
 	FinishedAt      *time.Time
@@ -95,7 +96,8 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 
 	out := &RanDetail{
 		RunID: run.ID, Scanner: run.Scanner, ScannerVersion: run.ScannerVersion,
-		DatabaseVersion: run.DatabaseVersion, RanHere: run.RanHere,
+		DatabaseVersion: run.DatabaseVersion, RecordsVersion: run.RecordsVersion,
+		RanHere:   run.RanHere,
 		StartedAt: run.StartedAt, FinishedAt: run.FinishedAt,
 		Failure: run.Failure, Caution: run.Caution,
 		OpenedBy: map[string]int{}, ClosedBy: map[string]int{},

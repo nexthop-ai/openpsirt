@@ -105,8 +105,8 @@ const (
 	// an issue already tracked. The record is taken back rather than the world
 	// having changed.
 	//
-	// It is the one closure on a different axis from the rest. Every other
-	// answers "why did this stop being present"; this one says it was never
+	// It is on a different axis from the rest, with Unaffected. Every other
+	// answers "why did this stop being present"; these two say it was never
 	// present, so it is neither a resolution nor a disappearance — it does not
 	// count toward how fast things are fixed and it appears in no release
 	// note, because there is nothing to tell a customer about a build that was
@@ -131,6 +131,16 @@ const (
 	// an upgrade says, and the build's word is applied without being decided
 	// again here. The finding opens again once a build stops declaring it.
 	Patched Closure = "patched"
+	// Unaffected means the issue's CVE record states that the upstream release
+	// this place holds is not affected, where the scanner's source matched it
+	// from a range that left that statement out (REQ-31). The closed row keeps
+	// the record's lines that said so, and the finding opens again once a run
+	// no longer reads them.
+	//
+	// On the same axis as Invalid: the issue was never present in this
+	// release, so it is neither a resolution nor a disappearance, and it is in
+	// no release note and no count of how fast things are fixed.
+	Unaffected Closure = "unaffected"
 )
 
 // wasOpen is the condition that a row was open at some point.
@@ -150,7 +160,15 @@ const wasOpen = `(f.opened_run_id IS NULL OR f.closed_run_id IS NULL
 // from this rather than written out again, so a closure added here is
 // published and one removed here is gone from the document too.
 func Closures() []Closure {
-	return []Closure{Removed, Upgraded, Revised, Patched, Superseded, Unexplained, Invalid, Fixed}
+	return []Closure{Removed, Upgraded, Revised, Patched, Superseded, Unexplained, Invalid, Unaffected, Fixed}
+}
+
+// NeverPresent is what says the issue was never in the release at all: a
+// record taken back, and a version the issue's record states is unaffected.
+// A row closed for either is in no open set a trend reads and in no count of
+// which releases held the issue.
+func NeverPresent() []Closure {
+	return []Closure{Invalid, Unaffected}
 }
 
 // Resolving is what counts as an issue actually going away.
@@ -196,6 +214,10 @@ type Run struct {
 	// because a run that warned and a run that failed are different things,
 	// and a column holding either would make them one.
 	Caution string `bun:"caution"`
+	// RecordsVersion is the CVE record snapshot the run narrowed matches
+	// with, as the moment it describes. Empty where it read none, and nothing
+	// was narrowed.
+	RecordsVersion string `bun:"records_version"`
 }
 
 // Finding is a vulnerability at a place.
@@ -361,6 +383,9 @@ type Finding struct {
 	// whoever typed it that the sentence goes somewhere.
 	ClosedNote    string  `bun:"closed_note"`
 	ClosedBecause Closure `bun:"closed_because"`
+	// UnaffectedBy is the CVE record lines that closed this as unaffected, as
+	// JSON. Empty on every other row.
+	UnaffectedBy string `bun:"unaffected_by"`
 }
 
 // Reported is one issue a scanner reported against one component.
@@ -384,6 +409,10 @@ type Reported struct {
 	MatchedFrom  string
 	MatchedIn    string
 	MatchedRange string
+	// Unaffected is the CVE record lines stating that the component's
+	// upstream release is not affected, as JSON, where a record says so.
+	// Present means the run closes the finding rather than opening it.
+	Unaffected string
 }
 
 // Applied describes what a run changed.
@@ -403,6 +432,10 @@ type Applied struct {
 	// Patched counts findings a patch the build declares closed on this run,
 	// including those recorded closed on first sight.
 	Patched int
+	// Unaffected counts findings closed on this run because the issue's CVE
+	// record states the version is unaffected, including those recorded
+	// closed on first sight.
+	Unaffected int
 	// ClaimsReaching and ClaimsReachingNothing say how many of the build's
 	// arguments landed on something it ships. One that reached nothing means a
 	// finding the build believes it answered comes back as noise, and nothing
@@ -425,7 +458,7 @@ type Applied struct {
 
 // Unchanged reports whether the run changed nothing.
 func (a Applied) Unchanged() bool {
-	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0
+	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0 && a.Unaffected == 0
 }
 
 // PlaceIdentity keys a component under the thing that pulled it in.

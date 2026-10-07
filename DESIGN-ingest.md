@@ -33,6 +33,7 @@ REQ-69.
 - [Supplier advisories](#supplier-advisories)
 - [Supplier directories](#supplier-directories)
 - [The offline scanner database](#the-offline-scanner-database)
+- [CVE records](#cve-records)
 - [Analyzer findings](#analyzer-findings)
 - [Limits](#limits)
 
@@ -864,8 +865,11 @@ which file they wrote it in.
 | The same document uploaded again writes nothing where it reads as what stands, and replaces what stands where it reads differently | The digest is of the bytes. A reader that derives a different name or target from the same bytes has changed what the statements say, and uploading again is how rows stored under the earlier reading are brought up to date |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is a statement about `frr` |
 
-What is done with the statements is not an ingest question: they are evidence and
-a prefill, never applied (REQ-31).
+What is done with the statements is not an ingest question. A supplier's
+statement about its own product closes the finding at the places that product
+occupies (REQ-31), and that half is not built: a statement is evidence and a
+prefill, and closes nothing. `DESIGN-triage.md` § Evidence from publishers holds
+what is built.
 
 ## Supplier advisories
 
@@ -1036,6 +1040,36 @@ discovers broken.
 | Verified before it is declared | The target runs that same scanner against the bundle with the network off and auto-update refused, which is the configuration on the far side of the gap |
 | The verification is a target of its own | So it can be run on the far side. "It built" and "it loads where it has to" are different claims |
 
+## CVE records
+
+What a scan narrows its matches with is a snapshot of CVE records, kept on disk
+beside the scanner's data and read whole (REQ-12, REQ-31).
+`DESIGN-findings.md` § CVE record ranges holds what a scan does with it.
+
+| Source | |
+|---|---|
+| The CVE List | The public body of every CVE record, published as a repository whose hourly releases each carry an archive of every record as it stood at a midnight |
+| The archive read | The day's own, from the newest release; the release tagged for midnight carries the day before's instead, which is read where the day's is absent |
+| What is kept | Each record with an unaffected line it can order, whole: 22,481 of 402,541 on 2026-10-07, in a 534 KB snapshot |
+| What the snapshot describes | The newest moment a kept record was updated. A run records it as the snapshot it read |
+
+| Rule | Reason |
+|---|---|
+| A connected deployment fetches it, checking hourly | The same arrangement as the scanner's own data. A fetch reads the newest release from where its page redirects, rather than from the repository host's API, which answers sixty unauthenticated requests an hour per address |
+| Only the repository host and the two hosts it hands a download to are reached, and the one redirect a download takes is followed only to those | Every other outbound request goes to a host the application names (REQ-69) |
+| An air-gapped deployment is carried a snapshot | `make cve-records` fetches one with the binary the image carries and reads it back before declaring it. On the far side it is copied into the directory, with fetching turned off |
+| An archive downloaded some other way is read into the same place | `openpsirt records import`, for a deployment whose route out is not this one |
+| The snapshot is replaced by a rename | A scan reads the old file or the new one, never half of either |
+| A snapshot that cannot be read is an error, never no records | A damaged bundle read as none would close nothing and say so nowhere |
+| Each replica keeps its own | The scanner's data is kept the same way, on the same volume |
+
+| Bound | |
+|---|---|
+| The download | 8 GiB, against 622 MB on 2026-10-07 |
+| The archive inside it | 8 GiB, written to disk before it is read, and removed once it is |
+| One record | 16 MiB |
+| Records in a snapshot | A million |
+
 ## Analyzer findings
 
 Findings from a static analyzer or a fuzzer are intended scope and **are not
@@ -1054,6 +1088,8 @@ to retrofit were settled early.
 
 | Limit | Detail |
 |---|---|
+| A day's whole archive is downloaded to keep half a megabyte of it | 622 MB on 2026-10-07. The List's hourly files of what changed are not read: a day's delay is what the scanner's own data has, and a second path to keep right has not been measured as worth it |
+| A deployment reaching the internet only through a proxy fetches no CVE records | The guarded client dials directly, so the check on the address it connects to is a check on the host it reaches. Such a deployment imports an archive instead |
 | A build dated on arrival is ordered by when it was sent, not when it was made | An older undated document sent late is taken as the newest. Documents that state a time are ordered by it, so this reaches only producers that state none |
 | The bounds are set from what reading costs, not from what a document looks like | An edge holds about half a kilobyte of heap while being read and a component about one and a third, so round numbers several times the largest real producer — two million edges, a quarter of a million components — accept a document taking about 1.3 GB, past what the chart ships as a limit. Such a file is guaranteed to kill the process, in the background reader that runs after the upload is answered 202. The budget is about 250 MB for one document, which is the server's share of the pod rather than the whole of it — the scanner is a second process in the same cgroup — and a test measures the per-unit cost with a wide bound |
 | The reader's bounds are configuration, not constants | A defaults function every deployment runs unchanged is a constant with extra steps |
