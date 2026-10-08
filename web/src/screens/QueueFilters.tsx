@@ -78,14 +78,17 @@ export function QueueFilters({
           set("proposed_by", who);
         }}
       >
+        {/* A search box, and a label without "sign-in" or "name" in it: a
+            lone text box in a form, labeled like a username, is what LastPass
+            offers to fill whatever the ignore attributes say. */}
         <input
           {...notACredential}
-          type="text"
+          type="search"
           value={who}
           onChange={(event) => setWho(event.target.value)}
           onBlur={() => set("proposed_by", who)}
           placeholder="Proposed by"
-          aria-label="Proposed by, by sign-in name"
+          aria-label="Proposed by"
           style={{ width: 150 }}
         />
       </form>
