@@ -396,6 +396,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 					Set("placement = ?", nullable(placed.Placement)).
 					Set("document = ?", from.Document).
 					Set("digest = ?", from.Digest).
+					Set("restated_at = ?", now).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
 				return err
 			})

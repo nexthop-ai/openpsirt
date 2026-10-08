@@ -8,7 +8,8 @@ import "strings"
 // vexStatementsV070 is v0.7.0's declaration of the vex_statement table, and the
 // indexes it makes.
 //
-// v0.2.0's, with the product the statement's component ships inside. Derived
+// v0.2.0's, with the product the statement's component ships inside, and when
+// a later document last said it again. Derived
 // from v0.2.0's declaration, which a tagged release fixed and which never
 // changes again.
 func vexStatementsV070(t *columnTypes) []string {
@@ -32,6 +33,12 @@ func vexStatementsV070(t *columnTypes) []string {
 			-- source, and for every statement recorded before this was read,
 			-- so that neither closes anything.
 			"placement"    `+t.kind+` NULL,`)
+	statements[0] = withColumn(statements[0], `"uploaded_at" `+t.timestamp+` NOT NULL,`,
+		`-- When a later document from the publisher said the statement
+			-- again, word for word, where one has. The row is kept for the
+			-- repeat, so this is the moment the publisher last said it. Null
+			-- for a statement nothing has repeated.
+			"restated_at" `+t.timestamp+` NULL,`)
 	return statements
 }
 

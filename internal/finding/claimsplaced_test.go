@@ -337,6 +337,29 @@ func TestARevisionUploadedOnItsOwnReplacesTheClaimSentWithTheInventory(t *testin
 }
 
 func TestALaterUploadWithTheInventoryReplacesARevisionUploadedOnItsOwn(t *testing.T) {
+	// The earlier word suppresses and the later one does not, so only the
+	// rule that the later word stands keeps the finding work.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.rooted(t, rootPurl)
+		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")
+		time.Sleep(5 * time.Millisecond)
+		f.shipped(t, beside(acmeY))
+		f.rooted(t, rootPurl)
+		f.argues(t, insideOf(sbom.Affected, sonicRoot, "turn compression off"))
+		f.reported(t, found(inside, zlib))
+		for _, row := range f.every(t) {
+			if row.SuppressedBy != nil || row.ClaimedBy == nil {
+				t.Errorf("suppressed by %v, claimed by %v: the release's later word, affected, "+
+					"does not stand over the earlier revision", row.SuppressedBy, row.ClaimedBy)
+			}
+		}
+	})
+}
+
+func TestAStatementSaidAgainInALaterDocumentIsTheNewerWord(t *testing.T) {
+	// The vendor says affected, the release's upload says not affected, and the
+	// vendor's next document says affected again, word for word.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
 		f.rooted(t, rootPurl)
@@ -345,10 +368,12 @@ func TestALaterUploadWithTheInventoryReplacesARevisionUploadedOnItsOwn(t *testin
 		f.shipped(t, beside(acmeY))
 		f.rooted(t, rootPurl)
 		f.argues(t, insideOf(sbom.NotAffected, sonicRoot, "never called"))
+		time.Sleep(5 * time.Millisecond)
+		f.vendorSays(t, rootPurl, sbom.Affected, "sha256:vendor-2")
 		f.reported(t, found(inside, zlib))
 		for _, row := range f.every(t) {
-			if row.SuppressedBy == nil {
-				t.Error("the release's later word, not affected, does not stand over the earlier revision")
+			if row.SuppressedBy != nil {
+				t.Error("the vendor's word said again after the release's upload does not stand")
 			}
 		}
 	})

@@ -42,7 +42,7 @@ func TestAV060DatabaseUpgradesToV070(t *testing.T) {
 		}
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "vex_statement"
 			WHERE "within_purl" IS NOT NULL OR "within" IS NOT NULL OR "within_about" IS NOT NULL
-				OR "placement" IS NOT NULL`).
+				OR "placement" IS NOT NULL OR "restated_at" IS NOT NULL`).
 			Scan(ctx, &placed); err != nil {
 			t.Fatalf("the statement table has no product a component ships inside: %v", err)
 		}

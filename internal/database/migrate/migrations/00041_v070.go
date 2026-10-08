@@ -40,6 +40,8 @@ func upV070(ctx context.Context, sqldb *sql.DB) error {
 //   - A statement keeps the product its component ships inside, and what it
 //     names its supplier's product as. A statement v0.6.0 holds kept neither,
 //     and closes nothing until it is read again.
+//   - A statement keeps when a later document last said it again. No
+//     statement v0.6.0 holds was said again since it was recorded.
 //   - Every supplier read from its directory is read again from its window,
 //     so its advisories are read with the product they place. A claim an
 //     advisory read again repeats keeps its row, whatever else the product
@@ -72,7 +74,7 @@ func upgradeV070(ctx context.Context, tx bun.Tx) error {
 	}
 	if err := u.change(vexStatementsV070(t), change{table: "vex_statement",
 		add: []added{{column: "within_purl"}, {column: "within"}, {column: "within_about"},
-			{column: "placement"}}}); err != nil {
+			{column: "placement"}, {column: "restated_at"}}}); err != nil {
 		return err
 	}
 	if err := u.run([]string{

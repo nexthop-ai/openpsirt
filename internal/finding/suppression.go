@@ -67,8 +67,8 @@ type Claim struct {
 	ClosedScanID *int64 `bun:"closed_scan_id"`
 	// Said is when the claim was last said: the build's latest upload for a
 	// claim sent with the inventory, which restates every claim it still
-	// makes, and the upload of the statement for one taken from a published
-	// document. Read with the open claims, never stored.
+	// makes, and the last document that said the statement for one taken from
+	// a published document. Read with the open claims, never stored.
 	Said time.Time `bun:"said,scanonly"`
 }
 
@@ -286,7 +286,7 @@ func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error
 		Join(`JOIN "target" AS "t" ON t.id = sup.target_id`).
 		Join(`JOIN "scan" AS "latest" ON latest.id = t.last_scan_id`).
 		Join(`LEFT JOIN "vex_statement" AS "ss" ON ss.id = sup.stated_by`).
-		ColumnExpr(`COALESCE(ss.uploaded_at, latest.received_at) AS "said"`).
+		ColumnExpr(`COALESCE(ss.restated_at, ss.uploaded_at, latest.received_at) AS "said"`).
 		Where("sup.target_id = ?", targetID).Where("sup.closed_scan_id IS NULL").
 		Order("sup.id").Scan(ctx)
 	if err != nil {
