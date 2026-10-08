@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="../pipeline/">
+        <link rel="prev" href="../vendor-release/">
       
       
         <link rel="next" href="../helm/">
@@ -347,6 +347,33 @@
     
   
     Build pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vendor-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A vendor's release
   
 
     
@@ -4081,6 +4108,18 @@ one does.</p>
 <tr>
 <td>A VEX document a build's page generates is this deployment's own unless <code>kind=with-suppliers</code> is asked for, which is a second document with an identifier and revisions of its own</td>
 <td>Nothing. Every document v0.6.0 recorded as gone out is this deployment's own, and keeps its revisions</td>
+</tr>
+<tr>
+<td>A generated VEX document names the build by the package identifier its SBOM gave its root, where that identifier names a version, and states a dismissal agreed at some places of a component one place at a time</td>
+<td>Tell anybody matching on the old product name, <code>product:stream:variant</code>, that the document now names what the SBOM does. A build whose SBOM gave its root no such identifier keeps the old name</td>
+</tr>
+<tr>
+<td>A claim the build sent with its SBOM about a component inside a product of the build applies beneath that product, rather than at every place of the component</td>
+<td>Nothing for a branch: its next upload restates each claim with its product. A tag is not uploaded again, so its claims keep applying across the build until it is</td>
+</tr>
+<tr>
+<td>A VEX document uploaded on its own whose statements name the build's root is the build's own claim</td>
+<td>Upload such a document again. A statement recorded by v0.6.0 kept no product, so it stays evidence until it is read again</td>
 </tr>
 </tbody>
 </table>
