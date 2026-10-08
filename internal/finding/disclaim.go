@@ -63,10 +63,94 @@ const AffectedOutcome = "affected"
 type disclaiming struct {
 	said     []Statement
 	byIssue  map[string][]int
+	affected map[affectedAt]bool
+	*placer
+}
+
+// placer is where products sit in one build: its components, the edges between
+// them read downward, and each product's placement once it has been asked for.
+//
+// A build's own claim about a component inside one of its products and a
+// supplier's statement about its own product are placed alike, so they share
+// one walk per product.
+type placer struct {
 	inv      inventory
 	children map[int64][]int64
 	placed   map[string]*placement
-	affected map[affectedAt]bool
+	// root is the build's own component. It is the product every claim is
+	// about already, and never a product inside the build.
+	root int64
+	// names caches whether a product names any component of the build.
+	names map[string]bool
+}
+
+// placing reads the build's root and turns its places into a placer.
+func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
+	places consumers) (*placer, error) {
+
+	p := &placer{inv: inv, children: map[int64][]int64{}, placed: map[string]*placement{},
+		names: map[string]bool{}}
+	// What each component pulls in, the edges read the other way. Zero is
+	// the build's root, as it is for a place.
+	for child, above := range places {
+		for _, consumer := range above {
+			p.children[consumer] = append(p.children[consumer], child)
+		}
+	}
+	var roots []int64
+	if err := db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`n.component_id`).
+		Where("n.target_id = ?", targetID).
+		Where("n.closed_scan_id IS NULL").
+		Where("n.is_root = ?", true).
+		Scan(ctx, &roots); err != nil {
+		return nil, fmt.Errorf("read the build's own component: %w", err)
+	}
+	if len(roots) > 0 {
+		p.root = roots[0]
+	}
+	return p, nil
+}
+
+// reaches reports whether a build's claim naming the product given reaches a
+// component at the place its consumer is.
+//
+// A claim naming no product, or naming one no component of the build is, is
+// about the build: the build's root, or a name the build's producer gave the
+// whole of it. One naming a component of the build applies only where every
+// route to the place runs through that component at the version the claim
+// names, and never to the product itself.
+func (p *placer) reaches(product *sbom.Target, component graph.Component, consumerID int64) bool {
+	if product == nil || !p.ships(*product) {
+		return true
+	}
+	if consumerID == 0 {
+		return false
+	}
+	at := p.place(*product)
+	if at.product[component.ID] {
+		return false
+	}
+	return at.at(consumerID) == answersAll
+}
+
+// ships reports whether a product names a component of the build other than
+// its root, at any version.
+func (p *placer) ships(product sbom.Target) bool {
+	key := product.Purl + "\x00" + product.Name
+	if held, ok := p.names[key]; ok {
+		return held
+	}
+	found := false
+	for id, c := range p.inv.byID {
+		if id != p.root && isProduct(product, c, false) {
+			found = true
+			break
+		}
+	}
+	p.names[key] = found
+	return found
 }
 
 // placement is where one supplier's product sits in a build: its components,
@@ -110,9 +194,9 @@ const (
 // because which identifier a publisher chose is a preference of whichever
 // database they consulted.
 func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Named,
-	issueIDs []int64, inv inventory, places consumers) (*disclaiming, error) {
+	issueIDs []int64, placed *placer) (*disclaiming, error) {
 
-	d := &disclaiming{byIssue: map[string][]int{}, inv: inv, placed: map[string]*placement{}}
+	d := &disclaiming{byIssue: map[string][]int{}, placer: placed}
 	var names []string
 	seen := map[string]bool{}
 	for _, issue := range issues {
@@ -153,14 +237,6 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 	}
 	for i, one := range d.said {
 		d.byIssue[one.Vulnerability] = append(d.byIssue[one.Vulnerability], i)
-	}
-	// What each component pulls in, the edges read the other way. Zero is
-	// the build's root, as it is for a place.
-	d.children = map[int64][]int64{}
-	for child, above := range places {
-		for _, consumer := range above {
-			d.children[consumer] = append(d.children[consumer], child)
-		}
 	}
 	d.affected, err = affectedPlaces(ctx, db, productID, issueIDs)
 	if err != nil {
@@ -282,13 +358,13 @@ func suppliedProduct(one Statement) sbom.Target {
 	return sbom.Target{Purl: one.Purl, Name: one.Component, Version: one.About}
 }
 
-// place is where a supplier's product sits in this build, worked out once per
-// product however many statements name it.
+// place is where a product sits in this build, worked out once per product
+// however many statements and claims name it.
 //
 // The product is matched exactly at the version the statement names: a
-// statement about one release says nothing about the next, and one naming no
-// version never reaches here.
-func (d *disclaiming) place(product sbom.Target) *placement {
+// statement about one release says nothing about the next. One naming no
+// version is placed nowhere.
+func (d *placer) place(product sbom.Target) *placement {
 	key := product.Purl + "\x00" + product.Name + "\x00" + product.VersionNamed()
 	if held, ok := d.placed[key]; ok {
 		return held
@@ -299,6 +375,9 @@ func (d *disclaiming) place(product sbom.Target) *placement {
 		return p
 	}
 	for id, c := range d.inv.byID {
+		if id == d.root {
+			continue
+		}
 		if isProduct(product, c, true) {
 			p.product[id] = true
 		}
@@ -336,8 +415,8 @@ func (d *disclaiming) place(product sbom.Target) *placement {
 
 // isProduct reports whether a component is the supplier's product: by the
 // package identifier the statement names, where it names one of a package,
-// and otherwise by the component's own name. With atVersion, at the version
-// the statement names as well.
+// and otherwise by the identifier or by the component's own name. With
+// atVersion, at the version the statement names as well.
 //
 // Never by what the component was built from. A fork of the supplier's source
 // carries the supplier's name as the name it was built from, and a build of
@@ -351,11 +430,16 @@ func isProduct(product sbom.Target, c graph.Component, atVersion bool) bool {
 	if heldVersion == "" {
 		heldVersion = c.Version
 	}
-	if base != "" && !strings.HasPrefix(base, "pkg:generic/") {
+	switch {
+	case base != "" && !strings.HasPrefix(base, "pkg:generic/"):
 		if base != held {
 			return false
 		}
-	} else if product.Name == "" || !strings.EqualFold(product.Name, c.Name) {
+	case base != "" && base == held:
+		// A generic identifier names a product by what the inventory calls
+		// it in its own identifier, which the name it gives may not repeat:
+		// pkg:generic/sonic-utilities beside "SONiC utilities".
+	case product.Name == "" || !strings.EqualFold(product.Name, c.Name):
 		return false
 	}
 	return !atVersion || (version != "" && version == heldVersion)

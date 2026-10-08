@@ -248,6 +248,7 @@ const WORDS: { [K in ClosedParameter]: Record<Word<K>, true> } = {
   assigned: { me: true, somebody: true, nobody: true },
   fix_state: { fixed: true, none: true, "wont-fix": true, unknown: true, mixed: true },
   vex_status: { not_affected: true, affected: true, fixed: true, under_investigation: true },
+  build_says: { not_affected: true, affected: true, under_investigation: true },
   origin: { scanner: true, manual: true },
   planned: { planned: true, unplanned: true, either: true },
   across_variants: { only: true, every: true },
@@ -264,6 +265,7 @@ type ClosedParameter =
   | "assigned"
   | "fix_state"
   | "vex_status"
+  | "build_says"
   | "origin"
   | "planned"
   | "across_variants"
@@ -341,6 +343,7 @@ export function listQuery(params: URLSearchParams) {
   const releases = pick("on", params.getAll("on"));
   const support = pick("support", params.getAll("support"));
   const vexStatus = pick("vex_status", params.getAll("vex_status"));
+  const buildSays = pick("build_says", params.getAll("build_says"));
   const origin = one("origin", params.get("origin") ?? "");
   const planned = one("planned", params.get("planned") ?? "");
   const variants = one("across_variants", params.get("variants") ?? "");
@@ -423,6 +426,7 @@ export function listQuery(params: URLSearchParams) {
     ...(variants ? { across_variants: variants } : {}),
     ...(publishers.length > 0 ? { vex_publisher: publishers } : {}),
     ...(vexStatus.length > 0 ? { vex_status: vexStatus } : {}),
+    ...(buildSays.length > 0 ? { build_says: buildSays } : {}),
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
     ...(tags.length > 0 ? { tag: tags } : {}),

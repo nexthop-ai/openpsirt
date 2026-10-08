@@ -40,10 +40,18 @@ func upV070(ctx context.Context, sqldb *sql.DB) error {
 //   - A statement keeps the product its component ships inside, and what it
 //     names its supplier's product as. A statement v0.6.0 holds kept neither,
 //     and closes nothing until it is read again.
+//   - A statement keeps when a later document last said it again. No
+//     statement v0.6.0 holds was said again since it was recorded.
 //   - Every supplier read from its directory is read again from its window,
 //     so its advisories are read with the product they place. A claim an
 //     advisory read again repeats keeps its row, whatever else the product
 //     now keeps from it, and raises no notice.
+//   - A build's claim keeps the product its target ships inside, and the
+//     published statement it was taken from. No claim v0.6.0 holds kept
+//     either, and each applies across the build until the build's next
+//     upload restates it with its product.
+//   - A finding names the build's claim covering it, whatever the claim
+//     says. Every finding v0.6.0 holds names none until the next run.
 //   - A VEX document that went out records which kind it was, and revisions
 //     are numbered per kind. Every one v0.6.0 recorded was this deployment's
 //     own.
@@ -55,12 +63,18 @@ func upgradeV070(ctx context.Context, tx bun.Tx) error {
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
 
 	if err := u.change(findingV070(t), change{table: "finding",
-		add: []added{{column: "unaffected_by"}, {column: "stated_by"}}}); err != nil {
+		add: []added{{column: "unaffected_by"}, {column: "stated_by"},
+			{column: "claimed_by"}}}); err != nil {
+		return err
+	}
+	if err := u.change(suppressionV070(t), change{table: "suppression",
+		add: []added{{column: "within_purl"}, {column: "within_name"},
+			{column: "within_version"}, {column: "stated_by"}}}); err != nil {
 		return err
 	}
 	if err := u.change(vexStatementsV070(t), change{table: "vex_statement",
 		add: []added{{column: "within_purl"}, {column: "within"}, {column: "within_about"},
-			{column: "placement"}}}); err != nil {
+			{column: "placement"}, {column: "restated_at"}}}); err != nil {
 		return err
 	}
 	if err := u.run([]string{

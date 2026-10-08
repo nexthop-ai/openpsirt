@@ -78,5 +78,6 @@ func StatementsV070(engine database.Engine) map[string][]string {
 		"scan_run":      scanRunV070(t),
 		"vex_statement": vexStatementsV070(t),
 		"vex_issuance":  vexIssuanceV070(t),
+		"suppression":   suppressionV070(t),
 	}
 }

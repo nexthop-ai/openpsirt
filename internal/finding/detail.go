@@ -184,6 +184,9 @@ type Evidence struct {
 	// Places is where it sits here — the consumer that pulls the component in,
 	// and whether the build has already argued that place away.
 	Places []Sitting
+	// Claimed is what the build says about the places shown, one entry per
+	// claim covering any of them.
+	Claimed []BuildClaim
 	// AssignedTo is who is dealing with this, by sign-in identity, or empty
 	// where nobody is. One name for the whole finding, because assignment is
 	// set for a group at once; where the places somehow disagree it is empty
@@ -493,6 +496,7 @@ type evidenceRow struct {
 	Decision      *int64     `bun:"decision"`
 	Claim         *int64     `bun:"claim"`
 	Suppressed    bool       `bun:"suppressed"`
+	ClaimedBy     *int64     `bun:"claimed_by"`
 	AnsweredBy    string     `bun:"answered_by"`
 	AnsweredIn    string     `bun:"answered_in"`
 	Urgency       int64      `bun:"urgency"`
@@ -598,6 +602,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`(SELECT de.id `+standingHere+`) AS "decision"`, productID).
 		ColumnExpr(`(SELECT de.claim_id `+standingHere+`) AS "claim"`, productID).
 		ColumnExpr(`CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
+		ColumnExpr(`f.claimed_by AS "claimed_by"`).
 		ColumnExpr(`COALESCE(sb.publisher, '') AS "answered_by"`).
 		ColumnExpr(`COALESCE(sb.within, sb.component, '') AS "answered_in"`).
 		ColumnExpr(`f.urgency AS "urgency"`).
@@ -680,6 +685,17 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
+	claimed := map[int64]bool{}
+	var claims []int64
+	for _, row := range rows {
+		if row.ClaimedBy != nil && !claimed[*row.ClaimedBy] {
+			claimed[*row.ClaimedBy] = true
+			claims = append(claims, *row.ClaimedBy)
+		}
+	}
+	if evidence.Claimed, err = claimedOn(ctx, s.db, claims); err != nil {
+		return nil, err
+	}
 	if evidence.Ratings, err = NewVulnerabilities(s.db).Ratings(ctx, vulnerabilityID); err != nil {
 		return nil, err
 	}

@@ -413,6 +413,11 @@ type Finding struct {
 	// not on others: the row stays open for the routes nobody has answered,
 	// and is not work while it does.
 	StatedBy *int64 `bun:"stated_by"`
+	// ClaimedBy is the build's claim covering this finding, whatever it says.
+	// Where the claim suppresses it is the claim SuppressedBy names; where it
+	// says the flaw applies it is the claim carrying the build's workaround,
+	// which suppresses nothing and leaves the finding work.
+	ClaimedBy *int64 `bun:"claimed_by"`
 }
 
 // Reported is one issue a scanner reported against one component.

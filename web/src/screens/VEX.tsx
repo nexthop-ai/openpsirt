@@ -70,6 +70,14 @@ export function VEX() {
             : "Approved dismissals and public findings only."}{" "}
           <a href={base + tail}>Current document (JSON)</a>
         </p>
+        {/* How a customer loads a release, which is the question somebody
+            sending this is asked. Both kinds load the same way. */}
+        <p
+          className="hint"
+          title="It names the build the way the SBOM names its root, which is what a customer's scanner and a customer's OpenPSIRT match on"
+        >
+          Send it with this build&rsquo;s SBOM. Either kind loads.
+        </p>
       </div>
 
       <div className="tabs2">

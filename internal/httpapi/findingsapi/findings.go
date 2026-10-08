@@ -401,6 +401,20 @@ type StepBody struct {
 	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
 }
 
+// BuildClaimBody is one claim the build makes about a finding.
+type BuildClaimBody struct {
+	Status        string `json:"status" doc:"What the build says, in the VEX vocabulary"`
+	Justification string `json:"justification,omitempty" doc:"The VEX justification term it gave"`
+	Statement     string `json:"statement,omitempty" doc:"The words it gave: why the flaw does not apply, or the workaround where it does"`
+	Subject       string `json:"subject" doc:"The component the claim names"`
+	Version       string `json:"version,omitempty" doc:"The version of that component the claim names, where it names one"`
+	Within        string `json:"within,omitempty" doc:"The product of the build the claim names the component as shipping inside, where it names one. The claim applies beneath that product"`
+	WithinVersion string `json:"within_version,omitempty" doc:"The version of that product"`
+	Pedigree      bool   `json:"pedigree,omitempty" doc:"Whether the claim arrived on the component itself, as a patch declaring what it fixes"`
+	Publisher     string `json:"publisher,omitempty" doc:"Whose VEX document the claim came from, where it was uploaded on its own rather than with the inventory"`
+	Document      string `json:"document,omitempty" doc:"The VEX document the claim came from, where it was uploaded on its own"`
+}
+
 // SittingBody is one place a component occupies in this build.
 type SittingBody struct {
 	Place string `json:"place" doc:"Name this when recording a decision about it"`
@@ -567,6 +581,10 @@ type EvidenceBody struct {
 	NothingSince     bool   `json:"nothing_since,omitempty" doc:"Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned"`
 
 	Places []SittingBody `json:"places"`
+	// Claimed is what the build says about the places shown, in its own
+	// words: the reason a place is marked or closed, and the workaround where
+	// the build says the flaw applies.
+	Claimed []BuildClaimBody `json:"claimed" doc:"The build's own claims covering any of the places shown, the ones that answer a place first"`
 
 	// AssignedTo is who is dealing with this, by sign-in identity. Empty means
 	// nobody — and it is the same field the assignment route writes, so the
@@ -752,6 +770,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, RoutedBy: e.RoutedBy,
 		Tags:     e.Tags,
 		Places:   make([]SittingBody, 0, len(e.Places)),
+		Claimed:  make([]BuildClaimBody, 0, len(e.Claimed)),
 		Standing: []core.StandingClaimBody{}, Previous: []core.EarlierBody{}, Similar: []core.SimilarBody{},
 		Elsewhere: []core.ElsewhereBody{},
 		Said:      []core.SaidBody{},
@@ -795,6 +814,14 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 	}
 	for _, link := range e.Links {
 		body.Links = append(body.Links, LinkBody{URL: link.URL, Name: link.Name})
+	}
+	for _, claim := range e.Claimed {
+		body.Claimed = append(body.Claimed, BuildClaimBody{
+			Status: claim.Status, Justification: claim.Justification, Statement: claim.Statement,
+			Subject: claim.Subject, Version: claim.Version,
+			Within: claim.Within, WithinVersion: claim.WithinVersion,
+			Pedigree: claim.Pedigree, Publisher: claim.Publisher, Document: claim.Document,
+		})
 	}
 	for _, place := range e.Places {
 		sitting := SittingBody{

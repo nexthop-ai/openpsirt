@@ -407,6 +407,7 @@ says what turns each on.
 | [Current state](built.md) | What is built, and what is not |
 | [Evaluation](trying.md) | Standing one up to look at |
 | [Build pipelines](pipeline.md) | A pipeline declares the target, mints a key and posts the inventory |
+| [A vendor's release](vendor-release.md) | Loading a vendor's SBOM and VEX document, so their judgments are recorded as theirs |
 | [Configuration](configuration.md) | Every setting, and what reads it |
 | [API reference](reference/api.md) | Every operation, generated from the server |
 | [Privileges](reference/privileges.md) | Which role reaches which endpoint |

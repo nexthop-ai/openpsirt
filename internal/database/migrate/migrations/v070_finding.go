@@ -10,8 +10,8 @@ import (
 // findingV070 is v0.7.0's declaration of the finding table, and the indexes it
 // makes.
 //
-// v0.3.0's, with the CVE record lines that closed a finding as unaffected, and
-// the supplier's statement that answers it.
+// v0.3.0's, with the CVE record lines that closed a finding as unaffected, the
+// supplier's statement that answers it, and the build's claim about it.
 // Derived from v0.3.0's declaration, which a tagged release fixed and which
 // never changes again.
 func findingV070(t *columnTypes) []string {
@@ -31,6 +31,13 @@ func findingV070(t *columnTypes) []string {
 			-- reference cannot dangle, and a column taking a null and holding
 			-- one is added where the table stands on every engine.
 			"stated_by"        `+t.refNull+` NULL,`)
+	statements[0] = withColumn(statements[0], `"stated_by"        `+t.refNull+` NULL,`,
+		`-- The build's claim covering this finding, whatever it says. The
+			-- reference above it names only a claim that suppresses; this one
+			-- names a claim that the flaw applies as well, which is what
+			-- carries the workaround the build published. A plain reference
+			-- without a foreign key, for the reason the one above it gives.
+			"claimed_by"       `+t.refNull+` NULL,`)
 	return statements
 }
 

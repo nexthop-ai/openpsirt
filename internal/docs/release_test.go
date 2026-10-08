@@ -39,6 +39,9 @@ var notReleases = map[string][]string{
 		"8.4.0",  // curl, in an inventory comparison
 		"1.3.1",  // zlib, in the same comparison
 	},
+	"docs/vendor-release.md": {
+		"8.5.0", // curl, in a statement's example
+	},
 }
 
 // releaseLiterals returns every version-shaped literal in a page that is not

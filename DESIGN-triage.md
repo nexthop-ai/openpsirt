@@ -1305,7 +1305,7 @@ the product was read, names no supplier's product and closes nothing.
 | A finding on the product itself stays evidence, a cycle in the graph putting it beneath itself included | A statement naming a package alone cannot tell the supplier's own build from a rebuild of its source |
 | A statement naming a package of an ecosystem alone closes nothing | A distribution's package identifier is shared by its own build and by a rebuild of its source |
 | The product is matched exactly, at the version the statement names | A statement about one release says nothing about the next, so a version change reopens the finding. A statement naming no version is about every release, past and future, and stays evidence |
-| The product is matched by the package identifier the statement names, or by the component's own name, and never by what the component was built from | A fork of the supplier's source carries the supplier's name as what it was built from, and a build of the supplier's source is not the supplier's product |
+| The product is matched by the package identifier the statement names, or by the component's own name, and never by what the component was built from. A generic identifier is matched against the component's identifier as well as its name | A fork of the supplier's source carries the supplier's name as what it was built from, and a build of the supplier's source is not the supplier's product |
 | Only `not_affected` closes, whatever its justification | Each justification is the supplier speaking about its own product. A statement that something will not be fixed is affected and judged minor, and stays a prefilled will-not-fix |
 | The product has to be a component of the build | A build of the supplier's source is not the supplier's product. A distribution names a platform, which no build here contains, so its statements close nothing |
 | The build's own patch and the CVE record are asked first | Both say the code is not vulnerable here, which is the stronger answer |
@@ -1315,6 +1315,25 @@ the product was read, names no supplier's product and closes nothing.
 | A place closed for any other reason keeps no answer on some routes | What closed it is the reason a register reads beside it |
 | The closed row names the statement, and a revision saying the same thing moves the row to it | What closed it stays readable after the statement is superseded |
 | Among several statements, one answering every route stands over one answering some, and the oldest over a newer | The answer does not move between runs |
+
+### Statements about the build
+
+A statement whose product is a build's root speaks for the build's producer,
+whichever way it arrived (REQ-11). Sent with the inventory, it is recorded as
+the build's claim when the scan is read. In a document uploaded on its own, it
+is recorded by the run as a claim of the build taken from that statement. Both
+are applied alike: `DESIGN-findings.md` § Build-declared claims holds what each
+status does.
+
+| Rule | |
+|---|---|
+| The root is matched by the package identifier the build's latest inventory gave it, at the version the statement names | A statement about one release says nothing about the next. A statement naming no version, and an inventory giving its root no package identifier, place nothing, and the statement stays evidence |
+| A root another build of the product also holds names neither build | Two variants of one release commonly share the identifier, and a statement about one is not about the other. Sent with each inventory, the statements are told apart by the upload they arrive in |
+| Where a claim sent with the inventory and one taken from a statement cover one place, the one said more recently stands | A revision uploaded on its own replaces what came with the inventory, and a later upload replaces the revision. Each upload says again every claim the build still sends, and a later document repeating a statement word for word says it again. The same document uploaded twice says nothing new |
+| A claim taken from a statement closes when the statement is set aside or revised away, or the root moves to another version | It is kept in step by the run, before the build's claims are read. A scan restates the claims it sent and never these |
+| The claim names the statement it was taken from | Whose document it is stays readable on the finding |
+| A statement about a component inside the build, uploaded on its own, is that component's supplier's | § Supplier statements applied holds what it closes |
+| The same statement sent with the inventory is the build's claim, applied beneath that component | The build is speaking. A supplier's statement is replaced by the publisher's next document across the whole product, and every build of a product sends one by the same author, so read as a supplier's each build would set aside the last one's. `DESIGN-ingest.md` § Build-declared suppressions holds where it applies |
 
 ### Evidence placement
 

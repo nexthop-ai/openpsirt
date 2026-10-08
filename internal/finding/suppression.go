@@ -51,8 +51,41 @@ type Claim struct {
 	// document stated one outside the package identifier. A publisher naming
 	// no package states it as the branch its product sits in.
 	SubjectVersion string `bun:"subject_version,nullzero"`
-	OpenedScanID   int64  `bun:"opened_scan_id,notnull"`
-	ClosedScanID   *int64 `bun:"closed_scan_id"`
+	// WithinPurl, WithinName and WithinVersion are the product the subject
+	// ships inside, where the document named one. A claim about a component
+	// inside a product of the build applies beneath that product; one whose
+	// product is the build's root, or nothing the build ships, applies across
+	// the build.
+	WithinPurl    string `bun:"within_purl,nullzero"`
+	WithinName    string `bun:"within_name,nullzero"`
+	WithinVersion string `bun:"within_version,nullzero"`
+	// StatedBy is the published statement this claim was taken from, where a
+	// document uploaded on its own named the build's root as its product.
+	// Nil for a claim the build sent with its inventory.
+	StatedBy     *int64 `bun:"stated_by"`
+	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
+	ClosedScanID *int64 `bun:"closed_scan_id"`
+	// Said is when the claim was last said: the build's latest upload for a
+	// claim sent with the inventory, which restates every claim it still
+	// makes, and the last document that said the statement for one taken from
+	// a published document. Read with the open claims, never stored.
+	Said time.Time `bun:"said,scanonly"`
+}
+
+// Published is the origin of a claim taken from a published statement whose
+// product is the build's root. The document arrived on its own rather than
+// with an inventory, and what it says about the build is the build's own claim.
+// A scan restates the claims of the two origins it reads, and never this one:
+// a run keeps these in step with the statements that stand.
+const Published = "published"
+
+// within is the product a claim's target ships inside, and nil where the
+// document named the target alone.
+func (c Claim) within() *sbom.Target {
+	if c.WithinPurl == "" && c.WithinName == "" {
+		return nil
+	}
+	return &sbom.Target{Purl: c.WithinPurl, Name: c.WithinName, Version: c.WithinVersion}
 }
 
 // covers reports whether this claim is about the component described.
@@ -79,7 +112,9 @@ func (c Claim) fixes() bool { return sbom.Status(c.Status).Fixes() }
 // the same argument writes nothing and changing the reasoning is a change. The
 // version is part of it where one is stated, so a claim about 4.2 and one about
 // 5.0 are two claims; a claim stating none outside its package identifier
-// keys as it did before a version could be stored.
+// keys as it did before a version could be stored. The product the subject
+// ships inside and the statement a claim was taken from are part of it the same
+// way.
 func claimIdentity(c Claim) string {
 	parts := []string{
 		strings.ToUpper(strings.TrimSpace(c.Vulnerability)),
@@ -87,6 +122,14 @@ func claimIdentity(c Claim) string {
 	}
 	if c.SubjectVersion != "" {
 		parts = append(parts, c.SubjectVersion)
+	}
+	// A claim about zlib inside curl and one about every zlib are two claims.
+	// A claim naming no product keys as it did before a product was stored.
+	if c.WithinPurl != "" || c.WithinName != "" {
+		parts = append(parts, "within", c.WithinPurl, c.WithinName, c.WithinVersion)
+	}
+	if c.StatedBy != nil {
+		parts = append(parts, "stated", fmt.Sprint(*c.StatedBy))
 	}
 	basis := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(basis))
@@ -164,14 +207,22 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 					SubjectVersion: statedBeside(subject),
 					OpenedScanID:   scanID,
 				}
+				if subject.Within != nil {
+					row.WithinPurl = subject.Within.Purl
+					row.WithinName = subject.Within.ComponentNamed()
+					row.WithinVersion = subject.Within.VersionNamed()
+				}
 				row.Identity = claimIdentity(row)
 				wanted[row.Identity] = row
 			}
 		}
 
+		// A claim taken from a document uploaded on its own is no scan's to
+		// restate or withdraw.
 		var open []Claim
 		err := tx.NewSelect().Model(&open).
-			Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").Scan(ctx)
+			Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").
+			Where("origin <> ?", Published).Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read what this build argued before: %w", err)
 		}
@@ -231,8 +282,13 @@ func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error
 	// recorded should not depend on what a map felt like doing.
 	var rows []Claim
 	err := db.NewSelect().Model(&rows).
-		Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").
-		Order("id").Scan(ctx)
+		ColumnExpr("sup.*").
+		Join(`JOIN "target" AS "t" ON t.id = sup.target_id`).
+		Join(`JOIN "scan" AS "latest" ON latest.id = t.last_scan_id`).
+		Join(`LEFT JOIN "vex_statement" AS "ss" ON ss.id = sup.stated_by`).
+		ColumnExpr(`COALESCE(ss.restated_at, ss.uploaded_at, latest.received_at) AS "said"`).
+		Where("sup.target_id = ?", targetID).Where("sup.closed_scan_id IS NULL").
+		Order("sup.id").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build argues: %w", err)
 	}
@@ -255,6 +311,11 @@ type Carried struct {
 	Status        string
 	Justification string
 	Statement     string
+	// Within and WithinVersion are the product of the build the claim names
+	// its subject as shipping inside, where it names one: "zlib inside curl"
+	// and "zlib inside openssl" are two claims.
+	Within        string
+	WithinVersion string
 	// Pedigree says the claim arrived attached to a component rather than in a
 	// document of its own — a carried patch declaring what it fixes, which is
 	// the only way a backport can be seen here at all.
@@ -296,7 +357,10 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 	limit = database.AList.Of(limit)
 
 	where := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.Where("sup.target_id = ?", targetID)
+		// What the build sent with its inventories. A claim taken from a
+		// document uploaded on its own is shown on the findings it covers,
+		// and it is held over no stretch of the build's own scans.
+		q = q.Where("sup.target_id = ?", targetID).Where("sup.origin <> ?", Published)
 		if name := strings.TrimSpace(component); name != "" {
 			// Matched on what the claim says it is about rather than on a
 			// component row, because a claim naming something this build does
@@ -320,6 +384,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		Justification string     `bun:"justification"`
 		Statement     string     `bun:"statement"`
 		Origin        string     `bun:"origin"`
+		WithinPurl    string     `bun:"within_purl"`
+		WithinName    string     `bun:"within_name"`
+		WithinVersion string     `bun:"within_version"`
 		Since         time.Time  `bun:"since"`
 		Until         *time.Time `bun:"until"`
 	}
@@ -336,6 +403,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
 		ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
 		ColumnExpr(`sup.origin AS "origin"`).
+		ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
+		ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).
+		ColumnExpr(`COALESCE(sup.within_version, '') AS "within_version"`).
 		ColumnExpr(`opened.built_at AS "since"`).
 		ColumnExpr(`closed.built_at AS "until"`).
 		// Anything still being said first, newest first within that: a claim
@@ -348,7 +418,13 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 	}
 	out := make([]Carried, 0, len(rows))
 	for _, row := range rows {
+		var within, withinVersion string
+		if row.WithinPurl != "" || row.WithinName != "" {
+			product := sbom.Target{Purl: row.WithinPurl, Name: row.WithinName, Version: row.WithinVersion}
+			within, withinVersion = product.ComponentNamed(), product.VersionNamed()
+		}
 		out = append(out, Carried{
+			Within: within, WithinVersion: withinVersion,
 			Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 			Status: row.Status, Justification: row.Justification,
 			Statement: row.Statement,

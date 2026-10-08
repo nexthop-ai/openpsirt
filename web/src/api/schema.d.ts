@@ -6739,6 +6739,28 @@ export interface components {
              */
             undecided: number;
         };
+        BuildClaimBody: {
+            /** @description The VEX document the claim came from, where it was uploaded on its own */
+            document?: string;
+            /** @description The VEX justification term it gave */
+            justification?: string;
+            /** @description Whether the claim arrived on the component itself, as a patch declaring what it fixes */
+            pedigree?: boolean;
+            /** @description Whose VEX document the claim came from, where it was uploaded on its own rather than with the inventory */
+            publisher?: string;
+            /** @description The words it gave: why the flaw does not apply, or the workaround where it does */
+            statement?: string;
+            /** @description What the build says, in the VEX vocabulary */
+            status: string;
+            /** @description The component the claim names */
+            subject: string;
+            /** @description The version of that component the claim names, where it names one */
+            version?: string;
+            /** @description The product of the build the claim names the component as shipping inside, where it names one. The claim applies beneath that product */
+            within?: string;
+            /** @description The version of that product */
+            within_version?: string;
+        };
         BuildCountsBody: {
             /** Format: int64 */
             critical: number;
@@ -6930,6 +6952,10 @@ export interface components {
             version?: string;
             /** @description The identifier the build argued about, as it wrote it */
             vulnerability: string;
+            /** @description The product of the build the claim names its subject as shipping inside, where it names one. The claim applies beneath that product */
+            within?: string;
+            /** @description The version of that product */
+            within_version?: string;
         };
         "Carry-decisionsRequest": {
             /**
@@ -8020,6 +8046,8 @@ export interface components {
             assessed?: string;
             /** @description The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
+            /** @description The build's own claims covering any of the places shown, the ones that answer a place first */
+            claimed: components["schemas"]["BuildClaimBody"][] | null;
             component: string;
             /**
              * Format: int64
@@ -14950,6 +14978,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -15064,6 +15094,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -16845,6 +16877,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17010,6 +17044,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17137,6 +17173,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17269,6 +17307,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17399,6 +17439,8 @@ export interface operations {
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
