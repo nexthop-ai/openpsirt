@@ -397,7 +397,7 @@ func TestAnAdvisoryAboutSomethingThisProductShipsIsRecordedAsEvidence(t *testing
 
 		said, err := finding.NewStore(f.db.DB).SaidAbout(ctx,
 			access.Everything("the test"), f.product, 0,
-			[]string{"CVE-2026-1111"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0")
+			[]string{"CVE-2026-1111"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -512,7 +512,7 @@ func TestAVexDocumentInAPublishersFeedIsLeftAlone(t *testing.T) {
 		}
 		said, err := finding.NewStore(f.db.DB).SaidAbout(ctx,
 			access.Everything("the test"), f.product, 0,
-			[]string{"CVE-2026-4444"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0")
+			[]string{"CVE-2026-4444"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

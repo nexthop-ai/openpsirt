@@ -132,6 +132,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
+		// What suppliers say about their own products, where it can close a
+		// finding here (REQ-31): read once, and placed in this build's graph
+		// once per product it names.
+		suppliers, err := disclaimers(ctx, tx, productID, issues, present, places)
+		if err != nil {
+			return err
+		}
 		// Those that reached anything are worked out against what the target
 		// contains, not against what was reported: a claim covering a
 		// component nothing was found in has still done its job, while one
@@ -213,6 +220,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// that say so. Wanted for the same reason, and closing for a different
 		// one: the release never held the issue.
 		cleared := map[key]string{}
+		// Those a supplier's statement answers on every route up the tree, by
+		// the statement. Wanted, and closing: the supplier says the product
+		// they sit in is not affected.
+		disclaimed := map[key]int64{}
 		// The time each of them has, where it is on the clock at all. Carried
 		// beside the finding rather than on it: a deadline is worked out from
 		// the finding's own opening, and one already open opened before this
@@ -248,6 +259,20 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				if !patched[key{vulnerabilityID, at}] {
 					cleared[key{vulnerabilityID, at}] = r.Unaffected
 				}
+				// A supplier's statement is asked last. A patch and a record
+				// both say the code is not vulnerable here, which is the
+				// stronger of the answers.
+				delete(disclaimed, key{vulnerabilityID, at})
+				var answeredBy *int64
+				if !patched[key{vulnerabilityID, at}] && cleared[key{vulnerabilityID, at}] == "" {
+					statement, how := suppliers.answering(r.Issue, vulnerabilityID, component, consumerID)
+					switch how {
+					case answersAll:
+						disclaimed[key{vulnerabilityID, at}] = *statement
+					case answersSome:
+						answeredBy = statement
+					}
+				}
 				wanted[key{vulnerabilityID, at}] = Finding{
 					TargetID: targetID, Kind: Vulnerable,
 					// A scanner's finding in a shipped component is public
@@ -263,6 +288,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Matched: r.Matched, MatchedFrom: r.MatchedFrom,
 					MatchedIn: r.MatchedIn, MatchedRange: r.MatchedRange,
 					SuppressedBy: covering,
+					StatedBy:     answeredBy,
 					OpenedAt:     startedAt,
 					OpenedRunID:  &runID,
 				}
@@ -345,6 +371,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// by the lines that say so.
 		clearing := map[string][]int64{}
 		var arrivedCleared []key
+		// And for one a supplier's statement answers on every route, by the
+		// statement.
+		disclaiming := map[int64][]int64{}
+		var arrivedDisclaimed []key
 		for k, f := range wanted {
 			if patched[k] {
 				if already, open := held[k]; open {
@@ -363,6 +393,16 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					applied.Unaffected++
 				} else {
 					arrivedCleared = append(arrivedCleared, k)
+				}
+				continue
+			}
+			if statement, answered := disclaimed[k]; answered {
+				if already, open := held[k]; open {
+					disclaiming[statement] = append(disclaiming[statement], already.ID)
+					applied.Closed++
+					applied.Disclaimed++
+				} else {
+					arrivedDisclaimed = append(arrivedDisclaimed, k)
 				}
 				continue
 			}
@@ -421,6 +461,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				Set("matched_in = ?", f.MatchedIn).
 				Set("matched_range = ?", f.MatchedRange).
 				Set("suppressed_by = ?", f.SuppressedBy).
+				Set("stated_by = ?", f.StatedBy).
 				Set("last_changed_at = ?", now)
 			if moved {
 				update = update.
@@ -455,6 +496,9 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			reading = append(reading, k.vulnerabilityID)
 		}
 		for _, k := range arrivedCleared {
+			reading = append(reading, k.vulnerabilityID)
+		}
+		for _, k := range arrivedDisclaimed {
 			reading = append(reading, k.vulnerabilityID)
 		}
 		latest, latestAt, err := latestClosed(ctx, tx, targetID, reading)
@@ -559,6 +603,48 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				return fmt.Errorf("point %d unaffected findings at their record's lines: %w", len(ids), err)
 			}
 		}
+		// A finding first seen with a supplier's statement answering it on
+		// every route is recorded, closed, for the same reason: a release
+		// comparison and the register have the statement to read. Recorded
+		// once, and where the statement is revised, the row is pointed at the
+		// new one.
+		var recordingDisclaimed []Finding
+		restated := map[int64][]int64{}
+		for _, k := range arrivedDisclaimed {
+			f := wanted[k]
+			statement := disclaimed[k]
+			if was, recorded := latest[k]; recorded && was.ClosedBecause == Disclaimed {
+				if was.StatedBy == nil || *was.StatedBy != statement {
+					restated[statement] = append(restated[statement], was.ID)
+				}
+				continue
+			}
+			f.LastChangedAt = now
+			f.ClosedAt = &startedAt
+			f.ClosedRunID = &runID
+			f.ClosedBecause = Disclaimed
+			f.StatedBy = &statement
+			f.DueAt = nil
+			recordingDisclaimed = append(recordingDisclaimed, f)
+		}
+		if len(recordingDisclaimed) > 0 {
+			if err := database.InBatches(ctx, tx, recordingDisclaimed); err != nil {
+				return fmt.Errorf("record %d findings their suppliers state are not affected: %w",
+					len(recordingDisclaimed), err)
+			}
+			applied.Disclaimed += len(recordingDisclaimed)
+		}
+		for statement, ids := range restated {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set("stated_by = ?", statement).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("point %d disclaimed findings at their statement: %w", len(ids), err)
+			}
+		}
 		for claimID, ids := range standsOn {
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Finding)(nil)).
@@ -578,11 +664,19 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// And where what is wanted at that place is patched, the row closes as
 		// patched: the version moved and the issue did not come with it.
 		patchedAt := map[at]int64{}
+		// And where a supplier's statement answers what is wanted at that
+		// place on every route, the row closes as disclaimed: the version
+		// moved and the supplier says the new one is not affected.
+		disclaimedAt := map[at]int64{}
 		for k, f := range wanted {
 			// A release the record states is unaffected is not one the issue
 			// came with: the row before it closes for what moved, which is
 			// the version reaching past the issue.
 			if cleared[k] != "" {
+				continue
+			}
+			if statement, answered := disclaimed[k]; answered {
+				disclaimedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = statement
 				continue
 			}
 			wantedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = true
@@ -617,6 +711,12 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				patching[claimID] = append(patching[claimID], f.ID)
 				applied.Closed++
 				applied.Patched++
+				continue
+			}
+			if statement, ok := disclaimedAt[at{f.VulnerabilityID, f.PlaceIdentity}]; ok {
+				disclaiming[statement] = append(disclaiming[statement], f.ID)
+				applied.Closed++
+				applied.Disclaimed++
 				continue
 			}
 			reason, movedTo := present.why(departed[f.ComponentID])
@@ -667,6 +767,21 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			})
 			if err != nil {
 				return fmt.Errorf("close %d findings their records state are unaffected: %w", len(ids), err)
+			}
+		}
+		for statement, ids := range disclaiming {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set("closed_at = ?", startedAt).
+					Set("closed_run_id = ?", runID).
+					Set("closed_because = ?", Disclaimed).
+					Set("moved_to = ?", "").
+					Set("stated_by = ?", statement).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("close %d findings their suppliers state are not affected: %w", len(ids), err)
 			}
 		}
 		for claimID, ids := range patching {
@@ -767,7 +882,8 @@ func same(held, found Finding) bool {
 		held.MatchedFrom == found.MatchedFrom &&
 		held.MatchedIn == found.MatchedIn &&
 		held.MatchedRange == found.MatchedRange &&
-		equalRef(held.SuppressedBy, found.SuppressedBy)
+		equalRef(held.SuppressedBy, found.SuppressedBy) &&
+		equalRef(held.StatedBy, found.StatedBy)
 }
 
 // learnedExploitation is the moment to record beside a clock that just moved,

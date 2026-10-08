@@ -61,13 +61,15 @@ export function Register() {
     .getAll("state")
     .filter((word): word is Stands => (STATES as readonly string[]).includes(word));
   const standing = params.get("standing") === "open";
-  // What the CVE records closed, listed on its own so a wrong record can be
-  // found.
-  const recordClosed = params.get("closed_because") === "unaffected";
+  // What the CVE records closed, and what suppliers' statements closed, each
+  // listed on its own so a wrong record or a wrong statement can be found.
+  const closedBy = params
+    .getAll("closed_because")
+    .filter((word): word is ClosedBy => (CLOSED_BY as readonly string[]).includes(word));
   const narrowed = {
     ...(states.length > 0 ? { state: states } : {}),
     ...(standing ? { standing: "open" as const } : {}),
-    ...(recordClosed ? { closed_because: ["unaffected" as const] } : {}),
+    ...(closedBy.length > 0 ? { closed_because: closedBy } : {}),
   };
   const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}\u0000${params.toString()}`;
   const [shown, setShown] = useState(showing);
@@ -95,7 +97,7 @@ export function Register() {
   const asked = new URLSearchParams();
   for (const word of states) asked.append("state", word);
   if (standing) asked.set("standing", "open");
-  if (recordClosed) asked.set("closed_because", "unaffected");
+  for (const word of closedBy) asked.append("closed_because", word);
 
   const rows = register.data?.items ?? [];
   const total = register.data?.total ?? 0;
@@ -157,24 +159,28 @@ export function Register() {
               />{" "}
               Still open
             </label>
-            <label title="Closed because the issue's CVE record says this version is unaffected">
-              <input
-                type="checkbox"
-                checked={recordClosed}
-                onChange={(e) => {
-                  const next = new URLSearchParams(params);
-                  if (e.target.checked) next.set("closed_because", "unaffected");
-                  else next.delete("closed_because");
-                  setParams(next);
-                }}
-              />{" "}
-              Not affected, per CVE record
-            </label>
+            {CLOSED_BY.map((word) => (
+              <label key={word} title={CLOSED_BY_HINT[word]}>
+                <input
+                  type="checkbox"
+                  checked={closedBy.includes(word)}
+                  onChange={(e) => {
+                    const next = new URLSearchParams(params);
+                    const kept = closedBy.filter((w) => w !== word);
+                    if (e.target.checked) kept.push(word);
+                    next.delete("closed_because");
+                    for (const w of kept) next.append("closed_because", w);
+                    setParams(next);
+                  }}
+                />{" "}
+                {CLOSED_BY_LABEL[word]}
+              </label>
+            ))}
           </div>
 
           <h3>
             {total.toLocaleString()} {total === 1 ? "row" : "rows"}
-            {(states.length > 0 || standing || recordClosed) && (
+            {(states.length > 0 || standing || closedBy.length > 0) && (
               <span className="hint"> narrowed</span>
             )}
           </h3>
@@ -293,7 +299,15 @@ export function Register() {
                                   {recordLine(line)}
                                 </div>
                               ))}
+                              {row.stated && <div className="hint">{statedLine(row.stated)}</div>}
                             </>
+                          ) : row.stated ? (
+                            <span
+                              className="hint"
+                              title="The routes outside the supplier's product are still open"
+                            >
+                              answered inside {row.stated.product}, per {row.stated.publisher}
+                            </span>
                           ) : (
                             <span className="hint">—</span>
                           )}
@@ -402,6 +416,30 @@ function MeasuredWith({
 // against what shipped, so a column of wire tokens is the tool showing its
 // storage rather than answering; a state the table does not know is still
 // shown as it arrived.
+// The closures listed on their own, and what each is called on the screen.
+const CLOSED_BY = ["unaffected", "disclaimed"] as const;
+type ClosedBy = (typeof CLOSED_BY)[number];
+const CLOSED_BY_LABEL: Record<ClosedBy, string> = {
+  unaffected: "Not affected, per CVE record",
+  disclaimed: "Not affected, per supplier",
+};
+const CLOSED_BY_HINT: Record<ClosedBy, string> = {
+  unaffected: "Closed because the issue's CVE record says this version is unaffected",
+  disclaimed: "Closed because a supplier says the product this sits in is not affected",
+};
+
+// A supplier's statement as the words a reader checks a closure against.
+function statedLine(stated: {
+  publisher: string;
+  product: string;
+  justification?: string;
+  statement?: string;
+}): string {
+  const why = stated.justification ? ` (${stated.justification.replaceAll("_", " ")})` : "";
+  const words = stated.statement ? `: ${stated.statement}` : "";
+  return `${stated.publisher} says ${stated.product} is not affected${why}${words}`;
+}
+
 // A CVE record's line as the words a reader checks a closure against: the
 // product the record names, and the versions it says are unaffected.
 function recordLine(line: {

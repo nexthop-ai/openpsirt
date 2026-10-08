@@ -415,6 +415,8 @@ type SittingBody struct {
 	// reading "build" as "does not ship" is wrong for every compiled language.
 	DeclaredAs string `json:"declared_as,omitempty" doc:"The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
 	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
+	AnsweredBy string `json:"answered_by,omitempty" doc:"The supplier whose statement answers this place on the routes that run through their product. The place stays open for the routes outside it"`
+	AnsweredIn string `json:"answered_in,omitempty" doc:"The supplier's product those routes run through"`
 	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
 	// DeferredDays is what a deferral asked for here is added to before it is
@@ -698,7 +700,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// database they consulted rather than a property of the issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
 			issue, append([]string{body.Vulnerability}, body.Aliases...),
-			body.Component, evidence.Purl)
+			body.Component, evidence.Purl, target.ID, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what publishers say could not be read", err)
 		}
@@ -799,6 +801,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		sitting := SittingBody{
 			Place: place.PlaceIdentity, Component: place.Component,
 			Consumer: place.Consumer, Suppressed: place.Suppressed,
+			AnsweredBy: place.AnsweredBy, AnsweredIn: place.AnsweredIn,
 			DeclaredAs: place.DeclaredAs,
 		}
 		if place.Decision != nil {

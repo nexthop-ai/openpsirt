@@ -400,7 +400,7 @@ func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarg
 		}
 		_, err = vex.NewStoreCarrying(r.DB.DB, 1).For(t.Context(), who,
 			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
-			"mine", "master", "broadcom", false)
+			"mine", "master", "broadcom", false, vex.Ours)
 		if !errors.Is(err, vex.ErrTooLarge) {
 			t.Fatalf("a build past the ceiling answered %v, wanted a refusal naming itself", err)
 		}
@@ -592,7 +592,7 @@ func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
 		}
 		_, err = vex.NewStoreCarrying(r.DB.DB, 1).Changed(t.Context(), who,
 			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
-			"mine", "master", "broadcom")
+			"mine", "master", "broadcom", vex.Ours)
 		if !errors.Is(err, vex.ErrTooLarge) {
 			t.Fatalf("comparing a build past the ceiling answered %v", err)
 		}

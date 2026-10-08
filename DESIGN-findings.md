@@ -1001,6 +1001,7 @@ change" is counted by.
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: this build never shipped it, the entry named the wrong product, or it duplicates an issue already tracked |
 | Unaffected | The issue's CVE record states the upstream release this place holds is not affected (§ CVE record ranges) |
+| Disclaimed | A supplier states the product this place sits in, at the version the build ships, is not affected, and every route up the tree from the place runs through that product (`DESIGN-triage.md` § Evidence from publishers) |
 
 Superseded is told apart from Upgraded because they are opposite answers to "was
 this fixed", and conflating them put one issue in a release comparison as both
@@ -1013,6 +1014,14 @@ and the releases an issue was in leave out a build holding nothing else. It neve
 here — that is a triage decision of `not-applicable` with the justification
 that fits, agreed by a second person and exported as VEX. Letting the closure
 absorb that case would route dismissals around approval.
+
+Disclaimed is on neither axis. Nothing in the build changed, so it is no fix;
+the vulnerable code is in the release, so the release held the issue, and a
+trend counts the place open until it closes. It is the one closure that says the
+finding exists and does not apply here, and it routes no dismissal around
+approval: the judgment is the supplier's, about its own product, applied the way
+a build's own patch is (REQ-31). Somebody who disagrees marks the place
+affected, and the statement does not close it there.
 
 Unexplained is always reported and never suppressed. There is no volume at which
 "we cannot account for this" stops mattering. Several in one scan additionally

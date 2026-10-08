@@ -858,18 +858,19 @@ which file they wrote it in.
 | Rule | Reason |
 |---|---|
 | A CSAF product identifier is resolved through the tree that defines it | It is somebody else's key, not a name. The tree may arrive after the claims referring to it, so identifiers are collected as they are read and resolved once the document closes. An identifier the tree never defines is dropped, and a claim left pointing at nothing is refused |
-| A composite identifier is resolved through the relationship that made it, down to the package | A distribution names a product as a package inside a platform, and the claims point at the composite. The package is the half a component here can be. All five relationship categories the format defines read the same way: the reference names the thing and what it relates to names the context |
+| A composite identifier is resolved through the relationship that made it, down to the package, and the product it relates to is kept beside it | A distribution names a product as a package inside a platform, and the claims point at the composite. The package is the half a component here can be, and the product is what places a supplier's statement in a build. All five relationship categories the format defines read the same way: the reference names the thing and what it relates to names the context |
+| An OpenVEX product with subcomponents is kept beside each subcomponent | The subcomponents are what the statement is about and the product is what they ship inside, so a statement about zlib inside a product is not a statement about every zlib |
 | A CSAF *advisory* is refused here and read by the supplier-advisory path | Each is read under what the document around the claims means, and what a later upload of it replaces differs |
 | The reader is the one the build's own suppressions go through | One parser rather than one per distribution's format keeps the hostile-input surface to a size somebody can reason about |
 | Uploading again from the same publisher sets aside what they said before rather than deleting it | What an approval was granted on the strength of has to stay readable. The document's digest is kept with every statement, so a revision can be noticed |
 | The same document uploaded again writes nothing where it reads as what stands, and replaces what stands where it reads differently | The digest is of the bytes. A reader that derives a different name or target from the same bytes has changed what the statements say, and uploading again is how rows stored under the earlier reading are brought up to date |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is a statement about `frr` |
+| The product a component ships inside is stored as its package identifier, its name folded the same way, and the version it was stated at | The name is what a product is found by in a build, and the version is what a statement is applied at |
 
 What is done with the statements is not an ingest question. A supplier's
 statement about its own product closes the finding at the places that product
-occupies (REQ-31), and that half is not built: a statement is evidence and a
-prefill, and closes nothing. `DESIGN-triage.md` § Evidence from publishers holds
-what is built.
+occupies (REQ-31), and every other statement is evidence and a prefill.
+`DESIGN-triage.md` § Evidence from publishers holds both.
 
 ## Supplier advisories
 

@@ -10,6 +10,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
@@ -34,6 +35,13 @@ func upV070(ctx context.Context, sqldb *sql.DB) error {
 //     way.
 //   - A run records which CVE record snapshot it read. No run v0.6.0 holds
 //     read one.
+//   - A finding names the supplier's statement that answers it. No finding
+//     v0.6.0 holds is answered by one.
+//   - A statement keeps the product its component ships inside. A statement
+//     v0.6.0 holds kept none, and holds none until it is uploaded again.
+//   - A VEX document that went out records which kind it was, and revisions
+//     are numbered per kind. Every one v0.6.0 recorded was this deployment's
+//     own.
 func upgradeV070(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -42,8 +50,25 @@ func upgradeV070(ctx context.Context, tx bun.Tx) error {
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
 
 	if err := u.change(findingV070(t), change{table: "finding",
-		add: []added{{column: "unaffected_by"}}}); err != nil {
+		add: []added{{column: "unaffected_by"}, {column: "stated_by"}}}); err != nil {
 		return err
+	}
+	if err := u.change(vexStatementsV070(t), change{table: "vex_statement",
+		add: []added{{column: "within_purl"}, {column: "within"}, {column: "within_about"}}}); err != nil {
+		return err
+	}
+	if err := u.change(vexIssuanceV070(t), change{table: "vex_issuance",
+		add:         []added{{column: "kind", fill: "'ours'"}},
+		constraints: []string{"vex_issuance_once_per_kind"}}); err != nil {
+		return err
+	}
+	// A rebuilt SQLite table is made without it. Dropped after the new rule
+	// exists, because MySQL and MariaDB refuse to drop the index a foreign key
+	// is served by, and the build is served by either.
+	if u.engine != database.SQLite {
+		if err := u.dropUnique("vex_issuance", "vex_issuance_once"); err != nil {
+			return err
+		}
 	}
 	return u.change(scanRunV070(t), change{table: "scan_run",
 		add: []added{{column: "records_version"}}})

@@ -731,6 +731,7 @@ The dependency path shows the first six ways down, with a row beneath it.
 |---|---|
 | The rest unfold from a secondary button that names what it adds | "Show 24 more", then "Show fewer". A total says how many there are, and what somebody deciding whether to click wants is how many they have not seen |
 | The link into the tree sits apart from it, at the row's far end | Two inline controls side by side read as one run of text. The row wraps at a phone's width rather than squeezing them together |
+| A place a supplier's statement answers on some routes says so at the end of its way down, naming the supplier's product, with the supplier on hover | The place is open and is not work, and a reader asks why. The routes outside the product are what is left to judge |
 
 The notes thread and the claim's comments are two threads (REQ-29). The
 comments sit on the decision's card they are about, and the notes in a card of
@@ -1375,6 +1376,7 @@ says and § Issuance records what recording keeps.
 | Recording offers the document it recorded | It is the one to send, because it carries the version it is recorded under |
 | The control is offered to whoever reaches the screen | Recording asks for a triage role on the product. The refusal is the server's sentence rather than a control hidden on a guess about roles |
 | Whether it changed since it went out is said the way the advisory says it | One component draws both, so the two documents cannot come to say it differently |
+| The two documents are two tabs, ours first, and the one shown is in the address | Each has its own revisions, so what is listed and what is recorded follow the tab. Linked, the address opens the document somebody meant |
 
 #### The panel on a flaw
 

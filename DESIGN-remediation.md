@@ -679,6 +679,13 @@ claims (REQ-39), from `wont-fix` claims that say what a holder can do
 instead, and from the patches the build declares, for one product, stream and
 variant.
 
+Two documents describe a build, chosen when one is generated.
+
+| Kind | Carries |
+|---|---|
+| Ours | What this deployment agreed to, and the patches the build declares. The default |
+| With suppliers | Ours, and beside it what a supplier states about its own product, in the supplier's name, where the statement closed every place of a component in the build |
+
 A customer running their own scanner against a shipped image asks "which of these
 are you not affected by" more often than they ask for an advisory. Generating it
 puts this deployment's dismissals in writing, machine-readable, in front of every
@@ -687,7 +694,7 @@ customer — which is the reason the two-person approval on those claims exists.
 | Rule | Reason |
 |---|---|
 | OpenVEX rather than the CSAF profile | It is the format this deployment already reads. One document shape to get right, and one deployment's output can be another's input |
-| Approved claims only, besides the build's own patches | A proposal is one person's opinion and this document is the deployment's word to a customer |
+| Approved claims only, besides the build's own patches and, in the document carrying them, suppliers' statements | A proposal is one person's opinion and this document is the deployment's word to a customer |
 | A patch the build declares is said as `fixed` | The build's word on its own patches is applied without a decision here (REQ-11). The finding it covers is closed as patched, and a customer's scanner still matches the upstream version, so without the statement the scanner reports it as affected |
 | A patch is said only while it stands | The component still ships in the build, no place of a component of that name and package identifier is open against the issue, and the build still declares the patch. A build that drops the patch has the statement drop with it, before any scan reopens the finding |
 | The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
@@ -700,6 +707,11 @@ customer — which is the reason the two-person approval on those claims exists.
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
 | Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
 | Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
+| Each kind is a document of its own, with its own identifier and its own revisions | A toggle on one document would have a reader watch statements vanish and return as whoever generated it chose, which reads as a retraction nobody made |
+| Ours is the default | Putting a supplier's word under this deployment's name is a choice somebody makes on purpose, and configuring a supplier is not that choice |
+| A supplier's statement is said only while it stands, under the guard a patch stands under | The component still ships, no place of a component of that name and package identifier is open against the issue, and the statement that closed it has not been set aside |
+| A supplier's statement is said as `not_affected`, with the supplier's justification, and an impact statement naming the publisher, the document and the product | A customer sees whose judgment it is, and this deployment passes on the supplier's word rather than asserting it as its own analysis |
+| A statement this deployment makes about the same issue and component stands in the supplier's place | An agreed claim or a declared patch is this deployment's own word |
 | A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
 
 A statement is made only where every open place agrees, and agrees the same
@@ -731,6 +743,7 @@ decision's identifier, and its words are read by that identifier.
 
 | Rule | |
 |---|---|
+| The document carrying suppliers' statements is named for the build and its kind | It is a second document, so it is called something else: ours keeps the name it has always had |
 | The identifier names the build and nothing that moves | A reader keeps documents by it and tells a revision of one document from a second document by whether it matches. Anything in it that moves between generations makes every fetch a document in its own right |
 | The build is named by the stored names | A name people type is matched without regard to capitals, so one build asked for two ways carries one name |
 | The version is one past what has gone out | A document nobody has published is the first revision, and the next one generated after an issuance is the second. It says so before it goes out, because the bytes an operator sends carry the number they will be known by |
@@ -744,8 +757,8 @@ decision's identifier, and its words are read by that identifier.
 An issuance records when a document went out, by whom, and a digest of what
 went out. An advisory's is keyed on the advisory, which is what makes a
 revision of a document covering two issues one record rather than two; a VEX
-document's is keyed on the build it describes, which is what its identifier
-names.
+document's is keyed on the build it describes and the kind of document, which
+is what its identifier names, so each kind numbers its own revisions.
 Without it a second document for the same advisory could carry no revision history
 and could not increment its version, both of which CSAF validators check.
 

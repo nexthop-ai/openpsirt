@@ -100,6 +100,13 @@ type Target struct {
 	// it as the branch the product sits in, and without it a claim about one
 	// version of an appliance reads as a claim about every version of it.
 	Version string
+	// Within is the product the target ships inside, where the document named
+	// one: the product of an OpenVEX statement whose subcomponents are the
+	// targets, and the platform a CSAF relationship composes the target into.
+	// A supplier speaking about its own product speaks about what sits inside
+	// it, so this is what places a statement in a build. Nil where the
+	// document named the target alone.
+	Within *Target
 }
 
 // VersionNamed is the version a claim's target was made about.

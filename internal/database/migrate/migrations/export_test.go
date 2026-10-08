@@ -74,7 +74,9 @@ var Unscoped = unscopedV050
 func StatementsV070(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
-		"finding":  findingV070(t),
-		"scan_run": scanRunV070(t),
+		"finding":       findingV070(t),
+		"scan_run":      scanRunV070(t),
+		"vex_statement": vexStatementsV070(t),
+		"vex_issuance":  vexIssuanceV070(t),
 	}
 }

@@ -531,14 +531,24 @@ whichever of the two leads with the owner; SQLite rebuilds both tables.
 
 ### The untagged upgrade
 
-Migration 41. A finding gains the CVE record lines that closed it as
-unaffected, and a run the CVE record snapshot it read: two columns that hold a
-null and that every engine adds where the table stands. The release's
-declarations of the two tables are v0.3.0's and v0.2.0's with the column added.
+Migration 41. Each change is a column added to a table the release declares
+anew, the declaration being the tagged one with the column beside it.
+
+| Table | Gains | Every engine |
+|---|---|---|
+| `finding` | The CVE record lines that closed it as unaffected, and the supplier's statement answering it | Two columns holding a null, added where the table stands |
+| `scan_run` | The CVE record snapshot it read | A column holding a null, added where the table stands |
+| `vex_statement` | The product the statement's component ships inside: its package identifier, its name and its version | Three columns holding a null, added where the table stands. A statement uploaded before the upgrade names none until it is uploaded again |
+| `vex_issuance` | Which kind of document went out, every existing row taking this deployment's own, and its revisions numbered per build and kind | A column filled as it is added. The rule numbering revisions per build is replaced by one numbering them per build and kind, added before the old one is dropped, because MySQL and MariaDB refuse to drop the index a foreign key is served by. SQLite rebuilds the table |
+
+| Rule | |
+|---|---|
+| The supplier's statement on a finding is a reference without a foreign key | A statement is superseded and never deleted, so the reference cannot dangle, and a column holding a null is added where the finding table stands on SQLite rather than rebuilding it |
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.6.0 database | Upgraded, no finding holds record lines and no run a snapshot, and each declaration describes the table the migrations built |
+| A v0.6.0 database | Upgraded, no finding holds record lines or a statement, no run a snapshot, no statement a product, and each declaration describes the table the migrations built |
+| A VEX document a v0.6.0 deployment recorded as gone out | Upgraded, it is this deployment's own document. The other kind's first revision is accepted beside it, and a second first revision of the same kind is refused |
 
 ### Release records
 

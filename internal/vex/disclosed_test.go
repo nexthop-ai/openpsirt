@@ -37,7 +37,7 @@ func TestEveryReadOfABuildsDocumentAsksForDisclosedReading(t *testing.T) {
 		// One document out, so every read below has something to answer with
 		// when it is not refused.
 		if _, err := store.Issued(ctx, as(access.PublicTriage), named,
-			"sonic", "master", "broadcom"); err != nil {
+			"sonic", "master", "broadcom", vex.Ours); err != nil {
 			t.Fatal(err)
 		}
 
@@ -46,23 +46,23 @@ func TestEveryReadOfABuildsDocumentAsksForDisclosedReading(t *testing.T) {
 			ask  func(access.Subject) error
 		}{
 			{"the document", func(s access.Subject) error {
-				_, err := store.For(ctx, s, named, "sonic", "master", "broadcom", false)
+				_, err := store.For(ctx, s, named, "sonic", "master", "broadcom", false, vex.Ours)
 				return err
 			}},
 			{"the document with undisclosed work", func(s access.Subject) error {
-				_, err := store.For(ctx, s, named, "sonic", "master", "broadcom", true)
+				_, err := store.For(ctx, s, named, "sonic", "master", "broadcom", true, vex.Ours)
 				return err
 			}},
 			{"what went out", func(s access.Subject) error {
-				_, err := store.Issuances(ctx, s, "sonic", "master", "broadcom")
+				_, err := store.Issuances(ctx, s, "sonic", "master", "broadcom", vex.Ours)
 				return err
 			}},
 			{"whether it changed", func(s access.Subject) error {
-				_, err := store.Changed(ctx, s, named, "sonic", "master", "broadcom")
+				_, err := store.Changed(ctx, s, named, "sonic", "master", "broadcom", vex.Ours)
 				return err
 			}},
 			{"what was sent", func(s access.Subject) error {
-				_, err := store.Sent(ctx, s, "sonic", "master", "broadcom", 1)
+				_, err := store.Sent(ctx, s, "sonic", "master", "broadcom", vex.Ours, 1)
 				return err
 			}},
 		}

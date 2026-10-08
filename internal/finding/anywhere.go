@@ -264,7 +264,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// number and a version 4 number sit in the same column.
 		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		ColumnExpr(`MAX(COALESCE(v.score_version, '')) AS "score_version"`).
-		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
+		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 		// One undisclosed place makes the group undisclosed, counted rather

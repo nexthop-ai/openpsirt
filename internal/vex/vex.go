@@ -140,6 +140,29 @@ type Inside struct {
 	ID string `json:"@id"`
 }
 
+// Kind is which document about a build is meant: what this deployment agreed
+// to, or that with what suppliers state about their own products beside it.
+//
+// Each is a document of its own, with an identifier and revisions of its own.
+// A toggle on one document would have a reader holding it watch statements
+// vanish and return as whoever generated it chose, which reads as a retraction
+// nobody made.
+type Kind string
+
+const (
+	// Ours is what this deployment agreed to and the patches the build
+	// declares. The default, because putting a supplier's word under this
+	// deployment's name is a choice somebody makes on purpose.
+	Ours Kind = "ours"
+	// WithSuppliers is that, and beside it what a supplier states about its
+	// own product where the statement closed every place of a component in
+	// the build, attributed to the supplier.
+	WithSuppliers Kind = "with-suppliers"
+)
+
+// Kinds are the documents about a build, in the order they are offered.
+func Kinds() []Kind { return []Kind{Ours, WithSuppliers} }
+
 // Store writes VEX documents.
 type Store struct {
 	db  *bun.DB
@@ -197,7 +220,7 @@ func (s *Store) carrying() int {
 // and silence already reads as affected in this format, which is the honest
 // answer for something we have only postponed.
 func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string, undisclosed bool) (*Statements, error) {
+	product, stream, variant string, undisclosed bool, kind Kind) (*Statements, error) {
 
 	if !who.Stated() {
 		return nil, ErrNoPublisher
@@ -213,7 +236,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 		}
 		visible = append(visible, access.Private)
 	}
-	return s.document(ctx, who, named, target, visible)
+	return s.document(ctx, who, named, target, visible, kind)
 }
 
 // ErrNoPublisher says the deployment has not been told who it publishes as.
@@ -271,7 +294,11 @@ const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON gn.target_id = f.target_id
 // document assembles what stands about one build, at the visibilities asked
 // for.
 func (s *Store) document(ctx context.Context, who publisher.Named, named *catalog.Named,
-	target *catalog.Target, visible []access.Visibility) (*Statements, error) {
+	target *catalog.Target, visible []access.Visibility, kind Kind) (*Statements, error) {
+
+	if kind != Ours && kind != WithSuppliers {
+		return nil, refusal.Errorf("%q is not a kind of document this writes", kind)
+	}
 
 	var rows []struct {
 		VulnerabilityID int64  `bun:"vulnerability_id"`
@@ -326,6 +353,12 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
+	var stated []statedBySupplier
+	if kind == WithSuppliers {
+		if stated, err = s.disclaimed(ctx, target.ID, visible); err != nil {
+			return nil, err
+		}
+	}
 	// Refused rather than truncated. There is no second request for the rest
 	// of a document, and one that stopped at a ceiling would say "nothing is
 	// claimed about this" by omission about everything past it — to every
@@ -337,7 +370,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// not be generated" with a 500, and the sentence saying which build and
 	// what the limit is went to the log instead of to the person who can act
 	// on it.
-	if len(rows)+len(fixed) > s.carrying() {
+	if len(rows)+len(fixed)+len(stated) > s.carrying() {
 		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
@@ -364,12 +397,12 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// Which revision this is, read from what has gone out for this build.
 	// A document generated twice with nothing published in between is the
 	// same revision, which is what its identifier staying still says.
-	revision, err := s.revision(ctx, target.ID)
+	revision, err := s.revision(ctx, target.ID, kind)
 	if err != nil {
 		return nil, err
 	}
 	doc := &Statements{
-		Context: namespace, ID: identify(who, named), Author: who.Name,
+		Context: namespace, ID: identify(who, named, kind), Author: who.Name,
 		Tooling:   "OpenPSIRT " + version.Get().Version,
 		Timestamp: s.now().UTC(), Version: revision,
 		Statements: make([]Statement, 0, len(rows)),
@@ -386,6 +419,9 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		issues = append(issues, row.VulnerabilityID)
 	}
 	for _, row := range fixed {
+		issues = append(issues, row.VulnerabilityID)
+	}
+	for _, row := range stated {
 		issues = append(issues, row.VulnerabilityID)
 	}
 	alsoCalled, err := s.namesOf(ctx, issues)
@@ -438,6 +474,33 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 				ID: shipped, Subcomponents: []Inside{{ID: about}},
 			}},
 			Status: "fixed",
+		})
+	}
+
+	// What suppliers state, where this deployment says nothing about the same
+	// issue in the same component: an agreed claim or a declared patch is this
+	// deployment's own word, and stands in front of somebody else's.
+	ours := map[[2]string]bool{}
+	for _, one := range doc.Statements {
+		ours[[2]string{one.Vulnerability.Name, one.Products[0].Subcomponents[0].ID}] = true
+	}
+	for _, row := range stated {
+		about := row.Purl
+		if about == "" {
+			about = row.Component
+		}
+		if ours[[2]string{row.Identifier, about}] {
+			continue
+		}
+		doc.Statements = append(doc.Statements, Statement{
+			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
+			Timestamp:     row.ClosedAt.UTC(),
+			Products: []Shipped{{
+				ID: shipped, Subcomponents: []Inside{{ID: about}},
+			}},
+			Status:          "not_affected",
+			Justification:   row.Justification,
+			ImpactStatement: row.attributed(),
 		})
 	}
 
@@ -558,6 +621,141 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 	return fixed, nil
 }
 
+// statedBySupplier is an issue a supplier's statement about its own product
+// closed at every place of one component in the build.
+type statedBySupplier struct {
+	VulnerabilityID int64
+	Identifier      string
+	Component       string
+	Purl            string
+	Publisher       string
+	Product         string
+	Version         string
+	Justification   string
+	Statement       string
+	Document        string
+	ClosedAt        time.Time
+}
+
+// attributed is what the supplier said, in their name: whose statement it is,
+// which product of theirs it is about, the document it is in, and their words.
+func (s statedBySupplier) attributed() string {
+	product := s.Product
+	if s.Version != "" {
+		product += " " + s.Version
+	}
+	said := fmt.Sprintf("Per %s, in %s: %s is not affected.", s.Publisher, s.Document, product)
+	if s.Statement != "" {
+		said += " " + s.Statement
+	}
+	return said
+}
+
+// disclaimed reads what suppliers' statements about their own products close
+// in this build, which the document carrying them says as not affected.
+//
+// Under the guard the build's own patches stand under, and for the same
+// reason: the format says "this product, this component, not affected", so a
+// statement is made only while all of these hold:
+//
+//   - the component still ships in this build
+//   - no place of a component of that name and package identifier is open
+//     against the issue
+//   - the statement that closed it still stands
+func (s *Store) disclaimed(ctx context.Context, targetID int64,
+	visible []access.Visibility) ([]statedBySupplier, error) {
+
+	var rows []struct {
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Identifier      string `bun:"identifier"`
+		Component       string `bun:"component"`
+		Purl            string `bun:"purl"`
+		First           int64  `bun:"first"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(nodeJoin).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
+		ColumnExpr(`v.id AS "vulnerability_id"`).
+		ColumnExpr(`v.identifier AS "identifier"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
+		// The row the statement and the date are read from: the lowest, so
+		// every engine names the same one.
+		ColumnExpr(`MIN(f.id) AS "first"`).
+		Where("f.target_id = ?", targetID).
+		Where("f.closed_because = ?", finding.Disclaimed).
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where("ss.superseded_at IS NULL").
+		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "n"
+			WHERE n.target_id = f.target_id AND n.component_id = f.component_id
+				AND n.closed_scan_id IS NULL)`).
+		Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
+			JOIN "component" AS "oc" ON oc.id = o.component_id
+			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
+				AND o.closed_at IS NULL AND oc.name = c.name
+				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
+		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
+		Limit(s.carrying()+1).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read what suppliers' statements close: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.First)
+	}
+	var read []struct {
+		ID            int64     `bun:"id"`
+		ClosedAt      time.Time `bun:"closed_at"`
+		Publisher     string    `bun:"publisher"`
+		Product       string    `bun:"product"`
+		Version       string    `bun:"version"`
+		Justification string    `bun:"justification"`
+		Statement     string    `bun:"statement"`
+		Document      string    `bun:"document"`
+	}
+	where, args := database.InAnyOf("f.id", ids)
+	if err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
+		ColumnExpr(`f.id AS "id"`).
+		ColumnExpr(`f.closed_at AS "closed_at"`).
+		ColumnExpr(`ss.publisher AS "publisher"`).
+		ColumnExpr(`COALESCE(ss.within, ss.component) AS "product"`).
+		ColumnExpr(`COALESCE(ss.within_about, ss.about) AS "version"`).
+		ColumnExpr(`COALESCE(ss.justification, '') AS "justification"`).
+		ColumnExpr(`COALESCE(ss.statement, '') AS "statement"`).
+		ColumnExpr(`ss.document AS "document"`).
+		Where(where, args...).
+		Scan(ctx, &read); err != nil {
+		return nil, fmt.Errorf("read the statements that closed them: %w", err)
+	}
+	byID := make(map[int64]int, len(read))
+	for i, row := range read {
+		byID[row.ID] = i
+	}
+
+	stated := make([]statedBySupplier, 0, len(rows))
+	for _, row := range rows {
+		one := read[byID[row.First]]
+		stated = append(stated, statedBySupplier{
+			VulnerabilityID: row.VulnerabilityID, Identifier: row.Identifier,
+			Component: row.Component, Purl: row.Purl,
+			Publisher: one.Publisher, Product: one.Product, Version: one.Version,
+			Justification: one.Justification, Statement: one.Statement,
+			Document: one.Document, ClosedAt: one.ClosedAt,
+		})
+	}
+	return stated, nil
+}
+
 // statusOf turns an outcome into what the format calls it.
 //
 // Only the four a VEX document per build names arrive here. A deferral never
@@ -598,7 +796,13 @@ func statusOf(outcome string) string {
 // The names are the stored ones rather than the ones the request spelled. A
 // name people type is matched without regard to capitals, so the same build
 // asked for two ways is one document and has to be called one thing.
-func identify(who publisher.Named, named *catalog.Named) string {
+//
+// The document carrying suppliers' statements is a second document, so it is
+// called something else.
+func identify(who publisher.Named, named *catalog.Named, kind Kind) string {
+	if kind == WithSuppliers {
+		return fmt.Sprintf("%s/vex/%s/%s", who.Namespace, build(named), WithSuppliers)
+	}
 	return fmt.Sprintf("%s/vex/%s", who.Namespace, build(named))
 }
 

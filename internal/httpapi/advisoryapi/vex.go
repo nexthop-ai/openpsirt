@@ -32,6 +32,11 @@ func registerVEX(api huma.API, in core.Deps) {
 			"anything — silence already reads as affected in this format.\n\n" +
 			"Public findings only. `undisclosed=true` includes the rest for somebody who " +
 			"may read them, which is a preview rather than a thing to publish.\n\n" +
+			"`kind=with-suppliers` is a second document with an identifier of its own. It adds, " +
+			"as `not_affected`, what a supplier states about its own product where the " +
+			"statement closed every place of a component in the build, in the supplier's " +
+			"name. A statement this deployment makes about the same issue and component " +
+			"stands in its place.\n\n" +
 			"Requires a publisher configured for this deployment: a document naming none has " +
 			"nobody as its author.",
 		Tags: []string{"Findings"},
@@ -39,10 +44,11 @@ func registerVEX(api huma.API, in core.Deps) {
 		"the document is about the whole build rather than about one issue.",
 		core.PublicRights()...),
 		func(ctx context.Context, input *struct {
-			Product     string `path:"product"`
-			Stream      string `path:"stream"`
-			Variant     string `path:"variant"`
-			Undisclosed bool   `query:"undisclosed" doc:"Include findings nobody has announced. A preview, not a document to publish"`
+			Product     string       `path:"product"`
+			Stream      string       `path:"stream"`
+			Variant     string       `path:"variant"`
+			Undisclosed bool         `query:"undisclosed" doc:"Include findings nobody has announced. A preview, not a document to publish"`
+			Kind        documentKind `query:"kind" doc:"Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours"`
 		}) (*struct{ Body *vex.Statements }, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -52,7 +58,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				return nil, core.NoDatabase(in.Logger)
 			}
 			doc, err := vex.NewStore(in.DB.DB).For(ctx, subject, in.Publisher,
-				input.Product, input.Stream, input.Variant, input.Undisclosed)
+				input.Product, input.Stream, input.Variant, input.Undisclosed, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "the document could not be generated")
 			}
@@ -79,9 +85,10 @@ func registerVEX(api huma.API, in core.Deps) {
 		"a row saying a document about this build went out is as much a disclosure as the "+
 		"document.", core.PublicRights()...),
 		func(ctx context.Context, input *struct {
-			Product string `path:"product"`
-			Stream  string `path:"stream"`
-			Variant string `path:"variant"`
+			Product string       `path:"product"`
+			Stream  string       `path:"stream"`
+			Variant string       `path:"variant"`
+			Kind    documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
 		}) (*vexIssuances, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -92,12 +99,12 @@ func registerVEX(api huma.API, in core.Deps) {
 			}
 			store := vex.NewStore(in.DB.DB)
 			gone, err := store.Issuances(ctx, subject,
-				input.Product, input.Stream, input.Variant)
+				input.Product, input.Stream, input.Variant, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "what has gone out could not be read")
 			}
 			changed, err := store.Changed(ctx, subject, in.Publisher,
-				input.Product, input.Stream, input.Variant)
+				input.Product, input.Stream, input.Variant, input.Kind.kind())
 			switch {
 			case errors.Is(err, vex.ErrTooLarge):
 				// What went out is still what went out. A build that grew past
@@ -142,9 +149,10 @@ func registerVEX(api huma.API, in core.Deps) {
 		"eyes on each statement it carries was taken when the claim was approved.",
 		access.PublicTriage),
 		func(ctx context.Context, input *struct {
-			Product string `path:"product"`
-			Stream  string `path:"stream"`
-			Variant string `path:"variant"`
+			Product string       `path:"product"`
+			Stream  string       `path:"stream"`
+			Variant string       `path:"variant"`
+			Kind    documentKind `query:"kind" doc:"Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours"`
 		}) (*struct {
 			Status int
 			Body   VEXRecordedBody
@@ -157,7 +165,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				return nil, core.NoDatabase(in.Logger)
 			}
 			recorded, err := vex.NewStore(in.DB.DB).Issued(ctx, subject, in.Publisher,
-				input.Product, input.Stream, input.Variant)
+				input.Product, input.Stream, input.Variant, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "that could not be recorded")
 			}
@@ -187,10 +195,11 @@ func registerVEX(api huma.API, in core.Deps) {
 		"the document is about the whole build rather than about one issue.",
 		core.PublicRights()...),
 		func(ctx context.Context, input *struct {
-			Product string `path:"product"`
-			Stream  string `path:"stream"`
-			Variant string `path:"variant"`
-			Version int    `path:"version" minimum:"1" doc:"Which revision, counting from one"`
+			Product string       `path:"product"`
+			Stream  string       `path:"stream"`
+			Variant string       `path:"variant"`
+			Version int          `path:"version" minimum:"1" doc:"Which revision, counting from one"`
+			Kind    documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
 		}) (*struct{ Body json.RawMessage }, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -200,7 +209,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				return nil, core.NoDatabase(in.Logger)
 			}
 			sent, err := vex.NewStore(in.DB.DB).Sent(ctx, subject,
-				input.Product, input.Stream, input.Variant, input.Version)
+				input.Product, input.Stream, input.Variant, input.Kind.kind(), input.Version)
 			if errors.Is(err, vex.ErrNoSuchRevision) {
 				return nil, huma.Error404NotFound("no document went out as that revision")
 			}
@@ -211,6 +220,28 @@ func registerVEX(api huma.API, in core.Deps) {
 			// customer was sent.
 			return &struct{ Body json.RawMessage }{Body: json.RawMessage(sent)}, nil
 		})
+}
+
+// documentKind is the query-side vocabulary of which document about a build is
+// meant, taken from the store rather than written out again.
+type documentKind string
+
+// Schema answers with the kinds the store writes, in its order.
+func (documentKind) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(vex.Kinds()))
+	for _, each := range vex.Kinds() {
+		offered = append(offered, string(each))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
+// kind is the document asked for, which is this deployment's own where the
+// request names none.
+func (k documentKind) kind() vex.Kind {
+	if k == "" {
+		return vex.Ours
+	}
+	return vex.Kind(k)
 }
 
 // vexIssuances is what has gone out for a build, and whether what would be

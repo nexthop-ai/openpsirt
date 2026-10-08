@@ -343,7 +343,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("st.product_id = ?", productID).
 		Where("f.closed_at IS NULL").
-		Where("f.suppressed_by IS NULL").
+		Where(NotArguedAway).
 		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE `+DecisionAt("st.product_id")+`

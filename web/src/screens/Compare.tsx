@@ -259,6 +259,7 @@ const WENT: Record<string, string> = {
   superseded: "Superseded",
   unexplained: "Unexplained",
   unaffected: "Not affected",
+  disclaimed: "Not affected, per supplier",
 };
 
 function Columns({

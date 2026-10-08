@@ -209,15 +209,7 @@ func statementsOf(said []sbom.Suppression) []finding.Statement {
 	statements := make([]finding.Statement, 0, len(said))
 	for _, one := range said {
 		for _, at := range one.Targets {
-			statements = append(statements, finding.Statement{
-				Vulnerability: one.Vulnerability,
-				Purl:          at.Purl,
-				About:         at.VersionNamed(),
-				Component:     at.ComponentNamed(),
-				Status:        string(one.Status),
-				Justification: one.Justification,
-				Statement:     one.Statement,
-			})
+			statements = append(statements, finding.StatementOf(one, at))
 		}
 	}
 	return statements

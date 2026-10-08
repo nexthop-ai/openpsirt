@@ -872,6 +872,14 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 // Apart from narrow, so that the rest of it reads as independent narrowings.
 // The statements are resolved into the (component, issue) pairs they name,
 // once, and the list is joined to that.
+//
+// A statement naming the product a component ships inside, where this product
+// ships that product, is about the component where it sits inside it, which a
+// pair cannot say. It reaches the list through the finding the run answered
+// with it, and through nothing else (REQ-31). A product this product does not
+// ship, such as the platform a distribution composes its packages into, places
+// nothing, and its statement is matched by package. Asked once per statement
+// rather than per finding.
 func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	publishers, saidIt := trimmed(f.Publishers), trimmed(f.VexStatus)
 	if len(publishers) > 0 || len(saidIt) > 0 {
@@ -892,6 +900,13 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 			about = append(about, bun.List(saidIt))
 		}
 		narrowing := strings.Join(asked, " AND ")
+		alone := narrowing + ` AND (ss.within IS NULL OR NOT EXISTS (SELECT 1
+			FROM "component" AS "pc"
+			JOIN "graph_node" AS "pn" ON pn.component_id = pc.id
+			JOIN "target" AS "pt" ON pt.id = pn.target_id
+			JOIN "stream" AS "ps" ON ps.id = pt.stream_id
+			WHERE ps.product_id = ss.product_id AND pn.closed_scan_id IS NULL
+			  AND pc.name_folded = ss.within))`
 
 		// The issue under its own name, and under every other name it
 		// goes by: which identifier a publisher chose says nothing
@@ -911,25 +926,31 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 			FROM "vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON vc.name_folded = ss.component
 			JOIN "vulnerability" AS "vv" ON vv.identifier_folded = ss.vulnerability
-			WHERE ` + narrowing + `
+			WHERE ` + alone + `
 			UNION
 			SELECT ss.product_id, vc.id, vl.vulnerability_id
 			FROM "vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON vc.name_folded = ss.component
 			JOIN "vulnerability_alias" AS "vl" ON vl.identifier_folded = ss.vulnerability
-			WHERE ` + narrowing + `)`
+			WHERE ` + alone + `)`
 
 		where, args := f.product()
 		joined := make([]any, 0, 2*len(about)+len(args))
 		joined = append(joined, about...)
 		joined = append(joined, about...)
 		joined = append(joined, args...)
-		q = q.Join("JOIN "+pairs+` AS "vx" ON vx.component_id = f.component_id`+
+		q = q.Join("LEFT JOIN "+pairs+` AS "vx" ON vx.component_id = f.component_id`+
 			" AND vx.vulnerability_id = f.vulnerability_id"+
 			// Correlated on the row's own product where the list spans them,
 			// so a statement in one product cannot answer for a finding in
 			// another.
-			" AND vx.product_id = "+where, joined...)
+			" AND vx.product_id = "+where, joined...).
+			// The union is distinct on the pair, so the join adds at most one
+			// row to a finding. A statement the run answered a finding with
+			// is in the finding's own product, because the run reads that
+			// product's statements and no other's.
+			Where(`(vx.component_id IS NOT NULL OR f.stated_by IN
+				(SELECT ss.id FROM "vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
 	}
 	return q
 }

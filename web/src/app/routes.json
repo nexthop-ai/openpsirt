@@ -122,7 +122,10 @@
   "matchCoverage": {
     "path": "/products/:product/streams/:stream/variants/:variant/match-coverage"
   },
-  "vex": { "path": "/products/:product/streams/:stream/variants/:variant/vex" },
+  "vex": {
+    "path": "/products/:product/streams/:stream/variants/:variant/vex",
+    "query": ["kind"]
+  },
   "comparison": {
     "path": "/products/:product/comparison",
     "query": ["from", "from_variant", "to", "to_variant", "undisclosed"]

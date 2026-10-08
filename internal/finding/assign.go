@@ -647,7 +647,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		ColumnExpr(`f.assigned_to AS "person_id"`).
 		Where("f.due_at IS NOT NULL").
 		Where("f.due_at < ?", s.now().UTC()).
-		Where("f.suppressed_by IS NULL").
+		Where(NotArguedAway).
 		Where("NOT "+standing, args...).
 		GroupExpr("f.assigned_to, f.vulnerability_id, f.component_id, st.product_id")
 	err := s.db.NewSelect().

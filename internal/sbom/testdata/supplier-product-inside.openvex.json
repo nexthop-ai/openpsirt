@@ -1,0 +1,40 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://acme.example/vex/acme-y-4.2",
+  "author": "Acme Security",
+  "timestamp": "2026-10-01T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {"name": "CVE-2022-37434"},
+      "products": [
+        {
+          "@id": "pkg:generic/acme-y@4.2",
+          "subcomponents": [{"@id": "pkg:generic/zlib@1.2.11"}]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Acme Y never calls inflateGetHeader()."
+    },
+    {
+      "vulnerability": {"name": "CVE-2023-45853"},
+      "products": [{"@id": "pkg:generic/acme-y@4.2"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Acme Y does not build the minizip contrib code."
+    },
+    {
+      "vulnerability": {"name": "CVE-2018-25032"},
+      "products": [
+        {
+          "@id": "pkg:generic/acme-y",
+          "subcomponents": [{"@id": "pkg:generic/zlib@1.2.11"}]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_cannot_be_controlled_by_adversary",
+      "impact_statement": "Acme Y compresses only data it generated itself."
+    }
+  ]
+}

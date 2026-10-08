@@ -21,8 +21,9 @@ import (
 )
 
 func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
-	// A third layer beside the build's own claims and our
-	// decisions: shown, offered as a prefill, and never applied by itself.
+	// A third layer beside the build's own claims and our decisions. A
+	// statement naming no supplier's product is shown, offered as a prefill,
+	// and never applied by itself.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 

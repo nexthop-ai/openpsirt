@@ -55,8 +55,11 @@ type DisposedBody struct {
 	// reader can check the closure against the record without the snapshot
 	// the run read, which the next replaces.
 	Unaffected []core.RecordLineBody `json:"unaffected,omitempty" doc:"The CVE record lines stating this version is unaffected. Only on a row closed as unaffected"`
-	Due        string                `json:"due,omitempty"`
-	Met        *bool                 `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
+	// Stated is the supplier's own words for why this is answered, so a
+	// reader can check the closure against the statement.
+	Stated *StatedBody `json:"stated,omitempty" doc:"The supplier's statement answering this place: the one that closed a row closed as disclaimed, or one answering an open row on the routes through the supplier's product"`
+	Due    string      `json:"due,omitempty"`
+	Met    *bool       `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
 }
 
 // closure is the query-side vocabulary of why a finding closed, taken from the
@@ -285,7 +288,7 @@ func registerRegister(api huma.API, in core.Deps) {
 				"outcome", "justification", "proposed by", "proposed at",
 				"approved by", "approved at", "agreement carried",
 				"opened", "closed", "closed because", "closed note", "due", "met",
-				"unaffected by",
+				"unaffected by", "stated by",
 			},
 			// Streamed rather than paged, and neither counted. A file has no
 			// column for how many rows there are altogether, and every page
@@ -306,7 +309,7 @@ func registerRegister(api huma.API, in core.Deps) {
 							body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 							strconv.FormatBool(body.AgreementCarried),
 							body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
-							body.Due, met, saidLines(body.Unaffected),
+							body.Due, met, saidLines(body.Unaffected), statedBy(body.Stated),
 						})
 					})
 			},
@@ -321,6 +324,30 @@ func registerRegister(api huma.API, in core.Deps) {
 			core.WriteExport(writer, input.Format, name, out)
 		}}, nil
 	})
+}
+
+// StatedBody is a supplier's statement beside the place it answers.
+type StatedBody struct {
+	Publisher     string `json:"publisher" doc:"Who published the statement"`
+	Product       string `json:"product" doc:"The supplier's product the statement is about"`
+	Justification string `json:"justification,omitempty" doc:"The justification the supplier gave, in the exchange format's vocabulary"`
+	Statement     string `json:"statement,omitempty" doc:"What the supplier wrote alongside it"`
+	Document      string `json:"document" doc:"The file the statement arrived in"`
+}
+
+// statedBy writes a supplier's statement into one cell.
+func statedBy(said *StatedBody) string {
+	if said == nil {
+		return ""
+	}
+	cell := said.Publisher + ", " + said.Product
+	if said.Justification != "" {
+		cell += ": " + said.Justification
+	}
+	if said.Statement != "" {
+		cell += ". " + said.Statement
+	}
+	return cell
 }
 
 // saidLines writes a closure's record lines into one cell.
@@ -354,6 +381,13 @@ func disposedBody(row finding.Disposed) DisposedBody {
 		body.Closed = row.ClosedAt.Format(time.DateOnly)
 		body.ClosedBecause, body.ClosedNote = closure(row.ClosedBecause), row.ClosedNote
 		body.Unaffected = core.RecordLines(row.UnaffectedBy)
+	}
+	if row.Stated != nil {
+		body.Stated = &StatedBody{
+			Publisher: row.Stated.Publisher, Product: row.Stated.Product,
+			Justification: row.Stated.Justification, Statement: row.Stated.Statement,
+			Document: row.Stated.Document,
+		}
 	}
 	if row.DueAt != nil {
 		body.Due = row.DueAt.Format(time.DateOnly)

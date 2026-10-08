@@ -10,7 +10,8 @@ import (
 // findingV070 is v0.7.0's declaration of the finding table, and the indexes it
 // makes.
 //
-// v0.3.0's, with the CVE record lines that closed a finding as unaffected.
+// v0.3.0's, with the CVE record lines that closed a finding as unaffected, and
+// the supplier's statement that answers it.
 // Derived from v0.3.0's declaration, which a tagged release fixed and which
 // never changes again.
 func findingV070(t *columnTypes) []string {
@@ -21,6 +22,15 @@ func findingV070(t *columnTypes) []string {
 			-- the row because the snapshot the run read is replaced by the
 			-- next, and the closure has to stay explicable after it is.
 			"unaffected_by"    `+t.text+` NULL,`)
+	statements[0] = withColumn(statements[0], `"unaffected_by"    `+t.text+` NULL,`,
+		`-- The supplier's statement that answers this finding, where one
+			-- does: on a row closed as disclaimed, the statement that closed
+			-- it; on an open row, a statement answering it on some routes up
+			-- the tree and not on others. A plain reference without a foreign
+			-- key: a statement is superseded and never deleted, so the
+			-- reference cannot dangle, and a column taking a null and holding
+			-- one is added where the table stands on every engine.
+			"stated_by"        `+t.refNull+` NULL,`)
 	return statements
 }
 

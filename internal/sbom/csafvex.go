@@ -59,9 +59,11 @@ type named struct {
 }
 
 // joins is what a relationship says: the package the composite identifier
-// stands for, and whatever the relationship named the composite itself.
+// stands for, the platform it is composed into, and whatever the relationship
+// named the composite itself.
 type joins struct {
 	reference string
+	context   string
 	own       named
 }
 
@@ -448,6 +450,10 @@ func (r *csafReader) relationship() error {
 		case "product_reference":
 			value, err := r.b.str()
 			join.reference = value
+			return err
+		case "relates_to_product_reference":
+			value, err := r.b.str()
+			join.context = value
 			return err
 		case "full_product_name":
 			return r.b.object(func(field string) error {
@@ -934,7 +940,12 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 					claim.Justification = said
 				}
 			}
-			claim.Targets = append(claim.Targets, targetOf(at))
+			target := targetOf(at)
+			if context, held := r.composedInto(id); held {
+				within := targetOf(context)
+				target.Within = &within
+			}
+			claim.Targets = append(claim.Targets, target)
 		}
 		if len(order) == 0 {
 			return nil, refusal.Errorf("the claim about %s points at no product this document "+
@@ -982,6 +993,25 @@ func (r *csafReader) defines(id string) (named, bool) {
 		// permits one, and following a chain of them is a walk that can cycle
 		// for a name the relationship has already given.
 		return join.own, join.own.name != ""
+	}
+	return at, true
+}
+
+// composedInto is the platform a composite identifier composes its package
+// into, where the identifier is a composite and the tree defines the platform.
+//
+// A supplier speaking about its own product speaks about what sits inside it,
+// so the platform is what places a statement in a build. Only one step is
+// followed, for the reason defines gives: a chain of composites is a walk that
+// can cycle.
+func (r *csafReader) composedInto(id string) (named, bool) {
+	join, held := r.joined[id]
+	if !held || join.context == "" {
+		return named{}, false
+	}
+	at, held := r.tree[join.context]
+	if !held || (at.purl == "" && at.name == "") {
+		return named{}, false
 	}
 	return at, true
 }
