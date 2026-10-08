@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { initials } from "../ui/initials";
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useTopOnArrival } from "./arrival";
+import { TO_THE_TOP, useTopOnArrival } from "./arrival";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import {
   inboxAt,
@@ -498,13 +498,13 @@ function Rail({
       pathname === to.split("?")[0] &&
       [...new URLSearchParams(mark)].every(([key, value]) => asked.getAll(key).includes(value));
     return (
-      <Link to={to} className="nav" aria-current={here ? "page" : undefined}>
+      <Link to={to} state={TO_THE_TOP} className="nav" aria-current={here ? "page" : undefined}>
         {body}
       </Link>
     );
   }
   return (
-    <NavLink to={to} end={end} className="nav">
+    <NavLink to={to} state={TO_THE_TOP} end={end} className="nav">
       {body}
     </NavLink>
   );

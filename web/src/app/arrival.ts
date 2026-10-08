@@ -16,8 +16,13 @@ import { useLocation, useNavigationType } from "react-router-dom";
 // Only on a change of path. How a screen was reached is read through a ref, so
 // a filter ticked on a list somebody came Back to, which is a push on the same
 // path, leaves the page where it is.
+//
+// A link carrying TO_THE_TOP opens at the top on any path, the one somebody is
+// already on included. The rail's entries carry it: picking the screen you are
+// on from the rail is asking for its beginning, and the address alone does not
+// move when nothing in it changes.
 export function useTopOnArrival(): void {
-  const { pathname } = useLocation();
+  const { pathname, key, state } = useLocation();
   const navigation = useNavigationType();
   const how = useRef(navigation);
   useEffect(() => {
@@ -26,4 +31,11 @@ export function useTopOnArrival(): void {
   useEffect(() => {
     if (how.current !== "POP") window.scrollTo({ top: 0 });
   }, [pathname]);
+  const asked = (state as { top?: unknown } | null)?.top === true;
+  useEffect(() => {
+    if (asked && how.current !== "POP") window.scrollTo({ top: 0 });
+  }, [key, asked]);
 }
+
+// The navigation state a link passes to open its screen at the top.
+export const TO_THE_TOP = { top: true } as const;
