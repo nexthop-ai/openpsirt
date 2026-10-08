@@ -625,7 +625,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// places having shown six is a form nobody can trust.
 		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
 			componentID).
-		Where("f.closed_at IS NULL").
+		Where(Decidable).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		OrderExpr("f.urgency DESC, component, consumer").
 		Scan(ctx, &rows)

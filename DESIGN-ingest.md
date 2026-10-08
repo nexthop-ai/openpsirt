@@ -866,6 +866,8 @@ which file they wrote it in.
 | The same document uploaded again writes nothing where it reads as what stands, and replaces what stands where it reads differently | The digest is of the bytes. A reader that derives a different name or target from the same bytes has changed what the statements say, and uploading again is how rows stored under the earlier reading are brought up to date |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is a statement about `frr` |
 | The product a component ships inside is stored as its package identifier, its name folded the same way, and the version it was stated at | The name is what a product is found by in a build, and the version is what a statement is applied at |
+| What a statement names its supplier's product as is stored with it: a component inside a named product, a product named alone by no package identifier, or nothing | Only a statement read this way places anything, so one recorded before the product was read, and a package named alone, close nothing |
+| The same bytes read again, claiming what stands and placing it differently, are placed where they stand | Set aside and written again, every approved decision citing one would be told the publisher changed what they published |
 
 What is done with the statements is not an ingest question. A supplier's
 statement about its own product closes the finding at the places that product
@@ -875,9 +877,11 @@ occupies (REQ-31), and every other statement is evidence and a prefill.
 ## Supplier advisories
 
 A supplier's CSAF security advisory arrives by administrator upload, on a path
-of its own, and lands in the same evidence layer (REQ-31). It is a document
-about the publisher's own flaws, and the products it names are components this
-product ships.
+of its own, and lands where a VEX document lands (REQ-31): evidence and a
+prefill, and where it states the publisher's own product is not affected, a
+closure at the places that product occupies. It is a document about the
+publisher's own flaws, and the products it names are components this product
+ships.
 
 | Rule | Reason |
 |---|---|
@@ -947,7 +951,7 @@ document has been read.
 
 | Rule | Reason |
 |---|---|
-| Off unless a supplier is configured | Naming one is the switch. A second setting beside an empty list would be two ways to say the same thing, and a deployment that cannot reach out loses a publisher's judgment as evidence; what a scan reports is unaffected |
+| Off unless a supplier is configured | Naming one is the switch. A second setting beside an empty list would be two ways to say the same thing, and a deployment that cannot reach out loses a publisher's judgment, as evidence and as what it would close |
 | A supplier is configured against one product | That is what a claim is recorded against, so a supplier feeding two products is two rows, each read and withdrawn on its own |
 | Withdrawing a supplier removes nothing they said | Their claims are evidence an approval may have been granted on the strength of. What withdrawal stops is the reading |
 | A supplier is matched by name without regard to capitals, and a product out of use takes none | Two spellings of one name are one supplier, on every engine, because the stored value is lowered rather than an engine asked to fold. A product taken out of use accepts no scan, so what a supplier would be read against is a build list nothing adds to — and nothing lists the product, so nothing could withdraw the supplier either |
@@ -1021,10 +1025,11 @@ SUSE describes itself on `www.suse.com` and serves its directory from
 | https only, and no redirect followed | A redirect is somebody other than the description naming where to go |
 | A budget of its own rather than the interactive one | That one is sized for somebody watching a blank page: at ten seconds a document too large to arrive inside it could not be fetched at all, however many times it was tried |
 
-Nothing it reads decides anything. A pass on a timer makes that easier to
-violate by accident than an upload does, because nobody is watching each
-document arrive: what lands is evidence beside a finding and a prefill for a
-decision, and never a judgment of ours.
+What it reads lands where an upload lands. A supplier's statement that its own
+product is not affected closes the finding inside that product at the next
+scan (REQ-31), and everything else is evidence beside a finding and a prefill
+for a decision, never a judgment of ours. The configuration that admitted the
+publisher is the decision behind either.
 
 ## The offline scanner database
 

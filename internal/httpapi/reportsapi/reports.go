@@ -49,14 +49,14 @@ type ComparisonBody struct {
 
 // ChangedBody is one issue that differs between two builds.
 type ChangedBody struct {
-	Vulnerability string `json:"vulnerability"`
-	Component     string `json:"component"`
-	Severity      string `json:"severity,omitempty"`
-	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,patched,superseded,unexplained,unaffected" doc:"The reason it went. Only on fixed entries"`
-	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
-	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
-	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
-	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
+	Vulnerability string  `json:"vulnerability"`
+	Component     string  `json:"component"`
+	Severity      string  `json:"severity,omitempty"`
+	Because       closure `json:"because,omitempty" doc:"The reason it went. Only on an entry that left the affected list"`
+	ArrivedFrom   string  `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
+	FromVersion   string  `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
+	MovedTo       string  `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
+	ClosedRun     int64   `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
 	// State is the decision standing on it, on a still-present entry and
 	// nowhere else. It turns a list of what is still there into something
 	// somebody can sign a release off against: an approved
@@ -431,7 +431,7 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 			Vulnerability: row.Vulnerability, Component: row.Component, Severity: row.Severity,
 		}
 		if why {
-			body.Because = string(row.Because)
+			body.Because = closure(row.Because)
 			body.FromVersion, body.MovedTo = row.FromVersion, row.MovedTo
 			body.ClosedRun = row.ClosedRun
 		}

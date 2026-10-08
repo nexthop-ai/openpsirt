@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -335,7 +336,8 @@ func TestAFindingClosedByAStatementPointsAtItsRevision(t *testing.T) {
 		f.publishes(t, []finding.Statement{{
 			Vulnerability: inside, Purl: zlib.Purl, Component: "zlib", About: "1.2.11",
 			WithinPurl: acmeY.Purl, Within: "acme-y", WithinAbout: "4.2",
-			Status: "not_affected", Justification: "vulnerable_code_not_in_execute_path",
+			Placement: finding.PlacedInside,
+			Status:    "not_affected", Justification: "vulnerable_code_not_in_execute_path",
 			Statement: "Acme Y does not link inflateGetHeader at all.",
 		}}, "sha256:acme-3")
 		f.reported(t, found(inside, zlib))
@@ -635,6 +637,276 @@ func TestAStatementAboutAPlatformNothingHereShipsIsEvidenceByPackage(t *testing.
 		}
 		if len(groups) != 1 || groups[0].Places != 2 {
 			t.Errorf("the list finds %+v by the platform's publisher, want both zlib places", groups)
+		}
+	})
+}
+
+func TestAStatementRecordedBeforeItsProductWasReadClosesNothing(t *testing.T) {
+	// Every statement recorded before the product was read names no
+	// placement, a versioned package among them. Read as a product named
+	// alone, Debian's word about one package closes the issue on everything
+	// beneath it at the first scan after the upgrade.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.publishes(t, []finding.Statement{{
+			Vulnerability: productOnly, Purl: acmeY.Purl, Component: "acme-y", About: "4.2",
+			Status: "not_affected", Justification: "vulnerable_code_not_present",
+		}}, "sha256:legacy")
+		if applied, _ := f.reported(t, found(productOnly, zlib)); applied.Disclaimed != 0 {
+			t.Errorf("a statement with no placement disclaimed %d", applied.Disclaimed)
+		}
+	})
+}
+
+func TestAPackageNamedAloneClosesNothing(t *testing.T) {
+	// A distribution's package identifier is shared by its own build and by a
+	// rebuild of its source, so a statement naming one alone stays evidence.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{libnl, libpng},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: libnl},
+				{Parent: libnl, Child: libpng},
+			},
+		})
+		claim := sbom.Suppression{Vulnerability: inside, Status: sbom.NotAffected,
+			Justification: "vulnerable_code_not_present"}
+		said := finding.StatementOf(claim, sbom.Target{Purl: libnl.Purl})
+		if said.Placement != "" {
+			t.Fatalf("a package named alone is placed as %q", said.Placement)
+		}
+		f.publishes(t, []finding.Statement{said}, "sha256:package")
+		if applied, _ := f.reported(t, found(inside, libpng)); applied.Disclaimed != 0 {
+			t.Errorf("a package named alone disclaimed %d beneath it", applied.Disclaimed)
+		}
+	})
+}
+
+func TestTheSameDocumentReadAgainIsPlacedWhereItStands(t *testing.T) {
+	// Set aside and written again, every approved decision citing one of
+	// these statements would be told the publisher changed what they said.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		file, err := os.Open("../sbom/testdata/supplier-product-inside.openvex.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = file.Close() }()
+		claims, err := sbom.ReadSuppressions(file, sbom.Limits{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var placed, unplaced []finding.Statement
+		for _, claim := range claims {
+			for _, target := range claim.Targets {
+				one := finding.StatementOf(claim, target)
+				placed = append(placed, one)
+				one.WithinPurl, one.Within, one.WithinAbout, one.Placement = "", "", "", ""
+				unplaced = append(unplaced, one)
+			}
+		}
+		who := f.planner(t, access.PublicTriage)
+		from := finding.Supplied{Source: finding.FromVex, Publisher: "Acme Security",
+			Document: "acme-y.openvex.json", Digest: "sha256:same"}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, from, unplaced); err != nil {
+			t.Fatal(err)
+		}
+		var before []int64
+		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
+			Scan(ctx, &before); err != nil {
+			t.Fatal(err)
+		}
+		recorded, superseded, err := f.store.RecordStatements(ctx, who, f.productID, from, placed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if superseded != 0 || recorded != len(placed) {
+			t.Errorf("reading it again recorded %d and set aside %d", recorded, superseded)
+		}
+		var rows []finding.Statement
+		if err := f.db.DB.NewSelect().Model(&rows).Order("id").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != len(before) {
+			t.Fatalf("%d statements, were %d", len(rows), len(before))
+		}
+		for i, row := range rows {
+			if row.ID != before[i] || row.Superseded != nil {
+				t.Errorf("statement %d is %d, superseded %v; want the same row standing", i, row.ID, row.Superseded)
+			}
+		}
+		if rows[0].Placement == "" && rows[1].Placement == "" && rows[2].Placement == "" {
+			t.Error("nothing was placed")
+		}
+	})
+}
+
+func TestAForkOfTheProductIsNotTheProduct(t *testing.T) {
+	// Built from Acme's source and patched here, it carries Acme's name as
+	// what it was built from. Acme spoke for its own build.
+	each(t, func(t *testing.T, f *fixture) {
+		fork := graph.Described{Purl: "pkg:generic/nh-acme-y@4.2-nh1", Name: "nh-acme-y",
+			Version: "4.2-nh1", UpstreamName: "acme-y", UpstreamVersion: "4.2"}
+		f.shipped(t, beside(fork))
+		f.acmeSays(t)
+		if applied, _ := f.reported(t, found(inside, zlib)); applied.Disclaimed != 0 {
+			t.Errorf("a fork of Y disclaimed %d", applied.Disclaimed)
+		}
+	})
+}
+
+func TestAStatementAboutOneReleaseOfTheProductIsEvidenceOnAnother(t *testing.T) {
+	// It closes nothing at 4.3, and it is still what Acme said.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, beside(acmeYNew))
+		f.acmeSays(t)
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: inside, Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var componentID int64
+		if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").
+			Where("c.purl = ?", zlib.Purl).Scan(ctx, &componentID); err != nil {
+			t.Fatal(err)
+		}
+		said, err := f.store.SaidAbout(ctx, f.planner(t, access.PublicTriage), f.productID,
+			interned[inside], []string{inside}, "zlib", zlib.Purl, f.target, componentID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != 1 {
+			t.Errorf("Acme's statement about Y 4.2 is evidence %d times on the zlib inside Y 4.3", len(said))
+		}
+	})
+}
+
+func TestAFindingOnTheProductStaysOpenInACycle(t *testing.T) {
+	// Two packages depending on each other is ordinary, and puts the product
+	// beneath itself.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{acmeY, libpng},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: acmeY},
+				{Parent: acmeY, Child: libpng},
+				{Parent: libpng, Child: acmeY},
+			},
+		})
+		f.acmeSays(t)
+		applied, _ := f.reported(t, found(productOnly, acmeY))
+		if applied.Disclaimed != 0 {
+			t.Errorf("a finding on Y itself disclaimed %d", applied.Disclaimed)
+		}
+	})
+}
+
+func TestAVersionMovingToOneTheSupplierSpeaksForClosesAsDisclaimed(t *testing.T) {
+	// The row before closes for the supplier's word, not as an upgrade: no fix
+	// was made.
+	each(t, func(t *testing.T, f *fixture) {
+		zlibNew := graph.Described{Purl: "pkg:generic/zlib@1.2.12", Name: "zlib", Version: "1.2.12"}
+		f.shipped(t, deep())
+		f.reported(t, found(inside, zlib))
+		f.publishes(t, []finding.Statement{{
+			Vulnerability: inside, Purl: zlibNew.Purl, Component: "zlib", About: "1.2.12",
+			WithinPurl: acmeY.Purl, Within: "acme-y", WithinAbout: "4.2", Placement: finding.PlacedInside,
+			Status: "not_affected", Justification: "vulnerable_code_not_in_execute_path",
+		}}, "sha256:newer-zlib")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{acmeY, libpng, zlibNew},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: acmeY},
+				{Parent: acmeY, Child: libpng},
+				{Parent: libpng, Child: zlibNew},
+			},
+		})
+		f.reported(t, found(inside, zlibNew))
+		for _, row := range f.every(t) {
+			if row.ClosedBecause == finding.Upgraded {
+				t.Error("the row before closed as upgraded; nothing was fixed")
+			}
+		}
+		closed := 0
+		for _, row := range f.every(t) {
+			if row.ClosedBecause == finding.Disclaimed {
+				closed++
+			}
+		}
+		if closed != 2 {
+			t.Errorf("%d rows closed as disclaimed, want the old version's and the new one's", closed)
+		}
+	})
+}
+
+func TestRescanningADisclaimedBuildTouchesNoRow(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.acmeSays(t)
+		f.reported(t, found(inside, zlib))
+		before := placedAt(t, f, f.every(t))["zlib under acme-y"]
+		f.reported(t, found(inside, zlib))
+		after := placedAt(t, f, f.every(t))["zlib under acme-y"]
+		if !after.LastChangedAt.Equal(before.LastChangedAt) {
+			t.Errorf("a rescan rewrote the closed row: changed %v, was %v",
+				after.LastChangedAt, before.LastChangedAt)
+		}
+	})
+}
+
+func TestAPlaceAnsweredOnSomeRoutesCarriesNoDeadline(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, shared())
+		f.reported(t, found(inside, zlib))
+		if open := f.open(t); len(open) != 1 || open[0].DueAt == nil {
+			t.Fatalf("with nothing answering it the place is %+v, want it due", open)
+		}
+		f.acmeSays(t)
+		f.reported(t, found(inside, zlib))
+		if open := f.open(t); len(open) != 1 || open[0].DueAt != nil {
+			t.Errorf("answered through Y the place is due %v", open[0].DueAt)
+		}
+	})
+}
+
+func TestAnAnswerOnSomeRoutesGoesWithAPlaceThatClosesForAnotherReason(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, shared())
+		f.acmeSays(t)
+		f.reported(t, found(inside, zlib))
+		// The scanner stops reporting it.
+		f.reported(t)
+		for _, row := range f.every(t) {
+			if row.ClosedAt != nil && row.ClosedBecause != finding.Disclaimed && row.StatedBy != nil {
+				t.Errorf("closed as %q, still answered by statement %d", row.ClosedBecause, *row.StatedBy)
+			}
+		}
+	})
+}
+
+func TestADuplicateOfAnIssueASupplierAnswersEverywhereIsRefused(t *testing.T) {
+	// The place is open for the route nobody answered and is not work, so a
+	// report pointed at it as a duplicate reaches nobody who is looking.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, shared())
+		f.acmeSays(t)
+		f.reported(t, found(inside, zlib))
+		if open := f.open(t); len(open) != 1 || open[0].StatedBy == nil {
+			t.Fatalf("the place is %+v, want it open and answered through Y", open)
+		}
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		named := f.claims(t, who, 1)
+		_, err := f.store.Rule(ctx, who, f.productID, finding.Ruled{
+			References: []string{named[0]}, Disposition: finding.Duplicate,
+			DuplicateOf: f.issueID(t, inside),
+		})
+		if !errors.Is(err, finding.ErrDuplicateOfClosed) {
+			t.Errorf("a duplicate of an issue a supplier answers everywhere was answered %v", err)
 		}
 	})
 }

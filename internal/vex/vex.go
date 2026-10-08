@@ -39,6 +39,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -477,20 +478,13 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		})
 	}
 
-	// What suppliers state, where this deployment says nothing about the same
-	// issue in the same component: an agreed claim or a declared patch is this
-	// deployment's own word, and stands in front of somebody else's.
-	ours := map[[2]string]bool{}
-	for _, one := range doc.Statements {
-		ours[[2]string{one.Vulnerability.Name, one.Products[0].Subcomponents[0].ID}] = true
-	}
+	// What suppliers state. An agreed claim is said only of a component with
+	// a place open, and a supplier's statement only of one with none, so the
+	// two never speak about one issue in one component.
 	for _, row := range stated {
 		about := row.Purl
 		if about == "" {
 			about = row.Component
-		}
-		if ours[[2]string{row.Identifier, about}] {
-			continue
 		}
 		doc.Statements = append(doc.Statements, Statement{
 			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
@@ -499,7 +493,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 				ID: shipped, Subcomponents: []Inside{{ID: about}},
 			}},
 			Status:          "not_affected",
-			Justification:   row.Justification,
+			Justification:   known(row.Justification),
 			ImpactStatement: row.attributed(),
 		})
 	}
@@ -621,6 +615,20 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 	return fixed, nil
 }
 
+// known is a supplier's justification where it is one the format defines, and
+// nothing otherwise. A supplier's document is not checked against the
+// vocabulary as it is read, and this document publishes it under this
+// deployment's name; the impact statement beside it satisfies the format
+// without one.
+func known(justification string) string {
+	for _, each := range triage.Justifications() {
+		if string(each) == justification {
+			return justification
+		}
+	}
+	return ""
+}
+
 // statedBySupplier is an issue a supplier's statement about its own product
 // closed at every place of one component in the build.
 type statedBySupplier struct {
@@ -662,6 +670,7 @@ func (s statedBySupplier) attributed() string {
 //   - no place of a component of that name and package identifier is open
 //     against the issue
 //   - the statement that closed it still stands
+//   - no other supplier's statement closed a place of it
 func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	visible []access.Visibility) ([]statedBySupplier, error) {
 
@@ -698,6 +707,11 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 				AND o.closed_at IS NULL AND oc.name = c.name
 				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
 		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
+		// One supplier's statement and no other. Two suppliers answering
+		// places of one component each spoke for their own product, and the
+		// format names the component once: credited to either, the document
+		// says one of them spoke for the other's.
+		Having("COUNT(DISTINCT f.stated_by) = 1").
 		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {

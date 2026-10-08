@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -24,6 +25,12 @@ import (
 // asks this: the deadline lists, the overdue counts, the review routing, and
 // the notifications.
 const NotArguedAway = "(f.suppressed_by IS NULL AND f.stated_by IS NULL)"
+
+// Decidable says a finding `f` is one somebody may decide about: open, or
+// closed by a supplier's statement. A person who disagrees with a supplier
+// marks the place affected, and the next run opens it again, so the place has
+// to be reachable while the statement has it closed.
+const Decidable = "(f.closed_at IS NULL OR f.closed_because = '" + string(Disclaimed) + "')"
 
 // AffectedOutcome is the outcome a person records to say an issue applies,
 // named here so the run and the triage package cannot drift on the spelling.
@@ -89,7 +96,7 @@ const (
 // because which identifier a publisher chose is a preference of whichever
 // database they consulted.
 func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Named,
-	inv inventory, places consumers) (*disclaiming, error) {
+	issueIDs []int64, inv inventory, places consumers) (*disclaiming, error) {
 
 	d := &disclaiming{byIssue: map[string][]int{}, inv: inv, placed: map[string]*placement{}}
 	var names []string
@@ -119,8 +126,8 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 			return q
 		}).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("ss.within_about IS NOT NULL").
-				WhereOr("ss.within IS NULL AND ss.about <> ?", "")
+			return q.WhereOr("ss.placement = ? AND ss.within_about IS NOT NULL", PlacedInside).
+				WhereOr("ss.placement = ? AND ss.about <> ?", PlacedProduct, "")
 		}).
 		Order("ss.id").
 		Scan(ctx)
@@ -141,7 +148,7 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 			d.children[consumer] = append(d.children[consumer], child)
 		}
 	}
-	d.affected, err = affectedPlaces(ctx, db, productID, issues)
+	d.affected, err = affectedPlaces(ctx, db, productID, issueIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -149,12 +156,13 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 }
 
 // affectedPlaces is every place in this product a person has said one of these
-// issues applies at, by a decision that stands.
+// issues applies at, by a decision that stands, keyed by the issue a decision
+// is about now, merged issues included.
 //
 // A disagreement with a supplier goes through the ordinary route: somebody
 // marks the place affected, and the statement does not close it there.
 func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
-	issues []Named) (map[affectedAt]bool, error) {
+	issueIDs []int64) (map[affectedAt]bool, error) {
 
 	var rows []struct {
 		VulnerabilityID int64  `bun:"vulnerability_id"`
@@ -163,6 +171,7 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 		Consumer        string `bun:"consumer"`
 	}
 	standing, held := InForce()
+	issues, ids := database.InAnyOf("dv.issue_id", issueIDs)
 	err := db.NewSelect().
 		TableExpr(Decisions).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
@@ -174,6 +183,7 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 		Where("cl.outcome = ?", AffectedOutcome).
 		Where("de.live_key IS NOT NULL").
 		Where(standing, held...).
+		Where(issues, ids...).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where people have said an issue applies: %w", err)
@@ -217,7 +227,7 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 	for _, i := range candidates {
 		one := d.said[i]
 		product := suppliedProduct(one)
-		if one.Within != "" {
+		if one.Placement == PlacedInside {
 			// A statement about a component inside the product is about that
 			// component, and the product places it.
 			about := sbom.Target{Purl: one.Purl, Name: one.Component, Version: one.About}
@@ -225,7 +235,13 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 				continue
 			}
 		}
-		switch d.place(product).at(consumerID) {
+		p := d.place(product)
+		if p.product[component.ID] {
+			// A finding on the product itself, which a cycle in the graph can
+			// put beneath it, is evidence.
+			continue
+		}
+		switch p.at(consumerID) {
 		case answersAll:
 			id := one.ID
 			return &id, answersAll
@@ -246,7 +262,7 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 // component ships inside, or the component itself where the statement named
 // nothing it ships inside.
 func suppliedProduct(one Statement) sbom.Target {
-	if one.Within != "" {
+	if one.Placement == PlacedInside {
 		return sbom.Target{Purl: one.WithinPurl, Name: one.Within, Version: one.WithinAbout}
 	}
 	return sbom.Target{Purl: one.Purl, Name: one.Component, Version: one.About}
@@ -269,7 +285,7 @@ func (d *disclaiming) place(product sbom.Target) *placement {
 		return p
 	}
 	for id, c := range d.inv.byID {
-		if product.Covers(describedOf(c)) {
+		if isProduct(product, c, true) {
 			p.product[id] = true
 		}
 	}
@@ -302,6 +318,33 @@ func (d *disclaiming) place(product sbom.Target) *placement {
 		queue = append(queue, d.children[at]...)
 	}
 	return p
+}
+
+// isProduct reports whether a component is the supplier's product: by the
+// package identifier the statement names, where it names one of a package,
+// and otherwise by the component's own name. With atVersion, at the version
+// the statement names as well.
+//
+// Never by what the component was built from. A fork of the supplier's source
+// carries the supplier's name as the name it was built from, and a build of
+// the supplier's source is not the supplier's product.
+func isProduct(product sbom.Target, c graph.Component, atVersion bool) bool {
+	base, version := graph.PackageOf(product.Purl)
+	if version == "" {
+		version = product.Version
+	}
+	held, heldVersion := graph.PackageOf(c.Purl)
+	if heldVersion == "" {
+		heldVersion = c.Version
+	}
+	if base != "" && !strings.HasPrefix(base, "pkg:generic/") {
+		if base != held {
+			return false
+		}
+	} else if product.Name == "" || !strings.EqualFold(product.Name, c.Name) {
+		return false
+	}
+	return !atVersion || (version != "" && version == heldVersion)
 }
 
 // at is how the product stands at a place whose consumer is the component

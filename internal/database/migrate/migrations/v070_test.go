@@ -41,7 +41,8 @@ func TestAV060DatabaseUpgradesToV070(t *testing.T) {
 			t.Fatalf("the finding table has no statement answering it: %v", err)
 		}
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "vex_statement"
-			WHERE "within_purl" IS NOT NULL OR "within" IS NOT NULL OR "within_about" IS NOT NULL`).
+			WHERE "within_purl" IS NOT NULL OR "within" IS NOT NULL OR "within_about" IS NOT NULL
+				OR "placement" IS NOT NULL`).
 			Scan(ctx, &placed); err != nil {
 			t.Fatalf("the statement table has no product a component ships inside: %v", err)
 		}
@@ -101,6 +102,38 @@ func TestAnIssuanceV060RecordedIsOursAfterTheUpgrade(t *testing.T) {
 		}
 		if err := issue("ours"); err == nil {
 			t.Error("a second first revision of the same kind was accepted")
+		}
+	})
+}
+
+// A supplier read from its directory before the upgrade is read again from its
+// window after it, so what it published is read with the product each
+// statement places.
+func TestASupplierIsReadAgainAfterTheUpgrade(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v060)
+		w, err := world.Declare(ctx, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC()
+		if _, err := db.DB.NewRaw(`INSERT INTO "advisory_source" ("product_id", "name",
+			"display_name", "url", "caught_up_to", "caught_up_mark", "created_by", "created_at")
+			VALUES (?, 'acme', 'Acme', 'https://acme.example/provider-metadata.json', ?, 'mark', ?, ?)`,
+			w.Product.ID, now, w.Person.ID, now).Exec(ctx); err != nil {
+			t.Fatalf("configure a supplier at v0.6.0: %v", err)
+		}
+		dbtest.MigrateTo(t, db, v070)
+
+		var held int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "advisory_source"
+			WHERE "caught_up_to" IS NOT NULL OR "caught_up_mark" IS NOT NULL`).Scan(ctx, &held); err != nil {
+			t.Fatal(err)
+		}
+		if held != 0 {
+			t.Errorf("%d suppliers kept how far they had read", held)
 		}
 	})
 }

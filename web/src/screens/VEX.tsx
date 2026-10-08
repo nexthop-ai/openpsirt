@@ -77,7 +77,10 @@ export function VEX() {
           type="button"
           className="tab2"
           aria-selected={kind === "ours"}
-          onClick={() => setParams({})}
+          onClick={() => {
+            record.reset();
+            setParams({});
+          }}
         >
           Ours only
         </button>
@@ -86,7 +89,10 @@ export function VEX() {
           className="tab2"
           aria-selected={kind === "with-suppliers"}
           title="Adds what suppliers say about their own products, in their name"
-          onClick={() => setParams({ kind: "with-suppliers" })}
+          onClick={() => {
+            record.reset();
+            setParams({ kind: "with-suppliers" });
+          }}
         >
           With supplier statements
         </button>

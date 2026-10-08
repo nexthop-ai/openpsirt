@@ -113,3 +113,55 @@ func TestASuppliersStatementClosesTheFindingAndIsPublishedOnlyWhenAsked(t *testi
 		}
 	})
 }
+
+// A person who disagrees with a supplier marks the place affected through the
+// ordinary route, while the statement has it closed, and the next scan opens it
+// again.
+func TestAPlaceASupplierClosedCanBeMarkedAffectedAndOpensAgain(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			build+"/findings/CVE-2022-37434/components/zlib/decision",
+			`{"outcome":"affected","reasoning":"We call inflateGetHeader through our own wrapper."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("marking it affected answered %d: %s", got.Code, got.Body.String())
+		}
+
+		r.ScannedInsideAcme(t, "again", false)
+		var open struct {
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings", &open)
+		if open.Total != 1 {
+			t.Errorf("after marking it affected, %d open, want the zlib inside Y", open.Total)
+		}
+	})
+}
+
+// A statement the supplier set aside is said by nobody, from the moment it is
+// set aside.
+func TestTheDocumentWithSuppliersDropsWhatWasWithdrawn(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 1 {
+			t.Fatalf("the document with suppliers says %+v", said)
+		}
+
+		// Acme's next statement set says nothing about it, and nothing has
+		// rescanned yet: the finding is still closed.
+		withdrawn := strings.Replace(httpapitest.AcmeSays(t), `"CVE-2022-37434"`, `"CVE-2000-0001"`, 1)
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", withdrawn); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 0 {
+			t.Errorf("a statement Acme set aside is still said: %+v", said)
+		}
+	})
+}

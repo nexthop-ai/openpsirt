@@ -24,7 +24,14 @@ func vexStatementsV070(t *columnTypes) []string {
 			-- Null where the document named the component alone.
 			"within_purl"  `+t.free+` NULL,
 			"within"       `+t.name+` NULL,
-			"within_about" `+t.name+` NULL,`)
+			"within_about" `+t.name+` NULL,
+			-- What the statement names its supplier's product as: inside,
+			-- for a component inside a product the document named; product,
+			-- for a product named alone by no package identifier. Null for a
+			-- package named alone, which cannot be told from a rebuild of its
+			-- source, and for every statement recorded before this was read,
+			-- so that neither closes anything.
+			"placement"    `+t.kind+` NULL,`)
 	return statements
 }
 

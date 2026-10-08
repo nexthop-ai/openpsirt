@@ -56,6 +56,11 @@ type Statement struct {
 	WithinPurl  string `bun:"within_purl,nullzero"`
 	Within      string `bun:"within,nullzero"`
 	WithinAbout string `bun:"within_about,nullzero"`
+	// Placement is what the statement names its supplier's product as:
+	// PlacedInside, PlacedProduct, or empty for a package named alone and for
+	// a statement recorded before it was read. Only a placed statement closes
+	// anything (REQ-31).
+	Placement string `bun:"placement,nullzero"`
 	// Status is what they said in the format's own vocabulary, Justification
 	// the term they gave for it, and Statement the reasoning — which is the
 	// part worth having, because the status is in the fix state already.
@@ -93,12 +98,33 @@ func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
 		Justification: claim.Justification,
 		Statement:     claim.Statement,
 	}
-	if at.Within != nil {
+	switch {
+	case at.Within != nil:
 		said.WithinPurl = at.Within.Purl
 		said.Within = at.Within.ComponentNamed()
 		said.WithinAbout = at.Within.VersionNamed()
+		said.Placement = PlacedInside
+	case !packaged(at.Purl):
+		said.Placement = PlacedProduct
 	}
 	return said
+}
+
+// What a statement names its supplier's product as.
+const (
+	// PlacedInside is a component inside a product the document named.
+	PlacedInside = "inside"
+	// PlacedProduct is a product named alone, by no package identifier: an
+	// equipment vendor's appliance, or a product spelled as a source tree.
+	PlacedProduct = "product"
+)
+
+// packaged reports whether a target is named by the package identifier of an
+// ecosystem's package, which a distribution's own build and a rebuild of its
+// source share, rather than as a product.
+func packaged(purl string) bool {
+	parts := graph.PartsOfPurl(purl)
+	return parts.Name != "" && parts.Type != sourceTree
 }
 
 // The two kinds of document a third party's judgment arrives in.
@@ -305,8 +331,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		// is how rows stored under an earlier reading are brought up to date.
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
-			Column("vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "status", "justification", "statement").
+			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
+				"within_about", "placement", "status", "justification", "statement").
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
@@ -319,6 +345,19 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 		if len(standing) > 0 && sameReading(standing, said) {
 			// What the document says is what the record already holds.
+			recorded = len(standing)
+			return nil
+		}
+		// The same bytes, saying the same things, read with where each
+		// statement places its supplier's product beside them: a statement
+		// recorded before the product was read. The claims are unchanged, so
+		// they are brought up to date where they stand. Set aside, every
+		// approved decision citing one would be told the publisher changed
+		// what they published, which they did not.
+		if len(standing) > 0 && sameClaims(standing, said) {
+			if err := placeWhereTheyStand(ctx, tx, standing, said); err != nil {
+				return err
+			}
 			recorded = len(standing)
 			return nil
 		}
@@ -451,7 +490,7 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		err := s.db.NewSelect().Model(&beneath).
 			Where("product_id = ?", productID).
 			Where("superseded_at IS NULL").
-			Where("within IS NULL").
+			Where("placement = ?", PlacedProduct).
 			Where("vulnerability IN (?)", bun.List(lowered)).
 			Where("component IN (?)", bun.List(aboveNames)).
 			Scan(ctx)
@@ -510,11 +549,12 @@ func (s *Store) shipsProducts(ctx context.Context, productID int64,
 }
 
 // placedAbove reports whether the product a statement names is one of these
-// components, at the version the statement names where it names one.
+// components, at whatever version: a statement about Y 4.2 is evidence on what
+// sits inside Y 4.3, and only closes anything at 4.2.
 func placedAbove(one Statement, above []graph.Component) bool {
 	product := suppliedProduct(one)
 	for _, c := range above {
-		if product.Covers(describedOf(c)) {
+		if isProduct(product, c, false) {
 			return true
 		}
 	}
@@ -588,6 +628,88 @@ const (
 	MostDocumentName = database.NameWidth
 )
 
+// claimOf is what a statement claims, leaving out where it places its
+// supplier's product.
+func claimOf(one Statement) string {
+	return strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
+		one.About, one.Status, one.Justification, one.Statement}, "\x00")
+}
+
+// placementOf is where a statement places its supplier's product.
+func placementOf(one Statement) string {
+	return strings.Join([]string{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}, "\x00")
+}
+
+// sameClaims reports whether two sets of statements claim the same things, in
+// any order, wherever they place their suppliers' products.
+func sameClaims(held, said []Statement) bool {
+	if len(held) != len(said) {
+		return false
+	}
+	claims := func(rows []Statement) []string {
+		out := make([]string, len(rows))
+		for i, one := range rows {
+			out[i] = claimOf(one)
+		}
+		slices.Sort(out)
+		return out
+	}
+	return slices.Equal(claims(held), claims(said))
+}
+
+// placeWhereTheyStand writes where each statement places its supplier's
+// product onto the standing row claiming the same thing.
+//
+// Rows claiming the same thing are paired in a fixed order on both sides, so
+// two identical claims placed in two products each take one placement.
+func placeWhereTheyStand(ctx context.Context, tx bun.IDB, held, said []Statement) error {
+	byClaim := map[string][]Statement{}
+	for _, one := range said {
+		byClaim[claimOf(one)] = append(byClaim[claimOf(one)], one)
+	}
+	for claim := range byClaim {
+		slices.SortFunc(byClaim[claim], func(a, b Statement) int {
+			return strings.Compare(placementOf(a), placementOf(b))
+		})
+	}
+	sorted := slices.Clone(held)
+	slices.SortFunc(sorted, func(a, b Statement) int { return cmp.Compare(a.ID, b.ID) })
+	placed := map[string][]int64{}
+	at := map[string]Statement{}
+	for _, row := range sorted {
+		claim := claimOf(row)
+		next := byClaim[claim][0]
+		byClaim[claim] = byClaim[claim][1:]
+		placed[placementOf(next)] = append(placed[placementOf(next)], row.ID)
+		at[placementOf(next)] = next
+	}
+	for key, ids := range placed {
+		one := at[key]
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			_, err := tx.NewUpdate().Model((*Statement)(nil)).
+				Set("within_purl = ?", nullable(one.WithinPurl)).
+				Set("within = ?", nullable(one.Within)).
+				Set("within_about = ?", nullable(one.WithinAbout)).
+				Set("placement = ?", nullable(one.Placement)).
+				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("place what they said where it stands: %w", err)
+		}
+	}
+	return nil
+}
+
+// nullable is a value written as a null where it is empty, the way the
+// columns it is written into hold an absence.
+func nullable(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
 // sameReading reports whether two sets of statements say the same things,
 // in any order. Only what a reader derives from the document is compared.
 func sameReading(held, said []Statement) bool {
@@ -598,7 +720,7 @@ func sameReading(held, said []Statement) bool {
 		out := make([]string, len(rows))
 		for i, one := range rows {
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
-				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Status,
+				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
 				one.Justification, one.Statement}, "\x00")
 		}
 		slices.Sort(out)

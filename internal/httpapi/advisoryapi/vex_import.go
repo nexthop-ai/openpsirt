@@ -111,9 +111,11 @@ func registerVexImport(api huma.API, in core.Deps) {
 		Summary: "Upload a VEX document",
 		Description: "Takes one OpenVEX document of what a distribution or an upstream " +
 			"security team has published about components this product ships.\n\n" +
-			"Nothing is applied. What arrives is a third layer beside the build's own " +
-			"claims and our decisions: shown as evidence, offered as a prefill, and never " +
-			"standing as our judgment by itself.\n\n" +
+			"A supplier's statement that its own product, at the version a build ships, is " +
+			"not affected closes the finding where every route to it runs through that " +
+			"product, at the next scan. Everything else that arrives is a third layer beside " +
+			"the build's own claims and our decisions: shown as evidence and offered as a " +
+			"prefill.\n\n" +
 			"What a document adds over what the scanner already reports is the " +
 			"reasoning. The status is in the fix state already.\n\n" +
 			"Uploading again from the same publisher sets aside what they said before rather " +

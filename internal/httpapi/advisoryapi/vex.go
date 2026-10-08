@@ -35,8 +35,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			"`kind=with-suppliers` is a second document with an identifier of its own. It adds, " +
 			"as `not_affected`, what a supplier states about its own product where the " +
 			"statement closed every place of a component in the build, in the supplier's " +
-			"name. A statement this deployment makes about the same issue and component " +
-			"stands in its place.\n\n" +
+			"name.\n\n" +
 			"Requires a publisher configured for this deployment: a document naming none has " +
 			"nobody as its author.",
 		Tags: []string{"Findings"},

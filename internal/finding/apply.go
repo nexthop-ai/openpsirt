@@ -135,7 +135,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// What suppliers say about their own products, where it can close a
 		// finding here (REQ-31): read once, and placed in this build's graph
 		// once per product it names.
-		suppliers, err := disclaimers(ctx, tx, productID, issues, present, places)
+		issueIDs := make([]int64, 0, len(vulnerabilities))
+		for _, id := range vulnerabilities {
+			issueIDs = append(issueIDs, id)
+		}
+		suppliers, err := disclaimers(ctx, tx, productID, issues, issueIDs, present, places)
 		if err != nil {
 			return err
 		}
@@ -313,7 +317,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				// question about upstream, and this product having been
 				// attacked says nothing about that — what it says is that the
 				// finding is not one to put below the line.
-				if onTheClock && floor.Admits(rated.Exploited || rated.ExploitedHere, severity) {
+				// A place a supplier answers on some routes is not work, so it
+				// carries no deadline: every count of what is late then agrees
+				// about it without each having to ask.
+				if onTheClock && answeredBy == nil &&
+					floor.Admits(rated.Exploited || rated.ExploitedHere, severity) {
 					window := windows.For(rated.Exploited, severity)
 					windowFor[key{vulnerabilityID, at}] = window
 					// From this run, which for a new finding is when it was
@@ -638,6 +646,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Finding)(nil)).
 					Set("stated_by = ?", statement).
+					Set("last_changed_at = ?", now).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
 				return err
 			})
@@ -746,6 +755,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Set("closed_at = ?", startedAt).
 					Set("closed_run_id = ?", runID).
 					Set("closed_because = ?", key.Reason).
+					// A supplier's answer on some routes went with the place.
+					Set("stated_by = NULL").
 					Set("moved_to = ?", key.MovedTo).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
 				return err
@@ -760,6 +771,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Set("closed_at = ?", startedAt).
 					Set("closed_run_id = ?", runID).
 					Set("closed_because = ?", Unaffected).
+					// A supplier's answer on some routes went with the place.
+					Set("stated_by = NULL").
 					Set("moved_to = ?", "").
 					Set("unaffected_by = ?", lines).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
@@ -790,6 +803,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Set("closed_at = ?", startedAt).
 					Set("closed_run_id = ?", runID).
 					Set("closed_because = ?", Patched).
+					// A supplier's answer on some routes went with the place.
+					Set("stated_by = NULL").
 					Set("moved_to = ?", "").
 					Set("suppressed_by = ?", claimID).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
@@ -838,7 +853,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		var rows []Finding
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
-				"place_identity", "closed_because", "suppressed_by", "unaffected_by").
+				"place_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
 			Where("target_id = ?", targetID).
 			Where("kind = ?", Vulnerable).
 			Where("closed_at IS NOT NULL").

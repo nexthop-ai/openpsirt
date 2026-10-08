@@ -1292,21 +1292,27 @@ as a prefill, and closes nothing.
 The supplier's product is what the statement names a component as shipping
 inside: the product of an OpenVEX statement with subcomponents, or the platform
 a CSAF relationship composes the component into. Where a statement names no
-such product, the product is what it names.
+such product and names what it is about by no package identifier, the product
+is what it names. A statement naming a package alone, and one recorded before
+the product was read, names no supplier's product and closes nothing.
 
 | Rule | |
 |---|---|
 | A statement closes a finding where every route up the tree from its place runs through the supplier's product | A place is a component and what pulls it in, so every route to it runs through its consumer: the consumer is the product, or sits beneath it where the root reaches it no other way. Worked out per product from the build's edges, two passes each |
-| A place reached through the product and outside it stays open, marked as answered through the product, and is not work | One row stands for both routes. Closed, it hides the route nobody answered; unmarked, it hides that the supplier answered the other. It carries no deadline pressure, no overdue count and no notice, and counts as answered |
+| A place reached through the product and outside it stays open, marked as answered through the product, and is not work | One row stands for both routes. Closed, it hides the route nobody answered; unmarked, it hides that the supplier answered the other. It carries no deadline, so no count of what is late includes it, raises no notice, routes no duplicate report to it, and counts as answered |
 | A statement about a component inside the product closes the findings of its issue on that component | Another component under the product, reported against the same issue, is not answered by it |
 | A statement naming the product alone closes the findings of its issue on anything beneath the product | "The product is not affected" is the supplier speaking about everything they shipped |
-| A finding on the product itself stays evidence | A statement naming a package alone cannot tell the supplier's own build from a rebuild of its source |
+| A finding on the product itself stays evidence, a cycle in the graph putting it beneath itself included | A statement naming a package alone cannot tell the supplier's own build from a rebuild of its source |
+| A statement naming a package of an ecosystem alone closes nothing | A distribution's package identifier is shared by its own build and by a rebuild of its source |
 | The product is matched exactly, at the version the statement names | A statement about one release says nothing about the next, so a version change reopens the finding. A statement naming no version is about every release, past and future, and stays evidence |
+| The product is matched by the package identifier the statement names, or by the component's own name, and never by what the component was built from | A fork of the supplier's source carries the supplier's name as what it was built from, and a build of the supplier's source is not the supplier's product |
 | Only `not_affected` closes, whatever its justification | Each justification is the supplier speaking about its own product. A statement that something will not be fixed is affected and judged minor, and stays a prefilled will-not-fix |
 | The product has to be a component of the build | A build of the supplier's source is not the supplier's product. A distribution names a platform, which no build here contains, so its statements close nothing |
 | The build's own patch and the CVE record are asked first | Both say the code is not vulnerable here, which is the stronger answer |
-| A place somebody marked affected, by a decision standing at its versions, stays open | A disagreement with a supplier goes through the ordinary route, and needs no second person, because it hides nothing |
+| A place somebody marked affected, by a decision standing at its versions, stays open | A disagreement with a supplier goes through the ordinary route, and needs no second person, because it hides nothing. A place the statement has closed is shown on the finding and can be decided about, and the next run opens it again |
 | A run that no longer reads the statement there opens the finding again | The statement set aside or revised away, the product at another version, or the place reachable outside it. A statement uploaded between scans is applied by the next scan |
+| A version moving to one the statement speaks for closes the row before it as disclaimed | Nothing was fixed, so it is no upgrade |
+| A place closed for any other reason keeps no answer on some routes | What closed it is the reason a register reads beside it |
 | The closed row names the statement, and a revision saying the same thing moves the row to it | What closed it stays readable after the statement is superseded |
 | Among several statements, one answering every route stands over one answering some, and the oldest over a newer | The answer does not move between runs |
 
@@ -1314,7 +1320,7 @@ such product, the product is what it names.
 
 | Rule | |
 |---|---|
-| A statement naming the product its component ships inside, where this product ships that product, is evidence where the product is above the component in the build | Shown against every component of that name, it speaks for a component the supplier never spoke for |
+| A statement naming the product its component ships inside, where this product ships that product, is evidence where the product is above the component in the build, at whatever version | Shown against every component of that name, it speaks for a component the supplier never spoke for. A statement about one release of the product is still what the supplier said where another sits, and closes nothing there |
 | A statement naming a product this product does not ship is evidence by package | The platform a distribution composes its packages into is no component of any build, so it places nothing. Whether a product ships is asked by name, across this product's builds |
 | A statement naming a product alone is evidence on the product, and on whatever sits beneath it | It is about the product and what the supplier shipped inside it |
 | The list's filter by publisher and by status reaches a statement placed by its product only through the findings the run answered with it | A pair of component and issue cannot say where a component sits, and placing each row of the list is a walk per row. A placed statement the run does not apply, one of another status or naming no version, is evidence on the finding and is not found by the filter |

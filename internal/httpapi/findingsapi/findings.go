@@ -597,13 +597,12 @@ type EvidenceBody struct {
 	// reason a place is a component at a position.
 	Elsewhere []core.ElsewhereBody `json:"elsewhere" doc:"Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five"`
 
-	// Vex is the third layer beside the build's own claims and our decisions:
-	// the claims a distribution or an upstream security team has published
-	// about this component in a VEX document. Evidence and a
-	// prefill; never applied to anything by itself, because a third
-	// party's claim standing as ours would put somebody else's judgment
-	// inside a number we quote.
-	Said []core.SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied"`
+	// Said is the third layer beside the build's own claims and our
+	// decisions: the claims a distribution, an upstream security team or a
+	// supplier has published about this component. Evidence and a prefill. A
+	// supplier's statement about its own product is applied by the run, at
+	// the places that product occupies, and is here as the evidence for it.
+	Said []core.SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here or read from a supplier's directory. Evidence, and a prefill; a supplier's statement that its own product is not affected closes the places inside that product at the next scan"`
 }
 
 func registerFindingDetail(api huma.API, in core.Deps) {

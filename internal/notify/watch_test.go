@@ -1189,3 +1189,27 @@ func staleness(t *testing.T, db *database.DB, admin *access.Account) string {
 	}
 	return ""
 }
+
+// A place a supplier's statement answers on some routes is open for the rest
+// and is not work, so nobody is told about it.
+func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		rights := access.NewStore(db.DB)
+		product := w.Product
+		released := w.TargetFor(w.Tag, w.Customer)
+		triager := recordPerson(t, rights, "triager@example.com", false, product.ID, access.PublicTriage)
+
+		critical(t, db, released.ID, "CVE-2026-ANSWERED", "critical")
+		if _, err := db.DB.NewUpdate().Table("finding").
+			Set("stated_by = ?", 1).
+			Where("target_id = ?", released.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		sweep(t, db)
+		if told := openFor(t, db, triager, notify.CriticalOnRelease); len(told) != 0 {
+			t.Errorf("the triager was told %q about a place a supplier answers", told)
+		}
+	})
+}

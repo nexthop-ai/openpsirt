@@ -37,8 +37,13 @@ func upV070(ctx context.Context, sqldb *sql.DB) error {
 //     read one.
 //   - A finding names the supplier's statement that answers it. No finding
 //     v0.6.0 holds is answered by one.
-//   - A statement keeps the product its component ships inside. A statement
-//     v0.6.0 holds kept none, and holds none until it is uploaded again.
+//   - A statement keeps the product its component ships inside, and what it
+//     names its supplier's product as. A statement v0.6.0 holds kept neither,
+//     and closes nothing until it is read again.
+//   - Every supplier read from its directory is read again from its window,
+//     so its advisories are read with the product they place. An advisory
+//     read again that says what it said is brought up to date where it
+//     stands, and raises no notice.
 //   - A VEX document that went out records which kind it was, and revisions
 //     are numbered per kind. Every one v0.6.0 recorded was this deployment's
 //     own.
@@ -54,7 +59,13 @@ func upgradeV070(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := u.change(vexStatementsV070(t), change{table: "vex_statement",
-		add: []added{{column: "within_purl"}, {column: "within"}, {column: "within_about"}}}); err != nil {
+		add: []added{{column: "within_purl"}, {column: "within"}, {column: "within_about"},
+			{column: "placement"}}}); err != nil {
+		return err
+	}
+	if err := u.run([]string{
+		`UPDATE "advisory_source" SET "caught_up_to" = NULL, "caught_up_mark" = NULL`,
+	}); err != nil {
 		return err
 	}
 	if err := u.change(vexIssuanceV070(t), change{table: "vex_issuance",

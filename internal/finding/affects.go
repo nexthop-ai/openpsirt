@@ -231,6 +231,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 				Set("closed_by = ?", subject.ID).
 				Set("closed_note = ?", because).
 				Set("closed_because = ?", Invalid).
+				Set("stated_by = NULL").
 				Where("id IN (?)", bun.List(batch)).
 				// Still open, checked as the write happens: two people editing
 				// the set at once is ordinary, and the second must not
