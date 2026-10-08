@@ -14,7 +14,7 @@ import {
   inventoriesAt,
   issueAt,
   streamsAt,
-  treeAt,
+  dependenciesAt,
   upgradesAt,
   variantsAt,
 } from "./routes";
@@ -218,10 +218,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               unit="findings nobody holds and nobody has decided"
               quiet
             />
-            <Rail to="/work" icon="people" label="Assignments" />
+            <Rail to="/assignments" icon="people" label="Assignments" />
             {/* The record of what was judged. Across products because that is how
               it is asked for — an auditor asks about a period, not a build. */}
-            <Rail to="/audit" icon="ledger" label="The record" />
+            <Rail to="/record" icon="ledger" label="The record" />
             {/* The catalog of named reports, and the one place a report is
               built by hand. Here rather than under a build because a report
               spans whatever the picker has selected, up to every product a
@@ -251,7 +251,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               unit="findings — an issue at a component, counted once per build"
               quiet
             />
-            <Rail to={build ? treeAt(build) : ""} icon="tree" label="Dependencies" needs={whole} />
+            <Rail
+              to={build ? dependenciesAt(build) : ""}
+              icon="tree"
+              label="Dependencies"
+              needs={whole}
+            />
             <Rail
               to={build ? inventoriesAt(build) : ""}
               icon="scan"
@@ -291,7 +296,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               being recorded is precisely what is *not* in that list, and it asks
               more than a control beside a table has room for. It needs no
               product picked, because the screen asks for one. */}
-            <Rail to="/record" icon="record" label="Report a flaw" />
+            <Rail to="/report-a-flaw" icon="record" label="Report a flaw" />
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}
@@ -300,7 +305,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               from each. Beside Disclosing because both are dates with
               somebody outside waiting on them, which no remediation deadline
               has. */}
-            <Rail to="/obligations" icon="shield" label="Exploited here" />
+            <Rail to="/exploited-here" icon="shield" label="Exploited here" />
             {/* What this deployment has said about its own flaws. Beside
               Disclosing because an embargo reaching its date is one of the
               three things an advisory gets written for. */}
@@ -339,7 +344,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {who.admin && <Rail to="/teams" icon="teams" label="Teams" />}
             {/* Who holds what, which the audit permission is largely for.
               The screen already degrades for a reader who cannot grant. */}
-            {(who.admin || who.audits) && <Rail to="/people" icon="roles" label="Access" />}
+            {(who.admin || who.audits) && <Rail to="/access" icon="roles" label="Access" />}
             {/* Assignment without a person doing it, by standing rule.
               Under Manage because it is something set up once rather than worked
               at, and called what it does: the act it automates is assignment. */}

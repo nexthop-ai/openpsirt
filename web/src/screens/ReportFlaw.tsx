@@ -44,7 +44,7 @@ import { inboxReportAt, issueAt, productFindingsAt } from "../app/routes";
 // rather than in a scheme of its own.
 const SEVERITIES = RECORDABLE;
 
-export function Record() {
+export function ReportFlaw() {
   const scope = useScope();
   const who = useWho();
   const navigate = useNavigate();

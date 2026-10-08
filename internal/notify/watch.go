@@ -553,7 +553,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 			// every time somebody assigned them anything.
 			About: identify("person:" + row.Identity),
 			Body:  body,
-			Link:  weblink.WorkPerson(row.Identity),
+			Link:  weblink.AssignmentsPerson(row.Identity),
 		})
 	}
 	return holding, nil

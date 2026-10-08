@@ -20,7 +20,7 @@ import { at } from "../ui/when";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
-import { decisionAt, inboxReportAt, refiled, treeAt, type Build } from "../app/routes";
+import { decisionAt, inboxReportAt, refiled, dependenciesAt, type Build } from "../app/routes";
 
 // Away is an address somebody else supplied, shown as a link only where it is
 // one this deployment is willing to send a reader to.
@@ -118,7 +118,7 @@ export function Places({
             is. A chain is what the tree opens along, and the first place is
             not always one that has a route up; the tree handed only a name
             has nothing to open on the way down to it. */}
-        <Link to={treeAt(build, intoTheTree(places))} className="linkish">
+        <Link to={dependenciesAt(build, intoTheTree(places))} className="linkish">
           View in dependency tree →
         </Link>
       </div>

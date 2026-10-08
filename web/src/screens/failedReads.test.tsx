@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Inventories } from "./Inventories";
 import { InventoryCompare } from "./InventoryCompare";
-import { Obligations } from "./Obligations";
+import { Exploited } from "./Exploited";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 // A secondary read that fails is said, on the screens that read one beside
@@ -30,7 +30,11 @@ describe("a secondary read that fails", () => {
   it("says which builds went quiet could not be read", async () => {
     failing("/v1/scanning");
     mount.render(
-      screen(<Inventories />, "/products/sonic/streams/master/variants/x/scans", `${BUILD}/scans`),
+      screen(
+        <Inventories />,
+        "/products/sonic/streams/master/variants/x/inventories",
+        `${BUILD}/inventories`,
+      ),
     );
     await settle();
     expect(mount.host().textContent).toContain("Which builds have gone quiet could not be read.");
@@ -38,7 +42,7 @@ describe("a secondary read that fails", () => {
 
   it("says the windows could not be read rather than that none are declared", async () => {
     failing("/v1/obligation-windows");
-    mount.render(screen(<Obligations />));
+    mount.render(screen(<Exploited />));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("The windows could not be read.");

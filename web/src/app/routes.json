@@ -105,17 +105,17 @@
     "path": "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component",
     "query": ["ecosystem", "from", "namespace", "rule", "version"]
   },
-  "tree": {
-    "path": "/products/:product/streams/:stream/variants/:variant/components",
+  "dependencies": {
+    "path": "/products/:product/streams/:stream/variants/:variant/dependencies",
     "query": ["at", "ecosystem", "namespace", "path", "q", "version"]
   },
   "decide": {
     "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide",
     "query": ["contains", "ecosystem", "namespace", "version"]
   },
-  "inventories": { "path": "/products/:product/streams/:stream/variants/:variant/scans" },
+  "inventories": { "path": "/products/:product/streams/:stream/variants/:variant/inventories" },
   "inventoryChanges": {
-    "path": "/products/:product/streams/:stream/variants/:variant/scans/:scan/changes"
+    "path": "/products/:product/streams/:stream/variants/:variant/inventories/:scan/changes"
   },
   "run": { "path": "/products/:product/streams/:stream/variants/:variant/runs/:run" },
   "upgrades": { "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades" },
@@ -134,16 +134,16 @@
   "inbox": { "path": "/products/:product/inbox", "query": ["waiting"] },
   "inboxReport": { "path": "/products/:product/inbox/:reference" },
   "me": { "path": "/me" },
-  "people": { "path": "/people" },
-  "person": { "path": "/people/:identity" },
+  "access": { "path": "/access" },
+  "person": { "path": "/access/:identity" },
   "teams": { "path": "/teams" },
-  "work": { "path": "/work", "query": ["person", "tab", "team"] },
-  "audit": { "path": "/audit", "query": ["alone", "from", "in_force", "outcome", "product", "to"] },
+  "assignments": { "path": "/assignments", "query": ["person", "tab", "team"] },
+  "record": { "path": "/record", "query": ["alone", "from", "in_force", "outcome", "product", "to"] },
   "reports": { "path": "/reports" },
   "report": { "path": "/reports/:report", "query": ["days"] },
-  "record": { "path": "/record", "query": ["from", "product", "source"] },
+  "reportFlaw": { "path": "/report-a-flaw", "query": ["from", "product", "source"] },
   "disclosing": { "path": "/disclosing" },
-  "obligations": { "path": "/obligations", "query": ["product"] },
+  "exploited": { "path": "/exploited-here", "query": ["product"] },
   "advisories": { "path": "/advisories" },
   "advisory": { "path": "/advisories/:advisory" },
   "autoAssignment": { "path": "/auto-assignment" },

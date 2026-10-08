@@ -147,7 +147,7 @@ export function findingAt(
 }
 
 // The screens of one build.
-export const treeAt = (build: Build, query?: Query) => at("tree", build, query);
+export const dependenciesAt = (build: Build, query?: Query) => at("dependencies", build, query);
 export const decideAt = (build: Build, component: string, which: Which = {}) =>
   at(
     "decide",
@@ -210,15 +210,15 @@ export const reviewQueueAt = (
 
 // The form that records a flaw in a product, started from a report where one
 // prompted it, or with where it came from already answered.
-export const recordAt = (product: string, from?: string, source?: "outside") =>
-  at("record", {}, { product, from: from || undefined, source });
+export const reportFlawAt = (product: string, from?: string, source?: "outside") =>
+  at("reportFlaw", {}, { product, from: from || undefined, source });
 
 // The Exploited here shelf, narrowed to one product where one is named.
-export const obligationsAt = (product?: string) =>
-  at("obligations", {}, { product: product || undefined });
+export const exploitedAt = (product?: string) =>
+  at("exploited", {}, { product: product || undefined });
 
 // The record of judgments, asked a question.
-export const auditAt = (query?: Query) => at("audit", {}, query);
+export const recordAt = (query?: Query) => at("record", {}, query);
 
 // An address built here, with its query replaced, for a list moved to another
 // scope with the filters it carried.

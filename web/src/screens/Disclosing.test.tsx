@@ -78,7 +78,7 @@ describe("the disclosing screen", () => {
     const shortcut = Array.from(mount.host().querySelectorAll("a")).find(
       (each) => each.textContent === "Record a reported flaw",
     );
-    expect(shortcut?.getAttribute("href")).toBe("/record?product=sonic&source=outside");
+    expect(shortcut?.getAttribute("href")).toBe("/report-a-flaw?product=sonic&source=outside");
   });
 });
 

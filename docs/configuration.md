@@ -357,7 +357,7 @@ alone is caught.
 ### Roles from groups
 
 Which groups grant which roles is set here and nowhere else. Nothing in the
-running application changes it, and the API and the People screen only show
+running application changes it, and the API and the Access screen only show
 it. It is applied at every start.
 
 | Variable | File key | Meaning | Default |

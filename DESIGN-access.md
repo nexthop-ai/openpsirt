@@ -861,7 +861,7 @@ lifetime. The deliberate case is handled at once by ending their sessions.
 Configuration states which groups grant which roles, and nothing else does
 (REQ-41). The mapping decides who holds every role in the deployment, so it
 changes the way the deployment does, and nothing running can widen it. The API
-and the People screen read it and offer no way to change it.
+and the Access screen read it and offer no way to change it.
 
 | Rule | Reason |
 |---|---|
@@ -894,7 +894,7 @@ when any one of them holds.
 | Configuration writes only its own source | A name removed from configuration takes back what the name gave, and nothing granted here or derived from a group |
 | Somebody named and also granted here keeps administration when the name goes | The grant here is a separate act that nobody took back |
 | A person is read with two answers: granted here, and named in configuration | Deciding whether somebody stays an administrator once a name goes needs to see which they hold. A group's grant reads as granted here |
-| Stating administration here writes only the grant made here | A named person reads as not granted here until somebody grants it, and granting it is how they keep administration after the name goes. The People screen's box is that grant, with a line beneath it where configuration names them too |
+| Stating administration here writes only the grant made here | A named person reads as not granted here until somebody grants it, and granting it is how they keep administration after the name goes. The Access screen's box is that grant, with a line beneath it where configuration names them too |
 | A name added or removed is recorded in the administrative trail, with configuration as the actor, and a removal is also logged at startup by identity | An operator who just edited the configuration reads the log; an access review reads the trail |
 | The upgrade from v0.4.0 clears the flag for every named administrator whose flag no group derived | v0.4.0 wrote the name into the flag and kept nothing telling the two apart. The name still holds, so nobody loses administration at the upgrade; an administrator granted here and also named has to be granted again once the name goes |
 

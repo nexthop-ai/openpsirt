@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { People } from "./People";
+import { Access } from "./Access";
 import type { Who } from "../app/session";
 import { screen, serve, settle, mounted, type Answer } from "../test/mount";
 
@@ -37,7 +37,7 @@ function deployment(overrides: Record<string, Answer> = {}) {
 describe("the access screen", () => {
   it("says the credentials could not be read rather than that none are issued", async () => {
     deployment({ "/v1/keys": { status: 503 } });
-    mount.render(screen(<People who={admin} />));
+    mount.render(screen(<Access who={admin} />));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("The keys and tokens could not be read.");
@@ -46,7 +46,7 @@ describe("the access screen", () => {
 
   it("says the group bindings could not be read", async () => {
     deployment({ "/v1/roles/bindings": { status: 503 } });
-    mount.render(screen(<People who={admin} />));
+    mount.render(screen(<Access who={admin} />));
     await settle();
     expect(mount.host().textContent).toContain("The group bindings could not be read.");
   });
@@ -64,7 +64,7 @@ describe("the access screen", () => {
         },
       },
     });
-    mount.render(screen(<People who={admin} />));
+    mount.render(screen(<Access who={admin} />));
     await settle();
     const rows = [...mount.host().querySelectorAll("tr")].map((row) => row.textContent ?? "");
     expect(rows).toContain("leadsWhole deploymentadmin");
@@ -74,14 +74,14 @@ describe("the access screen", () => {
 
   it("offers withdrawing a role only to an administrator", async () => {
     deployment();
-    mount.render(screen(<People who={admin} />));
+    mount.render(screen(<Access who={admin} />));
     await settle();
     expect(mount.host().querySelector('[title="Withdraw this role"]')).not.toBeNull();
   });
 
   it("offers an auditor no control to withdraw a role", async () => {
     deployment();
-    mount.render(screen(<People who={auditor} />));
+    mount.render(screen(<Access who={auditor} />));
     await settle();
     expect(mount.host().textContent).toContain("alice");
     expect(mount.host().querySelector('[title="Withdraw this role"]')).toBeNull();

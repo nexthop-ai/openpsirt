@@ -22,7 +22,7 @@ import { streamAt } from "../app/routes";
 // one never changes again — so they are labeled rather than blended into a
 // single list of names. A tag names the branch it was cut from, which is what
 // lets a branch be compared against its last release.
-export function Streams() {
+export function Branches() {
   const { product = "" } = useParams();
   const queries = useQueryClient();
   const who = useWho();

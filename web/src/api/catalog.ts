@@ -16,7 +16,7 @@ import { unwrap } from "./queries";
 // landed in one of them.
 
 export type Product = Body<"ProductBody">;
-export type Stream = Body<"StreamBody">;
+type Stream = Body<"StreamBody">;
 type Variant = Body<"VariantBody">;
 
 // The three, as one hook. The variants are the product's own — what it is

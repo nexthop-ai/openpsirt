@@ -20,7 +20,7 @@ import { NotFound } from "../screens/NotFound";
 import { Products } from "../screens/Products";
 import { Product } from "../screens/Product";
 import { Run } from "../screens/Run";
-import { Streams } from "../screens/Streams";
+import { Branches } from "../screens/Branches";
 import { Variants } from "../screens/Variants";
 
 // Split by route, so a screen carries the weight of what it actually needs.
@@ -30,7 +30,7 @@ import { Variants } from "../screens/Variants";
 // failed to arrive is asked for again when the boundary around it is.
 const Home = retrying(() => import("../screens/Home").then((m) => m.Home));
 const Finding = retrying(() => import("../screens/Finding").then((m) => m.Finding));
-const Tree = retrying(() => import("../screens/Tree").then((m) => m.Tree));
+const Dependencies = retrying(() => import("../screens/Dependencies").then((m) => m.Dependencies));
 const Compare = retrying(() => import("../screens/Compare").then((m) => m.Compare));
 const Inbox = retrying(() => import("../screens/Inbox").then((m) => m.Inbox));
 const InboxReport = retrying(() => import("../screens/InboxReport").then((m) => m.InboxReport));
@@ -40,8 +40,8 @@ const InventoryCompare = retrying(() =>
 const InventoryChanges = retrying(() =>
   import("../screens/InventoryChanges").then((m) => m.InventoryChanges),
 );
-const People = retrying(() => import("../screens/People").then((m) => m.People));
-const Work = retrying(() => import("../screens/Work").then((m) => m.Work));
+const Access = retrying(() => import("../screens/Access").then((m) => m.Access));
+const Assignments = retrying(() => import("../screens/Assignments").then((m) => m.Assignments));
 const Queue = retrying(() => import("../screens/Queue").then((m) => m.Queue));
 const Decision = retrying(() => import("../screens/Decision").then((m) => m.Decision));
 const Claim = retrying(() => import("../screens/Claim").then((m) => m.Claim));
@@ -53,7 +53,7 @@ const AutoAssignment = retrying(() =>
   import("../screens/AutoAssignment").then((m) => m.AutoAssignment),
 );
 const Disclosing = retrying(() => import("../screens/Disclosing").then((m) => m.Disclosing));
-const Obligations = retrying(() => import("../screens/Obligations").then((m) => m.Obligations));
+const Exploited = retrying(() => import("../screens/Exploited").then((m) => m.Exploited));
 const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
 const MatchCoverage = retrying(() =>
   import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
@@ -61,12 +61,12 @@ const MatchCoverage = retrying(() =>
 const Inventories = retrying(() => import("../screens/Inventories").then((m) => m.Inventories));
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
 const System = retrying(() => import("../screens/System").then((m) => m.System));
-const Audit = retrying(() => import("../screens/Audit").then((m) => m.Audit));
+const TheRecord = retrying(() => import("../screens/TheRecord").then((m) => m.TheRecord));
 const Reports = retrying(() => import("../screens/reports/Catalog").then((m) => m.Catalog));
 const Report = retrying(() => import("../screens/reports/Report").then((m) => m.Report));
-const Record = retrying(() => import("../screens/Record").then((m) => m.Record));
+const ReportFlaw = retrying(() => import("../screens/ReportFlaw").then((m) => m.ReportFlaw));
 const Person = retrying(() => import("../screens/Person").then((m) => m.Person));
-const Stream = retrying(() => import("../screens/Stream").then((m) => m.Stream));
+const Branch = retrying(() => import("../screens/Branch").then((m) => m.Branch));
 const Advisories = retrying(() => import("../screens/Advisories").then((m) => m.Advisories));
 const Advisory = retrying(() => import("../screens/Advisory").then((m) => m.Advisory));
 const VEX = retrying(() => import("../screens/VEX").then((m) => m.VEX));
@@ -156,11 +156,11 @@ export function App() {
               <Route path={ROUTES.issue} element={<Issue />} />
               <Route path={ROUTES.products} element={<Products who={who.data} />} />
               <Route path={ROUTES.product} element={<Product />} />
-              <Route path={ROUTES.streams} element={<Streams />} />
+              <Route path={ROUTES.streams} element={<Branches />} />
               {/* A branch and a tag share this address and are different
                 questions, so it resolves to whichever screen answers the one
                 that line poses. */}
-              <Route path={ROUTES.stream} element={<Stream />} />
+              <Route path={ROUTES.stream} element={<Branch />} />
               <Route path={ROUTES.variants} element={<Variants />} />
               {/* The list at whatever the picker selects, and the same screen at the
             address a build's other screens share. */}
@@ -168,7 +168,7 @@ export function App() {
               <Route path={ROUTES.productComponent} element={<Component />} />
               <Route path={ROUTES.buildFindings} element={<Findings />} />
               <Route path={ROUTES.finding} element={<Finding />} />
-              <Route path={ROUTES.tree} element={<Tree />} />
+              <Route path={ROUTES.dependencies} element={<Dependencies />} />
               <Route path={ROUTES.decide} element={<Together />} />
               <Route path={ROUTES.inventories} element={<Inventories />} />
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
@@ -183,18 +183,18 @@ export function App() {
               {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
               <Route path={ROUTES.me} element={<Me />} />
-              <Route path={ROUTES.people} element={<People who={who.data} />} />
+              <Route path={ROUTES.access} element={<Access who={who.data} />} />
               {/* One person, whole. An administrator's surface: it carries what
                 somebody was told, which is the question asked after a leak. */}
               <Route path={ROUTES.person} element={<Person />} />
               <Route path={ROUTES.teams} element={<Teams />} />
-              <Route path={ROUTES.work} element={<Work />} />
-              <Route path={ROUTES.audit} element={<Audit />} />
+              <Route path={ROUTES.assignments} element={<Assignments />} />
+              <Route path={ROUTES.record} element={<TheRecord />} />
               <Route path={ROUTES.reports} element={<Reports />} />
               <Route path={ROUTES.report} element={<Report />} />
-              <Route path={ROUTES.record} element={<Record />} />
+              <Route path={ROUTES.reportFlaw} element={<ReportFlaw />} />
               <Route path={ROUTES.disclosing} element={<Disclosing />} />
-              <Route path={ROUTES.obligations} element={<Obligations />} />
+              <Route path={ROUTES.exploited} element={<Exploited />} />
               <Route path={ROUTES.advisories} element={<Advisories />} />
               <Route path={ROUTES.advisory} element={<Advisory />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />

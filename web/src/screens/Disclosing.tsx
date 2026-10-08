@@ -17,7 +17,7 @@ import { Severity } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { useReseed } from "../ui/reseed";
-import { issueAt, recordAt } from "../app/routes";
+import { issueAt, reportFlawAt } from "../app/routes";
 import { scopeQuery, useScope } from "../app/scope";
 
 // The findings approaching disclosure, and the place an embargo is moved (a
@@ -188,7 +188,7 @@ export function Disclosing() {
             flaw from outside starts a date; the other way is a claim from
             outside ruled a duplicate, which is made on the report. */}
         {mayRecord && (
-          <Link className="btn" to={recordAt(scope.product ?? "", undefined, "outside")}>
+          <Link className="btn" to={reportFlawAt(scope.product ?? "", undefined, "outside")}>
             Record a reported flaw
           </Link>
         )}

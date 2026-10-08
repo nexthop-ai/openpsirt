@@ -38,7 +38,10 @@ const SAMPLES: Record<string, () => string[]> = {
       odd,
     ),
   ],
-  treeAt: () => [routes.treeAt(build), routes.treeAt(build, { at: odd, path: odd })],
+  dependenciesAt: () => [
+    routes.dependenciesAt(build),
+    routes.dependenciesAt(build, { at: odd, path: odd }),
+  ],
   decideAt: () => [routes.decideAt(build, odd, { version: odd, ecosystem: odd, namespace: odd })],
   inventoriesAt: () => [routes.inventoriesAt(build)],
   inventoryChangesAt: () => [routes.inventoryChangesAt(build, 7)],
@@ -48,7 +51,7 @@ const SAMPLES: Record<string, () => string[]> = {
   vexAt: () => [routes.vexAt(build)],
   sameScreenAt: () => [
     routes.sameScreenAt(build, ""),
-    routes.sameScreenAt(build, "components"),
+    routes.sameScreenAt(build, "dependencies"),
     routes.sameScreenAt(build, "findings/CVE-1/components/a%2Fb"),
   ],
   sameProductScreenAt: () => [routes.sameProductScreenAt(odd, "/inbox")],
@@ -60,9 +63,12 @@ const SAMPLES: Record<string, () => string[]> = {
   reportAt: () => [routes.reportAt(odd)],
   settingsAt: () => [routes.settingsAt(odd)],
   reviewQueueAt: () => [routes.reviewQueueAt(), routes.reviewQueueAt({ product: odd, mine: true })],
-  recordAt: () => [routes.recordAt(odd, odd), routes.recordAt(odd, undefined, "outside")],
-  obligationsAt: () => [routes.obligationsAt(), routes.obligationsAt(odd)],
-  auditAt: () => [routes.auditAt({ alone: "true", outcome: odd })],
+  reportFlawAt: () => [
+    routes.reportFlawAt(odd, odd),
+    routes.reportFlawAt(odd, undefined, "outside"),
+  ],
+  exploitedAt: () => [routes.exploitedAt(), routes.exploitedAt(odd)],
+  recordAt: () => [routes.recordAt({ alone: "true", outcome: odd })],
   requeried: () => [
     routes.requeried(
       routes.productFindingsAt(odd, { q: odd }),

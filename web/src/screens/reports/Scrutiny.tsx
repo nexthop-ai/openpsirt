@@ -25,7 +25,7 @@ import {
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
-import { auditAt, claimAt } from "../../app/routes";
+import { recordAt, claimAt } from "../../app/routes";
 
 // The window back. Ninety days is a quarter, which is the period an
 // audit asks about; the others are here because a control question is
@@ -83,7 +83,7 @@ export function Scrutiny() {
     // The record reads "to" as the last day in the period, as this sheet does.
     if (period.to) asked.set("to", period.to);
     if (product) asked.set("product", product);
-    return auditAt(asked);
+    return recordAt(asked);
   };
 
   const alone = got.data?.alone ?? [];

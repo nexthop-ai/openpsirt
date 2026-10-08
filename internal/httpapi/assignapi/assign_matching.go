@@ -163,7 +163,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: piecesOfWork(arrived) + " in " + input.Product,
-				Link: weblink.Work(), Private: handed.Undisclosed, ProductID: &product,
+				Link: weblink.Assignments(), Private: handed.Undisclosed, ProductID: &product,
 			}, "person", whoToTell)
 		}
 		left, err := pieceBodies(ctx, in, handed.Left)

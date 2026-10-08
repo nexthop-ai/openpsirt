@@ -468,7 +468,7 @@ func TestAStandingConditionTakesUpWhetherItIsUndisclosed(t *testing.T) {
 		store := notify.NewStore(db.DB)
 		for _, private := range []bool{false, true} {
 			if _, _, err := store.Reconcile(ctx, who.ID, notify.QueueUntaken, []notify.Holds{{
-				About: "queue", Body: "Work is waiting.", Link: "/work",
+				About: "queue", Body: "Work is waiting.", Link: "/assignments",
 				Private: private, ProductID: &product.ID,
 			}}); err != nil {
 				t.Fatal(err)

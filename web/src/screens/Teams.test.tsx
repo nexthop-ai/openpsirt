@@ -62,14 +62,14 @@ describe("one person", () => {
 
   it("offers recording a departure to an administrator", async () => {
     deployment(true);
-    mount.render(screen(<Person />, "/people/alice", "/people/:identity"));
+    mount.render(screen(<Person />, "/access/alice", "/access/:identity"));
     await settle();
     expect(leave()?.disabled).toBe(false);
   });
 
   it("holds recording a departure back from an auditor, and says why", async () => {
     deployment(false);
-    mount.render(screen(<Person />, "/people/alice", "/people/:identity"));
+    mount.render(screen(<Person />, "/access/alice", "/access/:identity"));
     await settle();
     expect(leave()?.disabled).toBe(true);
     expect(leave()?.title).toContain("administrator");

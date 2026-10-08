@@ -1615,7 +1615,7 @@ a switch that exists only in the API.
 
 ## A person, whole
 
-`/people/:identity`, reached from the people list by their name — the same move
+`/access/:identity`, reached from the Access screen by their name — the same move
 as a component's name opening the component. An administrator's screen: it
 carries what somebody was told, which is the question asked after a leak.
 

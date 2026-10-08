@@ -22,7 +22,7 @@ import { on } from "../ui/when";
 import { standing } from "./inbox";
 import { RuleForm, RulingCard } from "./InboxRuling";
 import { Attached } from "../ui/Attached";
-import { inboxAt, issueAt, recordAt } from "../app/routes";
+import { inboxAt, issueAt, reportFlawAt } from "../app/routes";
 
 // One report: what was claimed, who sent it, whether they were answered, what
 // arrived with it, and what it was judged to be.
@@ -151,7 +151,7 @@ function Judge({ product, reference }: { product: string; reference: string }) {
   return (
     <>
       <div className="actions" style={{ marginBottom: 12 }}>
-        <Link className="btn" to={recordAt(product, reference)}>
+        <Link className="btn" to={reportFlawAt(product, reference)}>
           Record as a new flaw
         </Link>
       </div>

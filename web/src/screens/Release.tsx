@@ -11,7 +11,14 @@ import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { BANDS } from "../ui/severities";
 import { Wide } from "../ui/Wide";
-import { buildFindingsAt, comparisonAt, reportAt, streamsAt, treeAt, vexAt } from "../app/routes";
+import {
+  buildFindingsAt,
+  comparisonAt,
+  reportAt,
+  streamsAt,
+  dependenciesAt,
+  vexAt,
+} from "../app/routes";
 
 // One release, gathered.
 //
@@ -157,7 +164,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                       </td>
                       <td>{variant.customer_facing === false ? "No" : "Yes"}</td>
                       <td>
-                        <Link className="linkish" to={treeAt(at)}>
+                        <Link className="linkish" to={dependenciesAt(at)}>
                           Dependencies
                         </Link>
                       </td>
