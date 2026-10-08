@@ -250,6 +250,76 @@ func (r *Reach) ScannedAtTwoPlaces(t *testing.T) {
 	}
 }
 
+// ScannedBeneathAProduct is one issue in one library that curl pulls in
+// directly and through libssh, that an app pulls in, and that the build holds
+// directly: four places, two of them beneath curl.
+//
+// The build names its root by the package identifier given, where one is.
+func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
+	t.Helper()
+	ctx := t.Context()
+
+	names := catalog.NewStore(r.DB.DB)
+	located, err := names.Locate(ctx, "mine", "master", "broadcom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "beneath-a-product", BuiltAt: time.Now().UTC(),
+		ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	if root != "" {
+		if _, err := r.DB.DB.NewUpdate().Table("scan").Set("root_identifier = ?", root).
+			Where("id = ?", scan.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+	curl := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+	libssh := graph.Described{Purl: "pkg:deb/debian/libssh@0.10.6", Name: "libssh", Version: "0.10.6"}
+	app := graph.Described{Purl: "pkg:deb/debian/app@1.0", Name: "app", Version: "1.0"}
+	library := graph.Described{
+		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
+	}
+	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+		Root:       product,
+		Components: []graph.Described{curl, libssh, app, library},
+		Dependencies: []graph.Dependency{
+			{Parent: product, Child: curl}, {Parent: curl, Child: library},
+			{Parent: curl, Child: libssh}, {Parent: libssh, Child: library},
+			{Parent: product, Child: app}, {Parent: app, Child: library},
+			{Parent: product, Child: library},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	findings := finding.NewStore(r.DB.DB)
+	run, err := findings.Begin(ctx, finding.Run{
+		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
+		DatabaseVersion: "2026-08-28", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+		{
+			Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+			Component: library, FixState: finding.NoFix,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // PatchedKernel is the two-issue build with the first issue patched in the
 // kernel, as the build declares it.
 func (r *Reach) PatchedKernel(t *testing.T) {

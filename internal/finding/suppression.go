@@ -51,8 +51,36 @@ type Claim struct {
 	// document stated one outside the package identifier. A publisher naming
 	// no package states it as the branch its product sits in.
 	SubjectVersion string `bun:"subject_version,nullzero"`
-	OpenedScanID   int64  `bun:"opened_scan_id,notnull"`
-	ClosedScanID   *int64 `bun:"closed_scan_id"`
+	// WithinPurl, WithinName and WithinVersion are the product the subject
+	// ships inside, where the document named one. A claim about a component
+	// inside a product of the build applies beneath that product; one whose
+	// product is the build's root, or nothing the build ships, applies across
+	// the build.
+	WithinPurl    string `bun:"within_purl,nullzero"`
+	WithinName    string `bun:"within_name,nullzero"`
+	WithinVersion string `bun:"within_version,nullzero"`
+	// StatedBy is the published statement this claim was taken from, where a
+	// document uploaded on its own named the build's root as its product.
+	// Nil for a claim the build sent with its inventory.
+	StatedBy     *int64 `bun:"stated_by"`
+	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
+	ClosedScanID *int64 `bun:"closed_scan_id"`
+}
+
+// Published is the origin of a claim taken from a published statement whose
+// product is the build's root. The document arrived on its own rather than
+// with an inventory, and what it says about the build is the build's own claim.
+// A scan restates the claims of the two origins it reads, and never this one:
+// a run keeps these in step with the statements that stand.
+const Published = "published"
+
+// within is the product a claim's target ships inside, and nil where the
+// document named the target alone.
+func (c Claim) within() *sbom.Target {
+	if c.WithinPurl == "" && c.WithinName == "" {
+		return nil
+	}
+	return &sbom.Target{Purl: c.WithinPurl, Name: c.WithinName, Version: c.WithinVersion}
 }
 
 // covers reports whether this claim is about the component described.
@@ -79,7 +107,9 @@ func (c Claim) fixes() bool { return sbom.Status(c.Status).Fixes() }
 // the same argument writes nothing and changing the reasoning is a change. The
 // version is part of it where one is stated, so a claim about 4.2 and one about
 // 5.0 are two claims; a claim stating none outside its package identifier
-// keys as it did before a version could be stored.
+// keys as it did before a version could be stored. The product the subject
+// ships inside and the statement a claim was taken from are part of it the same
+// way.
 func claimIdentity(c Claim) string {
 	parts := []string{
 		strings.ToUpper(strings.TrimSpace(c.Vulnerability)),
@@ -87,6 +117,14 @@ func claimIdentity(c Claim) string {
 	}
 	if c.SubjectVersion != "" {
 		parts = append(parts, c.SubjectVersion)
+	}
+	// A claim about zlib inside curl and one about every zlib are two claims.
+	// A claim naming no product keys as it did before a product was stored.
+	if c.WithinPurl != "" || c.WithinName != "" {
+		parts = append(parts, "within", c.WithinPurl, c.WithinName, c.WithinVersion)
+	}
+	if c.StatedBy != nil {
+		parts = append(parts, "stated", fmt.Sprint(*c.StatedBy))
 	}
 	basis := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(basis))
@@ -164,14 +202,22 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 					SubjectVersion: statedBeside(subject),
 					OpenedScanID:   scanID,
 				}
+				if subject.Within != nil {
+					row.WithinPurl = subject.Within.Purl
+					row.WithinName = subject.Within.ComponentNamed()
+					row.WithinVersion = subject.Within.VersionNamed()
+				}
 				row.Identity = claimIdentity(row)
 				wanted[row.Identity] = row
 			}
 		}
 
+		// A claim taken from a document uploaded on its own is no scan's to
+		// restate or withdraw.
 		var open []Claim
 		err := tx.NewSelect().Model(&open).
-			Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").Scan(ctx)
+			Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").
+			Where("origin <> ?", Published).Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read what this build argued before: %w", err)
 		}

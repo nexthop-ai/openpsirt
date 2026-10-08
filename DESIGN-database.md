@@ -536,7 +536,8 @@ anew, the declaration being the tagged one with the column beside it.
 
 | Table | Gains | Every engine |
 |---|---|---|
-| `finding` | The CVE record lines that closed it as unaffected, and the supplier's statement answering it | Two columns holding a null, added where the table stands |
+| `finding` | The CVE record lines that closed it as unaffected, the supplier's statement answering it, and the build's claim covering it whatever the claim says | Three columns holding a null, added where the table stands. A finding names no claim of the second kind until the next run |
+| `suppression` | The product a claim's subject ships inside: its package identifier, its name and its version, and the published statement a claim was taken from | Four columns holding a null, added where the table stands. A claim recorded before the upgrade names no product and applies across the build until a scan restates it |
 | `scan_run` | The CVE record snapshot it read | A column holding a null, added where the table stands |
 | `vex_statement` | The product the statement's component ships inside: its package identifier, its name and its version, and what the statement names its supplier's product as | Four columns holding a null, added where the table stands. A statement uploaded before the upgrade names none until it is read again |
 | `advisory_source` | Nothing; every supplier is set back to read from its window | Its cursor cleared, so the next pass reads what it already read with the product each statement places |
@@ -545,10 +546,11 @@ anew, the declaration being the tagged one with the column beside it.
 | Rule | |
 |---|---|
 | The supplier's statement on a finding is a reference without a foreign key | A statement is superseded and never deleted, so the reference cannot dangle, and a column holding a null is added where the finding table stands on SQLite rather than rebuilding it |
+| The build's claim covering a finding, and the statement a claim was taken from, are references without a foreign key | The same reason: a claim is closed and never deleted, and so is a statement |
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.6.0 database | Upgraded, no finding holds record lines or a statement, no run a snapshot, no statement a product, and each declaration describes the table the migrations built |
+| A v0.6.0 database | Upgraded, no finding holds record lines, a statement or a build's claim of the new kind, no run a snapshot, no statement or claim a product, and each declaration describes the table the migrations built |
 | A VEX document a v0.6.0 deployment recorded as gone out | Upgraded, it is this deployment's own document. The other kind's first revision is accepted beside it, and a second first revision of the same kind is refused |
 | A supplier a v0.6.0 deployment read part of | Upgraded, it holds no record of how far it read |
 

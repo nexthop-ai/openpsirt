@@ -1045,6 +1045,10 @@ after that, and it runs again on a schedule. A claim that lived only in the file
 would be gone by the time anything needed it, and every carried patch would come
 back as an outstanding vulnerability on the first re-scan.
 
+A build's claims arrive with its inventory, or in a document uploaded on its own
+whose statements name the build's root as their product. `DESIGN-triage.md` §
+Statements about the build holds the second.
+
 A statement naming several packages becomes several claims, one per subject.
 Claims are held over intervals, so re-sending them writes nothing; withdrawing
 one closes it rather than deleting it, because what a release argued is a
@@ -1058,7 +1062,13 @@ scanner fault.
 |---|---|
 | It carries a fix | The finding closes as patched, on the scan that first sees the claim. A patch has the effect a version bump has: the code no longer carries the flaw (REQ-11) |
 | The vulnerability does not apply | The finding stays open, marked with the claim, and is not work anybody has to do. It is an argument rather than a patch, and only a dismissal agreed here closes it |
-| It is affected, or it has not decided | Nothing is marked. The build is stating that it looked, which is information rather than an answer |
+| It is affected, or it has not decided | Nothing is marked, and the finding stays work. The build is stating that it looked, which is information rather than an answer |
+
+Every finding names the build's claim covering it, whatever the claim says, so
+the claim's words are shown on it. A claim that the flaw applies carries what
+the build published as the workaround, which is what makes it worth showing: the
+flaw is there, and a holder has something to apply. A claim that suppresses is
+preferred over one that informs where both cover a finding.
 
 A fix arrives in two forms: a patch on the component naming what it resolves,
 and a statement of its own saying `fixed`. Both close.

@@ -26,7 +26,9 @@ package vex
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -126,11 +128,13 @@ type Issue struct {
 }
 
 // Shipped is what somebody has: the build, with the component the statement is
-// about underneath it.
+// about underneath it, or the component of the build that pulls it in where the
+// statement is about one place.
 //
 // The build rather than the component, because a VEX statement is about a
 // thing somebody has — and what they have is our image, which happens to
-// contain that library.
+// contain that library. The build is named by its inventory's root, which a
+// scanner reading the inventory and this document together matches on.
 type Shipped struct {
 	ID            string   `json:"@id"`
 	Subcomponents []Inside `json:"subcomponents,omitempty"`
@@ -354,6 +358,12 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
+	// Where a component's places disagree, each place a decision covers is
+	// stated on its own, naming what pulls the component in as the product.
+	placed, err := finding.CoveredAtPlaces(ctx, s.db, named.ProductID, target.ID, visible, s.carrying())
+	if err != nil {
+		return nil, err
+	}
 	var stated []statedBySupplier
 	if kind == WithSuppliers {
 		if stated, err = s.disclaimed(ctx, target.ID, visible); err != nil {
@@ -371,7 +381,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// not be generated" with a 500, and the sentence saying which build and
 	// what the limit is went to the log instead of to the person who can act
 	// on it.
-	if len(rows)+len(fixed)+len(stated) > s.carrying() {
+	if len(rows)+len(placed)+len(fixed)+len(stated) > s.carrying() {
 		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
@@ -381,8 +391,11 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// The words each of those decisions rests on, read off the decision the
 	// statement is about. One statement for the document rather than one per
 	// component.
-	decided := make([]int64, 0, len(rows))
+	decided := make([]int64, 0, len(rows)+len(placed))
 	for _, row := range rows {
+		decided = append(decided, row.DecidedBy)
+	}
+	for _, row := range placed {
 		decided = append(decided, row.DecidedBy)
 	}
 	said, err := finding.StatedBy(ctx, s.db, decided)
@@ -419,6 +432,9 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	for _, row := range rows {
 		issues = append(issues, row.VulnerabilityID)
 	}
+	for _, row := range placed {
+		issues = append(issues, row.VulnerabilityID)
+	}
 	for _, row := range fixed {
 		issues = append(issues, row.VulnerabilityID)
 	}
@@ -430,7 +446,10 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		return nil, err
 	}
 
-	shipped := build(named)
+	shipped, err := s.rootOf(ctx, named, target.ID)
+	if err != nil {
+		return nil, err
+	}
 	for _, row := range rows {
 		about := row.Purl
 		if about == "" {
@@ -460,6 +479,31 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			statement.ImpactStatement = row.Mitigation
 		case "affected":
 			statement.ActionStatement = row.Mitigation
+		}
+		doc.Statements = append(doc.Statements, statement)
+	}
+	// A place stated on its own names what pulls the component in as the
+	// product, so a reader applies it beneath that product and nowhere else.
+	for _, row := range placed {
+		about := row.Purl
+		if about == "" {
+			about = row.Component
+		}
+		words := said[row.DecidedBy]
+		statement := Statement{
+			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
+			Timestamp:     words.ProposedAt.UTC(),
+			Products: []Shipped{{
+				ID: row.ConsumerPurl, Subcomponents: []Inside{{ID: about}},
+			}},
+			Status: statusOf(row.Outcome),
+		}
+		switch statement.Status {
+		case "not_affected":
+			statement.Justification = words.Justification
+			statement.ImpactStatement = words.Mitigation
+		case "affected":
+			statement.ActionStatement = words.Mitigation
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
@@ -506,7 +550,10 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		if a.Vulnerability.Name != b.Vulnerability.Name {
 			return a.Vulnerability.Name < b.Vulnerability.Name
 		}
-		return a.Products[0].Subcomponents[0].ID < b.Products[0].Subcomponents[0].ID
+		if a.Products[0].Subcomponents[0].ID != b.Products[0].Subcomponents[0].ID {
+			return a.Products[0].Subcomponents[0].ID < b.Products[0].Subcomponents[0].ID
+		}
+		return a.Products[0].ID < b.Products[0].ID
 	})
 	return doc, nil
 }
@@ -825,9 +872,31 @@ func identify(who publisher.Named, named *catalog.Named, kind Kind) string {
 	return fmt.Sprintf("%s/vex/%s", who.Namespace, build(named))
 }
 
-// build is how the thing somebody holds is named in the document.
+// build is how the thing somebody holds is named in the document's identifier.
 func build(named *catalog.Named) string {
 	return named.Product + ":" + named.Stream + ":" + named.Variant
+}
+
+// rootOf is how a statement names the build: the package identifier its
+// inventory gave its root, which is what a scanner reading the two together
+// matches the product against, and what a deployment loading both reads as the
+// build's own claim. The build's names stand in where the inventory named no
+// root by a package identifier.
+func (s *Store) rootOf(ctx context.Context, named *catalog.Named, targetID int64) (string, error) {
+	var root string
+	err := s.db.NewSelect().
+		TableExpr(`"target" AS "t"`).
+		Join(`JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
+		ColumnExpr(`COALESCE(sc.root_identifier, '')`).
+		Where("t.id = ?", targetID).
+		Scan(ctx, &root)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("read how the build names itself: %w", err)
+	}
+	if root == "" {
+		return build(named), nil
+	}
+	return root, nil
 }
 
 // namesOf is what each of these issues is also called, keyed by issue.

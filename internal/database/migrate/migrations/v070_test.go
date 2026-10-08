@@ -46,14 +46,26 @@ func TestAV060DatabaseUpgradesToV070(t *testing.T) {
 			Scan(ctx, &placed); err != nil {
 			t.Fatalf("the statement table has no product a component ships inside: %v", err)
 		}
-		if findings != 0 || runs != 0 || answered != 0 || placed != 0 {
-			t.Errorf("upgraded, %d findings, %d runs, %d answered findings and %d statements "+
-				"hold values nothing wrote", findings, runs, answered, placed)
+		var claimed, inside int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "finding" WHERE "claimed_by" IS NOT NULL`).
+			Scan(ctx, &claimed); err != nil {
+			t.Fatalf("the finding table has no build claim covering it: %v", err)
+		}
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "suppression"
+			WHERE "within_purl" IS NOT NULL OR "within_name" IS NOT NULL
+				OR "within_version" IS NOT NULL OR "stated_by" IS NOT NULL`).
+			Scan(ctx, &inside); err != nil {
+			t.Fatalf("the claim table has no product a subject ships inside: %v", err)
+		}
+		if findings != 0 || runs != 0 || answered != 0 || placed != 0 || claimed != 0 || inside != 0 {
+			t.Errorf("upgraded, %d findings, %d runs, %d answered findings, %d statements, "+
+				"%d claimed findings and %d claims hold values nothing wrote",
+				findings, runs, answered, placed, claimed, inside)
 		}
 		t.Run("TheDeclarationsAreTheTablesTheMigrationsBuild", func(t *testing.T) {
 			declared := migrations.StatementsV070(db.Server.Engine)
-			if len(declared) != 4 {
-				t.Errorf("v0.7.0 declares %d tables, want 4", len(declared))
+			if len(declared) != 5 {
+				t.Errorf("v0.7.0 declares %d tables, want 5", len(declared))
 			}
 			declarationsAreBuilt(t, ctx, db, declared, madeElsewhere)
 		})

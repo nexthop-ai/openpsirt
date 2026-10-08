@@ -589,7 +589,21 @@ its own name or in a header saying what it fixes.
 | A claim against a source tree matches a component of that name, or a fork of one | The build knows which packages came out of a tree and this deployment does not |
 | A source tree is named either way it can be named | As a bare name where the document carried no package identifier, and as a package identifier of the generic type where it carried one. The two are the same claim and are matched the same |
 | A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
-| A claim is matched at every place its component sits | The fan-out is ours either way |
+| A claim is matched at every place its component sits, within the product it names | The fan-out is ours either way. The next table holds what the product changes |
+
+A claim is placed by the product it names its subject as shipping inside.
+
+| The product is | The claim applies |
+|---|---|
+| Named by nothing, or the build's root, or nothing the build ships | Across the whole build. A root is stored by its name alone, so it is never a component the claim is placed beneath |
+| A component of the build, at the version the claim names | At a place where every route up the tree runs through that component, at any depth, and never on the component itself. A place reached through the product and outside it is not answered: the build spoke about what it shipped inside the product |
+| A component of the build at another version, or named at no version | Nowhere. A claim about one release of a product says nothing about another |
+
+A claim stores the product with the subject: its package identifier, its name
+and its version. A claim about zlib inside curl and one about every zlib are two
+claims, and a claim naming no product keys as it did before a product was
+stored, so a claim recorded earlier keeps its row until the build restates it
+with its product.
 
 A claim attached to a scan is stored with the package identifier, the name and
 the version it states outside the identifier. A claim that names no package and
@@ -869,10 +883,11 @@ which file they wrote it in.
 | What a statement names its supplier's product as is stored with it: a component inside a named product, a product named alone by no package identifier, or nothing | Only a statement read this way places anything, so one recorded before the product was read, and a package named alone, close nothing |
 | A claim a later document repeats word for word, placing the supplier's product where it stood, keeps its row and takes the later document's digest. A row recorded before its product was read keeps its row for the same claim placed anywhere, and takes where it is placed now | A superseded claim tells every approved decision citing it that the publisher changed what they published, and repeated, they did not. A claim moved to another release of the product is a change, and what an approval was granted on stays readable as it was. A fetched advisory's digest covers which of its claims were kept as well as its bytes, so the same advisory read again differs in digest whenever the product ships something it did not |
 
-What is done with the statements is not an ingest question. A supplier's
+What is done with the statements is not an ingest question. A statement whose
+product is a build's root is that build's own claim (REQ-11), a supplier's
 statement about its own product closes the finding at the places that product
 occupies (REQ-31), and every other statement is evidence and a prefill.
-`DESIGN-triage.md` § Evidence from publishers holds both.
+`DESIGN-triage.md` § Evidence from publishers holds the three.
 
 ## Supplier advisories
 

@@ -128,6 +128,12 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// rather than upstream of us, so a suppressed finding is something
 		// that can be seen and accounted for instead of one that never
 		// arrived.
+		//
+		// What a document uploaded on its own says about the build's root is
+		// the build's claim too, brought up to date first.
+		if err := publishedForBuild(ctx, tx, productID, targetID); err != nil {
+			return err
+		}
 		claims, err := openClaims(ctx, tx, targetID)
 		if err != nil {
 			return err
@@ -139,7 +145,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		for _, id := range vulnerabilities {
 			issueIDs = append(issueIDs, id)
 		}
-		suppliers, err := disclaimers(ctx, tx, productID, issues, issueIDs, present, places)
+		// Where each product a claim or a statement names sits in this
+		// build, worked out once per product.
+		placed, err := placing(ctx, tx, targetID, present, places)
+		if err != nil {
+			return err
+		}
+		suppliers, err := disclaimers(ctx, tx, productID, issues, issueIDs, placed)
 		if err != nil {
 			return err
 		}
@@ -249,9 +261,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				return fmt.Errorf("issue %q was not recorded", r.Issue.Identifier)
 			}
 
-			covering := coveringClaim(claims, r.Issue, component)
 			for _, consumerID := range places.of(component.ID) {
 				at := place{componentID: component.ID, consumerID: consumerID}
+				// Asked per place: a claim about a component inside one of the
+				// build's products reaches only the places beneath it.
+				covering, claimedBy := coveringClaim(claims, r.Issue, component, consumerID, placed)
 				// Set on every report rather than only when true, because a
 				// later report at the same key replaces the finding below and
 				// the claim it names with it.
@@ -293,6 +307,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					MatchedIn: r.MatchedIn, MatchedRange: r.MatchedRange,
 					SuppressedBy: covering,
 					StatedBy:     answeredBy,
+					ClaimedBy:    claimedBy,
 					OpenedAt:     startedAt,
 					OpenedRunID:  &runID,
 				}
@@ -470,6 +485,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				Set("matched_range = ?", f.MatchedRange).
 				Set("suppressed_by = ?", f.SuppressedBy).
 				Set("stated_by = ?", f.StatedBy).
+				Set("claimed_by = ?", f.ClaimedBy).
 				Set("last_changed_at = ?", now)
 			if moved {
 				update = update.
@@ -658,6 +674,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Finding)(nil)).
 					Set("suppressed_by = ?", claimID).
+					Set("claimed_by = ?", claimID).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
 				return err
 			})
@@ -807,6 +824,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Set("stated_by = NULL").
 					Set("moved_to = ?", "").
 					Set("suppressed_by = ?", claimID).
+					Set("claimed_by = ?", claimID).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
 				return err
 			})
@@ -898,7 +916,8 @@ func same(held, found Finding) bool {
 		held.MatchedIn == found.MatchedIn &&
 		held.MatchedRange == found.MatchedRange &&
 		equalRef(held.SuppressedBy, found.SuppressedBy) &&
-		equalRef(held.StatedBy, found.StatedBy)
+		equalRef(held.StatedBy, found.StatedBy) &&
+		equalRef(held.ClaimedBy, found.ClaimedBy)
 }
 
 // learnedExploitation is the moment to record beside a clock that just moved,
@@ -1080,13 +1099,18 @@ func describedOf(c graph.Component) graph.Described {
 	}
 }
 
-// coveringClaim finds the build's argument that covers a reported issue, if it
-// made one.
+// coveringClaim finds the build's argument that covers a reported issue at
+// one place, if it made one: the claim that suppresses it, and the claim the
+// finding names whatever it says.
 //
 // A claim that arrived attached to the component is preferred over one that
 // named something we had to match: the first knows exactly what it is about,
-// while the second may name a whole source tree.
-func coveringClaim(claims []Claim, issue Named, component graph.Component) *int64 {
+// while the second may name a whole source tree. A claim that suppresses is
+// preferred over one saying the flaw applies, which leaves the finding work and
+// carries the build's workaround.
+func coveringClaim(claims []Claim, issue Named, component graph.Component, consumerID int64,
+	p *placer) (suppressing, claimed *int64) {
+
 	names := map[string]bool{normalize(issue.Identifier): true}
 	for _, alias := range issue.Aliases {
 		names[normalize(alias)] = true
@@ -1094,14 +1118,21 @@ func coveringClaim(claims []Claim, issue Named, component graph.Component) *int6
 
 	described := describedOf(component)
 
-	var found *int64
+	var found, informing *int64
 	for _, claim := range claims {
-		if !names[normalize(claim.Vulnerability)] || !claim.suppresses() || !claim.covers(described) {
+		if !names[normalize(claim.Vulnerability)] || !claim.covers(described) ||
+			!p.reaches(claim.within(), component, consumerID) {
 			continue
 		}
 		id := claim.ID
+		if !claim.suppresses() {
+			if informing == nil {
+				informing = &id
+			}
+			continue
+		}
 		if claim.Origin == string(sbom.FromPedigree) {
-			return &id
+			return &id, &id
 		}
 		if found == nil {
 			// The first in a stable order, so the answer does not move
@@ -1109,7 +1140,10 @@ func coveringClaim(claims []Claim, issue Named, component graph.Component) *int6
 			found = &id
 		}
 	}
-	return found
+	if found != nil {
+		return found, found
+	}
+	return nil, informing
 }
 
 // inventory is what a target currently contains, as far as findings care.

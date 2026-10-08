@@ -1316,6 +1316,23 @@ the product was read, names no supplier's product and closes nothing.
 | The closed row names the statement, and a revision saying the same thing moves the row to it | What closed it stays readable after the statement is superseded |
 | Among several statements, one answering every route stands over one answering some, and the oldest over a newer | The answer does not move between runs |
 
+### Statements about the build
+
+A statement whose product is a build's root speaks for the build's producer,
+whichever way it arrived (REQ-11). Sent with the inventory, it is recorded as
+the build's claim when the scan is read. In a document uploaded on its own, it
+is recorded by the run as a claim of the build taken from that statement. Both
+are applied alike: `DESIGN-findings.md` § Build-declared claims holds what each
+status does.
+
+| Rule | |
+|---|---|
+| The root is matched by the package identifier the build's latest inventory gave it, at the version the statement names | A statement about one release says nothing about the next. A statement naming no version, and an inventory giving its root no package identifier, place nothing, and the statement stays evidence |
+| A claim taken from a statement closes when the statement is set aside or revised away, or the root moves to another version | It is kept in step by the run, before the build's claims are read. A scan restates the claims it sent and never these |
+| The claim names the statement it was taken from | Whose document it is stays readable on the finding |
+| A statement about a component inside the build, uploaded on its own, is that component's supplier's | § Supplier statements applied holds what it closes |
+| The same statement sent with the inventory is the build's claim, applied beneath that component | The build is speaking. A supplier's statement is replaced by the publisher's next document across the whole product, and every build of a product sends one by the same author, so read as a supplier's each build would set aside the last one's. `DESIGN-ingest.md` § Build-declared suppressions holds where it applies |
+
 ### Evidence placement
 
 | Rule | |

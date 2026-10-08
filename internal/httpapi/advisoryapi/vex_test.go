@@ -202,14 +202,13 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 	})
 }
 
-func TestAVEXStatementCoversEveryPlaceOrIsAbsent(t *testing.T) {
-	// The format says "this product, this component, not affected" and has no
-	// finer grain than that. A finding is an issue at a place, and a component
-	// commonly sits at many, so one dismissal agreed at one place speaks for
-	// a component still open at all the others. That is a
-	// machine-readable claim of "not affected" about something that is
-	// affected, published to every customer running a scanner against the
-	// image, which is the most expensive wrong answer this tool can produce.
+func TestADismissalAtOnePlaceIsStatedAboutThatPlaceAndNeverTheBuild(t *testing.T) {
+	// A finding is an issue at a place, and a component commonly sits at
+	// many. Stated about the build, one dismissal agreed at one place speaks
+	// for a component still open at all the others: a machine-readable claim
+	// of "not affected" about something that is affected, published to every
+	// customer running a scanner against the image. Stated with what pulls
+	// the component in as the product, it says what was agreed and no more.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedAtTwoPlaces(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
@@ -246,14 +245,32 @@ func TestAVEXStatementCoversEveryPlaceOrIsAbsent(t *testing.T) {
 				Vulnerability struct {
 					Name string `json:"name"`
 				} `json:"vulnerability"`
+				Products []struct {
+					ID            string `json:"@id"`
+					Subcomponents []struct {
+						ID string `json:"@id"`
+					} `json:"subcomponents"`
+				} `json:"products"`
 			} `json:"statements"`
 		}
 		httpapitest.Read(t, r, "triager", at, &doc)
+		consumers := map[string]bool{
+			"pkg:deb/debian/libswsscommon@1.0.0": true, "pkg:deb/debian/libteam5@1.31": true,
+		}
+		stated := 0
 		for _, each := range doc.Statements {
-			if each.Vulnerability.Name == "CVE-2026-9999" {
-				t.Errorf("a component dismissed at one place of several is published as "+
-					"not affected: %+v", doc.Statements)
+			if each.Vulnerability.Name != "CVE-2026-9999" {
+				continue
 			}
+			stated++
+			if !consumers[each.Products[0].ID] ||
+				each.Products[0].Subcomponents[0].ID != "pkg:deb/debian/libnl-3-200@3.7.0" {
+				t.Errorf("a component dismissed at one place of several is stated about %s, "+
+					"want the libnl one consumer pulls in", each.Products[0].ID)
+			}
+		}
+		if stated != 1 {
+			t.Errorf("%d statements about the issue, want the one place agreed", stated)
 		}
 	})
 }

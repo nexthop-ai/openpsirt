@@ -704,6 +704,7 @@ customer — which is the reason the two-person approval on those claims exists.
 | The mitigation goes in a different field depending on the status | On a claim that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
 | Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
 | The statement is about the build, with the component underneath | A VEX statement is about a thing somebody has, and what they have is the image |
+| The build is named by the package identifier its inventory gave its root | A scanner reading the inventory and the document together matches the product against the root, and a deployment loading both reads a statement about the root as the build's own claim. The build's names stand in where the inventory gave its root no package identifier |
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
 | Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
 | Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
@@ -715,15 +716,12 @@ customer — which is the reason the two-person approval on those claims exists.
 | An agreed claim and a supplier's statement never speak about one issue in one component | A claim is said only of a component with a place open, and a statement only of one with none |
 | A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
 
-A statement is made only where every open place agrees, and agrees the same
-way. An advisory asks the same of each release, through the same query. The format says "this product, this component, not affected" and has no
-finer grain. A component commonly sits at several places, so a dismissal agreed
-at one of them is not a claim about the component: published as one it is a
+A statement about the build is made only where every open place agrees, and
+agrees the same way. An advisory asks the same of each release, through the same
+query. A component commonly sits at several places, so a dismissal agreed at
+one of them is not a claim about the component: published as one it is a
 machine-readable "not affected" about something that is affected, sent to every
 customer running a scanner against the image.
-
-Places dismissed for different reasons — one not applicable, one already fixed —
-produced two contradictory statements and now produce none.
 
 Where several places were decided in separate sittings the document states the
 earliest: the claim that has stood longest and the one a reader can check
@@ -739,6 +737,24 @@ statement says the component is not present while describing the network
 control that protects it. That is a composite no record ever held, going to
 every customer running a scanner. The group answers with the earliest
 decision's identifier, and its words are read by that identifier.
+
+### Statements about one place
+
+Where a component's places disagree, each place a decision covers is stated on
+its own: the consumer that pulls the component in is the product, and the
+component is beneath it. "libnl inside libswsscommon 1.0.0: not affected".
+
+| Rule | |
+|---|---|
+| A place is stated only where every open place of the component beneath its consumer, at any depth, is decided the same way | A reader applies a statement about a product beneath that product, a supplier's statement included (REQ-31). Stated while a place deeper under the consumer is open, it answers that place too |
+| The earliest decision among those places speaks | As it does for a whole component |
+| A consumer whose package identifier names no version names no product | A statement naming a product at no version is about every release of it, and a reader applies it nowhere |
+| A place the build holds directly is never stated alone | It has no consumer, and the only product it could name is the build, which a reader applies across the whole build |
+| One statement per consumer, however many places beneath it agree | A place deeper under the consumer is stated about its own consumer as well, where the rule holds there |
+
+Places dismissed for different reasons — one not applicable, one already fixed —
+are no statement about the component. Each is stated about its own place, where
+the rule above holds there.
 
 ### Identity and revisions
 

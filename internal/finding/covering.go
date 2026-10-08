@@ -88,6 +88,18 @@ func coveringOutcomes(reader Reader) string {
 func WhollyCovered(q *bun.SelectQuery, productID int64,
 	visible []access.Visibility, reader Reader) *bun.SelectQuery {
 
+	return covered(q, productID, visible, reader).
+		Having("COUNT(cl.id) = COUNT(*)").
+		Having("COUNT(DISTINCT cl.outcome) = 1")
+}
+
+// covered joins each open finding of a grouped read to the approved, live
+// decisions covering it for one reader, and adds the outcome and the earliest
+// decision as the columns Covering reads. Safe as an aggregate only where the
+// caller refuses a group whose places disagree about the outcome.
+func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
+	reader Reader) *bun.SelectQuery {
+
 	return q.
 		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
 			AND de.state = 'approved'
@@ -96,13 +108,9 @@ func WhollyCovered(q *bun.SelectQuery, productID int64,
 			AND `+keyMatchesOn("de", `(SELECT mc.outcome FROM "claim" AS "mc"
 				WHERE mc.id = de.claim_id)`), productID, bun.List(visible)).
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id AND ` + coveringOutcomes(reader)).
-		// Safe as an aggregate, because the grouping refuses a group whose
-		// places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
 		ColumnExpr(`MIN(de.id) AS "decided_by"`).
-		Where("f.closed_at IS NULL").
-		Having("COUNT(cl.id) = COUNT(*)").
-		Having("COUNT(DISTINCT cl.outcome) = 1")
+		Where("f.closed_at IS NULL")
 }
 
 // Stated is what one decision claims, as a published statement repeats it.
