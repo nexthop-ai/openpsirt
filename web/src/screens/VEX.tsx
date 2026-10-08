@@ -64,7 +64,10 @@ export function VEX() {
       <div className="screen-head">
         <h2>VEX document</h2>
         <p>
-          For a customer&rsquo;s own scanner. Approved dismissals and public findings only.{" "}
+          For a customer&rsquo;s own scanner.{" "}
+          {kind === "with-suppliers"
+            ? "Approved dismissals, and suppliers' statements in their name. Public findings only."
+            : "Approved dismissals and public findings only."}{" "}
           <a href={base + tail}>Current document (JSON)</a>
         </p>
       </div>
