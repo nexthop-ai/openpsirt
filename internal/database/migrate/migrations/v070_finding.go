@@ -10,12 +10,12 @@ import (
 // findingV070 is v0.7.0's declaration of the finding table, and the indexes it
 // makes.
 //
-// v0.3.0's, with the CVE record lines that closed a finding as unaffected, the
-// supplier's statement that answers it, and the build's claim about it.
-// Derived from v0.3.0's declaration, which a tagged release fixed and which
-// never changes again.
+// The baseline's, with the CVE record lines that closed a finding as
+// unaffected, the supplier's statement that answers it, and the build's claim
+// about it. Derived from the baseline's declaration, which v0.5.0's record of
+// its schema holds.
 func findingV070(t *columnTypes) []string {
-	statements := findingV030(t)
+	statements := findingBaseline(t)
 	statements[0] = withColumn(statements[0], `"rated_at"         `+t.timestamp+` NULL,`,
 		`-- The lines of the CVE record that state this finding's version
 			-- is unaffected, as JSON, where that is why it closed. Kept on
@@ -43,9 +43,9 @@ func findingV070(t *columnTypes) []string {
 
 // scanRunV070 is v0.7.0's declaration of the scan run table.
 //
-// v0.2.0's, with the CVE record snapshot the run read.
+// The baseline's, with the CVE record snapshot the run read.
 func scanRunV070(t *columnTypes) []string {
-	for _, statement := range findingStatements(t) {
+	for _, statement := range issueBaseline(t) {
 		if !strings.Contains(statement, `CREATE TABLE "scan_run"`) {
 			continue
 		}

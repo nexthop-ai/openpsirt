@@ -14,8 +14,9 @@ advisory.
 
 !!! note "Alpha"
     Below 1.0 the API and the schema carry no compatibility promise. A
-    database built by any release is upgraded in place; a database built by
-    a release candidate or any other earlier build is recreated.
+    database built by a release is upgraded in place, or, where it is too
+    old, through an earlier release first; a database built by a release
+    candidate or any other earlier build is recreated.
     [Current state](built.md) says what is built and what is not.
 
 ## Scope

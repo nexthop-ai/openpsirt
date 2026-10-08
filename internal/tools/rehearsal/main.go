@@ -4,7 +4,7 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.1.0 -engine postgres -dir .demo/rehearsal
+//	rehearsal -from v0.5.0 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
 // the test suite reads, so the password is never on the command line. -url
@@ -89,7 +89,7 @@ func main() {
 	var r run
 	var dir string
 	var keep bool
-	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.1.0")
+	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.5.0")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
 	flag.StringVar(&r.adminURL, "url", "", "the engine's URL, when not OPENPSIRT_TEST_<ENGINE>_URL; the rehearsal makes a database of its own beside the one named")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
@@ -248,11 +248,6 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 			r.from, strings.Join(empty, ", "))
 	}
 
-	removed, err := r.droppedSettings(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	r.step("migrated to %d by this tree", current)
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
@@ -267,16 +262,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, with(rules(r.from), dropped(removed))))...)
-
-	if _, ok := notes[r.from]; ok {
-		r.step("what the upgrade note asks of an operator")
-		n, err := r.grantImplied(ctx)
-		if err != nil {
-			return nil, err
-		}
-		r.note("%d disclosed roles granted beside undisclosed ones", n)
-	}
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -295,12 +281,6 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	r.saveLogs(ctx, "current")
 	return faults, nil
 }
-
-// notes names the releases whose upgrade note asks an operator to act before
-// the upgraded deployment serves what it served. Before v0.2.0 an undisclosed
-// role reached disclosed work too, and nothing grants the disclosed role on
-// upgrade (docs/configuration.md, Upgrading).
-var notes = map[string]bool{"v0.1.0": true}
 
 // engineVariable is the environment variable holding an engine's URL.
 func engineVariable(engine string) string {
@@ -478,27 +458,6 @@ func connect(ctx context.Context, raw string) (*database.DB, error) {
 		return nil, err
 	}
 	return database.Open(ctx, target)
-}
-
-// droppedSettings counts the settings migration 38 removes from what the
-// release left: the patch branch switch, and v0.1.0's name for the disclosure
-// threshold where the new name is also stored.
-func (r *run) droppedSettings(ctx context.Context) (int64, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = db.Close() }()
-	var n int64
-	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "application_setting" AS "s"
-		WHERE "s"."name" = 'patch.branches'
-		   OR ("s"."name" = 'disclosure.extension-threshold' AND EXISTS (
-		       SELECT 1 FROM "application_setting" AS "t"
-		       WHERE "t"."name" = 'disclosure.movement-threshold'))`).Scan(&n)
-	if err != nil {
-		return 0, fmt.Errorf("count the settings the upgrade drops: %w", err)
-	}
-	return n, nil
 }
 
 // count reads how many rows each table holds, with nothing running against

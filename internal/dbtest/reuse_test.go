@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/uptrace/bun"
@@ -112,7 +113,7 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 		})
 
 		// The database an interrupted run leaves: made, and migrated no
-		// further than the first migration.
+		// further than the first migration, the baseline.
 		if _, err := ensureDatabase(ctx, admin, engine, name); err != nil {
 			t.Fatalf("make %s: %v", name, err)
 		}
@@ -121,7 +122,8 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		half := openClosed(t, own)
-		if err := migrate.UpTo(ctx, half, slog.New(slog.NewTextHandler(io.Discard, nil)), 1); err != nil {
+		if err := migrate.UpTo(ctx, half, slog.New(slog.NewTextHandler(io.Discard, nil)),
+			migrations.Baseline); err != nil {
 			t.Fatalf("apply the first migration: %v", err)
 		}
 		// What an interrupted schema statement leaves on MySQL and MariaDB:

@@ -67,7 +67,7 @@ func TestAV060DatabaseUpgradesToV070(t *testing.T) {
 			if len(declared) != 5 {
 				t.Errorf("v0.7.0 declares %d tables, want 5", len(declared))
 			}
-			declarationsAreBuilt(t, ctx, db, declared, madeElsewhere)
+			declarationsAreBuilt(t, ctx, db, declared, nil)
 		})
 	})
 }

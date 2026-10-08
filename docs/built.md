@@ -1,9 +1,9 @@
 # Current state
 
 The latest release is {{ release }}. Below 1.0 there is no compatibility
-promise for the API or the schema. A database built by any release is upgraded
-in place, and a database built by a release candidate or any other earlier
-build is recreated.
+promise for the API or the schema. A database built by a release is upgraded in
+place, or, where it is too old, through an earlier release first, and a
+database built by a release candidate or any other earlier build is recreated.
 [Configuration](configuration.md#upgrading) says what an upgrade changes.
 
 ## Areas

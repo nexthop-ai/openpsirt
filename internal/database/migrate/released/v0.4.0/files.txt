@@ -1,2 +1,0 @@
-# The migrations v0.4.0 tagged, and the digest of each file below its license header.
-last 38

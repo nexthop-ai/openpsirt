@@ -8,12 +8,11 @@ import "strings"
 // vexStatementsV070 is v0.7.0's declaration of the vex_statement table, and the
 // indexes it makes.
 //
-// v0.2.0's, with the product the statement's component ships inside, and when
-// a later document last said it again. Derived
-// from v0.2.0's declaration, which a tagged release fixed and which never
-// changes again.
+// The baseline's, with the product the statement's component ships inside,
+// and when a later document last said it again. Derived from the baseline's
+// declaration, which v0.5.0's record of its schema holds.
 func vexStatementsV070(t *columnTypes) []string {
-	statements := vexStatements(t)
+	statements := vexBaseline(t)
 	statements[0] = withColumn(statements[0], `"component"   `+t.name+` NOT NULL,`,
 		`-- The product the component ships inside, where the document
 			-- named one: the product of an OpenVEX statement with
@@ -44,11 +43,11 @@ func vexStatementsV070(t *columnTypes) []string {
 
 // vexIssuanceV070 is v0.7.0's declaration of the vex_issuance table.
 //
-// v0.2.0's, with the kind of document that went out. Each kind is a document
+// The baseline's, with the kind of document that went out. Each kind is a document
 // of its own, with an identifier and revisions of its own, so the revisions
 // are numbered per build and kind.
 func vexIssuanceV070(t *columnTypes) []string {
-	statements := vexIssuanceStatements(t)
+	statements := vexIssuanceBaseline(t)
 	statements[0] = withColumn(statements[0], `"target_id" `+t.ref+` NOT NULL,`,
 		`-- Which document about the build went out: what this deployment
 			-- agreed to, or that with what suppliers state about their own

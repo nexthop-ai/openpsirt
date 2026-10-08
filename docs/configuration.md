@@ -838,7 +838,8 @@ alone.
 OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
 ```
 
-The chart sets it from `outbound.excluded`.
+The chart sets it from `outbound.excluded`. Its earlier name,
+`OPENPSIRT_PATCH_EXCLUDED`, is refused at startup.
 
 ## Supplier advisories
 
@@ -1092,10 +1093,11 @@ deleting by surprise.
 
 ## Upgrading
 
-A database built by any release is upgraded in place, at startup or by
-`openpsirt migrate up`. One built by an earlier release passes through each
-later release's upgrade on the way. A database built by a release candidate or
-any build between releases is recreated.
+A database is upgraded in place, at startup or by `openpsirt migrate up`,
+through each later release's upgrade on the way. A database built by a release
+older than the [oldest section below](#from-v040) names is refused, and that
+section says how to bring it forward. A database built by a release candidate
+or any build between releases is recreated.
 
 Read [Every upgrade](#every-upgrade), the section for the release you are coming
 from, and every section after it.
@@ -1114,78 +1116,17 @@ database a later release upgraded and serves it, failing on what changed, so
 redeploying one, `helm rollback` included, is not going back: restore the
 backup first.
 
-### From v0.1.0
-
-| Change | What to do |
-|---|---|
-| `private-read` and `private-triage` reach undisclosed findings only. In v0.1.0 they reached disclosed findings too | Grant `public-read` or `public-triage` beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade |
-| The setting `disclosure.extension-threshold` is `disclosure.movement-threshold` | Nothing. The value is carried across by the upgrade |
-
-| After the upgrade from v0.1.0 | |
-|---|---|
-| An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
-| A reported flaw | Has a reference, minted as one recorded today would be |
-
-### From v0.2.0
-
-| Change | What to do |
-|---|---|
-| `OPENPSIRT_PATCH_EXCLUDED` is `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's `patchBranches.excluded` is `outbound.excluded` | Move the list. The old name is refused at startup, and the chart refuses to render with the old key set |
-| The excluded list also keeps supplier directories out, and a supplier is read from every host its description names | Set `outbound.excluded` wherever suppliers are configured |
-| A threshold stored under its v0.1.0 name, `disclosure.extension-threshold`, is in force again as `disclosure.movement-threshold` where that was never set. v0.2.0 read only the new name, so it ran on the default | Check it under Settings, Disclosure |
-| Patch branch lookups are turned on in the deployment's configuration. The `patch.branches` setting is gone | Set `patchBranches.enabled: true` in the chart, or `OPENPSIRT_PATCH_BRANCHES=true`. A deployment that had the setting on has the lookups off until then. [What to set first](#enabling) |
-
-| After the upgrade from v0.2.0 | |
-|---|---|
-| A report | Sent in from outside |
-| A flaw recorded here with a severity in force in its product | Rated at its first recording in that product. Its deadline counts from there, on the windows for flaws in our own product |
-| A flaw recorded here with no severity in force | Not rated, and with no deadline |
-| A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
-| A component | Has no license until a scan reads one from its inventory |
-
-### From v0.3.0
-
-v0.4.0 changed no schema, so a v0.3.0 database takes the same upgrade a v0.4.0
-one does.
-
-| Change | What to do |
-|---|---|
-| `triage.together-cap` bounds how many reports one ruling covers, how many places one answer about one issue covers, and how many rows a screen acts on one request at a time, and nothing else. An answer about many issues, a re-affirmation and a carry read `triage.review-issues` (200 issues) and `triage.agreed-issues` (2,000 issues). Those three, and recording a flaw or adding builds to one, read `triage.write-ceiling` (50,000 findings). A value set on `triage.together-cap` is not carried to them | Where `triage.together-cap` was changed, set the new limits under Settings, Triage |
-
 ### From v0.4.0
 
-| Change | What to do |
-|---|---|
-| `OPENPSIRT_DATABASE_URL` is refused at startup when it has a fragment (`#…`), an `@` in its path or in a query parameter's name, or no `//` after the scheme. v0.4.0 connected with such a URL, and each is the shape of a user name or password holding an unescaped `/`, `?`, `#` or `@`, part of which v0.4.0 wrote to its startup log. An `@` in a query parameter's value, as in `?user=app@corp`, is accepted as before | Percent-encode `/ ? # @` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
-| Removing a name from `OPENPSIRT_BOOTSTRAP_ADMINS` and restarting revokes the administration the name granted. v0.4.0 left it standing | Nothing, unless somebody named there should stay an administrator after the name goes: before removing the name, tick the administrator box for them under People. The box is the grant made in the application, and the line beneath it says when configuration names them too |
-| With roles bound to groups, somebody recorded under People who has not signed in within the authorization window is refused, as in direct mode. v0.4.0 admitted them on their first arrival in a mapped group | Record them again to reopen the window |
-| A chart install with `auth.trustedHeader.name` set renders a NetworkPolicy admitting only the ingress controller, by ingress-nginx's labels and namespace unless told otherwise | Where the controller is not ingress-nginx, or runs in a namespace other than `ingress-nginx`, set `networkPolicy.ingressController` to its labels, or add it under `networkPolicy.from`. Anything in the cluster that reaches the Service directly rather than through the ingress, such as a pipeline uploading with a key, is refused until it is named under `networkPolicy.from`. [The trusted header](#the-trusted-header) |
-| `OPENPSIRT_BASE_URL` with a query, a fragment or credentials is refused at startup | Write the address alone |
-| With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set, `sslmode=disable`, `tls=false` or `allowFallbackToPlaintext=true` in the database URL, or `PGSSLMODE=disable` under a URL naming no mode, is refused at startup, and a transport that may fall back to cleartext is replaced by one that may not | Remove the cleartext setting |
-| Migrating with `OPENPSIRT_DB_MAX_OPEN=1` on PostgreSQL, MySQL or MariaDB is refused | Set it to 2 or more |
-| Half an object store credential pair is refused at startup: a key without its secret, a secret without its key, or a session token with neither. v0.4.0 ignored the half and ran as the environment's own identity | Set `OPENPSIRT_ATTACHMENT_KEY` and `OPENPSIRT_ATTACHMENT_SECRET` together or not at all, and the same for `OPENPSIRT_DIRECTORY_KEY` and `OPENPSIRT_DIRECTORY_SECRET` |
-| Recording that an advisory went out takes a triage role on every product it covers. In v0.4.0 a triage role on any product was enough | Grant the publisher triage on each product their advisories cover |
-| A filter taking words from a set refuses a word named twice with a 422, and a filter of product names takes at most 200. A saved filter repeating a word opens as a 422 | Save the filter again without the repeat |
-| What somebody was told, read from their page by an administrator or an auditor, holds only lines about products the reader holds a role on. In v0.4.0 it also held the disclosed lines about every other product | Grant the reader the product where they investigate a person's notices |
-| Another name for an issue is recorded only on a flaw recorded here, and only as a CVE or a GitHub advisory. In v0.4.0 any text was taken on any issue | Nothing. A scanner's issue takes its other names from the scans |
-| Saved filters are read and kept at `/v1/session/me/saved-filters`. In v0.4.0 they were kept per product, under `/v1/products/{product}/saved-filters` | Point a script that keeps filters at the new address |
-| `saved.max-per-person` counts every saved filter one person keeps. In v0.4.0 it counted each product's | Nothing, unless somebody keeps more than it after the upgrade: they are refused a new filter until they forget enough, or it is raised under Settings, Limits |
+A database v0.4.0 or an earlier release built is refused at startup and by
+`openpsirt migrate up`, naming the version it holds. This release makes
+v0.5.0's schema in one step and carries none of the upgrades before it.
 
-| After the upgrade from v0.4.0 | |
-|---|---|
-| A name added to or removed from `OPENPSIRT_BOOTSTRAP_ADMINS` | Recorded in the administrative changes at the start that applies it, by configuration |
-| Somebody named in `OPENPSIRT_BOOTSTRAP_ADMINS` | Administers through the name. An administration grant made under People for them is not kept, because v0.4.0 recorded the name and the grant in one place, and they lose administration when the name goes unless it is granted again. The administrative changes list, filtered to accounts, shows who was granted administration under People and by whom |
-| An alert that a critical finding is on a release, that a build has gone quiet, or about an embargo | Opens once more, and every outbound destination is sent it once more |
-| Re-scans | Can pause once, for up to a day, where a v0.4.0 process held the re-scan lease when it stopped |
-| A name somebody recorded for an issue in v0.4.0 | Reads as reported by a scan, so it cannot be removed. A name recorded from v0.5.0 on can be |
-| API keys whose names differ only in capitals or surrounding spaces, as `CI` and `ci` | One keeps the name in lower case and goes on working: a key in force before a withdrawn one, then the oldest. Every other key in force is withdrawn, so a pipeline sending with it is refused from the upgrade on and needs a new key. The key list shows each one as withdrawn under a numbered name, as `ci #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it and the moment it ran |
-| An API key's name | Stored in lower case. Withdraw it by that name in any capitals |
-| One person's API tokens whose names differ only in capitals or surrounding spaces | One keeps the name in lower case and goes on working: a token in force before a withdrawn one, then the oldest. Every other token in force is withdrawn, so a script using it is refused from the upgrade on and its owner needs to mint a new one. The owner's token list shows each one as withdrawn under a numbered name, as `laptop #7`, and the administrative changes list, filtered to credentials, shows each withdrawal with the upgrade as who made it |
-| An API token's name | Stored in lower case. Withdraw it by that name in any capitals |
-| An exploited issue | Has no day it was listed in the known-exploited catalog. The first scan stating one moves every open exploited finding of the issue to count from that day, and some become overdue at once |
-| A flaw found here with a report from outside ruled a duplicate of it, and no disclosure date | Dated from when that report arrived, plus the disclosure window. The flaw's embargo history shows the date as set by the ruling |
-| A saved filter | Offered on every findings list, in every product, and applied within the product, branch and variant on screen. The branch, the variant, anything naming one build or one run, and the grouping are no longer part of it |
-| One person's saved filters of one name in several products | The oldest keeps the name. One that becomes the same filter as an older one, the same query preparing the same claim once its branch and variant go, is removed. Each other is renamed after its product, as `Kernel (Router)`, with a number after it where that name is taken too |
+1. Back the database up.
+2. Run `openpsirt migrate up` with v0.6.0 against it. v0.6.0 carries every
+   earlier upgrade, and its [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.6.0/configuration/#upgrading)
+   say what each one changes.
+3. Deploy this release, reading the sections from v0.6.0 on.
 
 ### From v0.5.0
 

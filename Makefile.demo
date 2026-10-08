@@ -719,7 +719,7 @@ demo-reset: demo-down
 # this tree and checked. DESIGN-database.md § Upgrade rehearsal says what it
 # checks; it is a step of the release checklist there.
 #
-#   make upgrade-rehearsal FROM=v0.2.0 ENGINE=postgres
+#   make upgrade-rehearsal FROM=v0.5.0 ENGINE=postgres
 #
 # The engine's URL is the one make engines-up wrote, read by the tool from the
 # environment rather than its command line, and the rehearsal makes a
@@ -730,7 +730,7 @@ demo-reset: demo-down
 REHEARSAL_DIR ?= $(DEMO_DIR)/rehearsal
 upgrade-rehearsal:
 	@test -n "$(FROM)" && test -n "$(ENGINE)" \
-	  || { echo "usage: make upgrade-rehearsal FROM=v0.2.0 ENGINE=sqlite|postgres|mysql|mariadb"; exit 2; }
+	  || { echo "usage: make upgrade-rehearsal FROM=v0.5.0 ENGINE=sqlite|postgres|mysql|mariadb"; exit 2; }
 	@mkdir -p $(REHEARSAL_DIR)
 	@[ -d $(REHEARSAL_DIR)/grype ] || [ ! -d $(DEMO_DIR)/grype ] || cp -a $(DEMO_DIR)/grype $(REHEARSAL_DIR)/grype
 	@$(MAKE) --no-print-directory demo-image DEMO_IMAGE=openpsirt-rehearsal:current

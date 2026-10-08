@@ -509,12 +509,12 @@ that check a download:
 A release is a tag, on a commit that froze the release's migrations.
 Everything after the tag is the `Release` workflow.
 
-1. Rehearse the upgrade from every earlier release on each engine.
-   `DESIGN-database.md` § Upgrade rehearsal says what it checks.
+1. Rehearse the upgrade from every earlier release the baseline upgrades, on
+   each engine. `DESIGN-database.md` § Upgrade rehearsal says what it checks.
 
    ```
    make engines-up
-   for from in v0.1.0 v0.2.0 v0.3.0 v0.4.0 v0.5.0; do for engine in sqlite postgres mysql mariadb; do
+   for from in v0.5.0 v0.6.0; do for engine in sqlite postgres mysql mariadb; do
      make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
    done; done
    ```

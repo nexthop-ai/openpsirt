@@ -5,8 +5,10 @@ package migrations_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -93,4 +95,36 @@ func TestWriteTheSchemaAReleaseTags(t *testing.T) {
 				engine)
 		}
 	}
+}
+
+// taggedSchema holds what a release's migrations build to what they built
+// when it was tagged, which the files alone do not: the column spellings and
+// widths they use are read from helpers a later change is free to edit.
+//
+// The expected schema was captured from the tag's migrations on each engine.
+func taggedSchema(t *testing.T, version string, engine database.Engine, got []string) {
+	t.Helper()
+	want, err := os.ReadFile(filepath.Join(records, version, released.Schema(string(engine)))) //nolint:gosec // G304: a record in this repository, named by a release and an engine
+	if err != nil {
+		t.Fatalf("read what %s built on %s: %v", version, engine, err)
+	}
+	lines := strings.Split(strings.TrimRight(string(want), "\n"), "\n")
+	if diff := setDiff(lines, got); diff != "" {
+		t.Errorf("the migrations no longer build what %s built on %s:\n%s", version, engine, diff)
+	}
+}
+
+func setDiff(want, got []string) string {
+	var b strings.Builder
+	for _, line := range want {
+		if !slices.Contains(got, line) {
+			fmt.Fprintf(&b, "  missing: %s\n", line)
+		}
+	}
+	for _, line := range got {
+		if !slices.Contains(want, line) {
+			fmt.Fprintf(&b, "  extra:   %s\n", line)
+		}
+	}
+	return b.String()
 }
