@@ -114,6 +114,7 @@ describe("every address the interface builds", () => {
   it("reads which routes the router mounts", () => {
     expect(mountedIn(`<Route path={ROUTES.home} element={<Home />} />`)).toEqual(["home"]);
     expect(mountedIn(`<Route path="/elsewhere" element={<Home />} />`)).toEqual([]);
+    expect(mountedIn(`<Route\n  path={ROUTES.home}\n  element={<Home />}\n/>`)).toEqual(["home"]);
   });
 });
 

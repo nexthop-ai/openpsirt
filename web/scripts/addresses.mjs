@@ -310,7 +310,7 @@ export function screensOf(appText) {
 // mountedIn is every route name the router mounts, as the name it reads out of
 // the table.
 export function mountedIn(appText) {
-  return [...appText.matchAll(/<Route path=\{ROUTES\.(\w+)\}/g)].map((m) => m[1]);
+  return [...appText.matchAll(/<Route\s+path=\{ROUTES\.(\w+)\}/g)].map((m) => m[1]);
 }
 
 // The router's own source.

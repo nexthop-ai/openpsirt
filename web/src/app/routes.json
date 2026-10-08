@@ -138,7 +138,10 @@
   "person": { "path": "/access/:identity" },
   "teams": { "path": "/teams" },
   "assignments": { "path": "/assignments", "query": ["person", "tab", "team"] },
-  "record": { "path": "/record", "query": ["alone", "from", "in_force", "outcome", "product", "to"] },
+  "record": {
+    "path": "/record",
+    "query": ["alone", "from", "in_force", "outcome", "product", "to"]
+  },
   "reports": { "path": "/reports" },
   "report": { "path": "/reports/:report", "query": ["days"] },
   "reportFlaw": { "path": "/report-a-flaw", "query": ["from", "product", "source"] },
@@ -149,5 +152,17 @@
   "autoAssignment": { "path": "/auto-assignment" },
   "settings": { "path": "/settings" },
   "settingsSection": { "path": "/settings/:section" },
-  "system": { "path": "/system" }
+  "system": { "path": "/system" },
+  "formerAccess": { "path": "/people" },
+  "formerPerson": { "path": "/people/:identity" },
+  "formerAssignments": { "path": "/work" },
+  "formerExploited": { "path": "/obligations" },
+  "formerRecord": { "path": "/audit" },
+  "formerDependencies": {
+    "path": "/products/:product/streams/:stream/variants/:variant/components"
+  },
+  "formerInventories": { "path": "/products/:product/streams/:stream/variants/:variant/scans" },
+  "formerInventoryChanges": {
+    "path": "/products/:product/streams/:stream/variants/:variant/scans/:scan/changes"
+  }
 }

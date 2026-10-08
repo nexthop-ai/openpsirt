@@ -107,7 +107,7 @@ func TestAnAddressIsHeldToTheRouteTable(t *testing.T) {
 	}{
 		{"/review-queue?mine=1", false},
 		{"/review-queue?tab=mine", true},
-		{"/work", true},
+		{"/assignment", true},
 		{"/queue?mine=1", true},
 		{"/products/p/streams/s/variants/v/findings/CVE-1/components/c", false},
 		{"/products/p/streams/s/variants/v/findings/CVE-1/components/a/b", true},

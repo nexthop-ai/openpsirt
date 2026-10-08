@@ -9,8 +9,9 @@ import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
+import { Moved, built } from "./moved";
 import { retrying } from "./retrying";
-import { ROUTES } from "./routes";
+import { ROUTES, dependenciesAt, inventoriesAt, inventoryChangesAt, personAt } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
@@ -201,6 +202,37 @@ export function App() {
               <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
               <Route path={ROUTES.settingsSection} element={<Settings who={who.data} />} />
               <Route path={ROUTES.system} element={<System />} />
+              {/* The addresses these screens had before each was named after
+                its rail entry. A notice in somebody's bell keeps the link it
+                was sent with, so the old address forwards rather than opening
+                the catch-all. The old address of The record is not here: the
+                record now lives there. */}
+              <Route path={ROUTES.formerAccess} element={<Moved to={() => "/access"} />} />
+              <Route
+                path={ROUTES.formerPerson}
+                element={<Moved to={(at) => personAt(at.identity ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerAssignments}
+                element={<Moved to={() => "/assignments"} />}
+              />
+              <Route
+                path={ROUTES.formerExploited}
+                element={<Moved to={() => "/exploited-here"} />}
+              />
+              <Route path={ROUTES.formerRecord} element={<Moved to={() => "/record"} />} />
+              <Route
+                path={ROUTES.formerDependencies}
+                element={<Moved to={(at) => dependenciesAt(built(at))} />}
+              />
+              <Route
+                path={ROUTES.formerInventories}
+                element={<Moved to={(at) => inventoriesAt(built(at))} />}
+              />
+              <Route
+                path={ROUTES.formerInventoryChanges}
+                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+              />
               {/* An address this application does not answer. It says so, and
                 keeps the address in the bar: redirecting home threw away the
                 one piece of evidence a link built wrong leaves behind, which
