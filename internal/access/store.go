@@ -464,6 +464,20 @@ func (s *Store) SetEmail(ctx context.Context, personID int64, address string, fr
 	return nil
 }
 
+// SetDisplayName records the label shown instead of somebody's identity. An
+// empty name clears it, which leaves the identity showing.
+func (s *Store) SetDisplayName(ctx context.Context, personID int64, name string) error {
+	if personID == 0 {
+		return refusal.New("a name needs somebody to belong to")
+	}
+	if _, err := s.db.NewUpdate().Model((*Account)(nil)).
+		Set("display_name = ?", strings.TrimSpace(name)).
+		Where("id = ?", personID).Exec(ctx); err != nil {
+		return fmt.Errorf("record the name of person %d: %w", personID, err)
+	}
+	return nil
+}
+
 // SetDigest records what somebody asked to be sent.
 //
 // Both switches are theirs rather than an administrator's: what somebody wants

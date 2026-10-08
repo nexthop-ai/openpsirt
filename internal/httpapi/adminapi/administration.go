@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -157,8 +158,10 @@ func seesNothing(held []HeldBody) bool {
 // caller sends "effective": true to be allowed to, and the reply echoes that
 // back as though it were the answer.
 type RecordBody struct {
-	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
-	DisplayName string `json:"display_name,omitempty" doc:"The label shown instead of the identity"`
+	Identity string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
+	// DisplayName is a pointer for the reason Email is: a name, an empty one,
+	// and no mention at all are three different requests.
+	DisplayName *string `json:"display_name,omitempty" doc:"The label shown instead of the identity. Send it empty to clear it; omit it to leave it alone"`
 	// Admin is a pointer so that three things stay distinguishable: making
 	// somebody an administrator, taking it away, and saying nothing about it.
 	// A plain bool decodes an absent field as false, so granting a role — a
@@ -408,7 +411,11 @@ func registerAdministration(api huma.API, a core.Administering) {
 			// connection takes administration away from somebody who has it,
 			// records nothing saying so, and answers 201.
 			var before *access.Account
-			before, person, err = store.Restate(ctx, in.Body.Identity, in.Body.DisplayName,
+			named := ""
+			if in.Body.DisplayName != nil {
+				named = strings.TrimSpace(*in.Body.DisplayName)
+			}
+			before, person, err = store.Restate(ctx, in.Body.Identity, named,
 				in.Body.Admin, in.Body.Audits)
 			switch {
 			case errors.Is(err, database.ErrGoAgain):
@@ -435,6 +442,20 @@ func registerAdministration(api huma.API, a core.Administering) {
 			if in.Body.Email != nil {
 				if err := store.SetEmail(ctx, person.ID, *in.Body.Email, access.Recorded); err != nil {
 					return core.WentWrong(a.Logger, "where to reach them could not be recorded", err)
+				}
+			}
+			// The name, for somebody already recorded: recording a new
+			// person wrote it above. Stated empty clears it, which leaves the
+			// identity showing; omitted leaves it alone.
+			if before != nil && in.Body.DisplayName != nil && named != before.DisplayName {
+				if err := store.SetDisplayName(ctx, person.ID, named); err != nil {
+					return core.WentWrong(a.Logger, "that name could not be recorded", err)
+				}
+				person.DisplayName = named
+				if err := core.Noted(ctx, db, trail.Account, person.Identity,
+					trail.Said("named "+before.DisplayName, before.DisplayName != ""),
+					trail.Said("named "+named, named != "")); err != nil {
+					return core.NotRecorded(a.Logger, err)
 				}
 			}
 			if len(in.Body.Holds) > 0 && deriving == access.GroupBound {

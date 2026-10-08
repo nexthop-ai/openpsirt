@@ -11058,7 +11058,7 @@ export interface components {
             admin?: boolean;
             /** @description Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is */
             audits?: boolean;
-            /** @description The label shown instead of the identity */
+            /** @description The label shown instead of the identity. Send it empty to clear it; omit it to leave it alone */
             display_name?: string;
             /** @description The address to reach them at outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was */
             email?: string;
