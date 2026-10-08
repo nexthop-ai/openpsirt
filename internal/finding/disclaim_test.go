@@ -1058,3 +1058,55 @@ func anyAnswered(rows []finding.Finding) bool {
 	}
 	return false
 }
+
+func TestAClaimMovedToAnotherReleaseOfTheProductIsSetAside(t *testing.T) {
+	// What an approval was granted on stays readable as it was: a statement
+	// about Y 4.2 is not rewritten into one about Y 4.3.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage)
+		at := func(version string) finding.Statement {
+			return finding.Statement{Vulnerability: inside, Purl: zlib.Purl, Component: "zlib",
+				About: "1.2.11", WithinPurl: "pkg:generic/acme-y@" + version, Within: "acme-y",
+				WithinAbout: version, Placement: finding.PlacedInside, Status: "not_affected"}
+		}
+		from := finding.Supplied{Source: finding.FromVex, Publisher: "Acme Security",
+			Document: "acme-y.openvex.json", Digest: "sha256:one"}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			[]finding.Statement{at("4.9")}); err != nil {
+			t.Fatal(err)
+		}
+		var first int64
+		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Scan(ctx, &first); err != nil {
+			t.Fatal(err)
+		}
+
+		// A plain addition: 4.10 sorts before 4.9, and 4.9 keeps its row.
+		from.Digest = "sha256:two"
+		if _, superseded, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			[]finding.Statement{at("4.9"), at("4.10")}); err != nil || superseded != 0 {
+			t.Fatalf("adding 4.10 set aside %d: %v", superseded, err)
+		}
+		var kept finding.Statement
+		if err := f.db.DB.NewSelect().Model(&kept).Where("ss.id = ?", first).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if kept.Superseded != nil || kept.WithinAbout != "4.9" {
+			t.Errorf("the 4.9 row is superseded %v and now about %q", kept.Superseded, kept.WithinAbout)
+		}
+
+		// A move: 4.9 is no longer said, 4.11 is.
+		from.Digest = "sha256:three"
+		if _, superseded, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			[]finding.Statement{at("4.10"), at("4.11")}); err != nil || superseded != 1 {
+			t.Fatalf("moving 4.9 to 4.11 set aside %d: %v", superseded, err)
+		}
+		if err := f.db.DB.NewSelect().Model(&kept).Where("ss.id = ?", first).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if kept.Superseded == nil || kept.WithinAbout != "4.9" {
+			t.Errorf("the 4.9 row is superseded %v and about %q, want it set aside as it was",
+				kept.Superseded, kept.WithinAbout)
+		}
+	})
+}

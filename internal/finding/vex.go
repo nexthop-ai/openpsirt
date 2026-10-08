@@ -670,38 +670,61 @@ type placed struct {
 // places them, the standing rows the document no longer makes, and the claims
 // it makes that nothing stands for.
 //
-// Rows making one claim are paired in a fixed order on both sides, so two
-// identical claims placed in two products each keep one row.
+// A repeat is the same claim placing the supplier's product in the same place.
+// A claim moved to another release of the product is a different claim, and
+// what an approval was granted on stays readable as it was. A row recorded
+// before its product was read places nothing, and pairs with the same claim
+// placed anywhere, once no exact repeat wants it. Rows are paired in a fixed
+// order on both sides, so two identical claims placed in two products each
+// keep one row.
 func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statement) {
 	sorted := slices.Clone(held)
 	slices.SortFunc(sorted, func(a, b Statement) int { return cmp.Compare(a.ID, b.ID) })
-	byClaim := map[string][]Statement{}
+	exactly := func(one Statement) string { return claimOf(one) + "\x00" + placementOf(one) }
+	exact, unplaced := map[string][]Statement{}, map[string][]Statement{}
 	for _, row := range sorted {
-		byClaim[claimOf(row)] = append(byClaim[claimOf(row)], row)
+		if row.Placement == "" && row.Within == "" {
+			unplaced[claimOf(row)] = append(unplaced[claimOf(row)], row)
+			continue
+		}
+		exact[exactly(row)] = append(exact[exactly(row)], row)
 	}
 	saying := slices.Clone(said)
 	slices.SortStableFunc(saying, func(a, b Statement) int {
-		if c := strings.Compare(claimOf(a), claimOf(b)); c != 0 {
-			return c
-		}
-		return strings.Compare(placementOf(a), placementOf(b))
+		return strings.Compare(exactly(a), exactly(b))
 	})
+
 	repeated := map[placed][]int64{}
-	var fresh []Statement
+	keep := func(one Statement, row Statement) {
+		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}
+		repeated[at] = append(repeated[at], row.ID)
+	}
+	// Exact repeats first, so a row recorded before its product was read
+	// never takes a claim a placed row repeats.
+	var rest []Statement
 	for _, one := range saying {
-		claim := claimOf(one)
-		if rows := byClaim[claim]; len(rows) > 0 {
-			at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}
-			repeated[at] = append(repeated[at], rows[0].ID)
-			byClaim[claim] = rows[1:]
+		if rows := exact[exactly(one)]; len(rows) > 0 {
+			keep(one, rows[0])
+			exact[exactly(one)] = rows[1:]
+			continue
+		}
+		rest = append(rest, one)
+	}
+	var fresh []Statement
+	for _, one := range rest {
+		if rows := unplaced[claimOf(one)]; len(rows) > 0 {
+			keep(one, rows[0])
+			unplaced[claimOf(one)] = rows[1:]
 			continue
 		}
 		fresh = append(fresh, one)
 	}
 	var gone []int64
-	for _, rows := range byClaim {
-		for _, row := range rows {
-			gone = append(gone, row.ID)
+	for _, left := range []map[string][]Statement{exact, unplaced} {
+		for _, rows := range left {
+			for _, row := range rows {
+				gone = append(gone, row.ID)
+			}
 		}
 	}
 	slices.Sort(gone)
