@@ -629,6 +629,9 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							Where(start.from(""), start.args...).
 							Where("closed_at IS NULL").
 							Where("kind <> ?", Entered).
+							// A place a supplier answers on some routes
+							// carries no deadline.
+							Where("stated_by IS NULL").
 							Where(inThisProduct, productID)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {

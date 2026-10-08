@@ -456,17 +456,33 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 			claims); err != nil {
 			t.Fatal(err)
 		}
-		// The same slice, the way a retry hands it back. Under another digest,
-		// so the pass sets the first aside and writes the claims again rather
-		// than finding the same bytes already held and writing nothing.
+		// A revision saying other things sets them aside. A claim repeated
+		// word for word keeps its row, so only claims nothing stands for are
+		// written, and this is what puts them back in that position.
+		revised := from
+		revised.Digest = "sha256:two"
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, revised,
+			[]finding.Statement{{Vulnerability: "CVE-2026-3", Component: "curl", Status: "affected"}}); err != nil {
+			t.Fatal(err)
+		}
+		// The same claims, the way a retry hands them back, carrying the keys
+		// a pass before was given.
+		var given []int64
+		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
+			Limit(len(claims)).Scan(ctx, &given); err != nil {
+			t.Fatal(err)
+		}
+		for i := range claims {
+			claims[i].ID = given[i]
+		}
 		again := from
-		again.Digest = "sha256:two"
+		again.Digest = "sha256:three"
 		recorded, superseded, err := f.store.RecordStatements(ctx, who, f.productID, again, claims)
 		if err != nil {
 			t.Fatalf("recording the same claims again: %v", err)
 		}
-		if recorded != len(claims) || superseded != len(claims) {
-			t.Errorf("the second pass recorded %d and set aside %d, want %d of each",
+		if recorded != len(claims) || superseded != 1 {
+			t.Errorf("the last pass recorded %d and set aside %d, want %d and 1",
 				recorded, superseded, len(claims))
 		}
 	})

@@ -299,6 +299,9 @@ func (from Supplied) valid() error {
 // of the same name and leaves the rest of what they have published standing —
 // and neither kind touches the other, because uploading a publisher's
 // statement set would otherwise set aside every advisory of theirs on record.
+//
+// A claim the document repeats word for word keeps its row and stands in the
+// new document. Only a claim it no longer makes is set aside.
 func (s *Store) RecordStatements(ctx context.Context, by access.Subject, productID int64,
 	from Supplied, said []Statement) (recorded, superseded int, err error) {
 
@@ -318,16 +321,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 
 		// The same bytes read the same way change nothing, so nothing is
-		// written. Set aside and rewritten, every standing claim gets a new
-		// identity and a superseded moment — and a superseded claim is what
-		// tells everyone holding an approved decision that cited it that the
-		// publisher has changed what they published. Re-syncing a publisher's
-		// directory is the ordinary operation once advisories arrive one per
-		// issue, so that notice would fire on every pass and say nothing.
-		//
-		// The digest is of the bytes, and what the claims say is also how
-		// they were read. Where the reading of the same bytes differs from
-		// what stands, the reading is recorded, so uploading a document again
+		// written. Where the reading of the same bytes differs from what
+		// stands, the reading is recorded below, so uploading a document again
 		// is how rows stored under an earlier reading are brought up to date.
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
@@ -348,38 +343,62 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			recorded = len(standing)
 			return nil
 		}
-		// The same bytes, saying the same things, read with where each
-		// statement places its supplier's product beside them: a statement
-		// recorded before the product was read. The claims are unchanged, so
-		// they are brought up to date where they stand. Set aside, every
-		// approved decision citing one would be told the publisher changed
-		// what they published, which they did not.
-		if len(standing) > 0 && sameClaims(standing, said) {
-			if err := placeWhereTheyStand(ctx, tx, standing, said); err != nil {
-				return err
-			}
-			recorded = len(standing)
-			return nil
-		}
-
-		setting := tx.NewUpdate().Model((*Statement)(nil)).
-			Set("superseded_at = ?", now).
+		// What stands under this document's key, whatever bytes it arrived
+		// as. A claim the document repeats word for word keeps its row, brought
+		// up to date with the document it now stands in and where it places
+		// its supplier's product. Only a claim the document no longer makes is
+		// set aside, because a superseded claim is what tells everyone holding
+		// an approved decision that cited it that the publisher changed what
+		// they published — and repeated, they did not. A fetched advisory's
+		// digest covers which of its claims were kept as well as its bytes, so
+		// the same advisory read again differs in digest whenever the product
+		// ships something it did not.
+		var held []Statement
+		heldBy := tx.NewSelect().Model(&held).
+			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
+				"within_about", "placement", "status", "justification", "statement").
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
 			Where("superseded_at IS NULL")
 		if from.Source == FromAdvisory {
-			setting = setting.Where("document_id = ?", identifier)
+			heldBy = heldBy.Where("document_id = ?", identifier)
 		}
-		res, err := setting.Exec(ctx)
+		if err := heldBy.Scan(ctx); err != nil {
+			return fmt.Errorf("ask what they said before: %w", err)
+		}
+		repeated, gone, fresh := pairRepeated(held, said)
+
+		err = database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
+			_, err := tx.NewUpdate().Model((*Statement)(nil)).
+				Set("superseded_at = ?", now).
+				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+			return err
+		})
 		if err != nil {
 			return fmt.Errorf("set aside what they said before: %w", err)
 		}
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("set aside what they said before: %w", err)
+		superseded = len(gone)
+
+		for placed, ids := range repeated {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Statement)(nil)).
+					Set("within_purl = ?", nullable(placed.WithinPurl)).
+					Set("within = ?", nullable(placed.Within)).
+					Set("within_about = ?", nullable(placed.WithinAbout)).
+					Set("placement = ?", nullable(placed.Placement)).
+					Set("document = ?", from.Document).
+					Set("digest = ?", from.Digest).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("keep what they said again: %w", err)
+			}
+			recorded += len(ids)
 		}
-		superseded = int(n)
+
+		said = fresh
 		for i := range said {
 			// The store assigns identity, so a key on the way in is cleared
 			// rather than stated. The engine writes the key it assigned back
@@ -640,65 +659,53 @@ func placementOf(one Statement) string {
 	return strings.Join([]string{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}, "\x00")
 }
 
-// sameClaims reports whether two sets of statements claim the same things, in
-// any order, wherever they place their suppliers' products.
-func sameClaims(held, said []Statement) bool {
-	if len(held) != len(said) {
-		return false
-	}
-	claims := func(rows []Statement) []string {
-		out := make([]string, len(rows))
-		for i, one := range rows {
-			out[i] = claimOf(one)
-		}
-		slices.Sort(out)
-		return out
-	}
-	return slices.Equal(claims(held), claims(said))
+// placed is where a statement places its supplier's product, which a
+// repeated claim takes from the document repeating it.
+type placed struct {
+	WithinPurl, Within, WithinAbout, Placement string
 }
 
-// placeWhereTheyStand writes where each statement places its supplier's
-// product onto the standing row claiming the same thing.
+// pairRepeated pairs each claim a document makes with a standing row making
+// the same claim, and answers the repeated rows by where the document now
+// places them, the standing rows the document no longer makes, and the claims
+// it makes that nothing stands for.
 //
-// Rows claiming the same thing are paired in a fixed order on both sides, so
-// two identical claims placed in two products each take one placement.
-func placeWhereTheyStand(ctx context.Context, tx bun.IDB, held, said []Statement) error {
-	byClaim := map[string][]Statement{}
-	for _, one := range said {
-		byClaim[claimOf(one)] = append(byClaim[claimOf(one)], one)
-	}
-	for claim := range byClaim {
-		slices.SortFunc(byClaim[claim], func(a, b Statement) int {
-			return strings.Compare(placementOf(a), placementOf(b))
-		})
-	}
+// Rows making one claim are paired in a fixed order on both sides, so two
+// identical claims placed in two products each keep one row.
+func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statement) {
 	sorted := slices.Clone(held)
 	slices.SortFunc(sorted, func(a, b Statement) int { return cmp.Compare(a.ID, b.ID) })
-	placed := map[string][]int64{}
-	at := map[string]Statement{}
+	byClaim := map[string][]Statement{}
 	for _, row := range sorted {
-		claim := claimOf(row)
-		next := byClaim[claim][0]
-		byClaim[claim] = byClaim[claim][1:]
-		placed[placementOf(next)] = append(placed[placementOf(next)], row.ID)
-		at[placementOf(next)] = next
+		byClaim[claimOf(row)] = append(byClaim[claimOf(row)], row)
 	}
-	for key, ids := range placed {
-		one := at[key]
-		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-			_, err := tx.NewUpdate().Model((*Statement)(nil)).
-				Set("within_purl = ?", nullable(one.WithinPurl)).
-				Set("within = ?", nullable(one.Within)).
-				Set("within_about = ?", nullable(one.WithinAbout)).
-				Set("placement = ?", nullable(one.Placement)).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("place what they said where it stands: %w", err)
+	saying := slices.Clone(said)
+	slices.SortStableFunc(saying, func(a, b Statement) int {
+		if c := strings.Compare(claimOf(a), claimOf(b)); c != 0 {
+			return c
+		}
+		return strings.Compare(placementOf(a), placementOf(b))
+	})
+	repeated := map[placed][]int64{}
+	var fresh []Statement
+	for _, one := range saying {
+		claim := claimOf(one)
+		if rows := byClaim[claim]; len(rows) > 0 {
+			at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}
+			repeated[at] = append(repeated[at], rows[0].ID)
+			byClaim[claim] = rows[1:]
+			continue
+		}
+		fresh = append(fresh, one)
+	}
+	var gone []int64
+	for _, rows := range byClaim {
+		for _, row := range rows {
+			gone = append(gone, row.ID)
 		}
 	}
-	return nil
+	slices.Sort(gone)
+	return repeated, gone, fresh
 }
 
 // nullable is a value written as a null where it is empty, the way the

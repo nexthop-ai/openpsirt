@@ -670,6 +670,8 @@ func (s statedBySupplier) attributed() string {
 //   - no place of a component of that name and package identifier is open
 //     against the issue
 //   - the statement that closed it still stands
+//   - nothing has been recorded at its place since, the build's own patch
+//     included
 //   - no other supplier's statement closed a place of it
 func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	visible []access.Visibility) ([]statedBySupplier, error) {
@@ -698,6 +700,9 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		Where("f.closed_because = ?", finding.Disclaimed).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("ss.superseded_at IS NULL").
+		// What the place holds now: a later row at it, patched by the build
+		// or open again, is what the document goes by.
+		Where(finding.LatestAtItsPlace).
 		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "n"
 			WHERE n.target_id = f.target_id AND n.component_id = f.component_id
 				AND n.closed_scan_id IS NULL)`).

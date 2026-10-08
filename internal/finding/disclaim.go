@@ -26,11 +26,25 @@ import (
 // the notifications.
 const NotArguedAway = "(f.suppressed_by IS NULL AND f.stated_by IS NULL)"
 
+// LatestAtItsPlace says no row of the same issue has been recorded at the same
+// place in the same build after the finding `f`.
+//
+// A run records a new row rather than reopening a closed one, so a place
+// closed by a supplier's statement and recorded again later, at another
+// version or closed another way, holds rows the later one stands for. Ordered
+// by identifier rather than by moment: a version moving closes the row before
+// and records the row after at one moment.
+const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
+	WHERE lt.target_id = f.target_id AND lt.vulnerability_id = f.vulnerability_id
+	  AND lt.place_identity = f.place_identity AND lt.id > f.id)`
+
 // Decidable says a finding `f` is one somebody may decide about: open, or
-// closed by a supplier's statement. A person who disagrees with a supplier
-// marks the place affected, and the next run opens it again, so the place has
-// to be reachable while the statement has it closed.
-const Decidable = "(f.closed_at IS NULL OR f.closed_because = '" + string(Disclaimed) + "')"
+// closed by a supplier's statement and the latest row at its place. A person
+// who disagrees with a supplier marks the place affected, and the next run
+// opens it again, so the place has to be reachable while the statement has it
+// closed.
+const Decidable = "(f.closed_at IS NULL OR (f.closed_because = '" + string(Disclaimed) + "' AND " +
+	LatestAtItsPlace + "))"
 
 // AffectedOutcome is the outcome a person records to say an issue applies,
 // named here so the run and the triage package cannot drift on the spelling.

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 const build = "/v1/products/mine/streams/master/variants/broadcom"
@@ -162,6 +163,58 @@ func TestTheDocumentWithSuppliersDropsWhatWasWithdrawn(t *testing.T) {
 		}
 		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 0 {
 			t.Errorf("a statement Acme set aside is still said: %+v", said)
+		}
+	})
+}
+
+// After Y moves to a release the supplier speaks for too, the place holds two
+// rows closed by statements. Marking it affected is about the one standing
+// now, and the next scan opens it.
+func TestMarkingAffectedAfterTheProductMovedReachesThePlaceAsItStandsNow(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcmeAt(t, "at-4.2", "4.2", false, nil)
+		// Acme's statement, reissued for 4.3.
+		reissued := strings.ReplaceAll(httpapitest.AcmeSays(t), "acme-y@4.2", "acme-y@4.3")
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", reissued); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcmeAt(t, "at-4.3", "4.3", false, nil)
+
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			build+"/findings/CVE-2022-37434/components/zlib/decision",
+			`{"outcome":"affected","reasoning":"We call inflateGetHeader through our own wrapper."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("marking it affected answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcmeAt(t, "at-4.3-again", "4.3", false, nil)
+		var open struct {
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings", &open)
+		if open.Total != 1 {
+			t.Errorf("after marking it affected at 4.3, %d open, want the zlib inside Y", open.Total)
+		}
+	})
+}
+
+// A place a supplier's statement closed and the build later patched is
+// patched: the document says fixed, and nothing about what the supplier said.
+func TestAPlaceTheBuildLaterPatchedIsSaidOnlyAsFixed(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+		r.ScannedInsideAcmeAt(t, "patched", "4.2", false, []sbom.Suppression{{
+			Vulnerability: "CVE-2022-37434", Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
+			Targets: []sbom.Target{{Purl: "pkg:generic/zlib@1.2.11"}},
+		}})
+		_, said := statementsAbout(t, r, "with-suppliers")
+		if len(said) != 1 || said[0].Status != "fixed" {
+			t.Errorf("the document with suppliers says %+v, want fixed alone", said)
 		}
 	})
 }

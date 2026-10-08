@@ -149,7 +149,6 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 				Set("closed_by = ?", subject.ID).
 				Set("closed_note = ?", because).
 				Set("closed_because = ?", Fixed).
-				Set("stated_by = NULL").
 				Where("id IN (?)", bun.List(batch)).
 				// Still open, checked as the write happens. Two people closing
 				// the same thing at once is ordinary, and the second must not

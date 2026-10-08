@@ -910,3 +910,151 @@ func TestADuplicateOfAnIssueASupplierAnswersEverywhereIsRefused(t *testing.T) {
 		}
 	})
 }
+
+func TestARevisionRepeatingAClaimKeepsItsRow(t *testing.T) {
+	// A fetched advisory read again with something new kept beside what it
+	// said before differs in digest. What it repeats keeps its row, so no
+	// approval citing it is told the publisher changed what they said.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage)
+		from := finding.Supplied{Source: finding.FromAdvisory, Identifier: "ACME-SA-1",
+			Publisher: "Acme Security", Document: "acme-sa-1.json", Digest: "sha256:first"}
+		before := []finding.Statement{{Vulnerability: inside, Component: "zlib", Status: "not_affected"}}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, from, before); err != nil {
+			t.Fatal(err)
+		}
+		var first int64
+		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Scan(ctx, &first); err != nil {
+			t.Fatal(err)
+		}
+		from.Digest = "sha256:second"
+		recorded, superseded, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			[]finding.Statement{
+				{Vulnerability: inside, Component: "zlib", Status: "not_affected"},
+				{Vulnerability: productOnly, Component: "curl", Status: "affected"},
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if recorded != 2 || superseded != 0 {
+			t.Errorf("the revision recorded %d and set aside %d, want 2 and none", recorded, superseded)
+		}
+		var kept finding.Statement
+		if err := f.db.DB.NewSelect().Model(&kept).Where("ss.id = ?", first).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if kept.Superseded != nil || kept.Digest != "sha256:second" {
+			t.Errorf("the repeated claim is superseded %v under %q, want standing in the revision",
+				kept.Superseded, kept.Digest)
+		}
+	})
+}
+
+func TestNoDeadlineComesBackToAPlaceTheSupplierAnswers(t *testing.T) {
+	// Every writer of a deadline leaves the place alone: the issue becoming
+	// exploited, the issue rated here, and the windows changing.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, shared())
+		f.acmeSays(t)
+		f.reported(t, found(inside, zlib))
+		answered := func(what string) {
+			t.Helper()
+			if open := f.open(t); len(open) != 1 || open[0].DueAt != nil {
+				t.Errorf("after %s the place is due %v", what, open[0].DueAt)
+			}
+		}
+		answered("the scan")
+
+		issue := f.issueID(t, inside)
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set("exploited = ?", true).
+			Where("id = ?", issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := finding.Reranked(ctx, f.db.DB, []int64{issue}, time.Now().UTC()); err != nil {
+			t.Fatal(err)
+		}
+		answered("the issue became exploited")
+
+		if _, err := f.store.Assess(ctx, f.planner(t, access.PublicTriage), f.productID, issue,
+			"critical", "Reachable from the network in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+		answered("the issue was rated here")
+
+		if _, err := f.store.Recompute(ctx, finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
+		answered("the windows were recomputed")
+	})
+}
+
+func TestEveryOtherClosureTakesTheSuppliersAnswerOffThePlace(t *testing.T) {
+	// What closed it is the reason a register reads beside it.
+	for _, c := range []struct {
+		name  string
+		close func(t *testing.T, f *fixture)
+	}{
+		{"the scanner stops reporting it", func(t *testing.T, f *fixture) { f.reported(t) }},
+		{"the record excludes the version", func(t *testing.T, f *fixture) {
+			r := found(inside, zlib)
+			r.Unaffected = recordSays
+			f.reported(t, r)
+		}},
+		{"the build patches it", func(t *testing.T, f *fixture) {
+			if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, []sbom.Suppression{{
+				Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
+				Targets: []sbom.Target{{Purl: zlib.Purl}},
+			}}, everyOrigin); err != nil {
+				t.Fatal(err)
+			}
+			f.reported(t, found(inside, zlib))
+		}},
+		{"its issue merges into one already open there", func(t *testing.T, f *fixture) {
+			f.reported(t, found(inside, zlib, "GHSA-aaaa-bbbb-cccc"))
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				f.shipped(t, shared())
+				f.acmeSays(t)
+				if c.name == "its issue merges into one already open there" {
+					// The other name first, so the place it holds is the
+					// one kept, and the one the supplier answers closes.
+					f.reported(t, found("GHSA-aaaa-bbbb-cccc", zlib))
+					f.reported(t, found("GHSA-aaaa-bbbb-cccc", zlib), found(inside, zlib))
+				} else {
+					f.reported(t, found(inside, zlib))
+				}
+				if open := f.open(t); !anyAnswered(open) {
+					t.Fatalf("nothing open is answered through Y: %+v", open)
+				}
+				c.close(t, f)
+				closed := 0
+				for _, row := range f.every(t) {
+					if row.ClosedAt == nil || row.ClosedBecause == finding.Disclaimed {
+						continue
+					}
+					closed++
+					if row.StatedBy != nil {
+						t.Errorf("closed as %q, still answered by statement %d", row.ClosedBecause, *row.StatedBy)
+					}
+				}
+				if closed == 0 {
+					t.Fatal("nothing closed, so this checked nothing")
+				}
+			})
+		})
+	}
+}
+
+// anyAnswered reports whether a supplier answers any of these rows.
+func anyAnswered(rows []finding.Finding) bool {
+	for _, row := range rows {
+		if row.StatedBy != nil {
+			return true
+		}
+	}
+	return false
+}

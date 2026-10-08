@@ -41,9 +41,9 @@ func upV070(ctx context.Context, sqldb *sql.DB) error {
 //     names its supplier's product as. A statement v0.6.0 holds kept neither,
 //     and closes nothing until it is read again.
 //   - Every supplier read from its directory is read again from its window,
-//     so its advisories are read with the product they place. An advisory
-//     read again that says what it said is brought up to date where it
-//     stands, and raises no notice.
+//     so its advisories are read with the product they place. A claim an
+//     advisory read again repeats keeps its row, whatever else the product
+//     now keeps from it, and raises no notice.
 //   - A VEX document that went out records which kind it was, and revisions
 //     are numbered per kind. Every one v0.6.0 recorded was this deployment's
 //     own.

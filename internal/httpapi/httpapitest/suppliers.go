@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 // AcmeSays is the supplier fixture the readers are tested against: Acme's
@@ -30,10 +31,19 @@ func AcmeSays(t *testing.T) string {
 }
 
 // ScannedInsideAcme stores a build of mine on master for broadcom holding
-// Acme's product Y with zlib inside it, and zlib pulled in by curl as well
-// where outsideToo says so, then applies a run reporting CVE-2022-37434
+// Acme's product Y at 4.2 with zlib inside it, and zlib pulled in by curl as
+// well where outsideToo says so, then applies a run reporting CVE-2022-37434
 // against zlib.
 func (r *Reach) ScannedInsideAcme(t *testing.T, hash string, outsideToo bool) {
+	t.Helper()
+	r.ScannedInsideAcmeAt(t, hash, "4.2", outsideToo, nil)
+}
+
+// ScannedInsideAcmeAt is ScannedInsideAcme with Y at a version of the caller's
+// choosing, and with what the build argues about what it ships.
+func (r *Reach) ScannedInsideAcmeAt(t *testing.T, hash, version string, outsideToo bool,
+	claims []sbom.Suppression) {
+
 	t.Helper()
 	ctx := t.Context()
 
@@ -55,7 +65,7 @@ func (r *Reach) ScannedInsideAcme(t *testing.T, hash string, outsideToo bool) {
 	}
 
 	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	acmeY := graph.Described{Purl: "pkg:generic/acme-y@4.2", Name: "acme-y", Version: "4.2"}
+	acmeY := graph.Described{Purl: "pkg:generic/acme-y@" + version, Name: "acme-y", Version: version}
 	zlib := graph.Described{Purl: "pkg:generic/zlib@1.2.11", Name: "zlib", Version: "1.2.11"}
 	curl := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
 	snap := graph.Snapshot{
@@ -76,6 +86,10 @@ func (r *Reach) ScannedInsideAcme(t *testing.T, hash string, outsideToo bool) {
 	}
 
 	findings := finding.NewStore(r.DB.DB)
+	if _, err := findings.RecordClaims(ctx, target.ID, scan.ID, claims,
+		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
+		t.Fatal(err)
+	}
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
 		DatabaseVersion: "2026-08-28", RanHere: true,
