@@ -466,14 +466,27 @@ func (s *Store) SetEmail(ctx context.Context, personID int64, address string, fr
 
 // SetDisplayName records the label shown instead of somebody's identity. An
 // empty name clears it, which leaves the identity showing.
-func (s *Store) SetDisplayName(ctx context.Context, personID int64, name string) error {
+//
+// Conditional on from, the name the caller read inside the same transaction,
+// so the trail's record of the move is a move this write made. One that
+// matched nothing answers database.ErrGoAgain and is taken again whole.
+func (s *Store) SetDisplayName(ctx context.Context, personID int64, from, to string) error {
 	if personID == 0 {
 		return refusal.New("a name needs somebody to belong to")
 	}
-	if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-		Set("display_name = ?", strings.TrimSpace(name)).
-		Where("id = ?", personID).Exec(ctx); err != nil {
+	result, err := s.db.NewUpdate().Model((*Account)(nil)).
+		Set("display_name = ?", strings.TrimSpace(to)).
+		Where("id = ?", personID).
+		Where(`COALESCE("display_name", '') = ?`, from).Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("record the name of person %d: %w", personID, err)
+	}
+	n, err := database.Affected(result)
+	if err != nil {
+		return fmt.Errorf("record the name of person %d: %w", personID, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("record the name of person %d: %w", personID, database.ErrGoAgain)
 	}
 	return nil
 }

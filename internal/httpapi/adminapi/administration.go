@@ -448,7 +448,13 @@ func registerAdministration(api huma.API, a core.Administering) {
 			// person wrote it above. Stated empty clears it, which leaves the
 			// identity showing; omitted leaves it alone.
 			if before != nil && in.Body.DisplayName != nil && named != before.DisplayName {
-				if err := store.SetDisplayName(ctx, person.ID, named); err != nil {
+				err := store.SetDisplayName(ctx, person.ID, before.DisplayName, named)
+				switch {
+				case errors.Is(err, database.ErrGoAgain):
+					// Renamed by somebody else since it was read: the retry
+					// reads the name they left.
+					return err
+				case err != nil:
 					return core.WentWrong(a.Logger, "that name could not be recorded", err)
 				}
 				person.DisplayName = named

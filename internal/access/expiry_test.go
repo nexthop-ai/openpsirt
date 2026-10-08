@@ -361,6 +361,44 @@ func TestAMoveThatLostARaceIsTakenAgain(t *testing.T) {
 	})
 }
 
+// A rename conditioned on a name somebody else has since replaced matched
+// nothing, writes nothing and says so, and one conditioned on the name held
+// moves it, from no name as well as from one.
+func TestARenameThatLostARaceIsTakenAgain(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		at := time.Now()
+		store, id := atClock(t, db, &at)
+		named := func() string {
+			t.Helper()
+			person, err := store.byID(ctx, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return person.DisplayName
+		}
+
+		if err := store.SetDisplayName(ctx, id, "Someone", "Ada"); err != nil {
+			t.Fatalf("renaming somebody: %v", err)
+		}
+		if err := store.SetDisplayName(ctx, id, "Someone", "Grace"); !errors.Is(err, database.ErrGoAgain) {
+			t.Errorf("a rename from a name already replaced answered %v", err)
+		}
+		if got := named(); got != "Ada" {
+			t.Errorf("a rename that lost its race left the name %q", got)
+		}
+		if err := store.SetDisplayName(ctx, id, "Ada", ""); err != nil {
+			t.Fatalf("clearing the name: %v", err)
+		}
+		if got := named(); got != "" {
+			t.Errorf("a cleared name reads %q", got)
+		}
+		if err := store.SetDisplayName(ctx, id, "", "Ada"); err != nil {
+			t.Errorf("naming somebody unnamed: %v", err)
+		}
+	})
+}
+
 // What Restate answers as before is the value its own write was made against.
 // Another writer that got there first leaves before and after equal, so the
 // caller records no move; a caller reading before for itself could have read
