@@ -209,7 +209,7 @@ func TestADismissalAtOnePlaceIsStatedAboutThatPlaceAndNeverTheBuild(t *testing.T
 	// of "not affected" about something that is affected, published to every
 	// customer running a scanner against the image. Stated with what pulls
 	// the component in as the product, it says what was agreed and no more.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedAtTwoPlaces(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
 

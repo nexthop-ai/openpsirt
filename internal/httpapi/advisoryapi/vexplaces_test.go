@@ -100,7 +100,7 @@ func TestAPlaceIsStatedOnlyWhereEverythingBeneathItsProductAgrees(t *testing.T) 
 	// The library under curl is dismissed and the one under libssh, which only
 	// curl pulls in, is not. A reader applying "the library inside curl"
 	// beneath curl would answer the place under libssh too.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedBeneathAProduct(t, "")
 		dismissedUnder(t, r, "curl")
 		if got := statedAbout(t, r); len(got) != 0 {
@@ -110,7 +110,7 @@ func TestAPlaceIsStatedOnlyWhereEverythingBeneathItsProductAgrees(t *testing.T) 
 }
 
 func TestEachPlaceBeneathAnAgreedProductIsStatedAboutItsConsumer(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedBeneathAProduct(t, "")
 		dismissedUnder(t, r, "curl", "libssh")
 		want := []string{
@@ -125,7 +125,7 @@ func TestEachPlaceBeneathAnAgreedProductIsStatedAboutItsConsumer(t *testing.T) {
 
 func TestAPlaceTheBuildPullsInDirectlyIsNeverStatedAlone(t *testing.T) {
 	// A statement naming the build as the product is about the whole build.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedBeneathAProduct(t, "pkg:generic/mine@1.0")
 		dismissedUnder(t, r, "")
 		if got := statedAbout(t, r); len(got) != 0 {
@@ -135,12 +135,25 @@ func TestAPlaceTheBuildPullsInDirectlyIsNeverStatedAlone(t *testing.T) {
 }
 
 func TestAComponentAgreedEverywhereIsStatedAboutTheBuildsRoot(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedBeneathAProduct(t, "pkg:generic/mine@1.0")
 		dismissedUnder(t, r, "", "curl", "libssh", "app")
 		want := "pkg:generic/mine@1.0 > " + library
 		if got := statedAbout(t, r); len(got) != 1 || got[0] != want {
 			t.Errorf("stated %v, want the one statement about the build", got)
+		}
+	})
+}
+
+func TestARootNamingNoVersionIsNotWhatTheDocumentNames(t *testing.T) {
+	// An identifier naming no version names every release, and a reader would
+	// apply this release's dismissals to the next.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedBeneathAProduct(t, "pkg:generic/mine")
+		dismissedUnder(t, r, "", "curl", "libssh", "app")
+		want := "mine:master:broadcom > " + library
+		if got := statedAbout(t, r); len(got) != 1 || got[0] != want {
+			t.Errorf("stated %v, want the one statement naming the build by its names", got)
 		}
 	})
 }

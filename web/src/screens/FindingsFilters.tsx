@@ -132,6 +132,15 @@ const VEX_STATUS = [
   ["under_investigation", "Under investigation"],
 ] as const;
 
+// What the build's own claims say about an open finding. A fixed claim closes
+// what it covers, so it is never offered here.
+const BUILD_SAYS = [
+  ["", "Any"],
+  ["not_affected", "Not affected"],
+  ["affected", "Affected"],
+  ["under_investigation", "Under investigation"],
+] as const;
+
 export const DEADLINES = [
   ["", "Any"],
   ["overdue", "Overdue"],
@@ -314,7 +323,7 @@ export function activeFilters(
   if (at("unconfirmed") === "1") add("unconfirmed", "Not confirmed by a packager", "only");
   each("vex_publisher", "VEX publisher", []);
   each("vex_status", "VEX status", VEX_STATUS);
-  each("build_says", "Build says", VEX_STATUS);
+  each("build_says", "Build says", BUILD_SAYS);
   each("component", "Component", []);
   for (const kind of params.getAll("ecosystem").filter(Boolean)) {
     out.push({
@@ -640,7 +649,7 @@ export function Filters({
           label="Build says"
           hint="What the build's own VEX says. Affected finds the workarounds"
           chosen={all("build_says")}
-          options={VEX_STATUS}
+          options={BUILD_SAYS}
           onChange={(chosen) => setMany("build_says", chosen)}
         />
       </Group>

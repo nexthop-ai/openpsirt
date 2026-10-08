@@ -1062,7 +1062,7 @@ scanner fault.
 |---|---|
 | It carries a fix | The finding closes as patched, on the scan that first sees the claim. A patch has the effect a version bump has: the code no longer carries the flaw (REQ-11) |
 | The vulnerability does not apply | The finding stays open, marked with the claim, and is not work anybody has to do. It is an argument rather than a patch, and only a dismissal agreed here closes it |
-| It is affected, or it has not decided | Nothing is marked, and the finding stays work. The build is stating that it looked, which is information rather than an answer |
+| It is affected, or it has not decided | Nothing is suppressed, and the finding stays work. The build is stating that it looked, which is information rather than an answer |
 
 Every finding names the build's claim covering it, whatever the claim says, so
 the claim's words are shown on it. A claim that the flaw applies carries what

@@ -537,7 +537,7 @@ anew, the declaration being the tagged one with the column beside it.
 | Table | Gains | Every engine |
 |---|---|---|
 | `finding` | The CVE record lines that closed it as unaffected, the supplier's statement answering it, and the build's claim covering it whatever the claim says | Three columns holding a null, added where the table stands. A finding names no claim of the second kind until the next run |
-| `suppression` | The product a claim's subject ships inside: its package identifier, its name and its version, and the published statement a claim was taken from | Four columns holding a null, added where the table stands. A claim recorded before the upgrade names no product and applies across the build until a scan restates it |
+| `suppression` | The product a claim's subject ships inside: its package identifier, its name and its version, and the published statement a claim was taken from | Four columns holding a null, added where the table stands. A claim recorded before the upgrade names no product and applies across the build until the build's next upload restates it |
 | `scan_run` | The CVE record snapshot it read | A column holding a null, added where the table stands |
 | `vex_statement` | The product the statement's component ships inside: its package identifier, its name and its version, and what the statement names its supplier's product as | Four columns holding a null, added where the table stands. A statement uploaded before the upgrade names none until it is read again |
 | `advisory_source` | Nothing; every supplier is set back to read from its window | Its cursor cleared, so the next pass reads what it already read with the product each statement places |

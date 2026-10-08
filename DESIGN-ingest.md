@@ -597,7 +597,7 @@ A claim is placed by the product it names its subject as shipping inside.
 |---|---|
 | Named by nothing, or the build's root, or nothing the build ships | Across the whole build. A root is stored by its name alone, so it is never a component the claim is placed beneath |
 | A component of the build, at the version the claim names | At a place where every route up the tree runs through that component, at any depth, and never on the component itself. A place reached through the product and outside it is not answered: the build spoke about what it shipped inside the product |
-| A component of the build at another version, or named at no version | Nowhere. A claim about one release of a product says nothing about another |
+| A component of the build at another version, or named at no version | Nowhere, and the claim is counted as reaching nothing. A claim about one release of a product says nothing about another |
 
 A claim stores the product with the subject: its package identifier, its name
 and its version. A claim about zlib inside curl and one about every zlib are two

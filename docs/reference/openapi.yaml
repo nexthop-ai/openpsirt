@@ -1467,6 +1467,12 @@ components:
         vulnerability:
           description: The identifier the build argued about, as it wrote it
           type: string
+        within:
+          description: The product of the build the claim names its subject as shipping inside, where it names one. The claim applies beneath that product
+          type: string
+        within_version:
+          description: The version of that product
+          type: string
       required:
         - vulnerability
         - subject
@@ -15488,7 +15494,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:
@@ -16010,7 +16015,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:
@@ -18747,7 +18751,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:
@@ -19383,7 +19386,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:
@@ -19939,7 +19941,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:
@@ -20506,7 +20507,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:
@@ -21086,7 +21086,6 @@ paths:
               enum:
                 - not_affected
                 - affected
-                - fixed
                 - under_investigation
               type: string
             type:

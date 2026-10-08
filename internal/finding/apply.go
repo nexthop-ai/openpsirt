@@ -159,7 +159,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// contains, not against what was reported: a claim covering a
 		// component nothing was found in has still done its job, while one
 		// covering nothing the build ships has not.
-		applied.ClaimsReaching, applied.ClaimsReachingNothing = claimsReaching(claims, present)
+		applied.ClaimsReaching, applied.ClaimsReachingNothing = claimsReaching(claims, present,
+			places, placed)
 		// The claims that fix what they cover, as against those that argue it
 		// does not apply. The first close a finding and the second mark it.
 		fixing := map[int64]bool{}
@@ -1072,12 +1073,25 @@ func equalRef(a, b *int64) bool {
 // has answered will come back as noise. Nothing distinguishes that from a
 // finding nobody has looked at, so the count is reported rather than left to
 // be inferred.
-func claimsReaching(claims []Claim, present inventory) (reaching, reachingNothing int) {
+//
+// A claim naming a product of the build reaches only what sits beneath it, so
+// one naming a release of the product the build does not ship reaches nothing.
+func claimsReaching(claims []Claim, present inventory, places consumers,
+	p *placer) (reaching, reachingNothing int) {
+
 	for _, claim := range claims {
 		found := false
 		for _, component := range present.byID {
-			if claim.covers(describedOf(component)) {
-				found = true
+			if !claim.covers(describedOf(component)) {
+				continue
+			}
+			for _, consumerID := range places.of(component.ID) {
+				if p.reaches(claim.within(), component, consumerID) {
+					found = true
+					break
+				}
+			}
+			if found {
 				break
 			}
 		}
@@ -1118,10 +1132,35 @@ func coveringClaim(claims []Claim, issue Named, component graph.Component, consu
 
 	described := describedOf(component)
 
-	var found, informing *int64
+	var covering []Claim
+	latest := map[string]time.Time{}
 	for _, claim := range claims {
 		if !names[normalize(claim.Vulnerability)] || !claim.covers(described) ||
 			!p.reaches(claim.within(), component, consumerID) {
+			continue
+		}
+		covering = append(covering, claim)
+		if claim.Said.After(latest[claim.Origin]) {
+			latest[claim.Origin] = claim.Said
+		}
+	}
+	// A document uploaded on its own and the one sent with the inventory both
+	// speak for the build. Where both cover a place, the one said more
+	// recently is the build's word: a revision uploaded on its own replaces
+	// what came with the inventory, and a later upload replaces the revision.
+	stale := ""
+	if _, both := latest[Published]; both {
+		if _, sent := latest[string(sbom.FromStatement)]; sent {
+			stale = Published
+			if latest[Published].After(latest[string(sbom.FromStatement)]) {
+				stale = string(sbom.FromStatement)
+			}
+		}
+	}
+
+	var found, informing *int64
+	for _, claim := range covering {
+		if claim.Origin == stale {
 			continue
 		}
 		id := claim.ID

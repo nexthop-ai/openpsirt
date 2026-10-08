@@ -481,6 +481,8 @@ evidence.
 | The stretch of scans is what makes it a history | The interesting row is the claim that *stopped*: somebody dropped a patch and the finding it answered is back. A list of what stands would not contain that row |
 | Narrowed on what the claim says it is about, not on a package the build still carries | A claim naming something that has gone is what somebody asking why a patch stopped working wants |
 | The two kinds are distinguished on the row | A claim attached to a component is a patch declaring what it fixes; a claim in a document of its own names something to be matched. A claim that suppresses nothing says so |
+| A claim names the product it places its subject inside, where it names one | "zlib inside curl" and "zlib inside openssl" are two claims |
+| A claim taken from a document uploaded on its own is not listed | It is held over no stretch of the build's own scans. The finding it covers shows it |
 
 ## External links
 
@@ -703,7 +705,7 @@ customer — which is the reason the two-person approval on those claims exists.
 | A claim that will not be fixed is published as affected, and only where it names what to do instead | It is the truth about such a flaw: it is there and it is staying. Nothing else says so about a third-party component — no scan closes a standing property of a shipped feature, and an advisory states "no fix planned" only for a flaw recorded here — so under silence it reaches a customer never. The format requires an action on an affected statement, so a claim with nothing to offer has nothing to publish, and left out it falls through to the silence that already reads as affected |
 | The mitigation goes in a different field depending on the status | On a claim that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
 | Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
-| The statement is about the build, with the component underneath | A VEX statement is about a thing somebody has, and what they have is the image |
+| The statement is about the build, with the component underneath, or about the consumer where it is stated place by place | A VEX statement is about a thing somebody has, and what they have is the image |
 | The build is named by the package identifier its inventory gave its root | A scanner reading the inventory and the document together matches the product against the root, and a deployment loading both reads a statement about the root as the build's own claim. The build's names stand in where the inventory gave its root no package identifier |
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
 | Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
@@ -751,6 +753,7 @@ component is beneath it. "libnl inside libswsscommon 1.0.0: not affected".
 | A consumer whose package identifier names no version names no product | A statement naming a product at no version is about every release of it, and a reader applies it nowhere |
 | A place the build holds directly is never stated alone | It has no consumer, and the only product it could name is the build, which a reader applies across the whole build |
 | One statement per consumer, however many places beneath it agree | A place deeper under the consumer is stated about its own consumer as well, where the rule holds there |
+| A place is stated on its own from an agreed decision, never from a patch the build declares | A patch is said about a whole component. A fix the build states beneath one of its products closes only the places beneath it, so where another place of the component is open the fix is not published at all |
 
 Places dismissed for different reasons — one not applicable, one already fixed —
 are no statement about the component. Each is stated about its own place, where

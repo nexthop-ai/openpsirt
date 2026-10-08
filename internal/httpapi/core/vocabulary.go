@@ -101,6 +101,12 @@ type vexStatus string
 // Schema answers with the statuses the format defines.
 func (vexStatus) Schema(huma.Registry) *huma.Schema { return words(finding.VexStatuses()) }
 
+// buildSaying is what the build's own claims say about an open finding.
+type buildSaying string
+
+// Schema answers with the statuses an open finding's claim can hold.
+func (buildSaying) Schema(huma.Registry) *huma.Schema { return words(finding.BuildSayings()) }
+
 // origin is where a finding came from, as a narrowing.
 type origin string
 

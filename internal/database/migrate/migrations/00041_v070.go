@@ -46,8 +46,8 @@ func upV070(ctx context.Context, sqldb *sql.DB) error {
 //     now keeps from it, and raises no notice.
 //   - A build's claim keeps the product its target ships inside, and the
 //     published statement it was taken from. No claim v0.6.0 holds kept
-//     either, and each applies across the build until a scan restates it
-//     with its product.
+//     either, and each applies across the build until the build's next
+//     upload restates it with its product.
 //   - A finding names the build's claim covering it, whatever the claim
 //     says. Every finding v0.6.0 holds names none until the next run.
 //   - A VEX document that went out records which kind it was, and revisions

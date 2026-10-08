@@ -65,6 +65,11 @@ type Claim struct {
 	StatedBy     *int64 `bun:"stated_by"`
 	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
 	ClosedScanID *int64 `bun:"closed_scan_id"`
+	// Said is when the claim was last said: the build's latest upload for a
+	// claim sent with the inventory, which restates every claim it still
+	// makes, and the upload of the statement for one taken from a published
+	// document. Read with the open claims, never stored.
+	Said time.Time `bun:"said,scanonly"`
 }
 
 // Published is the origin of a claim taken from a published statement whose
@@ -277,8 +282,13 @@ func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error
 	// recorded should not depend on what a map felt like doing.
 	var rows []Claim
 	err := db.NewSelect().Model(&rows).
-		Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").
-		Order("id").Scan(ctx)
+		ColumnExpr("sup.*").
+		Join(`JOIN "target" AS "t" ON t.id = sup.target_id`).
+		Join(`JOIN "scan" AS "latest" ON latest.id = t.last_scan_id`).
+		Join(`LEFT JOIN "vex_statement" AS "ss" ON ss.id = sup.stated_by`).
+		ColumnExpr(`COALESCE(ss.uploaded_at, latest.received_at) AS "said"`).
+		Where("sup.target_id = ?", targetID).Where("sup.closed_scan_id IS NULL").
+		Order("sup.id").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build argues: %w", err)
 	}
@@ -301,6 +311,11 @@ type Carried struct {
 	Status        string
 	Justification string
 	Statement     string
+	// Within and WithinVersion are the product of the build the claim names
+	// its subject as shipping inside, where it names one: "zlib inside curl"
+	// and "zlib inside openssl" are two claims.
+	Within        string
+	WithinVersion string
 	// Pedigree says the claim arrived attached to a component rather than in a
 	// document of its own — a carried patch declaring what it fixes, which is
 	// the only way a backport can be seen here at all.
@@ -342,7 +357,10 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 	limit = database.AList.Of(limit)
 
 	where := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.Where("sup.target_id = ?", targetID)
+		// What the build sent with its inventories. A claim taken from a
+		// document uploaded on its own is shown on the findings it covers,
+		// and it is held over no stretch of the build's own scans.
+		q = q.Where("sup.target_id = ?", targetID).Where("sup.origin <> ?", Published)
 		if name := strings.TrimSpace(component); name != "" {
 			// Matched on what the claim says it is about rather than on a
 			// component row, because a claim naming something this build does
@@ -366,6 +384,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		Justification string     `bun:"justification"`
 		Statement     string     `bun:"statement"`
 		Origin        string     `bun:"origin"`
+		WithinPurl    string     `bun:"within_purl"`
+		WithinName    string     `bun:"within_name"`
+		WithinVersion string     `bun:"within_version"`
 		Since         time.Time  `bun:"since"`
 		Until         *time.Time `bun:"until"`
 	}
@@ -382,6 +403,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
 		ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
 		ColumnExpr(`sup.origin AS "origin"`).
+		ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
+		ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).
+		ColumnExpr(`COALESCE(sup.within_version, '') AS "within_version"`).
 		ColumnExpr(`opened.built_at AS "since"`).
 		ColumnExpr(`closed.built_at AS "until"`).
 		// Anything still being said first, newest first within that: a claim
@@ -394,7 +418,13 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 	}
 	out := make([]Carried, 0, len(rows))
 	for _, row := range rows {
+		var within, withinVersion string
+		if row.WithinPurl != "" || row.WithinName != "" {
+			product := sbom.Target{Purl: row.WithinPurl, Name: row.WithinName, Version: row.WithinVersion}
+			within, withinVersion = product.ComponentNamed(), product.VersionNamed()
+		}
 		out = append(out, Carried{
+			Within: within, WithinVersion: withinVersion,
 			Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 			Status: row.Status, Justification: row.Justification,
 			Statement: row.Statement,

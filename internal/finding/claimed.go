@@ -80,6 +80,10 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 		ColumnExpr(`COALESCE(ss.publisher, '') AS "publisher"`).
 		ColumnExpr(`COALESCE(ss.document, '') AS "document"`).
 		Where(where, args...).
+		// What the build still says. A place a supplier's statement closed
+		// keeps the claim it named when it closed, and the build may have
+		// withdrawn that claim since.
+		Where("sup.closed_scan_id IS NULL").
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what the build says about this: %w", err)
 	}

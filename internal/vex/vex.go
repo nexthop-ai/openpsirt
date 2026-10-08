@@ -39,6 +39,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -881,7 +882,7 @@ func build(named *catalog.Named) string {
 // inventory gave its root, which is what a scanner reading the two together
 // matches the product against, and what a deployment loading both reads as the
 // build's own claim. The build's names stand in where the inventory named no
-// root by a package identifier.
+// root by a package identifier that states a version.
 func (s *Store) rootOf(ctx context.Context, named *catalog.Named, targetID int64) (string, error) {
 	var root string
 	err := s.db.NewSelect().
@@ -893,7 +894,9 @@ func (s *Store) rootOf(ctx context.Context, named *catalog.Named, targetID int64
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("read how the build names itself: %w", err)
 	}
-	if root == "" {
+	// An identifier naming no version names every release of the product,
+	// and a reader applies a statement about it to all of them.
+	if _, version := graph.PackageOf(root); version == "" {
 		return build(named), nil
 	}
 	return root, nil

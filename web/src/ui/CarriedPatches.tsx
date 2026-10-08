@@ -111,6 +111,13 @@ export function CarriedPatches({
                         <td className="id">{row.vulnerability}</td>
                         <td className="id">
                           {row.version ? `${row.subject} ${row.version}` : row.subject}
+                          {row.within && (
+                            <span className="hint">
+                              {" "}
+                              inside {row.within}
+                              {row.within_version && <> {row.within_version}</>}
+                            </span>
+                          )}
                         </td>
                         <td>
                           {row.pedigree ? (

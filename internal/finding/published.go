@@ -30,7 +30,8 @@ import (
 //
 // The root is named by the package identifier the inventory gave it, at the
 // version the statement names. A statement naming no version is about every
-// release and is left as evidence, as a supplier's is.
+// release and is left as evidence, as a supplier's is, and so is one naming a
+// root another build of the product holds too.
 func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int64) error {
 	var build struct {
 		ScanID int64  `bun:"scan_id"`
@@ -52,7 +53,23 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 
 	wanted := map[string]Claim{}
 	rootBase, rootVersion := graph.PackageOf(build.Root)
-	if rootBase != "" && rootVersion != "" {
+	// A root another build of the product also holds names neither: two
+	// variants of one release commonly share the identifier, and a statement
+	// about one of them is not about the other. Sent with each inventory, the
+	// statements are told apart by the upload they arrive in.
+	var holding int
+	if rootBase != "" {
+		if holding, err = tx.NewSelect().
+			TableExpr(`"target" AS "t"`).
+			Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
+			Join(`JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
+			Where("st.product_id = ?", productID).
+			Where("sc.root_identifier = ?", build.Root).
+			Count(ctx); err != nil {
+			return fmt.Errorf("read which builds hold the root: %w", err)
+		}
+	}
+	if rootBase != "" && rootVersion != "" && holding == 1 {
 		var said []Statement
 		if err := tx.NewSelect().Model(&said).
 			Where("ss.product_id = ?", productID).
@@ -76,7 +93,7 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 				TargetID: targetID, Vulnerability: one.Vulnerability,
 				Status: one.Status, Justification: one.Justification,
 				Statement: one.Statement, Origin: Published,
-				SubjectPurl: one.Purl, SubjectName: one.Component,
+				SubjectPurl: one.Purl, SubjectName: spelled(one),
 				SubjectFolded:  one.Component,
 				SubjectVersion: statedBeside(sbom.Target{Purl: one.Purl, Version: one.About}),
 				StatedBy:       &id,
@@ -129,6 +146,16 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 		}
 	}
 	return nil
+}
+
+// spelled is the name a statement gives what it is about, as its publisher
+// spelled it. The stored name is folded for matching, and the package
+// identifier carries the spelling where there is one.
+func spelled(one Statement) string {
+	if name := nameOf(one.Purl); name != "" {
+		return name
+	}
+	return one.Component
 }
 
 // nameOf is the name a package identifier gives its package, which is what a

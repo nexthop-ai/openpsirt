@@ -6952,6 +6952,10 @@ export interface components {
             version?: string;
             /** @description The identifier the build argued about, as it wrote it */
             vulnerability: string;
+            /** @description The product of the build the claim names its subject as shipping inside, where it names one. The claim applies beneath that product */
+            within?: string;
+            /** @description The version of that product */
+            within_version?: string;
         };
         "Carry-decisionsRequest": {
             /**
@@ -14975,7 +14979,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -15091,7 +15095,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -16874,7 +16878,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17041,7 +17045,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17170,7 +17174,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17304,7 +17308,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
@@ -17436,7 +17440,7 @@ export interface operations {
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
                 /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */

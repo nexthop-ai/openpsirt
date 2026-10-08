@@ -23,6 +23,8 @@ type CarriedClaimBody struct {
 	Status        string `json:"status" doc:"The claim, in the exchange format's own vocabulary"`
 	Justification string `json:"justification,omitempty"`
 	Statement     string `json:"statement,omitempty" doc:"The build's own reasoning, shown as written and never rendered"`
+	Within        string `json:"within,omitempty" doc:"The product of the build the claim names its subject as shipping inside, where it names one. The claim applies beneath that product"`
+	WithinVersion string `json:"within_version,omitempty" doc:"The version of that product"`
 	// Pedigree is the one that matters here: a claim attached to a component
 	// is a carried patch declaring what it fixes, which is the only way a
 	// backport can be seen at all.
@@ -98,6 +100,7 @@ func registerCarried(api huma.API, in core.Deps) {
 				Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 				Status: row.Status, Justification: row.Justification,
 				Statement: row.Statement, Pedigree: row.Pedigree,
+				Within: row.Within, WithinVersion: row.WithinVersion,
 				Suppresses: row.Suppresses,
 				Since:      row.Since.Format(time.DateOnly),
 			}

@@ -22,7 +22,8 @@ about their own products, in the suppliers' names. The second carries more.
 
 A VEX document uploaded on its own has to name the build the way the SBOM names
 its root: the same package identifier, at the same version. A VEX document an
-OpenPSIRT deployment generates does this.
+OpenPSIRT deployment generates does this where the SBOM names its root by a
+package identifier stating a version. Otherwise, send the two together.
 
 ## The release here
 
@@ -57,12 +58,19 @@ apply to what the scan finds.
 
 A VEX document the vendor revises after the release is uploaded by an
 administrator, on its own. A statement naming the build's root is the build's
-claim whichever way it arrived, and the next scan applies it. A later document
-from the same publisher sets aside what the earlier one said.
+claim whichever way it arrived, and the next scan applies it.
+
+A later document from the same publisher sets aside what the earlier one said,
+across the whole product. So each release and each variant is uploaded under a
+publisher name of its own, or one release's revision sets aside another's.
+
+A statement naming a root that two builds of the product share, such as two
+variants of one release, is evidence rather than either build's claim. Send
+those with their SBOMs.
 
 ```bash
 curl -X POST \
-  "$OPENPSIRT/v1/products/sonic/vex-statements?publisher=Vendor" \
+  "$OPENPSIRT/v1/products/sonic/vex-statements?publisher=vendor-202605.1-broadcom" \
   -H "Origin: $OPENPSIRT" \
   -F "statements=@sonic-202605.1.openvex.json"
 ```

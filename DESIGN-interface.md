@@ -794,7 +794,7 @@ is not a fact about the patch.
 
 What the build says is a card of its own, above what publishers say and shown
 whatever has been decided, because a mark the build put on a place stays on it.
-One entry per claim covering a place shown: whose it is — the build, or the
+One entry per claim the build still makes covering a place shown: whose it is — the build, or the
 publisher whose document named the build as its product — the status, the
 component and version it names, the product it names the component as shipping
 inside, the justification, and the build's words. Where the build says the flaw

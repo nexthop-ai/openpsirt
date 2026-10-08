@@ -180,6 +180,13 @@ func VexStatuses() []string {
 	return []string{"not_affected", "affected", "fixed", "under_investigation"}
 }
 
+// BuildSayings are what the build's own claims say about an open finding, in
+// the format's vocabulary. A claim that the shipped code is fixed closes every
+// finding it covers, so it is never one an open finding is narrowed by.
+func BuildSayings() []string {
+	return []string{"not_affected", "affected", "under_investigation"}
+}
+
 // OutcomesOffered are the outcomes a publisher's statement can prefill.
 //
 // Derived from the mapping rather than listed beside it: a status that starts
