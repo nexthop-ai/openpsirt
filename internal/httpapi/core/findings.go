@@ -134,6 +134,7 @@ func (n Narrowing) Filter(floor finding.Floor) (finding.Filter, error) {
 		ClaimStates:       plainly(n.ClaimState),
 		Publishers:        n.Publisher,
 		VexStatus:         plainly(n.Said),
+		BuildSays:         plainly(n.BuildSays),
 		OpenedByRun:       n.OpenedByRun,
 	}
 	var openedBefore *time.Time
@@ -230,6 +231,7 @@ type Narrowing struct {
 	ClosedAfter  string       `query:"closed_after" doc:"Accepted and matches nothing: this list holds open rows only"`
 	DecidedAfter string       `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
 	Said         []vexStatus  `query:"vex_status,explode" uniqueItems:"true" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
+	BuildSays    []vexStatus  `query:"build_says,explode" uniqueItems:"true" doc:"Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround"`
 	Reassessed   bool         `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
 	Origin       origin       `query:"origin" doc:"Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand"`
 	Planned      string       `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`

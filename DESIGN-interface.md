@@ -498,9 +498,9 @@ Three filters need defining:
 A filter whose values are not exclusive takes several at once. Four do: the
 decision state, the decision outcome, what upstream did, and the kind of
 package. Each was one word, so "undecided or pending approval" had to be asked
-twice and read side by side. Four more take a set: who is dealing with it,
-what a VEX document says, and, among the typed boxes, the component, the tag,
-the VEX publisher and the weakness. The typed ones are chip fields, because a
+twice and read side by side. More take a set: who is dealing with it,
+what a VEX document says, what the build's own claims say, and, among the typed
+boxes, the component, the tag, the VEX publisher and the weakness. The typed ones are chip fields, because a
 box showing one value while narrowing by three is what the summary above the
 list exists to prevent.
 
@@ -791,6 +791,17 @@ been asked (`DESIGN-findings.md` § Patch branches): three by name in version
 order, the rest as a count, all of them on hover. A commit its repository does
 not hold says so. A link not yet looked up carries nothing, because "not yet"
 is not a fact about the patch.
+
+What the build says is a card of its own, above what publishers say and shown
+whatever has been decided, because a mark the build put on a place stays on it.
+One entry per claim covering a place shown: whose it is — the build, or the
+publisher whose document named the build as its product — the status, the
+component and version it names, the product it names the component as shipping
+inside, the justification, and the build's words. Where the build says the flaw
+applies, the words are labeled as the workaround: the finding stays work, and
+those words are the thing to apply. The words are a third party's and shown,
+never rendered, as a publisher's are. The findings list asks for these with
+"Build says", whose "affected" gathers the workarounds.
 
 A publisher's claim carries the version it was made about. A supplier's
 advisory names the version that carries the fix, which is not the version
@@ -1377,6 +1388,7 @@ says and § Issuance records what recording keeps.
 | The control is offered to whoever reaches the screen | Recording asks for a triage role on the product. The refusal is the server's sentence rather than a control hidden on a guess about roles |
 | Whether it changed since it went out is said the way the advisory says it | One component draws both, so the two documents cannot come to say it differently |
 | The two documents are two tabs, ours first, and the one shown is in the address | Each has its own revisions, so what is listed and what is recorded follow the tab. Linked, the address opens the document somebody meant |
+| The head says how a customer loads it | With the build's SBOM, in one upload, and either kind. Somebody sending it is asked that, and `docs/vendor-release.md` is the page the customer reads |
 
 #### The panel on a flaw
 

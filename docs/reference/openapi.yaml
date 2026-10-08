@@ -1099,6 +1099,43 @@ components:
         - open
         - undecided
       type: object
+    BuildClaimBody:
+      additionalProperties: false
+      properties:
+        document:
+          description: The VEX document the claim came from, where it was uploaded on its own
+          type: string
+        justification:
+          description: The VEX justification term it gave
+          type: string
+        pedigree:
+          description: Whether the claim arrived on the component itself, as a patch declaring what it fixes
+          type: boolean
+        publisher:
+          description: Whose VEX document the claim came from, where it was uploaded on its own rather than with the inventory
+          type: string
+        statement:
+          description: "The words it gave: why the flaw does not apply, or the workaround where it does"
+          type: string
+        status:
+          description: What the build says, in the VEX vocabulary
+          type: string
+        subject:
+          description: The component the claim names
+          type: string
+        version:
+          description: The version of that component the claim names, where it names one
+          type: string
+        within:
+          description: The product of the build the claim names the component as shipping inside, where it names one. The claim applies beneath that product
+          type: string
+        within_version:
+          description: The version of that product
+          type: string
+      required:
+        - status
+        - subject
+      type: object
     BuildCountsBody:
       additionalProperties: false
       properties:
@@ -3342,6 +3379,13 @@ components:
         assigned_to:
           description: The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person
           type: string
+        claimed:
+          description: The build's own claims covering any of the places shown, the ones that answer a place first
+          items:
+            $ref: "#/components/schemas/BuildClaimBody"
+          type:
+            - array
+            - "null"
         component:
           type: string
         days_left:
@@ -3542,6 +3586,7 @@ components:
         - component
         - version
         - places
+        - claimed
         - standing
         - previous
         - similar
@@ -15433,6 +15478,23 @@ paths:
               - array
               - "null"
             uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -15927,6 +15989,23 @@ paths:
           name: vex_status
           schema:
             description: Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
             items:
               enum:
                 - not_affected
@@ -18658,6 +18737,23 @@ paths:
               - array
               - "null"
             uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -19277,6 +19373,23 @@ paths:
               - array
               - "null"
             uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
           explode: false
           in: query
@@ -19805,6 +19918,23 @@ paths:
           name: vex_status
           schema:
             description: Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
             items:
               enum:
                 - not_affected
@@ -20355,6 +20485,23 @@ paths:
           name: vex_status
           schema:
             description: Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
             items:
               enum:
                 - not_affected
@@ -20918,6 +21065,23 @@ paths:
           name: vex_status
           schema:
             description: Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold
+            items:
+              enum:
+                - not_affected
+                - affected
+                - fixed
+                - under_investigation
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
+        - description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
+          explode: true
+          in: query
+          name: build_says
+          schema:
+            description: Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround
             items:
               enum:
                 - not_affected

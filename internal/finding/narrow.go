@@ -307,6 +307,10 @@ type Filter struct {
 	// retyped one at a time.
 	Publishers []string
 	VexStatus  []string
+	// BuildSays keeps only what the build's own claims say one of these
+	// about. A claim that the flaw applies leaves the finding work and
+	// carries the build's workaround, so this is how those are found together.
+	BuildSays []string
 	// OpenedAfter, ClosedAfter and ProposedAfter keep only what happened
 	// after a moment. An operational convenience with no compliance claim
 	// attached, which is the honest description of it: it is what the
@@ -580,6 +584,12 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// filter that changed the counts it narrows would be worse than a slow
 	// one.
 	q = f.sayingIt(q)
+	// A row-level condition: a group is in the list when any of its places is
+	// covered by a claim saying what was asked.
+	if says := trimmed(f.BuildSays); len(says) > 0 {
+		q = q.Where(`f.claimed_by IN (SELECT sup.id FROM "suppression" AS "sup"
+			WHERE sup.status IN (?))`, bun.List(says))
+	}
 	if f.OpenedAfter != nil {
 		q = q.Having("MIN(f.opened_at) > ?", *f.OpenedAfter)
 	}

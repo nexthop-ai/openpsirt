@@ -286,6 +286,8 @@ export function Finding() {
   // third layer beside what the build claims and what we decided. Shown,
   // offered as a prefill, never applied.
   const publishers = it.said ?? [];
+  // What the build itself says about these places, in its own words.
+  const claimed = it.claimed ?? [];
 
   // Counted as places, the way the decision counts them, not as chain rows.
   const decided = new Set(places.filter((p) => p.decision != null).map((p) => p.place)).size;
@@ -799,6 +801,43 @@ export function Finding() {
           <References advisory={it.advisory} refs={it.references ?? []} />
           <LookItUp links={it.links ?? []} />
         </div>
+
+        {/* The build's own words: why a place is marked or closed, and the
+            workaround where it says the flaw applies. Shown whatever has
+            been decided, because the marking stays on the place. Its text
+            is a third party's, shown and never rendered. */}
+        {claimed.length > 0 && (
+          <div className="card">
+            <h3>Build says</h3>
+            {claimed.map((one, i) => (
+              <div key={`${one.subject} ${i}`} className="prior">
+                <header>
+                  <span className="id">{one.publisher || "The build"}</span>{" "}
+                  <span className="hint">
+                    says <b>{one.status.replace("_", " ")}</b> of {one.subject}
+                    {one.version && <> {one.version}</>}
+                    {one.within && (
+                      <>
+                        {" "}
+                        inside {one.within}
+                        {one.within_version && <> {one.within_version}</>}
+                      </>
+                    )}
+                    {one.justification && <> · {one.justification.replaceAll("_", " ")}</>}
+                    {one.pedigree && <> · patch</>}
+                    {one.document && <> · {one.document}</>}
+                  </span>
+                </header>
+                {one.statement && (
+                  <div className="why">
+                    {one.status === "affected" && <span className="hint">Workaround</span>}
+                    <p style={{ whiteSpace: "pre-wrap" }}>{one.statement}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {undecided && (
           <>

@@ -6,6 +6,7 @@ package finding_test
 import (
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -238,6 +239,63 @@ func TestAScanDoesNotWithdrawAClaimTakenFromAPublishedStatement(t *testing.T) {
 		if applied.Closed != 0 || applied.Unstated != 0 {
 			t.Errorf("recording the build's own claims closed %d and carried %d of the "+
 				"published one", applied.Closed, applied.Unstated)
+		}
+	})
+}
+
+func TestTheListFindsWhatTheBuildSaysAndNothingElse(t *testing.T) {
+	// The build says the flaw applies inside Y and gives a workaround; the
+	// zlib under curl is answered by nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.argues(t, insideOf(sbom.Affected, acmeY, "turn compression off"))
+		f.reported(t, found(inside, zlib))
+		who := f.holding(t, access.PublicTriage)
+		places := func(filter finding.Filter) int {
+			t.Helper()
+			groups, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			total := 0
+			for _, g := range groups {
+				total += g.Places
+			}
+			return total
+		}
+		if got := places(finding.Filter{}); got != 2 {
+			t.Fatalf("the list holds %d places, want the two zlib places", got)
+		}
+		if got := places(finding.Filter{BuildSays: []string{"affected"}}); got != 1 {
+			t.Errorf("what the build says is affected is %d places, want the one inside Y", got)
+		}
+		if got := places(finding.Filter{BuildSays: []string{"not_affected"}}); got != 0 {
+			t.Errorf("what the build says is not affected is %d places, want none", got)
+		}
+	})
+}
+
+func TestAFindingShowsTheBuildsClaimInItsOwnWords(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.rooted(t, rootPurl)
+		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")
+		f.reported(t, found(inside, zlib))
+		who := f.holding(t, access.PublicTriage)
+		open := f.open(t)
+		evidence, err := f.store.Detail(t.Context(), who, f.target, open[0].VulnerabilityID,
+			open[0].ComponentID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(evidence.Claimed) != 1 {
+			t.Fatalf("%d claims shown, want the vendor's one", len(evidence.Claimed))
+		}
+		got := evidence.Claimed[0]
+		if got.Status != "not_affected" || got.Justification != "vulnerable_code_not_in_execute_path" ||
+			got.Statement != "zlib's inflate is never reached" || got.Publisher != "acme security" ||
+			got.Document != "acme-y.openvex.json" {
+			t.Errorf("shown %+v, want the vendor's status, justification and words, and whose", got)
 		}
 	})
 }

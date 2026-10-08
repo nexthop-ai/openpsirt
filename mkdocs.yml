@@ -51,6 +51,7 @@ nav:
   - Current state: built.md
   - Evaluation: trying.md
   - Build pipelines: pipeline.md
+  - A vendor's release: vendor-release.md
   - Configuration: configuration.md
   - Helm: helm.md
   - Running the binary: running.md

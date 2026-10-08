@@ -314,6 +314,7 @@ export function activeFilters(
   if (at("unconfirmed") === "1") add("unconfirmed", "Not confirmed by a packager", "only");
   each("vex_publisher", "VEX publisher", []);
   each("vex_status", "VEX status", VEX_STATUS);
+  each("build_says", "Build says", VEX_STATUS);
   each("component", "Component", []);
   for (const kind of params.getAll("ecosystem").filter(Boolean)) {
     out.push({
@@ -634,6 +635,13 @@ export function Filters({
           chosen={all("vex_status")}
           options={VEX_STATUS}
           onChange={(chosen) => setMany("vex_status", chosen)}
+        />
+        <Choices
+          label="Build says"
+          hint="What the build's own VEX says. Affected finds the workarounds"
+          chosen={all("build_says")}
+          options={VEX_STATUS}
+          onChange={(chosen) => setMany("build_says", chosen)}
         />
       </Group>
 
