@@ -1573,7 +1573,7 @@ components:
           description: The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix
           type: string
         because:
-          description: The reason it went. Only on fixed entries
+          description: The reason it went. Only on an entry that left the affected list
           enum:
             - removed
             - upgraded
@@ -1581,7 +1581,10 @@ components:
             - patched
             - superseded
             - unexplained
+            - invalid
             - unaffected
+            - disclaimed
+            - fixed
           type: string
         closed_by_run:
           description: The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
@@ -2766,6 +2769,7 @@ components:
             - unexplained
             - invalid
             - unaffected
+            - disclaimed
             - fixed
           type: string
         closed_note:
@@ -2825,6 +2829,9 @@ components:
             - agreed
             - lapsed
           type: string
+        stated:
+          $ref: "#/components/schemas/StatedBody"
+          description: "The supplier's statement answering this place: the one that closed a row closed as disclaimed, or one answering an open row on the routes through the supplier's product"
         unaffected:
           description: The CVE record lines stating this version is unaffected. Only on a row closed as unaffected
           items:
@@ -3467,7 +3474,7 @@ components:
           description: The standing rule that placed this, where one did. Empty means a person did, or nobody has
           type: string
         said:
-          description: What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied
+          description: What publishers have said about this, from VEX documents and supplier advisories uploaded here or read from a supplier's directory. Evidence, and a prefill; a supplier's statement that its own product is not affected closes the places inside that product at the next scan
           items:
             $ref: "#/components/schemas/SaidBody"
           type:
@@ -10226,6 +10233,12 @@ components:
     SittingBody:
       additionalProperties: false
       properties:
+        answered_by:
+          description: The supplier whose statement answers this place on the routes that run through their product. The place stays open for the routes outside it
+          type: string
+        answered_in:
+          description: The supplier's product those routes run through
+          type: string
         chain:
           description: The way down to here, the build first and this component last. Empty where the inventory left the component unplaced
           items:
@@ -10537,6 +10550,29 @@ components:
           description: What to call it. Left out, the document names the issues it covers
           maxLength: 191
           type: string
+      type: object
+    StatedBody:
+      additionalProperties: false
+      properties:
+        document:
+          description: The file the statement arrived in
+          type: string
+        justification:
+          description: The justification the supplier gave, in the exchange format's vocabulary
+          type: string
+        product:
+          description: The supplier's product the statement is about
+          type: string
+        publisher:
+          description: Who published the statement
+          type: string
+        statement:
+          description: What the supplier wrote alongside it
+          type: string
+      required:
+        - publisher
+        - product
+        - document
       type: object
     Statement:
       additionalProperties: false
@@ -17504,7 +17540,7 @@ paths:
         scope: deployment
     post:
       description: |-
-        Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision, and is never applied.
+        Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision. A statement that their own product, at the version a build ships, is not affected closes the finding inside that product at the next scan.
 
         The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
 
@@ -25409,6 +25445,7 @@ paths:
                 - unexplained
                 - invalid
                 - unaffected
+                - disclaimed
                 - fixed
               type: string
             type:
@@ -25559,6 +25596,7 @@ paths:
                 - unexplained
                 - invalid
                 - unaffected
+                - disclaimed
                 - fixed
               type: string
             type:
@@ -25931,6 +25969,8 @@ paths:
 
         Public findings only. `undisclosed=true` includes the rest for somebody who may read them, which is a preview rather than a thing to publish.
 
+        `kind=with-suppliers` is a second document with an identifier of its own. It adds, as `not_affected`, what a supplier states about its own product where the statement closed every place of a component in the build, in the supplier's name.
+
         Requires a publisher configured for this deployment: a document naming none has nobody as its author.
 
         Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
@@ -25958,6 +25998,16 @@ paths:
           schema:
             description: Include findings nobody has announced. A preview, not a document to publish
             type: boolean
+        - description: "Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours"
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: "Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours"
+            enum:
+              - ours
+              - with-suppliers
+            type: string
       responses:
         "200":
           content:
@@ -26009,6 +26059,16 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Which document about the build: ours or with-suppliers. Absent means ours"
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: "Which document about the build: ours or with-suppliers. Absent means ours"
+            enum:
+              - ours
+              - with-suppliers
+            type: string
       responses:
         "200":
           content:
@@ -26058,6 +26118,16 @@ paths:
           name: variant
           required: true
           schema:
+            type: string
+        - description: "Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours"
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: "Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours"
+            enum:
+              - ours
+              - with-suppliers
             type: string
       responses:
         "201":
@@ -26114,6 +26184,16 @@ paths:
             format: int64
             minimum: 1
             type: integer
+        - description: "Which document about the build: ours or with-suppliers. Absent means ours"
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: "Which document about the build: ours or with-suppliers. Absent means ours"
+            enum:
+              - ours
+              - with-suppliers
+            type: string
       responses:
         "200":
           content:
@@ -26140,7 +26220,7 @@ paths:
       description: |-
         Takes one CSAF security advisory a supplier has published about their own products, where those products are components this product ships.
 
-        Nothing is applied. What arrives is a third layer beside the build's own claims and our decisions: shown as evidence, offered as a prefill, and never standing as our judgment by itself.
+        A supplier's statement that its own product, at the version a build ships, is not affected closes the finding where every route to it runs through that product, at the next scan. Everything else that arrives is a third layer beside the build's own claims and our decisions: shown as evidence and offered as a prefill.
 
         An advisory is about the versions it names. Where it says a vulnerability is fixed in one version, that is not a statement about another, so a claim naming a version is shown against every version of that component and offers a prefill only at the version it named.
 
@@ -26427,7 +26507,7 @@ paths:
       description: |-
         Takes one OpenVEX document of what a distribution or an upstream security team has published about components this product ships.
 
-        Nothing is applied. What arrives is a third layer beside the build's own claims and our decisions: shown as evidence, offered as a prefill, and never standing as our judgment by itself.
+        A supplier's statement that its own product, at the version a build ships, is not affected closes the finding where every route to it runs through that product, at the next scan. Everything else that arrives is a third layer beside the build's own claims and our decisions: shown as evidence and offered as a prefill.
 
         What a document adds over what the scanner already reports is the reasoning. The status is in the fix state already.
 
