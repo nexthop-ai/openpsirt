@@ -37,17 +37,17 @@ func ReviewQueueMine() string { return "/review-queue?mine=1" }
 // that lapsed, which is where they are re-affirmed.
 func ReviewQueueReaffirm() string { return "/review-queue?reaffirm=1" }
 
-// Work is the screen of who holds what.
-func Work() string { return "/work" }
+// Assignments is the screen of who holds what.
+func Assignments() string { return "/assignments" }
 
-// WorkTeam is the work screen opened on one team's queue.
-func WorkTeam(team string) string {
-	return "/work?tab=people&team=" + url.QueryEscape(team)
+// AssignmentsTeam is the assignments screen opened on one team's queue.
+func AssignmentsTeam(team string) string {
+	return "/assignments?tab=people&team=" + url.QueryEscape(team)
 }
 
-// WorkPerson is the work screen opened on what one person holds.
-func WorkPerson(identity string) string {
-	return "/work?tab=people&person=" + url.QueryEscape(identity)
+// AssignmentsPerson is the assignments screen opened on what one person holds.
+func AssignmentsPerson(identity string) string {
+	return "/assignments?tab=people&person=" + url.QueryEscape(identity)
 }
 
 // Settings is the deployment's settings.
@@ -56,8 +56,8 @@ func Settings() string { return "/settings" }
 // System is the deployment's own health.
 func System() string { return "/system" }
 
-// Obligations is the list of what the deployment owes somebody by a date.
-func Obligations() string { return "/obligations" }
+// ExploitedHere is the list of what the deployment owes somebody by a date.
+func ExploitedHere() string { return "/exploited-here" }
 
 // Claim is one claim, whole.
 func Claim(id int64) string { return "/claims/" + strconv.FormatInt(id, 10) }
@@ -100,12 +100,12 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 
 // Inventories is the list of what one build sent.
 func Inventories(product, stream, variant string) string {
-	return build(product, stream, variant) + "/scans"
+	return build(product, stream, variant) + "/inventories"
 }
 
 // InventoryChanges is what one upload moved in a build's inventory.
 func InventoryChanges(product, stream, variant string, scan int64) string {
-	return build(product, stream, variant) + "/scans/" + strconv.FormatInt(scan, 10) + "/changes"
+	return build(product, stream, variant) + "/inventories/" + strconv.FormatInt(scan, 10) + "/changes"
 }
 
 // Report is one report sheet, opened on a window of days.

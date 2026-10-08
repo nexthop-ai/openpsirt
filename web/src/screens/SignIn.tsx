@@ -126,7 +126,15 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+      {/* Over the page it is a panel of its own, drawn like every other sheet:
+          text straight on the blurred screen behind it reads grey on grey. */}
+      <div
+        className={
+          resuming
+            ? "w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--line-strong)] bg-[var(--surface)] px-6 py-8 text-[var(--ink)] shadow-[var(--shadow-lg)]"
+            : "w-full max-w-sm"
+        }
+      >
         <div className="mb-8 flex flex-col items-center gap-3">
           {/* The artwork the look calls for. The light wordmark's ink is a
               near-black blue, which on the dark look's canvas is all but

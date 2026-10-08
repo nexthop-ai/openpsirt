@@ -21,7 +21,7 @@ import { Release } from "./Release";
 //
 // Resolved rather than guessed from the name. A tag is a tag because the
 // catalog says so, and a naming convention is a rule nobody agreed to.
-export function Stream() {
+export function Branch() {
   const { product = "", stream = "" } = useParams();
   // Retired releases included, and keyed apart from the offered list because
   // of it. This resolves a name somebody arrived with rather than offering a

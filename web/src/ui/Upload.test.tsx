@@ -41,8 +41,8 @@ describe("an upload that is already held", () => {
     mount.render(
       screen(
         <UploadDrawer open onClose={() => undefined} />,
-        "/products/sonic/streams/master/variants/broadcom/scans",
-        "/products/:product/streams/:stream/variants/:variant/scans",
+        "/products/sonic/streams/master/variants/broadcom/inventories",
+        "/products/:product/streams/:stream/variants/:variant/inventories",
       ),
     );
     await settle();

@@ -128,7 +128,7 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 					"No notice outside is recorded against it.",
 					one.Issue, one.ProductName, due.Window.Name, from, verb,
 					due.EndsAt.Format("2006-01-02 15:04 MST")),
-				Link:            weblink.Obligations(),
+				Link:            weblink.ExploitedHere(),
 				Private:         one.Private,
 				ProductID:       &one.Record.ProductID,
 				VulnerabilityID: &one.Record.VulnerabilityID,

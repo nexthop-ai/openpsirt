@@ -117,6 +117,7 @@ server's notification links are tested against it (`DESIGN-notifications.md`
 | A build's screen moved to another build keeps the address's own segments | A segment holding an escaped slash stays one segment. The router's match hands the tail back with the slash restored, so the tail is cut from the address as it stands |
 | An address written out whole is matched against the table | Path and query parameters both. An address the router does not know lands on the not-found screen, and a parameter the screen does not read opens it on its default |
 | Every parameter the table lists is read by the screen its route renders | The screen is found by reading the router, and every module it reaches is searched for a read of the parameter. A table promising a parameter nothing acts on is the dead link in a second place |
+| A screen whose address changed keeps its former address in the table, forwarding to the current one with the query and fragment it arrived with | A notice keeps the link it was sent with, so a notice still unread opens the screen rather than the not-found screen. An address another screen now holds forwards nowhere: The record holds the former address of the flaw form |
 | An API address is not an address into the page | One under `/v1`, or one joined onto the call that builds the API's build prefix, is the API document's to describe |
 
 The check reads the source, so it has one input it must report and one it must
@@ -1615,7 +1616,7 @@ a switch that exists only in the API.
 
 ## A person, whole
 
-`/people/:identity`, reached from the people list by their name — the same move
+`/access/:identity`, reached from the Access screen by their name — the same move
 as a component's name opening the component. An administrator's screen: it
 carries what somebody was told, which is the question asked after a leak.
 

@@ -19,11 +19,11 @@ describe("which screens need a whole build", () => {
   it("keeps the five that are about a way down", () => {
     // Each of these exists for one build and no other, because there is no
     // dependency graph across branches.
-    expect(needsBuild(`${BUILD}/components`)).toBe(true);
-    expect(needsBuild(`${BUILD}/components/libnl-3-200/decide`)).toBe(true);
-    expect(needsBuild(`${BUILD}/scans`)).toBe(true);
+    expect(needsBuild(`${BUILD}/dependencies`)).toBe(true);
+    expect(needsBuild(`${BUILD}/dependencies/libnl-3-200/decide`)).toBe(true);
+    expect(needsBuild(`${BUILD}/inventories`)).toBe(true);
     // What one upload changed is that upload's, and an upload is one build's.
-    expect(needsBuild(`${BUILD}/scans/4/changes`)).toBe(true);
+    expect(needsBuild(`${BUILD}/inventories/4/changes`)).toBe(true);
     expect(needsBuild(`${BUILD}/findings/CVE-2026-1/components/libnl-3-200`)).toBe(true);
   });
 
@@ -34,7 +34,7 @@ describe("which screens need a whole build", () => {
     expect(needsBuild("/products/sonic/findings")).toBe(false);
     expect(onFindings(`${BUILD}/findings`)).toBe(true);
     expect(onFindings("/products/sonic/findings")).toBe(true);
-    expect(onFindings(`${BUILD}/components`)).toBe(false);
+    expect(onFindings(`${BUILD}/dependencies`)).toBe(false);
   });
 });
 
@@ -131,12 +131,12 @@ describe("an address that names a product", () => {
 describe("changing scope stays on the screen", () => {
   it("swaps the build under a build-scoped screen", () => {
     expect(
-      rescoped(`${BUILD}/components`, {
+      rescoped(`${BUILD}/dependencies`, {
         product: "sonic",
         stream: "202411",
         variant: "mellanox",
       }),
-    ).toBe("/products/sonic/streams/202411/variants/mellanox/components");
+    ).toBe("/products/sonic/streams/202411/variants/mellanox/dependencies");
   });
 
   it("keeps a segment that carries an escaped slash as one segment", () => {
@@ -214,7 +214,7 @@ describe("changing scope stays on the screen", () => {
   it("refuses a partial selection on a screen that exists for one build", () => {
     // Those five screens are about a way down and have no answer for "every
     // branch", so there is nowhere to land.
-    expect(rescoped(`${BUILD}/components`, { product: "sonic" })).toBe(null);
+    expect(rescoped(`${BUILD}/dependencies`, { product: "sonic" })).toBe(null);
   });
 });
 

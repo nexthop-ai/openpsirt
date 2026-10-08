@@ -4,7 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Disclosing } from "./Disclosing";
-import { Work } from "./Work";
+import { Assignments } from "./Assignments";
 import { location, screen, serve, settle, mounted } from "../test/mount";
 
 // A list narrowed or switched starts at its own beginning, and a page past the
@@ -22,7 +22,7 @@ describe("the assignments screen", () => {
       if (path === "/v1/people/{identity}/assignments") return { data: { items: [], total: 10 } };
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Work />, "/work?tab=people&person=alice&offset=50"));
+    mount.render(screen(<Assignments />, "/assignments?tab=people&person=alice&offset=50"));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).not.toContain("They are not holding anything.");
@@ -37,7 +37,7 @@ describe("the assignments screen", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Work />, "/work?tab=people&offset=50"));
+    mount.render(screen(<Assignments />, "/assignments?tab=people&offset=50"));
     await settle();
     const bob = Array.from(mount.host().querySelectorAll("button")).find((each) =>
       each.textContent?.includes("bob"),

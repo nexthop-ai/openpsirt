@@ -76,7 +76,7 @@ export function Person() {
           {admin && (
             <>
               {" "}
-              · <Link to="/people">All users</Link>
+              · <Link to="/access">All users</Link>
             </>
           )}
         </p>

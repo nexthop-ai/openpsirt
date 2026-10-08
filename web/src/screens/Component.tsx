@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap, whichOf } from "../api/queries";
-import { claimAt, componentAt, decideAt, treeAt } from "../app/routes";
+import { claimAt, componentAt, decideAt, dependenciesAt } from "../app/routes";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Empty } from "../ui/Empty";
@@ -592,7 +592,7 @@ function Sits({
             )}
             <Link
               className="linkish"
-              to={treeAt(scope, {
+              to={dependenciesAt(scope, {
                 at: component,
                 ...whichOf({
                   version: pkg.version,

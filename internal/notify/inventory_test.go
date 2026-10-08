@@ -147,7 +147,7 @@ func TestAnUploadThatChangedMuchOfABuildIsToldTo(t *testing.T) {
 		// are: a message carrying the rows would be a list of a build's
 		// contents in everybody's mail.
 		if !strings.HasSuffix(told[0].Link, "/changes") ||
-			!strings.Contains(told[0].Link, "/products/sonic/streams/master/variants/broadcom/scans/") {
+			!strings.Contains(told[0].Link, "/products/sonic/streams/master/variants/broadcom/inventories/") {
 			t.Errorf("the link is %q, want the listing for this upload", told[0].Link)
 		}
 		for _, name := range held {

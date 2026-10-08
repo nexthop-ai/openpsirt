@@ -31,7 +31,7 @@ const PAGE = 50;
 // shared queue because it is assigned, and not in anybody's list because they
 // are not here. Nothing tells us somebody left, so releasing their work is an
 // action rather than something the tool discovers.
-export function Work() {
+export function Assignments() {
   const [params, setParams] = useSearchParams();
   const who = useWho();
   const tab = params.get("tab") ?? "due";

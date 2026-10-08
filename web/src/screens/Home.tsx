@@ -22,7 +22,7 @@ import {
   allFindingsAt,
   comparisonAt,
   inventoriesAt,
-  obligationsAt,
+  exploitedAt,
   productFindingsAt,
   reviewQueueAt,
 } from "../app/routes";
@@ -533,7 +533,7 @@ function Figures({
     <div className="kpis">
       {/* Hers first. What somebody opening this most days has to decide is
           what to pick up, and a count of the estate does not answer it. */}
-      <button type="button" className="kpi" onClick={() => navigate("/work")}>
+      <button type="button" className="kpi" onClick={() => navigate("/assignments")}>
         <span className="l">Assigned to you · {counting}</span>
         <span className="n">
           <Count of={assigned}>{() => (assigned.data?.total ?? 0).toLocaleString()}</Count>
@@ -576,7 +576,7 @@ function Figures({
         <button
           type="button"
           className="kpi urgent"
-          onClick={() => navigate(obligationsAt(at.product))}
+          onClick={() => navigate(exploitedAt(at.product))}
         >
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Exploited here
@@ -865,7 +865,7 @@ function InProgress({ me }: { me: string }) {
         ))}
       </ul>
       <footer>
-        <Link to="/work" className="linkish">
+        <Link to="/assignments" className="linkish">
           View assignments →
         </Link>
       </footer>

@@ -466,6 +466,48 @@ func TestTheUserListSaysWhereSomebodyIsReached(t *testing.T) {
 	})
 }
 
+// TestRecordingSomebodyAgainRenamesThem pins that the name of somebody already
+// recorded moves when a request states one, stays when a request says nothing
+// about it, and clears when a request states it empty.
+func TestRecordingSomebodyAgainRenamesThem(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		named := func() string {
+			t.Helper()
+			var person struct {
+				DisplayName string `json:"display_name"`
+			}
+			httpapitest.Read(t, r, "admin", "/v1/people/ada", &person)
+			return person.DisplayName
+		}
+		for _, step := range []struct{ body, want string }{
+			{`{"identity":"ada","display_name":"Ada"}`, "Ada"},
+			{`{"identity":"ada","display_name":"Ada Lovelace"}`, "Ada Lovelace"},
+			{`{"identity":"ada","email":"ada@example.test"}`, "Ada Lovelace"},
+			{`{"identity":"ada","display_name":""}`, ""},
+		} {
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+				step.body); got.Code >= 300 {
+				t.Fatalf("%s answered %d: %s", step.body, got.Code, got.Body.String())
+			}
+			if got := named(); got != step.want {
+				t.Errorf("after %s ada is called %q, want %q", step.body, got, step.want)
+			}
+		}
+
+		var trail httpapitest.Changed
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
+		renamed := false
+		for _, row := range trail.Items {
+			if row.About == "ada" && row.Became == "named Ada Lovelace" {
+				renamed = true
+			}
+		}
+		if !renamed {
+			t.Errorf("the trail has no row naming ada Ada Lovelace: %+v", trail.Items)
+		}
+	})
+}
+
 // The trail keys an administrative change on the names as stored, whatever
 // capitals the request typed them in, and records a membership only where it
 // changed.

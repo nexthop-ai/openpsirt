@@ -556,8 +556,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 			Where("f.closed_at IS NULL").
 			Where("f.assigned_to IS NOT NULL")
 		// One product where the caller named one, for a screen that is about
-		// one. Zero is every product, which is what the people screen asks
-		// for.
+		// one. Zero is every product, which is what the people tab of the
+		// assignments screen asks for.
 		if productID != 0 {
 			query = query.Where("st.product_id = ?", productID)
 		}

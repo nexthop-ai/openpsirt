@@ -3,7 +3,7 @@
 
 import { type Scoped } from "../../app/scope";
 import {
-  auditAt,
+  recordAt,
   comparisonAt,
   inventoriesAt,
   matchCoverageAt,
@@ -57,7 +57,7 @@ type Group = { name: string; reports: Report[] };
 function withProduct(asked: string, scope: Scoped): string {
   const query = new URLSearchParams(asked);
   if (scope.product) query.set("product", scope.product);
-  return auditAt(query);
+  return recordAt(query);
 }
 
 // The reports, by the question they answer. An entry leading to a filter on
@@ -211,7 +211,7 @@ export const ON_SCREENS: Report[] = [
     // per team, with the overdue count beside the total.
     name: "Assignments",
     answers: "Work held per person and team, and how much of it is overdue.",
-    to: () => "/work",
+    to: () => "/assignments",
   },
   {
     name: "Disclosing",

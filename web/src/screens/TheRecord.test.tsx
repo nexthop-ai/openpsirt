@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Audit, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./Audit";
+import { TheRecord, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./TheRecord";
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
@@ -34,7 +34,7 @@ describe("the change history on the record", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Audit />, "/audit"));
+    mount.render(screen(<TheRecord />, "/record"));
     await settle();
     const more = () =>
       Array.from(mount.host().querySelectorAll("button")).find(
@@ -62,7 +62,7 @@ describe("the change history's kind", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Audit />, "/audit?change=role"));
+    mount.render(screen(<TheRecord />, "/record?change=role"));
     await settle();
     expect(kinds).toContain("role");
     const file = Array.from(mount.host().querySelectorAll("a"))
@@ -95,7 +95,7 @@ describe("the period on the record", () => {
       if (query && "to" in query) ends[path] = query.to;
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Audit />, "/audit?from=2026-01-01&to=2026-03-31"));
+    mount.render(screen(<TheRecord />, "/record?from=2026-01-01&to=2026-03-31"));
     await settle();
     expect(ends["/v1/audit/claims"]).toBe("2026-04-01");
     expect(ends["/v1/administration/changes"]).toBe("2026-04-01");
@@ -164,7 +164,7 @@ describe("the record's list", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Audit />, "/audit?state=approved&state=lapsed"));
+    mount.render(screen(<TheRecord />, "/record?state=approved&state=lapsed"));
     await settle();
     const cards = mount.host().querySelectorAll(".judgment");
     expect(cards.length).toBe(1);

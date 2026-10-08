@@ -489,7 +489,7 @@ export function Overview() {
         <h3>Dismissals</h3>
         <p className="hint">
           Approved in this window, newest first. {byProduct(at.product)}, one row per place.{" "}
-          <Link to="/audit">The record</Link> groups them by claim.
+          <Link to="/record">The record</Link> groups them by claim.
         </p>
         {argued.isPending ? (
           <Loading />

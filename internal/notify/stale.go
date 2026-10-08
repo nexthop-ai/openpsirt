@@ -482,7 +482,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken. "+
 				"Work in a queue is held by nobody until somebody picks it up.",
 				row.Team, itemsWaiting(row.Waiting), row.Product),
-			Link:      weblink.WorkTeam(row.TeamName),
+			Link:      weblink.AssignmentsTeam(row.TeamName),
 			Private:   private,
 			ProductID: &row.ProductID,
 			TeamID:    &row.TeamID,

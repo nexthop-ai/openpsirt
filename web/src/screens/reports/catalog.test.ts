@@ -142,7 +142,7 @@ describe("what a catalog row carries with it", () => {
 
   it("carries it into an address that has no query of its own yet", () => {
     const changes = CATALOG.find((report) => report.name === "Administrative changes")!;
-    expect(leadsTo(changes, { product: "sonic" }).to).toBe("/audit?product=sonic");
-    expect(leadsTo(changes, {}).to).toBe("/audit");
+    expect(leadsTo(changes, { product: "sonic" }).to).toBe("/record?product=sonic");
+    expect(leadsTo(changes, {}).to).toBe("/record");
   });
 });

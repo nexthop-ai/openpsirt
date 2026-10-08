@@ -74,7 +74,7 @@ const STATES = [
 // the record rather than as a screenshot of an application: the shell, the
 // controls and the links go, a header states what was asked for and when it was
 // taken, and a judgment does not break across a page.
-export function Audit() {
+export function TheRecord() {
   const [params, setParams] = useSearchParams();
   // Repeated in the address rather than one value each, because "dismissed or
   // deferred" and "waiting or sent back" are questions a single value cannot
@@ -204,10 +204,10 @@ export function Audit() {
               auditor is given a document rather than a screen, and this was
               copied out by hand. The filters travel in the address, so the
               file is this page's own address with a suffix. */}
-          <a className="btn quiet" href={recordAt(params, "csv")}>
+          <a className="btn quiet" href={fileAt(params, "csv")}>
             CSV
           </a>{" "}
-          <a className="btn quiet" href={recordAt(params, "json")}>
+          <a className="btn quiet" href={fileAt(params, "json")}>
             JSON
           </a>{" "}
           <button type="button" className="btn" onClick={() => window.print()}>
@@ -842,7 +842,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
 // The screen's own filters are the file's, straight from the address, so a
 // narrowed screen and the file taken from it cannot disagree about what was
 // asked for.
-function recordAt(params: URLSearchParams, format: string): string {
+function fileAt(params: URLSearchParams, format: string): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
   // The change history's own filter, which the record's route does not take

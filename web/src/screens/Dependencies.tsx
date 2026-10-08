@@ -98,7 +98,7 @@ type Under = { kids?: Node[]; error?: unknown };
 // exploration.
 //
 // The selected component lives in the URL, so a link carries it.
-export function Tree() {
+export function Dependencies() {
   const { product = "" } = useParams();
   const who = useWho();
   // Somebody who holds no reading on the product gets the tree seen upward
