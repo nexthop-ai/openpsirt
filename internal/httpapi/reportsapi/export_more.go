@@ -242,7 +242,7 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 						}
 						rows = append(rows, []string{
 							group.what, body.Vulnerability, body.Component, body.Severity,
-							body.Because, body.FromVersion, body.MovedTo, body.ArrivedFrom,
+							string(body.Because), body.FromVersion, body.MovedTo, body.ArrivedFrom,
 							closedRun, string(body.State), string(body.Outcome),
 							string(body.Justification), body.Due,
 						})

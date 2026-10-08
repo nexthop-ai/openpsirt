@@ -88,7 +88,8 @@ type Group struct {
 	// measured in and the unit the disposition register expands to, rather
 	// than a number a reader is asked to reconcile with the two above.
 	Places int
-	// Answered counts the places the build has already argued about.
+	// Answered counts the places the build or a supplier has already argued
+	// about.
 	Answered int
 	// State is how far we have decided this group, in the same four words
 	// the state filter takes and by the same definition: undecided when no
@@ -867,7 +868,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// The scheme that score is on. A group is one issue, so every row it
 		// folds carries the same one and the aggregate is that value.
 		ColumnExpr(`MAX(COALESCE(v.score_version, '')) AS "score_version"`).
-		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
+		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
 		// The earliest opening among these places, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
 		// the year in the identifier.

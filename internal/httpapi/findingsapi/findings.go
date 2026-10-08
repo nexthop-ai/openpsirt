@@ -415,6 +415,8 @@ type SittingBody struct {
 	// reading "build" as "does not ship" is wrong for every compiled language.
 	DeclaredAs string `json:"declared_as,omitempty" doc:"The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
 	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
+	AnsweredBy string `json:"answered_by,omitempty" doc:"The supplier whose statement answers this place on the routes that run through their product. The place stays open for the routes outside it"`
+	AnsweredIn string `json:"answered_in,omitempty" doc:"The supplier's product those routes run through"`
 	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
 	// DeferredDays is what a deferral asked for here is added to before it is
@@ -595,13 +597,12 @@ type EvidenceBody struct {
 	// reason a place is a component at a position.
 	Elsewhere []core.ElsewhereBody `json:"elsewhere" doc:"Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five"`
 
-	// Vex is the third layer beside the build's own claims and our decisions:
-	// the claims a distribution or an upstream security team has published
-	// about this component in a VEX document. Evidence and a
-	// prefill; never applied to anything by itself, because a third
-	// party's claim standing as ours would put somebody else's judgment
-	// inside a number we quote.
-	Said []core.SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied"`
+	// Said is the third layer beside the build's own claims and our
+	// decisions: the claims a distribution, an upstream security team or a
+	// supplier has published about this component. Evidence and a prefill. A
+	// supplier's statement about its own product is applied by the run, at
+	// the places that product occupies, and is here as the evidence for it.
+	Said []core.SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here or read from a supplier's directory. Evidence, and a prefill; a supplier's statement that its own product is not affected closes the places inside that product at the next scan"`
 }
 
 func registerFindingDetail(api huma.API, in core.Deps) {
@@ -698,7 +699,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// database they consulted rather than a property of the issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
 			issue, append([]string{body.Vulnerability}, body.Aliases...),
-			body.Component, evidence.Purl)
+			body.Component, evidence.Purl, target.ID, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what publishers say could not be read", err)
 		}
@@ -799,6 +800,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		sitting := SittingBody{
 			Place: place.PlaceIdentity, Component: place.Component,
 			Consumer: place.Consumer, Suppressed: place.Suppressed,
+			AnsweredBy: place.AnsweredBy, AnsweredIn: place.AnsweredIn,
 			DeclaredAs: place.DeclaredAs,
 		}
 		if place.Decision != nil {

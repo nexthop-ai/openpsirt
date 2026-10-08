@@ -40,11 +40,11 @@ func TestADocumentRecordedAfterSomebodyElsesStatesTheLaterVersion(t *testing.T) 
 		racing := vex.NewStore(db.DB)
 		vex.Between(racing, func() {
 			if _, err := vex.NewStore(db.DB).Issued(ctx, subject, named,
-				"sonic", "master", "broadcom"); err != nil {
+				"sonic", "master", "broadcom", vex.Ours); err != nil {
 				t.Fatal(err)
 			}
 		})
-		recorded, err := racing.Issued(ctx, subject, named, "sonic", "master", "broadcom")
+		recorded, err := racing.Issued(ctx, subject, named, "sonic", "master", "broadcom", vex.Ours)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,14 +105,14 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 
 		hook := &insertsIssuance{rival: func() {
 			if _, err := vex.NewStore(db.DB).Issued(context.Background(), subject, named,
-				"sonic", "master", "broadcom"); err != nil {
+				"sonic", "master", "broadcom", vex.Ours); err != nil {
 				t.Errorf("the rival issuance: %v", err)
 			}
 		}}
 		hooked := bun.NewDB(db.DB.DB, db.Dialect())
 		hooked.AddQueryHook(hook)
 
-		recorded, err := vex.NewStore(hooked).Issued(ctx, subject, named, "sonic", "master", "broadcom")
+		recorded, err := vex.NewStore(hooked).Issued(ctx, subject, named, "sonic", "master", "broadcom", vex.Ours)
 		if err != nil {
 			t.Fatalf("an issuance that lost the race for its number answered %v", err)
 		}
@@ -156,7 +156,7 @@ func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if _, err := store.Issued(ctx, subject, named, "sonic", "master", "broadcom"); !errors.Is(err, vex.ErrRenamed) {
+		if _, err := store.Issued(ctx, subject, named, "sonic", "master", "broadcom", vex.Ours); !errors.Is(err, vex.ErrRenamed) {
 			t.Errorf("recording a document for a build renamed meanwhile answered %v", err)
 		}
 		went, err := db.DB.NewSelect().Table("vex_issuance").Count(ctx)

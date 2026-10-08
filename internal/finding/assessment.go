@@ -638,11 +638,13 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		FixState  FixState   `bun:"fix_state"`
 		FixedAt   *time.Time `bun:"fixed_at"`
 		DueAt     *time.Time `bun:"due_at"`
+		StatedBy  *int64     `bun:"stated_by"`
 	}
 	// Read before the flag is raised: afterwards there is nothing to tell the
 	// rows learning it from the ones that already carried it.
 	if err := tx.NewSelect().Model((*Finding)(nil)).
-		Column("id", "kind", "urgency_exploited", "opened_at", "fix_state", "fixed_at", "due_at").
+		Column("id", "kind", "urgency_exploited", "opened_at", "fix_state", "fixed_at", "due_at",
+			"stated_by").
 		Where("vulnerability_id = ?", issue).
 		Where("closed_at IS NULL").
 		Where("urgency_exploited = ? OR exploited_learned_at > ?", false, known).
@@ -661,6 +663,11 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		due := Deadline(row.FixState, true, row.OpenedAt, observedAt, &known,
 			row.FixedAt, windows.Exploited)
 		if row.Exploited && row.DueAt == nil {
+			due = nil
+		}
+		// A place a supplier answers on some routes is not work, and carries
+		// no deadline however the issue is rated.
+		if row.StatedBy != nil {
 			due = nil
 		}
 		key := clock{off: due == nil}
@@ -788,6 +795,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 			Where("urgency_exploited_here = ?", group.ExploitedHere).
 			Where("opened_at = ?", group.OpenedAt).
 			Where("kind <> ?", Entered).
+			// A place a supplier answers on some routes carries no deadline.
+			Where("stated_by IS NULL").
 			Where(inThisProduct, productID)
 		if group.LearnedAt != nil {
 			q = q.Where("exploited_learned_at = ?", *group.LearnedAt)

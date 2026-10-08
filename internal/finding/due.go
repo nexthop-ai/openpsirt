@@ -361,13 +361,13 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Where("f.closed_at IS NULL").
 			Where("f.due_at IS NOT NULL").
 			Where("f.due_at <= ?", s.now().UTC().Add(within)).
-			// Nothing the build already argued away, and nothing a decision
-			// takes off the clock. Not merely a claim: a proposal waiting for
+			// Nothing the build or a supplier already argued away, and nothing
+			// a decision takes off the clock. Not merely a claim: a proposal waiting for
 			// a second person suppresses nothing, and it took findings off
 			// this list for as long as it sat in the queue — a quarter, on
 			// one — while the same findings still counted as overdue against
 			// whoever held them.
-			Where("f.suppressed_by IS NULL").
+			Where(NotArguedAway).
 			Where("NOT "+standing, args...)
 		if !all {
 			q = q.Where("st.product_id IN (?)", bun.List(products))
@@ -629,6 +629,9 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							Where(start.from(""), start.args...).
 							Where("closed_at IS NULL").
 							Where("kind <> ?", Entered).
+							// A place a supplier answers on some routes
+							// carries no deadline.
+							Where("stated_by IS NULL").
 							Where(inThisProduct, productID)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {

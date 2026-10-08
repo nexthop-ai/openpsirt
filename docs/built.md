@@ -15,14 +15,14 @@ build is recreated.
 | Catalog and graph | Products, branches and tags, variants, and the dependency graph. Each is renamed and retired in place |
 | Ingest | CycloneDX, SPDX 2.x and SPDX 3.x, with the suppressions a build carries, and a receipt per upload naming what it moved |
 | Scanning | Run here on a schedule, findings tracked over intervals, CVSS 3 and 4.0 ratings kept side by side |
-| Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default |
+| Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default. A supplier's statement that its own product is not affected closes the finding inside that product |
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles per product or across every product, public and private as separate grants, enforced in the data layer |
 | Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections, and a review queue listed by the reason each claim waits |
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
-| Advisories | CSAF advisories with editorial states and a second person's agreement, stating a release known not affected where approved decisions cover it and saying no fix is planned where they say it will not be fixed, a CSAF provider directory, and per-build OpenVEX documents with a revision chain |
+| Advisories | CSAF advisories with editorial states and a second person's agreement, stating a release known not affected where approved decisions cover it and saying no fix is planned where they say it will not be fixed, a CSAF provider directory, and per-build OpenVEX documents with a revision chain, in two kinds: this deployment's own, and that with suppliers' statements beside it |
 | Obligations | Records of exploitation, the windows they may oblige, and the notices given |
 | Reporting | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
 | Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, Slack and Zulip channels and direct messages, and operational alerts |

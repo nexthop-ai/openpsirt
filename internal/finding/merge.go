@@ -417,6 +417,7 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 			Set("closed_at = ?", now).
 			Set("closed_run_id = ?", run).
 			Set("closed_because = ?", Invalid).
+			Set("stated_by = NULL").
 			Set("closed_note = ?", "Held twice once "+gone.Identifier+" merged into the issue it is.").
 			Where("f.id IN (?)", bun.List(twice)).Exec(ctx); err != nil {
 			return fmt.Errorf("close a place held twice under %s: %w", gone.Identifier, err)

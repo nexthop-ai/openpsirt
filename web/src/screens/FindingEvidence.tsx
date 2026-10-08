@@ -92,6 +92,14 @@ export function Places({
                     {last && place.suppressed && (
                       <span className="state open">suppressed by the build</span>
                     )}
+                    {last && place.answered_by && (
+                      <span
+                        className="state open"
+                        title={`${place.answered_by} says ${place.answered_in} is not affected. Routes outside it are still open.`}
+                      >
+                        answered inside {place.answered_in}
+                      </span>
+                    )}
                     {last && place.decision != null && (
                       <Link to={decisionAt(place.decision)} className="linkish">
                         decided

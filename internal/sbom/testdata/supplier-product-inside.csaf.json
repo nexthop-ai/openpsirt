@@ -1,0 +1,88 @@
+{
+  "document": {
+    "category": "csaf_vex",
+    "csaf_version": "2.0",
+    "distribution": {"tlp": {"label": "WHITE", "url": "https://www.first.org/tlp/"}},
+    "lang": "en",
+    "publisher": {
+      "category": "vendor",
+      "name": "Acme Security",
+      "namespace": "https://acme.example"
+    },
+    "title": "Acme Y 4.2: zlib inflateGetHeader",
+    "tracking": {
+      "id": "ACME-VEX-2026-0007",
+      "initial_release_date": "2026-10-01T00:00:00Z",
+      "current_release_date": "2026-10-01T00:00:00Z",
+      "status": "final",
+      "version": "1",
+      "revision_history": [
+        {"number": "1", "date": "2026-10-01T00:00:00Z", "summary": "Initial version"}
+      ]
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "category": "vendor",
+        "name": "Acme",
+        "branches": [
+          {
+            "category": "product_name",
+            "name": "Acme Y",
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "4.2",
+                "product": {
+                  "name": "Acme Y 4.2",
+                  "product_id": "ACME-Y-4.2",
+                  "product_identification_helper": {"purl": "pkg:generic/acme-y@4.2"}
+                }
+              }
+            ]
+          },
+          {
+            "category": "product_name",
+            "name": "zlib",
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "1.2.11",
+                "product": {
+                  "name": "zlib 1.2.11",
+                  "product_id": "ZLIB-1.2.11",
+                  "product_identification_helper": {"purl": "pkg:generic/zlib@1.2.11"}
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "zlib 1.2.11 as a component of Acme Y 4.2",
+          "product_id": "ACME-Y-4.2:ZLIB-1.2.11"
+        },
+        "product_reference": "ZLIB-1.2.11",
+        "relates_to_product_reference": "ACME-Y-4.2"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2022-37434",
+      "product_status": {"known_not_affected": ["ACME-Y-4.2:ZLIB-1.2.11"]},
+      "flags": [
+        {"label": "vulnerable_code_not_in_execute_path", "product_ids": ["ACME-Y-4.2:ZLIB-1.2.11"]}
+      ],
+      "threats": [
+        {"category": "impact", "details": "Acme Y never calls inflateGetHeader().",
+         "product_ids": ["ACME-Y-4.2:ZLIB-1.2.11"]}
+      ]
+    }
+  ]
+}

@@ -248,6 +248,9 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 				places[seen].Chain = walked
 			}
 			places[seen].Suppressed = places[seen].Suppressed && row.Suppressed
+			if places[seen].AnsweredBy != row.AnsweredBy || places[seen].AnsweredIn != row.AnsweredIn {
+				places[seen].AnsweredBy, places[seen].AnsweredIn = "", ""
+			}
 			// A claim standing on either row stands at the place. A decision
 			// is keyed on the place and expires on the versions, and two rows
 			// of one place need not hold the same ones — the source package
@@ -274,6 +277,7 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 			PlaceIdentity: row.PlaceIdentity,
 			Component:     row.Component, Consumer: row.Consumer,
 			Suppressed: row.Suppressed, Decision: row.Decision, Claim: row.Claim,
+			AnsweredBy: row.AnsweredBy, AnsweredIn: row.AnsweredIn,
 			Urgency: row.Urgency, Chain: walked,
 			DeclaredAs: scopes[[2]int64{row.ComponentID, puller}],
 		})
@@ -430,6 +434,12 @@ type Sitting struct {
 	Component  string
 	Consumer   string
 	Suppressed bool
+	// AnsweredBy is the supplier whose statement answers this place on the
+	// routes up the tree that run through their product, and AnsweredIn that
+	// product. The place stays open for the routes outside it. Empty where no
+	// statement answers it, and where the rows the place folds disagree.
+	AnsweredBy string
+	AnsweredIn string
 	Urgency    int64
 	// DeclaredAs is what the producer called this dependency, where it said
 	// anything: a CycloneDX component scope, or an SPDX lifecycle scope. It is
@@ -483,6 +493,8 @@ type evidenceRow struct {
 	Decision      *int64     `bun:"decision"`
 	Claim         *int64     `bun:"claim"`
 	Suppressed    bool       `bun:"suppressed"`
+	AnsweredBy    string     `bun:"answered_by"`
+	AnsweredIn    string     `bun:"answered_in"`
 	Urgency       int64      `bun:"urgency"`
 	ExploitedHere bool       `bun:"exploited_here"`
 	FixState      string     `bun:"fix_state"`
@@ -546,6 +558,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		// The supplier's statement answering this place on some routes, and
+		// the product it answers through.
+		Join(`LEFT JOIN "vex_statement" AS "sb" ON sb.id = f.stated_by`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		ColumnExpr(`f.consumer_id AS "consumer_id"`).
@@ -583,6 +598,8 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`(SELECT de.id `+standingHere+`) AS "decision"`, productID).
 		ColumnExpr(`(SELECT de.claim_id `+standingHere+`) AS "claim"`, productID).
 		ColumnExpr(`CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
+		ColumnExpr(`COALESCE(sb.publisher, '') AS "answered_by"`).
+		ColumnExpr(`COALESCE(sb.within, sb.component, '') AS "answered_in"`).
 		ColumnExpr(`f.urgency AS "urgency"`).
 		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
 		ColumnExpr(`f.fix_state AS "fix_state"`).
@@ -608,7 +625,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// places having shown six is a form nobody can trust.
 		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
 			componentID).
-		Where("f.closed_at IS NULL").
+		Where(Decidable).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		OrderExpr("f.urgency DESC, component, consumer").
 		Scan(ctx, &rows)

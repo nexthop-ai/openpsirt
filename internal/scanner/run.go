@@ -143,6 +143,7 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 			"suppressed", outcome.Applied.Suppressed,
 			"patched", outcome.Applied.Patched,
 			"unaffected", outcome.Applied.Unaffected,
+			"disclaimed", outcome.Applied.Disclaimed,
 			"claims_reaching", outcome.Applied.ClaimsReaching,
 			"claims_reaching_nothing", outcome.Applied.ClaimsReachingNothing,
 			"updated", outcome.Applied.Updated,

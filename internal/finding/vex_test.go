@@ -55,7 +55,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// Found however the asker spells it, on every engine.
 		for _, spelling := range []string{component, strings.ToLower(component), "LIBFÜNF"} {
 			said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-				[]string{"cve-2026-1", "CVE-2026-1"}, spelling, "")
+				[]string{"cve-2026-1", "CVE-2026-1"}, spelling, "", f.target, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -81,7 +81,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 			t.Errorf("a second document set aside %d of the first's statements", setAside)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-			[]string{"CVE-2026-1"}, component, "")
+			[]string{"CVE-2026-1"}, component, "", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// than with somebody else's VEX evidence.
 		stranger := f.planner(t)
 		if _, err := f.store.SaidAbout(ctx, stranger, f.productID+9999, issue,
-			[]string{"CVE-2026-1"}, component, ""); err == nil {
+			[]string{"CVE-2026-1"}, component, "", f.target, 0); err == nil {
 			t.Error("a product nobody holds anything on answered with statements")
 		}
 	})
@@ -122,7 +122,7 @@ func TestAVexStatementAboutALongNameIsFoldedToTheComponentsWidth(t *testing.T) {
 			t.Fatalf("a statement about a long name was refused: %v", err)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, strings.ToUpper(long), "")
+			[]string{"CVE-2026-1"}, strings.ToUpper(long), "", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -173,7 +173,7 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 			{"a component that carries no identifier", "", 1},
 		} {
 			said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-				[]string{"CVE-2026-1"}, "parser", c.purl)
+				[]string{"CVE-2026-1"}, "parser", c.purl, f.target, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -225,7 +225,7 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 			t.Fatal(err)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-			[]string{"CVE-2026-2"}, "thrift", "pkg:deb/debian/thrift@0.14.1")
+			[]string{"CVE-2026-2"}, "thrift", "pkg:deb/debian/thrift@0.14.1", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -279,7 +279,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 			t.Errorf("a second advisory set aside %d claims of the first", setAside)
 		}
 		still, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, "libnl", "")
+			[]string{"CVE-2026-1"}, "libnl", "", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -302,7 +302,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 				replaced)
 		}
 		other, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-2"],
-			[]string{"CVE-2026-2"}, "zlib", "")
+			[]string{"CVE-2026-2"}, "zlib", "", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -347,7 +347,7 @@ func TestAStatementSetAndAnAdvisoryDoNotReplaceEachOther(t *testing.T) {
 			t.Errorf("a statement set put aside %d claims from an advisory", setAside)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, "libnl", "")
+			[]string{"CVE-2026-1"}, "libnl", "", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -456,17 +456,33 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 			claims); err != nil {
 			t.Fatal(err)
 		}
-		// The same slice, the way a retry hands it back. Under another digest,
-		// so the pass sets the first aside and writes the claims again rather
-		// than finding the same bytes already held and writing nothing.
+		// A revision saying other things sets them aside. A claim repeated
+		// word for word keeps its row, so only claims nothing stands for are
+		// written, and this is what puts them back in that position.
+		revised := from
+		revised.Digest = "sha256:two"
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, revised,
+			[]finding.Statement{{Vulnerability: "CVE-2026-3", Component: "curl", Status: "affected"}}); err != nil {
+			t.Fatal(err)
+		}
+		// The same claims, the way a retry hands them back, carrying the keys
+		// a pass before was given.
+		var given []int64
+		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
+			Limit(len(claims)).Scan(ctx, &given); err != nil {
+			t.Fatal(err)
+		}
+		for i := range claims {
+			claims[i].ID = given[i]
+		}
 		again := from
-		again.Digest = "sha256:two"
+		again.Digest = "sha256:three"
 		recorded, superseded, err := f.store.RecordStatements(ctx, who, f.productID, again, claims)
 		if err != nil {
 			t.Fatalf("recording the same claims again: %v", err)
 		}
-		if recorded != len(claims) || superseded != len(claims) {
-			t.Errorf("the second pass recorded %d and set aside %d, want %d of each",
+		if recorded != len(claims) || superseded != 1 {
+			t.Errorf("the last pass recorded %d and set aside %d, want %d and 1",
 				recorded, superseded, len(claims))
 		}
 	})
@@ -517,7 +533,7 @@ func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
 			t.Errorf("the same bytes read another way set aside %d statements, want 1", setAside)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, "libstdc++6", "")
+			[]string{"CVE-2026-1"}, "libstdc++6", "", f.target, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

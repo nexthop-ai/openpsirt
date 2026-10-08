@@ -2287,7 +2287,7 @@ export interface paths {
         put?: never;
         /**
          * Read advisories from a supplier
-         * @description Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision, and is never applied.
+         * @description Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision. A statement that their own product, at the version a build ships, is not affected closes the finding inside that product at the next scan.
          *
          *     The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
          *
@@ -4733,6 +4733,8 @@ export interface paths {
          *
          *     Public findings only. `undisclosed=true` includes the rest for somebody who may read them, which is a preview rather than a thing to publish.
          *
+         *     `kind=with-suppliers` is a second document with an identifier of its own. It adds, as `not_affected`, what a supplier states about its own product where the statement closed every place of a component in the build, in the supplier's name.
+         *
          *     Requires a publisher configured for this deployment: a document naming none has nobody as its author.
          *
          *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
@@ -4823,7 +4825,7 @@ export interface paths {
          * Upload a supplier security advisory
          * @description Takes one CSAF security advisory a supplier has published about their own products, where those products are components this product ships.
          *
-         *     Nothing is applied. What arrives is a third layer beside the build's own claims and our decisions: shown as evidence, offered as a prefill, and never standing as our judgment by itself.
+         *     A supplier's statement that its own product, at the version a build ships, is not affected closes the finding where every route to it runs through that product, at the next scan. Everything else that arrives is a third layer beside the build's own claims and our decisions: shown as evidence and offered as a prefill.
          *
          *     An advisory is about the versions it names. Where it says a vulnerability is fixed in one version, that is not a statement about another, so a claim naming a version is shown against every version of that component and offers a prefill only at the version it named.
          *
@@ -4971,7 +4973,7 @@ export interface paths {
          * Upload a VEX document
          * @description Takes one OpenVEX document of what a distribution or an upstream security team has published about components this product ships.
          *
-         *     Nothing is applied. What arrives is a third layer beside the build's own claims and our decisions: shown as evidence, offered as a prefill, and never standing as our judgment by itself.
+         *     A supplier's statement that its own product, at the version a build ships, is not affected closes the finding where every route to it runs through that product, at the next scan. Everything else that arrives is a third layer beside the build's own claims and our decisions: shown as evidence and offered as a prefill.
          *
          *     What a document adds over what the scanner already reports is the reasoning. The status is in the fix state already.
          *
@@ -7005,10 +7007,10 @@ export interface components {
             /** @description The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix */
             arrived_from?: string;
             /**
-             * @description The reason it went. Only on fixed entries
+             * @description The reason it went. Only on an entry that left the affected list
              * @enum {string}
              */
-            because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "unaffected";
+            because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed";
             /**
              * Format: int64
              * @description The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
@@ -7707,7 +7709,7 @@ export interface components {
              * @description The reason it closed, in the tool's terms. Only on a closed row
              * @enum {string}
              */
-            closed_because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed";
+            closed_because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed";
             /** @description The person's own reason for closing it. Only where a person did */
             closed_note?: string;
             component: string;
@@ -7735,6 +7737,8 @@ export interface components {
              * @enum {string}
              */
             state: "undecided" | "waiting" | "agreed" | "lapsed";
+            /** @description The supplier's statement answering this place: the one that closed a row closed as disclaimed, or one answering an open row on the routes through the supplier's product */
+            stated?: components["schemas"]["StatedBody"];
             /** @description The CVE record lines stating this version is unaffected. Only on a row closed as unaffected */
             unaffected?: components["schemas"]["RecordLineBody"][] | null;
             version?: string;
@@ -8085,7 +8089,7 @@ export interface components {
             references?: components["schemas"]["ReferenceBody"][] | null;
             /** @description The standing rule that placed this, where one did. Empty means a person did, or nobody has */
             routed_by?: string;
-            /** @description What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied */
+            /** @description What publishers have said about this, from VEX documents and supplier advisories uploaded here or read from a supplier's directory. Evidence, and a prefill; a supplier's statement that its own product is not affected closes the places inside that product at the next scan */
             said: components["schemas"]["SaidBody"][] | null;
             /**
              * Format: double
@@ -11932,6 +11936,10 @@ export interface components {
             reasoning: string;
         };
         SittingBody: {
+            /** @description The supplier whose statement answers this place on the routes that run through their product. The place stays open for the routes outside it */
+            answered_by?: string;
+            /** @description The supplier's product those routes run through */
+            answered_in?: string;
             /** @description The way down to here, the build first and this component last. Empty where the inventory left the component unplaced */
             chain?: components["schemas"]["StepBody"][] | null;
             /**
@@ -12126,6 +12134,18 @@ export interface components {
             readonly $schema?: string;
             /** @description What to call it. Left out, the document names the issues it covers */
             title?: string;
+        };
+        StatedBody: {
+            /** @description The file the statement arrived in */
+            document: string;
+            /** @description The justification the supplier gave, in the exchange format's vocabulary */
+            justification?: string;
+            /** @description The supplier's product the statement is about */
+            product: string;
+            /** @description Who published the statement */
+            publisher: string;
+            /** @description What the supplier wrote alongside it */
+            statement?: string;
         };
         Statement: {
             action_statement?: string;
@@ -20183,7 +20203,7 @@ export interface operations {
                 /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
                 standing?: "open" | "closed";
                 /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
-                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed")[] | null;
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed")[] | null;
                 limit?: number;
                 offset?: number;
             };
@@ -20231,7 +20251,7 @@ export interface operations {
                 /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
                 standing?: "open" | "closed";
                 /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
-                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "fixed")[] | null;
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed")[] | null;
             };
             header?: never;
             path: {
@@ -20461,6 +20481,8 @@ export interface operations {
             query?: {
                 /** @description Include findings nobody has announced. A preview, not a document to publish */
                 undisclosed?: boolean;
+                /** @description Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours */
+                kind?: "ours" | "with-suppliers";
             };
             header?: never;
             path: {
@@ -20494,7 +20516,10 @@ export interface operations {
     };
     "list-vex-issuances": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Which document about the build: ours or with-suppliers. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
             header?: never;
             path: {
                 product: string;
@@ -20527,7 +20552,10 @@ export interface operations {
     };
     "record-vex-issued": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
             header?: never;
             path: {
                 product: string;
@@ -20560,7 +20588,10 @@ export interface operations {
     };
     "get-vex-issued": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Which document about the build: ours or with-suppliers. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
             header?: never;
             path: {
                 product: string;

@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Crumbs } from "../ui/Crumbs";
 import { apiBuildPath } from "./list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,18 +19,26 @@ import { on } from "../ui/when";
 // Recording hands back the document it recorded, which is the one to send: it
 // carries the version it is recorded under. Each revision that went out stays
 // readable as it went out.
+//
+// Two documents, each with its own identifier and its own revisions: ours, and
+// ours with what suppliers state about their own products beside it.
 export function VEX() {
   const { product = "", stream = "", variant = "" } = useParams();
+  const [params, setParams] = useSearchParams();
+  const kind: "ours" | "with-suppliers" =
+    params.get("kind") === "with-suppliers" ? "with-suppliers" : "ours";
+  const asked = kind === "with-suppliers" ? { kind } : {};
   const path = { product, stream, variant };
+  const tail = kind === "with-suppliers" ? "?kind=with-suppliers" : "";
   const base = apiBuildPath(path) + "/vex";
   const queries = useQueryClient();
 
   const gone = useQuery({
-    queryKey: ["vex-issuances", product, stream, variant],
+    queryKey: ["vex-issuances", product, stream, variant, kind],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance", {
-          params: { path },
+          params: { path, query: asked },
         }),
       ),
   });
@@ -38,11 +46,13 @@ export function VEX() {
     mutationFn: async () =>
       unwrap(
         await api.POST("/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance", {
-          params: { path },
+          params: { path, query: asked },
         }),
       ),
     onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["vex-issuances", product, stream, variant] });
+      void queries.invalidateQueries({
+        queryKey: ["vex-issuances", product, stream, variant, kind],
+      });
     },
   });
 
@@ -54,9 +64,38 @@ export function VEX() {
       <div className="screen-head">
         <h2>VEX document</h2>
         <p>
-          For a customer&rsquo;s own scanner. Approved dismissals and public findings only.{" "}
-          <a href={base}>Current document (JSON)</a>
+          For a customer&rsquo;s own scanner.{" "}
+          {kind === "with-suppliers"
+            ? "Approved dismissals, and suppliers' statements in their name. Public findings only."
+            : "Approved dismissals and public findings only."}{" "}
+          <a href={base + tail}>Current document (JSON)</a>
         </p>
+      </div>
+
+      <div className="tabs2">
+        <button
+          type="button"
+          className="tab2"
+          aria-selected={kind === "ours"}
+          onClick={() => {
+            record.reset();
+            setParams({});
+          }}
+        >
+          Ours only
+        </button>
+        <button
+          type="button"
+          className="tab2"
+          aria-selected={kind === "with-suppliers"}
+          title="Adds what suppliers say about their own products, in their name"
+          onClick={() => {
+            record.reset();
+            setParams({ kind: "with-suppliers" });
+          }}
+        >
+          With supplier statements
+        </button>
       </div>
 
       <div className="card">
@@ -89,7 +128,7 @@ export function VEX() {
                       <td>{row.issued_by}</td>
                       <td className="id">{row.digest}</td>
                       <td>
-                        <a href={`${base}/issuance/${row.version}`}>JSON</a>
+                        <a href={`${base}/issuance/${row.version}${tail}`}>JSON</a>
                       </td>
                     </tr>
                   ))}
@@ -113,7 +152,7 @@ export function VEX() {
         {record.isSuccess && (
           <p className="hint">
             Recorded as version {record.data.version}.{" "}
-            <a href={`${base}/issuance/${record.data.version}`}>Download what to send</a>
+            <a href={`${base}/issuance/${record.data.version}${tail}`}>Download what to send</a>
           </p>
         )}
         <p className="hint">Send the document recording hands back. It carries its version.</p>

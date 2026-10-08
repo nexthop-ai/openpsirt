@@ -141,6 +141,18 @@ const (
 	// release, so it is neither a resolution nor a disappearance, and it is in
 	// no release note and no count of how fast things are fixed.
 	Unaffected Closure = "unaffected"
+	// Disclaimed means a supplier stated that its own product, at the version
+	// this build ships, is not affected, and every route up the tree from this
+	// place runs through that product (REQ-31). The closed row names the
+	// statement, and the finding opens again once a run no longer reads it
+	// there: the statement set aside, the product at another version, or the
+	// place reachable outside it.
+	//
+	// Neither a resolution nor never present. Nothing in the build changed, so
+	// it counts toward no fix; the vulnerable code is in the release, so the
+	// release still held the issue. It is the footing a decision of
+	// `not-applicable` stands on, made by the supplier rather than here.
+	Disclaimed Closure = "disclaimed"
 )
 
 // wasOpen is the condition that a row was open at some point.
@@ -160,7 +172,16 @@ const wasOpen = `(f.opened_run_id IS NULL OR f.closed_run_id IS NULL
 // from this rather than written out again, so a closure added here is
 // published and one removed here is gone from the document too.
 func Closures() []Closure {
-	return []Closure{Removed, Upgraded, Revised, Patched, Superseded, Unexplained, Invalid, Unaffected, Fixed}
+	return []Closure{Removed, Upgraded, Revised, Patched, Superseded, Unexplained, Invalid, Unaffected,
+		Disclaimed, Fixed}
+}
+
+// MetNothing is what says a finding's deadline was never a deadline: the issue
+// was never present, or a supplier stated the product it sits in is not
+// affected. A deadline was set while the finding was believed to be work, and
+// a row closed for any of these met or missed nothing.
+func MetNothing() []Closure {
+	return append(NeverPresent(), Disclaimed)
 }
 
 // NeverPresent is what says the issue was never in the release at all: a
@@ -386,6 +407,12 @@ type Finding struct {
 	// UnaffectedBy is the CVE record lines that closed this as unaffected, as
 	// JSON. Empty on every other row.
 	UnaffectedBy string `bun:"unaffected_by"`
+	// StatedBy is the supplier's statement answering this finding. On a row
+	// closed as disclaimed it is the statement that closed it. On an open row
+	// it is a statement answering the finding on some routes up the tree and
+	// not on others: the row stays open for the routes nobody has answered,
+	// and is not work while it does.
+	StatedBy *int64 `bun:"stated_by"`
 }
 
 // Reported is one issue a scanner reported against one component.
@@ -436,6 +463,10 @@ type Applied struct {
 	// record states the version is unaffected, including those recorded
 	// closed on first sight.
 	Unaffected int
+	// Disclaimed counts findings closed on this run because a supplier stated
+	// its product is not affected, including those recorded closed on first
+	// sight.
+	Disclaimed int
 	// ClaimsReaching and ClaimsReachingNothing say how many of the build's
 	// arguments landed on something it ships. One that reached nothing means a
 	// finding the build believes it answered comes back as noise, and nothing
@@ -458,7 +489,8 @@ type Applied struct {
 
 // Unchanged reports whether the run changed nothing.
 func (a Applied) Unchanged() bool {
-	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0 && a.Unaffected == 0
+	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0 && a.Unaffected == 0 &&
+		a.Disclaimed == 0
 }
 
 // PlaceIdentity keys a component under the thing that pulled it in.

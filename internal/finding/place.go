@@ -122,7 +122,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.place_identity = ?", placeIdentity).
-		Where("f.closed_at IS NULL").
+		Where(Decidable).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		OrderExpr("component_upstream, consumer_upstream").
 		Scan(ctx, &rows)
@@ -469,7 +469,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		// as having answered it.
 		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
 			componentID).
-		Where("f.closed_at IS NULL").
+		Where(Decidable).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		OrderExpr("consumer, place_identity, component_upstream, consumer_upstream").
 		Scan(ctx, &rows)

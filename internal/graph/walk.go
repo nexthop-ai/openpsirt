@@ -245,6 +245,42 @@ func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64)
 	return rows, nil
 }
 
+// Above is every component above this one in a build, on any route up to the
+// root, the root itself left out.
+//
+// What places a supplier's statement on a finding: a statement about what sits
+// inside a product is evidence where the product is above the place, and
+// nowhere else. Read through the same walk the chains are, to the same bound.
+func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
+	componentID int64) ([]Component, error) {
+
+	if err := s.knowsBuild(ctx, subject, targetID); err != nil {
+		return nil, err
+	}
+	rows, err := s.climb(ctx, targetID, []int64{componentID})
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	seen := map[int64]bool{componentID: true}
+	for _, row := range rows {
+		if row.IsRoot || seen[row.ComponentID] {
+			continue
+		}
+		seen[row.ComponentID] = true
+		ids = append(ids, row.ComponentID)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var above []Component
+	if err := s.db.NewSelect().Model(&above).Where("c.id IN (?)", bun.List(ids)).
+		Order("c.id").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what sits above it: %w", err)
+	}
+	return above, nil
+}
+
 // Chains returns the way down to each of these components, root first.
 //
 // the complete chain on a finding asks a finding to show the complete chain,

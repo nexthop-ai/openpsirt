@@ -212,8 +212,9 @@ func (v *suppressions) vulnerability(claim *Suppression) error {
 //
 // A product with subcomponents is a claim about those components inside it:
 // the product is what shipped, and the subcomponents are what the statement
-// is about. So the subcomponents are the targets where there are any, and the
-// product only where there are none. This deployment's own export states
+// is about. So the subcomponents are the targets where there are any, each
+// carrying the product it ships inside, and the product only where there are
+// none. This deployment's own export states
 // every claim that way, with the build as the product.
 //
 // A subcomponent is read only as a package identifier. Anything else names a
@@ -248,6 +249,17 @@ func (v *suppressions) products(claim *Suppression) error {
 			return err
 		}
 		if stated {
+			// The product the subcomponents ship inside, kept beside each of
+			// them: a statement about zlib inside Y is not one about every
+			// zlib. A product named by something other than a package
+			// identifier is still the product, so its name is what it is
+			// called.
+			if product.Purl != "" {
+				within := Target{Purl: product.Purl, Name: nameOf(product.Purl)}
+				for i := range inside {
+					inside[i].Within = &within
+				}
+			}
 			claim.Targets = append(claim.Targets, inside...)
 			return nil
 		}

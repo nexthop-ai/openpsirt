@@ -912,15 +912,7 @@ func ours(advisory sbom.Advisory, ships map[string]bool) []finding.Statement {
 			if named == "" || !ships[graph.Folded(named)] {
 				continue
 			}
-			statements = append(statements, finding.Statement{
-				Vulnerability: claim.Vulnerability,
-				Purl:          at.Purl,
-				About:         at.VersionNamed(),
-				Component:     named,
-				Status:        string(claim.Status),
-				Justification: claim.Justification,
-				Statement:     claim.Statement,
-			})
+			statements = append(statements, finding.StatementOf(claim, at))
 		}
 	}
 	return statements

@@ -43,9 +43,11 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		Summary: "Upload a supplier security advisory",
 		Description: "Takes one CSAF security advisory a supplier has published about their " +
 			"own products, where those products are components this product ships.\n\n" +
-			"Nothing is applied. What arrives is a third layer beside the build's own " +
-			"claims and our decisions: shown as evidence, offered as a prefill, and never " +
-			"standing as our judgment by itself.\n\n" +
+			"A supplier's statement that its own product, at the version a build ships, is " +
+			"not affected closes the finding where every route to it runs through that " +
+			"product, at the next scan. Everything else that arrives is a third layer beside " +
+			"the build's own claims and our decisions: shown as evidence and offered as a " +
+			"prefill.\n\n" +
 			"An advisory is about the versions it names. Where it says a vulnerability is " +
 			"fixed in one version, that is not a statement about another, so a claim naming " +
 			"a version is shown against every version of that component and offers a " +

@@ -266,7 +266,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		ColumnExpr(`MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) = 1 AS "exploited"`).
 		Where("st.kind = ?", catalog.Tag).
 		Where("f.closed_at IS NULL").
-		Where("f.suppressed_by IS NULL").
+		Where(finding.NotArguedAway).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("f.urgency_exploited = ?", true).
 				WhereOr(rating.BandExpr+" = ?", "critical")

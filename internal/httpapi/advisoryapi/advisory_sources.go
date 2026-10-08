@@ -89,7 +89,9 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		Summary: "Read advisories from a supplier",
 		Description: "Records a supplier whose published security advisories are read on " +
 			"the scan schedule. What they say arrives as evidence beside a finding and a " +
-			"prefill for a decision, and is never applied.\n\n" +
+			"prefill for a decision. A statement that their own product, at the version a " +
+			"build ships, is not affected closes the finding inside that product at the next " +
+			"scan.\n\n" +
 			"The address is the supplier's CSAF provider description, which names where " +
 			"their advisories are listed. Both shapes the format defines are read: a ROLIE " +
 			"feed and a directory of documents. Only the listings a publisher labels " +

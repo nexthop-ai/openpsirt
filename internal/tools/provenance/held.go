@@ -105,6 +105,8 @@ var Held = []Entry{
 	{"internal/sbom/testdata/openpsirt-image.cdx.json", Ours, ""},
 	{"internal/sbom/testdata/producer-paths.txt", Ours, ""},
 	{"internal/sbom/testdata/suppression-from-patch.openvex.json", Ours, ""},
+	{"internal/sbom/testdata/supplier-product-inside.csaf.json", Ours, ""},
+	{"internal/sbom/testdata/supplier-product-inside.openvex.json", Ours, ""},
 	{"internal/sbom/testdata/switch-image.cdx.json.xz", Ours, ""},
 	{"internal/sbom/testdata/switch-image-mellanox.cdx.json.xz", Ours, ""},
 	{"internal/scanner/testdata/grype-output.json", Ours, ""},

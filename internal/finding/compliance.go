@@ -127,10 +127,10 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 			append([]any{now}, covers...)...).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.visibility IN (?)", bun.List(visible)).
-		// A finding that was never present met or missed nothing: its
-		// deadline was set while it was believed to be, and closing it says
-		// it never was.
-		Where("COALESCE(f.closed_because, '') NOT IN (?)", bun.List(NeverPresent())).
+		// A finding that was never present, or one a supplier stated is not
+		// affected, met or missed nothing: its deadline was set while it was
+		// believed to be work, and closing it says it never was.
+		Where("COALESCE(f.closed_because, '') NOT IN (?)", bun.List(MetNothing())).
 		GroupExpr(rating.BandExpr + ", f.vulnerability_id, f.component_id")
 
 	// Each of the four, read about a group rather than about a row.

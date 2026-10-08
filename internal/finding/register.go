@@ -79,6 +79,21 @@ type Disposed struct {
 	// UnaffectedBy is the CVE record lines that closed this as unaffected, as
 	// JSON. Empty on every other row.
 	UnaffectedBy string
+	// Stated is the supplier's statement answering this place: on a row
+	// closed as disclaimed, the one that closed it, and on an open row, one
+	// answering it on the routes through the supplier's product. Nil where
+	// none does.
+	Stated *SupplierSaid
+}
+
+// SupplierSaid is a supplier's statement as the register states it beside the
+// place it answers.
+type SupplierSaid struct {
+	Publisher     string
+	Product       string
+	Justification string
+	Statement     string
+	Document      string
 }
 
 // Register is every known vulnerability in one build with its disposition .
@@ -258,6 +273,12 @@ type registerRow struct {
 	ClosedBecause string     `bun:"closed_because"`
 	ClosedNote    string     `bun:"closed_note"`
 	UnaffectedBy  string     `bun:"unaffected_by"`
+	StatedBy      *int64     `bun:"stated_by"`
+	StatedWho     string     `bun:"stated_who"`
+	StatedIn      string     `bun:"stated_in"`
+	StatedWhy     string     `bun:"stated_why"`
+	StatedWords   string     `bun:"stated_words"`
+	StatedFile    string     `bun:"stated_file"`
 }
 
 // Registering narrows the register.
@@ -436,6 +457,8 @@ func (s *Store) registerQuery(productID int64,
 		// it is what a compliance reader comes here for, and the findings list
 		// says "lapsed" about the same place.
 		Join(`LEFT JOIN "person" AS "pp" ON pp.id = de.proposed_by`).
+		// The supplier's statement answering the place, where one does.
+		Join(`LEFT JOIN "vex_statement" AS "sr" ON sr.id = f.stated_by`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
@@ -482,6 +505,12 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
 		ColumnExpr(`COALESCE(f.closed_note, '') AS "closed_note"`).
 		ColumnExpr(`COALESCE(f.unaffected_by, '') AS "unaffected_by"`).
+		ColumnExpr(`f.stated_by AS "stated_by"`).
+		ColumnExpr(`COALESCE(sr.publisher, '') AS "stated_who"`).
+		ColumnExpr(`COALESCE(sr.within, sr.component, '') AS "stated_in"`).
+		ColumnExpr(`COALESCE(sr.justification, '') AS "stated_why"`).
+		ColumnExpr(`COALESCE(sr.statement, '') AS "stated_words"`).
+		ColumnExpr(`COALESCE(sr.document, '') AS "stated_file"`).
 		OrderExpr("v.identifier, c.name, f.place_identity")
 }
 
@@ -504,6 +533,12 @@ func disposedFrom(row registerRow) Disposed {
 		ClosedBecause: Closure(row.ClosedBecause), ClosedNote: row.ClosedNote,
 		UnaffectedBy: row.UnaffectedBy,
 	}
+	if row.StatedBy != nil {
+		one.Stated = &SupplierSaid{
+			Publisher: row.StatedWho, Product: row.StatedIn, Justification: row.StatedWhy,
+			Statement: row.StatedWords, Document: row.StatedFile,
+		}
+	}
 	// The same four words the state filter uses, at the grain of one
 	// place: a place has one standing decision or none, so there is no
 	// aggregate to take here and no way for this to disagree with the
@@ -518,9 +553,9 @@ func disposedFrom(row registerRow) Disposed {
 	// overdue — and two screens that disagree about the same second are
 	// two screens that disagree.
 	//
-	// Never answered for a closure saying the issue was never present, which
+	// Never answered for a closure saying the deadline was never one, which
 	// met or missed nothing.
-	if row.ClosedAt != nil && row.DueAt != nil && !slices.Contains(NeverPresent(), Closure(row.ClosedBecause)) {
+	if row.ClosedAt != nil && row.DueAt != nil && !slices.Contains(MetNothing(), Closure(row.ClosedBecause)) {
 		met := !row.ClosedAt.After(*row.DueAt)
 		one.Met = &met
 	}

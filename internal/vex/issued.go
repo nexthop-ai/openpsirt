@@ -52,6 +52,9 @@ type Issuance struct {
 	// TargetID is the build the document was about, which is what its
 	// identifier names.
 	TargetID int64 `bun:"target_id,notnull"`
+	// Kind is which document about the build went out. Each kind numbers its
+	// own revisions.
+	Kind Kind `bun:"kind,notnull"`
 	// Ordinal is which issuance this is, counting from one, and the version
 	// the document kept beside it states.
 	Ordinal int `bun:"ordinal,notnull"`
@@ -92,7 +95,7 @@ type Issuance struct {
 // second pair of eyes on each statement it carries was taken when the claim
 // was approved.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string) (*Issuance, error) {
+	product, stream, variant string, kind Kind) (*Issuance, error) {
 
 	if !who.Stated() {
 		return nil, ErrNoPublisher
@@ -105,7 +108,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		return nil, ErrMayNotPublish
 	}
 	doc, err := s.document(ctx, who, named, target,
-		[]access.Visibility{access.Public})
+		[]access.Visibility{access.Public}, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +134,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// database. A retry of a rolled-back attempt would re-insert a model
 		// carrying both of that attempt's answers.
 		recorded = &Issuance{
-			TargetID: target.ID, Digest: digest,
+			TargetID: target.ID, Kind: kind, Digest: digest,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor
@@ -141,6 +144,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		if err := tx.NewSelect().Model((*Issuance)(nil)).
 			ColumnExpr("COALESCE(MAX(ordinal), 0)").
 			Where("target_id = ?", target.ID).
+			Where("kind = ?", kind).
 			Scan(ctx, &highest); err != nil {
 			return err
 		}
@@ -207,7 +211,7 @@ type Went struct {
 // see is one they are told does not exist, and a row saying a document about
 // it went out is as much a disclosure as the document.
 func (s *Store) Issuances(ctx context.Context, subject access.Subject,
-	product, stream, variant string) ([]Went, error) {
+	product, stream, variant string, kind Kind) ([]Went, error) {
 
 	_, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
@@ -222,6 +226,7 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 		ColumnExpr(`pe.identity AS "issued_by"`).
 		ColumnExpr(`vi.issued_at AS "issued_at"`).
 		Where("vi.target_id = ?", target.ID).
+		Where("vi.kind = ?", kind).
 		OrderExpr("vi.ordinal ASC").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -238,7 +243,7 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 // The comparison is between settled digests, so a document regenerated with
 // nothing but its moment and its version moved reads as unchanged.
 func (s *Store) Changed(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string) (*bool, error) {
+	product, stream, variant string, kind Kind) (*bool, error) {
 
 	if !who.Stated() {
 		return nil, nil
@@ -251,6 +256,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	err = s.db.NewSelect().Model((*Issuance)(nil)).
 		Column("digest").
 		Where("target_id = ?", target.ID).
+		Where("kind = ?", kind).
 		OrderExpr("ordinal DESC").
 		Limit(1).
 		Scan(ctx, &last)
@@ -260,7 +266,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	if err != nil {
 		return nil, fmt.Errorf("read what last went out: %w", err)
 	}
-	doc, err := s.document(ctx, who, named, target, []access.Visibility{access.Public})
+	doc, err := s.document(ctx, who, named, target, []access.Visibility{access.Public}, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +284,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 // Narrowed the way the record of issuances is, because the bytes are what the
 // row describes.
 func (s *Store) Sent(ctx context.Context, subject access.Subject,
-	product, stream, variant string, ordinal int) (string, error) {
+	product, stream, variant string, kind Kind, ordinal int) (string, error) {
 
 	_, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
@@ -288,6 +294,7 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject,
 	err = s.db.NewSelect().Model((*Issuance)(nil)).
 		Column("document").
 		Where("target_id = ?", target.ID).
+		Where("kind = ?", kind).
 		Where("ordinal = ?", ordinal).
 		Limit(1).
 		Scan(ctx, &body)
@@ -310,11 +317,12 @@ var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 // the next one generated after an issuance is the second, and says so before
 // it goes out, because the bytes an operator sends have to carry the number
 // they will be known by.
-func (s *Store) revision(ctx context.Context, targetID int64) (int, error) {
+func (s *Store) revision(ctx context.Context, targetID int64, kind Kind) (int, error) {
 	var highest int
 	err := s.db.NewSelect().Model((*Issuance)(nil)).
 		ColumnExpr("COALESCE(MAX(ordinal), 0)").
 		Where("target_id = ?", targetID).
+		Where("kind = ?", kind).
 		Scan(ctx, &highest)
 	if err != nil {
 		return 0, fmt.Errorf("read which revision this is: %w", err)

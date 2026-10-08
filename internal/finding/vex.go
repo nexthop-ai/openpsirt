@@ -4,6 +4,7 @@
 package finding
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -17,12 +18,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 // Statement is what a third party's document says about a component we ship.
 //
-// A third layer beside the build's own claims and our decisions. Evidence, and
-// a prefill; never applied to anything by itself.
+// A third layer beside the build's own claims and our decisions: evidence, and
+// a prefill. A supplier's statement that its own product is not affected is
+// also applied, by the run, at the places that product occupies (REQ-31).
 type Statement struct {
 	bun.BaseModel `bun:"table:vex_statement,alias:ss"`
 
@@ -44,6 +47,20 @@ type Statement struct {
 	// states products and no package identifier states the version as the
 	// branch its product sits in, and there is nothing to read it out of.
 	About string `bun:"about,notnull"`
+	// WithinPurl, Within and WithinAbout are the product the component ships
+	// inside, where the document named one: its package identifier, its name,
+	// folded, and the version it was stated at. A supplier speaking about its
+	// own product speaks about what sits inside it, so these are what place
+	// the statement in a build. All three empty where the document named the
+	// component alone.
+	WithinPurl  string `bun:"within_purl,nullzero"`
+	Within      string `bun:"within,nullzero"`
+	WithinAbout string `bun:"within_about,nullzero"`
+	// Placement is what the statement names its supplier's product as:
+	// PlacedInside, PlacedProduct, or empty for a package named alone and for
+	// a statement recorded before it was read. Only a placed statement closes
+	// anything (REQ-31).
+	Placement string `bun:"placement,nullzero"`
 	// Status is what they said in the format's own vocabulary, Justification
 	// the term they gave for it, and Statement the reasoning — which is the
 	// part worth having, because the status is in the fix state already.
@@ -64,6 +81,50 @@ type Statement struct {
 	UploadedBy int64      `bun:"uploaded_by,notnull"`
 	UploadedAt time.Time  `bun:"uploaded_at,notnull"`
 	Superseded *time.Time `bun:"superseded_at"`
+}
+
+// StatementOf is one claim a document makes, about one of the components it
+// names, in the shape it is recorded in.
+//
+// One constructor for the upload path and the supplier path, so the two record
+// the same columns from the same claim.
+func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
+	said := Statement{
+		Vulnerability: claim.Vulnerability,
+		Purl:          at.Purl,
+		About:         at.VersionNamed(),
+		Component:     at.ComponentNamed(),
+		Status:        string(claim.Status),
+		Justification: claim.Justification,
+		Statement:     claim.Statement,
+	}
+	switch {
+	case at.Within != nil:
+		said.WithinPurl = at.Within.Purl
+		said.Within = at.Within.ComponentNamed()
+		said.WithinAbout = at.Within.VersionNamed()
+		said.Placement = PlacedInside
+	case !packaged(at.Purl):
+		said.Placement = PlacedProduct
+	}
+	return said
+}
+
+// What a statement names its supplier's product as.
+const (
+	// PlacedInside is a component inside a product the document named.
+	PlacedInside = "inside"
+	// PlacedProduct is a product named alone, by no package identifier: an
+	// equipment vendor's appliance, or a product spelled as a source tree.
+	PlacedProduct = "product"
+)
+
+// packaged reports whether a target is named by the package identifier of an
+// ecosystem's package, which a distribution's own build and a rebuild of its
+// source share, rather than as a product.
+func packaged(purl string) bool {
+	parts := graph.PartsOfPurl(purl)
+	return parts.Name != "" && parts.Type != sourceTree
 }
 
 // The two kinds of document a third party's judgment arrives in.
@@ -238,6 +299,9 @@ func (from Supplied) valid() error {
 // of the same name and leaves the rest of what they have published standing —
 // and neither kind touches the other, because uploading a publisher's
 // statement set would otherwise set aside every advisory of theirs on record.
+//
+// A claim the document repeats word for word keeps its row and stands in the
+// new document. Only a claim it no longer makes is set aside.
 func (s *Store) RecordStatements(ctx context.Context, by access.Subject, productID int64,
 	from Supplied, said []Statement) (recorded, superseded int, err error) {
 
@@ -253,24 +317,17 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		for i := range said {
 			said[i].Vulnerability = folded(said[i].Vulnerability)
 			said[i].Component = folded(said[i].Component)
+			said[i].Within = folded(said[i].Within)
 		}
 
 		// The same bytes read the same way change nothing, so nothing is
-		// written. Set aside and rewritten, every standing claim gets a new
-		// identity and a superseded moment — and a superseded claim is what
-		// tells everyone holding an approved decision that cited it that the
-		// publisher has changed what they published. Re-syncing a publisher's
-		// directory is the ordinary operation once advisories arrive one per
-		// issue, so that notice would fire on every pass and say nothing.
-		//
-		// The digest is of the bytes, and what the claims say is also how
-		// they were read. Where the reading of the same bytes differs from
-		// what stands, the reading is recorded, so uploading a document again
+		// written. Where the reading of the same bytes differs from what
+		// stands, the reading is recorded below, so uploading a document again
 		// is how rows stored under an earlier reading are brought up to date.
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
-			Column("vulnerability", "purl", "component", "about", "status",
-				"justification", "statement").
+			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
+				"within_about", "placement", "status", "justification", "statement").
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
@@ -286,25 +343,62 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			recorded = len(standing)
 			return nil
 		}
-
-		setting := tx.NewUpdate().Model((*Statement)(nil)).
-			Set("superseded_at = ?", now).
+		// What stands under this document's key, whatever bytes it arrived
+		// as. A claim the document repeats word for word keeps its row, brought
+		// up to date with the document it now stands in and where it places
+		// its supplier's product. Only a claim the document no longer makes is
+		// set aside, because a superseded claim is what tells everyone holding
+		// an approved decision that cited it that the publisher changed what
+		// they published — and repeated, they did not. A fetched advisory's
+		// digest covers which of its claims were kept as well as its bytes, so
+		// the same advisory read again differs in digest whenever the product
+		// ships something it did not.
+		var held []Statement
+		heldBy := tx.NewSelect().Model(&held).
+			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
+				"within_about", "placement", "status", "justification", "statement").
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
 			Where("superseded_at IS NULL")
 		if from.Source == FromAdvisory {
-			setting = setting.Where("document_id = ?", identifier)
+			heldBy = heldBy.Where("document_id = ?", identifier)
 		}
-		res, err := setting.Exec(ctx)
+		if err := heldBy.Scan(ctx); err != nil {
+			return fmt.Errorf("ask what they said before: %w", err)
+		}
+		repeated, gone, fresh := pairRepeated(held, said)
+
+		err = database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
+			_, err := tx.NewUpdate().Model((*Statement)(nil)).
+				Set("superseded_at = ?", now).
+				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+			return err
+		})
 		if err != nil {
 			return fmt.Errorf("set aside what they said before: %w", err)
 		}
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("set aside what they said before: %w", err)
+		superseded = len(gone)
+
+		for placed, ids := range repeated {
+			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+				_, err := tx.NewUpdate().Model((*Statement)(nil)).
+					Set("within_purl = ?", nullable(placed.WithinPurl)).
+					Set("within = ?", nullable(placed.Within)).
+					Set("within_about = ?", nullable(placed.WithinAbout)).
+					Set("placement = ?", nullable(placed.Placement)).
+					Set("document = ?", from.Document).
+					Set("digest = ?", from.Digest).
+					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("keep what they said again: %w", err)
+			}
+			recorded += len(ids)
 		}
-		superseded = int(n)
+
+		said = fresh
 		for i := range said {
 			// The store assigns identity, so a key on the way in is cleared
 			// rather than stated. The engine writes the key it assigned back
@@ -331,7 +425,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		//
 		// The batch is sized for the narrowest engine rather than for the
 		// fastest: PostgreSQL binds at most 65,535 parameters in one
-		// statement, and a claim states fourteen columns.
+		// statement.
 		for from := 0; from < len(said); from += statementsPerInsert {
 			to := min(from+statementsPerInsert, len(said))
 			batch := said[from:to]
@@ -345,13 +439,22 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	return recorded, superseded, err
 }
 
-// SaidAbout is what VEX publishers have said about one issue at one component,
-// newest first, standing statements only.
+// SaidAbout is what VEX publishers have said about one issue at one component
+// in one build, newest first, standing statements only.
 //
 // Matched on the issue's name and its aliases, because which identifier a
 // publisher chose is a preference of whichever database they consulted.
+//
+// A statement naming the product a component ships inside, where this product
+// ships that product, is about the component where it sits inside it: evidence
+// where the product is above the component in this build and nowhere else
+// (REQ-31). A product this product does not ship, such as the platform a
+// distribution composes its packages into, places nothing, and its statement
+// is evidence by package. A statement naming a product alone is evidence on
+// the product and on whatever sits beneath it.
 func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID,
-	vulnerabilityID int64, names []string, component, purl string) ([]Statement, error) {
+	vulnerabilityID int64, names []string, component, purl string,
+	targetID, componentID int64) ([]Statement, error) {
 
 	// Asked about the issue rather than about the product, because what comes
 	// back is narrowed to this issue's names and this component — it is
@@ -374,11 +477,107 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		Where("superseded_at IS NULL").
 		Where("vulnerability IN (?)", bun.List(lowered)).
 		Where("component = ?", folded(component)).
-		Order("uploaded_at DESC", "id DESC").Scan(ctx)
+		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what publishers have said about this: %w", err)
 	}
-	return namingTheSamePackage(said, purl), nil
+	said = namingTheSamePackage(said, purl)
+
+	above, err := graph.NewStore(s.db).Above(ctx, subject, targetID, componentID)
+	if err != nil {
+		return nil, err
+	}
+	shipped, err := s.shipsProducts(ctx, productID, said)
+	if err != nil {
+		return nil, err
+	}
+	kept := make([]Statement, 0, len(said))
+	for _, one := range said {
+		if one.Within == "" || !shipped[one.Within] || placedAbove(one, above) {
+			kept = append(kept, one)
+		}
+	}
+
+	// A statement naming a product alone, about a product above this
+	// component.
+	if len(above) > 0 {
+		aboveNames := make([]string, 0, len(above))
+		for _, c := range above {
+			aboveNames = append(aboveNames, folded(c.Name))
+		}
+		var beneath []Statement
+		err := s.db.NewSelect().Model(&beneath).
+			Where("product_id = ?", productID).
+			Where("superseded_at IS NULL").
+			Where("placement = ?", PlacedProduct).
+			Where("vulnerability IN (?)", bun.List(lowered)).
+			Where("component IN (?)", bun.List(aboveNames)).
+			Scan(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read what publishers have said about what this sits in: %w", err)
+		}
+		for _, one := range beneath {
+			if placedAbove(one, above) {
+				kept = append(kept, one)
+			}
+		}
+	}
+	slices.SortFunc(kept, func(a, b Statement) int {
+		if c := b.UploadedAt.Compare(a.UploadedAt); c != 0 {
+			return c
+		}
+		return cmp.Compare(b.ID, a.ID)
+	})
+	return slices.CompactFunc(kept, func(a, b Statement) bool { return a.ID == b.ID }), nil
+}
+
+// shipsProducts is which of the products these statements name a component
+// ships inside are shipped by any build of this product, by name.
+func (s *Store) shipsProducts(ctx context.Context, productID int64,
+	said []Statement) (map[string]bool, error) {
+
+	var named []string
+	for _, one := range said {
+		if one.Within != "" {
+			named = append(named, one.Within)
+		}
+	}
+	shipped := map[string]bool{}
+	if len(named) == 0 {
+		return shipped, nil
+	}
+	var rows []string
+	err := s.db.NewSelect().
+		Distinct().
+		TableExpr(`"component" AS "pc"`).
+		ColumnExpr(`pc.name_folded`).
+		Join(`JOIN "graph_node" AS "pn" ON pn.component_id = pc.id`).
+		Join(`JOIN "target" AS "pt" ON pt.id = pn.target_id`).
+		Join(`JOIN "stream" AS "ps" ON ps.id = pt.stream_id`).
+		Where("ps.product_id = ?", productID).
+		Where("pn.closed_scan_id IS NULL").
+		Where("pc.name_folded IN (?)", bun.List(named)).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read which suppliers' products this ships: %w", err)
+	}
+	for _, name := range rows {
+		shipped[name] = true
+	}
+	return shipped, nil
+}
+
+// placedAbove reports whether the product a statement names is one of these
+// components, at whatever version: a statement about Y 4.2 is evidence on what
+// sits inside Y 4.3, and only closes anything at 4.2.
+func placedAbove(one Statement, above []graph.Component) bool {
+	product := suppliedProduct(one)
+	for _, c := range above {
+		if isProduct(product, c, false) {
+			return true
+		}
+	}
+	return false
 }
 
 // namingTheSamePackage drops statements whose package identifier names
@@ -429,9 +628,9 @@ const sourceTree = "generic"
 // statementsPerInsert is how many claims one insert states.
 //
 // Bounded by what an engine will bind in one statement rather than by what is
-// fast: PostgreSQL takes 65,535 parameters, and a claim states fourteen
-// columns, so this leaves room for a column being added without the bound
-// becoming the thing that breaks.
+// fast: PostgreSQL takes 65,535 parameters, and five hundred claims leave room
+// for a hundred and thirty columns each, so a column added to a claim does not
+// make the bound the thing that breaks.
 const statementsPerInsert = 500
 
 // MostPublisher is how long the name of whoever published a statement may be,
@@ -448,6 +647,99 @@ const (
 	MostDocumentName = database.NameWidth
 )
 
+// claimOf is what a statement claims, leaving out where it places its
+// supplier's product.
+func claimOf(one Statement) string {
+	return strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
+		one.About, one.Status, one.Justification, one.Statement}, "\x00")
+}
+
+// placementOf is where a statement places its supplier's product.
+func placementOf(one Statement) string {
+	return strings.Join([]string{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}, "\x00")
+}
+
+// placed is where a statement places its supplier's product, which a
+// repeated claim takes from the document repeating it.
+type placed struct {
+	WithinPurl, Within, WithinAbout, Placement string
+}
+
+// pairRepeated pairs each claim a document makes with a standing row making
+// the same claim, and answers the repeated rows by where the document now
+// places them, the standing rows the document no longer makes, and the claims
+// it makes that nothing stands for.
+//
+// A repeat is the same claim placing the supplier's product in the same place.
+// A claim moved to another release of the product is a different claim, and
+// what an approval was granted on stays readable as it was. A row recorded
+// before its product was read places nothing, and pairs with the same claim
+// placed anywhere, once no exact repeat wants it. Rows are paired in a fixed
+// order on both sides, so two identical claims placed in two products each
+// keep one row.
+func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statement) {
+	sorted := slices.Clone(held)
+	slices.SortFunc(sorted, func(a, b Statement) int { return cmp.Compare(a.ID, b.ID) })
+	exactly := func(one Statement) string { return claimOf(one) + "\x00" + placementOf(one) }
+	exact, unplaced := map[string][]Statement{}, map[string][]Statement{}
+	for _, row := range sorted {
+		if row.Placement == "" && row.Within == "" {
+			unplaced[claimOf(row)] = append(unplaced[claimOf(row)], row)
+			continue
+		}
+		exact[exactly(row)] = append(exact[exactly(row)], row)
+	}
+	saying := slices.Clone(said)
+	slices.SortStableFunc(saying, func(a, b Statement) int {
+		return strings.Compare(exactly(a), exactly(b))
+	})
+
+	repeated := map[placed][]int64{}
+	keep := func(one Statement, row Statement) {
+		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}
+		repeated[at] = append(repeated[at], row.ID)
+	}
+	// Exact repeats first, so a row recorded before its product was read
+	// never takes a claim a placed row repeats.
+	var rest []Statement
+	for _, one := range saying {
+		if rows := exact[exactly(one)]; len(rows) > 0 {
+			keep(one, rows[0])
+			exact[exactly(one)] = rows[1:]
+			continue
+		}
+		rest = append(rest, one)
+	}
+	var fresh []Statement
+	for _, one := range rest {
+		if rows := unplaced[claimOf(one)]; len(rows) > 0 {
+			keep(one, rows[0])
+			unplaced[claimOf(one)] = rows[1:]
+			continue
+		}
+		fresh = append(fresh, one)
+	}
+	var gone []int64
+	for _, left := range []map[string][]Statement{exact, unplaced} {
+		for _, rows := range left {
+			for _, row := range rows {
+				gone = append(gone, row.ID)
+			}
+		}
+	}
+	slices.Sort(gone)
+	return repeated, gone, fresh
+}
+
+// nullable is a value written as a null where it is empty, the way the
+// columns it is written into hold an absence.
+func nullable(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
 // sameReading reports whether two sets of statements say the same things,
 // in any order. Only what a reader derives from the document is compared.
 func sameReading(held, said []Statement) bool {
@@ -458,7 +750,8 @@ func sameReading(held, said []Statement) bool {
 		out := make([]string, len(rows))
 		for i, one := range rows {
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
-				one.About, one.Status, one.Justification, one.Statement}, "\x00")
+				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
+				one.Justification, one.Statement}, "\x00")
 		}
 		slices.Sort(out)
 		return out

@@ -300,6 +300,7 @@ read specVersion:string
 read statements[].impact_statement:string
 read statements[].justification:string
 read statements[].products[].@id:string
+read statements[].products[].subcomponents[].@id:string
 read statements[].status:string
 read statements[].vulnerability.name:string
 skipped timestamp:string

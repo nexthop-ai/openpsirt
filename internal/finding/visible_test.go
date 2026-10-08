@@ -256,7 +256,7 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 				}},
 				{"what publishers said", func(s access.Subject) error {
 					_, err := f.store.SaidAbout(ctx, s, f.productID, issue,
-						[]string{"CVE-2026-1"}, "libnl", "")
+						[]string{"CVE-2026-1"}, "libnl", "", f.target, 0)
 					return err
 				}},
 				{"how the builds stand", func(s access.Subject) error {
