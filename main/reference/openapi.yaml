@@ -20055,6 +20055,8 @@ paths:
 
         `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
 
+        `limit=0` returns `total` alone, with no rows.
+
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-finding-components
       parameters:
@@ -20582,16 +20584,16 @@ paths:
           schema:
             description: Order the other way — oldest, nearest deadline, fewest places, lowest first
             type: boolean
-        - description: The number returned
+        - description: The number returned. Zero returns the total alone
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: The number returned
+            description: The number returned. Zero returns the total alone
             format: int64
             maximum: 200
-            minimum: 1
+            minimum: 0
             type: integer
         - description: The number skipped
           explode: false
@@ -21241,6 +21243,8 @@ paths:
 
         Ordered worst first, and `sort` takes any of: what the upgrade would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
 
+        `limit=0` returns `total` alone, with no rows.
+
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-fix-bundles
       parameters:
@@ -21337,19 +21341,23 @@ paths:
           schema:
             description: Order the other way — fewest, least urgent, nearest deadline first
             type: boolean
-        - explode: false
+        - description: The number returned. Zero returns the total alone
+          explode: false
           in: query
           name: limit
           schema:
             default: 50
+            description: The number returned. Zero returns the total alone
             format: int64
             maximum: 200
-            minimum: 1
+            minimum: 0
             type: integer
-        - explode: false
+        - description: The number skipped
+          explode: false
           in: query
           name: offset
           schema:
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -27092,6 +27100,8 @@ paths:
 
         Narrow by who proposed a claim, how old it is, how severe the issues it covers are, its outcome, and the release it covers. A claim is kept where one of its rows matches every filter, and is then returned whole.
 
+        `limit=0` returns `total` alone, with no entries.
+
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-review-queue
       parameters:
@@ -27179,19 +27189,23 @@ paths:
             description: Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
             maxLength: 191
             type: string
-        - explode: false
+        - description: The number returned. Zero returns the total alone
+          explode: false
           in: query
           name: limit
           schema:
             default: 50
+            description: The number returned. Zero returns the total alone
             format: int64
             maximum: 200
-            minimum: 1
+            minimum: 0
             type: integer
-        - explode: false
+        - description: The number skipped
+          explode: false
           in: query
           name: offset
           schema:
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
