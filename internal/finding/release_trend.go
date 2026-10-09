@@ -96,29 +96,37 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Band       string    `bun:"band"`
 		Open       int       `bun:"open"`
 	}
-	// The distinct issues per release and band, counted after. Distinct over
-	// the pair first for the same reason Releases does it: counting distinct
-	// over two columns has no spelling all four engines share.
-	inner := s.db.NewSelect().
-		Distinct().
+	// The distinct issues per release, then the band of each, counted after.
+	// The issues are reduced on the finding alone, before the issue or its
+	// rating is joined: a release holds each issue at many places, and
+	// joining first reads the issue's row once per place only to fold the
+	// copies away. Inside one product an issue has one band, so the pair
+	// is already distinct once it carries one.
+	issues := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(rating.For(rating.OnStream)).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
-		// The day it went out, where somebody said, and the day it was declared
-		// here otherwise. Ordering by the declaration alone made this chart an
-		// accident of administration: a release recorded months after it
-		// shipped sorted after ones that came out later, and a year
-		// backfilled in an afternoon plotted as a single day.
-		ColumnExpr(`COALESCE(st.released_on, st.created_at) AS "created_at"`).
-		ColumnExpr(rating.BandExpr+` AS "band"`).
+		ColumnExpr(`tg.stream_id AS "stream_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		Where("st.kind = ?", "tag").
-		Where("f.closed_at IS NULL")
-	inner = scope.Narrow(onlyReadable(inner, subject, products, all))
+		Where("f.closed_at IS NULL").
+		GroupExpr("tg.stream_id, f.vulnerability_id")
+	issues = scope.Narrow(onlyReadable(issues, subject, products, all))
+
+	inner := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, issues).
+		Join(`JOIN "stream" AS "st" ON st.id = grouped.stream_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(rating.For(rating.OnStream)).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(catalog.ShownExpr("st") + ` AS "stream_name"`).
+		// The day it went out, where somebody said, and the day it was declared
+		// here otherwise. Ordered by the declaration alone, the chart is an
+		// accident of administration: a release recorded months after it
+		// shipped sorts after ones that came out later, and a year
+		// backfilled in an afternoon plots as a single day.
+		ColumnExpr(`COALESCE(st.released_on, st.created_at) AS "created_at"`).
+		ColumnExpr(rating.BandExpr + ` AS "band"`)
 
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_release"`, inner).

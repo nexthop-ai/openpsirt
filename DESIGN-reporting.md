@@ -98,6 +98,24 @@ shape is then known and should not be reinvented under pressure — precompute a
 the grain access is granted at, one row per product per day, so a portfolio
 number stays the sum of what the reader may see.
 
+A count over findings reduces the places before it joins anything. The unit is
+an issue, or an issue at a component, and one issue sits at many places, so the
+findings are grouped on their own columns first and the issue, its rating and
+the catalog's names are joined to the groups. Every narrowing — what the reader
+may see, the selection, the line — is a condition on a place and applies before
+the grouping.
+
+| Report | Grouped to | Measured on 367,577 open places, PostgreSQL on one CPU |
+|---|---|---|
+| Backlog trend | Issue, product, and the moments it opened and closed | 15,053 rows sent, against 367,577 joined first; the request 0.25 s against 1.58 s, across 1 ms and 100 Mbit |
+| What each release holds | Build, issue and component | 0.17 s, against 1.38 s joined first |
+| Release readiness, what a build holds | Issue and component | 0.09 s, against 0.33 s joined first |
+| Release over release | Release and issue | Nothing to measure: the data holds no tags |
+| Aging buckets | Issue and product, then issue, with a flag per bucket (§ Remediation metrics) | One statement, 0.9 s, against three per bucket taking 2.1 s together, with 133,000 decisions |
+
+A DISTINCT over the joined rows reaches the same answer and is slower on
+PostgreSQL, because the join still runs once per place.
+
 ## The period a report covers
 
 Every report over a stretch of time takes one: deadline compliance,
@@ -323,6 +341,19 @@ line, and a list keeping those out shows fewer rows than the bucket names.
 The aging figures match on the live key rather than on both versions, unlike the deadline
 list: the aging query does not join the components those versions sit on, and for
 a figure about a backlog the question is "has anybody said anything here".
+
+The buckets are counted in one pass over what is open:
+
+1. Each place is matched once against the decisions in force, built from the
+   decision side and joined on the finding.
+2. Each issue gets a flag per bucket for having a place there, a flag per bucket
+   for having an unanswered place there, and the strictest rating its products
+   give it among the places in that bucket.
+3. The issues are counted by which flags and ratings they hold, which is a
+   handful of rows however many issues there are.
+
+An issue with places in two buckets counts in both, and is undecided in a bucket
+only where a place in that bucket is unanswered.
 
 Subtracting two moments has no portable spelling, so this is one of the few
 places an engine is asked directly. It is confined to a single expression, and

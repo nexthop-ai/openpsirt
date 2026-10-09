@@ -34,6 +34,10 @@ const (
 	OnStream On = "st.product_id"
 	// OnDecision is the product a decision was recorded in.
 	OnDecision On = "de.product_id"
+	// OnGrouped is the product column of a derived table aliased grouped,
+	// for a query that reduces its findings to one row per issue and product
+	// before the rating is joined.
+	OnGrouped On = "grouped.product_id"
 	// onBound is one product, bound. Used through Here.
 	onBound On = "?"
 )

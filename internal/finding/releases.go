@@ -71,23 +71,33 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// The distinct pairs first, counted after. Counting distinct over two
 	// columns at once is not something every engine spells the same way, and
 	// concatenating them into one string is a portability trap of its own.
-	inner := s.db.NewSelect().
-		Distinct().
+	//
+	// Reduced on the finding alone, one row per build, issue and component,
+	// and the names and the rating joined to what is left. Inside one product
+	// an issue has one band, so the band does not need to be in the key, and
+	// joining first reads the issue's row once per place only to fold the
+	// copies away.
+	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		Where("st.product_id = ?", productID).
+		Where("f.closed_at IS NULL").
+		GroupExpr("f.target_id, f.vulnerability_id, f.component_id")
+	pairs = inOneProduct(pairs, subject, productID, all)
+	inner := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, pairs).
+		Join(`JOIN "target" AS "tg" ON tg.id = grouped.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
 		Join(rating.Here, productID).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(rating.BandExpr+` AS "band"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("st.product_id = ?", productID).
-		Where("f.closed_at IS NULL")
-	inner = inOneProduct(inner, subject, productID, all)
+		ColumnExpr(rating.BandExpr + ` AS "band"`)
 
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "at"`, inner).

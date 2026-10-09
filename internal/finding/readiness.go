@@ -143,21 +143,28 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// first, because the fan-out is the point of the model and counting rows
 	// measures how much the dependency graph shares rather than how much
 	// there is to answer.
-	inner := s.db.NewSelect().
-		Distinct().
+	//
+	// Reduced on the finding alone, and the issue and its rating joined to
+	// what is left: inside one product an issue has one band, so the pair
+	// carries it without the band in the key, and joining first reads the
+	// issue's row once per place only to fold the copies away.
+	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(rating.Here, productID).
-		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
 		Where("tg.stream_id = ?", streamID).
-		Where("tg.variant_id = ?", variantID)
-	inner = floor.narrow(inOneProduct(inner, subject, productID, all))
+		Where("tg.variant_id = ?", variantID).
+		GroupExpr("f.vulnerability_id, f.component_id")
+	pairs = floor.narrow(inOneProduct(pairs, subject, productID, all))
+	inner := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, pairs).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(rating.Here, productID).
+		ColumnExpr(rating.BandExpr + ` AS "band"`)
 
 	var rows []struct {
 		Band string `bun:"band"`
