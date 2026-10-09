@@ -184,11 +184,11 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 		WHERE ac.advisory_id = ad.id AND (`+covered+`) AND NOT EXISTS (
-			SELECT 1 FROM "finding" AS "f"
+			SELECT 1 FROM `+finding.IssueFindings("f")+`
 			JOIN "target" AS "t" ON t.id = f.target_id
 			JOIN "stream" AS "st" ON st.id = t.stream_id
 			WHERE st.product_id = ac.product_id
-			  AND `+finding.SameIssue("f.vulnerability_id", "ac.vulnerability_id")+`
+			  AND "si"."id" = ac.vulnerability_id
 			  AND f.kind = ?
 			  AND `+where+`))`,
 		append([]any{finding.Entered}, args...)...)

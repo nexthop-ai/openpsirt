@@ -1007,3 +1007,42 @@ func TestWhatAgreeingWouldDoOverAFailedReadIsNotAnAbsentClaim(t *testing.T) {
 		t.Errorf("a database nobody can reach said the claim is not there: %v", err)
 	}
 }
+
+func TestARatingIsListedByWhatItsOwnIssueReachesAndNotByAnotherIssue(t *testing.T) {
+	// Each rating is shown where its own issue reaches a finding the reader
+	// may read in the rating's product. A readable finding of some other
+	// issue in the same product says nothing about this one.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		keeper := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		hidden := f.embargoed(t, keeper)
+		public := f.issueID(t, "CVE-2026-1")
+		for issue, severity := range map[int64]string{hidden: "critical", public: "low"} {
+			if _, err := f.store.Assess(ctx, keeper, f.productID, issue, severity, "Because."); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		f.recorded(t, keeper.ID+1, "onlooker")
+		reader := f.holding(t, access.PublicRead)
+		reader.ID = keeper.ID + 1
+		claims, _, total, err := f.store.Assessments(ctx, reader, 0, "", 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(claims) != 1 || claims[0].VulnerabilityID != public {
+			var listed []int64
+			for _, claim := range claims {
+				listed = append(listed, claim.VulnerabilityID)
+			}
+			t.Errorf("a reader of disclosed work is shown ratings of issues %v (total %d);"+
+				" want only %d, not the undisclosed %d", listed, total, public, hidden)
+		}
+	})
+}
