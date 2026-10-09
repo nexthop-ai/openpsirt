@@ -982,9 +982,8 @@ The indexes on the finding and decision tables that serve the hottest reads:
 |---|---|---|
 | What is open in a build | Build, closed, deadline | The deadline report for one build, as a range at the end of the prefix: 256 ms a page through the deployment-wide deadline index, 205 ms through this one, for a build of 183,788 open findings |
 | Deadlines running out | Closed, the build's claim, deadline | The deadline report across the deployment, which names no build: 248 ms through it, 343 to 392 ms without it |
-| Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason | The findings list and its total, and the backlog trend, each from the index alone. The trend grouped in the database reads 578 pages against 16,500 and takes 88 ms against 172 ms over 375,843 findings; the index is 4.6 MB against 4.2 MB without the last two columns |
-| Decisions waiting, by claim | State, claim | The review queue's page and its count: 81 ms against 22 ms and 40 ms against 22 ms, with 33,150 decisions waiting among 133,549 |
-| Decisions by state, in a product | State, product | The decisions that stopped applying: 21 ms against 11 ms |
+| Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
+| Decisions waiting, by claim | State, claim | The review queue's page and its count, with 33,150 decisions waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
 
 The measurements are PostgreSQL 16 with one processor, run on one database at a
 time. The widest of these keys is about 190 bytes on MySQL and MariaDB, far

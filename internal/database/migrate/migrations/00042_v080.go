@@ -49,7 +49,7 @@ func upgradeV080(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := u.index(decisionV080(t), "decision",
-		"decision_state_claim_idx", "decision_state_product_idx"); err != nil {
+		"decision_state_claim_idx"); err != nil {
 		return err
 	}
 	if u.engine != database.Postgres {
