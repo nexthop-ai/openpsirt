@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
@@ -154,6 +155,53 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 				continue
 			}
 			for _, want := range []string{itoa(wanted + 1), itoa(wanted), "restore the backup"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
+				}
+			}
+		}
+	})
+}
+
+// A database a release before v0.5.0 built records a version below the
+// migration that makes v0.5.0's schema at once. Serving or migrating it is
+// refused before anything runs, naming the version and the release that
+// upgrades it.
+func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, migrations.Baseline)
+		// Standing in for v0.4.0's last migration, recorded the way the
+		// library records one, in place of the baseline's.
+		const v040 = 38
+		record := func(ctx context.Context, from, to int64) error {
+			if _, err := db.ExecContext(ctx,
+				`DELETE FROM "goose_db_version" WHERE "version_id" = ?`, from); err != nil {
+				return err
+			}
+			_, err := db.ExecContext(ctx,
+				`INSERT INTO "goose_db_version" ("version_id", "is_applied") VALUES (?, ?)`, to, true)
+			return err
+		}
+		if err := record(ctx, migrations.Baseline, v040); err != nil {
+			t.Fatalf("record v0.4.0's last migration: %v", err)
+		}
+		t.Cleanup(func() {
+			if err := record(context.WithoutCancel(ctx), v040, migrations.Baseline); err != nil {
+				t.Errorf("record the baseline again: %v", err)
+			}
+		})
+
+		for what, err := range map[string]error{
+			"serving":   schemaIsCurrent(ctx, db, silent()),
+			"migrating": schema.Up(ctx, db, silent()),
+		} {
+			if err == nil {
+				t.Errorf("%s a schema a release before v0.5.0 built was allowed", what)
+				continue
+			}
+			for _, want := range []string{itoa(v040), "v0.6.0"} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
 				}

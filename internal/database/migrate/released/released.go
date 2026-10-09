@@ -44,6 +44,11 @@ type Record struct {
 	// Digests is each file the release shipped for its migrations, and the
 	// digest of the file below its license header.
 	Digests map[string]string
+	// Baseline is a release whose migrations were replaced by one that makes
+	// its schema directly. Its files are gone from the tree, so the record
+	// lists none, and its schema on each engine is what holds the
+	// replacement.
+	Baseline bool
 }
 
 var release = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)(-rc\.\d+)?$`)
@@ -150,6 +155,8 @@ func Read(root, version string) (*Record, error) {
 		line := strings.TrimSpace(lines.Text())
 		switch {
 		case line == "" || strings.HasPrefix(line, "#"):
+		case line == "baseline":
+			r.Baseline = true
 		case strings.HasPrefix(line, "last "):
 			if r.Last, err = strconv.ParseInt(strings.TrimPrefix(line, "last "), 10, 64); err != nil {
 				return nil, fmt.Errorf("%s line %d: %w", version, n, err)
@@ -167,6 +174,9 @@ func Read(root, version string) (*Record, error) {
 	}
 	if r.Last == 0 {
 		return nil, fmt.Errorf("%s names no last migration", version)
+	}
+	if r.Baseline && len(r.Digests) > 0 {
+		return nil, fmt.Errorf("%s is a baseline and lists files: a baseline's files are gone from the tree", version)
 	}
 	return r, nil
 }
@@ -232,7 +242,15 @@ func migrationNames(migrations string) ([]string, error) {
 // release owns that it did not list, one it listed that is gone, and one that
 // is not the file it tagged. Empty is a tree that still ships what the release
 // shipped.
+//
+// A baseline release is held to the opposite: its files are gone, so a file
+// numbered below its last migration or carrying its code is one somebody
+// misnumbered or misnamed. A database the release built records the baseline,
+// and a migration below it is one that database never applied and refuses.
 func Held(root, migrations string, r *Record) ([]string, error) {
+	if r.Baseline {
+		return replaced(migrations, r)
+	}
 	records, err := All(root)
 	if err != nil {
 		return nil, err
@@ -270,6 +288,29 @@ func Held(root, migrations string, r *Record) ([]string, error) {
 	for name := range r.Digests {
 		if !slices.Contains(owned, name) {
 			faults = append(faults, fmt.Sprintf("%s shipped %s and it is not here", r.Version, name))
+		}
+	}
+	slices.Sort(faults)
+	return faults, nil
+}
+
+// replaced is what a tree holds of the files a baseline release replaced.
+func replaced(migrations string, r *Record) ([]string, error) {
+	code, err := Code(r.Version)
+	if err != nil {
+		return nil, err
+	}
+	names, err := migrationNames(migrations)
+	if err != nil {
+		return nil, err
+	}
+	var faults []string
+	for _, name := range names {
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		if n := Number(name); (n > 0 && n < r.Last) || strings.HasPrefix(name, code+"_") {
+			faults = append(faults, fmt.Sprintf("%s belongs to %s, whose migrations the baseline replaced", name, r.Version))
 		}
 	}
 	slices.Sort(faults)

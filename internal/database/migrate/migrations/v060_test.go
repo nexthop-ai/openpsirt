@@ -85,7 +85,7 @@ func TestAV050DatabaseUpgradesToV060(t *testing.T) {
 			t.Errorf("upgraded, a v0.5.0 notice says %v and %v", reference, malicious)
 		}
 		t.Run("TheDeclarationsAreTheTablesTheMigrationsBuild", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV060(db.Server.Engine), nil)
+			declarationsAreBuilt(t, ctx, db, migrations.StatementsV060(db.Server.Engine))
 		})
 
 		leaveAtLatest(t, ctx, db)
@@ -158,13 +158,12 @@ func seedV050Obligation(t *testing.T, ctx context.Context, db *database.DB) (win
 
 // declarationsAreBuilt builds each declaration under a scratch name and
 // compares its description with the table the migrations built, line for line
-// in both directions. A built line madeElsewhere answers true for is one a
-// later migration added, and is not held against the declaration.
+// in both directions.
 //
 // The scratch tables are dropped before it returns, and however the
 // comparison ends, so what follows reads only what the migrations built.
 func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
-	declared map[string][]string, madeElsewhere func(table, line string) bool) {
+	declared map[string][]string) {
 	t.Helper()
 	var made []string
 	drop := func(ctx context.Context) {
@@ -202,8 +201,7 @@ func declarationsAreBuilt(t *testing.T, ctx context.Context, db *database.DB,
 			}
 		}
 		for _, line := range built {
-			if !slices.Contains(fromDeclaration, line) &&
-				(madeElsewhere == nil || !madeElsewhere(table, line)) {
+			if !slices.Contains(fromDeclaration, line) {
 				t.Errorf("the migrations build %q on %s and it is not declared", line, table)
 			}
 		}

@@ -6,11 +6,11 @@ package migrations
 // suppressionV070 is v0.7.0's declaration of a build's own claims, and its
 // index.
 //
-// v0.5.0's, with the product a claim's target ships inside and the published
-// statement a claim was taken from. Derived from v0.5.0's declaration, which a
-// tagged release fixed and which never changes again.
+// The baseline's, with the product a claim's target ships inside and the
+// published statement a claim was taken from. Derived from the baseline's
+// declaration, which v0.5.0's record of its schema holds.
 func suppressionV070(t *columnTypes) []string {
-	statements := suppressionV050(t)
+	statements := suppressionBaseline(t)
 	statements[0] = withColumn(statements[0], `"subject_version" `+t.free+` NULL,`,
 		`-- The product the subject ships inside, where the document named
 			-- one: the package identifier, the name as the producer spelled

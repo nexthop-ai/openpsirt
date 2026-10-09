@@ -20,7 +20,7 @@ func init() {
 
 // The v0.6.0 release's schema changed into v0.7.0's.
 //
-// Run in one transaction of its own, the way migrations 37 to 40 are.
+// Run in one transaction of its own, the way migration 40 is.
 func upV070(ctx context.Context, sqldb *sql.DB) error {
 	return inV020(ctx, sqldb, upgradeV070)
 }

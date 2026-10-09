@@ -750,7 +750,7 @@ one.
 | Bringing an existing date earlier is a shortening | Held to the movement threshold as a person's shortening is, and past it the date stays until a second person agrees (`DESIGN-access.md` § Disclosure-date movements). The arrival it counts from is typed by whoever records the claim, so a ruling is no route around the control a shortening needs |
 | Withdrawing the ruling puts the date back only where the ruling set it | The embargo's record is replayed without every withdrawn ruling, in the order each movement took effect — when it was agreed to, where it waited: a person's extension or shortening sets an end, and a ruling brings it earlier. Where the answer is where the embargo stands, nothing moves. Where it differs, the places take it, which may be no date at all, and the act `duplicate-undone` records it naming the ruling |
 | The ruling form says the date before it is submitted | "This starts a disclosure date of *date* on *flaw*", and that it waits for a second person where it would, asked of the server with the reports and the issue typed, under the right to propose the ruling. Nothing is shown where the ruling would start no date |
-| A duplicate ruled before the date was set by a ruling is dated on upgrade | `DESIGN-database.md` § The v0.5.0 upgrade |
+| A duplicate ruled before the date was set by a ruling is dated by the upgrade to v0.5.0 | A database that release upgraded holds the movement with its ruling and proposer, as one a ruling records today |
 
 | Refusal | Reason |
 |---|---|
@@ -1675,7 +1675,7 @@ question next year should find the answer rather than the question.
 | `Store.Apply` | Applying a scan is one act with four phases that share too much state to separate without passing a ten-field struct between them. It is also the model the rest of the package is held to: every value the closure uses it fetches inside the closure, the target is locked first, the difference is computed in memory and written as bounded batches |
 | `Store.Enter` | Fifty lines of refusals, each with its own reason, and one transaction. Both belong to the act; what it needed was the transaction discipline, which it has |
 | `fix.go` | Two responsibilities with a clean read-and-write seam, and one subject — upgrade commitments. Splitting it now would be splitting to hit a number. The cut is there when the write half grows |
-| The schema migrations | Each is one list of `CREATE TABLE` statements, but for migration 37, which changes v0.1.0's tables and reads v0.2.0's declarations of them. The length is the schema, the comment beside each column is what makes it legible, and splitting a table group across two functions would break the ordering the chain exists to check |
+| The schema migrations | Each baseline declaration is one list of `CREATE TABLE` statements for one area. The length is the schema, and the comment beside each column is what makes it legible |
 | `sortedBy`, `sortedAcross` and the by-component order | The lookup, the direction and the null-last case are one function the three call. Their tie-breaks genuinely differ and stayed with each list, which is what a reader of one of them needs beside it: a shared function taking the tie-break as an argument would put it back at the call site as an argument nobody can read |
 
 ## Limits

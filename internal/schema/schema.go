@@ -30,6 +30,9 @@ import (
 // upgraded, so this build has nothing it could do to one, and the way back to
 // an earlier release is the backup taken before the upgrade.
 func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
+	if err := NotBeforeTheBaseline(ctx, db); err != nil {
+		return err
+	}
 	if err := NotAhead(ctx, db); err != nil {
 		return err
 	}
@@ -58,6 +61,32 @@ func NotAhead(ctx context.Context, db *database.DB) error {
 			"upgraded it, or restore the backup taken before that upgrade", applied, wanted)
 	}
 	return nil
+}
+
+// NotBeforeTheBaseline refuses a database a release before v0.5.0 built.
+//
+// This build makes v0.5.0's schema in one migration and carries none of the
+// ones before it, so it has no way to upgrade an earlier schema. v0.6.0
+// carries every one of them, and a database it has upgraded is one this build
+// upgrades in turn.
+func NotBeforeTheBaseline(ctx context.Context, db *database.DB) error {
+	applied, err := Version(ctx, db)
+	if err != nil {
+		return err
+	}
+	if BeforeTheBaseline(applied) {
+		return fmt.Errorf("the database is at schema version %d, which a release before v0.5.0 "+
+			"built, and this build upgrades a database v0.5.0 or a later release built: take a "+
+			"backup, run openpsirt migrate up with v0.6.0, and then deploy this build", applied)
+	}
+	return nil
+}
+
+// BeforeTheBaseline reports whether a schema version is one a release before
+// v0.5.0 built. Zero is an empty database, which the baseline makes from
+// nothing.
+func BeforeTheBaseline(applied int64) bool {
+	return applied > 0 && applied < migrations.Baseline
 }
 
 // Version reports the schema version currently applied.

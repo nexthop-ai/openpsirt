@@ -86,7 +86,7 @@ func atV010(t *testing.T, migrations string) {
 
 func write(t *testing.T, path, content string) {
 	t.Helper()
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil { //nolint:gosec // G703: a path under this test's temporary directory
 		t.Fatal(err)
 	}
 }
@@ -344,5 +344,63 @@ func TestAMalformedRecordLineIsRefused(t *testing.T) {
 	write(t, filepath.Join(root, "v0.1.0", Files), "last 2\nabc123  00001_first.go\n")
 	if _, err := Read(root, "v0.1.0"); err == nil || !strings.Contains(err.Error(), "line 2") {
 		t.Errorf("a short digest answered %v", err)
+	}
+}
+
+// A release whose migrations were replaced by a baseline holds none of the
+// files it shipped and refuses one that reappears, numbered or named as its
+// own, and the release after it is still held to its own.
+func TestABaselineReleaseHoldsNoFilesAndTheNextIsStillHeld(t *testing.T) {
+	root, migrations := tree(t)
+	for _, name := range []string{"00001_first.go", "00002_second.go"} {
+		if err := os.Remove(filepath.Join(migrations, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(t, filepath.Join(migrations, "00002_baseline.go"), header+"package migrations\n\n// made at once\n")
+	write(t, filepath.Join(root, "v0.1.0", Files), "# a baseline\nbaseline\nlast 2\n")
+	if _, err := Freeze(root, migrations, "v0.2.0"); err != nil {
+		t.Fatal(err)
+	}
+	for _, engine := range Engines {
+		write(t, filepath.Join(root, "v0.2.0", Schema(engine)), "column t.c int\n")
+	}
+	baseline, err := Read(root, "v0.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if faults, err := Held(root, migrations, baseline); err != nil || len(faults) != 0 {
+		t.Errorf("the baseline release was held to files: %v %v", faults, err)
+	}
+	for _, name := range []string{"00001_misnumbered.go", "v010_table.go"} {
+		path := filepath.Join(migrations, name)
+		write(t, path, header+"package migrations\n")
+		if faults, err := Held(root, migrations, baseline); err != nil || len(faults) != 1 {
+			t.Errorf("%s, a file the baseline replaced, answered %v %v", name, faults, err)
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if faults := check(t, root, migrations, "v0.2.0"); len(faults) != 0 {
+		t.Errorf("the release after the baseline was refused: %v", faults)
+	}
+	write(t, filepath.Join(migrations, "00003_v020.go"), header+"package migrations\n\n// edited\n")
+	if faults := check(t, root, migrations, "v0.2.0"); len(faults) != 1 {
+		t.Errorf("an edit to the release after a baseline answered %v", faults)
+	}
+}
+
+// A baseline record that lists a file is refused: the files a baseline
+// replaced are gone from the tree.
+func TestABaselineRecordListingAFileIsRefused(t *testing.T) {
+	root, _ := tree(t)
+	content, err := os.ReadFile(filepath.Join(root, "v0.1.0", Files)) //nolint:gosec // G304: a record this test wrote
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "v0.1.0", Files), "baseline\n"+string(content))
+	if _, err := Read(root, "v0.1.0"); err == nil || !strings.Contains(err.Error(), "baseline") {
+		t.Errorf("a baseline listing files answered %v", err)
 	}
 }
