@@ -53,6 +53,8 @@ true is cleared, and running the same pass twice changes nothing.
 | Acknowledging a condition hides it rather than resolving it | The thing it is about is still true. Worth offering because somebody may have decided to live with it, and worth distinguishing on screen |
 | A standing condition states what is true now | A condition's sentence carries a count, and a row written once and left alone reports the number it had when somebody first looked. The row stays the same row and the sentence changes. So do its link, whether it is undisclosed, and the product and issue it is about, because every read narrows by those |
 | Everybody holding a condition is handed a list each sweep, even an empty one | A condition clears only by being left off a list. Somebody who stops being an administrator, or the last administrator demoted, would otherwise go on being told about products and people they no longer read |
+| Somebody holding none of a kind and found none is not reconciled for it | There is nothing to open and nothing to clear, and reconciling is a transaction per person per kind |
+| Who may do what is read once per sweep | Every condition reads the same people and grants, and administrators are the same people read again |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds

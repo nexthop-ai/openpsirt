@@ -85,6 +85,11 @@ func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) 
 	if err != nil {
 		return nil, fmt.Errorf("read who may hear about this: %w", err)
 	}
+	return actsOf(people, held), nil
+}
+
+// actsOf is whoActs over people and grants already read.
+func actsOf(people []access.Account, held map[int64][]access.Grant) map[int64]map[int64]acts {
 	out := make(map[int64]map[int64]acts, len(people))
 	for _, person := range people {
 		per := map[int64]acts{}
@@ -109,31 +114,17 @@ func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) 
 		}
 		out[person.ID] = per
 	}
-	return out, nil
+	return out
 }
 
-// everybody is the map a sweep starts from: an entry for every person who
-// might hold one of these, and for every person already holding one.
+// everybody is the map a sweep starts from: an entry, empty, for every person
+// already holding a condition of this kind.
 //
-// Both halves are needed. Reconcile makes somebody's open set exactly what it
-// is handed, so a person whose condition has stopped being true has to be
-// handed an empty list — and a person who has never been told anything has to
-// be in the map before anything can be added for them.
-func (w *Watch) everybody(ctx context.Context, kind Kind,
-	reach map[int64]map[int64]acts) (map[int64][]Holds, error) {
-
-	return w.everybodyAnd(ctx, kind, reach, nil)
-}
-
-// everybodyAnd is everybody, plus people named directly.
-//
-// The conditions about an embargo go to whoever holds it and to every
-// administrator, and an administrator is not in the reach map: that map
-// answers who may act on a product, and administration is not held per
-// product.
-func (w *Watch) everybodyAnd(ctx context.Context, kind Kind,
-	reach map[int64]map[int64]acts, also []int64) (map[int64][]Holds, error) {
-
+// Reconcile makes somebody's open set exactly what it is handed, so a person
+// whose condition has stopped being true has to be handed an empty list. A
+// person holding nothing and handed nothing has nothing to reconcile, and is
+// added only when a condition is found for them.
+func (w *Watch) everybody(ctx context.Context, kind Kind) (map[int64][]Holds, error) {
 	out := map[int64][]Holds{}
 	told, err := w.beingTold(ctx, kind)
 	if err != nil {
@@ -141,16 +132,6 @@ func (w *Watch) everybodyAnd(ctx context.Context, kind Kind,
 	}
 	for _, person := range told {
 		out[person] = nil
-	}
-	for _, person := range also {
-		if _, already := out[person]; !already {
-			out[person] = nil
-		}
-	}
-	for personID := range reach {
-		if _, already := out[personID]; !already {
-			out[personID] = nil
-		}
 	}
 	return out, nil
 }

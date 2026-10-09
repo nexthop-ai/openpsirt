@@ -34,13 +34,13 @@ import (
 // date stated for a release the record names has arrived. The windows in force anywhere are a day to a fortnight, and
 // an incident is rare: a warning that waits for most of a day to pass gives
 // back the hours it exists to save.
-func (w *Watch) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
 	return w.windows(ctx, ObligationOpen)
 }
 
 // windowsNear is every window whose warning has come and whose end has not,
 // with no notice named against it.
-func (w *Watch) windowsNear(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) windowsNear(ctx context.Context) (map[int64][]Holds, error) {
 	return w.windows(ctx, ObligationNear)
 }
 
@@ -49,13 +49,13 @@ func (w *Watch) windowsNear(ctx context.Context) (map[int64][]Holds, error) {
 //
 // It says the time passed and that nothing is recorded, which are both facts.
 // Whether anybody owed anything is not the tool's answer to give.
-func (w *Watch) windowsPassed(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) windowsPassed(ctx context.Context) (map[int64][]Holds, error) {
 	return w.windows(ctx, ObligationPassed)
 }
 
 // windows is the one pass behind all three, which differ in which part of a
 // window they report.
-func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, error) {
+func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, error) {
 	store := obligation.NewStore(w.db)
 	// As the deployment, which reads everything; each recipient is narrowed
 	// below by what they may act on.
@@ -68,13 +68,10 @@ func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 	if err != nil {
 		return nil, err
 	}
-	acts, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
+	acts := w.reach
 	// Everybody currently being told is handed a list, empty included, so a
 	// window answered since the last sweep clears.
-	out, err := w.everybody(ctx, kind, acts)
+	out, err := w.everybody(ctx, kind)
 	if err != nil {
 		return nil, err
 	}

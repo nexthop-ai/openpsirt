@@ -321,7 +321,7 @@ const pairsAtLeast = 10
 // Asked as the deployment and told to administrators, like the conditions
 // beside it. It names the two people, which is the fact; the claims are on the
 // report the link opens.
-func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
+func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	days, err := strconv.Atoi(pairsBack)
 	if err != nil {
 		return nil, fmt.Errorf("read how far back pairs are counted: %w", err)
@@ -356,10 +356,7 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	// Who may approve, product by product: a triager may agree to somebody
 	// else's claim, and so may somebody holding the approver capability,
 	// either one only where they may read.
-	reach, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
+	reach := w.reach
 	able := map[int64]int{}
 	for _, per := range reach {
 		for productID, at := range per {
