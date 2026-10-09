@@ -343,6 +343,9 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 	if err != nil {
 		return access.Public, err
 	}
+	if len(folds) == 0 {
+		return access.Public, nil
+	}
 	// Matched on the fold, the way the upgrade itself resolves what it covers:
 	// naming any binary of a source package reaches all of them, so asking
 	// about the binary alone would miss the embargo sitting on its sibling.
@@ -353,7 +356,7 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 		Where("visibility IN (?)", bun.List(visible)).
 		Where("visibility = ?", access.Private).
 		Where(`component_id IN (SELECT c.id FROM "component" AS "c"
-			WHERE `+FoldedOn+` IN (?))`, folds).
+			WHERE `+FoldedOn+` IN (?))`, bun.List(folds)).
 		Exists(ctx)
 	if err != nil {
 		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)

@@ -966,11 +966,28 @@ somebody decided and what a release is waiting on come to disagree.
 | Coverage follows the source package | Naming any binary, or the source, reaches all of them in the releases ticked — at whichever version each of those releases ships — and covers everything open on them, not only what records this version as its fix. Deciding that 3.5.2 also covers something fixed in 3.5.0 would need an ordering per ecosystem. A person claims the move answers what is open, and the scan says which of that was true |
 | One source version per promise | A release shipping a source at two versions holds two pieces of code. The promise names the version it is about, and one naming none where a release ships two is refused with the versions offered. A blank name reaches nothing: an empty source name is what every component naming no source holds |
 | The same resolution decides how far a handover discloses | The strictest visibility among what the promise covers is read across the same source packages, so an embargoed finding on a sibling binary makes handing over the named one the disclosure |
+| The source packages a name reaches are read first, and the findings against them as a list of values | Statistics lag the table after every large scan, until the server's own refresh reaches it. As a subquery inside the read of the findings, PostgreSQL then estimates it matches one finding and runs it once per finding, reading every graph node of the build each time. The promise, the disclosure check and the component's screen all read this way |
 | Recorded on the component's own screen | Ticking the releases the promise is for, naming the version and the date, and saying why. Ticking releases that need different versions is **two promises** |
 | Saying who carries it is part of the act | A person or a team, in the same transaction, so a promise nobody carries and a holder with no promise are both impossible. The handover is product-wide, and the level that matters is the strictest in the set — one embargoed finding among fifty makes the handover a disclosure |
 | The upgrade is reachable as a claim | Where its reasoning, its approval and the conversation about it already live |
 | **No bound on how much one promise covers** | Every other check a bulk judgment makes still applies — who may decide, what each proposal must carry, who it is recorded as made by — and the count is not one of them. A real image put one kernel bump at 4,485 findings across 44,016 places, and a cumulative bundle at 243,945; narrowing that to a cap would record a bump answering part of what it answers |
 | One transaction, not chunked and not a job | The cap was doing two jobs and only one was reviewability. The other was transaction size, and it was measured rather than assumed, on the act itself: a promise over 243,950 places takes 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and 23.9 s on PostgreSQL, from 44,030 places at 1.2 s, 2.4 s, 3.5 s and 4.8 s. That is a deliberate one-off act at the largest size the data can ask for, so there is nothing for a chunk or a queue to solve |
+
+Planning over a kernel, measured under `make measure` on 425,680 open findings
+in two products: the kernel carries 6,000 issues under 34 consumers, 204,000
+findings in a build of 737 graph nodes. The read resolves every place the
+promise covers; the act then writes a decision at each.
+
+| | PostgreSQL | MySQL | MariaDB | SQLite |
+|---|---|---|---|---|
+| The build's findings list, first page | 0.28 s | 0.52 s | 0.46 s | 0.26 s |
+| The read, statistics as the load left them | 1.7 s | 1.6 s | 1.3 s | 1.6 s |
+| The read, PostgreSQL's own refresh held off | 1.9 s; 22 s as a subquery | — | — | — |
+| The read, statistics refreshed | 0.9 s | 1.5 s | 1.2 s | 1.4 s |
+| The whole act | 20 s | 6.2 s | 5.2 s | 7.8 s |
+
+The act's time is the writing: on PostgreSQL, 17 s of its 20 s is the 408
+statements inserting the decisions.
 
 What it covers is derived, never marked. A covered finding is one a standing
 promise reaches, which the decision already records, so the mark is a join

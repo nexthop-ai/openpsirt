@@ -340,6 +340,9 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 	if err != nil {
 		return nil, err
 	}
+	if len(folds) == 0 {
+		return nil, nil
+	}
 	var rows []struct {
 		placeRow
 		VulnerabilityID int64  `bun:"vulnerability_id"`
@@ -376,7 +379,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// the source package's name alone could not do. A name reaches every
 		// fold it names in the builds asked about, so a source package named
 		// in two builds at two versions moves both.
-		Where(FoldedOn+` IN (?)`, folds).
+		Where(FoldedOn+` IN (?)`, bun.List(folds)).
 		OrderExpr("f.vulnerability_id, f.component_id, f.target_id, place_identity")
 	err = query.Scan(ctx, &rows)
 	if err != nil {
