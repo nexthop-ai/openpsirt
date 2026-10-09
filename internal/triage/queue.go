@@ -145,6 +145,10 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	// way every other list does — and zero is every product, which is what the
 	// queue screen asks for.
 	q = filter.narrow(q, subject)
+	// Whether any row of the claim is out of the reader's reach is a question
+	// about the claim, so it is asked of each group rather than of each row:
+	// a claim covering three hundred places would otherwise ask it three
+	// hundred times and get the same answer.
 	others := s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
 		Where(`"other".claim_id = de.claim_id`)
 	if filter.Reason.decides() {
@@ -153,7 +157,7 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 		}
 		outOfReach, args := notDecidableWhere(subject, `"other"`)
 		return decidableBy(q, subject, "de").
-			Where("NOT EXISTS (?)", others.Where(outOfReach, args...))
+			Having("NOT EXISTS (?)", others.Where(outOfReach, args...))
 	}
 	q = approvableBy(q, subject, "de")
 	// Mine asks for the reader's own claims waiting on somebody else, in the
@@ -164,7 +168,7 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	} else {
 		q = q.Where("de.proposed_by <> ?", subject.ID)
 	}
-	return q.Where("NOT EXISTS (?)", notApprovableBy(others, subject, `"other"`))
+	return q.Having("NOT EXISTS (?)", notApprovableBy(others, subject, `"other"`))
 }
 
 // QueueReason is why a claim waits in the review queue. Each reason is its own

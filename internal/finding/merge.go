@@ -106,6 +106,21 @@ func SameIssue(finding, filed string) string {
 		` AND "si"."issue_id" = ` + finding + `)`
 }
 
+// IssueFindings is the findings held under the issue a record is read as,
+// for the FROM of an existence test: `si` is the issue the record was filed
+// under, and the test correlates on `"si"."id"`. The finding takes the alias
+// given, which is always one named in code.
+//
+// SameIssue in its place correlates only through a second EXISTS inside the
+// first, and PostgreSQL then reads the findings of a whole product before
+// asking which of them hold the issue: 15 s for a page of 306 ratings, against
+// 7.9 ms starting from the issue's row and reaching the findings by their issue
+// column.
+func IssueFindings(finding string) string {
+	return `"vulnerability" AS "si" JOIN "finding" AS "` + finding + `" ON "` + finding +
+		`".vulnerability_id = "si"."issue_id"`
+}
+
 // HeldAs is the condition that a finding's issue column holds the issue the
 // row bound in its one placeholder is read as. A record filed under an issue
 // that merged into another names the issue it was filed under, and its

@@ -385,6 +385,7 @@ an identifier before.
 |---|---|
 | The builds named are the ones the reader may see | A claim somebody may read matches findings they may not, so the builds, the fix versions behind the outliers and the counts on a card are all narrowed per product. A list spanning products is narrowed per product too, at the visibility read in each |
 | A claim is shown only to somebody who may act on every row of it | Acting on a claim is acting on the argument, which does not come in halves. Shown half, a reader would agree to words whose other half waits on somebody else, and the size beside the card would be wrong |
+| Whether every row is in reach is asked once per claim | It is a fact about the claim, so it is a condition on the grouped claim rather than on each waiting row. Counting the expired deferrals among 3,000 claims of 133,000 rows: 29 ms against 78 ms per row on PostgreSQL, 39 ms against 73 ms on SQLite |
 
 ## Approval
 
@@ -753,6 +754,7 @@ statement for the whole deployment.
 | Nothing inherits | A product nobody has rated the issue in reads the published rating until somebody on that team looks. A rating arriving from a product a team cannot see is what this shape removes, so it is not reintroduced as a default |
 | Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the line the product triages at. Asked anywhere, somebody holding one product moved both in a product they cannot see |
 | Every act on a claim asks whether the person may read a finding of this issue **in that product**, at its visibility (REQ-43) | The claim carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and a claim that fails it is absent from the list rather than refused |
+| The list asks it from the issue's own row | The findings are reached through the issue the claim is filed under and the findings held under the issue it is read as. Asked from the product's findings, each claim reads all of them first: 5.4 s against under 5 ms for 306 claims on PostgreSQL |
 | An issue that sits at no build anywhere may still be rated | It is nobody's secret: there is no finding for a rating to disclose. It is what lets a product get ahead of an issue it knows is coming |
 | The counts beside a waiting claim stop at what the reader may see, inside the rating's own product | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
 | Rating something worse takes effect at once | Nobody needs protecting from being told something is worse than the world says |
@@ -1113,7 +1115,7 @@ out on code that then moved is both.
 
 | Where | Answer |
 |---|---|
-| The decision list | One filter answers both, and a row in both is counted once |
+| The decision list | One filter answers both, and a row in both is counted once. The claims whose date has passed are read once as a set and each row is tested against it: 22 ms to count 133,000 decisions on PostgreSQL, against 170 ms asking each row's claim |
 | The review queue | An expired deferral is in the Expired deferrals list while it stands. Once it lapses it is in none of the queue's lists, and only in its author's To reaffirm |
 
 ## Re-affirmation

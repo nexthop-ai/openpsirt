@@ -882,10 +882,10 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 			// own product.
 			readable := onlyReadable(s.db.NewSelect().
 				ColumnExpr("1").
-				TableExpr(`"finding" AS "f"`).
+				TableExpr(IssueFindings("f")).
 				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				Where(SameIssue("f.vulnerability_id", "asm.vulnerability_id")).
+				Where(`"si"."id" = asm.vulnerability_id`).
 				Where("st.product_id = asm.product_id"),
 				subject, products, all)
 			q = q.Where("EXISTS (?)", readable)

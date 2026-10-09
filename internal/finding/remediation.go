@@ -5,7 +5,10 @@ package finding
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -59,12 +62,16 @@ type Bucket struct {
 	Undecided int
 }
 
-// agingBuckets are the stretches what is open is counted into.
-var agingBuckets = []struct {
+// agingBucket is one stretch what is open is counted into, in days before
+// now: from is where it starts and to where it ends, zero for no end.
+type agingBucket struct {
 	label string
 	from  int
 	to    int
-}{
+}
+
+// agingBuckets are the stretches what is open is counted into.
+var agingBuckets = []agingBucket{
 	{"under a week", 0, 7},
 	{"one to four weeks", 7, 28},
 	{"one to three months", 28, 90},
@@ -190,100 +197,163 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	}
 	out.Opened = count
 
-	// Everything open now, by how long it has been. One statement per bucket
-	// rather than a case expression, because the boundaries are moments
-	// computed here and a database that does its own date arithmetic does it
-	// four different ways.
-	for _, bucket := range agingBuckets {
-		older := now.Add(-time.Duration(bucket.from) * 24 * time.Hour)
-		q := s.db.NewSelect().
-			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr("f.vulnerability_id").
-			Where("f.closed_at IS NULL").
-			Where("f.opened_at <= ?", older).
-			GroupExpr("f.vulnerability_id")
-		if bucket.to > 0 {
-			q = q.Where("f.opened_at > ?", now.Add(-time.Duration(bucket.to)*24*time.Hour))
+	aging, err := s.aging(ctx, subject, products, all, scope, now)
+	if err != nil {
+		return nil, err
+	}
+	out.Aging = aging
+	return out, nil
+}
+
+// aging counts what is open now into the buckets, each cut by severity and by
+// whether anybody has answered it.
+//
+// One pass over the open findings rather than three per bucket. Each issue is
+// reduced to a flag per bucket saying it has a place there, a flag per bucket
+// saying one of those places is unanswered, and the rating it carries there;
+// the issues are then counted by which flags and ratings they hold, which is
+// a handful of rows however many issues there are. An issue with places in
+// two buckets counts in both.
+//
+// The boundaries are moments computed here and bound, rather than date
+// arithmetic in the statement, because a database that does its own date
+// arithmetic does it four different ways.
+func (s *Store) aging(ctx context.Context, subject access.Subject, products []int64, all bool,
+	scope Scope, now time.Time) ([]Bucket, error) {
+
+	// Answered is the same test the deadline list makes: a claim waiting for
+	// a second person is not standing, so it answers nothing and the finding
+	// is still undecided. Matched on the live key rather than on both
+	// versions, because for a figure about a backlog "somebody has said
+	// something here" is the question, not "which build of it".
+	//
+	// Built once from the decision side and joined on the finding, so the
+	// question is asked of the decisions once rather than of every open
+	// place in turn. The decision is outermost through CROSS JOIN ... WHERE,
+	// for the reason the state filter gives: SQLite left to choose starts
+	// from every open finding.
+	standing, held := InForce()
+	answered := s.db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(DecisionIssue).
+		Join(`CROSS JOIN "finding" AS "f2"`).
+		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
+		Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
+		Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
+		ColumnExpr(`f2.id AS "finding_id"`).
+		Where("de.product_id = st2.product_id").
+		Where("de.live_key IS NOT NULL").
+		Where(standing, held...).
+		Where("f2.closed_at IS NULL").
+		GroupExpr("f2.id")
+
+	// One row per issue and product, with the flags. Every narrowing is a
+	// condition on a place, so each applies here, before the places are
+	// reduced.
+	places := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`LEFT JOIN (?) AS "answered" ON answered.finding_id = f.id`, answered).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		Where("f.closed_at IS NULL").
+		Where("f.opened_at <= ?", now).
+		GroupExpr("f.vulnerability_id, st.product_id")
+	for i, bucket := range agingBuckets {
+		in, args := bucket.holds(now)
+		places = places.
+			ColumnExpr(`MAX(CASE WHEN `+in+` THEN 1 ELSE 0 END) AS "open_`+bucketName(i)+`"`, args...).
+			ColumnExpr(`MAX(CASE WHEN `+in+` AND answered.finding_id IS NULL THEN 1 ELSE 0 END)`+
+				` AS "undecided_`+bucketName(i)+`"`, args...)
+	}
+	places = scope.Narrow(onlyReadable(places, subject, products, all))
+
+	// One row per issue. The rating is joined to the reduced rows, each
+	// product's own where it has stated one, and an issue's rating in a
+	// bucket is the strictest across the products it is open in there:
+	// the highest rank, with a word that ranks nothing below every band.
+	issues := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, places).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(rating.For(rating.OnGrouped)).
+		GroupExpr("grouped.vulnerability_id")
+	counted := s.db.NewSelect().
+		TableExpr(`(?) AS "per_issue"`, issues).
+		ColumnExpr(`COUNT(*) AS "issues"`)
+	var keys []string
+	for i := range agingBuckets {
+		name := bucketName(i)
+		issues = issues.
+			ColumnExpr(`MAX(grouped.open_` + name + `) AS "open_` + name + `"`).
+			ColumnExpr(`MAX(grouped.undecided_` + name + `) AS "undecided_` + name + `"`).
+			ColumnExpr(`MAX(CASE WHEN grouped.open_` + name + ` = 1 THEN ` + rankCase(rating.EffectiveExpr, 0) +
+				` END) AS "band_` + name + `"`)
+		for _, column := range []string{"open_", "undecided_", "band_"} {
+			counted = counted.ColumnExpr(`per_issue.` + column + name + ` AS "` + column + name + `"`)
+			keys = append(keys, "per_issue."+column+name)
 		}
-		n, err := s.db.NewSelect().
-			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(q, subject, products, all))).Count(ctx)
-		if err != nil {
+	}
+	counted = counted.GroupExpr(strings.Join(keys, ", "))
+
+	// A row of flags is one shape an issue can have across the buckets, and
+	// how many issues have it. Scanned by column name into one map per row,
+	// because the columns are as many as the buckets.
+	rows, err := counted.Rows(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count what is aging: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := make([]Bucket, len(agingBuckets))
+	for i, bucket := range agingBuckets {
+		out[i] = Bucket{Label: bucket.label, Days: bucket.from, Until: bucket.to,
+			BySeverity: map[string]int{}}
+	}
+	for rows.Next() {
+		var (
+			issueCount int
+			open       = make([]int, len(agingBuckets))
+			undecided  = make([]int, len(agingBuckets))
+			band       = make([]sql.NullInt64, len(agingBuckets))
+			into       = []any{&issueCount}
+		)
+		for i := range agingBuckets {
+			into = append(into, &open[i], &undecided[i], &band[i])
+		}
+		if err := rows.Scan(into...); err != nil {
 			return nil, fmt.Errorf("count what is aging: %w", err)
 		}
-		one := Bucket{Label: bucket.label, Days: bucket.from, Until: bucket.to, Open: n}
-
-		// The same bucket cut by severity. Counted as distinct issues like the
-		// bucket itself, so the parts sum to the whole rather than to the
-		// number of places.
-		var bands []struct {
-			Band  string `bun:"band"`
-			Count int    `bun:"number"`
+		for i := range agingBuckets {
+			if open[i] == 0 {
+				continue
+			}
+			out[i].Open += issueCount
+			out[i].BySeverity[BandOf(wordAt(int(band[i].Int64)))] += issueCount
+			if undecided[i] != 0 {
+				out[i].Undecided += issueCount
+			}
 		}
-		byBand := q.NewSelect().
-			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(
-				byBandOf(q), subject, products, all))).
-			ColumnExpr(`grouped.band AS "band"`).
-			ColumnExpr(`COUNT(*) AS "number"`).
-			GroupExpr("grouped.band")
-		if err := byBand.Scan(ctx, &bands); err != nil {
-			return nil, fmt.Errorf("count what is aging, by severity: %w", err)
-		}
-		one.BySeverity = make(map[string]int, len(bands))
-		for _, band := range bands {
-			one.BySeverity[BandOf(band.Band)] += band.Count
-		}
-
-		// And how many of them nobody has answered. The same test the deadline
-		// list makes: a claim waiting for a second person is not standing, so
-		// it answers nothing and the finding is still undecided.
-		//
-		// Matched on the live key rather than on both versions, because this
-		// query does not join the components those versions live on — and for
-		// a figure about a backlog "somebody has said something here" is the
-		// question, not "which build of it".
-		standing, held := InForce()
-		unanswered := q.NewSelect().
-			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr("f.vulnerability_id").
-			Where("f.closed_at IS NULL").
-			Where("f.opened_at <= ?", older).
-			Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
-				WHERE `+DecisionAt("st.product_id")+`
-				  AND de.live_key IS NOT NULL
-				  AND `+standing+`)`, held...).
-			GroupExpr("f.vulnerability_id")
-		if bucket.to > 0 {
-			unanswered = unanswered.Where("f.opened_at > ?",
-				now.Add(-time.Duration(bucket.to)*24*time.Hour))
-		}
-		one.Undecided, err = s.db.NewSelect().
-			TableExpr(`(?) AS "grouped"`,
-				scope.Narrow(onlyReadable(unanswered, subject, products, all))).Count(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("count what is aging undecided: %w", err)
-		}
-		out.Aging = append(out.Aging, one)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("count what is aging: %w", err)
 	}
 	return out, nil
 }
 
-// byBandOf is the same aging query carrying the severity each issue was rated
-// at, so a bucket can be cut by it.
-//
-// The band is taken as the strictest across the rows an issue groups to, which
-// is one value by construction: severity belongs to the issue rather than to
-// the place, and MIN over one value is that value.
-func byBandOf(from *bun.SelectQuery) *bun.SelectQuery {
-	return from.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		// Each row's own product rates it, read through the stream this query
-		// already joins. Without it the plan reported the published rating
-		// while the list it is a summary of reported the product's own.
-		Join(rating.For(rating.OnStream)).
-		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "band"`)
+// holds is the condition that a finding opened within this bucket, with the
+// moments it binds.
+func (b agingBucket) holds(now time.Time) (string, []any) {
+	older := now.Add(-time.Duration(b.from) * 24 * time.Hour)
+	if b.to == 0 {
+		return "f.opened_at <= ?", []any{older}
+	}
+	return "f.opened_at <= ? AND f.opened_at > ?",
+		[]any{older, now.Add(-time.Duration(b.to) * 24 * time.Hour)}
+}
+
+// bucketName is the suffix of a bucket's columns.
+func bucketName(i int) string {
+	return strconv.Itoa(i)
 }
 
 // secondsBetween averages how long an issue was open, through the one place an

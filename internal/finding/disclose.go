@@ -868,10 +868,10 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		// waiting when the issue was disclosed can no longer be agreed to,
 		// and a queue entry nobody can act on is noise on the one list whose
 		// point is that everything on it is a question.
-		Where(`EXISTS (SELECT 1 FROM "finding" AS "fu"
+		Where(`EXISTS (SELECT 1 FROM `+IssueFindings("fu")+`
 			JOIN "target" AS "tu" ON tu.id = fu.target_id
 			JOIN "stream" AS "su" ON su.id = tu.stream_id
-			WHERE `+SameIssue("fu.vulnerability_id", "dx.vulnerability_id")+`
+			WHERE "si"."id" = dx.vulnerability_id
 			AND su.product_id = dx.product_id
 			AND fu.visibility = ?)`, access.Private).
 		// Nor one a withdrawn ruling asked for, which can no longer be agreed

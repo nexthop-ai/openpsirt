@@ -1271,7 +1271,20 @@ Every filter narrows both statements through the same clauses, and none needs th
 issue or the component joined under the grouping — a rating or a name is asked as
 a membership test against the table that holds it. The decision-state filter is
 built from the decisions outward, joined to the grouping by the finding's
-identifier rather than a lookup per open row.
+identifier rather than a lookup per open row. In the second statement it is
+built for the page's issues alone, and across products for the kind of release
+the list holds as well. A derived table cannot see the conditions of the
+statement around it, and an engine that nests it under the page builds it again
+for every row: 35 s for a page of one lapsed group on PostgreSQL with 133,000
+decisions, and 0.15 s with the page's issues stated inside it.
+
+The four decision counts take two shapes, and the conditions are the same in
+both:
+
+| Shape | Asked by | Reason |
+|---|---|---|
+| A lookup per place | The page's groups | A page reads a few hundred places |
+| One row per decided place, built once from the decisions and joined on the finding | The product page's totals and build rows | They read every open place in the product. As a lookup per place that is 367,000 lookups a statement: 2.1 s against 0.2 s joined with 13 decisions, and 4.6 s against 1.2 s with 133,000 |
 
 Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
 went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18

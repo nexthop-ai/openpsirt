@@ -98,6 +98,24 @@ shape is then known and should not be reinvented under pressure — precompute a
 the grain access is granted at, one row per product per day, so a portfolio
 number stays the sum of what the reader may see.
 
+A count over findings reduces the places before it joins anything. The unit is
+an issue, or an issue at a component, and one issue sits at many places, so the
+findings are grouped on their own columns first and the issue, its rating and
+the catalog's names are joined to the groups. Every narrowing — what the reader
+may see, the selection, the line — is a condition on a place and applies before
+the grouping.
+
+| Report | Grouped to | Measured on 367,577 open places, PostgreSQL on one CPU |
+|---|---|---|
+| Backlog trend | Issue, product, and the moments it opened and closed | 15,053 rows sent, against 367,577 joined first; the request 0.25 s against 1.58 s, across 1 ms and 100 Mbit |
+| What each release holds | Build, issue and component | 0.17 s, against 1.38 s joined first |
+| Release readiness, what a build holds | Issue and component | 0.09 s, against 0.33 s joined first |
+| Release over release | Release and issue | Nothing to measure: the data holds no tags |
+| Aging buckets | Issue and product, then issue, with a flag per bucket (§ Remediation metrics) | One statement, 0.9 s, against three per bucket taking 2.1 s together, with 133,000 decisions |
+
+A DISTINCT over the joined rows reaches the same answer and is slower on
+PostgreSQL, because the join still runs once per place.
+
 ## The period a report covers
 
 Every report over a stretch of time takes one: deadline compliance,
@@ -139,6 +157,7 @@ getting worse, and one line hides that.
 | Answered against today's vulnerability data, not as of the day each was cut | That is what re-scanning a shipped release is for. A chart freezing the answer hides the advisory published after it shipped |
 | Rates stay on calendar | How much appeared and was resolved between two releases is an artifact of how far apart somebody cut them |
 | A product must be named, and two releases is the fewest that is a shape | Across products the tags interleave by date and mean nothing side by side; one bar reads as broken rather than as sparse |
+| An issue open in two products is counted once, in the strictest band the two give it | Each product rates it its own way, and the aging figures count it in the strictest too, so the two charts on one screen agree |
 | A release with nothing open is still a release | The figures are read from every build that has been *scanned*, with counts attached to that list rather than the list derived from the counts. Driven from findings alone, a clean release had no row, and absent is how this list says "never scanned" |
 
 The window becomes predicates before the statement runs: a finding opened
@@ -323,6 +342,20 @@ line, and a list keeping those out shows fewer rows than the bucket names.
 The aging figures match on the live key rather than on both versions, unlike the deadline
 list: the aging query does not join the components those versions sit on, and for
 a figure about a backlog the question is "has anybody said anything here".
+
+The buckets are counted in one pass over what is open:
+
+1. Each place is matched once against the decisions in force, built from the
+   decision side and joined on the finding.
+2. Each issue gets a flag per bucket for having a place there, a flag per bucket
+   for having an unanswered place there, and the strictest rating its products
+   give it among the places in that bucket. A rating that names no band ranks
+   below every band.
+3. The issues are counted by which flags and ratings they hold, which is a
+   handful of rows however many issues there are.
+
+An issue with places in two buckets counts in both, and is undecided in a bucket
+only where a place in that bucket is unanswered.
 
 Subtracting two moments has no portable spelling, so this is one of the few
 places an engine is asked directly. It is confined to a single expression, and

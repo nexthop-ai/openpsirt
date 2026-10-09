@@ -279,3 +279,57 @@ func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
 		}
 	})
 }
+
+func TestAnExpiredDeferralWithARowTheReaderMayNotDecideIsNotOfferedToThem(t *testing.T) {
+	// A new decision is made about the whole claim, so whether any row of it
+	// is out of the reader's reach is asked of the claim. A claim with one
+	// undisclosed row is not offered to somebody who may decide about
+	// disclosed work alone, and one wholly disclosed is.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		insider := f.privately(t)
+		defers := func(places ...triage.Place) int64 {
+			t.Helper()
+			soon := time.Now().UTC().Add(24 * time.Hour)
+			proposals := make([]triage.Proposal, 0, len(places))
+			for _, at := range places {
+				proposals = append(proposals, triage.Proposal{
+					Place: at, Outcome: triage.Deferred, DeferredUntil: &soon,
+					Reasoning: "Not this sprint.", By: insider.ID,
+				})
+			}
+			recorded, err := f.store.ProposeMany(ctx, insider, proposals)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// A date already gone is refused when written, so it is moved
+			// into the past after.
+			if _, err := f.db.DB.NewUpdate().Table("claim").
+				Set("deferred_until = ?", time.Now().UTC().Add(-time.Hour)).
+				Where("id = ?", recorded[0].ClaimID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			return recorded[0].ClaimID
+		}
+		mixed := defers(f.placeIn(f.product, "under-a", access.Private),
+			f.placeIn(f.product, "under-b", access.Public))
+		disclosed := defers(f.placeIn(f.product, "under-c", access.Public))
+
+		outsider := f.holding(t, "public-decider", map[int64][]access.Role{
+			f.product: {access.PublicRead, access.PublicTriage},
+		})
+		expired := triage.QueueFilter{Reason: triage.DeferralExpired}
+		if got := f.listed(t, outsider, expired); len(got) != 1 || got[0] != disclosed {
+			t.Errorf("somebody deciding disclosed work alone is offered claims %v; want only %d"+
+				" (the claim with an undisclosed row is %d)", got, disclosed, mixed)
+		}
+		// Somebody who may decide both is offered both, so the narrowing
+		// above is the reach and not the claims.
+		if got := f.listed(t, insider, expired); len(got) != 2 {
+			t.Errorf("somebody deciding at both visibilities is offered %v, want both claims", got)
+		}
+		if count, err := f.store.WaitingIn(ctx, outsider, f.product); err != nil || count != 0 {
+			t.Errorf("the approval count beside the product is %d (%v), want 0", count, err)
+		}
+	})
+}
