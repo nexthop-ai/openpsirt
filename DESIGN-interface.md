@@ -938,8 +938,9 @@ running to 2,800.
 | Rule | |
 |---|---|
 | The list travels with the finding, as one value in the address | A filter added to the list needs nothing on the finding and cannot collide with a name it already uses. With the list's own address in hand the finding asks the server the same question, so the row before and after are the ones that were on screen |
+| The page the list holds answers first | Opened from the list, the finding finds itself in the page the list already read under the same address. Where a row sits on either side of it, or it is at an end of the whole list, nothing is asked. A finding at a page's edge with more beyond it asks for the window below |
 | The walk does not stop at a page boundary the reader never chose | The window asked for is the list's page widened by one row at each end, and a neighbor is handed the list at the page *it* sits on. At the largest page there is no room to widen, so the window is the page itself and the walk ends at its edge rather than asking twice. **Unmoved**: widening backward alone put the page's last row outside its own window, and the row found nothing to walk from |
-| The row is found by what it is, not by where it sat | The list is read afresh, and under a state filter the row may have moved or gone. Where it cannot be found there is no walk, which is the same answer as arriving from somewhere that was not a list |
+| The row is found by what it is, not by where it sat | Under a state filter the row may have moved or gone since it was drawn. Where it cannot be found there is no walk, which is the same answer as arriving from somewhere that was not a list |
 | A list that asked for everything is still a list | Present-and-empty and absent are different: the first has a row before and after like any other |
 | After submitting, the next finding is offered first, and a decision that waits links to its own page second | That page is where its approval lands. A decision in force at once offers nothing more |
 
