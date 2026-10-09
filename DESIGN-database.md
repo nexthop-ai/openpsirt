@@ -98,6 +98,7 @@ Engine-specific code is confined to these places:
 | Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and the servers keep their own. § SQLite settings has the measurement |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 | A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
+| When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
 This list is the complete set, and where an engine may be named is checked by
@@ -408,13 +409,14 @@ anew, the declaration being the tagged one with the column beside it.
 
 ### The v0.8.0 upgrade
 
-Migration 42. Each change is an index; no column and no row moves. § Indexes
-says what each index serves.
+Migration 42. Each change is an index or a storage setting; no column and no
+row moves. § Indexes says what each index serves.
 
 | Table | Gains | Every engine |
 |---|---|---|
 | `finding` | What is open in a build indexed with its deadline, and the grouping index carrying when a finding opened and why it closed | Each index dropped and made again by the release's statement, where the table stands. SQLite included: an index is made there like anywhere else, and a rebuild would copy every row to change none |
 | `decision` | An index on the state and the claim, and one on the state and the product | Made where the table stands |
+| `finding`, on PostgreSQL alone | Vacuumed after a fiftieth of it changes and analyzed after a hundredth | A storage setting on the table |
 
 | Rule | |
 |---|---|
@@ -424,6 +426,7 @@ says what each index serves.
 |---|---|
 | A v0.7.0 database | Upgraded, each declaration describes the table the migrations built |
 | A v0.7.0 database holding some of the new indexes already | Upgraded the same, each index in the release's shape |
+| A v0.7.0 database, on PostgreSQL | Upgraded, the finding table holds the three storage settings |
 
 ### Release records
 
@@ -991,6 +994,17 @@ sixteen.
 What the two wider indexes add to a write is within the noise: copying 375,843
 findings into a table carrying v0.8.0's indexes took 6.5 to 8.6 s against 6.1
 to 7.9 s with v0.7.0's.
+
+An index-only scan on PostgreSQL reads the table for each page changed since
+the last vacuum, and the server's defaults vacuum a table after a fifth of it
+changes. A nightly scan rewrites tens of thousands of findings, less than that,
+so the finding table is vacuumed after a fiftieth and analyzed after a
+hundredth. With 46,980 of 375,843 findings rewritten, no vacuum ran at the
+defaults, and the package-kind count read the table 413,331 times and took
+246 ms; at a fiftieth a vacuum ran within the minute, and the count read the
+table not at all and took 64 ms. The settings are written once, by the
+migration, so values an operator sets on the table afterwards stay. The other
+three engines have no such setting.
 
 Dropping an index never costs a foreign key its index on the two engines that
 require one: in every case the constraint that made the wider index leads with
