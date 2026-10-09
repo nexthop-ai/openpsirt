@@ -242,9 +242,14 @@ func migrationNames(migrations string) ([]string, error) {
 // release owns that it did not list, one it listed that is gone, and one that
 // is not the file it tagged. Empty is a tree that still ships what the release
 // shipped.
+//
+// A baseline release is held to the opposite: its files are gone, so a file
+// numbered below its last migration or carrying its code is one somebody
+// misnumbered or misnamed. A database the release built records the baseline,
+// and a migration below it is one that database never applied and refuses.
 func Held(root, migrations string, r *Record) ([]string, error) {
 	if r.Baseline {
-		return nil, nil
+		return replaced(migrations, r)
 	}
 	records, err := All(root)
 	if err != nil {
@@ -283,6 +288,29 @@ func Held(root, migrations string, r *Record) ([]string, error) {
 	for name := range r.Digests {
 		if !slices.Contains(owned, name) {
 			faults = append(faults, fmt.Sprintf("%s shipped %s and it is not here", r.Version, name))
+		}
+	}
+	slices.Sort(faults)
+	return faults, nil
+}
+
+// replaced is what a tree holds of the files a baseline release replaced.
+func replaced(migrations string, r *Record) ([]string, error) {
+	code, err := Code(r.Version)
+	if err != nil {
+		return nil, err
+	}
+	names, err := migrationNames(migrations)
+	if err != nil {
+		return nil, err
+	}
+	var faults []string
+	for _, name := range names {
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		if n := Number(name); (n > 0 && n < r.Last) || strings.HasPrefix(name, code+"_") {
+			faults = append(faults, fmt.Sprintf("%s belongs to %s, whose migrations the baseline replaced", name, r.Version))
 		}
 	}
 	slices.Sort(faults)

@@ -651,6 +651,9 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // can see that, which is why the line it logs names the version rather than
 // calling the schema current.
 func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) error {
+	if err := schema.NotBeforeTheBaseline(ctx, db); err != nil {
+		return err
+	}
 	applied, err := schema.Version(ctx, db)
 	if err != nil {
 		return err
@@ -742,6 +745,8 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 		}
 		state := "the version this build expects"
 		switch {
+		case schema.BeforeTheBaseline(applied):
+			state = "before the baseline: upgrade it with v0.6.0 first"
 		case applied < wanted:
 			state = fmt.Sprintf("behind by %d", wanted-applied)
 		case applied > wanted:

@@ -164,8 +164,9 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 }
 
 // A database a release before v0.5.0 built records a version below the
-// migration that makes v0.5.0's schema at once. Migrating it is refused before
-// anything runs, naming the version and the release that upgrades it.
+// migration that makes v0.5.0's schema at once. Serving or migrating it is
+// refused before anything runs, naming the version and the release that
+// upgrades it.
 func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -192,13 +193,18 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 			}
 		})
 
-		err := schema.Up(ctx, db, silent())
-		if err == nil {
-			t.Fatal("migrating a schema a release before v0.5.0 built was allowed")
-		}
-		for _, want := range []string{itoa(v040), "v0.6.0"} {
-			if !strings.Contains(err.Error(), want) {
-				t.Errorf("the refusal does not say %q: %v", want, err)
+		for what, err := range map[string]error{
+			"serving":   schemaIsCurrent(ctx, db, silent()),
+			"migrating": schema.Up(ctx, db, silent()),
+		} {
+			if err == nil {
+				t.Errorf("%s a schema a release before v0.5.0 built was allowed", what)
+				continue
+			}
+			for _, want := range []string{itoa(v040), "v0.6.0"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
+				}
 			}
 		}
 	})

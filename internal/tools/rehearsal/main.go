@@ -22,8 +22,8 @@
 //
 //  1. The row count of every table, with the release stopped.
 //  2. The migrations, applied on their own, and the version they reach.
-//  3. The counts again, against what the upgrade tables in the database
-//     design document say happens to each table's rows.
+//  3. The counts again: a table the release held keeps its count, and a
+//     table the upgrade adds starts empty.
 //  4. The server started on it, the open findings of every build against
 //     what the release showed, and every GET its API document lists asked
 //     once, none of which may answer 5xx.

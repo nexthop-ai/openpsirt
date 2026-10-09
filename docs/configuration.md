@@ -1094,9 +1094,10 @@ deleting by surprise.
 ## Upgrading
 
 A database is upgraded in place, at startup or by `openpsirt migrate up`,
-through each later release's upgrade on the way. A database built by a release
-older than the [oldest section below](#from-v040) names is refused, and that
-section says how to bring it forward. A database built by a release candidate
+through each later release's upgrade on the way. A database built by the
+release the [oldest section below](#from-v040) names, or by an earlier one, is
+refused, and that section says how to bring it forward. A database built by a
+release candidate
 or any build between releases is recreated.
 
 Read [Every upgrade](#every-upgrade), the section for the release you are coming

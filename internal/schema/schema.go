@@ -74,12 +74,19 @@ func NotBeforeTheBaseline(ctx context.Context, db *database.DB) error {
 	if err != nil {
 		return err
 	}
-	if applied > 0 && applied < migrations.Baseline {
+	if BeforeTheBaseline(applied) {
 		return fmt.Errorf("the database is at schema version %d, which a release before v0.5.0 "+
 			"built, and this build upgrades a database v0.5.0 or a later release built: take a "+
 			"backup, run openpsirt migrate up with v0.6.0, and then deploy this build", applied)
 	}
 	return nil
+}
+
+// BeforeTheBaseline reports whether a schema version is one a release before
+// v0.5.0 built. Zero is an empty database, which the baseline makes from
+// nothing.
+func BeforeTheBaseline(applied int64) bool {
+	return applied > 0 && applied < migrations.Baseline
 }
 
 // Version reports the schema version currently applied.

@@ -348,7 +348,8 @@ func TestAMalformedRecordLineIsRefused(t *testing.T) {
 }
 
 // A release whose migrations were replaced by a baseline holds none of the
-// files it shipped, and the release after it is still held to its own.
+// files it shipped and refuses one that reappears, numbered or named as its
+// own, and the release after it is still held to its own.
 func TestABaselineReleaseHoldsNoFilesAndTheNextIsStillHeld(t *testing.T) {
 	root, migrations := tree(t)
 	for _, name := range []string{"00001_first.go", "00002_second.go"} {
@@ -370,6 +371,16 @@ func TestABaselineReleaseHoldsNoFilesAndTheNextIsStillHeld(t *testing.T) {
 	}
 	if faults, err := Held(root, migrations, baseline); err != nil || len(faults) != 0 {
 		t.Errorf("the baseline release was held to files: %v %v", faults, err)
+	}
+	for _, name := range []string{"00001_misnumbered.go", "v010_table.go"} {
+		path := filepath.Join(migrations, name)
+		write(t, path, header+"package migrations\n")
+		if faults, err := Held(root, migrations, baseline); err != nil || len(faults) != 1 {
+			t.Errorf("%s, a file the baseline replaced, answered %v %v", name, faults, err)
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if faults := check(t, root, migrations, "v0.2.0"); len(faults) != 0 {
 		t.Errorf("the release after the baseline was refused: %v", faults)

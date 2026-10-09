@@ -268,7 +268,7 @@ At 1.0 the baseline becomes 1.0's schema, beside one migration that upgrades a
 database the last 0.x release built. A database an earlier 0.x release built is
 upgraded to that release first.
 
-Migration 39 creates every table. Migrations 40 and 41 change existing tables.
+Migration 39 creates every table v0.5.0 had. Migrations 40 and 41 change existing tables and add the ones their release introduced.
 
 ### The baseline
 
@@ -282,7 +282,7 @@ only what follows it. A fresh install applies it and every migration after it.
 | v0.5.0's record of its schema holds it | On each of the four engines the baseline builds exactly the columns, constraints and indexes v0.5.0 built, and the schema test fails on any line either side lacks |
 | Every statement a declaration holds is one the baseline makes | A test reads each declaration and fails on a table or index the baseline makes from somewhere else, so no declaration reads as schema and is not |
 | A release's declaration may be derived from a baseline declaration | v0.7.0's declarations of the finding, claim, statement and issuance tables are the baseline's with columns beside them. The baseline's schema test holds what they start from |
-| A database below the baseline is refused | A version from 1 to 38 is one a release before v0.5.0 built. Startup and `openpsirt migrate up` refuse it before anything runs, naming its version and v0.6.0, which carries every upgrade before the baseline. Without the refusal the baseline would run against the old tables and fail on the first name already taken |
+| A database below the baseline is refused | A version from 1 to 38 is one a release before v0.5.0 built. Startup and `openpsirt migrate up` refuse it before anything runs, naming its version and v0.6.0, which carries every upgrade before the baseline, and `openpsirt migrate status` reports it as before the baseline. Without the refusal the baseline would run against the old tables: PostgreSQL and SQLite fail on the first name already taken, and MySQL and MariaDB step over every table that exists (§ Migrations that stop half way) and record the baseline over the old schema |
 
 ### Forward only
 
@@ -1121,8 +1121,3 @@ and the granularity are open questions.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about
   types.
-- Migration 37 is kept or collapsed on the measurement above. The lasting test
-  compares an upgraded database with one that walked the same chain empty, so
-  a column the migration leaves out is missing from both and nothing notices.
-  That the chain builds the schema the per-table migrations it replaced built
-  was checked once, when it was written, and matched on all four engines.
