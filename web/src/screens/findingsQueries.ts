@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { bumpQuery } from "./FindingsViews";
-import { acrossProducts, type withinVariant } from "./list";
+import { acrossProducts, findingsPageKey, type withinVariant } from "./list";
 
 // The findings list's reads: the rows of the view by issue, and each view's
 // own count.
@@ -31,7 +31,7 @@ export function useFindingsViews({
   view: string;
 }) {
   const findings = useQuery({
-    queryKey: ["findings", product, stream, variant, query],
+    queryKey: findingsPageKey(product, stream, variant, query),
     queryFn: async () =>
       unwrap(
         spanning
@@ -58,12 +58,10 @@ export function useFindingsViews({
   // which answers the total without reading a page or what decorates it. The
   // by-issue count is the one the screen already holds where the by-issue view
   // is what is drawn, so it is asked only from the other two, with a page of
-  // one: the findings list has no count-only answer. The counts are held for
-  // five minutes rather than asked again as somebody pages.
+  // one: the findings list has no count-only answer.
   const byIssue = useQuery({
     queryKey: ["findings", "count", product, stream, variant, query],
     enabled: view !== "issues",
-    staleTime: 5 * 60_000,
     queryFn: async () =>
       unwrap(
         spanning
@@ -81,7 +79,6 @@ export function useFindingsViews({
   const byComponent = useQuery({
     queryKey: ["findings-by-component", "count", product, selection, query],
     enabled: !spanning,
-    staleTime: 5 * 60_000,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/findings/components", {
@@ -100,7 +97,6 @@ export function useFindingsViews({
   const byUpgrade = useQuery({
     queryKey: ["fix-bundles", "count", product, selection, query],
     enabled: !spanning,
-    staleTime: 5 * 60_000,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/fix-bundles", {

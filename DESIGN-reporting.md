@@ -783,34 +783,26 @@ was capped.
 
 ## Fix-bundle page cost
 
-Measured rather than asserted. It runs at 2.2 s on a real deployment, and "the
-design says it should be fine" is a sentence with a word doing too much work in
-it.
-
 One build, 204,000 open findings, 136,000 of them naming a version that fixes
 them, folding to 700 bumps — the same two-thirds-fixable ratio a real switch
-image has, at the same order of open rows.
+image has, at the same order of open rows. Measured with the bundles grouped
+in one level, every open row grouped on the fold directly:
 
-| | Fix bundles | The findings list, over the same rows |
+| One level | Fix bundles | The findings list, over the same rows |
 |---|--:|--:|
 | SQLite | 1.28 s | 0.19 s |
 | PostgreSQL | 1.29 s | 0.43 s |
 | MariaDB | 1.49 s | 0.52 s |
 | MySQL | 1.56 s | 0.48 s |
 
-The findings list groups those rows into 6,000 groups off an index that covers
-everything it reads. The bundle query groups the same rows into 700 and takes
-three to eight times as long, because two of the columns it reads are not in
-any index it can use: the version that fixes a finding, and the fold key, which
-is on the component rather than on the finding.
+The cost in one level is the sort on the fold, a 64-character key, over every
+open row. The bundles are grouped in two levels, by integers first and by the
+fold over the partial groups;
+[DESIGN-findings.md § Two-level grouping](DESIGN-findings.md#two-level-grouping)
+holds the form and its measurement.
 
-Nothing is built on that yet. Grouping on the component instead of the fold
-saves six percent, so the fold is not where the time goes, and the remaining
-candidates are a stored fold key on the finding and an index that covers the
-fix version. The first is a derived value stored for speed, which has to be
-asked for rather than added while building something else.
-
-The measurement is `make measure`, and it runs on every engine.
+`make measure` takes the same measurement over the form in force, on every
+engine.
 
 ## Exports
 

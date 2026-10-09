@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { fromAt, listQuery, where, windowFor, withinVariant } from "./list";
+import { findingsPageKey, fromAt, listQuery, where, windowFor, withinVariant } from "./list";
 import { findingAt } from "../app/routes";
 import type { components } from "../api/schema";
 
@@ -62,18 +62,18 @@ export function useFindingNeighbors(
   const client = useQueryClient();
   const held = useMemo(() => {
     if (!walking) return undefined;
-    const page = client.getQueryData<Page>([
-      "findings",
-      product,
-      list.get("stream") ?? "",
-      list.get("variant") ?? "",
-      listed,
-    ]);
+    const page = client.getQueryData<Page>(
+      findingsPageKey(product, list.get("stream") ?? "", list.get("variant") ?? "", listed),
+    );
     if (!page) return undefined;
     const items = page.items ?? [];
     const i = indexIn(items);
-    const first = i === 0 && listed.offset > 0;
-    const last = i === items.length - 1 && listed.offset + items.length < page.total;
+    // At the largest page the window is the page itself, so asking for it
+    // would read the same rows again: the walk ends at the page's edge.
+    const wide = windowFor(listed.offset, listed.limit);
+    const widens = wide.offset !== listed.offset || wide.limit !== listed.limit;
+    const first = widens && i === 0 && listed.offset > 0;
+    const last = widens && i === items.length - 1 && listed.offset + items.length < page.total;
     return i < 0 || first || last ? undefined : page;
   }, [client, walking, product, list, listed, indexIn]);
   // Otherwise the page is asked for widened by one at each end, so that

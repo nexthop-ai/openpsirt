@@ -127,11 +127,11 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		ColumnExpr(PerFold(SourceVersion) + ` AS "shipped"`).
 		ColumnExpr(`f.fixed_in AS "fixed_in"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
-		ColumnExpr(`SUM(f.n) AS "places"`).
+		ColumnExpr(overParts.places() + ` AS "places"`).
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
-		ColumnExpr(`MAX(f.peak) AS "urgency"`).
-		ColumnExpr(`MAX(f.hit) AS "exploited"`).
-		ColumnExpr(`MAX(f.hit_here) AS "exploited_here"`).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`).
+		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
+		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
 		ColumnExpr(worst + ` AS "worst"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
@@ -199,7 +199,7 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 // key and everything it reports decomposes over the first: places are summed,
 // and the issues and the builds are distinct counts over far fewer rows.
 func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	inner := openRows(s.db, targets, visible).
+	inner := placeHeads(openRows(s.db, targets, visible)).
 		// A bundle is a version to move to.
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
@@ -207,10 +207,6 @@ func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filte
 		ColumnExpr("f.vulnerability_id").
 		ColumnExpr("f.target_id").
 		ColumnExpr("f.fixed_in").
-		ColumnExpr(`COUNT(*) AS "n"`).
-		ColumnExpr(`MAX(f.urgency) AS "peak"`).
-		ColumnExpr(exploitedAcross + ` AS "hit"`).
-		ColumnExpr(exploitedHereAcross + ` AS "hit_here"`).
 		GroupExpr("f.component_id, f.vulnerability_id, f.target_id, f.fixed_in")
 	if filter.BundleSort == BundlesByDeadline {
 		// Under the column's own name, so the order reads the same.
@@ -354,10 +350,10 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		// list shows and therefore what hiding this component would remove
 		// from it. The first level holds one row per issue.
 		ColumnExpr(`COUNT(*) AS "issues"`).
-		ColumnExpr(`SUM(f.n) AS "places"`).
-		ColumnExpr(`MAX(f.peak) AS "urgency"`).
-		ColumnExpr(`MAX(f.hit) AS "exploited"`).
-		ColumnExpr(`MAX(f.hit_here) AS "exploited_here"`).
+		ColumnExpr(overParts.places() + ` AS "places"`).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`).
+		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
+		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
 		// The total rides on the page, as the findings list's does.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// The issue is joined only where the order needs it, the way the
@@ -463,13 +459,9 @@ func (s *Store) countByComponent(ctx context.Context, targets []int64,
 func (s *Store) byComponent(targets []int64, visible []access.Visibility,
 	filter Filter) *bun.SelectQuery {
 
-	inner := openRows(s.db, targets, visible).
+	inner := placeHeads(openRows(s.db, targets, visible)).
 		ColumnExpr("f.component_id").
 		ColumnExpr("f.vulnerability_id").
-		ColumnExpr(`COUNT(*) AS "n"`).
-		ColumnExpr(`MAX(f.urgency) AS "peak"`).
-		ColumnExpr(exploitedAcross + ` AS "hit"`).
-		ColumnExpr(exploitedHereAcross + ` AS "hit_here"`).
 		GroupExpr("f.component_id, f.vulnerability_id")
 	// The two orders that read an aggregate of the places, carried up under
 	// the column's own name so the expression the order names reads the same.

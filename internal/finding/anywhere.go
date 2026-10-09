@@ -236,7 +236,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
 		ColumnExpr(overParts.places() + ` AS "places"`).
-		ColumnExpr(`MAX(f.peak) AS "urgency"`).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`)
 	if err := page.OrderExpr(sortedAcross(filter)).
 		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {

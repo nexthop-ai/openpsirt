@@ -1289,6 +1289,33 @@ both:
 | A lookup per place | The page's groups | A page reads a few hundred places |
 | One row per decided place, built once from the decisions and joined on the finding | The product page's totals and build rows | They read every open place in the product. As a lookup per place that is 367,000 lookups a statement: 2.1 s against 0.2 s joined with 13 decisions, and 4.6 s against 1.2 s with 133,000 |
 
+Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
+went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
+s.
+
+The list across products asks the same question without naming a product, so
+each decision is matched to the product of the finding it reaches. The
+decisions stay on the outside of that join, written `CROSS JOIN ... WHERE`,
+which is an inner join on every engine and on SQLite also fixes the order.
+Left to choose, SQLite starts from every open finding and reads every decision
+of its product once per row.
+
+| Undecided, first page and total | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| Across products, decisions outermost | 0.78 s | 0.57 s | 1.7 s | 0.78 s |
+| Across products, findings outermost | 331 s, without statistics | 0.56 s | 1.7 s | 0.77 s |
+| Inside one product | 1.3 s | 0.57 s | 1.2 s | 0.98 s |
+
+Measured over 425,680 open rows in two products, a kernel carrying 6,000 issues
+under 34 consumers among them, and 3,060 decisions, one row per page. Every
+figure but one is taken after the planner statistics are refreshed, which a
+server does on its own once about a tenth of a table has changed and a SQLite
+deployment does at start and after every scan. SQLite with the findings
+outermost was taken without them. Before that refresh the servers plan freshly
+loaded tables from one-row estimates: MySQL then reaches the findings through
+the index on open rows instead of the place index and takes minutes, whichever
+way the statement is written.
+
 ### Two-level grouping
 
 The fold is a 64-character key on the component. Grouped on it directly, every
@@ -1324,33 +1351,6 @@ On SQLite, over the demo's 367,870 open rows, the findings page went from
 0.19 s to 0.10 s and the fix bundles from 0.74 s to 0.33 s; the page by
 component went from 0.10 s to 0.12 s, which is the one statement two levels
 makes slower anywhere.
-
-Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
-went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
-s.
-
-The list across products asks the same question without naming a product, so
-each decision is matched to the product of the finding it reaches. The
-decisions stay on the outside of that join, written `CROSS JOIN ... WHERE`,
-which is an inner join on every engine and on SQLite also fixes the order.
-Left to choose, SQLite starts from every open finding and reads every decision
-of its product once per row.
-
-| Undecided, first page and total | SQLite | PostgreSQL | MySQL | MariaDB |
-|---|---|---|---|---|
-| Across products, decisions outermost | 0.78 s | 0.57 s | 1.7 s | 0.78 s |
-| Across products, findings outermost | 331 s, without statistics | 0.56 s | 1.7 s | 0.77 s |
-| Inside one product | 1.3 s | 0.57 s | 1.2 s | 0.98 s |
-
-Measured over 425,680 open rows in two products, a kernel carrying 6,000 issues
-under 34 consumers among them, and 3,060 decisions, one row per page. Every
-figure but one is taken after the planner statistics are refreshed, which a
-server does on its own once about a tenth of a table has changed and a SQLite
-deployment does at start and after every scan. SQLite with the findings
-outermost was taken without them. Before that refresh the servers plan freshly
-loaded tables from one-row estimates: MySQL then reaches the findings through
-the index on open rows instead of the place index and takes minutes, whichever
-way the statement is written.
 
 ## Urgency
 

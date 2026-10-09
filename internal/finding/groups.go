@@ -752,7 +752,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// The most urgent place this issue sits at. A group is one decision
 		// about one issue at one fold, so what should decide where that
 		// decision appears is the worst of what it covers.
-		ColumnExpr(`MAX(f.peak) AS "urgency"`).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`)
@@ -835,12 +835,8 @@ func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.Sel
 // are one row, because upgrading them is one act, deciding about them is one
 // judgment and routing them is one rule.
 func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
-	return db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
+	return openRows(db, targets, visible).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr(GroupedOn)
 }
 

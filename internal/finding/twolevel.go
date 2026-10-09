@@ -16,8 +16,8 @@ import (
 // integers — the issue and the component — and only those partial groups are
 // joined to the component and grouped again on the fold. A fold is a handful
 // of components at most, so the second grouping sorts thousands of rows rather
-// than hundreds of thousands. Measured on PostgreSQL with one CPU, the page of
-// groups went from 230–690 ms to 100–130 ms.
+// than hundreds of thousands. DESIGN-findings.md § Two-level grouping holds the
+// measurement.
 //
 // Every aggregate a group reports or is filtered on decomposes exactly. A
 // count is the sum of the partial counts, a minimum the minimum of the partial
@@ -45,6 +45,9 @@ const (
 
 // places is how many places the group holds.
 func (g grain) places() string { return g.pick("COUNT(*)", "SUM(f.n)") }
+
+// peak is the highest urgency among the group's places.
+func (g grain) peak() string { return g.pick("MAX(f.urgency)", "MAX(f.peak)") }
 
 // exploited and exploitedHere are the two exploitation flags.
 func (g grain) exploited() string { return g.pick(exploitedAcross, "MAX(f.hit)") }
@@ -104,11 +107,7 @@ const withFixAcross = "SUM(CASE WHEN f.fixed_in IS NULL OR f.fixed_in = '' THEN 
 func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery,
 	keyed func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
 
-	inner := keyed(f.narrowRows(rows)).
-		ColumnExpr(`COUNT(*) AS "n"`).
-		ColumnExpr(`MAX(f.urgency) AS "peak"`).
-		ColumnExpr(exploitedAcross + ` AS "hit"`).
-		ColumnExpr(exploitedHereAcross + ` AS "hit_here"`)
+	inner := placeHeads(keyed(f.narrowRows(rows)))
 	if f.DiffersBetweenBuilds && f.Builds > 1 {
 		inner = inner.ColumnExpr("f.target_id").GroupExpr("f.target_id")
 	}
@@ -117,6 +116,16 @@ func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery,
 		TableExpr(`(?) AS "f"`, inner).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`)
 	return f.narrowGroups(outer, overParts)
+}
+
+// placeHeads selects the first-level columns every second level reads: how
+// many places a partial group holds, their highest urgency and the two
+// exploitation flags, under the names the overParts spellings read.
+func placeHeads(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.ColumnExpr(overRows.places() + ` AS "n"`).
+		ColumnExpr(overRows.peak() + ` AS "peak"`).
+		ColumnExpr(overRows.exploited() + ` AS "hit"`).
+		ColumnExpr(overRows.exploitedHere() + ` AS "hit_here"`)
 }
 
 // byIssueAndComponent is the first level's keys for a list inside one product.
