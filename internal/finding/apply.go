@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -163,6 +164,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			places, placed)
 		// The claims that fix what they cover, as against those that argue it
 		// does not apply. The first close a finding and the second mark it.
+		byName := indexClaims(claims)
 		fixing := map[int64]bool{}
 		for _, claim := range claims {
 			if claim.fixes() {
@@ -261,12 +263,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			if !known {
 				return fmt.Errorf("issue %q was not recorded", r.Issue.Identifier)
 			}
+			naming := byName.naming(claims, r.Issue)
 
 			for _, consumerID := range places.of(component.ID) {
 				at := place{componentID: component.ID, consumerID: consumerID}
 				// Asked per place: a claim about a component inside one of the
 				// build's products reaches only the places beneath it.
-				covering, claimedBy := coveringClaim(claims, r.Issue, component, consumerID, placed)
+				covering, claimedBy := coveringClaim(naming, component, consumerID, placed)
 				// Set on every report rather than only when true, because a
 				// later report at the same key replaces the finding below and
 				// the claim it names with it.
@@ -358,7 +361,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// hand closes it, with a reason that reads like the issue went
 		// away. Nothing would report that: the row looks exactly like
 		// a component that stopped shipping.
-		var open []Finding
+		//
+		// Only the columns the difference reads. A large image holds hundreds
+		// of thousands of open rows, and every one of them is read here.
+		var open []heldFinding
 		err = tx.NewSelect().Model(&open).
 			Where("target_id = ?", targetID).
 			Where("kind = ?", Vulnerable).
@@ -367,21 +373,15 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			return fmt.Errorf("read what is already open: %w", err)
 		}
 
-		held := map[key]Finding{}
+		held := make(map[key]heldFinding, len(open))
 		// A second index, by place *name* rather than by component. A version
 		// change makes a different component and therefore a different key, so
 		// the two indexes disagree exactly where a version moved — which is
 		// the case worth telling apart from every other kind of closure.
-		heldAt := map[at]Finding{}
+		heldAt := make(map[at]heldFinding, len(open))
 		for _, f := range open {
 			held[key{f.VulnerabilityID, place{f.ComponentID, value(f.ConsumerID)}}] = f
 			heldAt[at{f.VulnerabilityID, f.PlaceIdentity}] = f
-		}
-		// The subject of those findings, so a version can be named rather
-		// than merely known to have changed.
-		before, err := componentsByID(ctx, tx, open)
-		if err != nil {
-			return err
 		}
 
 		now := s.now().UTC().Truncate(time.Microsecond)
@@ -399,6 +399,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// statement.
 		disclaiming := map[int64][]int64{}
 		var arrivedDisclaimed []key
+		// Where a version moved under an opening finding, the component it
+		// moved from, so the version can be named rather than merely known
+		// to have changed. Read once the loop has found them all.
+		movedFrom := map[int]int64{}
+		// The open findings that moved, grouped by exactly what each update
+		// writes, so a group is one statement over its identifiers.
+		updates := map[changeKey]*moving{}
 		for k, f := range wanted {
 			if patched[k] {
 				if already, open := held[k]; open {
@@ -442,7 +449,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				// only point where both versions are in hand.
 				if was, moved := heldAt[at{f.VulnerabilityID, f.PlaceIdentity}]; moved &&
 					was.ComponentID != f.ComponentID {
-					f.ArrivedFrom = upstreamOf(before[was.ComponentID])
+					movedFrom[len(opening)] = was.ComponentID
 				}
 				opening = append(opening, f)
 				continue
@@ -476,38 +483,36 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			if same(already, f) && !moved && !clockMoved {
 				continue
 			}
-			update := tx.NewUpdate().Model((*Finding)(nil)).
-				Set("fix_state = ?", f.FixState).
-				Set("fixed_in = ?", f.FixedIn).
-				Set("fixed_at = ?", f.FixedAt).
-				Set("matched = ?", f.Matched).
-				Set("matched_from = ?", f.MatchedFrom).
-				Set("matched_in = ?", f.MatchedIn).
-				Set("matched_range = ?", f.MatchedRange).
-				Set("suppressed_by = ?", f.SuppressedBy).
-				Set("stated_by = ?", f.StatedBy).
-				Set("claimed_by = ?", f.ClaimedBy).
-				Set("last_changed_at = ?", now)
-			if moved {
-				update = update.
-					Set("urgency = ?", f.Urgency).
-					Set("urgency_exploited = ?", f.RankExploited).
-					Set("urgency_shipped = ?", f.RankShipped)
+			change := moving{f: f, moved: moved, exploitationMoved: exploitationMoved,
+				learned: learned, clockMoved: clockMoved}
+			group, grouped := updates[change.key()]
+			if !grouped {
+				group = &change
+				updates[change.key()] = group
 			}
-			if exploitationMoved {
-				// The moment, kept beside the deadline it produced. Every
-				// later recount counts from it, and nothing else on the row
-				// holds it — so without this the recount fell back to the
-				// opening and moved the deadline into the past.
-				update = update.Set("exploited_learned_at = ?", learned)
-			}
-			if clockMoved {
-				update = update.Set("due_at = ?", f.DueAt)
-			}
-			if _, err := update.Where("id = ?", already.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("update a finding that moved: %w", err)
-			}
+			group.ids = append(group.ids, already.ID)
 			applied.Updated++
+		}
+		for _, group := range updates {
+			err := database.IDsInBatches(ctx, group.ids, func(ctx context.Context, batch []int64) error {
+				_, err := group.update(tx, now).Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("update %d findings that moved: %w", len(group.ids), err)
+			}
+		}
+		// The subject each moved-from finding was about.
+		movedIDs := make([]int64, 0, len(movedFrom))
+		for _, componentID := range movedFrom {
+			movedIDs = append(movedIDs, componentID)
+		}
+		before, err := componentsByID(ctx, tx, movedIDs)
+		if err != nil {
+			return err
+		}
+		for i, componentID := range movedFrom {
+			opening[i].ArrivedFrom = upstreamOf(before[componentID])
 		}
 		// What closed before at each place something opens or arrives patched:
 		// the latest row per component and consumer, which says whether a
@@ -533,11 +538,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// A place whose patch was dropped as its version moved. The patched row
 		// is closed, so the open index above never sees it, and the version the
 		// place held is what the new finding arrived from.
-		var patchedBefore []Finding
+		var patchedBefore []int64
 		for _, f := range opening {
 			if was, ok := latestAt[at{f.VulnerabilityID, f.PlaceIdentity}]; ok &&
 				f.ArrivedFrom == "" && was.ClosedBecause == Patched && was.ComponentID != f.ComponentID {
-				patchedBefore = append(patchedBefore, was)
+				patchedBefore = append(patchedBefore, was.ComponentID)
 			}
 		}
 		carried, err := componentsByID(ctx, tx, patchedBefore)
@@ -684,7 +689,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 		}
 
-		var closing []Finding
+		var closing []heldFinding
 		// With the same issue still wanted at the same place, this row is
 		// being superseded by one against a new version rather than resolved.
 		wantedAt := map[at]bool{}
@@ -720,7 +725,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// A closing finding's subject is read from the component
 		// catalog rather than from what the variant currently contains — the
 		// whole reason it is closing is usually that it is no longer there.
-		departed, err := componentsByID(ctx, tx, closing)
+		gone := make([]int64, 0, len(closing))
+		for _, f := range closing {
+			gone = append(gone, f.ComponentID)
+		}
+		departed, err := componentsByID(ctx, tx, gone)
 		if err != nil {
 			return err
 		}
@@ -846,7 +855,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// After this build's own rows are written, so what the scan changed
 		// here is counted as the scan's; the rows this corrects are the ones
 		// no scan was going to touch.
-		return Reranked(ctx, tx, interned.Moved(), startedAt)
+		return Reranked(ctx, tx, interned.Moved(), startedAt, targetID)
 	})
 	return applied, err
 }
@@ -869,14 +878,28 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		}
 	}
 	err := database.IDsInBatches(ctx, issues, func(ctx context.Context, batch []int64) error {
+		// The latest row of each grouping, by identifier, rather than every
+		// closed row ever recorded: a place whose version moves gathers a
+		// closed row at every move.
+		latest := func(grouping string) *bun.SelectQuery {
+			return db.NewSelect().
+				TableExpr(`"finding" AS "lf"`).
+				ColumnExpr("MAX(lf.id)").
+				Where("lf.target_id = ?", targetID).
+				Where("lf.kind = ?", Vulnerable).
+				Where("lf.closed_at IS NOT NULL").
+				Where("lf.vulnerability_id IN (?)", bun.List(batch)).
+				GroupExpr(grouping)
+		}
 		var rows []Finding
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
 				"place_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
-			Where("target_id = ?", targetID).
-			Where("kind = ?", Vulnerable).
-			Where("closed_at IS NOT NULL").
-			Where("vulnerability_id IN (?)", bun.List(batch)).
+			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.
+					WhereOr("id IN (?)", latest("lf.vulnerability_id, lf.component_id, lf.consumer_id")).
+					WhereOr("id IN (?)", latest("lf.vulnerability_id, lf.place_identity"))
+			}).
 			// Ascending, so the last row read at a place is its latest.
 			OrderExpr("id ASC").
 			Scan(ctx)
@@ -903,7 +926,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 // Everything else is what makes it that finding rather than another, and
 // comparing something no update writes would count the finding as changed
 // every night and move its last change forward with nothing having moved.
-func same(held, found Finding) bool {
+func same(held heldFinding, found Finding) bool {
 	return held.FixState == found.FixState &&
 		held.FixedIn == found.FixedIn &&
 		sameDate(held.FixedAt, found.FixedAt) &&
@@ -961,7 +984,7 @@ func exploitationKnown(listedOn *time.Time, learnedAt time.Time) *time.Time {
 // It does not answer whether the deadline moved. That is asked of the deadline
 // itself, because a fix appearing upstream moves it and touches no ranking
 // signal at all.
-func ranking(held, found Finding) (moved, exploitationMoved bool) {
+func ranking(held heldFinding, found Finding) (moved, exploitationMoved bool) {
 	moved = held.Urgency != found.Urgency ||
 		held.RankExploited != found.RankExploited ||
 		held.RankShipped != found.RankShipped
@@ -1122,21 +1145,17 @@ func describedOf(c graph.Component) graph.Described {
 // while the second may name a whole source tree. A claim that suppresses is
 // preferred over one saying the flaw applies, which leaves the finding work and
 // carries the build's workaround.
-func coveringClaim(claims []Claim, issue Named, component graph.Component, consumerID int64,
+//
+// The claims are the ones naming the issue, from claimsByName.
+func coveringClaim(claims []Claim, component graph.Component, consumerID int64,
 	p *placer) (suppressing, claimed *int64) {
-
-	names := map[string]bool{normalize(issue.Identifier): true}
-	for _, alias := range issue.Aliases {
-		names[normalize(alias)] = true
-	}
 
 	described := describedOf(component)
 
 	var covering []Claim
 	latest := map[string]time.Time{}
 	for _, claim := range claims {
-		if !names[normalize(claim.Vulnerability)] || !claim.covers(described) ||
-			!p.reaches(claim.within(), component, consumerID) {
+		if !claim.covers(described) || !p.reaches(claim.within(), component, consumerID) {
 			continue
 		}
 		covering = append(covering, claim)
@@ -1183,6 +1202,41 @@ func coveringClaim(claims []Claim, issue Named, component graph.Component, consu
 		return found, found
 	}
 	return nil, informing
+}
+
+// claimsByName is a build's claims by the issue each names, normalized.
+type claimsByName map[string][]int
+
+// indexClaims puts each claim under the name it argues about, once per apply
+// rather than once per place a reported issue occupies.
+func indexClaims(claims []Claim) claimsByName {
+	index := claimsByName{}
+	for i, claim := range claims {
+		name := normalize(claim.Vulnerability)
+		index[name] = append(index[name], i)
+	}
+	return index
+}
+
+// naming is the claims naming an issue by its identifier or any alias, in the
+// order the claims were read.
+func (index claimsByName) naming(claims []Claim, issue Named) []Claim {
+	var at []int
+	seen := map[string]bool{}
+	for _, name := range append([]string{issue.Identifier}, issue.Aliases...) {
+		name = normalize(name)
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		at = append(at, index[name]...)
+	}
+	sort.Ints(at)
+	out := make([]Claim, 0, len(at))
+	for _, i := range at {
+		out = append(out, claims[i])
+	}
+	return out
 }
 
 // inventory is what a target currently contains, as far as findings care.
@@ -1244,14 +1298,21 @@ func upstreamOf(c graph.Component) string {
 	return c.Version
 }
 
-// componentsByID reads what a set of findings was about.
-func componentsByID(ctx context.Context, db bun.IDB, findings []Finding) (map[int64]graph.Component, error) {
-	if len(findings) == 0 {
+// componentsByID reads the components a set of findings was about.
+//
+// Each component is asked for once. A kernel's findings name one component
+// thousands of times.
+func componentsByID(ctx context.Context, db bun.IDB, components []int64) (map[int64]graph.Component, error) {
+	if len(components) == 0 {
 		return nil, nil
 	}
-	ids := make([]int64, 0, len(findings))
-	for _, f := range findings {
-		ids = append(ids, f.ComponentID)
+	seen := make(map[int64]bool, len(components))
+	ids := make([]int64, 0, len(components))
+	for _, id := range components {
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
 	}
 	byID := map[int64]graph.Component{}
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {

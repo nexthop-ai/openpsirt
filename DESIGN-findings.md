@@ -986,7 +986,14 @@ change" is counted by.
 |---|---|
 | One writer at a time, per target | Recording what a run found begins by taking the target row. Two runs in flight would both read the same open findings, compute the same difference and write it, leaving two open rows for one finding. An ordinary update is a lock every supported engine honors. The test runs two overlapping applications and was checked by removing the hold, which reproduces the double-open on all three server engines |
 | A finding that is already open still moves | A fix appears, upstream declines to fix it, the build answers it. A run compares what it found against what is recorded and updates the parts that can move, stamping when they moved. Only those parts are compared: everything else is what makes it that finding |
+| Findings that moved to the same values are one write | Grouped by every value the update writes, the columns it leaves alone excepted, so each row receives exactly what it would alone |
+| An open finding is read in the columns the comparison uses | Every open row of the build is read on every scan, and the rest of the row is nothing the comparison asks |
+| What closed before at a place is read as its latest row | One row per issue and component, and one per issue and place name. A place whose version moves gathers a closed row at every move |
 | The intervals are the change record | Every node, edge, finding and claim records the run that opened it and the run that closed it, so asking what changed between two points is a query over those. There is no second table duplicating them |
+
+Measured on one image of 324,508 open findings, rescanned the day a likelihood
+feed moved every issue: 324,508 updates became 7,562 statements, and the rows
+re-ranked a second time after them, 324,508, became none.
 
 ## Closure reasons
 
@@ -1390,6 +1397,8 @@ bottom of the list, until somebody rescanned that tag, which for a tag is never.
 | The clock runs from when it was learned | Counted from when the finding opened, an issue that became exploited after six months lands three days before it was known — a deadline nobody could have met |
 | The moment it was learned is kept on the row | Nothing else holds it, so every later recount had to guess and fell back to the opening — which moved the deadline back to a date already in the past, on any assessment, agreement or withdrawal that touched the issue, with nothing logged |
 | It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
+| The scanned build's own scanner findings are left out of the rewrite | Applying the scan has just ranked every one of them from the same ratings, read in the same transaction. A finding recorded by hand in that build is rewritten, because the scan reads none. The exploited clock still reaches them: a listing day moving earlier re-clocks a row the scan found already exploited and left alone |
+| One statement per product and value of the order | Issues whose rest of the order comes out the same in one product share it. The issues, their products and those products' ratings are each read once for all of them |
 
 Five signals, in this order:
 
