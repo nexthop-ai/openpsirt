@@ -1,0 +1,151 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package finding_test
+
+import (
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+)
+
+// The decision counts read from the decision side: the product page's
+// totals, built once over every decided place, and a page of the state
+// filter, built for the page's own issues.
+
+func TestTheOverviewCountsADecidedPlaceOnceHoweverManyDecisionsReachIt(t *testing.T) {
+	// "Agreed" compares the places a standing decision covers against the
+	// places there are. Two decisions at one place are one decided place:
+	// counted as two they equal the two places, and an issue half answered
+	// reads as agreed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		places := f.placesOf(t, "CVE-2026-1")
+		if len(places) != 2 {
+			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
+		}
+		by := f.somebodyElse(t)
+		reader := f.holding(t, access.PublicRead)
+		stands := func() finding.BuildStanding {
+			t.Helper()
+			builds, whole, err := f.store.HowItStands(ctx, reader, f.productID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, build := range builds {
+				if build.TargetID == f.target && (build.Agreed != whole.Agreed || build.Undecided != whole.Undecided) {
+					t.Errorf("the build reads agreed %d, undecided %d where the product reads %d and %d",
+						build.Agreed, build.Undecided, whole.Agreed, whole.Undecided)
+				}
+			}
+			return whole
+		}
+		if got := stands(); got.Open != 1 || got.Undecided != 1 || got.Agreed != 0 {
+			t.Fatalf("before any decision: open %d, undecided %d, agreed %d; want 1, 1, 0",
+				got.Open, got.Undecided, got.Agreed)
+		}
+
+		under := places[swss.Name]
+		f.decidedAt(t, by, under, "approved", libnl.Version, swss.Version, "first-key")
+		f.decidedAt(t, by, under, "approved", libnl.Version, swss.Version, "second-key")
+		if got := stands(); got.Undecided != 0 || got.Agreed != 0 {
+			t.Errorf("two decisions at one of two places: undecided %d, agreed %d; want 0 and 0",
+				got.Undecided, got.Agreed)
+		}
+
+		f.decidedAt(t, by, places[teamd.Name], "approved", libnl.Version, teamd.Version, "third-key")
+		if got := stands(); got.Agreed != 1 {
+			t.Errorf("a decision at every place: agreed %d, want 1", got.Agreed)
+		}
+	})
+}
+
+func TestTheOverviewCountsADecisionOnlyAtTheVersionItWasMadeAgainst(t *testing.T) {
+	// A live claim covers a place at the versions it was keyed on. One made
+	// against another version of the library says nothing about this one, so
+	// the issue is still undecided here.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		places := f.placesOf(t, "CVE-2026-1")
+		f.decidedAt(t, f.somebodyElse(t), places[swss.Name], "approved", libnlNew.Version, swss.Version, "elsewhere")
+		_, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if whole.Undecided != 1 || whole.Agreed != 0 {
+			t.Errorf("a decision about %s at a place holding %s: undecided %d, agreed %d; want 1 and 0",
+				libnlNew.Version, libnl.Version, whole.Undecided, whole.Agreed)
+		}
+	})
+}
+
+func TestEachRowOfALapsedPageSaysItLapsed(t *testing.T) {
+	// The page reads what it shows about its rows from decisions about the
+	// page's own issues alone. Every row of every page still says the word
+	// the filter found it by.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		issues := []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3"}
+		reported := make([]finding.Reported, 0, len(issues))
+		for _, issue := range issues {
+			reported = append(reported, found(issue, libnl))
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+			t.Fatal(err)
+		}
+		by := f.somebodyElse(t)
+		// Two lapsed and one agreed, so the page has rows it must leave out.
+		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-1")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-2")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-3")[swss.Name], "approved", libnl.Version, swss.Version, "agreed")
+
+		reader := f.holding(t, access.PublicTriage)
+		lapsed := finding.Filter{States: []finding.ClaimStanding{finding.StandingLapsed}}
+		for _, page := range []struct {
+			what string
+			read func(offset int) ([]finding.Group, int, error)
+		}{
+			{"one product", func(offset int) ([]finding.Group, int, error) {
+				return f.store.Groups(ctx, reader, f.scope, 1, offset, lapsed)
+			}},
+			{"every product", func(offset int) ([]finding.Group, int, error) {
+				return f.store.Anywhere(ctx, reader, 1, offset, lapsed)
+			}},
+		} {
+			seen := map[string]bool{}
+			for offset := 0; offset < 3; offset++ {
+				groups, total, err := page.read(offset)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if total != 2 {
+					t.Errorf("%s: %d lapsed, want 2", page.what, total)
+				}
+				for _, group := range groups {
+					seen[group.Vulnerability] = true
+					if group.State != finding.StandingLapsed {
+						t.Errorf("%s: %s on page %d reads as %q, want lapsed",
+							page.what, group.Vulnerability, offset, group.State)
+					}
+				}
+			}
+			if len(seen) != 2 || !seen["CVE-2026-1"] || !seen["CVE-2026-2"] {
+				t.Errorf("%s: the pages held %v, want the two lapsed issues", page.what, seen)
+			}
+		}
+	})
+}

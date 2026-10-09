@@ -237,6 +237,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Builds          int    `bun:"builds"`
 		decorated
 	}
+	filter.PageIssues = issues
 	body := narrow(s.db.NewSelect()).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).

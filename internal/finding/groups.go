@@ -935,6 +935,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr(GroupedOn)
+	filter.PageIssues = issues
 	if err := filter.narrow(q).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read about what is open: %w", err)
 	}

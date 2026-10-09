@@ -3,23 +3,36 @@
 
 package finding
 
-import "github.com/uptrace/bun"
+import (
+	"strings"
+
+	"github.com/uptrace/bun"
+)
 
 // The decision state of a group, counted per place.
 //
-// Four correlated counts over our decisions in one product, at each place and
-// at the versions that place holds now. Asked as an EXISTS per place rather
-// than by joining the decisions in, because a join multiplies the rows — a
-// place with two decisions counts twice — and the number of places is exactly
-// what the state words compare against.
+// Four counts over our decisions in one product, at each place and at the
+// versions that place holds now. A place with two decisions is one place, and
+// the number of places is exactly what the state words compare against, so a
+// count never joins the decisions straight into the rows it counts.
+//
+// Two shapes ask it, and the conditions are the same in both:
+//
+//   - decidedAs, a correlated EXISTS per place, for a page of groups, which
+//     reads a few hundred places.
+//   - decisionsAtPlaces, one row per decided place built once from the decision
+//     side and joined on the finding, for a count over every open place in a
+//     product.
+//
+// The EXISTS runs once per place it is asked of, which is nothing on a page and
+// 367,000 probes for a product's totals: 2.1 s a statement on PostgreSQL,
+// against 0.2 s for the joined table, which starts from the decisions rather
+// than from the findings.
 //
 // Written once, because spelled again at every site the conditions drift: a
 // row requiring a live key for "waiting" where the filter does not puts a
 // claim proposed and then withdrawn in the filter's waiting bucket, with no
-// state word on the row that comes back. The filter's own counts keep a
-// different shape on purpose — a joined derived table rather than a correlated
-// subquery, because asking per row was 241,479 probes to say "nothing has been
-// decided here" — and it is the conditions that have to agree, not the shape.
+// state word on the row that comes back.
 
 // decisionState is one of those counts: the column it lands in, the condition
 // that recognizes it, and the words that condition binds.
@@ -107,4 +120,45 @@ func decidedAs(product string, state decisionState) string {
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE ` + DecisionAt(product) + `
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
+}
+
+// decisionsAtPlaces is one row per open finding in a product that a decision of
+// ours there covers, with a column per state saying whether one of the
+// decisions covering it is in that state. Joined to a query over finding AS f
+// as `LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id` and read through
+// placesDecided.
+//
+// Built from the decisions outward, the way the state filter's table is, and
+// with the decision outermost through CROSS JOIN ... WHERE for the reason that
+// table gives: SQLite left to choose starts from every open finding. The
+// findings it reaches are not held to the product's builds: the decision is,
+// and the join on the finding's identifier drops a place in another product
+// that shares the issue and the place identity. Holding them as well was
+// measured slower, 1.5 s against 1.1 s with 133,000 decisions on PostgreSQL.
+func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionState) *bun.SelectQuery {
+	decided := q.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(DecisionIssue).
+		Join(`CROSS JOIN "finding" AS "f2"`).
+		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
+		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`f2.id AS "finding_id"`)
+	for _, state := range states {
+		decided = decided.ColumnExpr(`MAX(CASE WHEN `+strings.TrimPrefix(state.condition, " AND ")+
+			` THEN 1 ELSE 0 END) AS "`+state.alias+`"`, state.args...)
+	}
+	return decided.
+		Where("de.product_id = ?", productID).
+		Where("f2.closed_at IS NULL").
+		Where(coversHere).
+		GroupExpr("f2.id")
+}
+
+// placesDecided is how many of a group's places decisionsAtPlaces marks in one
+// state, under the state's own alias. A place no decision covers has no row
+// in the joined table and counts as none.
+func placesDecided(state decisionState) string {
+	return `SUM(COALESCE(dd.` + state.alias + `, 0)) AS "` + state.alias + `"`
 }

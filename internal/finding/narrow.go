@@ -101,6 +101,12 @@ type Filter struct {
 	// anything correlating a place to a decision has to supply one or it
 	// matches every product in the deployment.
 	ProductID int64
+	// PageIssues is the issues of a page the store has already chosen, set by
+	// the store when it reads what it shows about that page. The decision
+	// table the state filter joins is built for these issues alone, which a
+	// page of fifty reads in milliseconds and every decided place in the
+	// deployment does not. Empty is every issue.
+	PageIssues []int64
 	// Ecosystems keeps components of these package kinds — deb, golang,
 	// pypi. Read from the package identifier rather than stored beside it,
 	// because the identifier is what says it and a second copy is a second

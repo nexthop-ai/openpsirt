@@ -230,15 +230,28 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		Where("f2.closed_at IS NULL").
 		Where(coversHere).
 		GroupExpr("f2.id")
+	// A joined derived table cannot see the outer query's conditions, and an
+	// engine that loops over the outer rows builds it again for each one: 35 s
+	// for a page of one on PostgreSQL with 133,000 decisions, against 0.15 s
+	// with the page's issues stated here as well. Each condition repeated
+	// here is one the outer query also holds, so it drops only rows the join
+	// would drop.
+	if len(f.PageIssues) > 0 {
+		decided = decided.Where("f2.vulnerability_id IN (?)", bun.List(f.PageIssues))
+	}
 	if f.Across {
-		// A joined derived table cannot reach the outer query's product, so
-		// across products it carries its own: the decision has to belong to
-		// the product the finding it answers for sits in, which is the same
-		// rule the bound number states inside one product.
+		// Across products it carries its own product, because it cannot reach
+		// the outer query's: the decision has to belong to the product the
+		// finding it answers for sits in, which is the same rule the bound
+		// number states inside one product. The kind of release is the other
+		// condition the outer query states on the stream.
 		decided = decided.
 			Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
 			Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
 			Where("de.product_id = st2.product_id")
+		if len(f.Workable.Kinds) == 1 {
+			decided = decided.Where("st2.kind = ?", f.Workable.Kinds[0])
+		}
 	} else {
 		decided = decided.Where("de.product_id = ?", f.ProductID)
 	}

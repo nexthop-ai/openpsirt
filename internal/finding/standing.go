@@ -74,15 +74,16 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// The things somebody decides about: one row per build, issue and
 	// component, with the places counted and the standing decisions counted
 	// against them. The state words below compare an approved count against
-	// the number of places, which is why the decisions are counted as a
-	// correlated EXISTS per place rather than joined — a join multiplies the
-	// rows and a place with two decisions would count twice.
+	// the number of places, so the decisions arrive as one row per decided
+	// place (decisionsAtPlaces) rather than joined in, where a place with two
+	// decisions would count twice.
+	//
 	// The one count no list carries: anything that still says something about
 	// the place. A withdrawn claim does not — it covers the place so that
-	// "lapsed" can be said, and counting it as a claim took the finding out
-	// of the undecided figure while putting it in no other, which is the same
-	// hole the list's own state words had. Spelled through the same helper as
-	// the rest, so the correlation and the version match are one expression.
+	// "lapsed" can be said, and counted as a claim it would take the finding
+	// out of the undecided figure while putting it in no other. Spelled
+	// through the same helper as the rest, so the version match is one
+	// expression.
 	anyClaim := decisionState{"any_claim", " AND de.state <> ?", []any{"withdrawn"}}
 	// The things somebody decides about, grouped one way for the build rows
 	// and another for the product's own totals: with the build in the key it
@@ -91,8 +92,6 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	grouped := func(byBuild bool) *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			ColumnExpr(`COUNT(*) AS "places"`).
 			ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 			ColumnExpr(`MAX(f.urgency) AS "urgency"`).
@@ -100,9 +99,11 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			// "some exploitation". This total is the feed's word about the
 			// world, and a product recorded as attacked here is a different
 			// fact that would be counted under the wrong name.
-			ColumnExpr(exploitedAcross+` AS "exploited"`).
-			ColumnExpr(decidedAs("?", anyClaim), productID, "withdrawn")
-		q = decisionCounts(q, "?", []any{productID}, claimApproved).
+			ColumnExpr(exploitedAcross + ` AS "exploited"`).
+			ColumnExpr(placesDecided(anyClaim)).
+			ColumnExpr(placesDecided(claimApproved))
+		q = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`,
+			decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
 			Where(inThisProductAs("f.target_id"), productID).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible))
