@@ -58,15 +58,6 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 					if !leads(columns, wider) {
 						continue
 					}
-					// finding_open_idx is the one deliberate exception, and it
-					// is deliberate for a measured reason rather than an
-					// argued one: it is narrower than the covering index it
-					// prefixes, so the scan for what is open in a build reads
-					// fewer pages through it. Dropping it is a trade rather
-					// than a tidy-up, and nobody has measured it as one.
-					if name == "finding_open_idx" {
-						continue
-					}
 					t.Errorf("%s.%s is (%s), which %s (%s) already answers — "+
 						"the wider one serves every lookup the narrower one does",
 						table, name, strings.Join(columns, ", "),

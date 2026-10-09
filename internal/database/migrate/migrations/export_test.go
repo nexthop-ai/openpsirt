@@ -22,8 +22,7 @@ func StatementsV060(engine database.Engine) map[string][]string {
 	}
 }
 
-// StatementsV070 is the untagged release's declaration of each table it
-// changes.
+// StatementsV070 is v0.7.0's declaration of each table it changes.
 func StatementsV070(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
@@ -32,5 +31,15 @@ func StatementsV070(engine database.Engine) map[string][]string {
 		"vex_statement": vexStatementsV070(t),
 		"vex_issuance":  vexIssuanceV070(t),
 		"suppression":   suppressionV070(t),
+	}
+}
+
+// StatementsV080 is the untagged release's declaration of each table it
+// changes.
+func StatementsV080(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{
+		"finding":  findingV080(t),
+		"decision": decisionV080(t),
 	}
 }
