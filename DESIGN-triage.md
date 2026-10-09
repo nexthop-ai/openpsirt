@@ -989,6 +989,11 @@ promise covers; the act then writes a decision at each.
 The act's time is the writing: on PostgreSQL, 17 s of its 20 s is the 408
 statements inserting the decisions.
 
+The row with the refresh held off is the measurement run against PostgreSQL
+alone, with `ALTER SYSTEM SET autovacuum = off` and `SELECT pg_reload_conf()`
+on the server before the run and `ALTER SYSTEM RESET autovacuum` after it. The
+22 s is the same read with the folds as a subquery inside it.
+
 What it covers is derived, never marked. A covered finding is one a standing
 promise reaches, which the decision already records, so the mark is a join
 rather than a tag across every row.
