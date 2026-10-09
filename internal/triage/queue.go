@@ -298,38 +298,33 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueFilter,
 	limit, offset int) ([]Waiting, int, error) {
 
-	limit = database.AList.Of(limit)
 	waitingClaims := func() *bun.SelectQuery { return s.waitingClaims(subject, filter) }
+	// A limit of zero asks how much is waiting and nothing else, which is
+	// what a badge polled once a minute needs.
+	if limit == 0 {
+		total, err := s.countClaims(ctx, waitingClaims, "what is waiting")
+		return nil, total, err
+	}
+	limit = database.AList.Of(limit)
 
-	page, err := s.pageClaims(ctx, subject, waitingClaims, limit, offset, "what is waiting")
+	page, err := s.claimsOn(ctx, waitingClaims, limit, offset, "what is waiting")
 	if err != nil {
 		return nil, 0, err
 	}
 	if len(page.Order) == 0 {
 		return nil, page.Total, nil
 	}
-	total, ids, byID, rows := page.Total, page.Order, page.Claims, page.Rows
+	total, ids, byID := page.Total, page.Order, page.Claims
 
 	// The representative is the earliest row; the sizes are counted over all
 	// of them.
-	first := map[int64]Decision{}
-	issues := map[int64]map[int64]bool{}
-	places := map[int64]map[string]bool{}
-	count := map[int64]int{}
-	for _, row := range rows {
-		if _, seen := first[row.ClaimID]; !seen {
-			first[row.ClaimID] = row
-			issues[row.ClaimID] = map[int64]bool{}
-			places[row.ClaimID] = map[string]bool{}
-		}
-		issues[row.ClaimID][row.VulnerabilityID] = true
-		places[row.ClaimID][row.PlaceIdentity] = true
-		count[row.ClaimID]++
+	sizes, err := s.claimSizes(ctx, subject, ids, "what is waiting")
+	if err != nil {
+		return nil, 0, err
 	}
-
 	representatives := make([]Decision, 0, len(ids))
 	for _, id := range ids {
-		representatives = append(representatives, first[id])
+		representatives = append(representatives, sizes[id].First)
 	}
 	reasoning, err := s.currentReasoning(ctx, representatives)
 	if err != nil {
@@ -377,7 +372,7 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueF
 	out := make([]Waiting, 0, len(ids))
 	for _, id := range ids {
 		claim := byID[id]
-		representative := first[id]
+		representative := sizes[id].First
 		// Agreed to before and back in the queue: an approver meeting it again
 		// should know they are re-reading something. Asked of the claim, which
 		// is what an agreement is given for.
@@ -387,9 +382,9 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueF
 			Reasoning:          reasoning[representative.ID],
 			PreviouslyApproved: before,
 			DeferredSoFar:      deferred[representative.ID],
-			Decisions:          count[id],
-			Issues:             len(issues[id]),
-			Places:             len(places[id]),
+			Decisions:          sizes[id].Decisions,
+			Issues:             sizes[id].Issues,
+			Places:             sizes[id].Places,
 			Builds:             builds[id],
 			Counter:            against[representative.ID],
 		}

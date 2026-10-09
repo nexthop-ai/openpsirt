@@ -872,3 +872,26 @@ func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
 		}
 	})
 }
+
+// A limit of zero answers the total of the fix-bundle list and of the list by
+// component without a row, and the totals are the ones their pages report.
+func TestALimitOfZeroAnswersTheTotalAlone(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		for _, path := range []string{
+			"/v1/products/mine/fix-bundles",
+			"/v1/products/mine/findings/components",
+		} {
+			var page, alone struct {
+				Items []json.RawMessage `json:"items"`
+				Total int               `json:"total"`
+			}
+			httpapitest.Read(t, r, "triager", path, &page)
+			httpapitest.Read(t, r, "triager", path+"?limit=0", &alone)
+			if page.Total == 0 || alone.Total != page.Total || alone.Items == nil || len(alone.Items) != 0 {
+				t.Errorf("%s: asked alone the total is %d with %d rows, and the page says %d",
+					path, alone.Total, len(alone.Items), page.Total)
+			}
+		}
+	})
+}

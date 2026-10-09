@@ -403,6 +403,13 @@ func (f Filter) ofRows() Filter {
 // its counts stop being the list's. The groups the list keeps are chosen at
 // the list's own grain and joined in, and only the conditions on a row are
 // applied here. A filter with no condition over a group is applied as it is.
+//
+// The kept groups are grouped in one level here rather than the list's two.
+// The planner cannot estimate how many groups a condition over a group keeps,
+// and over two levels of grouping it guesses a tenth of what it guesses over
+// one: 186 groups where 7,742 are kept. Joined back to the finding rows on
+// that guess it read the kernel's 271,000 rows once per kept group, and did not
+// finish in two minutes where the one-level form hashes the join in 2 s.
 func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
@@ -435,6 +442,12 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 // the places that lack it out of the count, and a group would report a size
 // smaller than it is.
 func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
+	return f.narrowGroups(f.narrowRows(q), overRows)
+}
+
+// narrowRows applies the half of the filter that is asked of each place: the
+// WHERE clauses, and the joins they read.
+func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if words := f.severities(); len(words) > 0 {
 		// The rating in force here, not the published one. Being able to say
 		// a published rating is wrong is pointless if the filter then ignores
@@ -455,32 +468,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 					Column("v.id").
 					Where(rating.EffectiveExpr+" IN (?)", bun.List(words)))
 		}
-	}
-	if f.Exploited {
-		// The flag, not the urgency. Two bands of the urgency answer "some
-		// exploitation" — the world's word and this product's own record of
-		// being attacked — and this filter names the first of them, so a
-		// threshold on the packed number would return the other as well.
-		q = q.Having(exploitedAcross+" = ?", 1)
-	}
-	if f.HasFix {
-		// Unanimity, like the fix-state filter below, which the documentation
-		// above calls the same question asked as a flag. A minimum skips
-		// nulls, so one place with a fixed version admitted the whole group —
-		// and a fold covering a package with a fix and one without answered
-		// yes to this, no to fix_state=fixed and yes to fix_state=mixed:
-		// three answers to one question.
-		q = q.Having("MIN(f.fixed_in) IS NOT NULL AND MIN(f.fixed_in) <> ?"+
-			" AND COUNT(*) = SUM(CASE WHEN f.fixed_in IS NULL OR f.fixed_in = ? THEN 0 ELSE 1 END)",
-			"", "")
-	}
-	if f.Unconfirmed {
-		// One place answers for the group. A group is an issue at a component,
-		// every place of it comes from the same line of a scanner's report,
-		// and the applier writes that line to all of them — so they cannot
-		// disagree, and an aggregate guarding against it would be a condition
-		// nothing can make false.
-		q = q.Having("MIN(f.matched) = ?", ByIdentifier)
 	}
 	// A component name somebody types is matched without regard to
 	// capitals, through the fold stored beside the name.
@@ -550,15 +537,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("f.consumer_id IN (?)",
 			componentsWhere(q, "c.name_folded = ?", graph.Folded(under)))
 	}
-	// The party dealing with it. Set for the whole group at once, so a group
-	// is held when its places are — asked as MIN and MAX rather than as one
-	// row, because a group whose places disagree is not "mine" and saying so
-	// would hand somebody work that is half theirs. Several answers OR
-	// together, and each keeps its own meaning inside the OR — which is why
-	// they are assembled as one condition rather than applied one at a time.
-	// Applied one at a time they would AND, and "mine or nobody's" would be a
-	// list of nothing.
-	q = f.heldBy(q)
 	// This product's own word on the issue, as against what was published. A
 	// rating of its own is the record of a priority somebody changed here —
 	// and a rating another product made is not, which is why the set is keyed
@@ -596,21 +574,12 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(`f.claimed_by IN (SELECT sup.id FROM "suppression" AS "sup"
 			WHERE sup.status IN (?))`, bun.List(says))
 	}
-	if f.OpenedAfter != nil {
-		q = q.Having("MIN(f.opened_at) > ?", *f.OpenedAfter)
-	}
 	if f.OpenedByRun > 0 {
 		// A row-level condition rather than one over the group: a group is in
 		// the list when any of its places was opened by that run, which is
 		// what "what this run opened" means — one issue at a component can
 		// appear at a place this run found and at forty it did not.
 		q = q.Where("f.opened_run_id = ?", f.OpenedByRun)
-	}
-	if f.ClosedAfter != nil {
-		// Closed rows are outside the list's own population, so this is the
-		// one filter that changes what the list is about rather than
-		// narrowing it. The caller says so by asking for it.
-		q = q.Having("MAX(f.closed_at) > ?", *f.ClosedAfter)
 	}
 	if f.ProposedAfter != nil {
 		where, args := f.product()
@@ -623,17 +592,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
 				Where("COALESCE(v.likelihood_ppm, 0) >= ?", f.LikelihoodAtLeast))
 	}
-	if f.OpenedBefore != nil {
-		// The oldest place decides: a group open here for a month with one
-		// place added yesterday has been somebody's problem for a month.
-		q = q.Having("MIN(f.opened_at) < ?", *f.OpenedBefore)
-	}
-	if f.Overdue {
-		q = q.Having("MIN(f.due_at) IS NOT NULL AND MIN(f.due_at) < ?", f.at())
-	} else if f.DueBefore != nil {
-		q = q.Having("MIN(f.due_at) IS NOT NULL AND MIN(f.due_at) < ?", *f.DueBefore)
-	}
-	q = f.whatUpstreamDid(q)
 	if cwes := trimmed(f.Weaknesses); len(cwes) > 0 {
 		// One indexed lookup against the table that holds them. A
 		// comma-joined column would make membership a substring match, and a
@@ -656,17 +614,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND ft.vulnerability_id = f.vulnerability_id
 			  AND ft.component_id = f.component_id
 			  AND ft.tag IN (?))`, append(args, bun.List(words))...)
-	}
-	// The places a promised upgrade covers, or the ones none does. A condition
-	// over the group rather than over a place, like every other decision
-	// predicate here: a group is planned when a promise reaches it, and
-	// unplanned when none reaches any of it.
-	if f.Planned != PlannedEither {
-		if f.Planned == PlannedOnly {
-			q = q.Having("SUM(COALESCE(dd.planned, 0)) > 0")
-		} else {
-			q = q.Having("SUM(COALESCE(dd.planned, 0)) = 0")
-		}
 	}
 	// Something a person recorded here rather than a scanner reporting it. Its
 	// own question rather than a shade of another: a recorded flaw is the only
@@ -701,13 +648,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		}
 		q = q.Where(held+")", asked...)
 	}
-	// Open in some builds of the selection and not others, which is what a
-	// comparison is about. Counted over the builds the selection holds rather
-	// than over every build there is: "differs" is a statement about what is
-	// being looked at.
-	if f.DiffersBetweenBuilds && f.Builds > 1 {
-		q = q.Having("COUNT(DISTINCT f.target_id) < ?", f.Builds)
-	}
 	q = f.acrossVariants(q)
 	if f.Beneath != nil {
 		// The subtree as the engine walks it, not as a list of identifiers
@@ -719,6 +659,87 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = f.Floor.narrow(q)
 	}
 	return q
+}
+
+// narrowGroups applies the half of the filter that is asked of a group — one
+// issue at one fold — as HAVING clauses, spelled at the grain g names: over
+// the places themselves, or over the partial groups the two-level form reads.
+// The conditions are the same at either grain; only the aggregates that reach
+// them differ.
+func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
+	if f.Exploited {
+		// The flag, not the urgency. Two bands of the urgency answer "some
+		// exploitation" — the world's word and this product's own record of
+		// being attacked — and this filter names the first of them, so a
+		// threshold on the packed number would return the other as well.
+		q = q.Having(g.exploited()+" = ?", 1)
+	}
+	if f.HasFix {
+		// Unanimity, like the fix-state filter below, which the documentation
+		// above calls the same question asked as a flag. A minimum skips
+		// nulls, so one place with a fixed version admitted the whole group —
+		// and a fold covering a package with a fix and one without answered
+		// yes to this, no to fix_state=fixed and yes to fix_state=mixed:
+		// three answers to one question.
+		q = q.Having("MIN(f.fixed_in) IS NOT NULL AND MIN(f.fixed_in) <> ?"+
+			" AND "+g.places()+" = "+g.withFix(), "")
+	}
+	if f.Unconfirmed {
+		// One place answers for the group. A group is an issue at a component,
+		// every place of it comes from the same line of a scanner's report,
+		// and the applier writes that line to all of them — so they cannot
+		// disagree, and an aggregate guarding against it would be a condition
+		// nothing can make false.
+		q = q.Having("MIN(f.matched) = ?", ByIdentifier)
+	}
+	// The party dealing with it. Set for the whole group at once, so a group
+	// is held when its places are — asked as MIN and MAX rather than as one
+	// row, because a group whose places disagree is not "mine" and saying so
+	// would hand somebody work that is half theirs. Several answers OR
+	// together, and each keeps its own meaning inside the OR — which is why
+	// they are assembled as one condition rather than applied one at a time.
+	// Applied one at a time they would AND, and "mine or nobody's" would be a
+	// list of nothing.
+	q = f.heldBy(q, g)
+	if f.OpenedAfter != nil {
+		q = q.Having("MIN(f.opened_at) > ?", *f.OpenedAfter)
+	}
+	if f.ClosedAfter != nil {
+		// Closed rows are outside the list's own population, so this is the
+		// one filter that changes what the list is about rather than
+		// narrowing it. The caller says so by asking for it.
+		q = q.Having("MAX(f.closed_at) > ?", *f.ClosedAfter)
+	}
+	if f.OpenedBefore != nil {
+		// The oldest place decides: a group open here for a month with one
+		// place added yesterday has been somebody's problem for a month.
+		q = q.Having("MIN(f.opened_at) < ?", *f.OpenedBefore)
+	}
+	if f.Overdue {
+		q = q.Having("MIN(f.due_at) IS NOT NULL AND MIN(f.due_at) < ?", f.at())
+	} else if f.DueBefore != nil {
+		q = q.Having("MIN(f.due_at) IS NOT NULL AND MIN(f.due_at) < ?", *f.DueBefore)
+	}
+	q = f.whatUpstreamDid(q, g)
+	// The places a promised upgrade covers, or the ones none does. A condition
+	// over the group rather than over a place, like every other decision
+	// predicate here: a group is planned when a promise reaches it, and
+	// unplanned when none reaches any of it.
+	if f.Planned != PlannedEither {
+		if f.Planned == PlannedOnly {
+			q = q.Having(g.decided("planned") + " > 0")
+		} else {
+			q = q.Having(g.decided("planned") + " = 0")
+		}
+	}
+	// Open in some builds of the selection and not others, which is what a
+	// comparison is about. Counted over the builds the selection holds rather
+	// than over every build there is: "differs" is a statement about what is
+	// being looked at.
+	if f.DiffersBetweenBuilds && f.Builds > 1 {
+		q = q.Having("COUNT(DISTINCT f.target_id) < ?", f.Builds)
+	}
+	return f.statesHaving(q, g)
 }
 
 // VariantSpread is how a group is spread over the variants of a branch.
@@ -817,7 +838,7 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 // its own meaning inside it: "nothing released or upstream declined" is the
 // population that needs a judgment rather than a bump, and it is two words for
 // one question.
-func (f Filter) whatUpstreamDid(q *bun.SelectQuery) *bun.SelectQuery {
+func (f Filter) whatUpstreamDid(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	states := f.fixStates()
 	if len(states) == 0 {
 		return q
@@ -826,10 +847,10 @@ func (f Filter) whatUpstreamDid(q *bun.SelectQuery) *bun.SelectQuery {
 	args := make([]any, 0, 2*len(states))
 	for _, state := range states {
 		if state == FixMixed {
-			says = append(says, "MIN(f.fix_state) <> MAX(f.fix_state)")
+			says = append(says, g.fixLeast()+" <> "+g.fixMost())
 			continue
 		}
-		says = append(says, "(MIN(f.fix_state) = ? AND MAX(f.fix_state) = ?)")
+		says = append(says, "("+g.fixLeast()+" = ? AND "+g.fixMost()+" = ?)")
 		args = append(args, state, state)
 	}
 	q = having(q, "("+strings.Join(says, " OR ")+")", args...)
@@ -845,7 +866,7 @@ func (f Filter) whatUpstreamDid(q *bun.SelectQuery) *bun.SelectQuery {
 // A condition on the group, so "mine" means every place held and every one of
 // them by one of my names. A group split between me and somebody else is not
 // mine, and saying it is would hand somebody work that is half theirs.
-func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
+func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	asked := trimmed(f.Assigned)
 	if len(asked) == 0 {
 		return q
@@ -855,9 +876,9 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 	for _, who := range asked {
 		switch who {
 		case "nobody":
-			says = append(says, "COUNT(f.assigned_to) = 0")
+			says = append(says, g.held()+" = 0")
 		case "somebody":
-			says = append(says, "COUNT(f.assigned_to) = COUNT(*)")
+			says = append(says, g.held()+" = "+g.places())
 		case "me":
 			// Mine or my team's, everywhere the phrase appears. A subject
 			// holding no party names nobody, so the phrase contributes
@@ -866,8 +887,8 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 			if len(f.HeldBy) == 0 {
 				continue
 			}
-			says = append(says, "(COUNT(f.assigned_to) = COUNT(*)"+
-				" AND MIN(f.assigned_to) IN (?) AND MAX(f.assigned_to) IN (?))")
+			says = append(says, "("+g.held()+" = "+g.places()+
+				" AND "+g.heldLeast()+" IN (?) AND "+g.heldMost()+" IN (?))")
 			args = append(args, bun.List(f.HeldBy), bun.List(f.HeldBy))
 		}
 	}

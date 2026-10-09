@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { fromAt, listQuery, where, windowFor, withinVariant } from "./list";
+import { findingsPageKey, fromAt, listQuery, where, windowFor, withinVariant } from "./list";
 import { findingAt } from "../app/routes";
+import type { components } from "../api/schema";
 
 // useFindingNeighbors is where one finding sits in the list it was opened from,
 // and the row before and after it.
@@ -40,11 +41,53 @@ export function useFindingNeighbors(
     () => withinVariant(listQuery(list), Boolean(list.get("variant"))),
     [list],
   );
-  // Widened by one at each end, so that stepping off a page finds the row on
-  // the next one rather than stopping at a boundary the reader never chose.
-  const span = useMemo(() => windowFor(listed.offset, listed.limit), [listed]);
-  const neighbors = useQuery({
-    enabled: walking,
+  // By what the row is rather than by where it sat: a row may have moved or
+  // gone since it was drawn.
+  const indexIn = useMemo(
+    () => (items: Item[]) =>
+      items.findIndex(
+        (row) =>
+          row.vulnerability === vulnerability &&
+          row.component === component &&
+          (row.version ?? "") === version &&
+          (!ecosystem || (row.ecosystem ?? "") === ecosystem) &&
+          (!namespace || (row.namespace ?? "") === namespace),
+      ),
+    [vulnerability, component, version, ecosystem, namespace],
+  );
+  // The page the list itself holds under the same address, where the reader
+  // came from it: the findings list caches its rows under this key. Where the
+  // finding sits inside that page with a row on either side — or at an end of
+  // the whole list — the neighbors are already known and nothing is asked.
+  const client = useQueryClient();
+  const held = useMemo(() => {
+    if (!walking) return undefined;
+    const page = client.getQueryData<Page>(
+      findingsPageKey(product, list.get("stream") ?? "", list.get("variant") ?? "", listed),
+    );
+    if (!page) return undefined;
+    const items = page.items ?? [];
+    const i = indexIn(items);
+    // At the largest page the window is the page itself, so asking for it
+    // would read the same rows again: the walk ends at the page's edge.
+    const wide = windowFor(listed.offset, listed.limit);
+    const widens = wide.offset !== listed.offset || wide.limit !== listed.limit;
+    const first = widens && i === 0 && listed.offset > 0;
+    const last = widens && i === items.length - 1 && listed.offset + items.length < page.total;
+    return i < 0 || first || last ? undefined : page;
+  }, [client, walking, product, list, listed, indexIn]);
+  // Otherwise the page is asked for widened by one at each end, so that
+  // stepping off a page finds the row on the next one rather than stopping at
+  // a boundary the reader never chose.
+  const span = useMemo(
+    () =>
+      held
+        ? { offset: listed.offset, limit: listed.limit }
+        : windowFor(listed.offset, listed.limit),
+    [held, listed],
+  );
+  const asked = useQuery({
+    enabled: walking && !held,
     queryKey: ["walk", product, from],
     queryFn: async () =>
       unwrap(
@@ -53,18 +96,10 @@ export function useFindingNeighbors(
         }),
       ),
   });
+  const neighbors = held ?? asked.data;
   return useMemo(() => {
-    const items = neighbors.data?.items ?? [];
-    // By what the row is rather than by where it sat: the list is read afresh
-    // here, and a row may have moved or gone since it was drawn.
-    const i = items.findIndex(
-      (row) =>
-        row.vulnerability === vulnerability &&
-        row.component === component &&
-        (row.version ?? "") === version &&
-        (!ecosystem || (row.ecosystem ?? "") === ecosystem) &&
-        (!namespace || (row.namespace ?? "") === namespace),
-    );
+    const items = neighbors?.items ?? [];
+    const i = indexIn(items);
     if (i < 0) return null;
     function step(j: number) {
       const row = items[j];
@@ -87,22 +122,13 @@ export function useFindingNeighbors(
     }
     return {
       at: span.offset + i,
-      total: neighbors.data?.total ?? 0,
+      total: neighbors?.total ?? 0,
       previous: step(i - 1),
       next: step(i + 1),
     };
-  }, [
-    neighbors.data,
-    span,
-    listed.limit,
-    list,
-    from,
-    rule,
-    product,
-    vulnerability,
-    component,
-    version,
-    ecosystem,
-    namespace,
-  ]);
+  }, [neighbors, indexIn, span, listed.limit, list, from, rule, product]);
 }
+
+// A page of the findings list, as the client types it.
+type Page = { items: Item[] | null; total: number };
+type Item = components["schemas"]["FindingBody"];

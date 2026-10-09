@@ -2695,6 +2695,8 @@ export interface paths {
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
+         *     `limit=0` returns `total` alone, with no rows.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-finding-components"];
@@ -2778,6 +2780,8 @@ export interface paths {
          *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
          *
          *     Ordered worst first, and `sort` takes any of: what the upgrade would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
+         *
+         *     `limit=0` returns `total` alone, with no rows.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -5158,6 +5162,8 @@ export interface paths {
          *     Each entry carries the full reasoning, whether it was previously approved and came back, how long the finding has been deferred in total, and how old the claim is. A claim over many issues also carries `outliers`: the rows that do not look like the rest, which is what to read instead of all of them.
          *
          *     Narrow by who proposed a claim, how old it is, how severe the issues it covers are, its outcome, and the release it covers. A claim is kept where one of its rows matches every filter, and is then returned whole.
+         *
+         *     `limit=0` returns `total` alone, with no entries.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -17323,7 +17329,7 @@ export interface operations {
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
-                /** @description The number returned */
+                /** @description The number returned. Zero returns the total alone */
                 limit?: number;
                 /** @description The number skipped */
                 offset?: number;
@@ -17542,7 +17548,9 @@ export interface operations {
                 sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
+                /** @description The number returned. Zero returns the total alone */
                 limit?: number;
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -21154,7 +21162,9 @@ export interface operations {
                 outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
                 release?: string;
+                /** @description The number returned. Zero returns the total alone */
                 limit?: number;
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;

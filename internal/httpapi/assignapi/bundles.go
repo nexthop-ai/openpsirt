@@ -103,13 +103,13 @@ func registerBundles(api huma.API, in core.Deps) {
 			"(`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is " +
 			"(`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). " +
 			"`asc` orders the other way. The default answers what should worry you; " +
-			"`sort=issues` answers what to do this afternoon.",
+			"`sort=issues` answers what to do this afternoon.\n\n" +
+			"`limit=0` returns `total` alone, with no rows.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		BundleQuery
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0"`
+		core.CountedPaging
 	}) (*struct {
 		Body struct {
 			Items []BundleBody `json:"items"`
@@ -122,18 +122,28 @@ func registerBundles(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		bundles, total, err := finding.NewStore(in.DB.DB).Bundles(ctx, subject, scope,
-			input.Limit, input.Offset, input.narrow(floor))
-		if err != nil {
-			return nil, core.RefusedFinding(in, err)
-		}
-
 		out := &struct {
 			Body struct {
 				Items []BundleBody `json:"items"`
 				Total int          `json:"total"`
 			}
 		}{}
+		store := finding.NewStore(in.DB.DB)
+		if input.Limit == 0 {
+			total, err := store.CountBundles(ctx, subject, scope, input.narrow(floor))
+			if err != nil {
+				return nil, core.RefusedFinding(in, err)
+			}
+			out.Body.Total = total
+			out.Body.Items = []BundleBody{}
+			return out, nil
+		}
+		bundles, total, err := store.Bundles(ctx, subject, scope,
+			input.Limit, input.Offset, input.narrow(floor))
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+
 		out.Body.Total = total
 		oneBuild := scope.StreamID != nil && scope.VariantID != nil
 		out.Body.Items = bundleBodies(bundles, oneBuild)

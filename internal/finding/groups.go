@@ -744,22 +744,21 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	limit, offset int, filter Filter) ([]groupHead, int, error) {
 
 	var heads []groupHead
-	page := openGroups(s.db, targets, visible).
+	page := s.foldGroups(targets, visible, filter).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
-		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(overParts.places() + ` AS "places"`).
 		// The most urgent place this issue sits at. A group is one decision
 		// about one issue at one fold, so what should decide where that
 		// decision appears is the worst of what it covers.
-		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
-		ColumnExpr(exploitedAcross + ` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross + ` AS "exploited_here"`).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`).
+		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
+		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`)
-	// The issue is joined only where the order needs it. The default page
-	// reads finding's covering index and nothing else, which is what makes it
-	// a page rather than a scan, and a join added for everybody would pay for
-	// a sort almost nobody asks for.
+	// The issue is joined only where the order needs it, and after the
+	// grouping: one row per issue and component, rather than a lookup behind
+	// every open place in the selection for a sort almost nobody asks for.
 	if by, known := order[filter.SortBy]; known && by.issue {
 		page = page.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`)
 	}
@@ -778,7 +777,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// repeats another.
 		OrderExpr(sortedBy(filter)).
 		Limit(limit).Offset(offset)
-	if err := filter.narrow(page).Scan(ctx, &heads); err != nil {
+	if err := page.Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open: %w", err)
 	}
 	if len(heads) > 0 {
@@ -789,31 +788,55 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	// counting them as two here changes the figure above the list depending
 	// on which page is being looked at — and this is the one somebody quotes,
 	// because it is what a deep link or the last page shows.
-	counted := openGroups(s.db, targets, visible).ColumnExpr("f.vulnerability_id")
-	total, err := s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, filter.narrow(counted)).
-		Count(ctx)
+	total, err := s.countGroups(ctx, s.foldGroups(targets, visible, filter))
 	if err != nil {
 		return nil, 0, fmt.Errorf("count what is open: %w", err)
 	}
 	return heads, total, nil
 }
 
-// openGroups is the statement every reading of the findings list starts
-// from: open findings in these builds that the reader may see, grouped one
-// issue at one fold. The page, its count and an act over every row it holds
-// each add their columns to this, so a condition added here reaches all three.
+// foldGroups is the statement every reading of the findings list's groups
+// starts from: open findings in these builds that the reader may see, narrowed
+// by the filter and grouped one issue at one fold, in the two-level form (see
+// twolevel.go). The page, its count and the hidden count each add their
+// columns to this, so a condition added here reaches all of them.
+//
+// The fold is the unit a person acts in: two binaries of one source package
+// are one row, because upgrading them is one act, deciding about them is one
+// judgment and routing them is one rule.
+func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
+	return filter.folded(s.db, openRows(s.db, targets, visible), byIssueAndComponent).
+		GroupExpr(GroupedOn)
+}
+
+// countGroups counts the groups a grouped statement produces.
+func (s *Store) countGroups(ctx context.Context, grouped *bun.SelectQuery) (int, error) {
+	return s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, grouped.ColumnExpr("f.vulnerability_id")).
+		Count(ctx)
+}
+
+// openRows is open findings in these builds that the reader may see, read as
+// "f" and not yet grouped.
+func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+	return db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible))
+}
+
+// openGroups is open findings in these builds that the reader may see, grouped
+// one issue at one fold in one level, for an act over every row the list holds
+// and for the groups another view keeps (see Filter.asListed). The page and its
+// count read the same groups through foldGroups.
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
 // judgment and routing them is one rule.
 func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
-	return db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
+	return openRows(db, targets, visible).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr(GroupedOn)
 }
 

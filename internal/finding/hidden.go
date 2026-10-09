@@ -35,29 +35,23 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	if len(targets) == 0 {
 		return 0, nil
 	}
-	counted := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		ColumnExpr("f.vulnerability_id").
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr(GroupedOn)
+	rows := openRows(s.db, targets, visible)
 	if words := filter.Floor.admits(); len(words) > 0 {
 		// The line's own condition, negated: no exploitation signal at
 		// all, and rated beneath the line. Both read the way
 		// Floor.narrow reads them, including the threshold that covers
 		// both bands.
-		counted = counted.Where("f.urgency < ?", int64(exploiting)).
+		rows = rows.Where("f.urgency < ?", int64(exploiting)).
 			Where("f.vulnerability_id IN (?)",
-				counted.NewSelect().TableExpr(`"vulnerability" AS "v"`).
+				rows.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 					Join(rating.Here, productID).
 					Column("v.id").
 					Where(rating.BandExpr+" NOT IN (?)", bun.List(words)))
 	}
-	n, err := s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, below.narrow(counted)).
-		Count(ctx)
+	// Grouped the way the list groups, in the same two levels: the issue and
+	// the component first, then the fold.
+	n, err := s.countGroups(ctx,
+		below.folded(s.db, rows, byIssueAndComponent).GroupExpr(GroupedOn))
 	if err != nil {
 		return 0, fmt.Errorf("count what the line keeps out: %w", err)
 	}

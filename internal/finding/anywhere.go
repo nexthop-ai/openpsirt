@@ -118,7 +118,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 	}
 
-	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+	// readable is the open places this subject may read, in the releases
+	// asked for, with the build and its stream joined.
+	readable := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if len(filter.Workable.Kinds) == 1 {
 			q = q.Where("st.kind = ?", filter.Workable.Kinds[0])
 		}
@@ -135,43 +137,88 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-			// The issue is joined for everybody here, unlike the per-product
-			// page: the line this list applies is the row's own product's, so
-			// the rating has to be compared in the statement rather than
-			// turned into a list of admitted words before it.
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			// And whatever the row's own product rates it, for the same
-			// reason: a rating belongs to a product, so a list spanning them
-			// reads each row's against the product that row is in.
-			Join(rating.For(rating.OnStream)).
+			Where("f.closed_at IS NULL")
+		return onlyReadable(q, subject, products, all)
+	}
+	// withRating joins the issue and whatever the row's own product rates it: a
+	// rating belongs to a product, so a list spanning them reads each row's
+	// against the product that row is in.
+	withRating := func(q *bun.SelectQuery, product rating.On) *bun.SelectQuery {
+		return q.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(rating.For(product))
+	}
+	// lined keeps what each row's own product's line admits, where somebody
+	// is using one. urgent is how the statement says a row carries an
+	// exploitation signal.
+	//
+	// Never below the line where somebody is using one, and being exploited
+	// is not a claim about how bad something is — it is a fact, and the one
+	// thing a line cannot set aside. Read off the urgency, whose two top bands
+	// are the feed's word and this product's own record of being attacked (the
+	// exploiting threshold).
+	lined := func(q *bun.SelectQuery, urgent string, args ...any) *bun.SelectQuery {
+		if wasBelow {
+			return q
+		}
+		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.
+				WhereOr(urgent, args...).
+				WhereOr(ratedAt+" >= "+lineAt, deployment)
+		})
+		if raised > 0 {
+			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.
+					WhereOr(urgent, args...).
+					WhereOr(ratedAt+" >= ?", raised)
+			})
+		}
+		return q
+	}
+	// narrow is every condition in one level, for the statement over the
+	// page's own rows.
+	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = withRating(readable(q).
+			Join(`JOIN "product" AS "p" ON p.id = st.product_id`), rating.OnStream).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			Where("f.closed_at IS NULL")
-		q = onlyReadable(q, subject, products, all)
-		if !wasBelow {
-			// Never below the line where somebody is using one,
-			// and being exploited is not a claim about how bad
-			// something is — it is a fact, and the one thing a
-			// line cannot set aside. Read off the urgency, whose
-			// two top bands are the feed's word and this product's
-			// own record of being attacked (the exploiting threshold).
-			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.
-					WhereOr("f.urgency >= ?", int64(exploiting)).
-					WhereOr(ratedAt+" >= "+lineAt, deployment)
-			})
-			if raised > 0 {
-				q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-					return q.
-						WhereOr("f.urgency >= ?", int64(exploiting)).
-						WhereOr(ratedAt+" >= ?", raised)
-				})
-			}
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`)
+		return filter.narrow(lined(q, "f.urgency >= ?", int64(exploiting)))
+	}
+	// grouped is the page's grouping in two levels (see twolevel.go). The
+	// first groups each product's places by issue and component, and by
+	// whether they carry an exploitation signal, which is the one thing about
+	// a place the line reads; the second reads the issue, its rating and the
+	// product's line once per partial group rather than once per place, keeps
+	// what the line admits, and groups on the fold. A partial group is wholly
+	// on one side of the line, so everything counted after it is counted over
+	// exactly the places the one-level statement admits.
+	grouped := func() *bun.SelectQuery {
+		rows := readable(s.db.NewSelect())
+		// A condition on the rating in force is asked of each place, so where
+		// one is asked the rating is joined below the grouping as well.
+		if len(filter.severities()) > 0 || filter.Reassessed {
+			rows = withRating(rows, rating.OnStream)
 		}
-		return filter.narrow(q)
+		hot := `CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END`
+		q := filter.folded(s.db, rows, func(q *bun.SelectQuery) *bun.SelectQuery {
+			q = q.ColumnExpr(`st.product_id AS "product_id"`).
+				ColumnExpr("f.vulnerability_id").ColumnExpr("f.component_id").
+				GroupExpr("st.product_id, f.vulnerability_id, f.component_id")
+			if wasBelow {
+				return q
+			}
+			return q.ColumnExpr(hot+` AS "hot"`, int64(exploiting)).
+				GroupExpr(hot, int64(exploiting))
+		})
+		by, known := order[filter.SortBy]
+		if !wasBelow || (known && by.issue) {
+			q = withRating(q, rating.OnPartial)
+		}
+		if !wasBelow {
+			q = q.Join(`JOIN "product" AS "p" ON p.id = f.product_id`)
+		}
+		return lined(q, "f.hot = ?", 1).GroupExpr("f.product_id, " + GroupedOn)
 	}
 
 	var heads []struct {
@@ -183,15 +230,14 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Urgency         int64  `bun:"urgency"`
 		Total           int    `bun:"total"`
 	}
-	page := narrow(s.db.NewSelect()).
-		ColumnExpr(`st.product_id AS "product_id"`).
+	page := grouped().
+		ColumnExpr(`f.product_id AS "product_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
-		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		GroupExpr(GroupedAcross)
+		ColumnExpr(overParts.places() + ` AS "places"`).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`).
+		ColumnExpr(`COUNT(*) OVER () AS "total"`)
 	if err := page.OrderExpr(sortedAcross(filter)).
 		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open anywhere: %w", err)
@@ -200,12 +246,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if len(heads) > 0 {
 		total = heads[0].Total
 	} else {
-		counted := narrow(s.db.NewSelect()).
-			ColumnExpr("f.vulnerability_id").
-			GroupExpr(GroupedAcross)
 		var err error
-		if total, err = s.db.NewSelect().
-			TableExpr(`(?) AS "grouped"`, counted).Count(ctx); err != nil {
+		if total, err = s.countGroups(ctx, grouped()); err != nil {
 			return nil, 0, fmt.Errorf("count what is open anywhere: %w", err)
 		}
 		return nil, total, nil
@@ -390,5 +432,5 @@ var lineAt = rankCase("COALESCE(NULLIF(p.triage_floor, ''), ?)", 0)
 // not swap between pages, and across products the pair that was enough is not
 // — one issue in one component can be a row in a dozen products.
 func sortedAcross(filter Filter) string {
-	return orderedBy(filter, ByUrgency) + ", st.product_id, f.vulnerability_id, " + FoldedOn
+	return orderedBy(filter, ByUrgency) + ", f.product_id, f.vulnerability_id, " + FoldedOn
 }

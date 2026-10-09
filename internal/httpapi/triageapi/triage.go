@@ -196,14 +196,14 @@ func registerTriage(api huma.API, in core.Deps) {
 			"rest, which is what to read instead of all of them.\n\n" +
 			"Narrow by who proposed a claim, how old it is, how severe the issues it covers " +
 			"are, its outcome, and the release it covers. A claim is kept where one of its " +
-			"rows matches every filter, and is then returned whole.",
+			"rows matches every filter, and is then returned whole.\n\n" +
+			"`limit=0` returns `total` alone, with no entries.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Mine    bool   `query:"mine" doc:"Return only claims you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you"`
 		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		core.QueueNarrowing
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0"`
+		core.CountedPaging
 	}) (*QueueOutput, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {

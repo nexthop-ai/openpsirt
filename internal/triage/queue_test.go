@@ -361,3 +361,31 @@ func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
 		}
 	})
 }
+
+// The queue's total asked alone is the total a page of it reports, and a page
+// past the end still says how much is waiting.
+func TestTheQueuesTotalAskedAloneIsThePagesTotal(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.claims(t, f.at())
+
+		_, paged, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		alone, total, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if paged != 1 || total != paged || len(alone) != 0 {
+			t.Errorf("asked alone the total is %d with %d rows, and a page says %d", total, len(alone), paged)
+		}
+		past, beyond, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if beyond != paged || len(past) != 0 {
+			t.Errorf("a page past the end counts %d with %d rows, want %d and none", beyond, len(past), paged)
+		}
+	})
+}

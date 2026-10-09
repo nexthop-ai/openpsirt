@@ -469,3 +469,26 @@ func TestAClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.T) 
 		}
 	})
 }
+
+// A limit of zero answers how much is waiting without an entry.
+func TestTheQueueAnswersItsTotalAloneForALimitOfZero(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+
+		got := httpapitest.AsPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue?limit=0", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading the queue's total answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Items []json.RawMessage `json:"items"`
+			Total int               `json:"total"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if out.Total != 1 || out.Items == nil || len(out.Items) != 0 {
+			t.Errorf("asked alone the queue says %d with %d entries, want 1 and none", out.Total, len(out.Items))
+		}
+	})
+}

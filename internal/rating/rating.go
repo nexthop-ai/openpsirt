@@ -38,6 +38,9 @@ const (
 	// for a query that reduces its findings to one row per issue and product
 	// before the rating is joined.
 	OnGrouped On = "grouped.product_id"
+	// OnPartial is the product the partial groups of the two-level form,
+	// read as "f", carry.
+	OnPartial On = "f.product_id"
 	// onBound is one product, bound. Used through Here.
 	onBound On = "?"
 )

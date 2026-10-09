@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { bumpQuery } from "./FindingsViews";
-import { acrossProducts, type withinVariant } from "./list";
+import { acrossProducts, findingsPageKey, type withinVariant } from "./list";
 
 // The findings list's reads: the rows of the view by issue, and each view's
 // own count.
@@ -31,7 +31,7 @@ export function useFindingsViews({
   view: string;
 }) {
   const findings = useQuery({
-    queryKey: ["findings", product, stream, variant, query],
+    queryKey: findingsPageKey(product, stream, variant, query),
     queryFn: async () =>
       unwrap(
         spanning
@@ -54,15 +54,14 @@ export function useFindingsViews({
   // is 7,455 rows is 341 by component and 284 by upgrade. Without the counts
   // the list opens on its longest view and reads as the only one.
   //
-  // Asked with a page of one, because the total is what is wanted. The
+  // The by-component and by-upgrade counts are asked with a limit of zero,
+  // which answers the total without reading a page or what decorates it. The
   // by-issue count is the one the screen already holds where the by-issue view
-  // is what is drawn, so it is asked only from the other two. The by-upgrade
-  // count is a fix-bundle aggregate, measured at 2.2 s against a backlog of
-  // 8,376 — held for five minutes rather than asked again as somebody pages.
+  // is what is drawn, so it is asked only from the other two, with a page of
+  // one: the findings list has no count-only answer.
   const byIssue = useQuery({
     queryKey: ["findings", "count", product, stream, variant, query],
     enabled: view !== "issues",
-    staleTime: 5 * 60_000,
     queryFn: async () =>
       unwrap(
         spanning
@@ -80,7 +79,6 @@ export function useFindingsViews({
   const byComponent = useQuery({
     queryKey: ["findings-by-component", "count", product, selection, query],
     enabled: !spanning,
-    staleTime: 5 * 60_000,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/findings/components", {
@@ -89,7 +87,7 @@ export function useFindingsViews({
             query: {
               ...(query as unknown as Record<string, never>),
               ...selection,
-              limit: 1,
+              limit: 0,
               offset: 0,
             },
           },
@@ -99,13 +97,12 @@ export function useFindingsViews({
   const byUpgrade = useQuery({
     queryKey: ["fix-bundles", "count", product, selection, query],
     enabled: !spanning,
-    staleTime: 5 * 60_000,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/fix-bundles", {
           params: {
             path: { product },
-            query: bumpQuery({ product, ...selection }, query, 1, 0) as Record<string, never>,
+            query: bumpQuery({ product, ...selection }, query, 0, 0) as Record<string, never>,
           },
         }),
       ),

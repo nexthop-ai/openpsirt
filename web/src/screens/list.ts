@@ -497,6 +497,18 @@ export function apiBuildPath(at: { product: string; stream: string; variant: str
   );
 }
 
+// The key the findings list caches a page of rows under. A finding opened from
+// the list reads its neighbors from that page where it can, so both sides name
+// the page through this one key.
+export function findingsPageKey(
+  product: string,
+  stream: string,
+  variant: string,
+  query: ReturnType<typeof withinVariant>,
+) {
+  return ["findings", product, stream, variant, query] as const;
+}
+
 // The window a finding asks for to know its neighbors: the page the list was
 // showing, widened by one row at each end. Widening is what makes the walk
 // continuous — the row before a page and the row after it are on other pages,

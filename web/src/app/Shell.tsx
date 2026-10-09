@@ -97,12 +97,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
     return () => document.removeEventListener("keydown", key);
   }, [menu]);
 
-  // The counts on the rail. Asked for with a page of one, because the total
-  // is what is wanted and the rows are not.
+  // The counts on the rail. The queue's is asked with a limit of zero, which
+  // answers the total and reads no claim.
   const queue = useQuery({
     queryKey: ["queue", "count"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 0 } } })),
     refetchInterval: 60_000,
   });
   // Rulings on vulnerability reports waiting for this reader, which sit in the
