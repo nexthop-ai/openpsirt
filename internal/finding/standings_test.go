@@ -29,7 +29,7 @@ func TestEveryStandingIsSaidAndFilteredByTheSameRules(t *testing.T) {
 	checked := 0
 	for _, standing := range ClaimStandings() {
 		checked++
-		if stateHaving(standing) == "" {
+		if stateHaving(standing, overRows) == "" {
 			t.Errorf("the list cannot filter by %q", standing)
 		}
 		if _, known := registerState(standing); !known {
@@ -48,7 +48,7 @@ func TestEveryStandingIsSaidAndFilteredByTheSameRules(t *testing.T) {
 
 	// And a word outside the list is refused by both filters rather than
 	// read as some condition.
-	if stateHaving("settled") != "" {
+	if stateHaving("settled", overRows) != "" {
 		t.Error("the list filters by a standing it does not list")
 	}
 	if _, known := registerState("settled"); known {

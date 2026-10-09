@@ -102,11 +102,13 @@ func DecisionAt(product string) string {
 // is matched by place so that "lapsed" can be said at all.
 const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 
-// byState keeps groups by how far they have been decided.
+// byState joins what each place has been decided as, for the conditions
+// statesHaving asks of a group.
 //
-// Every one of these is a condition over the *group* rather than over a place,
+// Every one of those is a condition over the *group* rather than over a place,
 // so they are HAVING clauses: a group is undecided when none of its places has
-// a decision, not when one of them does not.
+// a decision, not when one of them does not. This half is the join, which is
+// asked of each place and so sits wherever the places are read.
 //
 // These read the decision table and nothing else. `suppressed_by` is not a
 // decision of ours at all: it points at a suppression, and a suppression is a
@@ -236,23 +238,28 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	} else {
 		decided = decided.Where("de.product_id = ?", f.ProductID)
 	}
-	q = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
+	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
+}
 
-	if askedOutcome {
+// statesHaving keeps groups by how far they have been decided, over the
+// derived table byState joins, at the grain g names.
+func (f Filter) statesHaving(q *bun.SelectQuery, g grain) *bun.SelectQuery {
+	if len(trimmed(f.Outcomes)) > 0 {
 		// Every place answered the same way, not merely one of them: a group
 		// where one place is dismissed and the rest are open is not a
 		// dismissal, and listing it under "dismissed" is how a number stops
 		// being one somebody can act on.
-		q = q.Having("SUM(COALESCE(dd.this_outcome, 0)) = COUNT(*)")
+		q = q.Having(g.decided("this_outcome") + " = " + g.places())
 	}
 	// Each state is a condition over the group's decision counts, so a set of
 	// them is those conditions OR-ed — which is what a checkbox set means and
 	// what one value could not ask. Asking for all four is asking for
 	// everything, and reads as no narrowing at all rather than as four
 	// conditions nothing can satisfy at once.
+	states := trimmed(f.States)
 	wanted := make([]string, 0, len(states))
 	for _, each := range states {
-		if said := stateHaving(each); said != "" {
+		if said := stateHaving(each, g); said != "" {
 			wanted = append(wanted, "("+said+")")
 		}
 	}
@@ -266,26 +273,24 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 //
 // Named apart from the switch that used it so several can be combined, and so
 // each keeps the reasoning that made it what it is.
-func stateHaving(state ClaimStanding) string {
+func stateHaving(state ClaimStanding, g grain) string {
+	waiting, approved, lapsed := g.decided("waiting"), g.decided("approved"), g.decided("lapsed")
 	switch state {
 	case StandingAgreed:
-		return "SUM(COALESCE(dd.approved, 0)) = COUNT(*)"
+		return approved + " = " + g.places()
 	case StandingWaiting:
-		return "SUM(COALESCE(dd.waiting, 0)) > 0"
+		return waiting + " > 0"
 	case StandingLapsed:
 		// Lapsed means nothing replaced it: a claim made again at the place
 		// after the old one lapsed is waiting, which is what the row says,
 		// and the filter has to find the row by the word it reads.
-		return "SUM(COALESCE(dd.lapsed, 0)) > 0 AND SUM(COALESCE(dd.approved, 0)) = 0" +
-			" AND SUM(COALESCE(dd.waiting, 0)) = 0"
+		return lapsed + " > 0 AND " + approved + " = 0 AND " + waiting + " = 0"
 	case StandingUndecided:
 		// Nothing stands, rather than nothing was ever said. A claim that has
 		// been withdrawn leaves a row that covers the place and says nothing
 		// about it, so a count of rows would put the finding in no state at
 		// all, out of every bucket and the count above the list.
-		return "SUM(COALESCE(dd.waiting, 0)) = 0" +
-			" AND SUM(COALESCE(dd.approved, 0)) = 0" +
-			" AND SUM(COALESCE(dd.lapsed, 0)) = 0"
+		return waiting + " = 0 AND " + approved + " = 0 AND " + lapsed + " = 0"
 	default:
 		return ""
 	}

@@ -180,7 +180,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	}
 	// A build named twice is one build: a finding is a component at a place,
 	// and two rows at one place are two findings for one flaw.
-	in.TargetIDs = distinctIDs(in.TargetIDs)
+	in.TargetIDs = distinct(in.TargetIDs)
 	// One product, because an identifier is minted per product and a flaw
 	// recorded across two would have to be two records. Read from the builds
 	// rather than taken from the caller, and disagreement is refused rather

@@ -1260,10 +1260,13 @@ no longer shows.
 
 The page is read in two statements:
 
-1. Group every open finding in the build by issue and component and keep the
-   fifty most urgent, reading only the columns a covering index on the finding
-   table holds. The total rides on the same statement as a window count over the
-   groups, so it is counted through exactly the page's narrowing.
+1. Group every open finding in the build by issue and fold and keep the fifty
+   most urgent. The grouping is in two levels: the open rows are grouped by
+   issue and component first, reading only the columns a covering index on the
+   finding table holds, and those partial groups are joined to the component
+   and grouped again by fold. The total rides on the same statement as a window
+   count over the groups, so it is counted through exactly the page's
+   narrowing.
 2. Read what the page shows about those fifty groups and no others: likelihood
    and score, the four decision counts, how many ways down there are, the fix.
 
@@ -1285,6 +1288,42 @@ both:
 |---|---|---|
 | A lookup per place | The page's groups | A page reads a few hundred places |
 | One row per decided place, built once from the decisions and joined on the finding | The product page's totals and build rows | They read every open place in the product. As a lookup per place that is 367,000 lookups a statement: 2.1 s against 0.2 s joined with 13 decisions, and 4.6 s against 1.2 s with 133,000 |
+
+### Two-level grouping
+
+The fold is a 64-character key on the component. Grouped on it directly, every
+open row of the selection is sorted on that string, and on 367,000 rows the sort
+spills to disk. Grouped on the issue and the component first, the rows are
+sorted on two integers, and only the partial groups — one per issue at a
+package — reach the join to the component and the second grouping.
+
+| Rule | |
+|---|---|
+| A condition on a place is asked of the first level | It narrows which rows reach a partial group, which is what it narrows in one level |
+| A condition on a group is asked of the second level | A fold with one package decided and one not is neither undecided nor agreed. Asked of each package, it would be one row of each |
+| The first level carries the aggregates the second reads | A count is summed, a minimum and a maximum taken again, the earliest opening and the soonest deadline carried under their own names so the conditions and orders over them read the same at both levels |
+| A count of distinct builds adds the build to the first level's key | It is the one aggregate that does not decompose; carried as a key, the second level counts it distinctly over a few rows |
+| The issue is joined after the first level | An order by likelihood or score reads it once per partial group rather than once per place |
+| Across products, the line is applied after the first level | The first level also keys on the product and on whether the place carries an exploitation signal, so each partial group is wholly above a product's line or wholly below it. The issue, the product's rating and its line are read once per partial group, and every aggregate after it counts exactly the places the line admits |
+| The groups another view keeps under a condition over a group are grouped in one level | They are joined back to the finding rows, and the planner's estimate of how many groups a condition keeps falls by a factor of ten over two levels: 186 where 7,742 are kept. On that estimate PostgreSQL read one component's rows once per kept group and did not finish in two minutes; over one level it hashes the join in 2 s |
+| The by-component view and the fix bundles group the same way | By component, the first level is one row per issue, so the count of distinct issues is a count of rows. By upgrade, the first level keys on component, issue, build and fixed version |
+
+Measured on PostgreSQL 16 with one CPU over 375,843 finding rows in 10,255
+open groups, each statement's time on the server:
+
+| Statement | One level | Two levels |
+|---|---|---|
+| The page of the findings list | 258 ms | 66 ms |
+| The same, ordered by score | 186 ms | 97 ms |
+| The page across products | 395 ms | 101 ms |
+| The page by component | 130 ms | 81 ms |
+| The severity strip by component | 252 ms | 78 ms |
+| The page of fix bundles | 1,144 ms | 190 ms |
+
+On SQLite, over the demo's 367,870 open rows, the findings page went from
+0.19 s to 0.10 s and the fix bundles from 0.74 s to 0.33 s; the page by
+component went from 0.10 s to 0.12 s, which is the one statement two levels
+makes slower anywhere.
 
 Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
 went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
