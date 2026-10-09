@@ -1,0 +1,6 @@
+# The migrations v0.7.0 tagged, and the digest of each file below its license header.
+last 41
+43b8cc08735645b802f4b4ebf6599f979dc207077e9e0ac7ffadbec2a620ef46  00041_v070.go
+968d7a954b8a981151d394a3e77bb6834545b200ec2de2f336a4407c099732aa  v070_claims.go
+55828a1bade19ef4eeebf443f6b3e932b9ce7251cc5cc3d5eb855e9e00e5dd46  v070_finding.go
+74f450aebf87a2620d93ac8f79a411fccb35f05b049d672cda01f6d421e3a05b  v070_vex.go
