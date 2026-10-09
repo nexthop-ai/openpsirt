@@ -184,3 +184,72 @@ func TestAReleaseCountsAnIssueAtAComponentOnceAtTheProductsRating(t *testing.T) 
 		}
 	})
 }
+
+// ratedTwoWays is two issues open in the fixture's product and in a second
+// one, each rated low in one product and medium in the other, the opposite way
+// round from each other, and somebody who reads both. Whichever product's row
+// reaches a count last, one of the two issues arrives at low.
+func (f *fixture) ratedTwoWays(t *testing.T) access.Subject {
+	t.Helper()
+	ctx := t.Context()
+	both := []finding.Reported{found("CVE-2026-1", libnl), found("CVE-2026-2", libnl)}
+	f.shipped(t, twoConsumers())
+	if _, err := f.store.Apply(ctx, f.target, f.run(t), both); err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := f.inAnotherProduct(t, "hedgehog")
+	f.shippedTo(t, elsewhere, twoConsumers())
+	if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere), both); err != nil {
+		t.Fatal(err)
+	}
+	other := f.productOf(t, elsewhere)
+	f.rate(t, f.productID, "CVE-2026-1", "low")
+	f.rate(t, other, "CVE-2026-1", "medium")
+	f.rate(t, f.productID, "CVE-2026-2", "medium")
+	f.rate(t, other, "CVE-2026-2", "low")
+	return f.holdingIn(t, []int64{f.productID, other}, access.PublicRead)
+}
+
+func TestATrendCountsAnIssueOpenInTwoProductsInTheStrictestBandEitherGivesIt(t *testing.T) {
+	// One row per issue and product reaches the count, in no order anything
+	// sets, so the band has to be chosen rather than left to whichever row
+	// came last.
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.ratedTwoWays(t)
+		points, err := f.store.Trend(t.Context(), who, finding.Scope{},
+			time.Time{}, 24*time.Hour, 2, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		last := points[len(points)-1]
+		if last.Open != 2 || last.BySeverity["medium"] != 2 {
+			t.Errorf("two issues each rated low in one product and medium in the other: open %d, split %v; want 2, both medium",
+				last.Open, last.BySeverity)
+		}
+	})
+}
+
+func TestAgingCountsAnIssueOpenInTwoProductsInTheStrictestBandEitherGivesIt(t *testing.T) {
+	// The strictest by rank rather than the first word in alphabetical order,
+	// which puts low ahead of medium and an unrated issue ahead of every band.
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.ratedTwoWays(t)
+		got, err := f.store.Remediation(t.Context(), who, finding.Scope{}, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var held bool
+		for _, bucket := range got.Aging {
+			if bucket.Open == 0 {
+				continue
+			}
+			held = true
+			if bucket.Open != 2 || bucket.BySeverity["medium"] != 2 {
+				t.Errorf("%q holds %d open, split %v; want 2, both medium", bucket.Label, bucket.Open, bucket.BySeverity)
+			}
+		}
+		if !held {
+			t.Error("no bucket holds anything, so nothing here was checked")
+		}
+	})
+}

@@ -271,9 +271,8 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 
 	// One row per issue. The rating is joined to the reduced rows, each
 	// product's own where it has stated one, and an issue's rating in a
-	// bucket is the strictest across the products it is open in there. The
-	// word is folded to a band after, so the minimum is over the words as
-	// stored.
+	// bucket is the strictest across the products it is open in there:
+	// the highest rank, with a word that ranks nothing below every band.
 	issues := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, places).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
@@ -288,7 +287,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		issues = issues.
 			ColumnExpr(`MAX(grouped.open_` + name + `) AS "open_` + name + `"`).
 			ColumnExpr(`MAX(grouped.undecided_` + name + `) AS "undecided_` + name + `"`).
-			ColumnExpr(`MIN(CASE WHEN grouped.open_` + name + ` = 1 THEN ` + rating.EffectiveExpr +
+			ColumnExpr(`MAX(CASE WHEN grouped.open_` + name + ` = 1 THEN ` + rankCase(rating.EffectiveExpr, 0) +
 				` END) AS "band_` + name + `"`)
 		for _, column := range []string{"open_", "undecided_", "band_"} {
 			counted = counted.ColumnExpr(`per_issue.` + column + name + ` AS "` + column + name + `"`)
@@ -315,7 +314,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 			issueCount int
 			open       = make([]int, len(agingBuckets))
 			undecided  = make([]int, len(agingBuckets))
-			band       = make([]sql.NullString, len(agingBuckets))
+			band       = make([]sql.NullInt64, len(agingBuckets))
 			into       = []any{&issueCount}
 		)
 		for i := range agingBuckets {
@@ -329,7 +328,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 				continue
 			}
 			out[i].Open += issueCount
-			out[i].BySeverity[BandOf(band[i].String)] += issueCount
+			out[i].BySeverity[BandOf(wordAt(int(band[i].Int64)))] += issueCount
 			if undecided[i] != 0 {
 				out[i].Undecided += issueCount
 			}

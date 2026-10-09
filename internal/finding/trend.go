@@ -284,7 +284,13 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 			if row.ClosedAt != nil && !row.ClosedAt.After(to) {
 				continue
 			}
-			open[i][row.VulnerabilityID] = row.Severity
+			// One row per issue and product, so an issue open in two
+			// products arrives once with each product's rating, in no order
+			// anything sets. The strictest is kept, which is the band the
+			// aging figures count it in.
+			if was, seen := open[i][row.VulnerabilityID]; !seen || Ranks(row.Severity) > Ranks(was) {
+				open[i][row.VulnerabilityID] = row.Severity
+			}
 		}
 	}
 
