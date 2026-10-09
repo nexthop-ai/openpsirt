@@ -320,9 +320,14 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 			q = saying(q, "fc.deferred_until IS NOT NULL AND fc.deferred_until <= ?", s.now())
 		}
 		if f.Stopped {
-			q = q.Where(`(de.state = ? OR EXISTS (SELECT 1 FROM "claim" AS "fc" `+
-				`WHERE fc.id = de.claim_id AND fc.deferred_until IS NOT NULL `+
-				`AND fc.deferred_until <= ?))`, LapsedState, s.now())
+			// The claims whose date has passed, as a set the rows are tested
+			// against, rather than a lookup of each row's claim. Asked per row
+			// beside the OR, PostgreSQL probes the claim once for every
+			// decision in the product: 170 ms to count 133,000 decisions,
+			// against 22 ms with the set built once.
+			q = q.Where(`(de.state = ? OR de.claim_id IN (SELECT fc.id FROM "claim" AS "fc" `+
+				`WHERE fc.deferred_until IS NOT NULL AND fc.deferred_until <= ?))`,
+				LapsedState, s.now())
 		}
 		// The judgment's subject, through the one spelling the record's
 		// own page uses. Stated in the filter and applied by only one of the

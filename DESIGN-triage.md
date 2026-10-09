@@ -385,6 +385,7 @@ an identifier before.
 |---|---|
 | The builds named are the ones the reader may see | A claim somebody may read matches findings they may not, so the builds, the fix versions behind the outliers and the counts on a card are all narrowed per product. A list spanning products is narrowed per product too, at the visibility read in each |
 | A claim is shown only to somebody who may act on every row of it | Acting on a claim is acting on the argument, which does not come in halves. Shown half, a reader would agree to words whose other half waits on somebody else, and the size beside the card would be wrong |
+| Whether every row is in reach is asked once per claim | It is a fact about the claim, so it is a condition on the grouped claim rather than on each waiting row. Counting the expired deferrals among 3,000 claims of 133,000 rows: 29 ms against 78 ms per row on PostgreSQL, 39 ms against 73 ms on SQLite |
 
 ## Approval
 
@@ -1114,7 +1115,7 @@ out on code that then moved is both.
 
 | Where | Answer |
 |---|---|
-| The decision list | One filter answers both, and a row in both is counted once |
+| The decision list | One filter answers both, and a row in both is counted once. The claims whose date has passed are read once as a set and each row is tested against it: 22 ms to count 133,000 decisions on PostgreSQL, against 170 ms asking each row's claim |
 | The review queue | An expired deferral is in the Expired deferrals list while it stands. Once it lapses it is in none of the queue's lists, and only in its author's To reaffirm |
 
 ## Re-affirmation
