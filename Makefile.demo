@@ -560,6 +560,11 @@ demo-vex:
 # A name a build ships at several versions cannot be decided about without
 # saying which is meant, and this is a seed rather than a person making that
 # choice — so those rows are left alone.
+# The upgrade names the version it moves from. The filter above counts only the
+# versions with a fixed finding, and a build can ship the same name again at a
+# version with none — two openssl packages in the SONiC image, one built locally
+# and one from Debian — which the upgrade, resolving against the whole build,
+# refuses as ambiguous.
 # The upgrade goes on a different package from the ones decided above, because
 # it answers *everything* open on its component: planning one where a judgment
 # already stands at some of those places is refused, and rightly — one act
@@ -578,7 +583,7 @@ demo-triage:
 	  | awk -F',' '$(DEMO_CSV) \
 	    { part = $$at["component"]; \
 	      if ($$1 !~ /^CVE-/ || part == "" || part ~ /\//) next; \
-	      keep[++k] = $$1 "|" part "|" $$at["upstream fix"]; named_by[k] = part; \
+	      keep[++k] = $$1 "|" part "|" $$at["upstream fix"] "|" $$at["version"]; named_by[k] = part; \
 	      if (!(part SUBSEP $$at["version"] in seen)) { \
 	        seen[part SUBSEP $$at["version"]] = 1; versions[part]++ } } \
 	    END { for (i = 1; i <= k; i++) if (versions[named_by[i]] == 1) print keep[i] }'); \
@@ -586,7 +591,7 @@ demo-triage:
 	  echo "  nothing to decide yet — run make demo-status and try again"; exit 0; \
 	fi; \
 	n=0; \
-	while IFS='|' read -r cve component fixed; do \
+	while IFS='|' read -r cve component fixed version; do \
 	  [ -n "$$cve" ] || continue; \
 	  n=$$((n + 1)); \
 	  case $$n in \
@@ -616,10 +621,11 @@ demo-triage:
 	one=$$(echo "$$rows" | awk -F'|' -v skip="$$decided" \
 	  '$$2 != skip && !found { print; found = 1 }'); \
 	component=$$(echo "$$one" | cut -d'|' -f2); to=$$(echo "$$one" | cut -d'|' -f3); \
+	from=$$(echo "$$one" | cut -d'|' -f4); \
 	if [ -n "$$component" ] && [ -n "$$to" ]; then \
 	  curl -sS --noproxy '*' -o /dev/null -w "  upgrade $$component to $$to %{http_code}\n" \
 	    -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	    -d '{"to":"'"$$to"'","by":"'"$$(date -u -d '+3 days' +%Y-%m-%d)"'","team":"platform","reasoning":"Taking the kernel bump in the next build; the team is tracking it.","builds":[{"stream":"'"$$stream"'","variant":"'"$$variant"'"}]}' \
+	    -d '{"version":"'"$$from"'","to":"'"$$to"'","by":"'"$$(date -u -d '+3 days' +%Y-%m-%d)"'","team":"platform","reasoning":"Taking the kernel bump in the next build; the team is tracking it.","builds":[{"stream":"'"$$stream"'","variant":"'"$$variant"'"}]}' \
 	    "$(DEMO_URL)/v1/products/$$product/components/$$component/upgrade"; \
 	fi; \
 	echo "  seeded. A 422 or 409 above is this having been run before: a"; \
