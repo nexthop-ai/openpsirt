@@ -3,7 +3,10 @@
 
 package finding
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // FixedBecause is how a closure is said in a release note, for the test.
 //
@@ -52,3 +55,12 @@ func (s *Store) Clock(now func() time.Time) { s.now = now }
 // the test: identifiers a producer spells oddly are too many shapes to route
 // each through a scan.
 func KindAsked(purl string) string { return kindAsked(purl) }
+
+// InternAlone is Intern with every report resolved alone from the database,
+// for the test comparing it with resolving a run of reports from one read.
+func (v *Vulnerabilities) InternAlone(ctx context.Context, reported []Named) (map[string]int64, error) {
+	return v.intern(ctx, reported, true)
+}
+
+// Absorbed is how many issues the last interning merged into another.
+func (v *Vulnerabilities) Absorbed() int { return len(v.absorbed) }

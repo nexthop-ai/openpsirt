@@ -238,6 +238,25 @@ would depend on which scan ran last.
 
 A test puts the same two reports through in both orders and asserts they agree.
 
+A scan's reports are interned together:
+
+| Rule | |
+|---|---|
+| A report byte-identical to a later one in the same scan is interned once, as the later one | A scanner gives the same account of an issue for every package it matched. Every write fills a gap, moves toward worse or newer, or takes the value the last report states, so the copy changes nothing |
+| What is on record about a run of reports is read together | One statement per kind of record — names, filed names, issues, ratings, weaknesses, references — for a few hundred reports at a time |
+| A part of a report is written only where what was read says the statement would match a row | Each is the statement the report alone issues, with the same condition. Everything a rescan of unchanged data would issue matches nothing |
+| A report the read cannot answer for is resolved alone, from the database | One whose names reach no issue or more than one, one naming a better-known name than its issue is filed under, one naming a name outside plain ASCII, and one reaching an issue or a name an earlier report in the run wrote. Creating, merging and renaming an issue happen on that path alone |
+| Comparisons lean toward writing | A statement issued that matches nothing costs a round trip, and one skipped that would have matched loses a write. Names compare without regard to case, which is never narrower than an engine's comparison, and a day compares only where both sides are the start of a day in UTC |
+| The description and the advisory are written only where the row holds a gap | Spaces alone count as a gap, because one engine compares them equal to the empty string |
+
+A test interns the same random rounds of reports both ways, with names that
+overlap between issues so rounds merge and rename them, and requires the same
+rows, names, merges and moved issues after every round.
+
+Measured on one image whose 11,435 reports name 7,643 issues, rescanned with
+nothing changed: the rescan issued 570 statements where it issued 114,339, and
+rewrote none of the issue rows where it rewrote 11,435 with what they held.
+
 The score carries where it came from. Which scoring system it is on, who
 published it and whether it is the primary rating or a secondary one, filled
 where a report knows and never overwritten. Everything else a scan says is
