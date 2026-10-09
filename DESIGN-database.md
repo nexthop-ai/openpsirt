@@ -98,6 +98,7 @@ Engine-specific code is confined to these places:
 | Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and the servers keep their own. § SQLite settings has the measurement |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 | A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
+| When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
 This list is the complete set, and where an engine may be named is checked by
@@ -249,6 +250,7 @@ The chain is the baseline, then one part per release.
 | 39 | The baseline: v0.5.0's schema, made at once on an empty database. § The baseline says what holds it |
 | 40 | v0.6.0: v0.5.0's schema changed into v0.6.0's, and the rows moved with it. § The v0.6.0 upgrade says what it does. A database v0.6.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 41 | v0.7.0: v0.6.0's schema changed into v0.7.0's. § The v0.7.0 upgrade says what it does. A database v0.7.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| 42 | The untagged release: v0.7.0's schema changed into v0.8.0's. § The v0.8.0 upgrade says what it does. Edited until a tag ships it |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -268,7 +270,7 @@ At 1.0 the baseline becomes 1.0's schema, beside one migration that upgrades a
 database the last 0.x release built. A database an earlier 0.x release built is
 upgraded to that release first.
 
-Migration 39 creates every table v0.5.0 had. Migrations 40 and 41 change existing tables and add the ones their release introduced.
+Migration 39 creates every table v0.5.0 had. Migrations 40, 41 and 42 change existing tables and add the ones their release introduced.
 
 ### The baseline
 
@@ -404,6 +406,27 @@ anew, the declaration being the tagged one with the column beside it.
 | A v0.6.0 database | Upgraded, no finding holds record lines, a statement or a build's claim of the new kind, no run a snapshot, no statement or claim a product, and each declaration describes the table the migrations built |
 | A VEX document a v0.6.0 deployment recorded as gone out | Upgraded, it is this deployment's own document. The other kind's first revision is accepted beside it, and a second first revision of the same kind is refused |
 | A supplier a v0.6.0 deployment read part of | Upgraded, it holds no record of how far it read |
+
+### The v0.8.0 upgrade
+
+Migration 42. Each change is an index or a storage setting; no column and no
+row moves. § Indexes says what each index serves.
+
+| Table | Gains | Every engine |
+|---|---|---|
+| `finding` | What is open in a build indexed with its deadline, and the grouping index carrying when a finding opened and why it closed | Each index dropped and made again by the release's statement, where the table stands. SQLite included: an index is made there like anywhere else, and a rebuild would copy every row to change none |
+| `decision` | An index on the state and the claim, and one on the state and the product | Made where the table stands |
+| `finding`, on PostgreSQL alone | Vacuumed after a fiftieth of it changes and analyzed after a hundredth | A storage setting on the table |
+
+| Rule | |
+|---|---|
+| An index the database already holds under the name is replaced | On MySQL and MariaDB a stopped upgrade leaves the indexes it made, and the next start runs the migration from the top |
+
+| Check, on each of the four engines | What it holds |
+|---|---|
+| A v0.7.0 database | Upgraded, each declaration describes the table the migrations built |
+| A v0.7.0 database holding some of the new indexes already | Upgraded the same, each index in the release's shape |
+| A v0.7.0 database, on PostgreSQL | Upgraded, the finding table holds the three storage settings |
 
 ### Release records
 
@@ -953,10 +976,34 @@ where that is deliberate rather than a compromise, since the engines do not
 disagree about which columns an index is on, and reading index metadata is
 spelled four different ways.
 
-One exception, measured. The narrow index on what is open in a build leads the
-wider covering one, and scanning the narrow one reads fewer pages. Over hundreds
-of thousands of findings that is a trade. The same argument does not carry to
-the decision table, which holds thousands of rows.
+The indexes on the finding and decision tables that serve the hottest reads:
+
+| Index | Columns | Serves |
+|---|---|---|
+| What is open in a build | Build, closed, deadline | The deadline report for one build, as a range at the end of the prefix: 256 ms a page through the deployment-wide deadline index, 205 ms through this one, for a build of 183,788 open findings |
+| Deadlines running out | Closed, the build's claim, deadline | The deadline report across the deployment, which names no build: 248 ms through it, 343 to 392 ms without it |
+| Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
+| Decisions waiting, by claim | State, claim | The review queue's page and its count, with 33,150 decisions waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
+
+The measurements are PostgreSQL 16 with one processor, run on one database at a
+time. The widest of these keys is about 190 bytes on MySQL and MariaDB, far
+inside the 3,072 their row format allows, and ten columns, inside MySQL's
+sixteen.
+
+What the two wider indexes add to a write is within the noise: copying 375,843
+findings into a table carrying v0.8.0's indexes took 6.5 to 8.6 s against 6.1
+to 7.9 s with v0.7.0's.
+
+An index-only scan on PostgreSQL reads the table for each page changed since
+the last vacuum, and the server's defaults vacuum a table after a fifth of it
+changes. A nightly scan rewrites tens of thousands of findings, less than that,
+so the finding table is vacuumed after a fiftieth and analyzed after a
+hundredth. With 46,980 of 375,843 findings rewritten, no vacuum ran at the
+defaults, and the package-kind count read the table 413,331 times and took
+246 ms; at a fiftieth a vacuum ran within the minute, and the count read the
+table not at all and took 64 ms. The settings are written once, by the
+migration, so values an operator sets on the table afterwards stay. The other
+three engines have no such setting.
 
 Dropping an index never costs a foreign key its index on the two engines that
 require one: in every case the constraint that made the wider index leads with

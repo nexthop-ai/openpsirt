@@ -232,6 +232,35 @@ func (u *upgrader) change(statements []string, c change) error {
 	return u.run(stmts)
 }
 
+// index makes the named indexes on a table as the release declares them. An
+// index of that name the table already has is replaced. The table is left
+// where it stands on every engine, SQLite included: an index is made and
+// dropped there like anywhere else, and rebuilding the table would copy every
+// row to change none of them.
+func (u *upgrader) index(statements []string, table string, names ...string) error {
+	_, indexes, err := pick(statements, table)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		stmt, err := indexNamed(indexes, name)
+		if err != nil {
+			return err
+		}
+		if replaced, err := u.hasIndex(table, name); err != nil {
+			return err
+		} else if replaced {
+			if err := dropIndex(u.ctx, u.raw, table, name); err != nil {
+				return err
+			}
+		}
+		if err := u.run([]string{stmt}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // rebuild replaces a SQLite table with one made by the release's
 // statement, the rows copied across by column name.
 //
@@ -335,11 +364,13 @@ func (u *upgrader) sqliteIndexes(table string, declared []string) ([]string, err
 	return out, rows.Err()
 }
 
-// hasIndex reports whether a table already holds an index of this name, on
-// the three engines a table is altered in place on.
+// hasIndex reports whether a table already holds an index of this name.
 func (u *upgrader) hasIndex(table, name string) (bool, error) {
 	var query string
 	switch u.engine {
+	case database.SQLite:
+		query = `SELECT 1 FROM "sqlite_master"
+			WHERE "type" = 'index' AND "tbl_name" = ? AND "name" = ?`
 	case database.Postgres:
 		query = `SELECT 1 FROM "pg_catalog"."pg_indexes"
 			WHERE "schemaname" = CURRENT_SCHEMA() AND "tablename" = ? AND "indexname" = ?`
