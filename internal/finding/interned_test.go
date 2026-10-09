@@ -111,10 +111,14 @@ func reportsIn(r *rand.Rand, year int) []finding.Named {
 			named.ExploitedOn = nil
 		}
 		out = append(out, named)
-		// The same account again, as a scanner gives it for every package
-		// the issue was matched in.
-		if r.Intn(3) == 0 {
-			out = append(out, named)
+	}
+	// The same account again, as a scanner gives it for every package the
+	// issue was matched in, somewhere after the first: another report in
+	// between is what makes keeping the wrong copy visible.
+	for i := len(out) - 1; i >= 0; i-- {
+		for range r.Intn(3) / 2 * (1 + r.Intn(2)) {
+			at := i + 1 + r.Intn(len(out)-i)
+			out = append(out[:at], append([]finding.Named{out[i]}, out[at:]...)...)
 		}
 	}
 	return out
@@ -330,6 +334,41 @@ func TestInterningARunOfReportsWritesWhatInterningEachAloneWrites(t *testing.T) 
 		// The rounds have to have reached the cases that differ.
 		if merged == 0 || moved == 0 {
 			t.Fatalf("the rounds merged %d issues and moved %d, so this checked too little", merged, moved)
+		}
+	})
+}
+
+func TestARepeatedReportIsInternedAsItsFirstCopyAsWellAsItsLast(t *testing.T) {
+	// Only an insert writes a severity, so the first report about a new issue
+	// decides it; and a report naming two issues merges them only once both
+	// are on record. Leaving out a repeated report's first copy hands both
+	// to whatever arrived between it and the last.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		low := finding.Named{Identifier: "CVE-2026-9001", Severity: "low"}
+		high := finding.Named{Identifier: "CVE-2026-9001", Severity: "high", Description: "Another account."}
+		names, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{low, high, low})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var severity string
+		if err := f.db.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).ColumnExpr("v.severity").
+			Where("v.id = ?", names["CVE-2026-9001"]).Scan(ctx, &severity); err != nil {
+			t.Fatal(err)
+		}
+		if severity != "low" {
+			t.Errorf("an issue first reported low was created %q", severity)
+		}
+
+		a := finding.Named{Identifier: "CVE-2026-9002"}
+		b := finding.Named{Identifier: "GHSA-2026-9002"}
+		both := finding.Named{Identifier: "CVE-2026-9002", Aliases: []string{"GHSA-2026-9002"}}
+		interning := finding.NewVulnerabilities(f.db.DB)
+		if _, err := interning.Intern(ctx, []finding.Named{a, b, both, a}); err != nil {
+			t.Fatal(err)
+		}
+		if n := interning.Absorbed(); n != 1 {
+			t.Errorf("two issues a later report named together were merged %d times, want once", n)
 		}
 	})
 }

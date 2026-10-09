@@ -242,20 +242,22 @@ A scan's reports are interned together:
 
 | Rule | |
 |---|---|
-| A report byte-identical to a later one in the same scan is interned once, as the later one | A scanner gives the same account of an issue for every package it matched. Every write fills a gap, moves toward worse or newer, or takes the value the last report states, so the copy changes nothing |
+| A report byte-identical to others in the same scan is interned as its first and its last copy | A scanner gives the same account of an issue for every package it matched. The first copy decides what an insert writes and what a report between them merges; every other write fills a gap, moves toward worse or newer, or takes the value the last report states, so a copy between the two changes nothing |
+| The last copy is skipped where nothing since the first resolved to the same issue or merged one | The first copy recorded every name the report carries on that issue, and nothing else has moved it, so the last would write nothing |
 | What is on record about a run of reports is read together | One statement per kind of record — names, filed names, issues, ratings, weaknesses, references — for a few hundred reports at a time |
 | A part of a report is written only where what was read says the statement would match a row | Each is the statement the report alone issues, with the same condition. Everything a rescan of unchanged data would issue matches nothing |
 | A report the read cannot answer for is resolved alone, from the database | One whose names reach no issue or more than one, one naming a better-known name than its issue is filed under, one naming a name outside plain ASCII, and one reaching an issue or a name an earlier report in the run wrote. Creating, merging and renaming an issue happen on that path alone |
 | Comparisons lean toward writing | A statement issued that matches nothing costs a round trip, and one skipped that would have matched loses a write. Names compare without regard to case, which is never narrower than an engine's comparison, and a day compares only where both sides are the start of a day in UTC |
-| The description and the advisory are written only where the row holds a gap | Spaces alone count as a gap, because one engine compares them equal to the empty string |
+| The description and the advisory are written only where the row holds a gap | Spaces alone count as a gap, because MySQL and MariaDB compare them equal to the empty string |
 
 A test interns the same random rounds of reports both ways, with names that
 overlap between issues so rounds merge and rename them, and requires the same
 rows, names, merges and moved issues after every round.
 
 Measured on one image whose 11,435 reports name 7,643 issues, rescanned with
-nothing changed: the rescan issued 570 statements where it issued 114,339, and
-rewrote none of the issue rows where it rewrote 11,435 with what they held.
+nothing changed: interned together, 570 statements and no issue row rewritten;
+a report at a time, 114,339 statements and 11,435 issue rows rewritten with
+what they held.
 
 The score carries where it came from. Which scoring system it is on, who
 published it and whether it is the primary rating or a secondary one, filled
@@ -1007,12 +1009,13 @@ change" is counted by.
 | A finding that is already open still moves | A fix appears, upstream declines to fix it, the build answers it. A run compares what it found against what is recorded and updates the parts that can move, stamping when they moved. Only those parts are compared: everything else is what makes it that finding |
 | Findings that moved to the same values are one write | Grouped by every value the update writes, the columns it leaves alone excepted, so each row receives exactly what it would alone |
 | An open finding is read in the columns the comparison uses | Every open row of the build is read on every scan, and the rest of the row is nothing the comparison asks |
-| What closed before at a place is read as its latest row | One row per issue and component, and one per issue and place name. A place whose version moves gathers a closed row at every move |
+| What closed before at a place is read as its latest row | One row per issue, component and consumer, and one per issue and place name. A place whose version moves gathers a closed row at every move |
 | The intervals are the change record | Every node, edge, finding and claim records the run that opened it and the run that closed it, so asking what changed between two points is a query over those. There is no second table duplicating them |
 
 Measured on one image of 324,508 open findings, rescanned the day a likelihood
-feed moved every issue: 324,508 updates became 7,562 statements, and the rows
-re-ranked a second time after them, 324,508, became none.
+feed moved every issue: grouped by the values written, 7,562 update statements
+and no row re-ranked a second time; a finding at a time, 324,508 updates and
+324,508 rows re-ranked again after them.
 
 ## Closure reasons
 
@@ -1625,7 +1628,7 @@ the run is for is the *growth*, which is stable across both samples.
 |---|---|
 | The reads hold up | The findings list grew between 1.5 and 3.5 times while the table grew 16.8, because it is indexed on the target and whether a finding is closed |
 | Trend is the one that grows, about linearly | 18 ms to 394 ms on SQLite, 7 ms to 114 ms on PostgreSQL, 15 ms to 1.19 s on MySQL. It reads every interval overlapping the window rather than a page, and the open set grows as issues accumulate. It is the first query to reshape if a deployment reports a slow front page |
-| The four engines write a night in about the same time | 0.32 s to 0.36 s on average. A night is **60 statements on every engine**, so what one statement costs on each, which differs by an order of magnitude between MariaDB and MySQL, no longer decides it |
+| The four engines write a night in about the same time | 0.32 s to 0.36 s on average. A night is **60 statements on every engine**, so what one statement costs on each, which differs by an order of magnitude between MariaDB and MySQL, does not decide it |
 
 Rewriting every deadline walks the identifier range once. The moments a
 product's findings opened at ride inside the statement as a case over a batch of
@@ -1638,7 +1641,7 @@ estate split between the old policy and the new with nothing to retry it.
 
 A quiet night issues far fewer statements than the first — 60 against 1,605.
 The first night records every issue and opens every finding. A quiet night reads
-what is on record about the issues it reports once for the run, writes only
+what is on record about the issues it reports a few hundred at a time, writes only
 what moved, and writes that a batch at a time: § Report merging and
 § Interval storage hold the rules.
 

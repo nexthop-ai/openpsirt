@@ -56,8 +56,9 @@ func (s *Store) Clock(now func() time.Time) { s.now = now }
 // each through a scan.
 func KindAsked(purl string) string { return kindAsked(purl) }
 
-// InternAlone is Intern with every report resolved alone from the database,
-// for the test comparing it with resolving a run of reports from one read.
+// InternAlone is Intern with every report resolved alone from the database
+// and no copy left out, for the test comparing it with resolving a run of
+// reports from one read.
 func (v *Vulnerabilities) InternAlone(ctx context.Context, reported []Named) (map[string]int64, error) {
 	return v.intern(ctx, reported, true)
 }
