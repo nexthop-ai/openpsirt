@@ -248,7 +248,7 @@ The chain is the baseline, then one part per release.
 |---|---|
 | 39 | The baseline: v0.5.0's schema, made at once on an empty database. § The baseline says what holds it |
 | 40 | v0.6.0: v0.5.0's schema changed into v0.6.0's, and the rows moved with it. § The v0.6.0 upgrade says what it does. A database v0.6.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
-| 41 | The untagged release: v0.6.0's schema changed into the next release's. § The untagged upgrade says what it does. Edited until a tag ships it, and every schema change before that tag edits it rather than adding a migration beside it |
+| 41 | v0.7.0: v0.6.0's schema changed into v0.7.0's. § The v0.7.0 upgrade says what it does. A database v0.7.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -380,7 +380,7 @@ whichever of the two leads with the owner; SQLite rebuilds both tables.
 | A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains |
 | A v0.5.0 key and token in force and one of each withdrawn | Upgraded, the one in force holds its name in force and the withdrawn one holds none, and the withdrawn name is accepted again |
 
-### The untagged upgrade
+### The v0.7.0 upgrade
 
 Migration 41. Each change is a column added to a table the release declares
 anew, the declaration being the tagged one with the column beside it.
