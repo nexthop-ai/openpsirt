@@ -247,3 +247,43 @@ func TestReRankingAfterAScanLeavesTheScannedBuildAsTheScanRankedIt(t *testing.T)
 		}
 	})
 }
+
+func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
+	// The latest closed row of each place is picked by two membership tests
+	// joined by OR, which PostgreSQL and MySQL never read as a semi-join. The
+	// build, the kind
+	// and the issues are repeated on the outer read so it walks only their
+	// rows rather than every finding in the deployment.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		asked := &matchedStatements{}
+		f.db.AddQueryHook(asked)
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-CLOSED", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		asked.mu.Lock()
+		defer asked.mu.Unlock()
+		n := 0
+		for _, each := range asked.sent {
+			if !strings.Contains(each.query, "MAX(lf.id)") {
+				continue
+			}
+			n++
+			where := strings.Index(each.query, " WHERE ")
+			inner := strings.Index(each.query, "(SELECT ")
+			if where < 0 || inner < where {
+				t.Fatalf("the read has no outer condition ahead of its arms: %s", each.query)
+			}
+			outer := each.query[where:inner]
+			for _, part := range []string{"target_id = ", "kind = ", "closed_at IS NOT NULL", "vulnerability_id IN ("} {
+				if !strings.Contains(outer, part) {
+					t.Errorf("the outer read does not ask %q: %s", part, each.query)
+				}
+			}
+		}
+		if n == 0 {
+			t.Fatal("nothing read what closed before, so this checked nothing")
+		}
+	})
+}

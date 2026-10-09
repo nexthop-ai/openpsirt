@@ -895,6 +895,13 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
 				"place_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
+			// The range again outside the two arms: a membership test under OR
+			// is never a semi-join on PostgreSQL or MySQL, so without it the
+			// read walks every finding in the deployment.
+			Where("target_id = ?", targetID).
+			Where("kind = ?", Vulnerable).
+			Where("closed_at IS NOT NULL").
+			Where("vulnerability_id IN (?)", bun.List(batch)).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.
 					WhereOr("id IN (?)", latest("lf.vulnerability_id, lf.component_id, lf.consumer_id")).
