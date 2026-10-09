@@ -250,6 +250,14 @@ type Paging struct {
 	Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 }
 
+// CountedPaging is Paging for a list that also answers its total alone. A
+// limit of zero returns the total and no rows, without reading the page or
+// what decorates it.
+type CountedPaging struct {
+	Limit  int `query:"limit" default:"50" minimum:"0" maximum:"200" doc:"The number returned. Zero returns the total alone"`
+	Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
+}
+
 // AtOneBuild narrows a list within a single product's builds, and has no
 // meaning across products: a subtree is a walk over one build's edges, and
 // "differs between builds" and the spread across variants are statements

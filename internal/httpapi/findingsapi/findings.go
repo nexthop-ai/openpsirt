@@ -326,7 +326,8 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 			"`stream` and `variant` are optional and independent, as they are on the findings " +
 			"list: with either left out this counts across every build under the product that " +
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +
-			"unless both are named.",
+			"unless both are named.\n\n" +
+			"`limit=0` returns `total` alone, with no rows.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -334,7 +335,7 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 		core.AtOneBuild
 		core.Narrowing
-		core.Paging
+		core.CountedPaging
 	}) (*ComponentFindingsOutput, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
@@ -343,13 +344,23 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		subject, scope, narrowed := at.Subject, at.Scope, at.Filter
-		groups, total, err := finding.NewStore(in.DB.DB).ComponentGroups(ctx, subject, scope,
+		store := finding.NewStore(in.DB.DB)
+		out := &ComponentFindingsOutput{}
+		if input.Limit == 0 {
+			total, err := store.CountComponentGroups(ctx, subject, scope, narrowed)
+			if err != nil {
+				return nil, core.Refused(in.Logger, err, "cannot read what is open")
+			}
+			out.Body.Total = total
+			out.Body.Items = []ComponentFindingBody{}
+			return out, nil
+		}
+		groups, total, err := store.ComponentGroups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {
 			return nil, core.Refused(in.Logger, err, "cannot read what is open")
 		}
 
-		out := &ComponentFindingsOutput{}
 		out.Body.Total = total
 		out.Body.Items = make([]ComponentFindingBody, 0, len(groups))
 		for _, group := range groups {

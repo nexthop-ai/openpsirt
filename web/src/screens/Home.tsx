@@ -432,7 +432,7 @@ function Figures({
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
-          params: { query: { limit: 1, ...(at.product ? { product: at.product } : {}) } },
+          params: { query: { limit: 0, ...(at.product ? { product: at.product } : {}) } },
         }),
       ),
   });
@@ -452,7 +452,7 @@ function Figures({
     queryKey: ["queue", "count", "all"],
     enabled: widely,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 0 } } })),
   });
   const allLate = useQuery({
     queryKey: ["home", "running-out", "all"],
@@ -720,7 +720,7 @@ function Pending() {
     queryKey: ["queue", "home", "all"],
     enabled: !!at.product,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 0 } } })),
   });
   const items = queue.data?.items ?? [];
 
@@ -918,7 +918,7 @@ function Lapsed() {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
-          params: { query: { reason: "expired-deferral", limit: 1, ...product } },
+          params: { query: { reason: "expired-deferral", limit: 0, ...product } },
         }),
       ),
   });

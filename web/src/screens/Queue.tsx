@@ -99,8 +99,8 @@ export function Queue() {
   // What else the queue is narrowed by: who proposed a claim, its age, the
   // severity it covers, its outcome and the release it covers.
   const narrowing = queueNarrowing(params);
-  // One list per reason. A page when it is the list being read, one row when
-  // it is only a tab's count: every list is asked for on every visit so each
+  // One list per reason. A page when it is the list being read, the total
+  // alone when it is only a tab's count: every list is asked for on every visit so each
   // tab carries its number without being opened. The filters apply only to the
   // list on screen, so a tab's count is the whole of its list.
   const listing = (which: Reason) => {
@@ -122,7 +122,7 @@ export function Queue() {
             params: {
               query: {
                 reason: which,
-                limit: reading ? PAGE : 1,
+                limit: reading ? PAGE : 0,
                 offset: reading ? offset : 0,
                 ...within,
                 ...(reading ? narrowing : {}),

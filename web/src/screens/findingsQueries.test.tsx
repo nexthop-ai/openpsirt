@@ -35,13 +35,13 @@ function Views({ spanning, view }: { spanning: boolean; view: string }) {
 }
 
 describe("the findings list's reads", () => {
-  it("reads the rows by issue and counts the other two views with a page of one", async () => {
+  it("reads the rows by issue and counts the other two views without a page", async () => {
     const asked = asking();
     mount.render(screen(<Views spanning={false} view="issues" />));
     await settle();
     expect(asked).toContainEqual({ path: "/v1/products/{product}/findings", limit: 50 });
-    expect(asked).toContainEqual({ path: "/v1/products/{product}/findings/components", limit: 1 });
-    expect(asked).toContainEqual({ path: "/v1/products/{product}/fix-bundles", limit: 1 });
+    expect(asked).toContainEqual({ path: "/v1/products/{product}/findings/components", limit: 0 });
+    expect(asked).toContainEqual({ path: "/v1/products/{product}/fix-bundles", limit: 0 });
     expect(asked).toHaveLength(3);
   });
 
