@@ -210,6 +210,9 @@ func plain(name string) bool {
 // that would change something, and falls back to resolving it alone wherever
 // the read cannot answer.
 //
+// Its steps are one's, in one's order, each behind the comparison that says
+// whether it would write.
+//
 // Each part is the same statement resolving alone writes, issued where what
 // was read says it would match a row and skipped where it says it would match
 // none. Every comparison here leans toward issuing the statement: a statement
@@ -271,25 +274,11 @@ func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRec
 
 	// The names it has not been recorded under, from the names read: the same
 	// list resolving alone reads first.
-	present := map[string]bool{}
-	for _, alias := range known {
-		present[alias.Identifier] = true
+	recorded, err := v.name(ctx, id, named, names, known)
+	if err != nil {
+		return 0, err
 	}
-	var missing []Alias
-	for _, name := range names {
-		if !present[name] {
-			missing = append(missing, Alias{
-				VulnerabilityID: id, Identifier: name,
-				IdentifierFolded: FoldIdentifier(name),
-			})
-		}
-	}
-	if len(missing) > 0 {
-		if err := database.InBatches(ctx, v.db, missing); err != nil {
-			return 0, fmt.Errorf("record the names %q goes by: %w", named.Identifier, err)
-		}
-		wrote = true
-	}
+	wrote = wrote || recorded
 
 	if unclassified(held.weaknesses[id], named.Weaknesses, named.PrimaryWeakness) {
 		if err := v.classify(ctx, id, named.Weaknesses, named.PrimaryWeakness); err != nil {
@@ -327,8 +316,8 @@ func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRec
 // unfilled is whether filling the description and the advisory would match
 // the row: a value reported where the row holds none.
 //
-// Spaces alone count as none, because one engine compares an empty string
-// equal to a run of spaces.
+// Spaces alone count as none, because MySQL and MariaDB compare a run of
+// spaces equal to the empty string.
 func unfilled(row Vulnerability, named Named) bool {
 	empty := func(s string) bool { return strings.TrimRight(s, " ") == "" }
 	return (named.Description != "" && empty(row.Description)) ||
