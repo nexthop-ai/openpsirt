@@ -1081,6 +1081,7 @@ moved out from under, and those land in the review queue as work.
 | Rule | |
 |---|---|
 | One statement, not one per place | A real image holds tens of thousands of places, and a sweep costing a write per place is a sweep somebody turns off, after which nothing lapses and the whole mechanism is decorative |
+| Marked a bounded batch at a time, ending at a batch that came back short | The read asks about every live decision in the product. A short batch named everything lapsable at that moment, and reading again finds only what changed since, which the next sweep finds: 1.2 s a read over 133,549 live decisions on PostgreSQL |
 | A rebuild that moved nothing marks nothing | Rebuilds are nightly, so a sweep marking too much would unpick judgments nobody had revisited, every night |
 | A decision covering nothing in the product is not marked | A component that is gone closed its findings. A component still present at a different version is exactly the question somebody has to answer again |
 | Covering is asked of the product, not of the build that was scanned | One release stream moving while another still ships the version decided about leaves the decision covering the other. So a sweep marks only when this build holds the place at other versions **and** no open finding anywhere in the product still matches the decision's versions |
