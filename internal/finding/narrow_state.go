@@ -175,30 +175,14 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	// currently stands, because without that a judgment withdrawn eighteen
 	// months ago still answers for its place.
 	//
-	// The finding's component and consumer are joined for the versions: a
-	// live claim is about the place at the versions it was keyed on, and
-	// matching it by place alone reports a claim made about one build's
-	// version as standing over a second build shipping another.
-	//
-	// The decision is on the outside of the join to the findings, and CROSS
-	// JOIN ... WHERE is what puts it there. It is an inner join on every
-	// engine; on SQLite it also fixes the order. Across products nothing binds
-	// the decision's product, and SQLite left to choose starts from every open
+	// Built on decisionsOutward, which matches a decision to the places it
+	// covers at the versions they hold now. Across products nothing binds the
+	// decision's product, and SQLite left to choose starts from every open
 	// finding and reads every decision of its product once per row: 331 s to
 	// count the undecided among 425,680 open rows with 3,060 decisions, against
 	// 1.5 s with the decisions outermost and 0.83 s inside one product.
 	standingHere, inForce := InForce()
-	decided := q.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(DecisionIssue).
-		Join(`CROSS JOIN "finding" AS "f2"`).
-		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
-		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
-		// The argument, which is where the outcome lives: one act is one
-		// argument, and the rows underneath say where it lands.
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`f2.id AS "finding_id"`).
+	decided := decisionsOutward(q).
 		// Waiting, and standing: the row's own count requires the live key
 		// and this did not, so a claim proposed and then withdrawn put its
 		// group in the waiting bucket while the row drew no state word at
@@ -226,10 +210,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// proposed dismissing.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome IN (?) THEN 1 ELSE 0 END) AS "this_outcome"`,
-			append(append([]any{}, inForce...), bun.List(outcomes))...).
-		Where("f2.closed_at IS NULL").
-		Where(coversHere).
-		GroupExpr("f2.id")
+			append(append([]any{}, inForce...), bun.List(outcomes))...)
 	// A joined derived table cannot see the outer query's conditions, and an
 	// engine that loops over the outer rows builds it again for each one: 35 s
 	// for a page of one on PostgreSQL with 133,000 decisions, against 0.15 s

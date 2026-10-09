@@ -22,7 +22,8 @@ import (
 //     reads a few hundred places.
 //   - decisionsAtPlaces, one row per decided place built once from the decision
 //     side and joined on the finding, for a count over every open place in a
-//     product.
+//     product. The match from a decision to its places is decisionsOutward,
+//     which the state filter's table is built on too.
 //
 // The EXISTS runs once per place it is asked of, which is nothing on a page and
 // 367,000 probes for a product's totals: 2.1 s a statement on PostgreSQL,
@@ -128,29 +129,46 @@ func decidedAs(product string, state decisionState) string {
 // as `LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id` and read through
 // placesDecided.
 //
-// Built from the decisions outward, the way the state filter's table is, and
-// with the decision outermost through CROSS JOIN ... WHERE for the reason that
-// table gives: SQLite left to choose starts from every open finding. The
+// Built on decisionsOutward, the table the state filter is built on. The
 // findings it reaches are not held to the product's builds: the decision is,
 // and the join on the finding's identifier drops a place in another product
 // that shares the issue and the place identity. Holding them as well was
 // measured slower, 1.5 s against 1.1 s with 133,000 decisions on PostgreSQL.
 func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionState) *bun.SelectQuery {
-	decided := q.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(DecisionIssue).
-		Join(`CROSS JOIN "finding" AS "f2"`).
-		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
-		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`f2.id AS "finding_id"`)
+	decided := decisionsOutward(q)
 	for _, state := range states {
 		decided = decided.ColumnExpr(`MAX(CASE WHEN `+strings.TrimPrefix(state.condition, " AND ")+
 			` THEN 1 ELSE 0 END) AS "`+state.alias+`"`, state.args...)
 	}
-	return decided.
-		Where("de.product_id = ?", productID).
+	return decided.Where("de.product_id = ?", productID)
+}
+
+// decisionsOutward is every open finding a decision covers, one row per
+// finding, reached from the decision side: the decision is matched to a place
+// by its issue and place identity, held to the versions the place holds now,
+// and joined to its claim. Callers add a column per thing they ask of the
+// decisions and say which product a decision has to belong to.
+//
+// The one spelling of how a decision reaches the places it covers, shared by
+// the overview's counts and the state filter, so a change to the match is made
+// once and reaches both.
+//
+// The decision is outermost through CROSS JOIN ... WHERE. It is an inner join
+// on every engine, and on SQLite it also fixes the order: left to choose,
+// SQLite starts from every open finding and reads every decision of its
+// product once per row.
+func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(DecisionIssue).
+		Join(`CROSS JOIN "finding" AS "f2"`).
+		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
+		// The component and the consumer, for the versions: a live claim is
+		// about the place at the versions it was keyed on.
+		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`f2.id AS "finding_id"`).
 		Where("f2.closed_at IS NULL").
 		Where(coversHere).
 		GroupExpr("f2.id")
