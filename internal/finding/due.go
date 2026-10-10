@@ -402,11 +402,12 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// two hundred over a list of four hundred and sixty-two.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(grouping).
-		// The build is in the order as well as in the grouping. Without it two
-		// rows identical down to the component name order arbitrarily, and an
-		// arbitrary order between pages is how a paged read repeats one row
-		// and skips another.
-		OrderExpr("due, v.identifier, c.name, f.target_id").
+		// Total over the grouping, so every row has one place and a paged
+		// read visits each once. The build, then the component's version and
+		// the component itself: one name ships at several versions in one
+		// build, and an order that stops at the name leaves those rows to the
+		// plan.
+		OrderExpr("due, v.identifier, c.name, f.target_id, c.version, f.component_id").
 		Limit(limit).Offset(offset)
 
 	var late []Late

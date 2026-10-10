@@ -4,11 +4,13 @@
 package finding_test
 
 import (
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -866,6 +868,93 @@ func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
 			if got := f.deadline(t, each); got.Sub(want).Abs() > time.Second {
 				t.Errorf("%s is due %s, want %s — its own opening plus the window, not "+
 					"another finding's", each, got, want)
+			}
+		}
+	})
+}
+
+func TestPagingWhatIsRunningOutVisitsEveryRowOnceInOneOrder(t *testing.T) {
+	// One issue against one name at several versions in one build is a row
+	// per component, every one due at the same moment, and two components
+	// may share a version. A page boundary falls between them, so the order
+	// has to place each of them: by version, then by component.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-STDLIB", Severity: "high"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		run := f.run(t)
+		due := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond)
+		type made struct {
+			version, purl string
+			id            int64
+		}
+		var rows []made
+		// Versions of one shape, so every engine's collation orders them as
+		// bytes do, and inserted out of order. The later of each pair sorts
+		// first by package identifier, so an order ending at the identifier
+		// rather than the component reads differently.
+		for _, version := range []string{"go1.23.0", "go1.21.0", "go1.24.0", "go1.22.0"} {
+			for _, origin := range []string{"z", "a"} {
+				purl := "pkg:golang/stdlib@" + version + "?origin=" + origin
+				component := &graph.Component{
+					Identity: purl, Purl: purl, Name: "stdlib", NameFolded: graph.Folded("stdlib"),
+					Version: version, FirstSeenAt: time.Now().Truncate(time.Microsecond),
+				}
+				if _, err := f.db.DB.NewInsert().Model(component).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				row := &finding.Finding{
+					TargetID: f.target, Kind: finding.Vulnerable,
+					VulnerabilityID: interned["CVE-2026-STDLIB"], Visibility: access.Public,
+					ComponentID: component.ID, PlaceIdentity: purl,
+					LastChangedAt: time.Now().Truncate(time.Microsecond),
+					OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
+					DueAt: &due,
+				}
+				if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				rows = append(rows, made{version: version, purl: purl, id: component.ID})
+			}
+		}
+		sort.Slice(rows, func(i, j int) bool {
+			if rows[i].version != rows[j].version {
+				return rows[i].version < rows[j].version
+			}
+			return rows[i].id < rows[j].id
+		})
+
+		who := f.holding(t, access.PublicTriage)
+		seen := map[string]int{}
+		var order []string
+		const size = 3
+		for offset := 0; offset < len(rows)+size; offset += size {
+			page, total, err := f.store.RunningOutPage(ctx, who, finding.Scope{},
+				14*24*time.Hour, size, offset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != len(rows) {
+				t.Fatalf("the list holds %d rows, want one per component, %d", total, len(rows))
+			}
+			for _, row := range page {
+				seen[row.Purl]++
+				order = append(order, row.Purl)
+			}
+		}
+		for _, row := range rows {
+			if seen[row.purl] != 1 {
+				t.Errorf("paging in threes visited %s %d times, want once", row.purl, seen[row.purl])
+			}
+		}
+		for i, row := range rows {
+			if i >= len(order) || order[i] != row.purl {
+				t.Fatalf("paged in threes the rows read %v, want them by version and then component",
+					order)
 			}
 		}
 	})
