@@ -28,6 +28,12 @@ export default defineConfig({
   // Go half, so that a figure quoted for this repository covers both.
   test: {
     environment: "jsdom",
+    // Each file gets a jsdom of its own inside a VM context, rather than a
+    // worker of its own: building the environment per worker was most of the
+    // run. Child processes rather than threads, because a test that sets the
+    // time zone needs it to take effect, and Node applies a change of `TZ`
+    // only on a process's main thread.
+    pool: "vmForks",
     // `scripts/` as well as `src/`, because the gate scripts live there. They
     // are `.mjs` with their detection exported, so the test beside them is an
     // ordinary `.test.ts`.

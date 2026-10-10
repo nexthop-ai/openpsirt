@@ -286,6 +286,15 @@ checks.
 | `npm run copy` | A paragraph, hint or empty-state detail on a screen putting more than 20 words up at once. `DESIGN-interface.md` § Screen copy says what it measures |
 | Query keys, in the web tests | An invalidation whose key no read's key starts with. The query cache matches an invalidation by prefix, so a key nothing reads refreshes nothing, and a control that saved looks as though it did not. Compared as far as each key is literal |
 
+The web tests run each file in a VM context of its own, inside a child process
+that runs file after file. Every file still gets a DOM of its own; the process
+is what is shared, and starting one per file was 70% of the run. They are
+processes because Node applies a change of the time zone only on a process's
+main thread, and a test setting a zone to tell a typed minute from a local one
+passes vacuously under UTC. Such a test asserts the zone took effect before
+relying on it. On four cores the run is 29 s with a process per file and 9 s
+this way.
+
 Formatting belongs to one tool. Stylelint's whitespace rules are off rather than
 left to disagree with Prettier.
 
