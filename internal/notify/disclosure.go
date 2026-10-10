@@ -35,7 +35,7 @@ import (
 // It is derived rather than remembered, so an embargo somebody extends leaves
 // this list on the next sweep without anybody dismissing anything, and one
 // that is disclosed leaves it because the finding stops being private.
-func (w *Watch) pastDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
+func (w *sweep) pastDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
 	return w.disclosureWithin(ctx, admins, DisclosureDue, 0)
 }
 
@@ -47,7 +47,7 @@ func (w *Watch) pastDisclosure(ctx context.Context, admins []int64) (map[int64][
 // a few times a year has no reason to open the screen that would have told
 // them. In the application rather than by mail, because mail may not name an
 // undisclosed issue.
-func (w *Watch) approachingDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
+func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
 	lead, err := setting.NewStore(w.db).Duration(ctx, setting.DisclosureLead,
 		setting.DefaultDisclosureLead)
 	if err != nil {
@@ -69,7 +69,7 @@ func (w *Watch) approachingDisclosure(ctx context.Context, admins []int64) (map[
 // It clears the way every other condition here clears: when the decision stops
 // standing, or when the statement it cites is current again. Nothing is
 // dismissed, because nothing here is an event.
-func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error) {
 	var rows []struct {
 		DecisionID      int64  `bun:"decision_id"`
 		ProductID       int64  `bun:"product_id"`
@@ -110,12 +110,9 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 
 	// Whoever may read it and act on it, which for a claim somebody approved
 	// is whoever may triage that product.
-	acts, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
+	acts := w.reach
 
-	out, err := w.everybody(ctx, StatementRevised, acts)
+	out, err := w.everybody(ctx, StatementRevised)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +145,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 // was neither an administrator nor currently holding the finding was absent
 // from the map, was never reconciled, and their alert stood indefinitely with
 // nothing able to clear it. That alert names the issue and the product.
-func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
+func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	lead time.Duration) (map[int64][]Holds, error) {
 
 	var rows []struct {
@@ -183,16 +180,13 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	if err != nil {
 		return nil, fmt.Errorf("read what is past its disclosure date: %w", err)
 	}
-	// Note there is no early return for an empty answer. Every administrator
-	// has to be handed a list either way, empty included: Reconcile makes
+	// Note there is no early return for an empty answer. Everybody being told
+	// one of these has to be handed a list either way, empty included: Reconcile makes
 	// somebody's open set exactly what it is given, so an embargo that was
 	// extended clears the alert it opened only because the next sweep hands
 	// the same person a list without it. Returning nothing at all would leave
 	// every cleared condition standing.
-	people, held, err := access.NewStore(w.db).People(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read who may hear about this: %w", err)
-	}
+	people, held := w.people, w.held
 	private := map[int64]map[int64]bool{}
 	// The party itself. The assignment column holds a party rather than a
 	// person, and a notification goes to somebody, so the two are mapped
@@ -209,8 +203,8 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		whose[person.PartyID] = person.ID
 	}
 
-	// Every administrator, and everybody who is currently being told one of
-	// these, whether or not they should still hear about anything. Reconcile
+	// Everybody who is currently being told one of these, whether or not they
+	// should still hear about anything. Reconcile
 	// makes one person's open set exactly what it is handed, so somebody who
 	// is never handed a list is never reconciled — and their alert stands
 	// after the thing it was about has been answered.
@@ -218,7 +212,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	// Who hears about an embargo includes whoever holds it, and work is handed
 	// around: the person who held it yesterday would keep an alert about a
 	// date that has since been moved, with nothing left to clear it.
-	out, err := w.everybodyAnd(ctx, kind, nil, admins)
+	out, err := w.everybody(ctx, kind)
 	if err != nil {
 		return nil, err
 	}

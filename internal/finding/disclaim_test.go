@@ -972,7 +972,7 @@ func TestNoDeadlineComesBackToAPlaceTheSupplierAnswers(t *testing.T) {
 			Where("id = ?", issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err := finding.Reranked(ctx, f.db.DB, []int64{issue}, time.Now().UTC()); err != nil {
+		if err := finding.Reranked(ctx, f.db.DB, []int64{issue}, time.Now().UTC(), 0); err != nil {
 			t.Fatal(err)
 		}
 		answered("the issue became exploited")

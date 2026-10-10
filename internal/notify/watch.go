@@ -83,7 +83,7 @@ func (w *Watch) Run(ctx context.Context, interval time.Duration) {
 // Somebody who stops being an administrator is handed an empty list, which
 // clears what they were told: these name products and people they may no
 // longer read, and nothing else would ever reconcile them.
-func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened, cleared int, err error) {
+func (w *sweep) tellAdministrators(ctx context.Context, admins []int64) (opened, cleared int, err error) {
 	// Somebody away and still holding work, what has gone quiet, the tool's
 	// own health, and the second-person control. Each of the last four is a
 	// report that nobody opens unless it has something to say, asked as a
@@ -109,12 +109,16 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 				return opened, cleared, err
 			}
 		}
-		out, err := w.everybodyAnd(ctx, each.kind, nil, admins)
+		out, err := w.everybody(ctx, each.kind)
 		if err != nil {
 			return opened, cleared, err
 		}
 		for _, admin := range admins {
-			out[admin] = holding
+			// An administrator with nothing to hear and nothing being said
+			// to them is left alone: there is nothing to reconcile.
+			if _, told := out[admin]; told || len(holding) > 0 {
+				out[admin] = holding
+			}
 		}
 		o, c, err := w.tell(ctx, each.kind, out, each.what)
 		opened, cleared = opened+o, cleared+c
@@ -123,6 +127,17 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		}
 	}
 	return opened, cleared, nil
+}
+
+// sweep is one pass over every condition, with everybody and what they hold
+// read once at its start for every condition to share.
+type sweep struct {
+	*Watch
+	people []access.Account
+	held   map[int64][]access.Grant
+	// reach is what each person may do with each product, from the two
+	// above.
+	reach map[int64]map[int64]acts
 }
 
 // tell makes what each person is told of one kind exactly what they are
@@ -155,14 +170,16 @@ func fanOut(out map[int64][]Holds, acts map[int64]map[int64]acts, productID int6
 
 // Once derives every condition and reconciles it against what is being said.
 func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
-	admins, err := w.administrators(ctx)
+	people, held, err := access.NewStore(w.db).People(ctx)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("read who may hear about this: %w", err)
 	}
+	admins := administrators(people)
+	s := &sweep{Watch: w, people: people, held: held, reach: actsOf(people, held)}
 
 	// Run with no administrator too, so the last one to be demoted has what
 	// they were told cleared.
-	o, c, err := w.tellAdministrators(ctx, admins)
+	o, c, err := s.tellAdministrators(ctx, admins)
 	opened, cleared = opened+o, cleared+c
 	if err != nil {
 		return opened, cleared, err
@@ -185,32 +202,32 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		// administrators hear about all of them, and whoever holds one hears
 		// about theirs.
 		{DisclosureDue, func(ctx context.Context) (map[int64][]Holds, error) {
-			return w.pastDisclosure(ctx, admins)
+			return s.pastDisclosure(ctx, admins)
 		}, "what is past its date"},
 		// An embargo whose date is coming. Before the date, not on it: an
 		// approver who touches disclosure a few times a year has no reason to
 		// open the screen that would have told them, and an agreement to move
 		// a date is worthless without time to arrange it.
 		{DisclosureNear, func(ctx context.Context) (map[int64][]Holds, error) {
-			return w.approachingDisclosure(ctx, admins)
+			return s.approachingDisclosure(ctx, admins)
 		}, "what is about to disclose"},
 		// A window after an attack on a product, running and then passed,
 		// with nobody outside recorded as told.
-		{ObligationOpen, w.windowsOpen, "which windows after an attack are running"},
-		{ObligationNear, w.windowsNear, "which windows after an attack are about to end"},
-		{ObligationPassed, w.windowsPassed, "which windows after an attack have passed"},
+		{ObligationOpen, s.windowsOpen, "which windows after an attack are running"},
+		{ObligationNear, s.windowsNear, "which windows after an attack are about to end"},
+		{ObligationPassed, s.windowsPassed, "which windows after an attack have passed"},
 		// A VEX publisher changing what they said about something a standing
 		// decision cited.
-		{StatementRevised, w.statementsRevised, "what a publisher changed"},
+		{StatementRevised, s.statementsRevised, "what a publisher changed"},
 		// Work that has stopped moving: different waits with different
 		// audiences.
-		{ClaimWaiting, w.waitingClaims, "what is waiting on a second person"},
-		{SentBackWaiting, w.sentBackWaiting, "what was sent back and left"},
-		{DeferralEnding, w.deferralsEnding, "which deferrals are running out"},
-		{QueueUntaken, w.queuesUntaken, "what is sitting in a queue"},
-		{Unanswered, w.unanswered, "whose report nobody has answered"},
+		{ClaimWaiting, s.waitingClaims, "what is waiting on a second person"},
+		{SentBackWaiting, s.sentBackWaiting, "what was sent back and left"},
+		{DeferralEnding, s.deferralsEnding, "which deferrals are running out"},
+		{QueueUntaken, s.queuesUntaken, "what is sitting in a queue"},
+		{Unanswered, s.unanswered, "whose report nobody has answered"},
 		// A critical against something already shipped.
-		{CriticalOnRelease, w.criticalOnReleases, "what is critical on a release"},
+		{CriticalOnRelease, s.criticalOnReleases, "what is critical on a release"},
 	} {
 		holding, err := each.of(ctx)
 		if err != nil {
@@ -244,7 +261,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 // finding content. Administering a deployment grants no reading of a
 // product, so sending it to administrators alone would be both a disclosure
 // to people who may not read it and silence for the people who can act.
-func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, error) {
 	standing, args := finding.OffTheClock("st.product_id", time.Now().UTC())
 
 	var rows []struct {
@@ -283,16 +300,13 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 	// ask the same question a thousand times. This one goes to whoever may
 	// triage, because reading alone is not enough — interrupting somebody who
 	// cannot act is noise.
-	acts, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
+	acts := w.reach
 
 	// Everybody currently being told one of these is handed a list, empty
 	// included. Reconcile makes one person's open set exactly what it is
 	// given, so somebody who is never handed a list is never reconciled, and
 	// their alert would stand after the thing it was about had been answered.
-	out, err := w.everybody(ctx, CriticalOnRelease, acts)
+	out, err := w.everybody(ctx, CriticalOnRelease)
 	if err != nil {
 		return nil, err
 	}
@@ -401,18 +415,14 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 }
 
 // administrators is who hears about the tool's own health.
-func (w *Watch) administrators(ctx context.Context) ([]int64, error) {
-	people, _, err := access.NewStore(w.db).People(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read who administers this: %w", err)
-	}
+func administrators(people []access.Account) []int64 {
 	var admins []int64
 	for _, person := range people {
 		if person.Administers() {
 			admins = append(admins, person.ID)
 		}
 	}
-	return admins, nil
+	return admins
 }
 
 // identify is the key a condition is recognized by between sweeps.

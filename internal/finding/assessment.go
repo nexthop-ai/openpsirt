@@ -485,24 +485,9 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	}
 
 	// Everything below the flags, packed by the same function that packs it
-	// at ingest. The flags themselves are per finding, so they stay in the
-	// statement — and every one of them is read here, so this is the one
-	// place the packed number is written again whichever signal moved.
-	rest := Ranked{ScoreCenti: inForce.Score(), LikelihoodPPM: inForce.LikelihoodPPM}.Rank()
-	_, err = tx.NewUpdate().
-		Model((*Finding)(nil)).
-		Set("urgency = (CASE WHEN urgency_exploited_here THEN ? ELSE 0 END)"+
-			" + (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
-			" + (CASE WHEN urgency_shipped THEN ? ELSE 0 END) + ?",
-			int64(exploitedHereBand), int64(exploitedBand),
-			int64(shippedBand), int64(rest)).
+	// at ingest.
+	_, err = reranking(tx, productID, inForce.rest()).
 		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("closed_at IS NULL").
-		// This product's findings alone. The number being written was worked
-		// out from this product's rating, and writing it over another
-		// product's rows is the deployment-wide rating arriving by the back
-		// door.
-		Where(inThisProduct, productID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("move this issue in the order: %w", err)
@@ -510,98 +495,33 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	return nil
 }
 
-// Reranked puts every open finding of these issues back where the signals now
-// say it belongs.
-//
-// Three of the four signals the order is worked out from are properties of
-// the issue — known exploitation, exploitation likelihood, and the score —
-// and a report raises them for the issue wherever it appears. The fourth, the
-// rating, belongs to a product, so the order is worked out once per product
-// holding the issue rather than once for the deployment. The order is
-// stored per finding and was rewritten only for the build being scanned, so
-// every other build kept a number computed from a world that had moved: a
-// known-exploited issue in a shipped tag sat below the triage line, answered
-// no exploited filter, got no exploited deadline and sorted at the bottom,
-// until somebody rescanned that tag — which for a tag is never.
-//
-// It is not a cache being refreshed. The stored order describes an issue
-// rather than a moment, so it is rewritten when the signals move; what is
-// stored because it cannot be worked out again is a different thing and is
-// not this.
-//
-// Only the exploited flag moves a deadline, and only for the rows it was
-// raised on, counted from when this was learned — the same rule and the same
-// moment the scanned build's own rows are clocked by. A score or a likelihood
-// moving deliberately changes no clock: neither is in the deadline, and a
-// clock reset by a revised number would never arrive.
-//
-// Takes the handle because the caller writes inside its own transaction: the
-// scan that raised the signal and the re-ranking it forces are one act.
-func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Time) error {
-	if len(issues) == 0 {
-		return nil
-	}
-	windows, err := LoadWindows(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, id := range issues {
-		var issue struct {
-			Exploited   bool       `bun:"exploited"`
-			ExploitedOn *time.Time `bun:"exploited_on"`
-		}
-		if err := tx.NewSelect().
-			TableExpr(`"vulnerability" AS "v"`).
-			ColumnExpr(`COALESCE(v.exploited, ?) AS "exploited"`, false).
-			ColumnExpr(`v.exploited_on AS "exploited_on"`).
-			Where("v.id = ?", id).Scan(ctx, &issue); err != nil {
-			return fmt.Errorf("read what is known about this issue: %w", err)
-		}
+// rest is the part of the order below the per-finding flags, packed by the
+// same function that packs it at ingest.
+func (r Rating) rest() Rank {
+	return Ranked{ScoreCenti: r.Score(), LikelihoodPPM: r.LikelihoodPPM}.Rank()
+}
 
-		recorded := false
-		if issue.Exploited {
-			recorded, err = exploitationClocked(ctx, tx, id,
-				*exploitationKnown(issue.ExploitedOn, learnedAt), learnedAt, windows)
-			if err != nil {
-				return err
-			}
-		}
-
-		// The order itself, product by product, from each one's own rating
-		// and the flags each row now carries. The signal that moved is the
-		// issue's and reaches every product holding it; what it is combined
-		// with is that product's rating, so the same report leaves two
-		// products ordering the issue differently — which is the point of a
-		// rating belonging to one.
-		products, err := productsHolding(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		// Each product's own rating, in one statement rather than one per
-		// product. The batched read is what RatingsIn is for, and a
-		// deployment with a dozen products would otherwise ask twelve
-		// questions to answer one.
-		rated, err := RatingsIn(ctx, tx, products, []int64{id})
-		if err != nil {
-			return err
-		}
-		for _, productID := range products {
-			if err := rerank(ctx, tx, productID, id,
-				rated[RatedKey{ProductID: productID, VulnerabilityID: id}]); err != nil {
-				return err
-			}
-			// A recorded flaw that learned it has just been given a
-			// scanned finding's deadline above. Its own windows and its own
-			// start put it back. Asked only then, because this runs for
-			// every issue whose likelihood a feed moved.
-			if recorded {
-				if _, err := recountOwn(ctx, tx, productID, []int64{id}, learnedAt); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+// reranking writes the order onto one product's open findings: the flags each
+// row carries, and the rest of the order as worked out from that product's
+// rating. The caller names which issues.
+//
+// The flags are per finding, so they stay in the statement, and every one of
+// them is read here: this is the one statement the packed number is written
+// again by, whichever signal moved.
+func reranking(tx bun.IDB, productID int64, rest Rank) *bun.UpdateQuery {
+	return tx.NewUpdate().
+		Model((*Finding)(nil)).
+		Set("urgency = (CASE WHEN urgency_exploited_here THEN ? ELSE 0 END)"+
+			" + (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
+			" + (CASE WHEN urgency_shipped THEN ? ELSE 0 END) + ?",
+			int64(exploitedHereBand), int64(exploitedBand),
+			int64(shippedBand), int64(rest)).
+		Where("closed_at IS NULL").
+		// This product's findings alone. The number being written was worked
+		// out from this product's rating, and writing it over another
+		// product's rows is the deployment-wide rating arriving by the back
+		// door.
+		Where(inThisProduct, productID)
 }
 
 // exploitationClocked puts an exploited issue's open findings on the clock

@@ -133,11 +133,14 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// whose rows span batches hears once. A batch that fails leaves the ones
 	// before it committed, and those are still reported alongside the error.
 	// A row this sweep lapsed leaves the lapsable set unless somebody revises
-	// it in between, so the sweep ends at the pass that marks none.
+	// it in between, so the sweep ends at the pass that marks none — or at a
+	// pass that read fewer than a batch, which read every row lapsable at
+	// that moment. Asking again then reads every decision in the product
+	// once more to find only what changed since, which the next sweep finds.
 	out := Lapsed{}
 	var all []int64
 	var failed error
-	for {
+	for more := true; more; {
 		var moved int64
 		var lapsed []int64
 		if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
@@ -146,6 +149,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			if err := lapsable(tx).Scan(ctx, &ids); err != nil {
 				return fmt.Errorf("read what the code moved out from under: %w", err)
 			}
+			more = len(ids) == database.InBulk.Most
 			if len(ids) == 0 {
 				return nil
 			}

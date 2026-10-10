@@ -51,7 +51,7 @@ import (
 //
 // Sent-back claims are excluded, because those are not waiting on an approver
 // at all — they have their own condition below, aimed at the other person.
-func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 	after, err := setting.NewStore(w.db).Duration(ctx,
 		setting.WaitingAfter, setting.DefaultWaitingAfter)
 	if err != nil {
@@ -93,11 +93,8 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, fmt.Errorf("read what is waiting on a second person: %w", err)
 	}
 
-	reach, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
-	out, err := w.everybody(ctx, ClaimWaiting, reach)
+	reach := w.reach
+	out, err := w.everybody(ctx, ClaimWaiting)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +215,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 // sent-back claim is waiting on its author. What told them was one event, at
 // the moment it was sent back, and an event is exactly what cannot
 // report that it has since been ignored.
-func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) {
 	after, err := setting.NewStore(w.db).Duration(ctx,
 		setting.SentBackAfter, setting.DefaultSentBackAfter)
 	if err != nil {
@@ -254,11 +251,8 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		return nil, fmt.Errorf("read what was sent back and left: %w", err)
 	}
 
-	reach, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
-	out, err := w.everybody(ctx, SentBackWaiting, reach)
+	reach := w.reach
+	out, err := w.everybody(ctx, SentBackWaiting)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +288,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 // early: what follows the date is the finding arriving back in
 // somebody's queue as work that is now late, and the whole value of the
 // warning is the time it leaves to do something else instead.
-func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) {
 	lead, err := setting.NewStore(w.db).Duration(ctx,
 		setting.DeferralLead, setting.DefaultDeferralLead)
 	if err != nil {
@@ -345,11 +339,8 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		return nil, fmt.Errorf("read which deferrals are running out: %w", err)
 	}
 
-	reach, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
-	out, err := w.everybody(ctx, DeferralEnding, reach)
+	reach := w.reach
+	out, err := w.everybody(ctx, DeferralEnding)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +384,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 // individually addressed to; a member who cannot read undisclosed work is not
 // told that undisclosed work is waiting, which is the same rule that decides
 // whether a queue may hold it at all.
-func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	after, err := setting.NewStore(w.db).Duration(ctx,
 		setting.QueuedAfter, setting.DefaultQueuedAfter)
 	if err != nil {
@@ -458,11 +449,8 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, fmt.Errorf("read what is sitting in a queue: %w", err)
 	}
 
-	reach, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
-	out, err := w.everybody(ctx, QueueUntaken, reach)
+	reach := w.reach
+	out, err := w.everybody(ctx, QueueUntaken)
 	if err != nil {
 		return nil, err
 	}
@@ -555,16 +543,13 @@ func itemsWaiting(n int) string {
 // Judged or not. A claim that turned out to be announced work is still a
 // letter a stranger sent, and reading it asks the same thing it asked
 // before.
-func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
+func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 	rows, err := finding.NewStore(w.db).Unacknowledged(ctx)
 	if err != nil {
 		return nil, err
 	}
-	reach, err := whoActs(ctx, w.db)
-	if err != nil {
-		return nil, err
-	}
-	out, err := w.everybody(ctx, Unanswered, reach)
+	reach := w.reach
+	out, err := w.everybody(ctx, Unanswered)
 	if err != nil {
 		return nil, err
 	}
