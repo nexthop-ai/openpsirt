@@ -1299,20 +1299,21 @@ The page is read in two statements:
 2. Read what the page shows about those fifty groups and no others: likelihood
    and score, the four decision counts, how many ways down there are, the fix.
 
-Every filter narrows both statements through the same clauses, and none needs the
-issue or the component joined under the grouping — a rating or a name is asked as
-a membership test against the table that holds it. The decision-state filter is
+Every condition on a place narrows both statements through the same clauses, and
+none needs the issue or the component joined under the grouping — a rating or a
+name is asked as a membership test against the table that holds it. The decision-state filter is
 built from the decisions outward rather than as a lookup per open row, and in
 the first statement alone: the decided places are counted beside the first
 level of the grouping (§ Two-level grouping). The second statement reads the
 page's groups by the conditions on a place and none over a group, because the
 first statement already chose the groups by those, and a group it reads that is
 not on the page is dropped. Built for the page's issues and joined to its
-places, the table was estimated against one place and built again for each:
+places, the table is estimated against one place and built again for each:
 87 s for a page of fifty undecided high issues on PostgreSQL with 133,549
 decisions, against 35 ms without it. Another view keeping the list's groups
-under a condition over a group still joins the table to each place, across
-products for the kind of release the list holds as well.
+under a condition over a group joins the table to each place where the filter
+needs a decision, narrowed to the decisions' issues, and counts the decided
+places beside the list's first level where it does not (§ Two-level grouping).
 
 | Rule | |
 |---|---|
@@ -1391,7 +1392,8 @@ package — reach the join to the component and the second grouping.
 | The decided groups are stacked with the partial groups, never joined to them | The two are put one under the other and folded on the keys. Joined on the keys, MariaDB worked out the decided groups again for each of 12,260 partial groups it joined them to: 71 s for the undecided list across products, which takes 0.37 s joined to every place and 0.23 s stacked |
 | Each place is counted once only where a condition compares decided places with places | Agreed and an outcome hold where every place does, so the decisions are folded to the place before the keys. Every other condition asks whether any place carries a flag or none does, and the decisions fold straight to the keys |
 | Across products, the line is applied after the first level | The first level also keys on the product and on whether the place carries an exploitation signal, so each partial group is wholly above a product's line or wholly below it. The issue, the product's rating and its line are read once per partial group, and every aggregate after it counts exactly the places the line admits |
-| The groups another view keeps under a condition over a group are grouped in one level | They are joined back to the finding rows, and the planner's estimate of how many groups a condition keeps falls by a factor of ten over two levels: 186 where 7,742 are kept. On that estimate PostgreSQL read one component's rows once per kept group and did not finish in two minutes; over one level it hashes the join in 2 s |
+| The groups another view keeps under a condition over a group are grouped in one level | They are joined back to the finding rows, and the planner's estimate of how many groups a condition keeps falls by a factor of ten over two levels: 186 where 7,742 are kept. On that estimate PostgreSQL read one component's rows once per kept group and did not finish in two minutes; over one level it hashes the join in 2 s. A filter needing a decision falls the same way, 279 where 1,753 are kept: 185 s for the lapsed fix bundles in two levels against 1.2 s in one |
+| The groups a filter passing with no decision keeps are the list's own two-level statement | Undecided is one such filter, and the decided places are stacked beside the first level. In one level the decision table is built from every decision of the product and joined to every open place, and MariaDB gave no answer in 985 s for the component view of what is undecided among 425,680 open rows with 3,060 decisions, against 2.6 s in two levels |
 | A bundle's names are grouped over the page's components | The components of the page's folds are read first and named as a list, and the places are grouped on the component, the build and the fixed version before the names and the fold are joined. Named as a list, PostgreSQL estimates the places from the components' own statistics and hashes them into groups; joined to the component, it expects 690 places a worker for 90,467 and sorts them on disk. 166 ms named as a list against 287 ms joined, over the kernel's 271,400 places in two builds |
 | The by-component view and the fix bundles group the same way | By component, the first level is one row per issue, so the count of distinct issues is a count of rows. By upgrade, the first level keys on component, issue, build and fixed version |
 
@@ -1819,5 +1821,6 @@ question next year should find the answer rather than the question.
 | The finding screen reads open findings, and a finding closed as unaffected is read in the register with the record's lines | The screen is where a judgment is made, and the record has made this one |
 | A wrong record cannot be overridden here | Nothing records that a release is affected against a record saying it is not, and a run consults no decision before closing. The register lists every such closure so a wrong one can be found; correcting it is correcting the record, which the next snapshot carries. Not built |
 | The outbound VEX document says nothing about a finding closed as unaffected | A statement to customers that a release is not affected is a decision this deployment makes, and a closure is not one |
+| On MariaDB the component and fix-bundle views do not answer under a filter needing a decision | The one-level form joins the decision table to every open place, and MariaDB works it out again per group: no answer in 589 s for the components waiting among 425,680 open rows with 3,060 decisions. The two-level form answers there in 0.04 s, and on PostgreSQL its kept groups are estimated at a sixth of those that pass and the join back runs 185 s. Not solved |
 | A merge is not undone | Two issues a report wrongly named together stay one. Nothing a report says is taken to unmerge, and unmerging would have to divide findings and decisions made since |
 | An issue absorbed keeps the name it was filed under | The kept issue is not refiled under a name the absorbed row holds. Where the best-known name is one the absorbed row holds, the kept issue stays filed where it is |

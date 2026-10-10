@@ -102,9 +102,9 @@ type Filter struct {
 	// matches every product in the deployment.
 	ProductID int64
 	// decidedIssues is the only issues a group can be filed under and pass
-	// the filter, set by the store where every condition the filter asks of
-	// a group needs a decision of some kind at one of its places: the issues
-	// of those decisions, read before the list is. Nil asks nothing, and
+	// the filter, set by the store where some condition every passing group
+	// meets needs a decision of some kind at one of its places: the issues of
+	// those decisions, read before the list is. Nil asks nothing, and
 	// empty answers nothing.
 	decidedIssues []int64
 	// decidedApart says the places are read without the decision table
@@ -420,13 +420,36 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	if !f.asksOfGroups() {
 		return f.narrow(q)
 	}
-	kept := f.narrow(openGroups(db, targets, visible).
+	kept := f.listed(db, targets, visible).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(FoldedOn + ` AS "fold"`))
+		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return f.ofRows().narrow(q.
 		Join(`JOIN "component" AS "ck" ON ck.id = f.component_id`).
 		Join(`JOIN (?) AS "kept" ON kept.vulnerability_id = f.vulnerability_id`+
 			` AND kept.fold = ck.fold_key`, kept))
+}
+
+// listed is the groups the findings list holds under the filter, one issue at
+// one fold, for a statement to select its columns from.
+//
+// A filter that can pass with no decision, such as undecided, reads the
+// list's own two-level statement, which counts the decided places beside its
+// first level. Joined to every open place instead, the decision table is built
+// from every decision of the product, and MariaDB gave no answer in 985 s for
+// the component view of what is undecided among 425,680 open rows with 3,060
+// decisions, against 2.6 s in two levels.
+//
+// A filter needing a decision reads the one-level grouping, with the decision
+// table narrowed to the issues the decisions name (see decidedIssuesFor). In
+// two levels PostgreSQL estimates the groups such a condition keeps at a sixth
+// of those that pass, 279 where 1,753 pass, and joined back to the finding
+// rows on that estimate it read a component's rows once per kept group: 185 s
+// for the lapsed fix bundles against 1.2 s in one level.
+func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+	if f.asksDecided() && f.decidedIssues == nil {
+		return f.folded(db, openRows(db, targets, visible), issueAndComponent).GroupExpr(GroupedOn)
+	}
+	return f.narrow(openGroups(db, targets, visible))
 }
 
 // narrow applies the filter to a grouped query over finding AS f.

@@ -5,9 +5,11 @@ package finding_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // The decision counts read from the decision side: the product page's
@@ -189,6 +191,71 @@ func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryPlaceInBothIsAnswered(t
 		if whole.Open != 2 || whole.Agreed != 1 || whole.Undecided != 1 {
 			t.Errorf("the product: open %d, agreed %d, undecided %d; want 2, 1, 1",
 				whole.Open, whole.Agreed, whole.Undecided)
+		}
+	})
+}
+
+func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing.T) {
+	// One issue at one component in two builds, under a different consumer in
+	// each, so the two builds hold two places of one group. The first build's
+	// place is answered and not yet due; the second's is unanswered and past
+	// its deadline. Each build row says its own half. The product's group is
+	// open and overdue, because its earliest deadline has passed, and neither
+	// undecided nor agreed, because one place is answered and the other is
+	// not. Whatever order the rows arrive in, a fold reading one build's row
+	// alone, or the later deadline, answers otherwise.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, other, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{teamd, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: teamd},
+				{Parent: teamd, Child: libnl},
+			},
+		})
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC()
+		for target, due := range map[int64]time.Time{
+			f.target: now.AddDate(0, 0, 30),
+			other:    now.AddDate(0, 0, -100),
+		} {
+			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
+				Set("due_at = ?", due).Where("target_id = ?", target).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		f.decidedAt(t, f.somebodyElse(t), f.placesOf(t, "CVE-2026-1")[swss.Name],
+			"approved", libnl.Version, swss.Version, "first-build")
+
+		builds, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := map[int64][4]int{f.target: {1, 0, 0, 1}, other: {1, 1, 1, 0}}
+		if len(builds) != len(want) {
+			t.Fatalf("%d build rows, want %d", len(builds), len(want))
+		}
+		for _, build := range builds {
+			got := [4]int{build.Open, build.Overdue, build.Undecided, build.Agreed}
+			if got != want[build.TargetID] {
+				t.Errorf("build %d: open, overdue, undecided, agreed %v; want %v",
+					build.TargetID, got, want[build.TargetID])
+			}
+		}
+		if got := [4]int{whole.Open, whole.Overdue, whole.Undecided, whole.Agreed}; got != [4]int{1, 1, 0, 0} {
+			t.Errorf("the product: open, overdue, undecided, agreed %v; want [1 1 0 0]", got)
 		}
 	})
 }

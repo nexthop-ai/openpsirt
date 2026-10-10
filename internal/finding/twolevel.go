@@ -347,12 +347,8 @@ func (f Filter) partialColumns() []partColumn {
 			partColumn{"MIN(f.assigned_to)", "MIN", "held_least"},
 			partColumn{"MAX(f.assigned_to)", "MAX", "held_most"})
 	}
-	// The columns of the table byState joins, wherever it joins it. Where the
-	// decided places are counted beside the first level, they are not here.
-	if f.asksDecided() && !f.decidedApart {
-		for _, flag := range decidedFlags {
-			columns = append(columns, partColumn{overRows.decided(flag), "SUM", flag})
-		}
-	}
+	// The decision flags are not among them: a filter asking how far a group
+	// has been decided counts its decided places beside the first level (see
+	// decidedBeside).
 	return columns
 }

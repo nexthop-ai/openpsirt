@@ -89,6 +89,11 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		if len(targets) == 0 {
 			return nil
 		}
+		// Inside the attempt, like the builds: the issues are read from the
+		// decisions as they stand when this attempt runs.
+		if err := inner.decidedIssuesFor(ctx, &narrowed, []int64{productID}, false); err != nil {
+			return err
+		}
 
 		pieces, err := inner.pieces(ctx, targets, visible, narrowed)
 		if err != nil {
@@ -231,10 +236,10 @@ func (s *Store) pieces(ctx context.Context, targets []int64, visible []access.Vi
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Fold            string `bun:"fold"`
 	}
-	q := openGroups(s.db, targets, visible).
+	q := filter.listed(s.db, targets, visible).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
-	if err := filter.narrow(q).Scan(ctx, &rows); err != nil {
+	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what the narrowing admits: %w", err)
 	}
 	out := make([]Piece, 0, len(rows))

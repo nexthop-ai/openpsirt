@@ -113,7 +113,8 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // asked of each place and so sits wherever the places are read. The list's own
 // groups count the decided places beside their first level instead (see
 // decidedBeside), a page's rows need neither (see ofPage), and this join
-// serves the groups another view keeps.
+// serves the groups another view keeps where the filter needs a decision (see
+// Filter.listed).
 //
 // These read the decision table and nothing else. `suppressed_by` is not a
 // decision of ours at all: it points at a suppression, and a suppression is a
@@ -153,32 +154,15 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		return q
 	}
 	// Built on decisionsOutward, which matches a decision to the places it
-	// covers at the versions they hold now. Across products nothing binds the
-	// decision's product, and SQLite left to choose starts from every open
-	// finding and reads every decision of its product once per row: 331 s to
-	// count the undecided among 425,680 open rows with 3,060 decisions, against
-	// 1.5 s with the decisions outermost and 0.83 s inside one product.
+	// covers at the versions they hold now, and bound to the one product the
+	// view narrows inside. A list spanning products counts its decided places
+	// beside its first level, so it never reaches this join.
 	decided := f.flagColumns(decisionsOutward(q))
 	if f.decidedIssues != nil {
 		// On the decisions, for the reason decidedBeside gives.
 		decided = f.amongDecidedIssues(decided, "dv.issue_id")
 	}
-	if f.Across {
-		// Across products it carries its own product, because it cannot reach
-		// the outer query's: the decision has to belong to the product the
-		// finding it answers for sits in, which is the same rule the bound
-		// number states inside one product. The kind of release is the other
-		// condition the outer query states on the stream.
-		decided = decided.
-			Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
-			Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
-			Where("de.product_id = st2.product_id")
-		if len(f.Workable.Kinds) == 1 {
-			decided = decided.Where("st2.kind = ?", f.Workable.Kinds[0])
-		}
-	} else {
-		decided = decided.Where("de.product_id = ?", f.ProductID)
-	}
+	decided = decided.Where("de.product_id = ?", f.ProductID)
 	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
 }
 

@@ -200,6 +200,54 @@ func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 		if total != 0 {
 			t.Errorf("agreed and differing between builds: %d groups, want none", total)
 		}
+
+		// CVE-2026-2 is in the first build only, so it differs between them;
+		// agreed at its one place, it is the one group both conditions keep.
+		// The total rather than the page, which one engine answers empty.
+		f.decidedAt(t, f.somebodyElse(t), f.placesOf(t, "CVE-2026-2")[swss.Name],
+			"approved", libnl.Version, swss.Version, "only-here")
+		_, total, err = f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
+			DiffersBetweenBuilds: true, States: []finding.ClaimStanding{finding.StandingAgreed},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 {
+			t.Errorf("agreed and in the first build alone: %d groups, want 1", total)
+		}
+	})
+}
+
+func TestAnOutcomeHoldsForAGroupOnlyWhereEveryPlaceIsAnsweredThatWay(t *testing.T) {
+	// One issue at two places. Dismissed as not applicable at one of them, the
+	// group is not a dismissal; dismissed at both, it is. Each place is counted
+	// once, so two decided places compare equal to the group's two places.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		places := f.placesOf(t, "CVE-2026-1")
+		if len(places) != 2 {
+			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
+		}
+		who := f.holding(t, access.PublicTriage)
+		dismissed := func(when string, want int) {
+			t.Helper()
+			here, across := f.listed(t, who, finding.Filter{Outcomes: []string{"not-applicable"}})
+			if here != want || across != want {
+				t.Errorf("%s: %d not applicable in the product and %d across products, want %d",
+					when, here, across, want)
+			}
+		}
+		by := f.somebodyElse(t)
+		f.decidedAt(t, by, places[swss.Name], "approved", libnl.Version, swss.Version, "under-swss")
+		dismissed("dismissed at one of two places", 0)
+		f.decidedAt(t, by, places[teamd.Name], "approved", libnl.Version, teamd.Version, "under-teamd")
+		dismissed("dismissed at both places", 1)
 	})
 }
 
