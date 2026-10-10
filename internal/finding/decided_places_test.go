@@ -149,3 +149,46 @@ func TestEachRowOfALapsedPageSaysItLapsed(t *testing.T) {
 		}
 	})
 }
+
+func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryPlaceInBothIsAnswered(t *testing.T) {
+	// The product's totals fold the build rows by issue and component, so the
+	// decided places of a group in two builds are added together before they
+	// are compared with its places. One decision at a place both builds hold
+	// answers both places, so the issue is agreed in each build and in the
+	// product; the second issue is undecided in all three.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, other, through(libnl))
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		by := f.somebodyElse(t)
+		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-1")[swss.Name], "approved", libnl.Version, swss.Version, "both")
+		builds, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 2 {
+			t.Fatalf("%d build rows, want 2", len(builds))
+		}
+		for _, build := range builds {
+			if build.Open != 2 || build.Agreed != 1 || build.Undecided != 1 {
+				t.Errorf("build %d: open %d, agreed %d, undecided %d; want 2, 1, 1",
+					build.TargetID, build.Open, build.Agreed, build.Undecided)
+			}
+		}
+		if whole.Open != 2 || whole.Agreed != 1 || whole.Undecided != 1 {
+			t.Errorf("the product: open %d, agreed %d, undecided %d; want 2, 1, 1",
+				whole.Open, whole.Agreed, whole.Undecided)
+		}
+	})
+}

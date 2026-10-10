@@ -1318,6 +1318,13 @@ both:
 | A lookup per place | The page's groups | A page reads a few hundred places |
 | One row per decided place, built once from the decisions and joined on the finding | The product page's totals and build rows | They read every open place in the product. As a lookup per place that is 367,000 lookups a statement: 2.1 s against 0.2 s joined with 13 decisions, and 4.6 s against 1.2 s with 133,000 |
 
+The product page reads its build rows and its totals from one statement, one row
+per build, issue and component, and folds those rows again by issue and
+component for the totals. Every column folds exactly: places and decided places
+are sums, the deadline a minimum, the exploitation flag a maximum. A second
+statement for the totals builds the table of decided places a second time, 0.9 s
+each with 133,549 decisions; the page takes 1.2 s against 2.0 s for two.
+
 Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
 went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
 s.
