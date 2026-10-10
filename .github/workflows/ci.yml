@@ -94,6 +94,9 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 20
 
     env:
+      # Whether this run writes the Go build and linter caches. One spelling,
+      # read by the steps that mark, prune and save them.
+      SAVES_CACHES: ${{ github.ref == 'refs/heads/main' }}
       OPENPSIRT_TEST_POSTGRES_URL: postgres://postgres:test@127.0.0.1:5432/openpsirt?sslmode=disable
       OPENPSIRT_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:3306/openpsirt
       OPENPSIRT_TEST_MARIADB_URL: mariadb://root:test@127.0.0.1:3307/openpsirt
@@ -139,6 +142,14 @@ jobs:
           path: ~/.cache/go-build
           key: go-build-${{ runner.os }}-${{ github.run_id }}
           restore-keys: go-build-${{ runner.os }}-
+      # The linter's results, kept the way the build cache is and for the same
+      # reason: they are content-addressed, so an entry for a file that has
+      # since changed is never read, and a cold run analyzes every package.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: golangci-lint-${{ runner.os }}-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           # The version the image builds the interface with. "make check" runs
@@ -156,6 +167,21 @@ jobs:
         # both directions, so an engine added here and nowhere else is caught.
         run: make engines-check
 
+      - name: Mark every restored cache entry as unused
+        # Both caches record a use by moving an entry's modification time to
+        # now, but only where it is more than an hour old, and they trim what
+        # is more than five days old. Two hours back puts every entry between
+        # the two, so each one this run reads is moved past the marker and
+        # nothing is trimmed before it is read.
+        if: env.SAVES_CACHES == 'true'
+        run: |
+          for cache in ~/.cache/go-build ~/.cache/golangci-lint; do
+            if [ -d "$cache" ]; then
+              find "$cache" -mindepth 2 -maxdepth 2 -exec touch -m -d '2 hours ago' {} +
+            fi
+          done
+          touch "$RUNNER_TEMP/caches-marked"
+
       - name: Everything the local gate checks
         # Deliberately one target rather than a list of them. "make check" is
         # the definition of what CI checks, so a target added to it is run
@@ -171,13 +197,31 @@ jobs:
         # being current, the bill of materials, and the interface.
         run: make check
 
+      - name: Drop the cache entries this run did not read
+        # An entry is a file or, for a built program, a directory, two levels
+        # down. What is left is what this tree needs, so the cache saved below
+        # is the size of one tree's build rather than of every tree built on
+        # main in the last five days.
+        if: env.SAVES_CACHES == 'true'
+        run: |
+          for cache in ~/.cache/go-build ~/.cache/golangci-lint; do
+            before=$(du -sm "$cache" | cut -f1)
+            find "$cache" -mindepth 2 -maxdepth 2 ! -newer "$RUNNER_TEMP/caches-marked" -exec rm -rf {} +
+            echo "$cache: ${before} MB before, $(du -sm "$cache" | cut -f1) MB kept"
+          done
+
       # Written here rather than beside the restore, so what is stored is the
       # compilation this job did rather than what it started with.
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        if: github.ref == 'refs/heads/main'
+        if: env.SAVES_CACHES == 'true'
         with:
           path: ~/.cache/go-build
           key: go-build-${{ runner.os }}-${{ github.run_id }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: env.SAVES_CACHES == 'true'
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ github.run_id }}
 
       - name: Confirm every engine ran, and that each was the engine it claimed
         # A skipped engine passes silently, which would make the matrix
