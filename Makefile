@@ -205,7 +205,21 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # milliseconds, and the better part of a minute across the tree on a runner
 # that runs the pass one package at a time. 100 ms keeps a window for a
 # goroutine mid-operation; nothing in the tests leaves one running on purpose.
-RACE_PASS    = GORACE=atexit_sleep_ms=100 OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1
+#
+# The SQLite engine is C translated to Go, and instrumenting it is most of what
+# the detector costs: an empty test under the detector spends 48% of its time in
+# the engine parsing the schema, and the pointer checks the detector turns on
+# another 16 to 22%. The translated engine and the C library it runs on are
+# compiled without either. The engine's Go driver stays instrumented: an error
+# it fills in uninstrumented leaves no record of that write, so our code reading
+# it is checked against whatever last used the memory and reported as a race.
+# Our code, the query builder and the standard library stay instrumented and
+# checked, and a race inside the translated C is the one thing no longer seen.
+# The compiler flags are not documented for this use; a Go release that
+# rejects one fails the build.
+RACE_UNWATCHED = -gcflags='modernc.org/sqlite/lib=-race=false -d=checkptr=0' \
+	-gcflags='modernc.org/libc/...=-race=false -d=checkptr=0'
+RACE_PASS    = GORACE=atexit_sleep_ms=100 OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race $(RACE_UNWATCHED) -count=1
 SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1
 
 # Both passes at once. They share no engine — the detector runs on SQLite and

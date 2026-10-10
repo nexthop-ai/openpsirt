@@ -560,6 +560,28 @@ the tree on a runner that runs the pass one package at a time. 100 ms keeps a
 window for a goroutine mid-operation; nothing in the tests leaves one running
 on purpose.
 
+The race pass compiles the SQLite engine's translated C, and the C library it
+runs on, without the detector and without the pointer checks the detector
+turns on. Instrumenting that code is most of what the detector costs: an empty
+test spends 57 ms under the detector against 4.4 ms without, 48% of it in the
+engine parsing the schema and another 16 to 22% in the pointer checks.
+
+| The race pass, every package, four cores | Processor time | Wall time | Races reported |
+|---|---|---|---|
+| Every package instrumented | 481 s | 123 s | None |
+| Pointer checks off in the engine's packages | 316 s | 81 s | None |
+| The translated engine left out | 235 s | 62 s | None |
+| The translated engine and its C library left out | 186 s | 49 s | None |
+| Every package of the engine left out, its Go driver included | 180 s | 57 s | False, in 3 of 10 runs of one package |
+
+| Rule | Why |
+|---|---|
+| The translated engine and its C library are left out, and nothing else | This tree, the engine's Go driver, the query builder and the standard library's database layer stay instrumented and checked |
+| The engine's Go driver stays instrumented | An error it fills in uninstrumented leaves no record of the write, so this tree reading it is checked against whatever last used that memory, and the report is a race that is not there |
+| A race inside the engine's translated C is not reported | That code is the one thing the pass no longer inspects |
+| A test races this tree's code against the standard library's database layer and expects the report | Leaving out this tree or the database layer as well silences it, and the test fails |
+| The compiler flags are not documented for turning the detector off in one package | A Go release that rejects one fails the build loudly, and the patterns are then removed or respelled |
+
 The two run at once. They share no engine, so neither can see the other's rows,
 and they are bottlenecked on different things — the detector is in-process work
 and the server pass spends its time waiting on a socket — so each fills what the
