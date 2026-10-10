@@ -787,7 +787,7 @@ would take off a working list.
 | Counted in the rating's own product | That is everywhere the rating reaches. A count spanning products would describe work this decision does not touch |
 | What is already below the line is not counted | Agreeing takes it off nothing |
 | Narrowed to what the reader may see | That understates the effect for them, which is the right way for it to be wrong: the alternative discloses a count of undisclosed work |
-| Worked out only for the claims that are waiting | Answering it for every historical claim would cost a query each to say nothing |
+| Worked out only for the claims that are waiting | A count for a historical claim answers a question nobody is being asked |
 | Worked out for a page at once | The ratings, which of their issues the reader may be told of, and each named product's line, then one grouped read of the findings for every rating on the page. Each rating is still counted over its own issue in its own product. A rating at a time, a page of fifty is 263 statements and 0.32 s, of which 20 ms is the database |
 
 ## Coverage count

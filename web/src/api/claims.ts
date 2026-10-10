@@ -90,13 +90,12 @@ export function claimOf(row: QueueRow): Claim {
 // How many claims wait in the review queue, in one product or across all of
 // them. Asked with a limit of zero, which answers the total and reads no
 // claim, and under one key per product, so every reader of the same count on
-// a screen shares one request.
-export function useQueueCount(
-  product?: string,
-  options: { enabled?: boolean; refetchInterval?: number } = {},
-) {
+// a screen shares one request. Every reader refreshes it every minute, so two
+// counts side by side are equally fresh.
+export function useQueueCount(product?: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["queue", "count", product ?? ""],
+    refetchInterval: 60_000,
     ...options,
     queryFn: async () =>
       unwrap(

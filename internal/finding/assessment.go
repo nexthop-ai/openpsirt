@@ -871,8 +871,9 @@ type Consequence struct {
 // Asked inside each rating's own product, because that is everywhere the
 // rating reaches.
 //
-// A rating that is not there, or not one this reader may be told of, has no
-// entry. The statements are per page: the ratings, which of their issues the
+// For a reader who is not a person every rating asked has an empty entry.
+// Otherwise a rating that is not there, or not one this reader may be told
+// of, has no entry. The statements are per page: the ratings, which of their issues the
 // reader may be told of and the line, per product the page names, and one
 // grouped read of the findings for every rating at once. A page of fifty
 // asked a rating at a time is 263 statements, which is round trips rather

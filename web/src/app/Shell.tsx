@@ -99,7 +99,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   }, [menu]);
 
   // The counts on the rail.
-  const queue = useQueueCount(undefined, { refetchInterval: 60_000 });
+  const queue = useQueueCount();
   // Rulings on vulnerability reports waiting for this reader, which sit in the
   // same queue as the claims.
   const approvable = useApprovable();

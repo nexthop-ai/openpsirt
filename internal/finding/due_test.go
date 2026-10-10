@@ -959,3 +959,67 @@ func TestPagingWhatIsRunningOutVisitsEveryRowOnceInOneOrder(t *testing.T) {
 		}
 	})
 }
+
+func TestPagingWhatIsRunningOutPlacesRowsThatDifferOnlyInBeingExploited(t *testing.T) {
+	// A merge refiles the gone issue's findings with their flag as it was, so
+	// one issue at one component in one build can be two rows, one exploited
+	// and one not, due at the same moment. A page of one falls between them.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-MERGED", Severity: "high"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		run := f.run(t)
+		due := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond)
+		purl := "pkg:golang/stdlib@go1.23.0"
+		component := &graph.Component{
+			Identity: purl, Purl: purl, Name: "stdlib", NameFolded: graph.Folded("stdlib"),
+			Version: "go1.23.0", FirstSeenAt: time.Now().Truncate(time.Microsecond),
+		}
+		if _, err := f.db.DB.NewInsert().Model(component).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// The place that is not exploited is inserted first, and a grouping
+		// sorted on its keys reads it first too, so an order that leaves the
+		// flag to the plan reads the rows the other way round.
+		for _, exploited := range []bool{false, true} {
+			place := purl
+			if exploited {
+				place += "#exploited"
+			}
+			row := &finding.Finding{
+				TargetID: f.target, Kind: finding.Vulnerable,
+				VulnerabilityID: interned["CVE-2026-MERGED"], Visibility: access.Public,
+				ComponentID: component.ID, PlaceIdentity: place,
+				LastChangedAt: time.Now().Truncate(time.Microsecond),
+				OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
+				DueAt: &due, RankExploited: exploited,
+			}
+			if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		who := f.holding(t, access.PublicTriage)
+		var order []bool
+		for offset := 0; offset < 3; offset++ {
+			page, total, err := f.store.RunningOutPage(ctx, who, finding.Scope{},
+				14*24*time.Hour, 1, offset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != 2 {
+				t.Fatalf("the list holds %d rows, want one exploited and one not", total)
+			}
+			for _, row := range page {
+				order = append(order, row.Exploited)
+			}
+		}
+		if len(order) != 2 || !order[0] || order[1] {
+			t.Fatalf("paged one at a time the rows read exploited %v, want [true false]", order)
+		}
+	})
+}

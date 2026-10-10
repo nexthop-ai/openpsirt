@@ -213,8 +213,9 @@ figure.
 What is running out of time orders totally, so every row has one place and a
 page boundary between rows that tie on the deadline, the issue and the name
 repeats none and skips none. The order ends at the build, the component's
-version and the component, because one name ships at several versions in one
-build.
+version, the component and whether the row is exploited, exploited first,
+because one name ships at several versions in one build, and a merge can leave
+one component with an exploited row and one that is not.
 
 The three that keep a limit alone are the pickers: who holds something, who may
 be mentioned, and what sits at the top of one build's tree. Each is a list
