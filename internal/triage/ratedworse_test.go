@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -277,6 +278,68 @@ func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
 		if total != 1 || len(listed) != 1 || listed[0].Claim.ID != first.ClaimID {
 			t.Errorf("listed %d of %d, want the lapsed claim beside its standing sibling",
 				len(listed), total)
+		}
+	})
+}
+
+// holdUnder moves a finding to another issue.
+func (f *fixture) holdUnder(t *testing.T, findingID, issue int64) {
+	t.Helper()
+	if _, err := f.db.DB.NewUpdate().Table("finding").Set("vulnerability_id = ?", issue).
+		Where("id = ?", findingID).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestARiseLapsesAClaimUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t *testing.T) {
+	// A claim stays filed under the name it was made against when that name
+	// merges into another, and the findings it covers are then held under
+	// the other. A claim at a place whose finding moved to an unrelated issue
+	// covers nothing, however the names line up.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		filed := f.secondIssue(t)
+		unrelated, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-3", Severity: "low"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		in := f.build(t, f.product, "rated-merged")
+		claims := map[string]int64{}
+		held := map[string]int64{}
+		for _, place := range []string{"merged", "moved-away"} {
+			row := f.finds(t, in, f.component(t, "lib-"+place, "1.2.3"), place, access.Public)
+			f.holdUnder(t, row, filed)
+			at := f.at()
+			at.VulnerabilityID, at.PlaceIdentity, at.ConsumerUpstream = filed, place, ""
+			decision := f.judged(t, at, 300)
+			if err := agreeTo(ctx, f.store, f.reviewer, decision.ClaimID, ""); err != nil {
+				t.Fatal(err)
+			}
+			claims[place], held[place] = decision.ID, row
+		}
+		// The name merges into the fixture's issue, which now holds the
+		// finding at the first place. The second place's finding is another
+		// issue's.
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set("issue_id = ?", f.issue).
+			Where("id = ?", filed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.holdUnder(t, held["merged"], f.issue)
+		f.holdUnder(t, held["moved-away"], unrelated["CVE-2026-3"])
+
+		f.rateIssue(t, 980)
+		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.target}); err != nil {
+			t.Fatal(err)
+		}
+		if state := f.stateOf(t, claims["merged"]); state != triage.LapsedState {
+			t.Errorf("a claim under the merged name is %q after the issue it is read as was rated worse",
+				state)
+		}
+		if state := f.stateOf(t, claims["moved-away"]); state != triage.Approved {
+			t.Errorf("a claim whose finding is another issue's is %q after a rise, and it covers nothing",
+				state)
 		}
 	})
 }

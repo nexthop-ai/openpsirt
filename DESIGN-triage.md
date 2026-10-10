@@ -1125,6 +1125,8 @@ what rated worse means.
 | The proposer is told why | `DESIGN-notifications.md` § Claim outcomes |
 | Why a claim lapsed is worked out when it is read, not stored | A version that no longer matches anything open and a rating in a higher band are both facts about the present. Both can hold |
 | Failing to mark is reported and not fatal | The claim stands until the next scan with the issue open sweeps again |
+| A claim covering nothing open in its product is not marked | Its proposer would be told a finding is open again where none is, and re-affirming it would find nothing to re-make |
+| Covering is asked of the issue the claim is read as | A claim under a name that merged into another covers the findings held under the other. The finding's issue is compared with that issue, which the sweep has already joined: 1.37 s for the sweep after a rescan of 324,508 open findings beside 133,549 decisions, and 64.3 s through an existence test on the name nested inside the covering test |
 
 A claim also lapses when a report merges two issues and it is one of two live
 decisions at one place, the one with less standing. The merge records which
