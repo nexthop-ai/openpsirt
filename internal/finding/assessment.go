@@ -860,56 +860,107 @@ type Consequence struct {
 	OffTheList int
 }
 
-// WhatAgreeingWouldDo works out what putting a proposed rating in force would
-// take off a working list.
+// WhatAgreeingWouldDo works out what putting each of these proposed ratings
+// in force would take off a working list, keyed by assessment.
 //
 // Asked of what the reader may see, like everything else here: an approver who
 // cannot see what a finding says is not told how many of them this would hide.
 // That understates the effect for them, which is the right way for it to be
 // wrong — the alternative discloses a count of undisclosed work.
 //
-// Asked inside the rating's own product, because that is everywhere the rating
-// reaches.
+// Asked inside each rating's own product, because that is everywhere the
+// rating reaches.
+//
+// For a reader who is not a person every rating asked has an empty entry.
+// Otherwise a rating that is not there, or not one this reader may be told
+// of, has no entry. The statements are per page: the ratings, which of their issues the
+// reader may be told of and the line, per product the page names, and one
+// grouped read of the findings for every rating at once. A page of fifty
+// asked a rating at a time is 263 statements, which is round trips rather
+// than database time: 20 ms of execution in 0.32 s.
 func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
-	assessmentID int64) (Consequence, error) {
+	assessmentIDs []int64) (map[int64]Consequence, error) {
 
+	held := make(map[int64]Consequence, len(assessmentIDs))
 	if subject.Kind != access.Person {
-		return Consequence{}, nil
+		for _, id := range assessmentIDs {
+			held[id] = Consequence{}
+		}
+		return held, nil
 	}
-	claim := new(Assessment)
-	if err := s.db.NewSelect().Model(claim).Where("id = ?", assessmentID).
-		Scan(ctx); err != nil {
-		return Consequence{}, database.FromRead(err, ErrNoSuchAssessment,
-			fmt.Sprintf("read assessment %d", assessmentID))
+	var claims []Assessment
+	if err := database.IDsInBatches(ctx, assessmentIDs, func(ctx context.Context, batch []int64) error {
+		var read []Assessment
+		if err := s.db.NewSelect().Model(&read).Where("id IN (?)", bun.List(batch)).
+			Scan(ctx); err != nil {
+			return fmt.Errorf("read these assessments: %w", err)
+		}
+		claims = append(claims, read...)
+		return nil
+	}); err != nil {
+		return nil, err
 	}
+
 	// Enforced here as well as on the list that reaches it, because this
 	// is the layer that answers and a caller that arrived another way
 	// would otherwise be told the shape of an issue it may not be told
-	// about. Asked of the claim's own product, which is the only place this
-	// rating reaches.
-	told, err := MayBeToldOfWithin(ctx, s.db, subject, claim.ProductID, claim.VulnerabilityID)
-	if err != nil {
-		return Consequence{}, err
+	// about. Asked of each claim's own product, which is the only place
+	// its rating reaches.
+	issuesIn := map[int64][]int64{}
+	for _, claim := range claims {
+		issuesIn[claim.ProductID] = append(issuesIn[claim.ProductID], claim.VulnerabilityID)
 	}
-	if !told {
-		return Consequence{}, ErrNoSuchAssessment
+	told := map[int64]map[int64]bool{}
+	for product, issues := range issuesIn {
+		here, err := s.ToldOfIn(ctx, subject, product, issues)
+		if err != nil {
+			return nil, err
+		}
+		told[product] = here
 	}
-
+	var asked []Assessment
+	for _, claim := range claims {
+		if told[claim.ProductID][claim.VulnerabilityID] {
+			asked = append(asked, claim)
+		}
+	}
+	if len(asked) == 0 {
+		return held, nil
+	}
 	products, all := subject.Products()
 	if !all && len(products) == 0 {
-		return Consequence{}, nil
+		for _, claim := range asked {
+			held[claim.ID] = Consequence{}
+		}
+		return held, nil
 	}
 
-	floor, err := FloorFor(ctx, s.db, claim.ProductID)
-	if err != nil {
-		return Consequence{}, err
+	floors := map[int64]Floor{}
+	var ratedIn, filed []int64
+	for _, claim := range asked {
+		filed = append(filed, claim.VulnerabilityID)
+		if _, read := floors[claim.ProductID]; read {
+			continue
+		}
+		floor, err := FloorFor(ctx, s.db, claim.ProductID)
+		if err != nil {
+			return nil, err
+		}
+		floors[claim.ProductID] = floor
+		ratedIn = append(ratedIn, claim.ProductID)
 	}
 
 	// Grouped rather than row by row: what decides the answer is whether the
 	// finding is exploited and what it is rated now, and a build carries
-	// thousands of findings of one issue.
-	var rows []struct {
-		Exploited bool `bun:"exploited"`
+	// thousands of findings of one issue. Each issue asked is read as the
+	// issue it stands for, keyed by the name the rating was filed under, and
+	// each finding is rated in its own stream's product. The two lists admit
+	// an issue of one rating in the product of another, and those groups are
+	// read and left out below.
+	type group struct {
+		Filed     int64 `bun:"filed"`
+		ProductID int64 `bun:"product_id"`
+		Exploited bool  `bun:"exploited"`
 		// The line admits either exploitation signal, so a count of what a
 		// milder rating would take off the list has to read both. Reading one
 		// of them offered an approver a number that promised to hide findings
@@ -918,39 +969,59 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Severity      string `bun:"severity"`
 		Open          int    `bun:"open"`
 	}
-	q := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(rating.Here, claim.ProductID).
-		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
-		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-		ColumnExpr(`COUNT(*) AS "open"`).
-		Where(HeldAs("f.vulnerability_id"), claim.VulnerabilityID).
-		Where("f.closed_at IS NULL").
-		Where("st.product_id = ?", claim.ProductID).
-		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, " + rating.EffectiveExpr)
-	// Narrowed across every product, not only the claim's: an approver
-	// holding one product is not told how many findings this issue has in
-	// products they hold nothing on.
-	q = onlyReadable(q, subject, products, all)
-	if err := q.Scan(ctx, &rows); err != nil {
-		return Consequence{}, fmt.Errorf("read what this issue is open against: %w", err)
+	type pair struct{ filed, product int64 }
+	rows := map[pair][]group{}
+	if err := database.IDsInBatches(ctx, distinct(filed), func(ctx context.Context, batch []int64) error {
+		var read []group
+		q := s.db.NewSelect().
+			TableExpr(IssueFindings("f")).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(rating.For(rating.OnStream)).
+			ColumnExpr(`"si"."id" AS "filed"`).
+			ColumnExpr(`st.product_id AS "product_id"`).
+			ColumnExpr(`f.urgency_exploited AS "exploited"`).
+			ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
+			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
+			ColumnExpr(`COUNT(*) AS "open"`).
+			Where(`"si"."id" IN (?)`, bun.List(batch)).
+			Where("f.closed_at IS NULL").
+			Where("st.product_id IN (?)", bun.List(ratedIn)).
+			GroupExpr(`"si"."id", st.product_id, f.urgency_exploited, f.urgency_exploited_here, ` +
+				rating.EffectiveExpr)
+		// Narrowed across every product, not only the claim's: an approver
+		// holding one product is not told how many findings this issue has in
+		// products they hold nothing on.
+		q = onlyReadable(q, subject, products, all)
+		if err := q.Scan(ctx, &read); err != nil {
+			return fmt.Errorf("read what these issues are open against: %w", err)
+		}
+		for _, row := range read {
+			at := pair{filed: row.Filed, product: row.ProductID}
+			rows[at] = append(rows[at], row)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	held := Consequence{}
-	for _, row := range rows {
-		held.Findings += row.Open
-		// Only what the line admits today and would not admit after. A finding
-		// already below it is not taken off anything by this, and saying it
-		// was would inflate the number an approver is being asked to weigh.
-		exploited := row.Exploited || row.ExploitedHere
-		if floor.Admits(exploited, row.Severity) &&
-			!floor.Admits(exploited, claim.Severity) {
-			held.OffTheList += row.Open
+	for _, claim := range asked {
+		floor := floors[claim.ProductID]
+		would := Consequence{}
+		for _, row := range rows[pair{filed: claim.VulnerabilityID, product: claim.ProductID}] {
+			would.Findings += row.Open
+			// Only what the line admits today and would not admit after. A
+			// finding already below it is not taken off anything by this, and
+			// saying it was would inflate the number an approver is being
+			// asked to weigh.
+			exploited := row.Exploited || row.ExploitedHere
+			if floor.Admits(exploited, row.Severity) &&
+				!floor.Admits(exploited, claim.Severity) {
+				would.OffTheList += row.Open
+			}
 		}
+		held[claim.ID] = would
 	}
 	return held, nil
 }

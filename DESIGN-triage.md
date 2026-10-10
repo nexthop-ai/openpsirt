@@ -787,7 +787,8 @@ would take off a working list.
 | Counted in the rating's own product | That is everywhere the rating reaches. A count spanning products would describe work this decision does not touch |
 | What is already below the line is not counted | Agreeing takes it off nothing |
 | Narrowed to what the reader may see | That understates the effect for them, which is the right way for it to be wrong: the alternative discloses a count of undisclosed work |
-| Worked out only for the claims that are waiting | Answering it for every historical claim would cost a query each to say nothing |
+| Worked out only for the claims that are waiting | A count for a historical claim answers a question nobody is being asked |
+| Worked out for a page at once | The ratings, which of their issues the reader may be told of, and each named product's line, then one grouped read of the findings for every rating on the page. Each rating is still counted over its own issue in its own product. A rating at a time, a page of fifty is 263 statements and 0.32 s, of which 20 ms is the database |
 
 ## Coverage count
 
@@ -1125,6 +1126,8 @@ what rated worse means.
 | The proposer is told why | `DESIGN-notifications.md` § Claim outcomes |
 | Why a claim lapsed is worked out when it is read, not stored | A version that no longer matches anything open and a rating in a higher band are both facts about the present. Both can hold |
 | Failing to mark is reported and not fatal | The claim stands until the next scan with the issue open sweeps again |
+| A claim covering nothing open in its product is not marked | Its proposer would be told a finding is open again where none is, and re-affirming it would find nothing to re-make |
+| Covering is asked of the issue the claim is read as | A claim under a name that merged into another covers the findings held under the other. The finding's issue is compared with that issue, which the sweep has already joined: 1.37 s for the sweep after a rescan of 324,508 open findings beside 133,549 decisions, and 64.3 s through an existence test on the name nested inside the covering test |
 
 A claim also lapses when a report merges two issues and it is one of two live
 decisions at one place, the one with less standing. The merge records which

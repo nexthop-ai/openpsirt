@@ -212,6 +212,13 @@ well — a caller holding a full page cannot otherwise tell a clipped page from
 the whole list, and a screen then prints the length of its own page as the
 figure.
 
+What is running out of time orders totally, so every row has one place and a
+page boundary between rows that tie on the deadline, the issue and the name
+repeats none and skips none. The order ends at the build, the component's
+version, the component and whether the row is exploited, exploited first,
+because one name ships at several versions in one build, and a merge can leave
+one component with an exploited row and one that is not.
+
 The three that keep a limit alone are the pickers: who holds something, who may
 be mentioned, and what sits at the top of one build's tree. Each is a list
 somebody scrolls once.

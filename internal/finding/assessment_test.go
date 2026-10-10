@@ -332,10 +332,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		would, err := f.store.WhatAgreeingWouldDo(ctx, who, claim.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		would := f.agreeing(t, who, claim.ID)
 		if would.Findings != 2 {
 			t.Errorf("agreeing was measured against %+v, want two findings", would)
 		}
@@ -352,10 +349,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		would, err = f.store.WhatAgreeingWouldDo(ctx, who, crossing.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		would = f.agreeing(t, who, crossing.ID)
 		if would.OffTheList == 0 {
 			t.Fatal("a downgrade below the line reported nothing coming off it")
 		}
@@ -363,6 +357,20 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 			t.Errorf("it takes %d findings off the list, want 2", would.OffTheList)
 		}
 	})
+}
+
+// agreeing is what agreeing to one rating would do, asked alone.
+func (f *fixture) agreeing(t *testing.T, who access.Subject, id int64) finding.Consequence {
+	t.Helper()
+	would, err := f.store.WhatAgreeingWouldDo(t.Context(), who, []int64{id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	consequence, known := would[id]
+	if !known {
+		t.Fatalf("what agreeing to rating %d would do has no answer", id)
+	}
+	return consequence
 }
 
 func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
@@ -400,19 +408,13 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		public, err := f.store.WhatAgreeingWouldDo(ctx, who, claim.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		public := f.agreeing(t, who, claim.ID)
 		if public.Findings != 1 || public.OffTheList != 1 {
 			t.Errorf("a public reader was told %+v, want the one place they may see", public)
 		}
 
 		everything := f.holding(t, access.PublicTriage, access.PrivateRead)
-		all, err := f.store.WhatAgreeingWouldDo(ctx, everything, claim.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		all := f.agreeing(t, everything, claim.ID)
 		if all.Findings != 2 || all.OffTheList != 2 {
 			t.Errorf("a reader who may see both was told %+v, want both places", all)
 		}
@@ -466,10 +468,7 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		would, err := f.store.WhatAgreeingWouldDo(ctx, who, claim.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		would := f.agreeing(t, who, claim.ID)
 		if would.Findings != 2 {
 			t.Fatalf("measured against %+v, want the two findings in the rating's own product",
 				would)
@@ -660,10 +659,7 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		would, err := f.store.WhatAgreeingWouldDo(t.Context(), who, claim.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		would := f.agreeing(t, who, claim.ID)
 		if would.Findings != 1 {
 			t.Errorf("an approver holding one product was told this rating covers %d findings,"+
 				" want the one in that product — the other product's is neither reached by it"+
@@ -999,7 +995,7 @@ func TestWhatAgreeingWouldDoOverAFailedReadIsNotAnAbsentClaim(t *testing.T) {
 		t.Fatal(err)
 	}
 	who := access.NewPerson(1, "approver", false, nil, 101)
-	_, err = finding.NewStore(gone.DB).WhatAgreeingWouldDo(t.Context(), who, 1)
+	_, err = finding.NewStore(gone.DB).WhatAgreeingWouldDo(t.Context(), who, []int64{1})
 	if err == nil {
 		t.Fatal("a database nobody can reach answered what agreeing would do")
 	}
@@ -1043,6 +1039,96 @@ func TestARatingIsListedByWhatItsOwnIssueReachesAndNotByAnotherIssue(t *testing.
 			}
 			t.Errorf("a reader of disclosed work is shown ratings of issues %v (total %d);"+
 				" want only %d, not the undisclosed %d", listed, total, public, hidden)
+		}
+	})
+}
+
+// pageOfRatings is three proposed downgrades across two products that both
+// ship one of the two issues: one issue rated in each product, and the other
+// issue rated in the first.
+func (f *fixture) pageOfRatings(t *testing.T) (access.Subject, []int64) {
+	t.Helper()
+	ctx := t.Context()
+	if err := setting.NewStore(f.db.DB).Set(ctx, setting.TriageFloor, "medium"); err != nil {
+		t.Fatal(err)
+	}
+	f.shipped(t, twoConsumers())
+	elsewhere := f.inAnotherProduct(t, "second-product")
+	f.shippedTo(t, elsewhere, twoConsumers())
+	shared := found("CVE-2026-PAGE-A", libnl)
+	shared.Issue.Severity = "high"
+	own := found("CVE-2026-PAGE-B", swss)
+	own.Issue.Severity = "critical"
+	if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		[]finding.Reported{shared, own}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+		[]finding.Reported{shared}); err != nil {
+		t.Fatal(err)
+	}
+
+	f.recorded(t, 1, "someone")
+	there := f.productOf(t, elsewhere)
+	who := f.holdingIn(t, []int64{f.productID, there}, access.PublicTriage, access.PrivateTriage)
+	var ids []int64
+	for _, rated := range []struct {
+		product int64
+		issue   string
+	}{{f.productID, "CVE-2026-PAGE-A"}, {there, "CVE-2026-PAGE-A"}, {f.productID, "CVE-2026-PAGE-B"}} {
+		claim, err := f.store.Assess(ctx, who, rated.product, f.issue(t, rated.issue),
+			"low", "Not worth an afternoon.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, claim.ID)
+	}
+	return who, ids
+}
+
+func TestWhatAgreeingWouldDoAnswersEachRatingOnAPageAsItDoesAlone(t *testing.T) {
+	// One read for a page of ratings. Each is still counted over its own
+	// issue in its own product: the same issue rated in another product on
+	// the same page adds nothing to it.
+	each(t, func(t *testing.T, f *fixture) {
+		who, ids := f.pageOfRatings(t)
+		page, err := f.store.WhatAgreeingWouldDo(t.Context(), who, ids)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != len(ids) {
+			t.Fatalf("a page of %d ratings answered %d", len(ids), len(page))
+		}
+		for _, id := range ids {
+			alone := f.agreeing(t, who, id)
+			if alone.Findings == 0 {
+				t.Fatalf("rating %d is measured against nothing, so this compares nothing", id)
+			}
+			if page[id] != alone {
+				t.Errorf("rating %d reads %+v on a page and %+v alone", id, page[id], alone)
+			}
+		}
+	})
+}
+
+func TestWhatAgreeingWouldDoCostsNoMoreStatementsForMoreRatingsInAProduct(t *testing.T) {
+	// The statements are per page and per product the page names, never per
+	// rating, so a page's cost does not grow with the round trips to a
+	// distant database.
+	each(t, func(t *testing.T, f *fixture) {
+		who, ids := f.pageOfRatings(t)
+		// The first and third are in one product.
+		asked := func(ids []int64) int64 {
+			counted := &counter{}
+			f.db.AddQueryHook(counted)
+			if _, err := f.store.WhatAgreeingWouldDo(t.Context(), who, ids); err != nil {
+				t.Fatal(err)
+			}
+			return counted.queries.Load()
+		}
+		one, two := asked(ids[:1]), asked([]int64{ids[0], ids[2]})
+		if one != two {
+			t.Errorf("one rating took %d statements and two in the same product took %d", one, two)
 		}
 	})
 }

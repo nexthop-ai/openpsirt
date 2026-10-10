@@ -92,7 +92,7 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 				continue
 			}
 			var rows []int64
-			q := tx.NewSelect().Model((*Decision)(nil)).
+			q := tx.NewSelect().TableExpr(finding.Decisions).
 				ColumnExpr("de.id").
 				Where("de.claim_id = ?", group.ClaimID).
 				Where("de.product_id = ?", group.ProductID).
@@ -145,19 +145,26 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 }
 
 // coversSomething keeps the decisions an open finding in their product still
-// matches, at the versions they were made against, for a query over decision
-// AS "de".
+// matches, at the versions they were made against, for a query over
+// finding.Decisions.
 //
 // A decision covering nothing is not a judgment anybody is relying on. Lapsed
 // for a rating, its proposer would be told the finding is open again when none
 // is, and re-affirming it would find nothing to re-make.
+//
+// The finding's issue is compared with the issue the decision is read as,
+// which the statement has already joined. SameIssue in its place nests a
+// second EXISTS inside this one, and PostgreSQL then probes every live
+// decision against the product's open findings: 64.3 s for the sweep after a
+// rescan of a build of 324,508 open findings with 133,549 decisions, against
+// 1.37 s for the same 2,858 groups compared directly.
 var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
 	` JOIN "component" AS "c" ON c.id = fc.component_id` +
 	` LEFT JOIN "component" AS "uc" ON uc.id = fc.consumer_id` +
 	` JOIN "target" AS "tgc" ON tgc.id = fc.target_id` +
 	` JOIN "stream" AS "stc" ON stc.id = tgc.stream_id` +
 	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
-	` AND ` + finding.SameIssue("fc.vulnerability_id", "de.vulnerability_id") +
+	` AND fc.vulnerability_id = dv.issue_id` +
 	` AND fc.place_identity = de.place_identity` +
 	` AND COALESCE(de.component_upstream_version, '') = ` + finding.ComponentUpstreamExpr +
 	` AND COALESCE(de.consumer_upstream_version, '') = ` + finding.ConsumerUpstreamExpr + `)`

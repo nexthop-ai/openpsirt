@@ -251,6 +251,19 @@ func registerAssessment(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what these ratings belong to could not be read", err)
 		}
+		// Only for the ones somebody is being asked to agree to. It is a
+		// question about a decision not yet taken, and asking it of every
+		// historical claim would buy nothing. Asked once for the page.
+		var waiting []int64
+		for _, claim := range claims {
+			if claim.State == finding.AssessmentProposed && claim.NeedsApproval {
+				waiting = append(waiting, claim.ID)
+			}
+		}
+		would, err := store.WhatAgreeingWouldDo(ctx, subject, waiting)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "what agreeing would do could not be worked out", err)
+		}
 		out := &core.ListOutput[AssessmentBody]{}
 		out.Body.Total = total
 		out.Body.Items = make([]AssessmentBody, 0, len(claims))
@@ -258,21 +271,14 @@ func registerAssessment(api huma.API, in core.Deps) {
 			body := assessmentBody(claim, named[claim.VulnerabilityID], subject.ID)
 			body.Product = products[claim.ProductID]
 			body.ProductName = shown[claim.ProductID]
-			// Only for the ones somebody is being asked to agree to. It is a
-			// question about a decision not yet taken, and a query each for
-			// every historical claim would buy nothing.
 			if claim.State == finding.AssessmentProposed && claim.NeedsApproval {
-				would, err := store.WhatAgreeingWouldDo(ctx, subject, claim.ID)
 				// A claim that stopped being readable between the list and
-				// this loop leaves its counts off rather than failing the
-				// whole page.
-				if errors.Is(err, finding.ErrNoSuchAssessment) {
+				// this read is left off rather than failing the whole page.
+				consequence, known := would[claim.ID]
+				if !known {
 					continue
 				}
-				if err != nil {
-					return nil, core.WentWrong(in.Logger, "what agreeing would do could not be worked out", err)
-				}
-				body.Open, body.OffTheList = would.Findings, would.OffTheList
+				body.Open, body.OffTheList = consequence.Findings, consequence.OffTheList
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
