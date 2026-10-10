@@ -55,9 +55,10 @@ func open(t *testing.T, url string) *database.DB {
 // through Up passes with the entire advisory lock deleted. It proves the mutex
 // and nothing else. This drives acquire directly, from two separate pools.
 func TestLockExcludesAnotherConnection(t *testing.T) {
-	// Otherwise the second attempt waits five minutes.
+	// Otherwise the second attempt waits five minutes. The bound is whole
+	// seconds, and one is the least that still waits.
 	restore := lockWaitSeconds
-	lockWaitSeconds = 2
+	lockWaitSeconds = 1
 	t.Cleanup(func() { lockWaitSeconds = restore })
 
 	for name, env := range map[database.Engine]string{
@@ -394,20 +395,22 @@ func TestAPoolOfOneIsRefusedRatherThanWaitedOn(t *testing.T) {
 // end this one and hand the lock to a waiting replica.
 func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
 	restoreWait, restoreEvery := lockWaitSeconds, keepAliveEvery
-	lockWaitSeconds, keepAliveEvery = 1, 500*time.Millisecond
+	lockWaitSeconds, keepAliveEvery = 1, 250*time.Millisecond
 	t.Cleanup(func() { lockWaitSeconds, keepAliveEvery = restoreWait, restoreEvery })
 
 	servers(t, func(t *testing.T, engine database.Engine, address string) {
-		// Every session of the holder's pool is ended after two idle seconds.
+		// Every session of the holder's pool is ended after one idle second,
+		// the least the MySQL-protocol servers take, and a second instance
+		// asks after twice that.
 		idle, err := url.Parse(address)
 		if err != nil {
 			t.Fatal(err)
 		}
 		q := idle.Query()
 		if engine == database.Postgres {
-			q.Set("idle_session_timeout", "2s")
+			q.Set("idle_session_timeout", "1s")
 		} else {
-			q.Set("wait_timeout", "2")
+			q.Set("wait_timeout", "1")
 		}
 		idle.RawQuery = q.Encode()
 		holder := open(t, idle.String())
@@ -418,7 +421,7 @@ func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the first instance could not take the lock: %v", err)
 		}
-		time.Sleep(4 * time.Second)
+		time.Sleep(2 * time.Second)
 		if again, err := acquire(ctx, waiting); err == nil {
 			_ = again(ctx)
 			t.Fatal("the holder's session was ended while idle and a waiting instance took the lock")

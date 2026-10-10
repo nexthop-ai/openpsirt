@@ -471,8 +471,12 @@ func TestAnInventoryThatStatesNoBuildTimeIsDatedOnArrival(t *testing.T) {
 		// The same bytes sent again are the upload already held, and are
 		// answered with the time that upload was given rather than the
 		// time of the retry: the stored row keeps its first time, and the
-		// answer says what the row says.
-		time.Sleep(1100 * time.Millisecond)
+		// answer says what the row says. Sent once the clock has reached a
+		// later second than the first was dated, which is the precision the
+		// answer carries, so a retry dated afresh would read differently.
+		for time.Now().Before(built.Add(time.Second)) {
+			time.Sleep(10 * time.Millisecond)
+		}
 		if code, again := f.Send(t, httpapitest.Upload(t, f.Path, undated("2.41"))); code != http.StatusOK ||
 			again.BuiltAt != got.BuiltAt {
 			t.Errorf("the same undated bytes again answered %d dated %q, want 200 dated %q",

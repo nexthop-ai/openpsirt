@@ -68,9 +68,8 @@ func TestTwoUploadsOfOneFileRacingToWriteAnswerThatItIsHeld(t *testing.T) {
 			})
 			second <- got
 		}()
-		// Long enough for the second to have decided and to be waiting on the
-		// first's row.
-		time.Sleep(500 * time.Millisecond)
+		// Once the second has decided and is waiting on the first's row.
+		dbtest.UntilWaitingOnALock(t, db)
 		if err := first.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +103,7 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 			second <- ingest.NewStore(db.DB).Refused(ctx, sender,
 				ingest.Refusal{TargetID: target, Reason: "second"})
 		}()
-		time.Sleep(500 * time.Millisecond)
+		dbtest.UntilWaitingOnALock(t, db)
 		if err := first.Commit(); err != nil {
 			t.Fatal(err)
 		}
