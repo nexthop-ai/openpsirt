@@ -4,54 +4,79 @@
 package sbom_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
-// openFullSize decompresses the full-size fixture.
-//
-// Kept compressed in the repository: the shape is what matters and twenty
-// megabytes of it in every checkout is not.
-func openFullSize(t *testing.T) *os.File {
+// fullSize is the full-size fixture as read, once per binary. Every test of
+// it only reads the result, and decompressing and reading it is most of what
+// this package's tests cost.
+var fullSize struct {
+	once sync.Once
+	doc  *sbom.Document
+	err  error
+}
+
+// readFullSize returns the full-size fixture as the reader reads it.
+func readFullSize(t *testing.T) *sbom.Document {
 	t.Helper()
 	if _, err := exec.LookPath("xz"); err != nil {
 		t.Skip("xz is not available, so the full-size fixture cannot be read here")
 	}
+	fullSize.once.Do(func() {
+		fullSize.doc, fullSize.err = decompressAndRead(t.TempDir())
+	})
+	if fullSize.err != nil {
+		t.Fatal(fullSize.err)
+	}
+	return fullSize.doc
+}
 
+// decompressAndRead decompresses the full-size fixture into dir and reads it.
+//
+// Kept compressed in the repository: the shape is what matters and twenty
+// megabytes of it in every checkout is not.
+func decompressAndRead(dir string) (*sbom.Document, error) {
 	// Opened relative to a directory this test made, so the name cannot reach
 	// outside it however this file is later edited.
-	dir, err := os.OpenRoot(t.TempDir())
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	t.Cleanup(func() { _ = dir.Close() })
+	defer func() { _ = root.Close() }()
 
 	const name = "switch-image.cdx.json"
-	out, err := dir.Create(name)
+	out, err := root.Create(name)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	cmd := exec.Command("xz", "--decompress", "--stdout", "testdata/switch-image.cdx.json.xz")
 	cmd.Stdout = out
 	runErr := cmd.Run()
 	if err := out.Close(); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	if runErr != nil {
-		t.Fatalf("decompress the fixture: %v", runErr)
+		return nil, fmt.Errorf("decompress the fixture: %w", runErr)
 	}
 
-	f, err := dir.Open(name)
+	f, err := root.Open(name)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	t.Cleanup(func() { _ = f.Close() })
-	return f
+	defer func() { _ = f.Close() }()
+	doc, err := sbom.Read(f, sbom.Limits{})
+	if err != nil {
+		return nil, fmt.Errorf("read the fixture: %w", err)
+	}
+	return doc, nil
 }
 
 func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
@@ -64,12 +89,7 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// Taking a producer's identifier verbatim makes each spelling a component
 	// of its own, which double-counts the package, splits its findings, and
 	// gives half of them no vulnerability-database identifier.
-	f := openFullSize(t)
-
-	snapshot, err := sbom.Read(f, sbom.Limits{})
-	if err != nil {
-		t.Fatalf("read the fixture: %v", err)
-	}
+	snapshot := readFullSize(t)
 
 	identities := map[string]graph.Described{}
 	for _, component := range snapshot.Components {
@@ -276,11 +296,7 @@ func TestWhatAPackageWasBuiltFromIsReadHoweverItIsStated(t *testing.T) {
 	// The counts below are asserted; this sentence is not computed from
 	// anything, so it is a claim about the fixture that goes stale silently
 	// when the fixture moves under it.
-	f := openFullSize(t)
-	snapshot, err := sbom.Read(f, sbom.Limits{})
-	if err != nil {
-		t.Fatalf("read the fixture: %v", err)
-	}
+	snapshot := readFullSize(t)
 
 	var named, versioned, identified int
 	for _, component := range snapshot.Components {
