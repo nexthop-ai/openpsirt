@@ -272,27 +272,42 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		folds = append(folds, bundle.Fold)
 		versions = append(versions, bundle.To)
 	}
-	under := filter.asListed(s.db, openRows(s.db, targets, visible).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+	// The folds' components are read first and named as a list. The first
+	// level then groups the places on the component, the build and the
+	// version alone, and the fold is read from the component after: a
+	// component has one fold, so the groups are the same. Named as a list,
+	// PostgreSQL estimates the places from the components' own statistics
+	// and hashes them into groups, where joined to the component it expected
+	// 690 places a worker for 90,467 and sorted them on disk: 166 ms against
+	// 287 ms for the kernel's fold, 271,400 places in two builds.
+	var components []int64
+	if err := s.db.NewSelect().
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr("c.id").
 		Where(FoldedOn+" IN (?)", bun.List(distinct(folds))).
+		Scan(ctx, &components); err != nil {
+		return fmt.Errorf("read which components a bump moves: %w", err)
+	}
+	inFolds, args := database.InAnyOf("f.component_id", components)
+	under := filter.asListed(s.db, openRows(s.db, targets, visible).
+		Where(inFolds, args...).
 		Where("f.fixed_in IN (?)", bun.List(distinct(versions))).
-		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr("f.fixed_in").
 		ColumnExpr("f.component_id").
 		ColumnExpr("f.target_id").
-		GroupExpr(FoldedOn+", f.fixed_in, f.component_id, f.target_id"), targets, visible)
+		GroupExpr("f.component_id, f.target_id, f.fixed_in"), targets, visible)
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, under).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`f.fold AS "fold"`).
+		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`f.fixed_in AS "fixed_in"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`va.name AS "variant"`).
-		GroupExpr("f.fold, f.fixed_in, c.name, st.name, va.name").
+		GroupExpr(FoldedOn + ", f.fixed_in, c.name, st.name, va.name").
 		// In the order a reader scans them, so a bundle names its packages and
 		// its builds the same way on every read.
 		OrderExpr("c.name, st.name, va.name")
