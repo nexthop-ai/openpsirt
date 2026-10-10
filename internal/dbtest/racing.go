@@ -8,9 +8,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"io"
-	"log/slog"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -19,7 +16,6 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // A handle whose next commit loses a race, for pinning what a retry must not
@@ -139,12 +135,17 @@ func (t *raceTx) Commit() error {
 // where a caller puts whatever another worker did in the meantime.
 func Racing(t *testing.T, between func()) (*database.DB, *Race) {
 	t.Helper()
-	file := filepath.Join(t.TempDir(), "queue.db")
+	// The migrated template every other SQLite test copies, so a racing
+	// handle starts from the schema they do without migrating again.
+	template, err := sqliteTemplate()
+	if err != nil {
+		t.Fatalf("build the SQLite template: %v", err)
+	}
 
 	// Opened with the pragmas every other SQLite connection gets, so a test on
 	// this handle runs against enforced foreign keys and the application's
 	// journal, as production does.
-	target, err := database.ParseURL("sqlite://" + file + sqliteTestPragmas)
+	target, err := database.ParseURL(sqliteCopy(t, template))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,11 +159,6 @@ func Racing(t *testing.T, between func()) (*database.DB, *Race) {
 		Server: database.Server{Engine: database.SQLite},
 	}
 	t.Cleanup(func() { _ = handle.Close() })
-
-	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if err := schema.Up(context.Background(), handle, quiet); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
 	return handle, owner
 }
 

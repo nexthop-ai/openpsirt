@@ -430,6 +430,11 @@ fingerprint, the name widths the migrations read, the SQLite library and the
 migration library — so any of those changing names a different file, and one
 that does not open like a database is migrated again.
 
+A handle whose commit is made to lose a race starts from a copy of the same
+template, opened through the connector that refuses the commit. Under the race
+detector, migrating a fresh file for it costs 1.3 s of processor time a test,
+and copying the template 0.06 s.
+
 Each test gets a query builder of its own over the shared pool. A test may add a
 query hook to count its statements, and a hook on a shared builder goes on
 firing in every later test — alongside that test's own writers, which the race
@@ -596,7 +601,7 @@ run costs.
 
 | Engine | Setting | Where it is asked for |
 |---|---|---|
-| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens; `dbtest.Racing` builds its own handle and keeps the default |
+| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens, the racing handle included |
 | PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
 | MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
 
