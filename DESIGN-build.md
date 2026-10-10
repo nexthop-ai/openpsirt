@@ -211,18 +211,41 @@ rather than for tidiness.
 |---|---|---|---|
 | Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` | When the key is new |
 | Go build | The tree compiled plain and race-instrumented, its test binaries' objects, and the five tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
+| Linter results | The linter's analysis of each package, by the content it read | The run, restored by prefix | On `main` |
 | Image layers | Every stage's layers | The buildkit scope | On `main` |
 
-A pull request's run restores all three and writes none of them: what its
+A pull request's run restores all four and writes none of them: what its
 build would save is keyed to its own commit, which no later run builds, and a
 branch's scope is read by nothing but that branch. The store holds 10 GB and
 evicts what was used least recently, so a cache written for nobody is a cache
 that pushes out one somebody reads.
 
 A fresh Go build cache for this tree is 2.1 GB, 470 MB as stored; the race
-flavor is 640 MB of it and the tools 840 MB. Saved on `main` alone and trimmed
-by Go of anything unused for five days, it carries that many days of compiled
-versions besides.
+flavor is 640 MB of it and the tools 840 MB. Go trims an entry only after five
+days unused, so a cache saved as the run left it carries every version of the
+tree compiled on `main` in that time: 2.87 GB as stored, 55 to 71 s to restore
+and 38 to 47 s to save.
+
+The build and linter caches are saved holding what the run read and nothing
+else. Both mark an entry as used by moving its modification time to the
+present, but only when it is more than an hour old. Before the checks, every
+restored entry is moved two hours back, which is old enough for any read to
+move it again and too new for a trim to remove it; after them, every entry
+that did not move is deleted. Marking and deleting take under five seconds.
+Emptying the cache and building again would cost the whole compilation, which
+is 150 s on four cores for the test binaries alone.
+
+| | Saved as the run left it | Saved holding what the run read |
+|---|---|---|
+| Go build cache, as stored | 2.87 GB | 683 MB |
+| Its restore | 55 s | 11 s |
+| Its save | 38 to 47 s | 7 to 10 s |
+| The linter, with no results / with results for the same tree | 74 to 75 s | 1.4 s |
+
+The linter's results are 0.7 MB as stored. They are keyed by the content each
+package was analyzed from, so a file that changed is analyzed again and nothing
+else is: on four local cores, one changed file costs 9 to 12 s against 42 s
+with no results at all.
 
 A layer written after the source is copied is keyed to the commit, so nothing
 a later commit builds reuses it. The image's Go steps mount the Go build cache
