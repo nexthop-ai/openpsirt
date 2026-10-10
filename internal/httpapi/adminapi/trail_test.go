@@ -1006,11 +1006,14 @@ func TestBothThingsHeldOverTheDeploymentAreRecorded(t *testing.T) {
 // TestNoActHandsItsRecordsFailureToTheCaller walks every trailed route with
 // the trail table taken away.
 //
-// Ten of the forty sites returned the recorder's error straight out of the
-// closure, so a failed trail write handed the caller the driver's own message
-// — the statement text, and for a connection failure the address and the user
-// it tried. That is what `WentWrong` exists to stop, and the way it comes back
-// is a new trailed route written in the shape those ten had.
+// A recorder's error returned straight out of the closure hands the caller the
+// driver's own message — the statement text, and for a connection failure the
+// address and the user it tried. That is what `WentWrong` exists to stop, and
+// a new trailed route written that way is what this catches.
+//
+// The table is taken away once for the whole walk, because nothing between
+// two acts reads it. A rename on SQLite rewrites the whole schema: under the
+// race detector on four cores, two renames per act take 15 s and the acts 1 s.
 func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
@@ -1025,20 +1028,19 @@ func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 			}
 		}
 
+		hide("admin_change", "admin_change_hidden")
 		examined := 0
 		for _, act := range administrativeActs {
 			who := act.who
 			if who == "" {
 				who = "admin"
 			}
-			hide("admin_change", "admin_change_hidden")
 			var got *httptest.ResponseRecorder
 			if act.drive != nil {
 				got = act.drive(t, r, seen)
 			} else {
 				got = httpapitest.AsPerson(t, r, who, act.method, seen.fill(act.path), seen.fill(act.body))
 			}
-			hide("admin_change_hidden", "admin_change")
 			examined++
 
 			// Whatever the act would otherwise have answered, what it must
@@ -1056,6 +1058,7 @@ func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 				}
 			}
 		}
+		hide("admin_change_hidden", "admin_change")
 		if examined == 0 {
 			t.Fatal("no administrative act was driven, so this checked nothing")
 		}
