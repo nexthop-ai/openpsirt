@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import { unwrap } from "./queries";
 
@@ -85,6 +85,26 @@ export function claimOf(row: QueueRow): Claim {
     counter: row.counter ?? null,
     finding: row.finding ?? null,
   };
+}
+
+// How many claims wait in the review queue, in one product or across all of
+// them. Asked with a limit of zero, which answers the total and reads no
+// claim, and under one key per product, so every reader of the same count on
+// a screen shares one request.
+export function useQueueCount(
+  product?: string,
+  options: { enabled?: boolean; refetchInterval?: number } = {},
+) {
+  return useQuery({
+    queryKey: ["queue", "count", product ?? ""],
+    ...options,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/review-queue", {
+          params: { query: { limit: 0, ...(product ? { product } : {}) } },
+        }),
+      ),
+  });
 }
 
 // Anything that changes a claim invalidates the same set: the queue it may

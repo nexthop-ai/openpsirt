@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useApprovable } from "../api/intake";
+import { useQueueCount } from "../api/claims";
 import { notACredential } from "../ui/noautofill";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { initials } from "../ui/initials";
@@ -97,14 +98,8 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
     return () => document.removeEventListener("keydown", key);
   }, [menu]);
 
-  // The counts on the rail. The queue's is asked with a limit of zero, which
-  // answers the total and reads no claim.
-  const queue = useQuery({
-    queryKey: ["queue", "count"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 0 } } })),
-    refetchInterval: 60_000,
-  });
+  // The counts on the rail.
+  const queue = useQueueCount(undefined, { refetchInterval: 60_000 });
   // Rulings on vulnerability reports waiting for this reader, which sit in the
   // same queue as the claims.
   const approvable = useApprovable();

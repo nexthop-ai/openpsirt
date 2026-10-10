@@ -14,7 +14,7 @@ import { Severity } from "../ui/Severity";
 import { Failed } from "../ui/Failed";
 import { Pace, Mix, Ring, Releases } from "../ui/Charts";
 import { paceReading, mixReading } from "../ui/trend";
-import { claimOf } from "../api/claims";
+import { claimOf, useQueueCount } from "../api/claims";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
@@ -427,15 +427,7 @@ function Figures({
     queryFn: async () =>
       unwrap(await api.GET("/v1/my-claims", { params: { query: { limit: BACK_LIMIT } } })),
   });
-  const queue = useQuery({
-    queryKey: ["queue", "count", scope],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/review-queue", {
-          params: { query: { limit: 0, ...(at.product ? { product: at.product } : {}) } },
-        }),
-      ),
-  });
+  const queue = useQueueCount(at.product || undefined);
   // The same figures with the scope taken off, so a tile can show what the
   // selection costs rather than leaving somebody to guess at it. Asked only
   // where a scope narrows something: unscoped they would be the same number
@@ -448,12 +440,7 @@ function Figures({
   });
   const rulings = useApprovable(at.product || undefined);
   const allRulings = useApprovable();
-  const allQueue = useQuery({
-    queryKey: ["queue", "count", "all"],
-    enabled: widely,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 0 } } })),
-  });
+  const allQueue = useQueueCount(undefined, { enabled: widely });
   const allLate = useQuery({
     queryKey: ["home", "running-out", "all"],
     enabled: widely,
@@ -716,12 +703,7 @@ function Pending() {
   });
   const rulings = useApprovable(at.product || undefined);
   const allRulings = useApprovable();
-  const everywhere = useQuery({
-    queryKey: ["queue", "home", "all"],
-    enabled: !!at.product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 0 } } })),
-  });
+  const everywhere = useQueueCount(undefined, { enabled: !!at.product });
   const items = queue.data?.items ?? [];
 
   return (
