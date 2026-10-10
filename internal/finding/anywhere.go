@@ -177,8 +177,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 		return q
 	}
-	// narrow is every condition in one level, for the statement over the
-	// page's own rows.
+	// narrow is every condition on a place, for the statement over the page's
+	// own rows (see Filter.ofPage).
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = withRating(readable(q).
 			Join(`JOIN "product" AS "p" ON p.id = st.product_id`), rating.OnStream).
@@ -186,7 +186,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
 			Join(`JOIN "component" AS "c" ON c.id = f.component_id`)
-		return filter.narrow(lined(q, "f.urgency >= ?", int64(exploiting)))
+		return filter.ofPage(lined(q, "f.urgency >= ?", int64(exploiting)))
 	}
 	// grouped is the page's grouping in two levels (see twolevel.go). The
 	// first groups each product's places by issue and component, and by
@@ -281,7 +281,6 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Builds          int    `bun:"builds"`
 		decorated
 	}
-	filter.PageIssues = issues
 	body := narrow(s.db.NewSelect()).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).

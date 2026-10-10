@@ -112,8 +112,8 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // a decision, not when one of them does not. This half is the join, which is
 // asked of each place and so sits wherever the places are read. The list's own
 // groups count the decided places beside their first level instead (see
-// decidedBeside), and this join serves the statements that read a page's rows
-// or the groups another view keeps.
+// decidedBeside), a page's rows need neither (see ofPage), and this join
+// serves the groups another view keeps.
 //
 // These read the decision table and nothing else. `suppressed_by` is not a
 // decision of ours at all: it points at a suppression, and a suppression is a
@@ -159,15 +159,6 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	// count the undecided among 425,680 open rows with 3,060 decisions, against
 	// 1.5 s with the decisions outermost and 0.83 s inside one product.
 	decided := f.flagColumns(decisionsOutward(q))
-	// A joined derived table cannot see the outer query's conditions, and an
-	// engine that loops over the outer rows builds it again for each one: 35 s
-	// for a page of one on PostgreSQL with 133,000 decisions, against 0.15 s
-	// with the page's issues stated here as well. Each condition repeated
-	// here is one the outer query also holds, so it drops only rows the join
-	// would drop.
-	if len(f.PageIssues) > 0 {
-		decided = decided.Where("f2.vulnerability_id IN (?)", bun.List(f.PageIssues))
-	}
 	if f.decidedIssues != nil {
 		// On the decisions, for the reason decidedBeside gives.
 		decided = f.amongDecidedIssues(decided, "dv.issue_id")

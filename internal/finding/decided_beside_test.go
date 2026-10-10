@@ -144,11 +144,12 @@ func TestSeveralStatesNeedingADecisionEachFindTheirOwnGroups(t *testing.T) {
 	})
 }
 
-func TestAStateComparedAcrossBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
-	// Asked whether a group differs between builds, the first level is keyed on
-	// the build as well, and the decided places beside it are counted per
-	// build too. One issue in both builds, agreed at the place both share, and
-	// one in the first build alone and undecided.
+func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
+	// One issue in two builds, agreed at the place both share, and one in the
+	// first build alone and undecided. Over both builds the agreed issue is
+	// one group of two places, both answered by the one decision. Asked
+	// whether a group differs between builds, the first level is keyed on the
+	// build as well, and the decided places beside it are counted per build.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
@@ -173,38 +174,31 @@ func TestAStateComparedAcrossBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 			want   string
 			places int
 		}{
-			{finding.StandingAgreed, "", 0},
+			{finding.StandingAgreed, "CVE-2026-1", 2},
 			{finding.StandingUndecided, "CVE-2026-2", 1},
 		} {
-			groups, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
-				DiffersBetweenBuilds: true, States: []finding.ClaimStanding{asked.state},
-			})
+			groups, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
+				finding.Filter{States: []finding.ClaimStanding{asked.state}})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if asked.want == "" {
-				if total != 0 {
-					t.Errorf("%s and differing between builds: %d groups, want none", asked.state, total)
-				}
-				continue
-			}
 			if total != 1 || len(groups) != 1 || groups[0].Vulnerability != asked.want ||
 				groups[0].Places != asked.places {
-				t.Errorf("%s and differing between builds: %d groups %+v, want %s at %d place",
+				t.Errorf("%s over both builds: %d groups %+v, want %s at %d places",
 					asked.state, total, groups, asked.want, asked.places)
 			}
 		}
 
-		// And over both builds without the comparison, the agreed issue is one
-		// group of two places, both answered by the one decision.
-		groups, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
-			States: []finding.ClaimStanding{finding.StandingAgreed},
+		// The agreed issue is in both builds, so it does not differ between
+		// them, and the decided places counted per build must not make it.
+		_, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
+			DiffersBetweenBuilds: true, States: []finding.ClaimStanding{finding.StandingAgreed},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if total != 1 || len(groups) != 1 || groups[0].Places != 2 {
-			t.Errorf("agreed over both builds: %d groups %+v, want one of two places", total, groups)
+		if total != 0 {
+			t.Errorf("agreed and differing between builds: %d groups, want none", total)
 		}
 	})
 }

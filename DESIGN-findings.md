@@ -1302,15 +1302,17 @@ The page is read in two statements:
 Every filter narrows both statements through the same clauses, and none needs the
 issue or the component joined under the grouping — a rating or a name is asked as
 a membership test against the table that holds it. The decision-state filter is
-built from the decisions outward rather than as a lookup per open row. In the
-first statement the decided places are counted beside the first level of the
-grouping (§ Two-level grouping). In the second it is joined to each place by
-the finding's identifier and built for the page's issues alone, and across
-products for the kind of release the list holds as well. A derived table cannot
-see the conditions of the statement around it, and an engine that nests it
-under the page builds it again for every row: 35 s for a page of one lapsed
-group on PostgreSQL with 133,000 decisions, and 0.15 s with the page's issues
-stated inside it.
+built from the decisions outward rather than as a lookup per open row, and in
+the first statement alone: the decided places are counted beside the first
+level of the grouping (§ Two-level grouping). The second statement reads the
+page's groups by the conditions on a place and none over a group, because the
+first statement already chose the groups by those, and a group it reads that is
+not on the page is dropped. Built for the page's issues and joined to its
+places, the table was estimated against one place and built again for each:
+87 s for a page of fifty undecided high issues on PostgreSQL with 133,549
+decisions, against 35 ms without it. Another view keeping the list's groups
+under a condition over a group still joins the table to each place, across
+products for the kind of release the list holds as well.
 
 | Rule | |
 |---|---|

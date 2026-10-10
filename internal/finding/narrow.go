@@ -101,20 +101,15 @@ type Filter struct {
 	// anything correlating a place to a decision has to supply one or it
 	// matches every product in the deployment.
 	ProductID int64
-	// PageIssues is the issues of a page the store has already chosen, set by
-	// the store when it reads what it shows about that page. The decision
-	// table the state filter joins is built for these issues alone, which a
-	// page of fifty reads in milliseconds and every decided place in the
-	// deployment does not. Empty is every issue.
-	PageIssues []int64
 	// decidedIssues is the only issues a group can be filed under and pass
 	// the filter, set by the store where every condition the filter asks of
 	// a group needs a decision of some kind at one of its places: the issues
 	// of those decisions, read before the list is. Nil asks nothing, and
 	// empty answers nothing.
 	decidedIssues []int64
-	// decidedApart says the first level counts the decided places beside
-	// itself, so the places are read without the decision table joined.
+	// decidedApart says the places are read without the decision table
+	// joined: the first level counts the decided places beside itself, and a
+	// page's rows belong to groups the conditions over a group already chose.
 	decidedApart bool
 	// Ecosystems keeps components of these package kinds — deb, golang,
 	// pypi. Read from the package identifier rather than stored beside it,
@@ -452,6 +447,21 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 // smaller than it is.
 func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	return f.narrowGroups(f.narrowRows(q), overRows)
+}
+
+// ofPage narrows a statement over the groups of a page the store has already
+// chosen to the places those groups were counted over: every condition on a
+// place, and no condition over a group. The groups were kept by those in the
+// statement that chose the page, and a group the statement reads that is not
+// on the page is dropped by the caller.
+//
+// So the decision table is not built here. Built for the page's issues and
+// joined to its places, PostgreSQL estimated the places at one row and built
+// the table once per place: 87 s for a page of fifty undecided high issues
+// with 133,549 decisions, against 35 ms without it.
+func (f Filter) ofPage(q *bun.SelectQuery) *bun.SelectQuery {
+	f.decidedApart = true
+	return f.narrowRows(q)
 }
 
 // narrowRows applies the half of the filter that is asked of each place: the
