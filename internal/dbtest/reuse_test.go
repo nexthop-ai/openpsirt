@@ -20,75 +20,41 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// A server database is created and migrated on first use, and kept between
-// runs because applying the migrations is nearly the whole cost of a server
-// engine. An ordinary run takes one of the harness's paths, so nothing else in
-// the suite reaches the others: recognizing a database that is already there,
-// building again one an interrupted run left half migrated, and dropping what
-// an edited migration left behind. The DROP in particular is quoted the
+// A server database is created and migrated by the first binary to lease its
+// slot, and kept for every binary after it, because applying the migrations is
+// nearly the whole cost of a server engine. An ordinary run reaches creating
+// and reusing one; nothing else in the suite reaches building again one an
+// interrupted run left half migrated. The DROP in particular is quoted the
 // standard way, which the MySQL connections accept, and only running it says
 // so.
 //
 // These run against the servers only. SQLite has no reuse path: each test
 // takes a copy of a migrated template file.
 
-// The first call makes the database, the second recognizes it, and a third
-// for the same slot with a different schema fingerprint drops the one the
-// older migrations built, which is how a slot is rebuilt for a new schema.
-func TestAKeptDatabaseIsRecognizedAndAnOlderSchemaDropped(t *testing.T) {
+// The first call makes the database and the second recognizes it, which is
+// the difference between migrating a slot's database and emptying it.
+func TestAKeptDatabaseIsRecognized(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
 		admin := Open(t, base)
+		namespace := slotSpace(t, engine)
+		dropAfter(t, admin, engine, namespace)
+		name := slotName(namespace, schemaOne, 1)
 
-		// Two names for one slot, differing only where the fingerprint of the
-		// migrations sits — which is exactly what an edited migration
-		// produces.
-		path := "example.com/reuse" + suffixFor(t, engine) + ".test"
-		first, second := databaseName(path, 1, "aaaaaa"), databaseName(path, 1, "bbbbbb")
-		prefix := packagePrefix(first)
-		t.Cleanup(func() {
-			for _, name := range []string{first, second} {
-				if _, err := admin.ExecContext(context.WithoutCancel(ctx),
-					`DROP DATABASE IF EXISTS "`+name+`"`); err != nil {
-					t.Errorf("clean up %s: %v", name, err)
-				}
-			}
-		})
-
-		kept, err := ensureDatabase(ctx, admin, engine, first)
+		kept, err := ensureDatabase(ctx, admin, engine, name)
 		if err != nil {
-			t.Fatalf("make %s: %v", first, err)
+			t.Fatalf("make %s: %v", name, err)
 		}
 		if kept {
-			t.Fatalf("%s did not exist and was reported as kept", first)
+			t.Fatalf("%s did not exist and was reported as kept", name)
 		}
-
-		kept, err = ensureDatabase(ctx, admin, engine, first)
+		kept, err = ensureDatabase(ctx, admin, engine, name)
 		if err != nil {
-			t.Fatalf("recognize %s: %v", first, err)
+			t.Fatalf("recognize %s: %v", name, err)
 		}
 		if !kept {
 			t.Errorf("%s exists and was reported as new, so the harness would "+
-				"migrate it again rather than empty it", first)
-		}
-
-		// The same package, a moved schema. The older database is what an
-		// edited migration leaves behind, and leaving it would accumulate one
-		// per edit on every developer's server.
-		kept, err = ensureDatabase(ctx, admin, engine, second)
-		if err != nil {
-			t.Fatalf("make %s: %v", second, err)
-		}
-		if kept {
-			t.Errorf("%s did not exist and was reported as kept", second)
-		}
-		left, err := databasesFor(ctx, admin, engine, prefix)
-		if err != nil {
-			t.Fatalf("list the databases under %s: %v", prefix, err)
-		}
-		if len(left) != 1 || left[0] != second {
-			t.Errorf("under %s the server holds %v, wanted %s alone — the "+
-				"database an older schema built was not dropped", prefix, left, second)
+				"migrate it again rather than empty it", name)
 		}
 	})
 }
@@ -136,7 +102,7 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		got, err := prepareServer(ctx, engine, base, name)
+		got, _, err := prepareServer(ctx, engine, base, name)
 		if err != nil {
 			t.Fatalf("prepare the half-built database: %v", err)
 		}

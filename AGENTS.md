@@ -734,12 +734,14 @@ the ordinary case and takes the code's tier rather than the document one.
 
 Packages run in parallel in both. Each test binary builds the schema once — a
 migrated SQLite file copied per test, and on each server a database of the
-binary's own, named for the package and a slot — so no package can tear down
-another's tables (see `internal/dbtest`). A binary leases the lowest free slot
-of its package through a lock the server holds for its connection, so the same
-package run twice at once, from one checkout or two, gets two slots and two
-databases. Every checkout reuses the same slots, and `make engines-clean` drops
-the databases of slots nobody holds, safely while other tests run.
+binary's own while it runs, named for the schema and a slot — so no package can
+tear down another's tables (see `internal/dbtest`). A binary leases the lowest
+free slot of its schema through a lock the server holds for its connection, so
+two binaries running at once, of one package or two, from one checkout or two,
+get two slots and two databases. A binary that exits frees its slot, and its
+migrated database, to the next binary of any package. Every checkout reuses the
+same slots, and `make engines-clean` drops the databases of slots nobody holds,
+safely while other tests run.
 
 ### The second command
 

@@ -224,7 +224,7 @@ SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1
 
 # Both passes at once. They share no engine — the detector runs on SQLite and
 # the portability pass on the three servers — so neither can see the other's
-# rows, and the guard against two runs of one package meeting on one server
+# rows, and the guard against two binaries meeting in one database on a server
 # still holds.
 #
 # What it buys is that the two are bottlenecked on different things: the
@@ -1068,8 +1068,9 @@ engines-down:
 
 # Drops the test databases on the configured servers that no running test
 # binary holds. Safe while other checkouts run their tests: each binary holds
-# its slot's lock for as long as it uses the slot's database, and a database is
-# dropped only while this holds that lock instead (internal/dbtest).
+# the lock of the slot it leases for as long as it uses the slot's database,
+# and a database is dropped only while this holds that lock instead
+# (internal/dbtest).
 engines-clean:
 	$(GO) run ./internal/tools/dbclean
 
