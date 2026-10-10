@@ -488,7 +488,7 @@ with their claims and grants, about sixty transactions; run per test that was
 as a seeded template it is a file write.
 
 A server database is kept between runs and reused. Applying the migrations is
-nearly the whole cost of a server engine on a disk — 20.9 s on MySQL and 18.9 s
+nearly the whole cost of a server engine on a disk — 9.8 s on MySQL and 7.2 s
 on MariaDB, once per package per engine — and none of it tests anything the
 migration tests do not. A server CI starts is new every run, so there it keeps
 nothing and builds every schema; the runner's disk makes that cheaper than a
@@ -642,11 +642,11 @@ directory in memory, which removes the disk from building a schema as well as
 from committing to it. The CI services keep theirs on disk: a runner's memory
 is what the suite runs in, and its disk pays little for a schema change.
 
-| Building the schema, one database, a workstation | On disk | In memory |
-|---|---|---|
-| PostgreSQL | 0.49 s | 0.45 s |
-| MySQL | 20.9 s | 0.79 s |
-| MariaDB | 18.9 s | 0.17 s |
+| Building the schema, one database, a workstation | On disk | In memory | Server processor time, in memory |
+|---|---|---|---|
+| PostgreSQL | 0.43 s | 0.42 s | 0.37 s |
+| MySQL | 9.8 s | 0.83 s | 1.38 s |
+| MariaDB | 7.2 s | 0.18 s | 0.14 s |
 
 The server pass over every package, six at once, went from 516 s to 246 s of
 package time with the pool above and the data in memory, where the 516 s reused

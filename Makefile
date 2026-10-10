@@ -955,8 +955,8 @@ MY_AS_A_TEST_SERVER := --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0
 
 # The data directories are in memory. The settings above govern commits, and a
 # schema change syncs the files it creates whatever they say: building the
-# schema took MySQL 20.9 s and MariaDB 18.9 s on a workstation's disk and
-# 0.79 s and 0.17 s in memory. A stopped container loses its databases, which
+# schema took MySQL 9.8 s and MariaDB 7.2 s on a workstation's disk and
+# 0.83 s and 0.18 s in memory. A stopped container loses its databases, which
 # the harness answers by migrating again. CI keeps its servers on disk: the
 # runner's memory is what the suite runs in, and its disk pays little for DDL.
 PG_TEST_DATA := --tmpfs /var/lib/postgresql/data
