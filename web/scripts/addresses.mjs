@@ -20,10 +20,12 @@
 //
 // An API address opens on /v1, or is joined onto a call that builds one, and
 // is not an address into this application.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+
+import { interfaceSources, parse } from "./parsed.mjs";
 
 const here = import.meta.dirname;
 const src = path.join(here, "..", "src");
@@ -154,10 +156,6 @@ function isKey(node) {
   return Boolean(at && ts.isJsxAttribute(at) && at.name.getText() === "key");
 }
 
-function parse(text, file) {
-  return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-}
-
 // Whether a string glues a query onto an address it did not build: a template
 // opening on a substitution with a part that starts a query or adds to one,
 // or the query mark itself chosen by a condition inside it. A question mark
@@ -217,21 +215,6 @@ export function addressesIn(routes, text, file = "x.tsx", source = parse(text, f
   };
   walk(source);
   return { found, examined };
-}
-
-function sources(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...sources(full));
-    else if (
-      /\.tsx?$/.test(entry.name) &&
-      !entry.name.includes(".test.") &&
-      !entry.name.endsWith(".d.ts")
-    )
-      out.push(full);
-  }
-  return out;
 }
 
 // The query parameters one source file reads: the first argument of every
@@ -345,9 +328,7 @@ export function sweep() {
   // Each file is read and parsed once, and every rule reads that one tree.
   const imports = new Map();
   const reads = new Map();
-  for (const file of sources(src)) {
-    const text = readFileSync(file, "utf8");
-    const source = parse(text, file);
+  for (const { file, text, source } of interfaceSources()) {
     imports.set(file, importsOf(file, text));
     reads.set(file, readsIn(text, file, source));
     const relative = path.relative(src, file);

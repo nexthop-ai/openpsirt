@@ -10,69 +10,52 @@ import (
 
 const schemaOne = "0f0f0f0f0f0f0f0f"
 
-const httpapiPath = "github.com/nexthop-ai/openpsirt/internal/httpapi.test"
-
-// A database is named for its package and its slot, and for nothing about the
-// checkout it is tested from, so every checkout reuses the same few rather
-// than leaving a set behind each time one is deleted.
-func TestADatabaseIsNamedForItsPackageAndSlot(t *testing.T) {
-	one := databaseName(httpapiPath, 1, schemaOne)
-	two := databaseName(httpapiPath, 2, schemaOne)
+// A database is named for its schema and its slot, and for nothing about the
+// package or the checkout it is tested from, so every binary built from one
+// schema reuses the same few rather than migrating one of its own.
+func TestADatabaseIsNamedForItsSchemaAndSlot(t *testing.T) {
+	one := slotName(harnessPrefix, schemaOne, 1)
+	two := slotName(harnessPrefix, schemaOne, 2)
 	if one == two {
-		t.Fatalf("two slots of one package share the database %q", one)
+		t.Fatalf("two slots of one schema share the database %q", one)
 	}
-	for _, name := range []string{one, two, databaseName(httpapiPath, maxSlots, schemaOne)} {
-		// The readable part stays: somebody listing the server's databases
-		// should see which package each belongs to.
-		if !strings.HasPrefix(name, "openpsirt_t_httpapi_") {
-			t.Errorf("%q does not name its package", name)
+	for _, name := range []string{one, two, slotName(harnessPrefix, schemaOne, maxSlots)} {
+		if !strings.HasPrefix(name, harnessPrefix) {
+			t.Errorf("%q is not under the harness's prefix, so the clean never finds it", name)
 		}
 		// Every engine's identifier limit is at least 63 characters, and a
 		// MySQL lock name at most 64.
 		if len(name) > 63 {
 			t.Errorf("%q is too long for an identifier", name)
 		}
+		if slotShape(harnessPrefix).FindStringSubmatch(name) == nil {
+			t.Errorf("%q is not a slot's name, so a stale one is never collected", name)
+		}
 	}
-	if again := databaseName(httpapiPath, 1, schemaOne); again != one {
+	if again := slotName(harnessPrefix, schemaOne, 1); again != one {
 		t.Errorf("the name is not stable between runs: %q then %q", one, again)
 	}
-	// Two packages whose readable parts are cut to the same text still differ.
-	long := "github.com/nexthop-ai/openpsirt/internal/averyveryverylongpackagename"
-	if databaseName(long+"one.test", 1, schemaOne) == databaseName(long+"two.test", 1, schemaOne) {
-		t.Error("two packages cut to one readable name share a database")
-	}
-	// The slot's lock is the name up to the fingerprint, which is how a clean
-	// finds the lock that says whether a database is in use.
-	if got, want := slotOf(one), slotName(httpapiPath, 1); got != want {
-		t.Errorf("the database %q belongs to the slot %q, want %q", one, got, want)
+	// The database and its lock are one name, which is how a clean finds the
+	// lock that says whether a database is in use.
+	if locks := locksOf(one); locks[0] != one {
+		t.Errorf("the database %q is guarded by %v, want its own name first", one, locks)
 	}
 }
 
 func TestAnEditedMigrationNamesADifferentDatabase(t *testing.T) {
-	// A database is kept between runs and re-used rather than re-migrated, so
-	// what stops a run from testing against last week's schema is that the
+	// A database is kept between runs and reused rather than migrated again,
+	// so what stops a run from testing against last week's schema is that the
 	// name carries the migrations. The applied version cannot do it: below 1.0
 	// a schema change edits what declares the thing rather than adding a
-	// migration beside it, so the version stays where it was
-	// while the tables underneath are different.
-	before := databaseName(httpapiPath, 1, schemaOne)
-	after := databaseName(httpapiPath, 1, "abcabcabcabcabca")
+	// migration beside it, so the version stays where it was while the tables
+	// underneath are different.
+	before := slotName(harnessPrefix, schemaOne, 1)
+	after := slotName(harnessPrefix, "abcabcabcabcabca", 1)
 	if before == after {
 		t.Fatalf("two schemas share the database %q", before)
 	}
-	// And both sit under one prefix, which is how the older one is found and
-	// dropped rather than left on the server for good.
-	if packagePrefix(before) != packagePrefix(after) {
-		t.Errorf("%q and %q are not under one prefix, so nothing collects the older",
-			before, after)
-	}
-	if !strings.HasPrefix(packagePrefix(before), "openpsirt_t_httpapi_") {
-		t.Errorf("the prefix %q does not name the package", packagePrefix(before))
-	}
-	// Narrow enough to leave another slot of the same package alone: the
-	// prefix carries the slot, not only the package.
-	elsewhere := databaseName(httpapiPath, 2, schemaOne)
-	if strings.HasPrefix(elsewhere, packagePrefix(before)) {
-		t.Errorf("%q sits under another slot's prefix %q", elsewhere, packagePrefix(before))
+	shape := slotShape(harnessPrefix)
+	if shape.FindStringSubmatch(before)[1] == shape.FindStringSubmatch(after)[1] {
+		t.Errorf("%q and %q read as one schema, so the older is never collected", before, after)
 	}
 }

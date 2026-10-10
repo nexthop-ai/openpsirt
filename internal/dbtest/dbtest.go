@@ -12,11 +12,11 @@
 // binary in a run migrates one file and keeps it in the temporary directory,
 // every other binary reads it, and each test copies it — a copy is
 // milliseconds where a migration is most of a second. On the three servers
-// each binary gets a database of its own, named for the package and for a slot
-// the binary leases, and kept between runs; see serverDatabase.
-// Packages therefore share nothing and can run in parallel; tests within a
-// package share the database, and one pool of connections to it, and the
-// harness empties it before each of them.
+// each binary leases a slot of the schema and the database the slot holds,
+// which is kept between binaries and between runs; see serverDatabase.
+// Packages running at once therefore share nothing and can run in parallel;
+// tests within a package share the database, and one pool of connections to
+// it, and the harness empties it before each of them.
 //
 // A package whose tests start from the same rows declares them once as a
 // Seeded template. On SQLite the seed is applied to the template before the
@@ -541,31 +541,27 @@ func templateName() (string, error) {
 	return "openpsirt-dbtest-" + hex.EncodeToString(sum[:6]) + ".db", nil
 }
 
-// serverDatabase gives this binary its own database on the server the
-// configured URL names, migrated and empty. Named for the package, so that two
-// packages never share tables, and for a slot this binary leases, so that two
-// runs of one package at once never share them either.
+// serverDatabase gives this binary a database of its own on the server the
+// configured URL names, migrated and empty, for as long as the process runs.
 //
-// The slot is the lowest one no other binary of this package holds on that
-// server, and the lease lasts as long as the process: its lock lives with a
-// connection nothing closes, so a binary that exits or crashes gives it back.
-// Every checkout shares a package's slots, so a server holds as many databases
-// per package as the most runs of it there have been at once.
+// The database belongs to a slot of this build's schema, and the binary leases
+// the lowest slot no other binary holds on that server. The lease's lock lives
+// with a connection nothing closes, so a binary that exits or crashes gives the
+// slot back, and the next binary to start, of any package, takes it with its
+// database. A server therefore holds as many databases per schema as the most
+// binaries built from it that were alive there at once.
 //
-// The database is kept between runs and reused. Applying the migrations is
-// nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
-// MariaDB, once per package per engine, which is 475 s of server work in a run
-// that spends 43 s of processor time — and none of it tests anything the
-// migration tests do not. What makes reuse safe is that the name carries a
-// fingerprint of the migration sources: a schema change edits what declares
-// the thing rather than adding a migration beside it, so the applied
-// version does not move and only the content tells one schema from another. An
-// edited migration therefore names a different database, and the slot's
-// databases the other fingerprints named are dropped as the new one is
-// created, which the lease makes safe: nobody else is using the slot.
+// The database is kept between binaries and between runs, and reused. Applying
+// the migrations is nearly the whole cost of a server engine, and none of it
+// tests anything the migration tests do not. What makes reuse safe is that the
+// name carries a fingerprint of the migration sources: a schema change edits
+// what declares the thing rather than adding a migration beside it, so the
+// applied version does not move and only the content tells one schema from
+// another. An edited migration therefore names different databases.
 //
 // A reused database is emptied by the first test that runs on it, as every
-// test's database is. One whose migrations stopped part way is built again,
+// test's database is, and holds identifiers that continue from wherever the
+// last binary left them. One whose migrations stopped part way is built again,
 // described at prepareServer.
 func serverDatabase(engine database.Engine, base string) (string, error) {
 	serverMu.Lock()
@@ -577,14 +573,8 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("fingerprint the migrations: %w", err)
 	}
-	ctx := context.Background()
-	held, err := takeSlot(ctx, engine, base, packagePath())
+	held, own, err := leaseDatabase(context.Background(), engine, base, harnessPrefix, fingerprint)
 	if err != nil {
-		return "", err
-	}
-	own, err := prepareServer(ctx, engine, base, databaseName(packagePath(), held.slot, fingerprint))
-	if err != nil {
-		_ = held.release(ctx)
 		return "", err
 	}
 	serverLeases[engine] = held
@@ -593,7 +583,8 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 }
 
 // prepareServer leaves the database called name, on the server base names,
-// migrated to the schema this build expects, and returns its URL.
+// migrated to the schema this build expects, and returns its URL and whether
+// it had to create the database.
 //
 // A kept database is used as it stands where it holds that schema whole. A
 // run killed while it migrated leaves one holding less — a version short of
@@ -601,37 +592,38 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 // built again rather than migrated forward: on MySQL and MariaDB a schema
 // statement commits on its own, so a migration interrupted part way leaves
 // statements applied that no recorded version accounts for.
-func prepareServer(ctx context.Context, engine database.Engine, base, name string) (string, error) {
+func prepareServer(ctx context.Context, engine database.Engine, base, name string) (string, bool, error) {
 	own, err := databaseURL(base, engine, name)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	target, err := database.ParseURL(base)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	admin, err := database.Open(ctx, target)
 	if err != nil {
-		return "", fmt.Errorf("open %s: %w", target.Redacted, err)
+		return "", false, fmt.Errorf("open %s: %w", target.Redacted, err)
 	}
 	defer func() { _ = admin.Close() }()
 	kept, err := ensureDatabase(ctx, admin, engine, name)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	transient(ctx, admin, engine)
 	if kept {
 		if whole(ctx, own) {
-			return own, nil
+			return own, false, nil
 		}
 		if err := rebuild(ctx, admin, name); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
+	serverBuilds.Add(1)
 	if err := migrateFresh(own); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return own, nil
+	return own, !kept, nil
 }
 
 // databaseURL is the URL of the database called name on the server base
@@ -733,33 +725,24 @@ func serverConnection(engine database.Engine, own string) (*database.DB, error) 
 	return &database.DB{DB: bun.NewDB(pool.DB.DB, pool.Dialect()), Server: pool.Server}, nil
 }
 
-// ensureDatabase leaves exactly one database for this package and slot on
-// the server: the one named, created if it is not there. It reports whether
-// the database was already present, which is the difference between migrating
-// it and emptying it.
+// ensureDatabase creates the database called name if it is not there, and
+// reports whether it already was, which is the difference between migrating it
+// and emptying it. Databases of other names are left, whatever schema built
+// them: another binary may hold one.
 func ensureDatabase(ctx context.Context, admin *database.DB, engine database.Engine, name string) (bool, error) {
-	existing, err := databasesFor(ctx, admin, engine, packagePrefix(name))
+	existing, err := databasesFor(ctx, admin, engine, name)
 	if err != nil {
 		return false, err
 	}
-	kept := false
-	for _, other := range existing {
-		if other == name {
-			kept = true
-			continue
-		}
-		// Built by migrations this build does not have. Quoted, as every
-		// identifier is; the MySQL connections accept the standard quote.
-		if _, err := admin.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+other+`"`); err != nil {
-			return false, fmt.Errorf("drop the database an older schema left: %w", err)
-		}
+	if slices.Contains(existing, name) {
+		return true, nil
 	}
-	if !kept {
-		if _, err := admin.ExecContext(ctx, `CREATE DATABASE "`+name+`"`); err != nil {
-			return false, fmt.Errorf("create %s: %w", name, err)
-		}
+	// Quoted, as every identifier is; the MySQL connections accept the
+	// standard quote.
+	if _, err := admin.ExecContext(ctx, `CREATE DATABASE "`+name+`"`); err != nil {
+		return false, fmt.Errorf("create %s: %w", name, err)
 	}
-	return kept, nil
+	return false, nil
 }
 
 // transient asks a server to stop flushing to disk at every commit.
@@ -823,14 +806,6 @@ func databasesFor(ctx context.Context, admin *database.DB, engine database.Engin
 		return nil, err
 	}
 	return names, nil
-}
-
-// packagePath is the import path of the package this binary tests.
-func packagePath() string {
-	if info, ok := debug.ReadBuildInfo(); ok && info.Path != "" {
-		return info.Path
-	}
-	return os.Args[0]
 }
 
 // migrateFresh applies every migration to the database at url and closes it.

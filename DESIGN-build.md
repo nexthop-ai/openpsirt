@@ -318,6 +318,12 @@ passes vacuously under UTC. Such a test asserts the zone took effect before
 relying on it. On four cores the run is 29 s with a process per file and 9 s
 this way.
 
+The web tests that read the whole interface — addresses against the route
+table, query keys, screen copy and control names — run in one test file, over
+syntax trees built once and shared. A test file is a module graph of its own,
+so in separate files each parses every source again: 1.19 s of test time
+across the four, against 0.66 s sharing one parse.
+
 Formatting belongs to one tool. Stylelint's whitespace rules are off rather than
 left to disagree with Prettier.
 
@@ -406,13 +412,14 @@ run that uses it.
 
 ## Test databases
 
-Every test binary is one package, and every package holds a database of its own
-on each engine, so packages share nothing and run in parallel.
+Every test binary is one package, and every binary holds a database of its own
+on each engine while it runs, so packages running at once share nothing and run
+in parallel.
 
 | Engine | What a test gets | Emptied between tests |
 |---|---|---|
 | SQLite | A copy of a template migrated once per run and kept in the temporary directory, and a connection of its own | Not needed — each test holds its own file |
-| The three servers | The package's own database on the server, through one pool every test in the binary shares | Before every test, by deleting from the tables that hold rows |
+| The three servers | A database the binary leases on the server for as long as it runs, through one pool every test in the binary shares | Before every test, by deleting from the tables that hold rows |
 
 The pool on a server is shared because a PostgreSQL connection is a process on
 the server that starts knowing nothing of the schema. Its first statement over
@@ -430,6 +437,11 @@ fingerprint, the name widths the migrations read, the SQLite library and the
 migration library — so any of those changing names a different file, and one
 that does not open like a database is migrated again.
 
+A handle whose commit is made to lose a race starts from a copy of the same
+template, opened through the connector that refuses the commit. Under the race
+detector, migrating a fresh file for it costs 1.3 s of processor time a test,
+and copying the template 0.06 s.
+
 Each test gets a query builder of its own over the shared pool. A test may add a
 query hook to count its statements, and a hook on a shared builder goes on
 firing in every later test — alongside that test's own writers, which the race
@@ -442,7 +454,7 @@ test needs to reach the rows, such as an identifier or a secret shown once.
 | Engine | When the seed runs |
 |---|---|
 | SQLite | Once per binary, against the template, before the first copy |
-| The three servers | Per test, after the package's database is emptied |
+| The three servers | Per test, after the binary's database is emptied |
 
 A test that needs a product, its streams, its variants and a build of them
 takes them from one shared default world rather than declaring its own. The
@@ -476,56 +488,78 @@ with their claims and grants, about sixty transactions; run per test that was
 27% of the package's processor time under the race detector on two cores, and
 as a seeded template it is a file write.
 
-A server database is kept between runs and reused. Applying the migrations is
-nearly the whole cost of a server engine on a disk — 20.9 s on MySQL and 18.9 s
-on MariaDB, once per package per engine — and none of it tests anything the
-migration tests do not. A server CI starts is new every run, so there it keeps
-nothing and builds every schema; the runner's disk makes that cheaper than a
-workstation's, and the migrations package takes 25 s there against 109 s.
+A server database is kept between binaries and between runs, and reused.
+Applying the migrations is nearly the whole cost of a server engine on a disk —
+9.8 s on MySQL and 7.2 s on MariaDB for one database — and none of it tests
+anything the migration tests do not. A server CI starts is new every run, so
+there the first binary to lease each slot builds its database and every binary
+after it in that slot reuses it. A pass running two binaries at once builds
+two databases per engine, where a database per package built 33 or 34.
 
-A server database belongs to a package and a slot, and a test binary leases
-the slot for as long as it runs.
+| Server pass, fresh containers, two binaries at once | A database per package | A database per slot |
+|---|---|---|
+| PostgreSQL, processor time, test binaries and server | 211 s | 188 s |
+| MySQL, the same | 154 s | 103 s |
+| MariaDB, the same | 97 s | 79 s |
+| PostgreSQL, wall time | 230 s | 123 s |
+| MySQL, wall time | 403 s | 151 s |
+| MariaDB, wall time | 308 s | 132 s |
+
+Each engine was measured alone, on four cores, against a container started for
+the run on its own disk, as CI starts one.
+
+A server database belongs to a slot of a schema, and a test binary leases the
+slot for as long as it runs. The database and the slot's lock share one name.
 
 | Part of the name | Why |
 |---|---|
-| The package's own name, cut to 24 characters | A person reading the server's list sees which package each database belongs to |
-| A hash of the package's import path | Two packages cut to the same readable name hold different databases |
-| The slot's number | Two runs of one package at once hold different databases |
-| A fingerprint of the migration sources | An edited migration names a different database rather than reusing a stale one |
+| A hash of the migration sources' fingerprint | An edited migration names different databases rather than reusing a stale one |
+| The slot's number | Two binaries running at once hold different databases |
 
-The checkout a package is tested from is not in the name. Every checkout shares
-a package's slots, so a server holds as many databases per package as the most
-runs of it that were alive at once.
+Neither the package nor the checkout is in the name. A binary of any package,
+from any checkout of the same migrations, takes a slot another binary freed,
+with its database. A server holds as many databases per schema as the most
+binaries built from it that were alive there at once.
 
 | Slot rule | Why |
 |---|---|
-| A binary leases one slot per server, the lowest no other binary of its package holds | Slots stay few, and the lowest is the one most likely to hold a database already |
+| A binary leases one slot per server, the lowest no other binary of its schema holds | Slots stay few, and the lowest is the one most likely to hold a database already |
 | The lease is a lock the server keeps for one connection: a named lock on MySQL and MariaDB, a session advisory lock on PostgreSQL | A binary that exits or crashes closes the connection, and the server releases the lock with it |
 | Each slot is asked for without waiting | Two binaries starting at once are granted different slots, and neither waits on the other |
-| The lock is keyed on the package and the slot | Packages share slot numbers, so a run of the whole tree holds slot 1 of every package |
+| The lock is keyed on the schema and the slot | Two checkouts of different migrations hold different slots, and neither builds over the other's database |
 | On PostgreSQL the lock belongs to the database the configured URL names | An advisory lock is scoped to one database, so a run and a clean agree when they name the same one |
-| Thirty-two slots per package | A binary finding every one held refuses in words |
+| Sixty-four slots per schema | Every binary of every run on a server draws on them. A binary finding every one held refuses in words |
+
+What one package's tests leave in a database is what the next package's tests
+start from.
+
+| Left by an earlier binary | Why a later one is unaffected |
+|---|---|
+| Rows | Every test empties the database before it runs |
+| Identifiers continuing past the last binary's | A test reads the identifiers it made, and never assumes where a sequence starts |
+| A schema a test changed: a table renamed, an earlier release applied | The test puts the schema back when it ends |
 
 The fingerprint is recorded in the name. Below 1.0 a schema change edits what
 declares the thing rather than adding a migration beside it, so the applied
 version does not move and only the content of the migrations tells one schema
-from another. A slot's databases named by another fingerprint are dropped as
-this build's is created, and the lease makes that safe: nobody else is using the
-slot.
+from another.
 
 | A kept database | What the harness does |
 |---|---|
-| At the version this build's migrations end at | Uses it; the first test empties it as every test does |
-| At any other version, or none | Drops it and builds it again. A run killed while it migrated leaves one, and on MySQL and MariaDB a schema statement commits on its own, so the part a migration applied before it stopped is recorded by no version |
+| Named for this build's schema, at the version its migrations end at | Uses it; the first test empties it as every test does |
+| Named for this build's schema, at any other version, or none | Drops it and builds it again. A run killed while it migrated leaves one, and on MySQL and MariaDB a schema statement commits on its own, so the part a migration applied before it stopped is recorded by no version |
+| Named for another schema, its slot held | Leaves it. A checkout of that schema is running its tests |
+| Named for another schema, its slot free | Drops it when a binary creates a database for its own schema, under the same locks as the clean below |
 
 `make engines-clean` drops the harness's databases on every configured server
 whose slot nobody holds, and is safe while other checkouts run their tests.
 
 | Step | Why |
 |---|---|
-| Each database's slot lock is taken without waiting, on the clean's own connection | A held lock is a running binary using the database, and it is left |
-| The database is dropped while the clean holds the lock, and the lock released after | A binary starting meanwhile is refused that slot and takes another, so nothing it uses is dropped under it |
-| A database whose name carries no slot is dropped | Its lock is one no binary takes |
+| Each database's locks are taken without waiting, on the clean's own connection | A held lock is a running binary using the database, and it is left |
+| The locks are the one named for the database and the one named for it without its last part | The second is the slot lock of a harness that names a database for its package, a slot and a schema, which a checkout of an older tree runs |
+| The database is dropped while the clean holds the locks, and the locks released after | A binary starting meanwhile is refused that slot and takes another, so nothing it uses is dropped under it |
+| A database whose name is no slot's is dropped | Its locks are ones no binary takes |
 
 The race detector runs on SQLite alone. A Go data race does not vary by database
 engine, and the detector's cost is in-process work — which is most of what
@@ -548,6 +582,28 @@ a package whose tests take milliseconds, and the better part of a minute across
 the tree on a runner that runs the pass one package at a time. 100 ms keeps a
 window for a goroutine mid-operation; nothing in the tests leaves one running
 on purpose.
+
+The race pass compiles the SQLite engine's translated C, and the C library it
+runs on, without the detector and without the pointer checks the detector
+turns on. Instrumenting that code is most of what the detector costs: an empty
+test spends 57 ms under the detector against 4.4 ms without, 48% of it in the
+engine parsing the schema and another 16 to 22% in the pointer checks.
+
+| The race pass, every package, four cores | Processor time | Wall time | Races reported |
+|---|---|---|---|
+| Every package instrumented | 481 s | 123 s | None |
+| Pointer checks off in the engine's packages | 316 s | 81 s | None |
+| The translated engine left out | 235 s | 62 s | None |
+| The translated engine and its C library left out | 186 s | 49 s | None |
+| Every package of the engine left out, its Go driver included | 180 s | 57 s | False, in 3 of 10 runs of one package |
+
+| Rule | Why |
+|---|---|
+| The translated engine and its C library are left out, and nothing else | This tree, the engine's Go driver, the query builder and the standard library's database layer stay instrumented and checked |
+| The engine's Go driver stays instrumented | An error it fills in uninstrumented leaves no record of the write, so this tree reading it is checked against whatever last used that memory, and the report is a race that is not there |
+| A race inside the engine's translated C or its C library is not reported | That code is the one thing the pass no longer inspects |
+| A test races this tree's code against the standard library's database layer and expects the report | Leaving out this tree or the database layer as well silences it, and the test fails |
+| The compiler flags are not documented for turning the detector off in one package | A Go release that rejects one fails the build loudly, and the patterns are then removed or respelled |
 
 The two run at once. They share no engine, so neither can see the other's rows,
 and they are bottlenecked on different things — the detector is in-process work
@@ -596,7 +652,7 @@ run costs.
 
 | Engine | Setting | Where it is asked for |
 |---|---|---|
-| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens; `dbtest.Racing` builds its own handle and keeps the default |
+| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens, the racing handle included |
 | PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
 | MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
 
@@ -631,11 +687,11 @@ directory in memory, which removes the disk from building a schema as well as
 from committing to it. The CI services keep theirs on disk: a runner's memory
 is what the suite runs in, and its disk pays little for a schema change.
 
-| Building the schema, one database, a workstation | On disk | In memory |
-|---|---|---|
-| PostgreSQL | 0.49 s | 0.45 s |
-| MySQL | 20.9 s | 0.79 s |
-| MariaDB | 18.9 s | 0.17 s |
+| Building the schema, one database, a workstation | On disk | In memory | Server processor time, in memory |
+|---|---|---|---|
+| PostgreSQL | 0.43 s | 0.42 s | 0.37 s |
+| MySQL | 9.8 s | 0.83 s | 1.38 s |
+| MariaDB | 7.2 s | 0.18 s | 0.14 s |
 
 The server pass over every package, six at once, went from 516 s to 246 s of
 package time with the pool above and the data in memory, where the 516 s reused
@@ -1020,7 +1076,9 @@ generated address rather than at the organization's.
 | Branch protection is not enforced | The gate runs on every pull request but nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for early development, and it needs revisiting before outside contributions |
 | The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
 | The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer running the gate and a merge being blocked check different things |
-| A test database is named for its slot, never its checkout | A name carrying the checkout outlives the checkout. Measured on one workstation running many short-lived worktrees: about 750 databases and 55,000 tables per MySQL and MariaDB server, and every information-schema question slowed with them |
+| A test database is named for its schema and slot, never its package or checkout | A name carrying the checkout outlives the checkout. Measured on one workstation running many short-lived worktrees: about 750 databases and 55,000 tables per MySQL and MariaDB server, and every information-schema question slowed with them |
+| A test killed part way through changing the schema leaves it changed | The version still matches, so the next binary of any package uses the database and its first test fails on the missing table. `make engines-clean` drops it |
+| Checkouts of two schemas running at once drop each other's free databases | Only a binary creating a database drops another schema's, so each drop costs the other checkout one build, not one per binary |
 | The clean trusts the slot lock alone | A database somebody uses without holding its slot's lock — one made by hand, or by a harness that names databases another way — is dropped while in use |
 | A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
 | `README.md` and `docs/index.md` are compared, from their scope to the end of their features, with link targets set aside | Neither can include the other, and the same list maintained twice drifts. Each links to the other pages by its own path |

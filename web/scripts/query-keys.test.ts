@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { keysIn, reaches, stale, sweep } from "./query-keys.mjs";
+import { keysIn, reaches, stale } from "./query-keys.mjs";
 
 // Both directions per shape — one input that must be reported and one that
 // must not — because the failure that matters here is the check going quiet.
@@ -69,12 +69,5 @@ describe("an invalidation that reaches no read", () => {
         `q.invalidateQueries({ queryKey: ["gone"] });`,
       ),
     ).toEqual([["gone"]]);
-  });
-
-  it("finds none in the interface, and looked at some", async () => {
-    const { found, invalidations, reads } = await sweep();
-    expect(invalidations, "no invalidation was found, so this checked nothing").toBeGreaterThan(0);
-    expect(reads, "no read was found, so this checked nothing").toBeGreaterThan(0);
-    expect(found).toEqual([]);
   });
 });

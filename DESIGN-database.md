@@ -1074,10 +1074,10 @@ runs; the production engines run when the environment points at them and are
 skipped loudly otherwise.
 
 The schema is built once per test binary, not once per test. On SQLite a file is
-migrated on first use and copied per test; on each server the binary gets a
-database of its own, named for the package and the checkout it is tested from.
-The name hashes the directory as well as the import path, which is identical in
-two checkouts, so one cannot drop the other's database mid-run.
+migrated on first use and copied per test; on each server the binary leases a
+slot of the schema, and the database the slot holds, for as long as it runs.
+The database is named for the schema and the slot, and is kept for the next
+binary of any package. `DESIGN-build.md` § Test databases holds the rules.
 
 | Rule | |
 |---|---|

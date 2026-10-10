@@ -26,11 +26,23 @@ async function duplicateOf(issue: string) {
   act(() => duplicate?.click());
   const field = mount.host().querySelector<HTMLInputElement>("#duplicate-of");
   if (!field) throw new Error("no issue field");
-  act(() => type(field, issue));
-  await act(async () => {
-    await new Promise((done) => setTimeout(done, 450));
-  });
-  await settle();
+  // The pause is run on a clock of the test's own rather than waited out, and
+  // what it sets off is settled on that clock too: a timer still pending when
+  // the real clock returns never fires.
+  vi.useFakeTimers();
+  try {
+    act(() => type(field, issue));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450);
+    });
+    for (let round = 0; round < 5; round++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    }
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 describe("ruling a report a duplicate", () => {

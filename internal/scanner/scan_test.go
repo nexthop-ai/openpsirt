@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -59,7 +60,11 @@ func TestMain(m *testing.M) {
 		}
 		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
 	}
-	os.Exit(0)
+	// Left without the exit hooks. Under the race detector os.Exit waits a
+	// second for late reports, and the setting that shortens the wait does not
+	// reach the scanner, whose environment the run filters. What was printed is
+	// already written: fmt writes straight through to the descriptors.
+	syscall.Exit(0)
 }
 
 // scanning runs the scan against the test binary pretending to be a scanner.

@@ -13,17 +13,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// maxSlots is how many test binaries of one package may hold a database on
-// one server at once. A run of the whole tree holds one slot per package, so
-// this bounds concurrent runs of the same package from different checkouts.
-const maxSlots = 32
+// maxSlots is how many test binaries built from one schema may hold a
+// database on one server at once: every package of every run on that server,
+// from every checkout whose migrations carry the same fingerprint.
+const maxSlots = 64
 
 // harnessPrefix begins the name of every database this harness makes.
 const harnessPrefix = "openpsirt_t_"
@@ -33,10 +33,14 @@ const harnessPrefix = "openpsirt_t_"
 // shares a key with the one-key form the migration lock takes.
 const slotNamespace int32 = 0x6f707374
 
-// errNoSlot is the refusal when every slot of a package is held.
+// errNoSlot is the refusal when every slot of a schema is held.
 var errNoSlot = errors.New("every slot is held")
 
-// lease is one slot of one package on one server, held for as long as the
+// serverBuilds counts the server databases this process has migrated. A test
+// reads it to tell a database used as it stood from one built again.
+var serverBuilds atomic.Int64
+
+// lease is one slot of one schema on one server, held for as long as the
 // connection it was taken on is open. A test binary never releases its own:
 // the process ending closes the connection, and the server releases the lock
 // with it, which is also what happens when the binary crashes.
@@ -48,17 +52,42 @@ type lease struct {
 	key    string
 }
 
-// takeSlot leases the lowest free slot of the package at path on the server
-// base names.
+// leaseDatabase leases a slot of the schema fingerprint identifies, on the
+// server base names, and leaves the slot's database migrated to that schema.
+// It returns the lease, which the caller keeps for as long as it uses the
+// database, and the database's URL.
+//
+// The slot's database is used as it stands where it already holds the schema
+// whole, so a binary following another into a slot migrates nothing. A
+// database this lease had to create is the first of its schema in the slot,
+// and the databases of other schemas nobody holds are dropped then.
+func leaseDatabase(ctx context.Context, engine database.Engine, base, namespace, fingerprint string) (*lease, string, error) {
+	held, err := takeSlot(ctx, engine, base, namespace, fingerprint)
+	if err != nil {
+		return nil, "", err
+	}
+	own, created, err := prepareServer(ctx, engine, base, held.key)
+	if err == nil && created {
+		err = dropStale(ctx, engine, base, namespace, held.key)
+	}
+	if err != nil {
+		_ = held.release(ctx)
+		return nil, "", err
+	}
+	return held, own, nil
+}
+
+// takeSlot leases the lowest free slot of the schema fingerprint identifies,
+// in namespace, on the server base names.
 //
 // Each slot is tried without waiting, so two binaries starting at once each
 // come away with a different one: the server grants a lock to one connection
 // and refuses the other, which moves on to the next slot.
 //
-// The lock is keyed on the package as well as the slot. Two packages hold
-// different databases, so they can share a slot number, and a key of the slot
-// alone would make every package in a run take a slot of its own.
-func takeSlot(ctx context.Context, engine database.Engine, base, path string) (*lease, error) {
+// The lock is keyed on the schema and the slot, and on nothing about the
+// package: a package's binary that exits frees its slot, and its database, to
+// the next binary of any package.
+func takeSlot(ctx context.Context, engine database.Engine, base, namespace, fingerprint string) (*lease, error) {
 	target, err := database.ParseURL(base)
 	if err != nil {
 		return nil, err
@@ -73,7 +102,7 @@ func takeSlot(ctx context.Context, engine database.Engine, base, path string) (*
 		return nil, fmt.Errorf("hold a connection to %s: %w", target.Redacted, err)
 	}
 	for slot := 1; slot <= maxSlots; slot++ {
-		key := slotName(path, slot)
+		key := slotName(namespace, fingerprint, slot)
 		held, err := tryLock(ctx, conn, engine, key)
 		if err != nil {
 			_ = conn.Close()
@@ -86,7 +115,7 @@ func takeSlot(ctx context.Context, engine database.Engine, base, path string) (*
 	}
 	_ = conn.Close()
 	_ = db.Close()
-	return nil, fmt.Errorf("lease a slot for %s on %s: %w, %d of them", path, target.Redacted, errNoSlot, maxSlots)
+	return nil, fmt.Errorf("lease a slot on %s: %w, %d of them", target.Redacted, errNoSlot, maxSlots)
 }
 
 // release gives the slot back and closes the connection that held it.
@@ -152,53 +181,60 @@ func slotHash(key string) int32 {
 	return int32(binary.BigEndian.Uint32(sum[:4])) //nolint:gosec // G115: a hash, whose sign carries nothing
 }
 
-// slotName is a slot of the package at path: the package's own name for a
-// person reading the server's list, a hash of its import path, and the slot's
-// number. It is the name of the slot's lock, and every database the slot holds
-// begins with it.
+// slotName is a slot of the schema fingerprint identifies: the namespace, a
+// hash of the fingerprint and the slot's number. It is the name of the slot's
+// lock and of the database the slot holds, and it is short enough for every
+// engine's limit on an identifier and MySQL's on a lock name.
 //
-// The hash tells apart two packages whose names are cut to the same readable
-// part. The checkout is not in it: every checkout shares a package's slots, and
-// the lock is what keeps two of them out of one database at once.
-func slotName(path string, slot int) string {
-	base := strings.TrimSuffix(filepath.Base(path), ".test")
-	base = notIdentifier.ReplaceAllString(strings.ToLower(base), "_")
-	if len(base) > 24 {
-		base = base[:24]
+// Neither the package nor the checkout is in it. Every binary built from one
+// schema shares its slots, and the lock is what keeps two of them out of one
+// database at once.
+func slotName(namespace, fingerprint string, slot int) string {
+	sum := sha256.Sum256([]byte(fingerprint))
+	return fmt.Sprintf("%s%s_%02d", namespace, hex.EncodeToString(sum[:6]), slot)
+}
+
+// slotShape matches a name slotName gives, in namespace, and captures the
+// fingerprint's hash.
+func slotShape(namespace string) *regexp.Regexp {
+	return regexp.MustCompile(`^` + regexp.QuoteMeta(namespace) + `([0-9a-f]{12})_[0-9]{2}$`)
+}
+
+// locksOf is every lock whose holder may be using the database called name:
+// the lock named for the database, and the one named for it without its last
+// part, which is the slot lock of a harness that names a database for its
+// package, a slot and a schema.
+func locksOf(name string) []string {
+	if cut := strings.LastIndex(name, "_"); cut > 0 {
+		return []string{name, name[:cut]}
 	}
-	sum := sha256.Sum256([]byte(path))
-	return fmt.Sprintf("%s%s_%s_%02d", harnessPrefix, base, hex.EncodeToString(sum[:3]), slot)
+	return []string{name}
 }
 
-// databaseName is the database a slot of the package at path holds for a
-// schema built by the migrations that fingerprint identifies. Short enough for
-// every engine's limit on identifier length.
-func databaseName(path string, slot int, fingerprint string) string {
-	schema := sha256.Sum256([]byte(fingerprint))
-	return slotName(path, slot) + "_" + hex.EncodeToString(schema[:3])
+// dropStale drops the databases in namespace on the server base names that
+// were built for another schema and that nobody holds. own is the database
+// just created, whose schema's databases are all left.
+//
+// A database another checkout uses is held, and is left. One it used a moment
+// ago is not, and it builds that database again the next time it leases the
+// slot.
+func dropStale(ctx context.Context, engine database.Engine, base, namespace, own string) error {
+	shape := slotShape(namespace)
+	mine := shape.FindStringSubmatch(own)
+	stale := func(name string) bool {
+		match := shape.FindStringSubmatch(name)
+		return match != nil && (mine == nil || match[1] != mine[1])
+	}
+	_, _, err := dropUnheld(ctx, engine, base, namespace, stale)
+	return err
 }
-
-// slotOf is the slot a database belongs to: its name without the schema's
-// fingerprint, which is the name of the lock whoever uses it holds.
-func slotOf(name string) string {
-	return name[:strings.LastIndex(name, "_")]
-}
-
-// packagePrefix is everything in a name before the schema's fingerprint: this
-// package, in this slot. Every database under it was built for these tests, by
-// one set of migrations or another.
-func packagePrefix(name string) string {
-	return slotOf(name) + "_"
-}
-
-var notIdentifier = regexp.MustCompile(`[^a-z0-9_]+`)
 
 // CleanServers drops the harness's databases on every configured server that
 // no running test binary holds, and says what it dropped and what it left.
 //
 // A database is dropped only while this holds its slot's lock, so a binary
 // starting meanwhile is refused that slot and takes another. A database whose
-// name carries no slot has a lock nobody takes, and is dropped with the rest.
+// name is no slot's has a lock nobody takes, and is dropped with the rest.
 func CleanServers(ctx context.Context, out io.Writer) error {
 	var errs []error
 	cleaned := 0
@@ -212,7 +248,7 @@ func CleanServers(ctx context.Context, out io.Writer) error {
 			continue
 		}
 		cleaned++
-		dropped, held, err := dropUnheld(ctx, c.name, base, harnessPrefix)
+		dropped, held, err := dropUnheld(ctx, c.name, base, harnessPrefix, nil)
 		_, _ = fmt.Fprintf(out, "%s: dropped %d databases, left %d a running test holds\n",
 			c.name, len(dropped), len(held))
 		if err != nil {
@@ -225,15 +261,16 @@ func CleanServers(ctx context.Context, out io.Writer) error {
 	return errors.Join(errs...)
 }
 
-// dropUnheld drops every database under prefix on the server base names whose
-// slot lock nobody holds, and returns the names it dropped and the names it
-// left because a lease holds them.
+// dropUnheld drops every database under prefix on the server base names that
+// want accepts, or every one where want is nil, and whose locks nobody holds.
+// It returns the names it dropped and the names it left because a lease holds
+// them.
 //
-// Whether a slot is held is asked by taking its lock without waiting, on a
-// connection of this function's own, and the lock is kept across the drop. A
-// check followed by a drop would leave a moment in which a test binary leases
-// the slot and starts using the database being dropped.
-func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string) (dropped, held []string, err error) {
+// Whether a database is held is asked by taking each of its locks without
+// waiting, on a connection of this function's own, and the locks are kept
+// across the drop. A check followed by a drop would leave a moment in which a
+// test binary leases the slot and starts using the database being dropped.
+func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string, want func(string) bool) (dropped, held []string, err error) {
 	target, err := database.ParseURL(base)
 	if err != nil {
 		return nil, nil, err
@@ -255,24 +292,45 @@ func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string
 	}
 	var errs []error
 	for _, name := range names {
-		key := slotOf(name)
-		free, err := tryLock(ctx, conn, engine, key)
+		if want != nil && !want(name) {
+			continue
+		}
+		taken, free, err := lockAll(ctx, conn, engine, locksOf(name))
 		if err != nil {
 			errs = append(errs, err)
-			continue
 		}
-		if !free {
+		if err == nil && !free {
 			held = append(held, name)
-			continue
 		}
-		if _, err := conn.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+name+`"`); err != nil {
-			errs = append(errs, fmt.Errorf("drop %s: %w", name, err))
-		} else {
-			dropped = append(dropped, name)
+		if err == nil && free {
+			if _, err := conn.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+name+`"`); err != nil {
+				errs = append(errs, fmt.Errorf("drop %s: %w", name, err))
+			} else {
+				dropped = append(dropped, name)
+			}
 		}
-		if err := unlock(ctx, conn, engine, key); err != nil {
-			errs = append(errs, err)
+		for _, key := range taken {
+			if err := unlock(ctx, conn, engine, key); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return dropped, held, errors.Join(errs...)
+}
+
+// lockAll takes every lock in keys on conn without waiting, and stops at the
+// first another session holds. It returns the locks it took, which the caller
+// releases, and whether it took them all.
+func lockAll(ctx context.Context, conn *sql.Conn, engine database.Engine, keys []string) (taken []string, all bool, err error) {
+	for _, key := range keys {
+		granted, err := tryLock(ctx, conn, engine, key)
+		if err != nil {
+			return taken, false, err
+		}
+		if !granted {
+			return taken, false, nil
+		}
+		taken = append(taken, key)
+	}
+	return taken, true, nil
 }

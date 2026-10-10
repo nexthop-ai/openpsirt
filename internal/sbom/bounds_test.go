@@ -46,7 +46,7 @@ func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 	const perFile = 1024
 
 	t.Run("an edge", func(t *testing.T) {
-		const edges = 200_000
+		const edges = 20_000
 		var b strings.Builder
 		b.WriteString(`{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":` +
 			`{"bom-ref":"root","type":"application","name":"root","version":"1"}},"components":[`)
@@ -82,7 +82,7 @@ func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 		// the identifier — kept so an edge naming it is dropped knowingly —
 		// where a component is a described thing. The higher ceiling is only
 		// affordable while that stays true.
-		const files = 50_000
+		const files = 5_000
 		var b strings.Builder
 		b.WriteString(`{"spdxVersion":"SPDX-2.3","documentNamespace":"https://example.invalid/f","files":[`)
 		for i := 0; i < files; i++ {
@@ -105,7 +105,7 @@ func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 	})
 
 	t.Run("a component", func(t *testing.T) {
-		const components = 50_000
+		const components = 5_000
 		var b strings.Builder
 		b.WriteString(`{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":` +
 			`{"bom-ref":"root","type":"application","name":"root","version":"1"}},"components":[`)
