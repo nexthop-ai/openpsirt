@@ -35,6 +35,9 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	if len(targets) == 0 {
 		return 0, nil
 	}
+	if err := s.decidedIssuesFor(ctx, &below, []int64{productID}, false); err != nil {
+		return 0, err
+	}
 	rows := openRows(s.db, targets, visible)
 	if words := filter.Floor.admits(); len(words) > 0 {
 		// The line's own condition, negated: no exploitation signal at
@@ -51,7 +54,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	// Grouped the way the list groups, in the same two levels: the issue and
 	// the component first, then the fold.
 	n, err := s.countGroups(ctx,
-		below.folded(s.db, rows, byIssueAndComponent).GroupExpr(GroupedOn))
+		below.folded(s.db, rows, issueAndComponent).GroupExpr(GroupedOn))
 	if err != nil {
 		return 0, fmt.Errorf("count what the line keeps out: %w", err)
 	}

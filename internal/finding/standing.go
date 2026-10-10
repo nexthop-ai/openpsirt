@@ -6,6 +6,8 @@ package finding
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -85,97 +87,136 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// through the same helper as the rest, so the version match is one
 	// expression.
 	anyClaim := decisionState{"any_claim", " AND de.state <> ?", []any{"withdrawn"}}
-	// The things somebody decides about, grouped one way for the build rows
-	// and another for the product's own totals: with the build in the key it
-	// is one row per build, and without it a group in three builds is one
-	// thing, which is what the findings list answers for a whole product.
-	grouped := func(byBuild bool) *bun.SelectQuery {
-		q := s.db.NewSelect().
-			TableExpr(`"finding" AS "f"`).
-			ColumnExpr(`COUNT(*) AS "places"`).
-			ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-			ColumnExpr(`MAX(f.urgency) AS "urgency"`).
-			// The flag rather than the urgency's top bands, which answer
-			// "some exploitation". This total is the feed's word about the
-			// world, and a product recorded as attacked here is a different
-			// fact that would be counted under the wrong name.
-			ColumnExpr(exploitedAcross + ` AS "exploited"`).
-			ColumnExpr(placesDecided(anyClaim)).
-			ColumnExpr(placesDecided(claimApproved))
-		q = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`,
-			decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
-			Where(inThisProductAs("f.target_id"), productID).
-			Where("f.closed_at IS NULL").
-			Where("f.visibility IN (?)", bun.List(visible))
-		if byBuild {
-			return q.ColumnExpr(`f.target_id AS "target_id"`).
-				GroupExpr("f.target_id, f.vulnerability_id, f.component_id")
-		}
-		return q.GroupExpr("f.vulnerability_id, f.component_id")
+	// One row per build, issue and component. The build rows count these
+	// directly, and the product's totals fold them again by issue and
+	// component, in one pass here. The table of decided places is most of the
+	// cost of the reading, 0.7 s with 133,000 decisions on PostgreSQL, and a
+	// second statement builds it a second time. Every column folds exactly — the
+	// places and the decided places are sums, the deadline a minimum and the
+	// exploitation flag a maximum.
+	q := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		// The flag rather than the urgency's top bands, which answer
+		// "some exploitation". This total is the feed's word about the
+		// world, and a product recorded as attacked here is a different
+		// fact that would be counted under the wrong name.
+		ColumnExpr(exploitedAcross + ` AS "exploited"`).
+		ColumnExpr(placesDecided(anyClaim)).
+		ColumnExpr(placesDecided(claimApproved))
+	var groups []struct {
+		TargetID        int64      `bun:"target_id"`
+		VulnerabilityID int64      `bun:"vulnerability_id"`
+		ComponentID     int64      `bun:"component_id"`
+		Places          int        `bun:"places"`
+		DueAt           *time.Time `bun:"due_at"`
+		Exploited       int        `bun:"exploited"`
+		AnyClaim        int        `bun:"any_claim"`
+		Approved        int        `bun:"approved_here"`
 	}
-	// The four sums each grouping is reduced by, spelled once so the build
-	// rows and the product's totals cannot come to mean different things.
-	counted := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.
-			ColumnExpr(`COUNT(*) AS "open"`).
-			ColumnExpr(`SUM(CASE WHEN grouped.due_at IS NOT NULL AND grouped.due_at < ? THEN 1 ELSE 0 END) AS "overdue"`, now).
-			ColumnExpr(`SUM(grouped.exploited) AS "exploited"`).
-			ColumnExpr(`SUM(CASE WHEN grouped.any_claim = 0 THEN 1 ELSE 0 END) AS "undecided"`).
-			ColumnExpr(`SUM(CASE WHEN grouped.approved_here = grouped.places THEN 1 ELSE 0 END) AS "agreed"`)
-	}
-	groups := grouped(true)
-
-	var rows []struct {
-		TargetID  int64  `bun:"target_id"`
-		Stream    string `bun:"stream"`
-		Variant   string `bun:"variant"`
-		Open      int    `bun:"open"`
-		Overdue   int    `bun:"overdue"`
-		Exploited int    `bun:"exploited"`
-		Undecided int    `bun:"undecided"`
-		Agreed    int    `bun:"agreed"`
-	}
-	err = counted(s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, groups).
-		Join(`JOIN "target" AS "tg" ON tg.id = grouped.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`grouped.target_id AS "target_id"`).
-		ColumnExpr(`MIN(st.name) AS "stream"`).
-		ColumnExpr(`MIN(va.name) AS "variant"`)).
-		GroupExpr("grouped.target_id").
-		Scan(ctx, &rows)
+	err = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`,
+		decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
+		Where(inThisProductAs("f.target_id"), productID).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.target_id, f.vulnerability_id, f.component_id").
+		Scan(ctx, &groups)
 	if err != nil {
 		return nil, whole, fmt.Errorf("read how this product's builds stand: %w", err)
 	}
 
-	var totals []struct {
-		Open      int `bun:"open"`
-		Overdue   int `bun:"overdue"`
-		Exploited int `bun:"exploited"`
-		Undecided int `bun:"undecided"`
-		Agreed    int `bun:"agreed"`
+	// One thing somebody decides about, and how it stands, counted into a
+	// build row or the product's totals by the same four rules, so the two
+	// cannot come to mean different things.
+	type thing struct {
+		places, anyClaim, approved int
+		dueAt                      *time.Time
+		exploited                  bool
 	}
-	if err := counted(s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, grouped(false))).
-		Scan(ctx, &totals); err != nil {
-		return nil, whole, fmt.Errorf("read how this product stands: %w", err)
-	}
-	if len(totals) == 1 {
-		whole = BuildStanding{
-			Open: totals[0].Open, Overdue: totals[0].Overdue,
-			Exploited: totals[0].Exploited, Undecided: totals[0].Undecided,
-			Agreed: totals[0].Agreed,
+	count := func(into *BuildStanding, one thing) {
+		into.Open++
+		if one.dueAt != nil && one.dueAt.Before(now) {
+			into.Overdue++
+		}
+		if one.exploited {
+			into.Exploited++
+		}
+		if one.anyClaim == 0 {
+			into.Undecided++
+		}
+		if one.approved == one.places {
+			into.Agreed++
 		}
 	}
+	type key struct{ issue, component int64 }
+	builds := map[int64]*BuildStanding{}
+	across := map[key]*thing{}
+	order := make([]key, 0, len(groups))
+	for _, group := range groups {
+		one := thing{places: group.Places, anyClaim: group.AnyClaim, approved: group.Approved,
+			dueAt: group.DueAt, exploited: group.Exploited > 0}
+		build, held := builds[group.TargetID]
+		if !held {
+			build = &BuildStanding{TargetID: group.TargetID}
+			builds[group.TargetID] = build
+		}
+		count(build, one)
+		k := key{group.VulnerabilityID, group.ComponentID}
+		sum, seen := across[k]
+		if !seen {
+			copied := one
+			across[k] = &copied
+			order = append(order, k)
+			continue
+		}
+		sum.places += one.places
+		sum.anyClaim += one.anyClaim
+		sum.approved += one.approved
+		sum.exploited = sum.exploited || one.exploited
+		if one.dueAt != nil && (sum.dueAt == nil || one.dueAt.Before(*sum.dueAt)) {
+			sum.dueAt = one.dueAt
+		}
+	}
+	for _, k := range order {
+		count(&whole, *across[k])
+	}
 
-	out := make([]BuildStanding, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, BuildStanding{
-			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
-			Open: row.Open, Overdue: row.Overdue, Exploited: row.Exploited,
-			Undecided: row.Undecided, Agreed: row.Agreed,
-		})
+	// Each build's stream and variant, for the builds holding something.
+	ids := make([]int64, 0, len(builds))
+	for id := range builds {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	if len(ids) == 0 {
+		return []BuildStanding{}, whole, nil
+	}
+	var named []struct {
+		TargetID int64  `bun:"target_id"`
+		Stream   string `bun:"stream"`
+		Variant  string `bun:"variant"`
+	}
+	if err := s.db.NewSelect().
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`tg.id AS "target_id"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`va.name AS "variant"`).
+		Where("tg.id IN (?)", bun.List(ids)).
+		Scan(ctx, &named); err != nil {
+		return nil, whole, fmt.Errorf("read the builds of this product: %w", err)
+	}
+	for _, build := range named {
+		builds[build.TargetID].Stream, builds[build.TargetID].Variant = build.Stream, build.Variant
+	}
+
+	out := make([]BuildStanding, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, *builds[id])
 	}
 	return out, whole, nil
 }

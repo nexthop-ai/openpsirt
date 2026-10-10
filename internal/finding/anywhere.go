@@ -69,6 +69,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			" one build's edges, and this list spans products")
 	}
 	limit = database.AList.Of(limit)
+	if err := s.decidedIssuesFor(ctx, &filter, products, all); err != nil {
+		return nil, 0, err
+	}
 	filter.Across = true
 	filter.ProductID = 0
 	filter.HeldBy = subject.Mine()
@@ -174,8 +177,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 		return q
 	}
-	// narrow is every condition in one level, for the statement over the
-	// page's own rows.
+	// narrow is every condition on a place, for the statement over the page's
+	// own rows (see Filter.ofPage).
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = withRating(readable(q).
 			Join(`JOIN "product" AS "p" ON p.id = st.product_id`), rating.OnStream).
@@ -183,7 +186,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
 			Join(`JOIN "component" AS "c" ON c.id = f.component_id`)
-		return filter.narrow(lined(q, "f.urgency >= ?", int64(exploiting)))
+		return filter.ofPage(lined(q, "f.urgency >= ?", int64(exploiting)))
 	}
 	// grouped is the page's grouping in two levels (see twolevel.go). The
 	// first groups each product's places by issue and component, and by
@@ -201,16 +204,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			rows = withRating(rows, rating.OnStream)
 		}
 		hot := `CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END`
-		q := filter.folded(s.db, rows, func(q *bun.SelectQuery) *bun.SelectQuery {
-			q = q.ColumnExpr(`st.product_id AS "product_id"`).
-				ColumnExpr("f.vulnerability_id").ColumnExpr("f.component_id").
-				GroupExpr("st.product_id, f.vulnerability_id, f.component_id")
-			if wasBelow {
-				return q
-			}
-			return q.ColumnExpr(hot+` AS "hot"`, int64(exploiting)).
-				GroupExpr(hot, int64(exploiting))
-		})
+		keys := []partKey{
+			{expr: "st.product_id", name: "product_id"},
+			{expr: "f.vulnerability_id", name: "vulnerability_id"},
+			{expr: "f.component_id", name: "component_id"},
+		}
+		if !wasBelow {
+			keys = append(keys, partKey{expr: hot, args: []any{int64(exploiting)}, name: "hot"})
+		}
+		q := filter.folded(s.db, rows, keys)
 		by, known := order[filter.SortBy]
 		if !wasBelow || (known && by.issue) {
 			q = withRating(q, rating.OnPartial)
@@ -279,7 +281,6 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Builds          int    `bun:"builds"`
 		decorated
 	}
-	filter.PageIssues = issues
 	body := narrow(s.db.NewSelect()).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).

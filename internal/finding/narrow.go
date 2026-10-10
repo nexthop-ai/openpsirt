@@ -101,12 +101,16 @@ type Filter struct {
 	// anything correlating a place to a decision has to supply one or it
 	// matches every product in the deployment.
 	ProductID int64
-	// PageIssues is the issues of a page the store has already chosen, set by
-	// the store when it reads what it shows about that page. The decision
-	// table the state filter joins is built for these issues alone, which a
-	// page of fifty reads in milliseconds and every decided place in the
-	// deployment does not. Empty is every issue.
-	PageIssues []int64
+	// decidedIssues is the only issues a group can be filed under and pass
+	// the filter, set by the store where some condition every passing group
+	// meets needs a decision of some kind at one of its places: the issues of
+	// those decisions, read before the list is. Nil asks nothing, and
+	// empty answers nothing.
+	decidedIssues []int64
+	// decidedApart says the places are read without the decision table
+	// joined: the first level counts the decided places beside itself, and a
+	// page's rows belong to groups the conditions over a group already chose.
+	decidedApart bool
 	// Ecosystems keeps components of these package kinds — deb, golang,
 	// pypi. Read from the package identifier rather than stored beside it,
 	// because the identifier is what says it and a second copy is a second
@@ -416,13 +420,36 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	if !f.asksOfGroups() {
 		return f.narrow(q)
 	}
-	kept := f.narrow(openGroups(db, targets, visible).
+	kept := f.listed(db, targets, visible).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(FoldedOn + ` AS "fold"`))
+		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return f.ofRows().narrow(q.
 		Join(`JOIN "component" AS "ck" ON ck.id = f.component_id`).
 		Join(`JOIN (?) AS "kept" ON kept.vulnerability_id = f.vulnerability_id`+
 			` AND kept.fold = ck.fold_key`, kept))
+}
+
+// listed is the groups the findings list holds under the filter, one issue at
+// one fold, for a statement to select its columns from.
+//
+// A filter that can pass with no decision, such as undecided, reads the
+// list's own two-level statement, which counts the decided places beside its
+// first level. Joined to every open place instead, the decision table is built
+// from every decision of the product, and MariaDB gave no answer in 985 s for
+// the component view of what is undecided among 425,680 open rows with 3,060
+// decisions, against 2.6 s in two levels.
+//
+// A filter needing a decision reads the one-level grouping, with the decision
+// table narrowed to the issues the decisions name (see decidedIssuesFor). In
+// two levels PostgreSQL estimates the groups such a condition keeps at a sixth
+// of those that pass, 279 where 1,753 pass, and joined back to the finding
+// rows on that estimate it read a component's rows once per kept group: 185 s
+// for the lapsed fix bundles against 1.2 s in one level.
+func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+	if f.asksDecided() && f.decidedIssues == nil {
+		return f.folded(db, openRows(db, targets, visible), issueAndComponent).GroupExpr(GroupedOn)
+	}
+	return f.narrow(openGroups(db, targets, visible))
 }
 
 // narrow applies the filter to a grouped query over finding AS f.
@@ -445,9 +472,30 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	return f.narrowGroups(f.narrowRows(q), overRows)
 }
 
+// ofPage narrows a statement over the groups of a page the store has already
+// chosen to the places those groups were counted over: every condition on a
+// place, and no condition over a group. The groups were kept by those in the
+// statement that chose the page, and a group the statement reads that is not
+// on the page is dropped by the caller.
+//
+// So the decision table is not built here. Built for the page's issues and
+// joined to its places, PostgreSQL estimated the places at one row and built
+// the table once per place: 87 s for a page of fifty undecided high issues
+// with 133,549 decisions, against 35 ms without it.
+func (f Filter) ofPage(q *bun.SelectQuery) *bun.SelectQuery {
+	f.decidedApart = true
+	return f.narrowRows(q)
+}
+
 // narrowRows applies the half of the filter that is asked of each place: the
 // WHERE clauses, and the joins they read.
 func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
+	if f.decidedIssues != nil {
+		// A condition on the issue, which every place of a group shares: it
+		// drops whole groups, and only groups the conditions over a group
+		// drop anyway.
+		q = f.amongDecidedIssues(q, "f.vulnerability_id")
+	}
 	if words := f.severities(); len(words) > 0 {
 		// The rating in force here, not the published one. Being able to say
 		// a published rating is wrong is pointless if the filter then ignores
@@ -729,7 +777,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		if f.Planned == PlannedOnly {
 			q = q.Having(g.decided("planned") + " > 0")
 		} else {
-			q = q.Having(g.decided("planned") + " = 0")
+			q = q.Having(g.decided("planned") + " < 1")
 		}
 	}
 	// Open in some builds of the selection and not others, which is what a
@@ -876,9 +924,9 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	for _, who := range asked {
 		switch who {
 		case "nobody":
-			says = append(says, g.held()+" = 0")
+			says = append(says, g.held()+" < 1")
 		case "somebody":
-			says = append(says, g.held()+" = "+g.places())
+			says = append(says, g.held()+" >= "+g.places())
 		case "me":
 			// Mine or my team's, everywhere the phrase appears. A subject
 			// holding no party names nobody, so the phrase contributes
@@ -887,7 +935,7 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 			if len(f.HeldBy) == 0 {
 				continue
 			}
-			says = append(says, "("+g.held()+" = "+g.places()+
+			says = append(says, "("+g.held()+" >= "+g.places()+
 				" AND "+g.heldLeast()+" IN (?) AND "+g.heldMost()+" IN (?))")
 			args = append(args, bun.List(f.HeldBy), bun.List(f.HeldBy))
 		}

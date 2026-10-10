@@ -96,6 +96,9 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	if len(targets) == 0 {
 		return nil, 0, nil
 	}
+	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+		return nil, 0, err
+	}
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
@@ -171,8 +174,11 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 func (s *Store) CountBundles(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
 	if err != nil || len(targets) == 0 {
+		return 0, err
+	}
+	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
 		return 0, err
 	}
 	return s.countBumps(ctx, targets, visible, filter)
@@ -341,12 +347,15 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int, filter Filter) ([]ComponentGroup, int, error) {
 
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
 	if err != nil {
 		return nil, 0, err
 	}
 	if len(targets) == 0 {
 		return nil, 0, nil
+	}
+	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+		return nil, 0, err
 	}
 	limit = database.AList.Of(limit)
 
@@ -445,8 +454,11 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 func (s *Store) CountComponentGroups(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
 	if err != nil || len(targets) == 0 {
+		return 0, err
+	}
+	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
 		return 0, err
 	}
 	return s.countByComponent(ctx, targets, visible, filter)

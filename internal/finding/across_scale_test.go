@@ -142,6 +142,31 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 				acrossTook.Round(time.Millisecond), across, time.Since(at).Round(time.Millisecond), here)
 		}
 
+		// The component and fix-bundle views keep the list's groups under the
+		// same conditions over a group, grouped at their own grain.
+		for _, one := range []struct {
+			name   string
+			filter finding.Filter
+		}{
+			{"undecided", finding.Filter{States: []finding.ClaimStanding{finding.StandingUndecided}}},
+			{"waiting", finding.Filter{States: []finding.ClaimStanding{finding.StandingWaiting}}},
+			{"planned", finding.Filter{Planned: finding.PlannedOnly}},
+		} {
+			at := time.Now()
+			_, components, err := store.ComponentGroups(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			componentsTook := time.Since(at)
+			at = time.Now()
+			_, bundles, err := store.Bundles(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("%-20s components %9s (%d) · fix bundles %9s (%d)", one.name,
+				componentsTook.Round(time.Millisecond), components, time.Since(at).Round(time.Millisecond), bundles)
+		}
+
 		approver := access.NewPerson(person.ID+2, "an approver", false, map[int64][]access.Role{
 			product.ID: {access.PublicTriage, access.PrivateTriage, access.Approver},
 			other.ID:   {access.PublicTriage, access.PrivateTriage, access.Approver},

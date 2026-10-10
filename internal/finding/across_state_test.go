@@ -203,7 +203,7 @@ func (s *statements) AfterQuery(_ context.Context, event *bun.QueryEvent) {
 }
 
 // The state filter across products reaches each open finding from a decision,
-// through the finding's place index, as it does inside one product. Reached
+// through an index on the finding, as it does inside one product. Reached
 // the other way, SQLite starts from every open finding and reads every
 // decision of its product once per row, which is minutes on a real deployment
 // and invisible on a fixture this size — so the plan is what is asserted.
@@ -242,9 +242,10 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 		seen.mu.Unlock()
 
 		checked := 0
-		byPlace := regexp.MustCompile(`SEARCH f2 USING (COVERING )?INDEX finding_place_idx`)
+		fromDecision := regexp.MustCompile(`^SEARCH de USING `)
+		toFinding := regexp.MustCompile(`^SEARCH (f|f2) USING (COVERING )?INDEX finding_(place|vulnerability)_idx`)
 		for _, statement := range sent {
-			if !strings.Contains(statement, `AS "dd"`) {
+			if !strings.Contains(statement, `"decision" AS "de"`) || !strings.Contains(statement, `AS "f2"`) {
 				continue
 			}
 			checked++
@@ -258,10 +259,11 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 				t.Fatalf("explain a statement: %v", err)
 			}
 			var lines []string
-			reached := false
+			decisions, reached := false, false
 			for _, step := range plan {
 				lines = append(lines, step.Detail)
-				reached = reached || byPlace.MatchString(step.Detail)
+				decisions = decisions || fromDecision.MatchString(step.Detail)
+				reached = reached || (decisions && toFinding.MatchString(step.Detail))
 			}
 			if !reached {
 				t.Errorf("the state filter does not reach the findings from the decisions:\n  %s",

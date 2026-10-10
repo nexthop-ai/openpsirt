@@ -338,6 +338,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if len(targets) == 0 {
 		return nil, 0, nil
 	}
+	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+		return nil, 0, err
+	}
 
 	limit = database.AList.Of(limit)
 
@@ -805,7 +808,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 // are one row, because upgrading them is one act, deciding about them is one
 // judgment and routing them is one rule.
 func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	return filter.folded(s.db, openRows(s.db, targets, visible), byIssueAndComponent).
+	return filter.folded(s.db, openRows(s.db, targets, visible), issueAndComponent).
 		GroupExpr(GroupedOn)
 }
 
@@ -843,8 +846,9 @@ func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.S
 // decorate reads what the page shows about each of its groups, in one
 // statement over the groups named and no other.
 //
-// Narrowed through the same filter as the groups were chosen by, so every
-// number here is over exactly the places the group was counted over: a list
+// Narrowed by the same conditions on a place as the groups were chosen by (see
+// Filter.ofPage), so every number here is over exactly the places the group was
+// counted over: a list
 // narrowed to what sits inside one container reports how many of *those*
 // places are answered, not how many places there are anywhere.
 func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
@@ -958,8 +962,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr(GroupedOn)
-	filter.PageIssues = issues
-	if err := filter.narrow(q).Scan(ctx, &rows); err != nil {
+	if err := filter.ofPage(q).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read about what is open: %w", err)
 	}
 	for _, row := range rows {
