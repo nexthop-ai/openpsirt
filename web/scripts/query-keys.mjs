@@ -20,7 +20,7 @@ import ts from "typescript";
 
 import { interfaceSources, parse } from "./parsed.mjs";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = import.meta.dirname;
 const src = path.join(here, "..", "src");
 
 // The string elements a key opens with, and whether anything follows them.

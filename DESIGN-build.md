@@ -578,7 +578,7 @@ engine parsing the schema and another 16 to 22% in the pointer checks.
 |---|---|
 | The translated engine and its C library are left out, and nothing else | This tree, the engine's Go driver, the query builder and the standard library's database layer stay instrumented and checked |
 | The engine's Go driver stays instrumented | An error it fills in uninstrumented leaves no record of the write, so this tree reading it is checked against whatever last used that memory, and the report is a race that is not there |
-| A race inside the engine's translated C is not reported | That code is the one thing the pass no longer inspects |
+| A race inside the engine's translated C or its C library is not reported | That code is the one thing the pass no longer inspects |
 | A test races this tree's code against the standard library's database layer and expects the report | Leaving out this tree or the database layer as well silences it, and the test fails |
 | The compiler flags are not documented for turning the detector off in one package | A Go release that rejects one fails the build loudly, and the patterns are then removed or respelled |
 

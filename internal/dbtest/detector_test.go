@@ -19,13 +19,13 @@ import (
 // racyChildEnv marks the child process that runs the deliberate race.
 const racyChildEnv = "OPENPSIRT_TEST_RACY_CHILD"
 
-// The race pass leaves the SQLite engine's translated C uninstrumented, and
-// nothing else. A race between this package's code and the standard library's
-// database layer is still reported: database/sql writes a scanned value into
-// a variable this test reads on another goroutine, and the child process
-// running that race is expected to print the detector's report naming both
-// sides. A pattern widened past the SQLite engine's packages leaves one side
-// or both uninstrumented, and the report never comes.
+// The race pass leaves the SQLite engine's translated C and its C library
+// uninstrumented, and nothing else. A race between this package's code and the
+// standard library's database layer is still reported: database/sql writes a
+// scanned value into a variable this test reads on another goroutine, and the
+// child process running that race is expected to print the detector's report
+// naming both sides. A pattern widened past the SQLite engine's packages
+// leaves one side or both uninstrumented, and the report never comes.
 //
 // Verified by widening the pattern to every package: the child then exits
 // cleanly and this test fails.

@@ -24,24 +24,14 @@ const schemaPrefix = "#/components/schemas/"
 // schemas are the same each time and are worked out by whichever build reaches
 // a type first.
 //
-// The framework's registry is not safe for concurrent use. Asking it again for
-// what it was asked before only reads, because the answer is already held, so
-// a question it has answered is asked under the read lock and any other under
-// the write lock. Every question in a build after the first has been answered.
+// The framework's registry is not safe for concurrent use, so every question
+// is asked holding one lock. Builds in one process run one after another, so
+// the lock is never waited on.
 var derived = struct {
-	sync.RWMutex
+	sync.Mutex
 	registry huma.Registry
-	answered map[question]bool
 }{
 	registry: huma.NewMapRegistry(schemaPrefix, huma.DefaultSchemaNamer),
-	answered: map[question]bool{},
-}
-
-// question is everything the registry's answer for a type depends on.
-type question struct {
-	t        reflect.Type
-	allowRef bool
-	hint     string
 }
 
 // schemas is one API's view of the shared registry.
@@ -66,21 +56,12 @@ func newSchemas() *schemas {
 }
 
 // Schema works out the schema for a type, or returns the one already worked
-// out. A struct comes back as a reference, which is fresh on every call.
+// out. With allowRef a struct comes back as a reference, fresh on every call;
+// without it, the shared schema itself, which nothing here asks for.
 func (s *schemas) Schema(t reflect.Type, allowRef bool, hint string) *huma.Schema {
-	asked := question{t: t, allowRef: allowRef, hint: hint}
-	derived.RLock()
-	if derived.answered[asked] {
-		defer derived.RUnlock()
-		return derived.registry.Schema(t, allowRef, hint)
-	}
-	derived.RUnlock()
-
 	derived.Lock()
 	defer derived.Unlock()
-	answer := derived.registry.Schema(t, allowRef, hint)
-	derived.answered[asked] = true
-	return answer
+	return derived.registry.Schema(t, allowRef, hint)
 }
 
 // SchemaFromRef returns this API's copy of a top-level schema, copying it from
@@ -93,13 +74,13 @@ func (s *schemas) SchemaFromRef(ref string) *huma.Schema {
 	if have, ok := s.own[name]; ok {
 		return have
 	}
-	derived.RLock()
-	defer derived.RUnlock()
+	derived.Lock()
+	defer derived.Unlock()
 	return s.copy(name, derived.registry.Map()[name])
 }
 
 // copy records this API's copy of one shared schema. The caller holds the
-// read lock.
+// lock.
 func (s *schemas) copy(name string, shared *huma.Schema) *huma.Schema {
 	if shared == nil {
 		return nil
@@ -113,8 +94,8 @@ func (s *schemas) copy(name string, shared *huma.Schema) *huma.Schema {
 // complete copies every schema the shared registry holds that this API has not
 // asked for yet, so that answering a request never writes here.
 func (s *schemas) complete() {
-	derived.RLock()
-	defer derived.RUnlock()
+	derived.Lock()
+	defer derived.Unlock()
 	for name, shared := range derived.registry.Map() {
 		if _, ok := s.own[name]; !ok {
 			s.copy(name, shared)
@@ -124,8 +105,8 @@ func (s *schemas) complete() {
 
 // TypeFromRef returns the Go type a reference was worked out from.
 func (s *schemas) TypeFromRef(ref string) reflect.Type {
-	derived.RLock()
-	defer derived.RUnlock()
+	derived.Lock()
+	defer derived.Unlock()
 	return derived.registry.TypeFromRef(ref)
 }
 
