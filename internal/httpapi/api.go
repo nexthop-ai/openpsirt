@@ -306,6 +306,10 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	// for it. The document itself stays on the framework's own route,
 	// authenticated like everything else.
 	cfg.DocsPath = ""
+	// Every API this process builds shares the schemas worked out from Go
+	// types, which is most of what building one costs.
+	components := newSchemas()
+	cfg.Components.Schemas = components
 	// A response that writes its own bytes is sent as it writes them. The
 	// schema link the framework adds rebuilds the value as a type of its
 	// own, which drops the writer, so a CSAF document written with its keys
@@ -339,6 +343,7 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	reportsapi.Register(api, in)
 	advisoryapi.Register(api, in)
 	adminapi.Register(api, in)
+	components.complete()
 
 	// Last, so it claims only what nothing above it did.
 	mountInterface(router, in.Interface)
