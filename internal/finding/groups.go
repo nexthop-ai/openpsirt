@@ -338,6 +338,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if len(targets) == 0 {
 		return nil, 0, nil
 	}
+	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+		return nil, 0, err
+	}
 
 	limit = database.AList.Of(limit)
 
@@ -805,7 +808,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 // are one row, because upgrading them is one act, deciding about them is one
 // judgment and routing them is one rule.
 func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	return filter.folded(s.db, openRows(s.db, targets, visible), byIssueAndComponent).
+	return filter.folded(s.db, openRows(s.db, targets, visible), issueAndComponent).
 		GroupExpr(GroupedOn)
 }
 

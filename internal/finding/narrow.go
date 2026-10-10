@@ -107,6 +107,15 @@ type Filter struct {
 	// page of fifty reads in milliseconds and every decided place in the
 	// deployment does not. Empty is every issue.
 	PageIssues []int64
+	// decidedIssues is the only issues a group can be filed under and pass
+	// the filter, set by the store where every condition the filter asks of
+	// a group needs a decision of some kind at one of its places: the issues
+	// of those decisions, read before the list is. Nil asks nothing, and
+	// empty answers nothing.
+	decidedIssues []int64
+	// decidedApart says the first level counts the decided places beside
+	// itself, so the places are read without the decision table joined.
+	decidedApart bool
 	// Ecosystems keeps components of these package kinds — deb, golang,
 	// pypi. Read from the package identifier rather than stored beside it,
 	// because the identifier is what says it and a second copy is a second
@@ -448,6 +457,12 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // narrowRows applies the half of the filter that is asked of each place: the
 // WHERE clauses, and the joins they read.
 func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
+	if f.decidedIssues != nil {
+		// A condition on the issue, which every place of a group shares: it
+		// drops whole groups, and only groups the conditions over a group
+		// drop anyway.
+		q = f.amongDecidedIssues(q, "f.vulnerability_id")
+	}
 	if words := f.severities(); len(words) > 0 {
 		// The rating in force here, not the published one. Being able to say
 		// a published rating is wrong is pointless if the filter then ignores
@@ -729,7 +744,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		if f.Planned == PlannedOnly {
 			q = q.Having(g.decided("planned") + " > 0")
 		} else {
-			q = q.Having(g.decided("planned") + " = 0")
+			q = q.Having(g.decided("planned") + " < 1")
 		}
 	}
 	// Open in some builds of the selection and not others, which is what a
@@ -876,9 +891,9 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	for _, who := range asked {
 		switch who {
 		case "nobody":
-			says = append(says, g.held()+" = 0")
+			says = append(says, g.held()+" < 1")
 		case "somebody":
-			says = append(says, g.held()+" = "+g.places())
+			says = append(says, g.held()+" >= "+g.places())
 		case "me":
 			// Mine or my team's, everywhere the phrase appears. A subject
 			// holding no party names nobody, so the phrase contributes
@@ -887,7 +902,7 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 			if len(f.HeldBy) == 0 {
 				continue
 			}
-			says = append(says, "("+g.held()+" = "+g.places()+
+			says = append(says, "("+g.held()+" >= "+g.places()+
 				" AND "+g.heldLeast()+" IN (?) AND "+g.heldMost()+" IN (?))")
 			args = append(args, bun.List(f.HeldBy), bun.List(f.HeldBy))
 		}

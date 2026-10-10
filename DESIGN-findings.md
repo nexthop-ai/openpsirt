@@ -1302,13 +1302,31 @@ The page is read in two statements:
 Every filter narrows both statements through the same clauses, and none needs the
 issue or the component joined under the grouping — a rating or a name is asked as
 a membership test against the table that holds it. The decision-state filter is
-built from the decisions outward, joined to the grouping by the finding's
-identifier rather than a lookup per open row. In the second statement it is
-built for the page's issues alone, and across products for the kind of release
-the list holds as well. A derived table cannot see the conditions of the
-statement around it, and an engine that nests it under the page builds it again
-for every row: 35 s for a page of one lapsed group on PostgreSQL with 133,000
-decisions, and 0.15 s with the page's issues stated inside it.
+built from the decisions outward rather than as a lookup per open row. In the
+first statement the decided places are counted beside the first level of the
+grouping (§ Two-level grouping). In the second it is joined to each place by
+the finding's identifier and built for the page's issues alone, and across
+products for the kind of release the list holds as well. A derived table cannot
+see the conditions of the statement around it, and an engine that nests it
+under the page builds it again for every row: 35 s for a page of one lapsed
+group on PostgreSQL with 133,000 decisions, and 0.15 s with the page's issues
+stated inside it.
+
+| Rule | |
+|---|---|
+| A filter needing a decision reads the issues of those decisions first | Every state but undecided needs a decision in that state at one of a group's places, and an outcome or a promised upgrade one in force. Those decisions' issues narrow the places and the decisions both. The set is a superset: a decision covering nothing open still names its issue, and the conditions over a group decide what passes |
+| The issues are stated on the decisions and on the list's places, never on the decided side's places | A planner estimates the match between a decision and a place as two independent equalities, a tenth to a twentieth of the rows it produces. With the decided side's places narrowed too, PostgreSQL took them for the outer side and probed the place index once per decision |
+| Conditions over the decision counts are ranges | A count is never negative and never more than the places, so "none" is below one and "every place" is at least the places. A planner estimates a range over an aggregate at a third of the groups and an equality at a two hundredth, and multiplies estimates joined by AND |
+
+Measured on PostgreSQL 16 with one CPU, 368,847 open places and 133,549
+decisions, 59,762 of them lapsed:
+
+| Statement | Equalities, the table joined to every place | Ranges, the decided groups stacked with the first level |
+|---|---|---|
+| Undecided, groups estimated where 6,196 pass | 1 | 837 |
+| Undecided, the page's grouping | 1,149 ms | 635 ms |
+| The lapsed tile's grouping, with its issues read first in 19 ms: 1,330 of 7,549 | 1,200 ms | 419 ms |
+| The same, with the issues stated on the decided side's places as well | — | 2,726 ms |
 
 The four decision counts take two shapes, and the conditions are the same in
 both:
@@ -1367,6 +1385,9 @@ package — reach the join to the component and the second grouping.
 | The first level carries the aggregates the second reads | A count is summed, a minimum and a maximum taken again, the earliest opening and the soonest deadline carried under their own names so the conditions and orders over them read the same at both levels |
 | A count of distinct builds adds the build to the first level's key | It is the one aggregate that does not decompose; carried as a key, the second level counts it distinctly over a few rows |
 | The issue is joined after the first level | An order by likelihood or score reads it once per partial group rather than once per place |
+| The decision flags are counted beside the first level, on its keys | The decisions are matched to the places of the same population with every condition on a place applied and folded to the first level's keys. Joined to every open place instead, each of 368,847 rows is looked up in 148,102 decided places and the partial groups cannot be read from the covering index: 1,067 ms against 575 ms for a build's unsettled work |
+| The decided groups are stacked with the partial groups, never joined to them | The two are put one under the other and folded on the keys. Joined on the keys, MariaDB worked out the decided groups again for each of 12,260 partial groups it joined them to: 71 s for the undecided list across products, which takes 0.37 s joined to every place and 0.23 s stacked |
+| Each place is counted once only where a condition compares decided places with places | Agreed and an outcome hold where every place does, so the decisions are folded to the place before the keys. Every other condition asks whether any place carries a flag or none does, and the decisions fold straight to the keys |
 | Across products, the line is applied after the first level | The first level also keys on the product and on whether the place carries an exploitation signal, so each partial group is wholly above a product's line or wholly below it. The issue, the product's rating and its line are read once per partial group, and every aggregate after it counts exactly the places the line admits |
 | The groups another view keeps under a condition over a group are grouped in one level | They are joined back to the finding rows, and the planner's estimate of how many groups a condition keeps falls by a factor of ten over two levels: 186 where 7,742 are kept. On that estimate PostgreSQL read one component's rows once per kept group and did not finish in two minutes; over one level it hashes the join in 2 s |
 | A bundle's names are grouped over the page's components | The components of the page's folds are read first and named as a list, and the places are grouped on the component, the build and the fixed version before the names and the fold are joined. Named as a list, PostgreSQL estimates the places from the components' own statistics and hashes them into groups; joined to the component, it expects 690 places a worker for 90,467 and sorts them on disk. 166 ms named as a list against 287 ms joined, over the kernel's 271,400 places in two builds |

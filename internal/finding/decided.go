@@ -158,20 +158,29 @@ func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionSt
 // SQLite starts from every open finding and reads every decision of its
 // product once per row.
 func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
+	return decisionsOver(q, `"finding" AS "f2"`).
+		ColumnExpr(`f2.id AS "finding_id"`).
+		Where("f2.closed_at IS NULL").
+		GroupExpr("f2.id")
+}
+
+// decisionsOver is every decision reaching a place read from source as "f2",
+// one row per decision and place: the finding table itself, or a population of
+// places that already carries its own conditions, with the identifier, the
+// issue, the place identity, the component and the consumer under their own
+// names. The caller groups it.
+func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQuery {
 	return q.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(DecisionIssue).
-		Join(`CROSS JOIN "finding" AS "f2"`).
+		Join(`CROSS JOIN `+source, args...).
 		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
 		// The component and the consumer, for the versions: a live claim is
 		// about the place at the versions it was keyed on.
 		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`f2.id AS "finding_id"`).
-		Where("f2.closed_at IS NULL").
-		Where(coversHere).
-		GroupExpr("f2.id")
+		Where(coversHere)
 }
 
 // placesDecided is how many of a group's places decisionsAtPlaces marks in one

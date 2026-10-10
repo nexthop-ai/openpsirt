@@ -69,6 +69,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			" one build's edges, and this list spans products")
 	}
 	limit = database.AList.Of(limit)
+	if err := s.decidedIssuesFor(ctx, &filter, products, all); err != nil {
+		return nil, 0, err
+	}
 	filter.Across = true
 	filter.ProductID = 0
 	filter.HeldBy = subject.Mine()
@@ -201,16 +204,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			rows = withRating(rows, rating.OnStream)
 		}
 		hot := `CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END`
-		q := filter.folded(s.db, rows, func(q *bun.SelectQuery) *bun.SelectQuery {
-			q = q.ColumnExpr(`st.product_id AS "product_id"`).
-				ColumnExpr("f.vulnerability_id").ColumnExpr("f.component_id").
-				GroupExpr("st.product_id, f.vulnerability_id, f.component_id")
-			if wasBelow {
-				return q
-			}
-			return q.ColumnExpr(hot+` AS "hot"`, int64(exploiting)).
-				GroupExpr(hot, int64(exploiting))
-		})
+		keys := []partKey{
+			{expr: "st.product_id", name: "product_id"},
+			{expr: "f.vulnerability_id", name: "vulnerability_id"},
+			{expr: "f.component_id", name: "component_id"},
+		}
+		if !wasBelow {
+			keys = append(keys, partKey{expr: hot, args: []any{int64(exploiting)}, name: "hot"})
+		}
+		q := filter.folded(s.db, rows, keys)
 		by, known := order[filter.SortBy]
 		if !wasBelow || (known && by.issue) {
 			q = withRating(q, rating.OnPartial)

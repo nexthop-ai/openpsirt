@@ -4,6 +4,8 @@
 package finding
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -108,7 +110,10 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // Every one of those is a condition over the *group* rather than over a place,
 // so they are HAVING clauses: a group is undecided when none of its places has
 // a decision, not when one of them does not. This half is the join, which is
-// asked of each place and so sits wherever the places are read.
+// asked of each place and so sits wherever the places are read. The list's own
+// groups count the decided places beside their first level instead (see
+// decidedBeside), and this join serves the statements that read a page's rows
+// or the groups another view keeps.
 //
 // These read the decision table and nothing else. `suppressed_by` is not a
 // decision of ours at all: it points at a suppression, and a suppression is a
@@ -140,21 +145,73 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // tells a reader that a claim is pending in a product they cannot see; the
 // product is a condition on the decision for that reason.
 func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
-	states := trimmed(f.States)
-	outcomes := trimmed(f.Outcomes)
-
 	// The planned filter reads the same derived table, so asking for it is a
-	// reason to build it even where no state or outcome was asked for.
-	if len(states) == 0 && len(outcomes) == 0 && f.Planned == PlannedEither {
+	// reason to build it even where no state or outcome was asked for. Where
+	// the first level counts the decided places beside itself, nothing is
+	// joined to the places here.
+	if !f.asksDecided() || f.decidedApart {
 		return q
 	}
+	// Built on decisionsOutward, which matches a decision to the places it
+	// covers at the versions they hold now. Across products nothing binds the
+	// decision's product, and SQLite left to choose starts from every open
+	// finding and reads every decision of its product once per row: 331 s to
+	// count the undecided among 425,680 open rows with 3,060 decisions, against
+	// 1.5 s with the decisions outermost and 0.83 s inside one product.
+	decided := f.flagColumns(decisionsOutward(q))
+	// A joined derived table cannot see the outer query's conditions, and an
+	// engine that loops over the outer rows builds it again for each one: 35 s
+	// for a page of one on PostgreSQL with 133,000 decisions, against 0.15 s
+	// with the page's issues stated here as well. Each condition repeated
+	// here is one the outer query also holds, so it drops only rows the join
+	// would drop.
+	if len(f.PageIssues) > 0 {
+		decided = decided.Where("f2.vulnerability_id IN (?)", bun.List(f.PageIssues))
+	}
+	if f.decidedIssues != nil {
+		// On the decisions, for the reason decidedBeside gives.
+		decided = f.amongDecidedIssues(decided, "dv.issue_id")
+	}
+	if f.Across {
+		// Across products it carries its own product, because it cannot reach
+		// the outer query's: the decision has to belong to the product the
+		// finding it answers for sits in, which is the same rule the bound
+		// number states inside one product. The kind of release is the other
+		// condition the outer query states on the stream.
+		decided = decided.
+			Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
+			Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
+			Where("de.product_id = st2.product_id")
+		if len(f.Workable.Kinds) == 1 {
+			decided = decided.Where("st2.kind = ?", f.Workable.Kinds[0])
+		}
+	} else {
+		decided = decided.Where("de.product_id = ?", f.ProductID)
+	}
+	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
+}
+
+// asksDecided is whether any condition the filter asks of a group reads the
+// decision flags.
+func (f Filter) asksDecided() bool {
+	return len(trimmed(f.States)) > 0 || len(trimmed(f.Outcomes)) > 0 || f.Planned != PlannedEither
+}
+
+// decidedFlags is the flags flagColumns computes per place, in the order
+// they are selected.
+var decidedFlags = []string{"waiting", "approved", "lapsed", "planned", "this_outcome"}
+
+// flagColumns adds to a statement over decisions reaching places, read as
+// decisionsOver reads them, one column per flag saying whether a decision
+// covering the place has it.
+func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	// A request for one, kept before the list is padded: an empty IN
 	// list is a syntax error on two of the engines, so the column binds a
 	// word no outcome equals — and reading the padded list as a request
 	// would narrow every group to those answered "" everywhere, which is
 	// none of them.
-	askedOutcome := len(outcomes) > 0
-	if !askedOutcome {
+	outcomes := trimmed(f.Outcomes)
+	if len(outcomes) == 0 {
 		outcomes = []string{""}
 	}
 	// The words are spelled here rather than taken from the triage
@@ -168,23 +225,14 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	// where it does matter.
 	const (
 		proposed = "proposed"
-		approved = "approved"
 		lapsed   = "lapsed"
 	)
-	// One row per open finding that has a decision of ours in this product,
-	// saying which kinds. "Waiting" and "lapsed" count a claim in that state
-	// whether or not it still stands; "approved" counts only the claim that
-	// currently stands, because without that a judgment withdrawn eighteen
-	// months ago still answers for its place.
-	//
-	// Built on decisionsOutward, which matches a decision to the places it
-	// covers at the versions they hold now. Across products nothing binds the
-	// decision's product, and SQLite left to choose starts from every open
-	// finding and reads every decision of its product once per row: 331 s to
-	// count the undecided among 425,680 open rows with 3,060 decisions, against
-	// 1.5 s with the decisions outermost and 0.83 s inside one product.
+	// "Waiting" and "lapsed" count a claim in that state whether or not it
+	// still stands; "approved" counts only the claim that currently stands,
+	// because without that a judgment withdrawn eighteen months ago still
+	// answers for its place.
 	standingHere, inForce := InForce()
-	decided := decisionsOutward(q).
+	return q.
 		// Waiting, and standing: the row's own count requires the live key
 		// and this did not, so a claim proposed and then withdrawn put its
 		// group in the waiting bucket while the row drew no state word at
@@ -213,32 +261,96 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome IN (?) THEN 1 ELSE 0 END) AS "this_outcome"`,
 			append(append([]any{}, inForce...), bun.List(outcomes))...)
-	// A joined derived table cannot see the outer query's conditions, and an
-	// engine that loops over the outer rows builds it again for each one: 35 s
-	// for a page of one on PostgreSQL with 133,000 decisions, against 0.15 s
-	// with the page's issues stated here as well. Each condition repeated
-	// here is one the outer query also holds, so it drops only rows the join
-	// would drop.
-	if len(f.PageIssues) > 0 {
-		decided = decided.Where("f2.vulnerability_id IN (?)", bun.List(f.PageIssues))
-	}
-	if f.Across {
-		// Across products it carries its own product, because it cannot reach
-		// the outer query's: the decision has to belong to the product the
-		// finding it answers for sits in, which is the same rule the bound
-		// number states inside one product. The kind of release is the other
-		// condition the outer query states on the stream.
-		decided = decided.
-			Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
-			Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
-			Where("de.product_id = st2.product_id")
-		if len(f.Workable.Kinds) == 1 {
-			decided = decided.Where("st2.kind = ?", f.Workable.Kinds[0])
+}
+
+// decisionNeeded is a condition over a decision row "de" that some decision at
+// one of a group's places meets wherever the group passes the filter, with the
+// words it binds. Empty where a group can pass with no decision at all, which
+// is the case whenever "undecided" is among the states asked.
+//
+// Each state but undecided needs a decision in that state: lapsed a lapsed
+// one, waiting one waiting on a second person, agreed one in force. An outcome
+// or a promised upgrade needs one in force too. The conditions a group must
+// meet are joined by AND, so any one of them is a condition a passing group
+// meets; the states are joined by OR, so it is all of theirs, OR-ed.
+func (f Filter) decisionNeeded() (string, []any) {
+	if states := trimmed(f.States); len(states) > 0 {
+		if needed, args, every := neededByEach(states); every {
+			return needed, args
 		}
-	} else {
-		decided = decided.Where("de.product_id = ?", f.ProductID)
 	}
-	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
+	if len(trimmed(f.Outcomes)) > 0 || f.Planned == PlannedOnly {
+		return strings.TrimPrefix(claimApproved.condition, " AND "), claimApproved.args
+	}
+	return "", nil
+}
+
+// neededByEach is the decisions any one of these states needs, OR-ed, and
+// whether each of them needs one.
+func neededByEach(states []ClaimStanding) (string, []any, bool) {
+	conditions := make([]string, 0, len(states))
+	var args []any
+	for _, state := range states {
+		var needed decisionState
+		switch state {
+		case StandingLapsed:
+			needed = claimLapsed
+		case StandingWaiting:
+			needed = claimWaiting
+		case StandingAgreed:
+			needed = claimApproved
+		default:
+			return "", nil, false
+		}
+		conditions = append(conditions, "("+strings.TrimPrefix(needed.condition, " AND ")+")")
+		args = append(args, needed.args...)
+	}
+	return "(" + strings.Join(conditions, " OR ") + ")", args, true
+}
+
+// decidedIssuesFor sets the issues a group passing the filter can be filed
+// under, where the filter needs a decision to pass: the issues of the
+// decisions in these products meeting decisionNeeded. All is every product.
+//
+// The decision side is read first, because it is the small side. With
+// 59,762 lapsed decisions among 133,549 in one product, the lapsed decisions'
+// issues are 1,330 of the 7,549 its open findings name, read in 19 ms.
+// Stated on the list's places and on the decisions, they hold both to those
+// issues, and the lapsed tile takes 0.44 s where it took 1.0 s. A decision's
+// own versions are not compared here, so a decision that
+// covers nothing open still names its issue: the set is a superset, and the
+// conditions over a group decide what passes.
+func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products []int64, all bool) error {
+	needed, args := filter.decisionNeeded()
+	if needed == "" {
+		return nil
+	}
+	q := s.db.NewSelect().TableExpr(Decisions).
+		ColumnExpr("dv.issue_id").Distinct().
+		Where(needed, args...)
+	if !all {
+		if len(products) == 0 {
+			filter.decidedIssues = []int64{}
+			return nil
+		}
+		q = q.Where("de.product_id IN (?)", bun.List(products))
+	}
+	issues := []int64{}
+	if err := q.Scan(ctx, &issues); err != nil {
+		return fmt.Errorf("read the issues decided in this way: %w", err)
+	}
+	filter.decidedIssues = issues
+	return nil
+}
+
+// amongDecidedIssues holds a column naming an issue to decidedIssues.
+func (f Filter) amongDecidedIssues(q *bun.SelectQuery, column string) *bun.SelectQuery {
+	if len(f.decidedIssues) == 0 {
+		// An empty list is a syntax error on two of the engines, and an empty
+		// set holds nothing.
+		return q.Where("1 = 0")
+	}
+	return q.Where(column+" IN (?)", bun.List(f.decidedIssues))
 }
 
 // statesHaving keeps groups by how far they have been decided, over the
@@ -249,7 +361,7 @@ func (f Filter) statesHaving(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		// where one place is dismissed and the rest are open is not a
 		// dismissal, and listing it under "dismissed" is how a number stops
 		// being one somebody can act on.
-		q = q.Having(g.decided("this_outcome") + " = " + g.places())
+		q = q.Having(g.decided("this_outcome") + " >= " + g.places())
 	}
 	// Each state is a condition over the group's decision counts, so a set of
 	// them is those conditions OR-ed — which is what a checkbox set means and
@@ -273,24 +385,33 @@ func (f Filter) statesHaving(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 //
 // Named apart from the switch that used it so several can be combined, and so
 // each keeps the reasoning that made it what it is.
+//
+// Each count is a sum of flags over the group's places, so it is never
+// negative and never more than the places. The conditions are written as
+// ranges over those sums — "none" as below one, "every place" as at least the
+// places, several "none" as one sum below one — because a planner estimates a
+// range over an aggregate at a third of the groups and an equality at a two
+// hundredth, and multiplies the estimates of conditions joined by AND as
+// though they were independent. Undecided spelled as three equalities was
+// estimated at one group of 10,283 where 6,196 pass on PostgreSQL.
 func stateHaving(state ClaimStanding, g grain) string {
 	waiting, approved, lapsed := g.decided("waiting"), g.decided("approved"), g.decided("lapsed")
 	switch state {
 	case StandingAgreed:
-		return approved + " = " + g.places()
+		return approved + " >= " + g.places()
 	case StandingWaiting:
 		return waiting + " > 0"
 	case StandingLapsed:
 		// Lapsed means nothing replaced it: a claim made again at the place
 		// after the old one lapsed is waiting, which is what the row says,
 		// and the filter has to find the row by the word it reads.
-		return lapsed + " > 0 AND " + approved + " = 0 AND " + waiting + " = 0"
+		return lapsed + " > 0 AND " + approved + " + " + waiting + " < 1"
 	case StandingUndecided:
 		// Nothing stands, rather than nothing was ever said. A claim that has
 		// been withdrawn leaves a row that covers the place and says nothing
 		// about it, so a count of rows would put the finding in no state at
 		// all, out of every bucket and the count above the list.
-		return waiting + " = 0 AND " + approved + " = 0 AND " + lapsed + " = 0"
+		return waiting + " + " + approved + " + " + lapsed + " < 1"
 	default:
 		return ""
 	}
