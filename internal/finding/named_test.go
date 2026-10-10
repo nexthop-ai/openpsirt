@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -184,6 +185,69 @@ func TestABlankNameReachesNothing(t *testing.T) {
 			if len(reached) != 0 {
 				t.Errorf("%q reached %d places", blank, len(reached))
 			}
+		}
+	})
+}
+
+func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
+	// The folds a name reaches are read first and handed to every statement
+	// over the findings as values, so no statement over the findings matches
+	// the name itself. As a subquery over the build's graph, a planner on
+	// statistics that lag the table runs it once per finding, which on a
+	// kernel is every graph node of the build read hundreds of thousands of
+	// times.
+	each(t, func(t *testing.T, f *fixture) {
+		lib, gnutls := builtFrom("libcurl4t64", "8.5.0-2"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
+		f.shipped(t, graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{root, swss, lib, gnutls},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls}},
+		})
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-61", lib), found("CVE-2026-62", gnutls),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
+
+		seen := &statements{}
+		f.db.AddQueryHook(seen)
+		reached, err := f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
+			[]int64{f.target}, "libcurl4t64", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reached) != 2 {
+			t.Errorf("naming one binary reached %d issues, want both binaries' two", len(reached))
+		}
+		if _, err := f.store.StrictestOnComponent(t.Context(), who, f.productID,
+			[]int64{f.target}, "curl", ""); err != nil {
+			t.Fatal(err)
+		}
+		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), "curl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 || builds[0].Issues != 2 {
+			t.Errorf("the source package reads %+v, want one entry with two issues", builds)
+		}
+
+		seen.mu.Lock()
+		sent := append([]string{}, seen.sent...)
+		seen.mu.Unlock()
+		checked := 0
+		for _, statement := range sent {
+			if !strings.Contains(statement, `"finding" AS "f"`) &&
+				!strings.Contains(statement, `FROM "finding"`) {
+				continue
+			}
+			checked++
+			if strings.Contains(statement, "name_folded") {
+				t.Errorf("a statement over the findings resolves the folds itself:\n  %s", statement)
+			}
+		}
+		if checked == 0 {
+			t.Fatal("no statement over the findings was seen, so this checked nothing")
 		}
 	})
 }

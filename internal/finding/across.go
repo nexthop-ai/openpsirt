@@ -125,7 +125,13 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if len(targets) == 0 || name == "" {
 		return nil, nil
 	}
-	folds := FoldsNamed(s.db, targets, name, "")
+	folds, err := FoldsNamed(ctx, s.db, targets, name, "")
+	if err != nil {
+		return nil, err
+	}
+	if len(folds) == 0 {
+		return nil, nil
+	}
 
 	packages, err := s.packagesAcross(ctx, targets, visible, folds)
 	if err != nil {
@@ -208,8 +214,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	return out, nil
 }
 
-// FoldsNamed is the folds a name reaches in these builds, as a subquery
-// returning fold keys.
+// FoldsNamed is the folds a name reaches in these builds, as their keys.
 //
 // A name reaches a fold where a live binary in one of the builds carries it
 // or was built from a source carrying it, compared without regard to capitals.
@@ -221,12 +226,24 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 // A blank name reaches nothing. An empty string is what the source column
 // holds on every component that names no source, so compared, a blank name
 // would reach all of them.
-func FoldsNamed(db bun.IDB, targets []int64, name, version string) *bun.SelectQuery {
-	q := foldsNamed(db, targets, name).ColumnExpr("cn.fold_key")
+//
+// Read on its own and handed to each statement over the findings as a list of
+// values. As a subquery, how many findings it matches is the planner's
+// estimate, and on statistics that lag the table PostgreSQL estimates one and
+// runs the subquery once per finding, reading every graph node of the build
+// each time: the kernel's 204,000 findings in a build of 737 graph nodes take
+// 22 s that way and 1.9 s as values. Statistics lag after every large scan,
+// until the server's own refresh reaches the table.
+func FoldsNamed(ctx context.Context, db bun.IDB, targets []int64, name, version string) ([]string, error) {
+	q := foldsNamed(db, targets, name).ColumnExpr("cn.fold_key").Distinct()
 	if version = strings.TrimSpace(version); version != "" {
 		q = q.Where(sourceVersionOf+" = ?", version)
 	}
-	return q
+	var folds []string
+	if err := q.OrderExpr("cn.fold_key").Scan(ctx, &folds); err != nil {
+		return nil, fmt.Errorf("read what %q names in these builds: %w", strings.TrimSpace(name), err)
+	}
+	return folds, nil
 }
 
 // sourceVersionOf is SourceVersion over the component joined as "cn".
@@ -251,10 +268,10 @@ func foldsNamed(db bun.IDB, targets []int64, name string) *bun.SelectQuery {
 // naming the versions. Two versions in one build are two pieces of code,
 // decided about separately, so a promise made from one is not one about both.
 func OneFoldNamed(ctx context.Context, db bun.IDB, targets []int64,
-	name, version string) (*bun.SelectQuery, error) {
+	name, version string) ([]string, error) {
 
 	if strings.TrimSpace(version) != "" {
-		return FoldsNamed(db, targets, name, version), nil
+		return FoldsNamed(ctx, db, targets, name, version)
 	}
 	var rows []struct {
 		TargetID int64  `bun:"target_id"`
@@ -292,7 +309,15 @@ func OneFoldNamed(ctx context.Context, db bun.IDB, targets []int64,
 		}
 		return nil, &graph.Ambiguous{Name: strings.TrimSpace(name), Choices: choices}
 	}
-	return FoldsNamed(db, targets, name, ""), nil
+	folds := make([]string, 0, len(rows))
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if !seen[row.FoldKey] {
+			seen[row.FoldKey] = true
+			folds = append(folds, row.FoldKey)
+		}
+	}
+	return folds, nil
 }
 
 // packageRow is one binary package in one build, with the fold it belongs to.
@@ -326,7 +351,7 @@ type packageRow struct {
 // component is readable to anybody who may read the build while what is open
 // against it is not.
 func (s *Store) packagesAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds *bun.SelectQuery) ([]packageRow, error) {
+	visible []access.Visibility, folds []string) ([]packageRow, error) {
 
 	open := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -378,7 +403,7 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64,
 		Where("n.target_id IN (?)", bun.List(targets)).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
-		Where("c.fold_key IN (?)", folds).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		OrderExpr("st.name, va.name, c.name, c.version").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -402,7 +427,7 @@ type counted struct {
 // Counted over the fold rather than summed from its packages: one issue on
 // three binaries is one issue.
 func (s *Store) openAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds *bun.SelectQuery) (map[foldIn]counted, error) {
+	visible []access.Visibility, folds []string) (map[foldIn]counted, error) {
 
 	var rows []struct {
 		TargetID      int64      `bun:"target_id"`
@@ -429,7 +454,7 @@ func (s *Store) openAcross(ctx context.Context, targets []int64,
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("c.fold_key IN (?)", folds).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr("f.target_id, c.fold_key").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -451,7 +476,7 @@ func (s *Store) openAcross(ctx context.Context, targets []int64,
 // true whether or not anything is open. A binary of the fold pulling in another
 // is the fold depending on itself, which is not somebody consuming it.
 func (s *Store) pullersAcross(ctx context.Context, targets []int64,
-	folds *bun.SelectQuery) (map[foldIn]int, error) {
+	folds []string) (map[foldIn]int, error) {
 
 	var rows []struct {
 		TargetID  int64  `bun:"target_id"`
@@ -469,7 +494,7 @@ func (s *Store) pullersAcross(ctx context.Context, targets []int64,
 		ColumnExpr(`COUNT(DISTINCT e.parent_id) AS "consumers"`).
 		Where("e.target_id IN (?)", bun.List(targets)).
 		Where("e.closed_scan_id IS NULL").
-		Where("c.fold_key IN (?)", folds).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		Where("pc.fold_key <> c.fold_key").
 		GroupExpr("ch.target_id, c.fold_key").
 		Scan(ctx, &rows)
@@ -497,7 +522,7 @@ func (s *Store) pullersAcross(ctx context.Context, targets []int64,
 // where the ordering is unavailable the candidates carry equal counts and say
 // they are unranked rather than being ranked by the first.
 func (s *Store) upgradesAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds *bun.SelectQuery) (map[foldIn][]Candidate, error) {
+	visible []access.Visibility, folds []string) (map[foldIn][]Candidate, error) {
 
 	var rows []struct {
 		TargetID int64  `bun:"target_id"`
@@ -521,7 +546,7 @@ func (s *Store) upgradesAcross(ctx context.Context, targets []int64,
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("c.fold_key IN (?)", folds).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
 		Scan(ctx, &rows)
@@ -555,7 +580,7 @@ type promise struct {
 // promisedAcross is what has already been committed for each fold in each
 // build, read off the decisions rather than a record beside them.
 func (s *Store) promisedAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds *bun.SelectQuery) (map[foldIn]promise, error) {
+	visible []access.Visibility, folds []string) (map[foldIn]promise, error) {
 
 	var rows []struct {
 		TargetID    int64      `bun:"target_id"`
@@ -586,7 +611,7 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("c.fold_key IN (?)", folds).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		Where("cl.outcome = ?", "upgrade-needed").
 		Where("de.live_key IS NOT NULL").
 		GroupExpr("f.target_id, c.fold_key, cl.id, cl.committed_to, cl.upgrade_to").
@@ -636,7 +661,7 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 // Distinct issues, like the count beside it, so the parts sum to the whole
 // rather than to the number of places.
 func (s *Store) bandsAcross(ctx context.Context, productID int64, targets []int64,
-	visible []access.Visibility, folds *bun.SelectQuery) (map[foldIn]map[string]int, error) {
+	visible []access.Visibility, folds []string) (map[foldIn]map[string]int, error) {
 
 	var rows []struct {
 		TargetID int64  `bun:"target_id"`
@@ -659,7 +684,7 @@ func (s *Store) bandsAcross(ctx context.Context, productID int64, targets []int6
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("c.fold_key IN (?)", folds).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr("f.target_id, c.fold_key, "+rating.EffectiveExpr).
 		Scan(ctx, &rows)
 	if err != nil {
