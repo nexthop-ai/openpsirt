@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { BOUND, namesIn, proseIn, sweep, sweepNames } from "./screen-copy.mjs";
+import { BOUND, namesIn, proseIn } from "./screen-copy.mjs";
 
 // Both directions per shape — one input that must be reported and one that
 // must not — because the failure that matters here is the check going quiet.
@@ -65,15 +65,6 @@ describe("standing prose on a screen", () => {
     expect(reported(`const x = <p>{note ?? "${long}"}</p>;`)).toEqual([BOUND + 5]);
     expect(reported(`const x = <p>{note ?? "${short}"}</p>;`)).toEqual([]);
   });
-
-  it("finds no standing prose in the interface, and looked at some", async () => {
-    const { found, examined } = await sweep();
-    expect(
-      examined,
-      "no paragraph was found in the interface, so this checked nothing",
-    ).toBeGreaterThan(0);
-    expect(found).toEqual([]);
-  });
 });
 
 const rules = (source: string) => namesIn(source).found.map((each: { rule: string }) => each.rule);
@@ -108,14 +99,5 @@ describe("controls and labels that name their thing", () => {
   it("passes a heading or a label that names", () => {
     expect(rules(`const x = <h3>Sent</h3>;`)).toEqual([]);
     expect(rules(`const x = <Field label="Recipient"><input /></Field>;`)).toEqual([]);
-  });
-
-  it("finds none in the interface, and looked at some", async () => {
-    const { found, examined } = await sweepNames();
-    expect(
-      examined,
-      "no control, heading or label was found, so this checked nothing",
-    ).toBeGreaterThan(0);
-    expect(found).toEqual([]);
   });
 });

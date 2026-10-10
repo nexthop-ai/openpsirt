@@ -13,10 +13,11 @@
 // Parsed rather than matched: a paragraph's text is split across conditions
 // and fragments, and a pattern that skips expressions skips exactly the
 // branches the long sentences hide in.
-import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+
+import { interfaceSources, parse } from "./parsed.mjs";
 
 const here = import.meta.dirname;
 const src = path.join(here, "..", "src");
@@ -99,8 +100,7 @@ function lead(node) {
 // Every paragraph, element styled as a hint, and empty-state detail in one
 // file past the bound,
 // and how many were examined.
-export function proseIn(text, file = "x.tsx", bound = BOUND) {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+export function proseIn(text, file = "x.tsx", bound = BOUND, source = parse(text, file)) {
   const found = [];
   let examined = 0;
   const report = (node, n) => {
@@ -182,8 +182,7 @@ const LABELLED = new Set([
 
 // Every control whose whole text is vague, and every heading or label that
 // asks rather than names, in one file, and how many were examined.
-export function namesIn(text, file = "x.tsx") {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+export function namesIn(text, file = "x.tsx", source = parse(text, file)) {
   const found = [];
   let examined = 0;
   const at = (node) => source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
@@ -222,24 +221,19 @@ export function namesIn(text, file = "x.tsx") {
   return { found, examined };
 }
 
-async function sources(dir) {
-  const out = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await sources(full)));
-    else if (entry.name.endsWith(".tsx") && !entry.name.includes(".test.")) out.push(full);
-  }
-  return out;
+// The screens' sources: every `.tsx` file of the interface.
+function sources() {
+  return interfaceSources().filter(({ file }) => file.endsWith(".tsx"));
 }
 
 // The whole tree: every finding past the bound that is not allowed, and how
 // many paragraphs were examined.
-export async function sweep() {
+export function sweep() {
   const found = [];
   let examined = 0;
-  for (const file of await sources(src)) {
+  for (const { file, text, source } of sources()) {
     const rel = path.relative(src, file);
-    const result = proseIn(await readFile(file, "utf8"), file);
+    const result = proseIn(text, file, BOUND, source);
     examined += result.examined;
     for (const each of result.found) {
       const allowed = [...ALLOWED.keys()].some(
@@ -252,11 +246,11 @@ export async function sweep() {
 }
 
 // The whole tree, for vague controls and asking labels.
-export async function sweepNames() {
+export function sweepNames() {
   const found = [];
   let examined = 0;
-  for (const file of await sources(src)) {
-    const result = namesIn(await readFile(file, "utf8"), file);
+  for (const { file, text, source } of sources()) {
+    const result = namesIn(text, file, source);
     examined += result.examined;
     for (const each of result.found) found.push({ file: path.relative(src, file), ...each });
   }
@@ -264,7 +258,7 @@ export async function sweepNames() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const names = await sweepNames();
+  const names = sweepNames();
   if (names.examined === 0) {
     console.error("No control, heading or label was found, so this checked nothing.");
     process.exit(1);
@@ -277,7 +271,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     );
   }
   if (names.found.length > 0) process.exit(1);
-  const { found, examined } = await sweep();
+  const { found, examined } = sweep();
   if (examined === 0) {
     console.error("No paragraph was found in the interface, so this checked nothing.");
     process.exit(1);

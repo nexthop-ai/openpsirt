@@ -318,6 +318,12 @@ passes vacuously under UTC. Such a test asserts the zone took effect before
 relying on it. On four cores the run is 29 s with a process per file and 9 s
 this way.
 
+The web tests that read the whole interface — addresses against the route
+table, query keys, screen copy and control names — run in one test file, over
+syntax trees built once and shared. A test file is a module graph of its own,
+so in separate files each parses every source again: 1.19 s of test time
+across the four, against 0.66 s sharing one parse.
+
 Formatting belongs to one tool. Stylelint's whitespace rules are off rather than
 left to disagree with Prettier.
 

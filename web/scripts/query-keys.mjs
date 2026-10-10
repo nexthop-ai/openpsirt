@@ -14,10 +14,11 @@
 // ["home", "trend", scope], and one of ["trend"] does not. A read whose key
 // turns into an expression after its literal part may still match a longer
 // invalidation, so it is counted as one.
-import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+
+import { interfaceSources, parse } from "./parsed.mjs";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const src = path.join(here, "..", "src");
@@ -63,8 +64,7 @@ function calledAs(object) {
 
 // keysIn reads one source file: the keys its reads declare and the keys its
 // invalidations name.
-export function keysIn(text, file = "x.tsx") {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+export function keysIn(text, file = "x.tsx", source = parse(text, file)) {
   const reads = [];
   const invalidates = [];
   const walk = (node) => {
@@ -109,24 +109,13 @@ export function stale(files) {
   return found;
 }
 
-async function sources(dir) {
-  const out = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await sources(full)));
-    else if (/\.tsx?$/.test(entry.name) && !entry.name.includes(".test.")) out.push(full);
-  }
-  return out;
-}
-
 // The whole tree: every invalidation that reaches nothing, and how many
 // invalidations and reads were examined.
-export async function sweep() {
-  const files = [];
-  for (const file of await sources(src)) {
-    if (file.endsWith(".d.ts")) continue;
-    files.push({ file: path.relative(src, file), ...keysIn(await readFile(file, "utf8"), file) });
-  }
+export function sweep() {
+  const files = interfaceSources().map(({ file, text, source }) => ({
+    file: path.relative(src, file),
+    ...keysIn(text, file, source),
+  }));
   return {
     found: stale(files),
     invalidations: files.reduce((n, each) => n + each.invalidates.length, 0),
@@ -135,7 +124,7 @@ export async function sweep() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const { found, invalidations, reads } = await sweep();
+  const { found, invalidations, reads } = sweep();
   if (invalidations === 0 || reads === 0) {
     console.error("No invalidation or no read was found, so this checked nothing.");
     process.exit(1);
