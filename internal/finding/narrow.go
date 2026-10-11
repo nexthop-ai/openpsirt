@@ -411,12 +411,14 @@ func (f Filter) ofRows() Filter {
 // Under a filter needing a decision, q is grouped on the component and the
 // issue among its keys, and its groups are restricted to the kept groups after
 // it has grouped (see amongKept). Under any other condition over a group, the
-// kept groups are joined to q's finding rows, grouped in one level: the planner
-// cannot estimate how many groups a condition over a group keeps, and over two
-// levels of grouping it guesses a tenth of what it guesses over one, 186 groups
-// where 7,742 are kept. Joined back to the finding rows on that guess it read
-// the kernel's 271,000 rows once per kept group, and did not finish in two
-// minutes where the one-level form hashes the join in 2 s.
+// kept groups are joined to q's finding rows. A filter that reads the decisions
+// and can pass with none, such as undecided, keeps them in the list's two
+// levels (see listed). A filter that reads no decision keeps them in one level:
+// the planner cannot estimate how many groups a condition over a group keeps,
+// and over two levels of grouping it guesses a tenth of what it guesses over
+// one, 186 groups where 7,742 are kept. Joined back to the finding rows on that
+// guess it read the kernel's 271,000 rows once per kept group, and did not
+// finish in two minutes where the one-level form hashes the join in 2 s.
 func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 

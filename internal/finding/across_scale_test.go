@@ -176,7 +176,9 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		// The component and fix-bundle views keep the list's groups under the
 		// same conditions over a group, grouped at their own grain.
 		// Each is bounded rather than left to run, so a statement that runs
-		// away is reported as one and the measurement goes on.
+		// away is reported as one and the measurement goes on. A statement
+		// abandoned at the bound is stopped on the server before the next is
+		// timed, which is otherwise timed beside it.
 		bounded := func(read func(context.Context) (int, error)) string {
 			t.Helper()
 			within, cancel := context.WithTimeout(ctx, 3*time.Minute)
@@ -186,6 +188,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			took := time.Since(at)
 			switch {
 			case within.Err() != nil:
+				dbtest.StopAbandoned(t, db)
 				return fmt.Sprintf("unfinished after %s", took.Round(time.Second))
 			case err != nil:
 				t.Fatal(err)
