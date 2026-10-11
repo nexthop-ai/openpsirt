@@ -16805,7 +16805,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -16972,7 +16972,7 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -17101,7 +17101,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -17235,7 +17235,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -17367,7 +17367,7 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -22114,7 +22114,7 @@ export interface operations {
                 weeks?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build */
+                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -22161,7 +22161,7 @@ export interface operations {
                 weeks?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build */
+                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;

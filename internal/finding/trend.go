@@ -31,18 +31,12 @@ type Within struct {
 	// Component keeps what is open against components of this name, at any
 	// version.
 	Component string
-	// Beneath is what sits at a component or anywhere under it. A subtree is a
-	// walk over one build's edges, so it is answerable only where the
-	// selection names exactly one build.
-	//
-	// BeneathVersion, BeneathEcosystem and BeneathNamespace say which
-	// component, where the name means more than one. A build ships some libraries at several versions,
-	// and a few at one version as two components — and with no way to say
-	// which, a subtree of either was unaskable.
-	Beneath          string
-	BeneathVersion   string
-	BeneathEcosystem string
-	BeneathNamespace string
+	// Beneath is what sits at a component or anywhere under it, by the
+	// component's identifier, resolved by the caller in the one build the
+	// scope holds. A subtree is a walk over one build's edges, so it is
+	// answerable only where the selection names exactly one build. Nil is no
+	// narrowing.
+	Beneath *int64
 }
 
 // Point is what was true at one moment.
@@ -175,31 +169,19 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		moments = moments.Where("f.component_id IN (?)",
 			componentsWhere(moments, "c.name_folded = ?", graph.Folded(name)))
 	}
-	if under := strings.TrimSpace(within.Beneath); under != "" {
+	if within.Beneath != nil {
 		targets, err := s.Builds(ctx, scope)
 		if err != nil {
 			return nil, err
 		}
 		// Refused rather than answered from whichever build sorted first,
-		// which is what leaving the identifier at zero would have done —
-		// silently, and with an empty chart.
+		// which is a chart of somewhere else and silent about it.
 		if len(targets) != 1 {
 			return nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
 				" build's edges, and %d builds are in scope", len(targets))
 		}
-		componentID, err := graph.NewStore(s.db).ComponentAs(ctx, targets[0], under, graph.Choice{
-			Version:   strings.TrimSpace(within.BeneathVersion),
-			Ecosystem: strings.TrimSpace(within.BeneathEcosystem),
-			Namespace: strings.TrimSpace(within.BeneathNamespace),
-		})
-		if err != nil {
-			// Wrapped so the caller can still see what it is: a name meaning
-			// two components is the caller's question, and reported as a fault
-			// it becomes a 500 for something the reader can answer.
-			return nil, fmt.Errorf("trend beneath %q: %w", under, err)
-		}
 		moments = moments.Where("f.component_id IN (?)",
-			graph.Within(moments.DB(), targets[0], componentID))
+			graph.Within(moments.DB(), targets[0], *within.Beneath))
 	}
 
 	query := s.db.NewSelect().

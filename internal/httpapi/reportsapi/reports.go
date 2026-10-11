@@ -84,7 +84,7 @@ func registerReports(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
-		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
+		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
 		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
@@ -100,23 +100,17 @@ func registerReports(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope, since, week, input.Weeks,
-			finding.Within{
-				Component: input.Component, Beneath: input.Beneath,
-				BeneathVersion: input.Version, BeneathEcosystem: input.Ecosystem,
-				BeneathNamespace: input.Namespace,
-			})
+		// Resolved after the scope, which is what authorizes the request: a
+		// name is looked up only in a build the caller may read.
+		beneath, err := core.BeneathIn(ctx, in, scope, input.Beneath, graph.Choice{
+			Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
+		})
 		if err != nil {
-			// A name meaning two components is the caller's question and not a
-			// fault here: every other endpoint that resolves one answers with
-			// the choices, and a 500 here has the panel that draws a
-			// subtree's history say the trend cannot be worked out, about a
-			// component the reader could have picked.
-			var several *graph.Ambiguous
-			if errors.As(err, &several) {
-				return nil, core.SeveralComponents(several,
-					"?beneath_version= and, where two share a version, &beneath_ecosystem= and &beneath_namespace=")
-			}
+			return nil, err
+		}
+		points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope, since, week, input.Weeks,
+			finding.Within{Component: input.Component, Beneath: beneath})
+		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the trend could not be worked out", err)
 		}
 		out := &core.ListOutput[PointBody]{}

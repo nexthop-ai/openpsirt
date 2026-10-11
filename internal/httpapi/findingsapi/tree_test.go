@@ -98,8 +98,8 @@ func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
 		if total, code := list("&under=docker-a"); code != http.StatusOK || total != 2 {
 			t.Errorf("under docker-a answered %d with %d rows, want 2", code, total)
 		}
-		if _, code := list("&beneath=nothing-here"); code != http.StatusUnprocessableEntity {
-			t.Errorf("beneath a name the build lacks answered %d, want 422", code)
+		if _, code := list("&beneath=nothing-here"); code != http.StatusNotFound {
+			t.Errorf("beneath a name the build lacks answered %d, want 404, as every component lookup answers a name nothing holds", code)
 		}
 		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet,
 			"/v1/products/mine/findings/components?stream=master&variant=broadcom&beneath=docker-b", "")

@@ -428,6 +428,9 @@ kernel or a runtime rather than a whole image.
 |---|---|
 | It takes the findings list's own two narrowings | A component at any version, or a component and everything under it. A chart and a list describing a subtree differently is drift worth a shared definition to avoid |
 | Across several builds it refuses | A subtree is a walk over one build's edges, so a selection holding two has no single answer, and both ways of producing one are silent: a chart of whichever build sorted first, or an empty one from an identifier left at zero |
+| A selection naming no product refuses before any build is counted | Across every product the builds counted include ones the caller may not read |
+| The component is resolved as the findings list resolves it, after the selection is authorized | One answer per name: not found where the build does not hold it, the choices where it holds several. A product the caller may not read refuses the same way whatever its builds hold |
+| The export resolves the component before the file begins | A refusal after the first row can only cut the file short, under a status that has already said success |
 
 A carried patch shows here as a step down in the open count. A patch that names
 what it resolves closes the finding as patched on the scan that first carries it

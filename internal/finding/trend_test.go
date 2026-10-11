@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestABumpThatFixedNothingIsNotCountedAsResolved(t *testing.T) {
@@ -197,17 +198,26 @@ func TestATrendCanBeAskedForOnePartOfTheTree(t *testing.T) {
 			return points[len(points)-1]
 		}
 
+		beneath := func(t *testing.T, name string) *int64 {
+			t.Helper()
+			id, err := f.graph.ComponentAs(t.Context(), f.target, name, graph.Choice{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return &id
+		}
+
 		// Both issues, unnarrowed.
 		if got := last(t, finding.Within{}).Open; got != 2 {
 			t.Errorf("%d open across the product, want both issues", got)
 		}
 		// Under libswsscommon sits libnl and nothing else, so the issue filed against
 		// teamd is outside it.
-		if got := last(t, finding.Within{Beneath: "libswsscommon"}).Open; got != 1 {
+		if got := last(t, finding.Within{Beneath: beneath(t, "libswsscommon")}).Open; got != 1 {
 			t.Errorf("%d open beneath libswsscommon, want the one that sits under it", got)
 		}
 		// And under teamd sits libnl as well, so that one is in both.
-		if got := last(t, finding.Within{Beneath: "teamd"}).Open; got != 2 {
+		if got := last(t, finding.Within{Beneath: beneath(t, "teamd")}).Open; got != 2 {
 			t.Errorf("%d open beneath teamd, want the one on it and the one under it", got)
 		}
 		// A name is the component itself at any version, not its subtree.
@@ -232,9 +242,13 @@ func TestASubtreeTrendIsRefusedWhereTheSelectionIsNotOneBuild(t *testing.T) {
 		// A second build under the same product, so the selection holds two.
 		f.anotherBuild(t, "v2")
 
-		_, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), f.wholeProduct(),
+		under, err := f.graph.ComponentAs(t.Context(), f.target, "libswsscommon", graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), f.wholeProduct(),
 			time.Now().UTC().Add(-30*24*time.Hour), 24*time.Hour, 30,
-			finding.Within{Beneath: "libswsscommon"})
+			finding.Within{Beneath: &under})
 		if err == nil {
 			t.Fatal("a subtree trend across two builds was answered rather than refused")
 		}

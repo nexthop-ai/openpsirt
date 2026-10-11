@@ -263,7 +263,7 @@ type CountedPaging struct {
 // "differs between builds" and the spread across variants are statements
 // about a selection.
 type AtOneBuild struct {
-	Beneath          string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not is refused, and one the build holds as more than one component is refused with 409 naming the choices"`
+	Beneath          string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices"`
 	BeneathVersion   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 	BeneathEcosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 	BeneathNamespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
@@ -271,23 +271,36 @@ type AtOneBuild struct {
 	AcrossVariants   string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
 
-// beneathIn resolves the component a list is narrowed beneath. Nil where
-// nothing was asked. The walk under it is the store's, in the statement that
-// lists.
+// BeneathIn resolves the component a list or a trend is narrowed beneath. Nil
+// where nothing was asked. The walk under it is the store's, in the statement
+// that reads.
+//
+// Called with a scope the caller has already been authorized for, so every
+// answer here is about a build the caller may read. A selection naming no
+// product is refused before any build is looked at: across every product, the
+// builds counted would include ones the caller may not see.
 //
 // A name the build does not hold is refused rather than answered with an
 // empty list: an empty list is also what a subtree with nothing open looks
-// like, and the two mean different things to whoever typed the name.
+// like, and the two mean different things to whoever typed the name. It
+// answers 404, the answer every other component lookup gives a name nothing
+// holds. A name the build holds as several components answers 409 with the
+// choices.
 //
 // The subtree is a walk over one build's edges, so a selection holding several
 // is refused here as well as in the store. Which builds a selection holds is
 // asked of the store rather than inferred from which levels were named — one
 // rule, in one place, so the endpoint cannot come to disagree with the
 // statement it is narrowing.
-func beneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
+func BeneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 	which graph.Choice) (*int64, error) {
 	if name == "" {
 		return nil, nil
+	}
+	if scope.ProductID == nil {
+		return nil, huma.Error422UnprocessableEntity(
+			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
+				" needs a product, a branch and a variant that name exactly one build")
 	}
 	targets, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
 	if err != nil {
@@ -305,7 +318,10 @@ func beneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 			return nil, SeveralComponents(several,
 				"&beneath_version= and, where two share a version, &beneath_ecosystem= and &beneath_namespace=")
 		}
-		return nil, huma.Error422UnprocessableEntity("this build does not hold a component called " + name)
+		return nil, Absent(in.Logger, err, "the component to narrow beneath could not be looked up",
+			func() error {
+				return huma.Error404NotFound("this build does not hold a component called " + name)
+			})
 	}
 	return &componentID, nil
 }

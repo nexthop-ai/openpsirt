@@ -992,7 +992,7 @@ The list a tree number opens is `beneath`: every open finding at the component
 or anywhere under it, by the same walk. `under` stays the direct consumer. The
 two do not always show the same figure and are not forced to — the tree counts
 distinct issues and the list is one row per issue and component. A name the
-build does not hold is refused rather than answered with an empty list, since an
+build does not hold answers not found rather than an empty list, since an
 empty list is also what a clean subtree looks like.
 
 Searching the tree counts what the tree counts: distinct open issues the reader
