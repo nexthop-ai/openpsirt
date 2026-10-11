@@ -15,6 +15,7 @@ import (
 
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -110,22 +111,43 @@ func TestTwoChangesAtOnceCloseNoLoop(t *testing.T) {
 // A fix release named while the record is being cleared lands before the
 // clearing or not at all: the clearing waits for the naming, so no naming
 // arrives on a record already cleared.
+//
+// The order is read from the trail, which each act writes inside its own
+// transaction. The clearing writes its entry after it has waited for the
+// naming, so where both are recorded the naming's entry comes first.
 func TestAFixIsNotNamedOnARecordClearedAtTheSameTime(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
-		var cleared time.Time
 		racing, rival := rivalDuring(t, f, "INSERT", "exploited_fix", func() error {
-			err := triage.NewStore(f.db.DB).ClearExploitedHere(context.Background(), f.triager,
+			return triage.NewStore(f.db.DB).ClearExploitedHere(context.Background(), f.triager,
 				record.ID, "It was a test harness.")
-			cleared = time.Now()
-			return err
 		})
 		_, named := racing.NameFix(t.Context(), f.triager, record.ID, world.TagName)
-		returned := time.Now()
 		if err := rival(); err != nil {
 			t.Fatalf("the rival clearing: %v", err)
 		}
-		if named == nil && cleared.Before(returned) {
+		if named != nil {
+			return
+		}
+		var acts []trail.Change
+		if err := f.db.DB.NewSelect().Model(&acts).
+			Where("ac.kind = ?", trail.ExploitedHere).
+			OrderExpr("ac.id").Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		naming, clearing := -1, -1
+		for i, act := range acts {
+			switch {
+			case strings.HasSuffix(act.Name, ", fix release"):
+				naming = i
+			case act.Became == nil:
+				clearing = i
+			}
+		}
+		if naming < 0 || clearing < 0 {
+			t.Fatalf("the trail does not hold both acts: %+v", acts)
+		}
+		if clearing < naming {
 			t.Error("a fix release was named on a record cleared before the naming committed")
 		}
 	})
