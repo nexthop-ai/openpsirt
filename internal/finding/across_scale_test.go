@@ -310,7 +310,31 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 			}
 		}
 
+		// The component screen's read, which counts, rates, and lists where
+		// the kernel could go across every build of the product.
+		screen := func(statistics string) {
+			t.Helper()
+			bounded, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancel()
+			at := time.Now()
+			builds, err := store.AcrossBuilds(bounded, triager, finding.Scope{ProductID: &product.ID}, "kernel")
+			took := time.Since(at)
+			issues := 0
+			for _, one := range builds {
+				issues += one.Issues
+			}
+			switch {
+			case bounded.Err() != nil:
+				t.Logf("the kernel's component, %-11s unfinished after %s", statistics, took.Round(time.Second))
+			case err != nil:
+				t.Fatal(err)
+			default:
+				t.Logf("the kernel's component, %-11s %9s (%d issues)", statistics, took.Round(time.Millisecond), issues)
+			}
+		}
+
 		read("as loaded")
+		screen("as loaded")
 		plan("as loaded", "package-0")
 		dbtest.SettleStatistics(t, db)
 
@@ -323,6 +347,7 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 		}
 		t.Logf("the kernel build's list          %9s (%d)", time.Since(at).Round(time.Millisecond), listed)
 		read("refreshed")
+		screen("refreshed")
 		plan("refreshed", "package-1")
 		plan("refreshed", "kernel")
 	})

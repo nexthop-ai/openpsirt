@@ -716,6 +716,29 @@ and the act hangs off it.
 It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the
 releases it is for, the version, the date, the reason, and who carries it.
 
+### Component screen reads
+
+A kernel is most of a build: 322,616 open places across the bench image's two
+builds. Every read behind the page's rows is shaped by that size.
+
+| Rule | |
+|---|---|
+| The source package's component rows are read first and named to every statement over the findings as values | Restricted through a join on the fold key, the places are estimated as an average component's: PostgreSQL estimates the kernel's 322,616 at 106, sorts them on disk, and probes for a decision once per place |
+| The places are grouped to one row per issue on each component before anything else is joined | The fold key, the rating and the distinct counts are worked out over 17,866 rows rather than 322,616 |
+| The counts and their rating bands are one statement | An issue is rated one way in a product, so it lands in one band, and the counts per band sum to the counts per source package |
+| Where it could go is read as one row per issue and fix on each component, carrying identifiers and the fix alone | That is 13,938 rows for the kernel. One row per place is 274,068, each carrying the fold key and the package identifier, which takes 5 s on a 100 Mbit link. The fold and the ecosystem are the component's, already read |
+| What has been promised is correlated by the product the scope names, bound once | Every build on the page is in that product |
+| Each binary's own issue count groups to one row per issue before counting | A distinct count over the places sorts them: 150 ms against 80 ms on the bench kernel |
+
+| The page's own read, for the kernel | Alone | Four at once |
+|---|---:|---:|
+| Bench image, PostgreSQL 16, one processor, 1 ms and 100 Mbit to the server | 0.61 s | 2.2 s |
+| The same build's findings list, for comparison | 0.11 s | 0.29 s |
+
+On the measurement fixture's kernel of 204,000 places, with statistics settled,
+the read takes 0.38 s on PostgreSQL, 0.59 s on SQLite, 0.61 s on MySQL and
+0.45 s on MariaDB, against 0.09 s to 0.28 s for that build's findings list.
+
 ## The finding screen
 
 The finding is the working screen after a decision as well as before it.

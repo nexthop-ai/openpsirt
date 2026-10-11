@@ -133,14 +133,18 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		return nil, nil
 	}
 
-	packages, err := s.packagesAcross(ctx, targets, visible, folds)
+	held, err := s.componentsOf(ctx, folds)
+	if err != nil || len(held) == 0 {
+		return nil, err
+	}
+	packages, err := s.packagesAcross(ctx, targets, visible, held)
 	if err != nil {
 		return nil, err
 	}
 	if len(packages) == 0 {
 		return nil, nil
 	}
-	open, err := s.openAcross(ctx, targets, visible, folds)
+	open, bands, err := s.openAcross(ctx, productID, targets, visible, held)
 	if err != nil {
 		return nil, err
 	}
@@ -148,15 +152,11 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
-	upgrades, err := s.upgradesAcross(ctx, targets, visible, folds)
+	upgrades, err := s.upgradesAcross(ctx, targets, visible, held)
 	if err != nil {
 		return nil, err
 	}
-	promised, err := s.promisedAcross(ctx, targets, visible, folds)
-	if err != nil {
-		return nil, err
-	}
-	bands, err := s.bandsAcross(ctx, productID, targets, visible, folds)
+	promised, err := s.promisedAcross(ctx, productID, targets, visible, held)
 	if err != nil {
 		return nil, err
 	}
@@ -227,8 +227,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 // holds on every component that names no source, so compared, a blank name
 // would reach all of them.
 //
-// Read on its own and handed to each statement over the findings as a list of
-// values. As a subquery, how many findings it matches is the planner's
+// Read on its own, and what it names reaches each statement over the findings
+// as a list of values. As a subquery, how many findings it matches is the planner's
 // estimate, and on statistics that lag the table PostgreSQL estimates one and
 // runs the subquery once per finding, reading every graph node of the build
 // each time: the kernel's 204,000 findings in a build of 737 graph nodes take
@@ -320,6 +320,58 @@ func OneFoldNamed(ctx context.Context, db bun.IDB, targets []int64,
 	return folds, nil
 }
 
+// heldBy is the component rows the folds hold: the fold each belongs to and
+// its package identifier, by component.
+type heldBy map[int64]heldRow
+
+type heldRow struct {
+	fold string
+	purl string
+}
+
+// ids is the component identifiers, in order, for a statement to name as a
+// list of values.
+func (h heldBy) ids() []int64 {
+	out := make([]int64, 0, len(h))
+	for id := range h {
+		out = append(out, id)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// componentsOf is every component row the folds hold.
+//
+// Read on its own and handed to each statement over the findings as a list of
+// values, for the reason FoldsNamed is. Restricted through a join on the fold
+// key, the findings a fold holds are the planner's estimate for an average
+// component: PostgreSQL estimates the bench kernel's 322,616 open places at
+// 106, sorts them on disk, and probes an index once per place. Named as
+// values, the estimate comes from the statistics on those components, and the
+// same places are grouped in memory.
+func (s *Store) componentsOf(ctx context.Context, folds []string) (heldBy, error) {
+	var rows []struct {
+		ID      int64  `bun:"id"`
+		FoldKey string `bun:"fold_key"`
+		Purl    string `bun:"purl"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr(`c.id AS "id"`).
+		ColumnExpr(`c.fold_key AS "fold_key"`).
+		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read the components of a source package: %w", err)
+	}
+	out := make(heldBy, len(rows))
+	for _, row := range rows {
+		out[row.ID] = heldRow{fold: row.FoldKey, purl: row.Purl}
+	}
+	return out, nil
+}
+
 // packageRow is one binary package in one build, with the fold it belongs to.
 type packageRow struct {
 	TargetID      int64      `bun:"target_id"`
@@ -351,17 +403,31 @@ type packageRow struct {
 // component is readable to anybody who may read the build while what is open
 // against it is not.
 func (s *Store) packagesAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds []string) ([]packageRow, error) {
+	visible []access.Visibility, held heldBy) ([]packageRow, error) {
 
-	open := s.db.NewSelect().
+	// Both counts are restricted to the fold's components before they are
+	// grouped. Grouped over the whole build and joined after, they count
+	// every component the build holds to answer for a handful.
+	ids := held.ids()
+	// The distinct issues on a component are its rows once grouped to one
+	// per issue, which groups in memory where a distinct count over the
+	// places sorts them: on the bench kernel, 80 ms where the sort of 322,616
+	// places spilled to disk and took 150 ms.
+	issues := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.target_id, f.component_id")
+		Where("f.component_id IN (?)", bun.List(ids)).
+		GroupExpr("f.target_id, f.component_id, f.vulnerability_id")
+	open := s.db.NewSelect().
+		TableExpr(`(?) AS "oi"`, issues).
+		ColumnExpr(`"oi".target_id AS "target_id"`).
+		ColumnExpr(`"oi".component_id AS "component_id"`).
+		ColumnExpr(`COUNT(*) AS "issues"`).
+		GroupExpr(`"oi".target_id, "oi".component_id`)
 	pullers := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
 		Join(`JOIN "graph_node" AS "ch" ON ch.id = e.child_id`).
@@ -371,6 +437,7 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64,
 		Where("e.target_id IN (?)", bun.List(targets)).
 		Where("e.closed_scan_id IS NULL").
 		Where("e.parent_id <> e.child_id").
+		Where("ch.component_id IN (?)", bun.List(ids)).
 		GroupExpr("ch.target_id, ch.component_id")
 
 	var rows []packageRow
@@ -403,7 +470,7 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64,
 		Where("n.target_id IN (?)", bun.List(targets)).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
+		Where("n.component_id IN (?)", bun.List(ids)).
 		OrderExpr("st.name, va.name, c.name, c.version").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -422,16 +489,43 @@ type counted struct {
 	Fixable       int
 }
 
-// openAcross is what is open across each fold, per build.
+// openAcross is what is open across each fold, per build, and how it was
+// rated.
 //
 // Counted over the fold rather than summed from its packages: one issue on
-// three binaries is one issue.
-func (s *Store) openAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds []string) (map[foldIn]counted, error) {
+// three binaries is one issue. The rating bands count distinct issues too, so
+// the parts sum to the whole rather than to the number of places.
+//
+// Grouped twice. The places are grouped first to one row per issue on each
+// component, on identifiers alone; the fold, the issue's rating and the
+// distinct counts are worked out over those rows. An issue is rated one way
+// in a product, so each lands in one band, and the counts per band sum to the
+// counts per fold. On the bench kernel, 322,616 places are 17,866 issues on a
+// component, and the fold's text key and the rating are joined to those.
+func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64,
+	visible []access.Visibility, held heldBy) (map[foldIn]counted, map[foldIn]map[string]int, error) {
+
+	perIssue := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(exploitedAcross+` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
+		ColumnExpr("MAX(CASE WHEN f.fixed_in IS NOT NULL AND f.fixed_in <> ''"+
+			` THEN 1 ELSE 0 END) AS "fixable"`).
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where("f.component_id IN (?)", bun.List(held.ids())).
+		GroupExpr("f.target_id, f.component_id, f.vulnerability_id")
 
 	var rows []struct {
 		TargetID      int64      `bun:"target_id"`
 		FoldKey       string     `bun:"fold_key"`
+		Band          string     `bun:"band"`
 		Issues        int        `bun:"issues"`
 		Places        int        `bun:"places"`
 		DueAt         *time.Time `bun:"due_at"`
@@ -440,34 +534,49 @@ func (s *Store) openAcross(ctx context.Context, targets []int64,
 		Fixable       int        `bun:"fixable"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		ColumnExpr(`f.target_id AS "target_id"`).
+		TableExpr(`(?) AS "pi"`, perIssue).
+		Join(`JOIN "component" AS "c" ON c.id = "pi".component_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = "pi".vulnerability_id`).
+		// This product's rating where it has stated one. Every build here is
+		// in one product — the scope names it — so one bound identifier
+		// answers for all of them.
+		Join(rating.Here, productID).
+		ColumnExpr(`"pi".target_id AS "target_id"`).
 		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
-		ColumnExpr("COUNT(DISTINCT CASE WHEN f.fixed_in IS NOT NULL AND f.fixed_in <> ''"+
-			` THEN f.vulnerability_id END) AS "fixable"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr("f.target_id, c.fold_key").
+		ColumnExpr(rating.EffectiveExpr+` AS "band"`).
+		ColumnExpr(`COUNT(DISTINCT "pi".vulnerability_id) AS "issues"`).
+		ColumnExpr(`SUM("pi".places) AS "places"`).
+		ColumnExpr(`MIN("pi".due_at) AS "due_at"`).
+		ColumnExpr(`MAX("pi".exploited) AS "exploited"`).
+		ColumnExpr(`MAX("pi".exploited_here) AS "exploited_here"`).
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "pi".fixable = 1 THEN "pi".vulnerability_id END) AS "fixable"`).
+		GroupExpr(`"pi".target_id, c.fold_key, `+rating.EffectiveExpr).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what is open across a source package: %w", err)
+		return nil, nil, fmt.Errorf("read what is open across a source package: %w", err)
 	}
-	out := make(map[foldIn]counted, len(rows))
+	open := make(map[foldIn]counted, len(rows))
+	bands := map[foldIn]map[string]int{}
 	for _, row := range rows {
-		out[foldIn{row.TargetID, row.FoldKey}] = counted{
-			Issues: row.Issues, Places: row.Places, DueAt: row.DueAt,
-			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere, Fixable: row.Fixable,
+		key := foldIn{row.TargetID, row.FoldKey}
+		sum := open[key]
+		sum.Issues += row.Issues
+		sum.Places += row.Places
+		sum.Fixable += row.Fixable
+		sum.Exploited = max(sum.Exploited, row.Exploited)
+		sum.ExploitedHere = max(sum.ExploitedHere, row.ExploitedHere)
+		if row.DueAt != nil && (sum.DueAt == nil || row.DueAt.Before(*sum.DueAt)) {
+			sum.DueAt = row.DueAt
 		}
+		open[key] = sum
+		// A scanner's "unknown" and no rating at all are the same state, and
+		// two entries for it is two names for one nothing.
+		if bands[key] == nil {
+			bands[key] = map[string]int{}
+		}
+		bands[key][BandOf(row.Band)] += row.Issues
 	}
-	return out, nil
+	return open, bands, nil
 }
 
 // pullersAcross is how many things outside each fold pull it in, per build.
@@ -522,33 +631,35 @@ func (s *Store) pullersAcross(ctx context.Context, targets []int64,
 // where the ordering is unavailable the candidates carry equal counts and say
 // they are unranked rather than being ranked by the first.
 func (s *Store) upgradesAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds []string) (map[foldIn][]Candidate, error) {
+	visible []access.Visibility, held heldBy) (map[foldIn][]Candidate, error) {
 
 	var rows []struct {
-		TargetID int64  `bun:"target_id"`
-		FoldKey  string `bun:"fold_key"`
-		Issue    int64  `bun:"vulnerability_id"`
-		FixedIn  string `bun:"fixed_in"`
-		Purl     string `bun:"purl"`
+		TargetID    int64  `bun:"target_id"`
+		ComponentID int64  `bun:"component_id"`
+		Issue       int64  `bun:"vulnerability_id"`
+		FixedIn     string `bun:"fixed_in"`
 	}
-	// One row per finding rather than a grouped count, because the grouping is
-	// per version and a version has to be read out of the string first. An
-	// issue on several binaries of the fold counts once, because the candidates
-	// count issues rather than rows.
+	// One row per issue and fix on each component rather than a grouped
+	// count, because the grouping is per version and a version has to be read
+	// out of the string first. An issue on several binaries of the fold counts
+	// once, because the candidates count issues rather than rows. The fold and
+	// the ecosystem are the component's, already read, so each row carries
+	// identifiers and the string alone: on the bench kernel that is 13,938
+	// rows where one per place was 274,068, each carrying the fold key and
+	// the package identifier, and 5 s on a 100 Mbit link.
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
+		Where("f.component_id IN (?)", bun.List(held.ids())).
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
+		GroupExpr("f.target_id, f.component_id, f.vulnerability_id, f.fixed_in").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where a source package could go in each build: %w", err)
@@ -561,9 +672,10 @@ func (s *Store) upgradesAcross(ctx context.Context, targets []int64,
 		if len(versions) == 0 {
 			continue
 		}
-		key := foldIn{row.TargetID, row.FoldKey}
+		component := held[row.ComponentID]
+		key := foldIn{row.TargetID, component.fold}
 		per[key] = append(per[key], namedFix{issue: row.Issue, versions: versions})
-		scheme[key] = vercmp.SchemeOf(graph.EcosystemOf(row.Purl))
+		scheme[key] = vercmp.SchemeOf(graph.EcosystemOf(component.purl))
 	}
 	out := make(map[foldIn][]Candidate, len(per))
 	for key, found := range per {
@@ -579,42 +691,40 @@ type promise struct {
 
 // promisedAcross is what has already been committed for each fold in each
 // build, read off the decisions rather than a record beside them.
-func (s *Store) promisedAcross(ctx context.Context, targets []int64,
-	visible []access.Visibility, folds []string) (map[foldIn]promise, error) {
+func (s *Store) promisedAcross(ctx context.Context, productID int64, targets []int64,
+	visible []access.Visibility, held heldBy) (map[foldIn]promise, error) {
 
 	var rows []struct {
 		TargetID    int64      `bun:"target_id"`
-		FoldKey     string     `bun:"fold_key"`
+		ComponentID int64      `bun:"component_id"`
 		ClaimID     int64      `bun:"claim_id"`
 		CommittedTo *time.Time `bun:"committed_to"`
 		UpgradeTo   string     `bun:"upgrade_to"`
 	}
 	// Through the finding, because a decision is keyed on a place and a build
-	// is what a place sits in. A product is reached through the build rather
-	// than carried on the finding, which is where the correlation everywhere
-	// else starts from. One row per promise, so the date and the version
-	// reported come from the same one.
+	// is what a place sits in. Every build here is in one product — the scope
+	// names it — so one bound identifier is the product a decision is
+	// correlated by. One row per promise on each component, so the date and
+	// the version reported come from the same one, and the fold is the
+	// component's, already read.
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("st.product_id")).
+		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("?"), productID).
 		// The argument, which is where the outcome and the promise live: one
 		// act is one argument, and the rows underneath say where it lands.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`cl.id AS "claim_id"`).
 		ColumnExpr(`cl.committed_to AS "committed_to"`).
 		ColumnExpr(`COALESCE(cl.upgrade_to, '') AS "upgrade_to"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
+		Where("f.component_id IN (?)", bun.List(held.ids())).
 		Where("cl.outcome = ?", "upgrade-needed").
 		Where("de.live_key IS NOT NULL").
-		GroupExpr("f.target_id, c.fold_key, cl.id, cl.committed_to, cl.upgrade_to").
+		GroupExpr("f.target_id, f.component_id, cl.id, cl.committed_to, cl.upgrade_to").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
@@ -643,7 +753,7 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 		return a.claim > b.claim
 	}
 	for _, row := range rows {
-		key := foldIn{row.TargetID, row.FoldKey}
+		key := foldIn{row.TargetID, held[row.ComponentID].fold}
 		one := standing{promise{at: row.CommittedTo, to: row.UpgradeTo}, row.ClaimID}
 		if held, ok := best[key]; !ok || later(one, held) {
 			best[key] = one
@@ -652,53 +762,6 @@ func (s *Store) promisedAcross(ctx context.Context, targets []int64,
 	out := make(map[foldIn]promise, len(best))
 	for key, one := range best {
 		out[key] = one.promise
-	}
-	return out, nil
-}
-
-// bandsAcross is how what is open across each fold was rated, per build.
-//
-// Distinct issues, like the count beside it, so the parts sum to the whole
-// rather than to the number of places.
-func (s *Store) bandsAcross(ctx context.Context, productID int64, targets []int64,
-	visible []access.Visibility, folds []string) (map[foldIn]map[string]int, error) {
-
-	var rows []struct {
-		TargetID int64  `bun:"target_id"`
-		FoldKey  string `bun:"fold_key"`
-		Band     string `bun:"band"`
-		Issues   int    `bun:"issues"`
-	}
-	err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		// This product's rating where it has stated one. Every build here is
-		// in one product — the scope names it — so one bound identifier
-		// answers for all of them.
-		Join(rating.Here, productID).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(rating.EffectiveExpr+` AS "band"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr("f.target_id, c.fold_key, "+rating.EffectiveExpr).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
-	}
-	out := map[foldIn]map[string]int{}
-	for _, row := range rows {
-		// A scanner's "unknown" and no rating at all are the same state, and
-		// two entries for it is two names for one nothing.
-		key := foldIn{row.TargetID, row.FoldKey}
-		if out[key] == nil {
-			out[key] = map[string]int{}
-		}
-		out[key][BandOf(row.Band)] += row.Issues
 	}
 	return out, nil
 }
