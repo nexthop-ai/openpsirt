@@ -227,6 +227,57 @@ func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
 	})
 }
 
+func TestAStepCountsWhatEachNeighborCarriesAndPullsIn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		// What is open on each neighbor, and what each pulls in, is counted
+		// for the neighbors the step reaches, so each row reads its own
+		// numbers however the counting is narrowed. Each library carries a different number, and the root
+		// above the container none.
+		box, one, two := at("container", "1"), at("libone", "1.0"), at("libtwo", "1.0")
+		snap := graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{box, one, two},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: box}, {Parent: box, Child: one}, {Parent: box, Child: two},
+			},
+		}
+		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		findings := finding.NewStore(f.db.DB)
+		run, err := findings.Begin(t.Context(), finding.Run{
+			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			DatabaseVersion: "2026-08-28", RanHere: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		reported := func(id string, component graph.Described) finding.Reported {
+			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: component}
+		}
+		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+			reported("CVE-2026-1", one), reported("CVE-2026-2", two), reported("CVE-2026-3", two),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		above, below, err := f.store.Around(t.Context(), everyone(f), f.targetID, box.Name, graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		own, pulls := map[string]int{}, map[string]int{}
+		for _, row := range append(above, below...) {
+			own[row.Name], pulls[row.Name] = row.Findings, row.Children
+		}
+		if own[one.Name] != 1 || own[two.Name] != 2 || own[root.Name] != 0 || len(own) != 3 {
+			t.Errorf("the neighbors read %v open on themselves, wanted libone 1, libtwo 2 and the root 0", own)
+		}
+		if pulls[root.Name] != 1 || pulls[one.Name] != 0 || pulls[two.Name] != 0 {
+			t.Errorf("the neighbors pull in %v, wanted the root 1 and the libraries none", pulls)
+		}
+	})
+}
+
 func TestADocumentInALoopIsWalkedOnceAndStops(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		// a depends on b, b on a, and the product on a. Every walk has to

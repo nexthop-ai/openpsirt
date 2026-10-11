@@ -103,12 +103,19 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // over distinct components, not summed along edges: a library reached by
 // twenty containers is one thing inside each of them.
 //
-// Two statements over one walk: which components each start reaches, and the
-// issues open on the components reached, each once per component. The union
-// per start is taken here. Joined in the database, every start reaching a
-// large component carries that component's issues again: the bench kernel's
-// 45 parents make 302,269 rows to sort and count for 270 answers, 345 ms on
-// PostgreSQL, where the two statements return 5,331 and 10,769 rows in 100 ms.
+// Two statements: the walk, which says which components each start reaches,
+// and the issues open on the components reached, each once per component,
+// named as values. The union per start is taken here. Joined in the database,
+// every start reaching a large component carries that component's issues
+// again: the bench kernel's 45 parents make 302,269 rows to sort and count for
+// 270 answers, 345 ms on PostgreSQL, where the two statements return 5,331 and
+// 10,769 rows in 100 ms. The second walks nothing: walked again to restrict
+// the findings, it repeated the first statement's work, and SQLite read every
+// node in the database to match the walk's — 343 ms for the issues beneath
+// the measurement kernel's 34 consumers, against 208 ms named as values. On
+// the statistics a large scan leaves behind, reading what is around that
+// kernel took 4.2 s on PostgreSQL and 14.2 s on MariaDB, against 0.28 s and
+// 0.14 s.
 //
 // And by severity. A node saying five thousand beneath it says nothing about
 // whether any of it matters, which is what somebody deciding where to descend
@@ -176,17 +183,26 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Band            string `bun:"band"`
 	}
-	issueArgs := append(append([]any{}, walkArgs...), targetID, bun.List(visible), productID)
-	err = s.db.NewRaw(walk+`SELECT g.component_id AS "component_id", g.vulnerability_id AS "vulnerability_id",
+	seen := map[int64]bool{}
+	var all []int64
+	for _, row := range reached {
+		if !seen[row.Reached] {
+			seen[row.Reached] = true
+			all = append(all, row.Reached)
+		}
+	}
+	if len(all) == 0 {
+		return totals, nil
+	}
+	err = s.db.NewRaw(`SELECT g.component_id AS "component_id", g.vulnerability_id AS "vulnerability_id",
 	       `+rating.EffectiveExpr+` AS "band"
 	FROM (SELECT f.component_id AS "component_id", f.vulnerability_id AS "vulnerability_id"
 	      FROM "finding" AS "f"
 	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-	        AND f.component_id IN (SELECT n.component_id
-	                               FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node)
+	        AND f.component_id IN (?)
 	      GROUP BY f.component_id, f.vulnerability_id) AS "g"
 	JOIN "vulnerability" AS "v" ON v.id = g.vulnerability_id
-	`+rating.Here, issueArgs...).
+	`+rating.Here, targetID, bun.List(visible), bun.List(all), productID).
 		Scan(ctx, &open)
 	if err != nil {
 		return nil, fmt.Errorf("read what is open beneath each component: %w", err)
@@ -204,9 +220,37 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	for _, row := range reached {
 		under[row.Start] = append(under[row.Start], row.Reached)
 	}
+	alone := map[int64]map[string]int{}
 	for start, components := range under {
-		seen := map[issue]bool{}
+		// A start reaching one component that carries anything has that
+		// component's issues beneath it, each once already, so no union is
+		// taken. 44 of the bench kernel's 45 parents reach the kernel and
+		// nothing else carrying an issue, and the union of its 5,655 issues
+		// for each of them took 29 ms.
+		var carrying []int64
 		for _, c := range components {
+			if len(on[c]) > 0 {
+				carrying = append(carrying, c)
+			}
+		}
+		if len(carrying) == 1 {
+			counted, ok := alone[carrying[0]]
+			if !ok {
+				counted = map[string]int{}
+				for _, one := range on[carrying[0]] {
+					counted[one.band]++
+				}
+				alone[carrying[0]] = counted
+			}
+			bands := make(map[string]int, len(counted))
+			for band, n := range counted {
+				bands[band] = n
+			}
+			totals[start] = bands
+			continue
+		}
+		seen := map[issue]bool{}
+		for _, c := range carrying {
 			for _, one := range on[c] {
 				if seen[one] {
 					continue

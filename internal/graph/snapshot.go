@@ -707,7 +707,7 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 	// that is not narrowed the same way is still a count of what the reader
 	// may not see.
 	err := openIssuesJoin(s.db.NewSelect().
-		TableExpr(`"component" AS "c"`), readable, targetID).
+		TableExpr(`"component" AS "c"`), readable, targetID, nil).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
@@ -734,17 +734,28 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		near, far = far, near
 	}
 
+	edges := func() *bun.SelectQuery {
+		return s.db.NewSelect().
+			TableExpr(`"graph_edge" AS "e"`).
+			Join(`JOIN "graph_node" AS "nn" ON nn.id = e.`+near).
+			Join(`JOIN "graph_node" AS "fn" ON fn.id = e.`+far).
+			Where("e.target_id = ?", targetID).
+			Where("nn.component_id = ?", componentID).
+			Where("e.closed_scan_id IS NULL")
+	}
+	// The neighbors first, so what is counted against each is counted for
+	// them alone. Counted for the whole build and joined, the step above the
+	// bench kernel groups the build's 325,389 open places for 45 parents
+	// carrying none: 32 ms, against 3 ms for the two statements.
+	var ids []int64
+	if err := edges().ColumnExpr("DISTINCT fn.component_id").Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("walk the graph: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	var rows []Neighbor
-	query := s.db.NewSelect().
-		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "nn" ON nn.id = e.` + near).
-		Join(`JOIN "graph_node" AS "fn" ON fn.id = e.` + far)
-	err := neighborsAt(query, readable, targetID).
-		Where("e.target_id = ?", targetID).
-		Where("nn.component_id = ?", componentID).
-		Where("e.closed_scan_id IS NULL").
-		Scan(ctx, &rows)
-	if err != nil {
+	if err := neighborsAt(edges(), readable, targetID, ids).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("walk the graph: %w", err)
 	}
 
@@ -755,12 +766,13 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 
 // neighborsAt reads each node the query reaches as "fn" as a neighbor: its
 // component, what is open against it and how many things it pulls in, in the
-// order a reader descends by.
+// order a reader descends by. Only is the components the query can reach,
+// where they are known, and nil where it may reach any in the build.
 func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
-	targetID int64) *bun.SelectQuery {
+	targetID int64, only []int64) *bun.SelectQuery {
 
 	query = query.Join(`JOIN "component" AS "c" ON c.id = fn.component_id`)
-	return childrenJoin(openIssuesJoin(query, readable, targetID), targetID).
+	return childrenJoin(openIssuesJoin(query, readable, targetID, only), targetID, only).
 		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
@@ -806,16 +818,23 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 // counting them. A distinct count over the places sorts all of them: on the
 // bench kernel's build, 325,389 open places, the walk one step up from the
 // kernel takes 103 ms counted distinct and 42 ms grouped first.
+//
+// Where the components the query reaches are known, the pass is over theirs
+// alone.
 func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
-	targetID int64) *bun.SelectQuery {
+	targetID int64, only []int64) *bun.SelectQuery {
 
+	within, args := "", []any{targetID, bun.List(readable)}
+	if only != nil {
+		within, args = " AND f.component_id IN (?)", append(args, bun.List(only))
+	}
 	return query.
 		Join(`LEFT JOIN (SELECT g.cid AS "cid", COUNT(*) AS "n"
 			FROM (SELECT f.component_id AS "cid", f.vulnerability_id AS "vid"
 			      FROM "finding" AS "f"
-			      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
+			      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)`+within+`
 			      GROUP BY f.component_id, f.vulnerability_id) AS "g"
-			GROUP BY g.cid) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
+			GROUP BY g.cid) AS "open" ON open.cid = c.id`, args...).
 		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`)
 }
 
@@ -831,13 +850,20 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 // alone cost 5.06 s against 0.106 s for one pass. An index on the node's
 // component made it worse (5.4 s to 10.0 s), because the scan being repeated is
 // over the edges rather than the lookup it drives.
-func childrenJoin(query *bun.SelectQuery, targetID int64) *bun.SelectQuery {
+//
+// Where the components the query reaches are known, the pass is over theirs
+// alone.
+func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.SelectQuery {
+	within, args := "", []any{targetID}
+	if only != nil {
+		within, args = " AND dp.component_id IN (?)", append(args, bun.List(only))
+	}
 	return query.
 		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
-			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
-			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+			WHERE d.target_id = ? AND d.closed_scan_id IS NULL`+within+`
+			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, args...).
 		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`)
 }
 
@@ -864,7 +890,7 @@ func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 	targetID int64) ([]Neighbor, error) {
 
 	var rows []Neighbor
-	err := neighborsAt(s.db.NewSelect().TableExpr(`"graph_node" AS "fn"`), readable, targetID).
+	err := neighborsAt(s.db.NewSelect().TableExpr(`"graph_node" AS "fn"`), readable, targetID, nil).
 		Where("fn.target_id = ?", targetID).
 		Where("fn.closed_scan_id IS NULL").
 		Where("fn.is_root = ?", false).
@@ -1066,7 +1092,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	query := s.db.NewSelect().
 		TableExpr(matched, targetID, false, "%"+database.LikeEscaped(Folded(term))+"%").
 		Join(`JOIN "component" AS "c" ON c.id = matched.cid`)
-	err = childrenJoin(openIssuesJoin(query, readable, targetID), targetID).
+	err = childrenJoin(openIssuesJoin(query, readable, targetID, nil), targetID, nil).
 		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).

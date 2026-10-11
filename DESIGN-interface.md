@@ -731,23 +731,28 @@ builds. Every read behind the page's rows is shaped by that size.
 | Each binary's count is a column of the pass: whether each issue is on that binary, counted | There is one column per binary of the source package. Read in a statement of its own, it read the places again: 47 ms on PostgreSQL, and 219 ms on SQLite for the measurement fixture's kernel |
 | What has been promised is joined to each place as one number: the promise's rank above its claim's identifier | The greatest number over a source package is the promise that stands, and it names its claim. The promises are one row per issue and place before the join, so a place two promises reach is one place |
 | What has been promised is correlated by the product the scope names, bound once | Every build on the page is in that product |
-| A component's own open count in the tree groups to one row per issue before counting | It is counted for every component in the build and joined. Counted distinct, the build's 325,389 places are sorted: the step above the bench kernel takes 103 ms counted distinct and 42 ms grouped first |
-| What is beneath each neighbor is the union, per neighbor, of the issues on the components it reaches, taken in the application | Each of the kernel's 45 parents reaches the kernel, so joined in the database the kernel's issues arrive once per parent: 302,269 rows sorted for 270 answers, 345 ms. The walk and the issues on what it reaches are 5,331 and 10,769 rows, 100 ms |
+| A component's own open count in the tree groups to one row per issue before counting | Counted distinct, the places are sorted: over the bench kernel's build, 325,389 places, 103 ms counted distinct and 42 ms grouped first |
+| One step through the graph counts what is open on the neighbors it reaches, and what they pull in, named as values | The neighbors are read first. Counted for every component in the build and joined, the step above the bench kernel groups 325,389 places for 45 parents carrying none: 32 ms, against 3 ms for the two statements |
+| What is beneath each neighbor is the union, per neighbor, of the issues on the components it reaches, taken in the application | Each of the kernel's 45 parents reaches the kernel, so joined in the database the kernel's issues arrive once per parent: 302,269 rows sorted for 270 answers, 345 ms. The walk and the issues on what it reaches are 5,331 and 10,769 rows |
+| The issues on what the walk reaches are read for the components it reached, named as values | Walked a second time to restrict the findings, SQLite read every node in the database to match the walk's: 343 ms for the issues beneath the measurement kernel's 34 consumers, against 208 ms named as values. On the statistics a large scan leaves behind, the read took 4.2 s on PostgreSQL and 14.2 s on MariaDB, against 0.28 s and 0.14 s. The bench image's neighbors of its own root take 0.53 s against 0.77 s |
+| A neighbor reaching one component that carries anything takes that component's counts | No union is needed. 44 of the kernel's 45 parents reach the kernel and nothing else carrying an issue, and taking the union for each of them was 29 ms of the 182 ms the read took |
 | Rows of one name at one rank are ordered by the component's identifier | A build ships one name at more than one version, and without it two such rows trade places between plans |
 
 | The page's reads, for the kernel | Alone | Four at once |
 |---|---:|---:|
-| The component read, bench image, PostgreSQL 16, one processor, 1 ms and 100 Mbit to the server | 0.61 s | 2.4 s |
-| Where it sits in the build, the same bench | 0.21 s | 0.58 s |
-| The whole screen: the component read, then where it sits and the twelve weeks side by side | 0.90 s | 3.3 s |
-| The same build's findings list, for comparison | 0.11 s | 0.29 s |
+| The component read, bench image, PostgreSQL 16, one processor, 1 ms and 100 Mbit to the server | 0.28 s | 1.1 s |
+| Where it sits in the build, the same bench | 0.18 s | 0.39 s |
+| The twelve weeks, the same bench | 0.14 s | 0.35 s |
+| The whole screen: the component read, then where it sits and the twelve weeks side by side | 0.55 s | 1.9 s |
+| The same build's findings list, for comparison | 0.14 s | 0.37 s |
 
 On the measurement fixture's kernel of 204,000 places, with statistics settled,
-the read takes 0.38 s on PostgreSQL, 0.59 s on SQLite, 0.61 s on MySQL and
-0.45 s on MariaDB, against 0.09 s to 0.28 s for that build's findings list.
-Where it sits in the build, with its 34 consumers above it, takes 0.24 s on
-PostgreSQL, 0.68 s on SQLite, 0.53 s on MySQL and 0.34 s on MariaDB, against
-0.75 s to 0.87 s joined in the database.
+the component read takes 92 ms on PostgreSQL, 353 ms on SQLite, 479 ms on MySQL
+and 544 ms on MariaDB, against 110 ms to 144 ms for that build's findings list.
+The fixture's kernel names no fix. With a fix named on six issues in seven, the
+share a kernel carries, it takes 0.14 s, 0.38 s, 0.50 s and 0.51 s. Where it
+sits in the build, with its 34 consumers above it, takes 154 ms, 358 ms, 172 ms
+and 141 ms.
 
 ## The finding screen
 
