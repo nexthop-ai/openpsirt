@@ -49,15 +49,16 @@ type git struct {
 	// tests, which fetch from a directory because a test has no host to
 	// reach.
 	transport string
-	// locate turns a repository's address into what git is told to fetch.
-	// Nil everywhere but the tests, where it names a directory.
-	locate func(repository string) string
+	// locate turns a repository's address into what git is told to fetch,
+	// under the context the fetch runs in. Nil everywhere but the tests,
+	// where it names a directory.
+	locate func(ctx context.Context, repository string) string
 }
 
 // source is what git is told to fetch for a repository.
-func (g git) source(repository string) string {
+func (g git) source(ctx context.Context, repository string) string {
 	if g.locate != nil {
-		return g.locate(repository)
+		return g.locate(ctx, repository)
 	}
 	return repository
 }
@@ -194,7 +195,7 @@ func (g git) reaching(ctx context.Context, repository, dir string, args ...strin
 // prints is not a failure.
 func (g git) clone(ctx context.Context, repository, parent, dir string) error {
 	return g.reaching(ctx, repository, parent,
-		"clone", "--quiet", "--bare", "--no-tags", "--filter=tree:0", "--", g.source(repository), dir)
+		"clone", "--quiet", "--bare", "--no-tags", "--filter=tree:0", "--", g.source(ctx, repository), dir)
 }
 
 // fetch brings a copy's branches up to date, dropping branches the repository

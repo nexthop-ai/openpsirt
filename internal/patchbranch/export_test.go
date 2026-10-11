@@ -20,7 +20,8 @@ import (
 func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded, locate func(string) string) *Pass {
 	pass := &Pass{
 		db: db, logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		git:      git{excluded: excluded, transport: "file", locate: locate},
+		git: git{excluded: excluded, transport: "file",
+			locate: func(_ context.Context, repository string) string { return locate(repository) }},
 		copies:   copies{root: dir, quota: quota, now: time.Now, poll: 10 * time.Millisecond},
 		excluded: excluded,
 		on:       true,
@@ -42,6 +43,13 @@ func Settings(proxy string) []string { return git{transport: "https"}.settings(p
 // every renew while a visit runs.
 func (p *Pass) Leased(db *bun.DB, replica string, renew time.Duration) *Pass {
 	p.leases, p.replica, p.renew = queue.NewLeases(db), replica, renew
+	return p
+}
+
+// Locating is the pass naming what git fetches with locate, which is handed
+// the context the fetch runs in.
+func (p *Pass) Locating(locate func(ctx context.Context, repository string) string) *Pass {
+	p.git.locate = locate
 	return p
 }
 

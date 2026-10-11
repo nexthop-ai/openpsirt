@@ -116,6 +116,10 @@ func TestARelativeCopiesDirectoryHoldsItsCopies(t *testing.T) {
 	}
 }
 
+// patience bounds a wait for something a test expects to happen in a few
+// milliseconds. It is reached only where the behavior under test is broken.
+const patience = 10 * time.Second
+
 // A visit asks for the lease again as it runs, and stops when another
 // replica has it.
 func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
@@ -137,17 +141,23 @@ func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 			return *row.HeldUntil
 		}
 
-		// Held through a slow fetch: the lease moves on while it runs.
+		// Held through a slow fetch: the lease moves on while it runs. The
+		// fetch lasts until it has, or until it is plain that it will not.
 		if mine, err := leases.Take(ctx, patchbranch.Lease, "one", 30*time.Minute); err != nil || !mine {
 			t.Fatalf("taking the lease: %v %v", mine, err)
 		}
 		var during time.Time
 		slow := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
-			outward.Excluded{}, func(string) string {
-				during = heldUntil()
-				time.Sleep(200 * time.Millisecond)
-				return made.dir
-			}).Leased(db.DB, "one", 20*time.Millisecond)
+			outward.Excluded{}, nil).Locating(func(context.Context, string) string {
+			during = heldUntil()
+			for give := time.Now().Add(patience); time.Now().Before(give); {
+				if heldUntil().After(during) {
+					break
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			return made.dir
+		}).Leased(db.DB, "one", 20*time.Millisecond)
 		if _, err := slow.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +167,11 @@ func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 		}
 
 		// Lost part way: another replica takes it, and the visit stops rather
-		// than writing what the other replica is also writing.
+		// than writing what the other replica is also writing. The other
+		// replica's hold is one write, so the visit asking again cannot land
+		// between the lease lapsing and the other replica taking it. The
+		// fetch lasts until the visit has stopped, or until it is plain that
+		// it will not.
 		if _, err := db.DB.NewUpdate().Table("patch_repository").
 			Set("fetched_at = NULL").Set("reached_at = NULL").Where("1 = 1").Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -167,18 +181,19 @@ func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 			t.Fatal(err)
 		}
 		lost := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
-			outward.Excluded{}, func(string) string {
-				if _, err := db.DB.NewUpdate().Model((*queue.Lease)(nil)).
-					Set("held_until = ?", time.Now().UTC().Add(-time.Hour)).
-					Where("name = ?", patchbranch.Lease).Exec(ctx); err != nil {
-					t.Error(err)
-				}
-				if mine, err := leases.Take(ctx, patchbranch.Lease, "two", time.Hour); err != nil || !mine {
-					t.Errorf("the other replica could not take the lease: %v %v", mine, err)
-				}
-				time.Sleep(200 * time.Millisecond)
-				return made.dir
-			}).Leased(db.DB, "one", 20*time.Millisecond)
+			outward.Excluded{}, nil).Locating(func(visit context.Context, _ string) string {
+			if _, err := db.DB.NewUpdate().Model((*queue.Lease)(nil)).
+				Set("held_by = ?", "two").
+				Set("held_until = ?", time.Now().UTC().Add(time.Hour)).
+				Where("name = ?", patchbranch.Lease).Exec(ctx); err != nil {
+				t.Error(err)
+			}
+			select {
+			case <-visit.Done():
+			case <-time.After(patience):
+			}
+			return made.dir
+		}).Leased(db.DB, "one", 20*time.Millisecond)
 		if _, err := lost.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
