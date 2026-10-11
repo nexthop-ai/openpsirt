@@ -56,14 +56,9 @@ var order = map[SortKey]struct {
 	BySeverity:   {expr: "MAX(COALESCE(v.score_centi, 0))", issue: true},
 }
 
-// orderedBy is what an asked-for key sorts by, with the direction applied and
-// nothing else — the tie-break that makes paging stable differs per list and
-// is the caller's to append.
-//
-// One builder rather than one per list. Three lists sort on the same six keys
-// and each had written out the same lookup, the same direction and the same
-// null-last case, so a key that behaved differently on one of them was a
-// difference nobody could see.
+// orderedBy is the by-component view's order: what an asked-for key sorts by,
+// with the direction applied and nothing else. The view orders inside its
+// grouping, and its tie-break is the caller's to append.
 //
 // The expression comes from the allowlist and never from the request. A
 // caller's key that is not in it falls back to the one named here, which is

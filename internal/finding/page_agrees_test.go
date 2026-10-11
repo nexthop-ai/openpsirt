@@ -15,9 +15,9 @@ func TestAPageOfGroupsHoldsTheRowsItsTotalCounts(t *testing.T) {
 	// Two variants of one product: CVE-2026-1 open in both, CVE-2026-2 in
 	// the first alone and decided nowhere. Differing between the builds and
 	// undecided is CVE-2026-2, so the page holds it and the total says one.
-	// The page carries its total as a window count beside a HAVING that
-	// counts distinct builds and holds a second condition, which is the
-	// shape one engine answers with no rows.
+	// Differing puts a distinct count of builds in the HAVING the filter
+	// builds, and every case after the first adds a second condition beside
+	// it: the shape DESIGN-database.md § Silently wrong query shapes names.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))

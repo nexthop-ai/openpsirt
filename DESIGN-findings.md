@@ -1713,7 +1713,7 @@ the list itself pages through.
 | Rule | |
 |---|---|
 | It rides on the page | Counted after the grouping and before the limit, as a window count over the grouped statement, so the number and the rows cannot describe different sets |
-| The window sits outside the grouping | The findings list and the list across products narrow their groups with a `HAVING` the filter builds, and count in a statement over the grouped one. Asking what differs between builds puts a distinct count in that `HAVING`, and a window beside it loses rows on MariaDB (`DESIGN-database.md` § Silently wrong query shapes) |
+| The window sits outside the grouping | The findings list and the list across products narrow their groups with a `HAVING` the filter builds, and count in a statement over the grouped one. Asking what differs between builds puts a distinct count in that `HAVING`, a shape `DESIGN-database.md` § Silently wrong query shapes names |
 | The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source count as two where the page draws one, and the figure changes with the page being read |
 | A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
 | A total is asked alone with a limit of zero | The by-component view, the fix bundles and the review queue answer `limit=0` with the total and no rows, read through the same grouping and none of the page's decoration. A view's count on the button beside it, and a badge polled once a minute, are that question |
@@ -1795,7 +1795,7 @@ question next year should find the answer rather than the question.
 | `Store.Enter` | Fifty lines of refusals, each with its own reason, and one transaction. Both belong to the act; what it needed was the transaction discipline, which it has |
 | `fix.go` | Two responsibilities with a clean read-and-write seam, and one subject — upgrade commitments. Splitting it now would be splitting to hit a number. The cut is there when the write half grows |
 | The schema migrations | Each baseline declaration is one list of `CREATE TABLE` statements for one area. The length is the schema, and the comment beside each column is what makes it legible |
-| `sortedBy`, `sortedAcross` and the by-component order | The lookup, the direction and the null-last case are one function the three call. Their tie-breaks genuinely differ and stayed with each list, which is what a reader of one of them needs beside it: a shared function taking the tie-break as an argument would put it back at the call site as an argument nobody can read |
+| `pagedOrder` and the by-component order | Both read the one allowlist and the one direction-and-null-last rule. The two lists read through the paged statement name their tie-break at the call, as the columns they group on; the by-component view orders inside its grouping with its own tie-break |
 
 ## Limits
 
