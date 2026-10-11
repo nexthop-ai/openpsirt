@@ -129,3 +129,55 @@ func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T
 		}
 	})
 }
+
+func TestUndecidedReadsTheDecidedPlacesOfEveryIssueADecisionMarks(t *testing.T) {
+	// A group can be undecided with no decision anywhere, so the decided
+	// places are read only among the issues of the decisions that can mark a
+	// place. A lapsed decision holds no key, and a decision filed under an
+	// issue that later merged into the finding's names the issue the merge
+	// kept. Each still takes its group out of what is undecided; a withdrawn
+	// one marks nothing and leaves its group there.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-LAPSED", libnl), found("CVE-2026-MERGED", libnl),
+			found("CVE-2026-WITHDRAWN", libnl), found("CVE-2026-OPEN", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "GHSA-aaaa-bbbb-cccc"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		absorbed := f.issueID(t, "GHSA-aaaa-bbbb-cccc")
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"vulnerability"`).
+			Set("issue_id = ?", f.issueID(t, "CVE-2026-MERGED")).Where("id = ?", absorbed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		by := f.somebodyElse(t)
+		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-LAPSED")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		merged := f.placesOf(t, "CVE-2026-MERGED")[swss.Name]
+		merged.VulnerabilityID = absorbed
+		f.decidedAt(t, by, merged, "approved", libnl.Version, swss.Version, "merged")
+		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-WITHDRAWN")[swss.Name], "withdrawn",
+			libnl.Version, swss.Version, "")
+		who := f.holding(t, access.PublicTriage)
+
+		want := []string{"CVE-2026-OPEN at 1", "CVE-2026-WITHDRAWN at 1"}
+		undecided := []finding.ClaimStanding{finding.StandingUndecided}
+		for name, filter := range map[string]finding.Filter{
+			"undecided":               {States: undecided},
+			"undecided and nobody's":  {States: undecided, Assigned: []string{"nobody"}},
+			"undecided and unplanned": {States: undecided, Planned: finding.NotPlanned},
+		} {
+			here, across := f.listedAs(t, who, filter)
+			slices.Sort(here)
+			slices.Sort(across)
+			if !slices.Equal(here, want) || !slices.Equal(across, want) {
+				t.Errorf("%s: %v in the product and %v across products, want %v", name, here, across, want)
+			}
+		}
+	})
+}

@@ -295,17 +295,28 @@ func neededByEach(states []ClaimStanding) (string, []any, bool) {
 // own versions are not compared here, so a decision that
 // covers nothing open still names its issue: the set is a superset, and the
 // conditions over a group decide what passes.
+//
+// Where the filter asks how far a group has been decided and a group can pass
+// with no decision, undecided among the states asked, it sets the issues of
+// every decision that can mark a place instead: a lapsed one, or one holding
+// its key. Only the decided places are read among them (see decidedBeside).
 func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products []int64, all bool) error {
 	needed, args := filter.decisionNeeded()
+	into := &filter.decidedIssues
 	if needed == "" {
-		return nil
+		if !filter.asksDecided() {
+			return nil
+		}
+		// Every flag flagColumns computes needs one of the two: lapsed is the
+		// state, and the rest require the key.
+		needed, args, into = "(de.state = ? OR de.live_key IS NOT NULL)", []any{"lapsed"}, &filter.placedIssues
 	}
 	q := s.db.NewSelect().TableExpr(Decisions).
 		ColumnExpr("dv.issue_id").Distinct().
 		Where(needed, args...)
 	if !all {
 		if len(products) == 0 {
-			filter.decidedIssues = []int64{}
+			*into = []int64{}
 			return nil
 		}
 		q = q.Where("de.product_id IN (?)", bun.List(products))
@@ -314,7 +325,7 @@ func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products [
 	if err := q.Scan(ctx, &issues); err != nil {
 		return fmt.Errorf("read the issues decided in this way: %w", err)
 	}
-	filter.decidedIssues = issues
+	*into = issues
 	return nil
 }
 

@@ -107,6 +107,12 @@ type Filter struct {
 	// those decisions, read before the list is. Nil asks nothing, and
 	// empty answers nothing.
 	decidedIssues []int64
+	// placedIssues is the issues of every decision in the products that can
+	// mark a place, set by the store where the filter asks how far a group
+	// has been decided and a group can pass with no decision. The decided
+	// places are read among them alone. Nil asks nothing, and empty answers
+	// nothing.
+	placedIssues []int64
 	// decidedApart says the places are read without the decision table
 	// joined: the first level counts the decided places beside itself, and a
 	// page's rows belong to groups the conditions over a group already chose.

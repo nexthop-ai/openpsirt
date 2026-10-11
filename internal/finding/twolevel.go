@@ -164,8 +164,16 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	// place index once per decision, 2.7 s for the lapsed tile where the
 	// places hashed take 0.42 s. A decided place outside those issues joins
 	// no partial group, because the partial groups are narrowed to them.
+	//
+	// Where a group can pass with no decision the decisions are every
+	// decision of the product, and the places are narrowed to the issues any
+	// of them names (placedIssues) rather than the decisions: a place of
+	// another issue has no decision to match. With 133,549 decisions naming
+	// 3,013 of 7,550 issues, the undecided page's grouping takes 479 ms
+	// against 543 ms over every place, and the blocking list on a build's
+	// readiness 403 ms against 523 ms.
 	whole := apart
-	whole.decidedIssues = nil
+	whole.decidedIssues = f.placedIssues
 	population := whole.narrowRows(rows).
 		ColumnExpr(`f.id AS "id"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
