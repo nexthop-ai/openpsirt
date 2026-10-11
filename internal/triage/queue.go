@@ -145,19 +145,12 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	// way every other list does — and zero is every product, which is what the
 	// queue screen asks for.
 	q = filter.narrow(q, subject)
-	// Whether any row of the claim is out of the reader's reach is a question
-	// about the claim, so it is asked of each group rather than of each row:
-	// a claim covering three hundred places would otherwise ask it three
-	// hundred times and get the same answer.
-	others := s.db.NewSelect().TableExpr(`"decision" AS "other"`).ColumnExpr("1").
-		Where(`"other".claim_id = de.claim_id`)
 	if filter.Reason.decides() {
 		if filter.Mine {
 			q = q.Where("de.proposed_by = ?", subject.ID)
 		}
 		outOfReach, args := notDecidableWhere(subject, `"other"`)
-		return decidableBy(q, subject, "de").
-			Having("NOT EXISTS (?)", others.Where(outOfReach, args...))
+		return s.reachableClaims(decidableBy(q, subject, "de"), outOfReach, args)
 	}
 	q = approvableBy(q, subject, "de")
 	// Mine asks for the reader's own claims waiting on somebody else, in the
@@ -168,7 +161,32 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	} else {
 		q = q.Where("de.proposed_by <> ?", subject.ID)
 	}
-	return q.Having("NOT EXISTS (?)", notApprovableBy(others, subject, `"other"`))
+	outOfReach, args := notApprovableWhere(subject, `"other"`)
+	return s.reachableClaims(q, outOfReach, args)
+}
+
+// reachableClaims keeps the claims of the grouped statement with no row
+// meeting outOfReach, a condition on decision AS "other", and reads the
+// grouped statement's two columns.
+//
+// Whether any row of a claim is out of the reader's reach is a question about
+// the claim, so it is asked of each claim once the rows are grouped: a claim
+// covering three hundred places would otherwise ask it three hundred times and
+// get the same answer.
+//
+// It is asked by the statement over the grouping, as a join that finds no row.
+// PostgreSQL prices a correlated condition in a HAVING once per group at the
+// cost of running it alone, which puts a 30 ms statement past the price at
+// which it compiles the plan before running it. A NOT EXISTS over the grouping
+// MySQL answers by reading every decision to build the set of claims with a
+// row out of reach; the join it answers from an index.
+func (s *Store) reachableClaims(grouped *bun.SelectQuery, outOfReach string, args []any) *bun.SelectQuery {
+	return s.db.NewSelect().TableExpr(`(?) AS "waiting"`, grouped).
+		ColumnExpr(`"waiting".claim_id AS "claim_id"`).
+		ColumnExpr(`"waiting".newest AS "newest"`).
+		Join(`LEFT JOIN "decision" AS "other" ON "other".claim_id = "waiting".claim_id AND (`+
+			outOfReach+`)`, args...).
+		Where(`"other".id IS NULL`)
 }
 
 // QueueReason is why a claim waits in the review queue. Each reason is its own

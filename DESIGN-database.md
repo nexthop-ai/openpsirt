@@ -1226,6 +1226,12 @@ and the granularity are open questions.
   the minute passes, whoever it was for. The driver offers no busy handler to
   replace it with. Writes queued in the process instead would respect the
   context, and would miss every write that is not a transaction.
+- PostgreSQL compiles a plan priced past 100,000 before running it, which is
+  its default `jit_above_cost`, and the server's settings are left at their
+  defaults. The price is an estimate, and a statement that runs in 30 ms can be
+  priced past the line and spend 150 ms compiling. A condition about a group
+  written in its `HAVING` is the known case, and is asked over the grouped
+  statement instead (`DESIGN-triage.md` § Act placement).
 - Index key length is tightest on MySQL, and package identifiers get long.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about

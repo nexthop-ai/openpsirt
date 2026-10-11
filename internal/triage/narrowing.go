@@ -277,16 +277,16 @@ func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 	return query.Where(where, args...)
 }
 
-// notApprovableBy narrows a query to the decisions a subject may not agree
-// to — the complement of approvableBy, used to ask whether a claim has any
-// row outside what the reader may act on.
-func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
+// notApprovableWhere is the condition a decision row meets where the subject
+// may not agree to it — the complement of approvableBy, for asking whether a
+// claim has any row outside what the reader may act on.
+func notApprovableWhere(subject access.Subject, column string) (string, []any) {
 	if subject.Kind != access.Person {
-		return query
+		return "1 = 1", nil
 	}
 	products, all := subject.Products()
 	if all {
-		return query.Where("1 = 0")
+		return "1 = 0", nil
 	}
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return mayApprove(subject, id, v)
@@ -294,7 +294,7 @@ func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column stri
 	// The complement of the same condition. Neither column is ever null, so
 	// negating it is exact.
 	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
-	return query.Where("NOT ("+where+")", args...)
+	return "NOT (" + where + ")", args
 }
 
 // notDecidableWhere is the condition a decision row meets where the subject

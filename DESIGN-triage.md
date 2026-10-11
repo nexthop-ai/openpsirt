@@ -385,7 +385,8 @@ an identifier before.
 |---|---|
 | The builds named are the ones the reader may see | A claim somebody may read matches findings they may not, so the builds, the fix versions behind the outliers and the counts on a card are all narrowed per product. A list spanning products is narrowed per product too, at the visibility read in each |
 | A claim is shown only to somebody who may act on every row of it | Acting on a claim is acting on the argument, which does not come in halves. Shown half, a reader would agree to words whose other half waits on somebody else, and the size beside the card would be wrong |
-| Whether every row is in reach is asked once per claim | It is a fact about the claim, so it is a condition on the grouped claim rather than on each waiting row. Counting the expired deferrals among 3,000 claims of 133,000 rows: 29 ms against 78 ms per row on PostgreSQL, 39 ms against 73 ms on SQLite |
+| Whether every row is in reach is asked once per claim | It is a fact about the claim, so it is asked of each grouped claim rather than of each waiting row. Counting the expired deferrals among 3,000 claims of 133,000 rows: 29 ms against 78 ms per row on PostgreSQL, 39 ms against 73 ms on SQLite |
+| It is asked by the statement over the grouping, as a join that finds no row | PostgreSQL prices a correlated subquery in a `HAVING` once per group at the cost of running it alone, and compiles a plan priced past 100,000 before running it. The review-queue count over 133,549 decisions was priced at 515,000 and spent 150 ms compiling a 30 ms statement; over the grouping it is priced at 12,600, runs in 22 ms and compiles nothing. Written as `NOT EXISTS` over the grouping, MySQL reads every decision to build the set of claims out of reach, 33 ms against 22 ms for 3,000 claims of 132,000 rows |
 
 ## Approval
 
