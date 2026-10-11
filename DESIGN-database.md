@@ -23,6 +23,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Retryable transactions](#retryable-transactions)
 - [Reads a write depends on](#reads-a-write-depends-on)
 - [Connection pool](#connection-pool)
+- [Statement preparation](#statement-preparation)
 - [SQLite settings](#sqlite-settings)
 - [Indexes](#indexes)
 - [Columns no query reads](#columns-no-query-reads)
@@ -83,7 +84,7 @@ Engine-specific code is confined to these places:
 |---|---|
 | Schema migrations | Data-definition language differs |
 | The migration lock | Every engine spells advisory locking differently |
-| Connection setup | Driver-specific settings |
+| Connection setup | Driver-specific settings, PostgreSQL's statements sent unprepared among them (§ Statement preparation) |
 | Recognizing what an engine is telling us | All three drivers carry an error type of their own, SQLite included. Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT DO NOTHING` and the other two `ON DUPLICATE KEY UPDATE` setting the key to itself. Not `INSERT IGNORE`, which on those two also turns a value too wide for its column, a dangling reference and a missing value into warnings, and writes the row cut to fit or skips it while reporting success. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
@@ -91,6 +92,7 @@ Engine-specific code is confined to these places:
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped, and PostgreSQL refuses to write it into a timestamp column. The cast target differs: PostgreSQL takes a zoned timestamp, MySQL and MariaDB a six-digit datetime, and SQLite stores text and takes none |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Leasing the harness's slots | A test binary holds a lock the server keeps for its connection, and the two families spell it differently: a named lock on MySQL and MariaDB, an advisory lock on PostgreSQL, whose key is a number |
+| Counting the statements a server holds prepared | A test of connection setup asks it. PostgreSQL lists them in a catalog of its own, and MySQL and MariaDB count them in session status, kept in two different schemas |
 | Listing the harness's own databases | PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | Listing the tables of the harness's SQLite schema | SQLite keeps its schema in a catalog of its own. The servers are asked the same question through the information schema |
 | Commit durability on the harness servers | A global setting on the two MySQL-protocol servers, relaxed so the suite runs faster. PostgreSQL asks per session in the connection string, so it has nothing to branch on |
@@ -941,6 +943,22 @@ The defense is to ensure a connection is never idle long enough to be killed.
 
 Go's cleaner never runs more than once a second, however short the idle timeout
 is set. A value below a second reaps no faster.
+
+## Statement preparation
+
+| Rule | |
+|---|---|
+| A PostgreSQL statement is sent unprepared, parsed and run in one round trip | The query builder writes every value into the statement text, so no two statements share a text and a prepared one is never run again |
+| MySQL and MariaDB are sent the text alone | Their driver prepares only a statement carrying parameters, and the builder sends none |
+
+The PostgreSQL driver's default prepares every statement, keeps the last 512
+on the connection, and the server holds each of them parsed for as long as the
+connection lives. After writing the 291,500 decisions of one upgrade plan in
+statements of 500 rows, the server process behind the connection held 2,957 MB
+with them prepared and kept, and 2 MB unprepared.
+
+A test asks each server how many statements it holds prepared for one
+connection, before and after a query and an insert on it.
 
 ## SQLite settings
 

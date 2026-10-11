@@ -21,8 +21,9 @@ import (
 	"github.com/uptrace/bun/schema"
 
 	_ "github.com/go-sql-driver/mysql" // MySQL and MariaDB
-	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL
-	_ "modernc.org/sqlite"             // SQLite, pure Go so the binary stays static
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib" // PostgreSQL
+	_ "modernc.org/sqlite"           // SQLite, pure Go so the binary stays static
 )
 
 // minimum is the oldest release of each engine we will run against.
@@ -133,7 +134,7 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 		return nil, err
 	}
 
-	sqldb, err := sql.Open(driver, dsn)
+	sqldb, err := openPool(target.Engine, driver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", target.Engine, scrub(err, target))
 	}
@@ -339,6 +340,27 @@ func Query(sqldb *sql.DB, e Engine) (*bun.DB, error) {
 		return nil, err
 	}
 	return bun.NewDB(sqldb, dialect()), nil
+}
+
+// openPool opens the pool every connection is drawn from.
+//
+// A PostgreSQL statement is sent unprepared, parsed and run in one round trip.
+// The query builder writes every value into the statement text, so no two
+// statements share a text and a cache of prepared statements never answers
+// from itself. The driver's default prepares each one and keeps the last 512
+// on the connection, and the server holds each of those parsed: after one
+// upgrade plan wrote 291,500 decisions in batches of 500, the server process
+// behind that connection held 2,957 MB, against 2 MB unprepared.
+func openPool(e Engine, driver, dsn string) (*sql.DB, error) {
+	if e != Postgres {
+		return sql.Open(driver, dsn)
+	}
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	config.DefaultQueryExecMode = pgx.QueryExecModeExec
+	return stdlib.OpenDB(*config), nil
 }
 
 func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err error) {

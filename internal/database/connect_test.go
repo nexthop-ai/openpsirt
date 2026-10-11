@@ -4,9 +4,11 @@
 package database_test
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -330,4 +332,65 @@ func TestOpeningRefusesACleartextTransportWhenEncryptionIsRequired(t *testing.T)
 			t.Errorf("%s: opened, or refused for another reason: %v", raw, err)
 		}
 	}
+}
+
+// A statement leaves nothing prepared on the server behind the connection that
+// ran it. The query builder writes every value into the statement text, so a
+// statement kept prepared is one nothing runs again, held by the server for as
+// long as the connection lives.
+func TestAStatementLeavesNothingPreparedOnTheServer(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = conn.Close() }()
+		// PostgreSQL lists what a connection holds prepared. MySQL and
+		// MariaDB count every statement a session has prepared, which grows
+		// by the same amount.
+		var count func() int
+		switch db.Server.Engine {
+		case database.Postgres:
+			count = func() int {
+				t.Helper()
+				var n int
+				if err := conn.QueryRowContext(ctx,
+					"SELECT COUNT(*) FROM pg_prepared_statements").Scan(&n); err != nil {
+					t.Fatal(err)
+				}
+				return n
+			}
+		case database.MySQL, database.MariaDB:
+			count = func() int {
+				t.Helper()
+				var name string
+				var n int
+				if err := conn.QueryRowContext(ctx,
+					"SHOW SESSION STATUS LIKE 'Com_stmt_prepare'").Scan(&name, &n); err != nil {
+					t.Fatal(err)
+				}
+				return n
+			}
+		default:
+			t.Skipf("%s has no server to hold a statement", db.Server.Engine)
+		}
+		before := count()
+		for i := range 3 {
+			var rows []string
+			if err := conn.NewSelect().ColumnExpr("?", fmt.Sprint("statement-", i)).
+				Scan(ctx, &rows); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := conn.NewInsert().Model(&[]keptRow{{
+				Name: fmt.Sprint("prepared-", i), Value: "v", UpdatedAt: time.Now().UTC(),
+			}}).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if after := count(); after != before {
+			t.Errorf("the server holds %d statements prepared for the connection, want %d",
+				after, before)
+		}
+	})
 }
