@@ -24,6 +24,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Reads a write depends on](#reads-a-write-depends-on)
 - [Connection pool](#connection-pool)
 - [Statement preparation](#statement-preparation)
+- [Bulk inserts](#bulk-inserts)
 - [SQLite settings](#sqlite-settings)
 - [Indexes](#indexes)
 - [Columns no query reads](#columns-no-query-reads)
@@ -92,6 +93,7 @@ Engine-specific code is confined to these places:
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped, and PostgreSQL refuses to write it into a timestamp column. The cast target differs: PostgreSQL takes a zoned timestamp, MySQL and MariaDB a six-digit datetime, and SQLite stores text and takes none |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Leasing the harness's slots | A test binary holds a lock the server keeps for its connection, and the two families spell it differently: a named lock on MySQL and MariaDB, an advisory lock on PostgreSQL, whose key is a number |
+| Writing a batch whose identifiers nobody reads | PostgreSQL takes one array a column and unpacks it into rows. The other three have no array type and take a list of rows. § Bulk inserts has the measurement |
 | Counting the statements a server holds prepared | A test of connection setup asks it. PostgreSQL lists them in a catalog of its own, and MySQL and MariaDB count them in session status, kept in two different schemas |
 | Listing the harness's own databases | PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | Listing the tables of the harness's SQLite schema | SQLite keeps its schema in a catalog of its own. The servers are asked the same question through the information schema |
@@ -959,6 +961,33 @@ with them prepared and kept, and 2 MB unprepared.
 
 A test asks each server how many statements it holds prepared for one
 connection, before and after a query and an insert on it.
+
+## Bulk inserts
+
+| Rule | |
+|---|---|
+| Rows are written 500 to a statement | Two of the four engines cap a statement's size in server configuration, and the lowest default in circulation is sixteen megabytes |
+| A writer that needs no identifier reads none back | Reading them back returns a row for every row written, carrying the identifier and each column left to its default |
+| On PostgreSQL, such a batch is one array a column | The server parses a list of rows a value at a time and an array whole, and unpacks the arrays into rows |
+| A row type with a column that names its own default keeps the list of rows | A column with a default, or one storing a zero value as null, is left to its default one row at a time, which an array cannot say |
+
+Writing the 291,500 decisions of one upgrade plan, measured on PostgreSQL 16
+with one processor over a 1 ms, 100 Mbit link:
+
+| Statements | A row |
+|---|---|
+| A list of rows, prepared and kept, identifiers read back | 93 µs |
+| A list of rows, unprepared, identifiers read back | 62 to 76 µs |
+| A list of rows, unprepared, nothing read back | 53 to 55 µs |
+| Arrays, nothing read back | 42 to 44 µs |
+| Arrays, on the table without its four foreign keys | 17 µs |
+
+PostgreSQL checks each foreign key with a query per row written, and those
+checks are the rest of the cost. MySQL and MariaDB check a foreign key inside
+the storage engine.
+
+A test writes the same rows through both kinds of statement, every column kind
+and text that looks like syntax among them, and compares what is stored.
 
 ## SQLite settings
 

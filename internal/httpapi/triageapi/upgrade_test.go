@@ -275,3 +275,60 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 		}
 	})
 }
+
+// A promise stores a decision at every place it reports, and only there: one
+// for each issue at each place on the component, each a live claim of the
+// promise.
+func TestAPromiseStoresADecisionAtEveryPlaceItReports(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedTwoIssues(t)
+
+		soon := time.Now().UTC().Add(365 * 24 * time.Hour).Format("2006-01-02")
+		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
+			"builds":[{"stream":"master","variant":"broadcom"}],
+			"reasoning":"Moving the package rather than answering each of these."}`, soon)
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/linux-image/upgrade", body)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
+		}
+		var done struct {
+			ClaimID   int64 `json:"claim_id"`
+			Decisions int   `json:"decisions"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+
+		var places int
+		if err := r.DB.DB.NewSelect().
+			TableExpr(`(SELECT DISTINCT f.vulnerability_id, f.place_identity
+				FROM "finding" AS "f" JOIN "component" AS "c" ON c.id = f.component_id
+				WHERE c.name = ? AND f.closed_at IS NULL) AS "open_places"`, "linux-image").
+			ColumnExpr("COUNT(*)").Scan(ctx, &places); err != nil {
+			t.Fatal(err)
+		}
+		var stored []struct {
+			State   string  `bun:"state"`
+			LiveKey *string `bun:"live_key"`
+		}
+		if err := r.DB.DB.NewSelect().Table("decision").Column("state", "live_key").
+			Where("claim_id = ?", done.ClaimID).Scan(ctx, &stored); err != nil {
+			t.Fatal(err)
+		}
+		if places < 2 {
+			t.Fatalf("the build has %d places open on the component, so this checked nothing", places)
+		}
+		if done.Decisions != places || len(stored) != places {
+			t.Fatalf("the promise reported %d decisions and stored %d, over %d places",
+				done.Decisions, len(stored), places)
+		}
+		for _, row := range stored {
+			if row.State != "proposed" || row.LiveKey == nil {
+				t.Errorf("a stored decision is %s with live key %v, want a live proposal",
+					row.State, row.LiveKey)
+			}
+		}
+	})
+}

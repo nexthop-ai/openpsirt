@@ -194,8 +194,8 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// nothing to do with.
 		//
 		// The cost of committing one of that size is measured rather than
-		// assumed: 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and
-		// 23.9 s on PostgreSQL, under "make measure".
+		// assumed: 5.6 s on SQLite, 5.7 s on MariaDB, 7.2 s on MySQL and
+		// 6.2 s on PostgreSQL, under "make measure".
 		if err := permitted(subject, proposals, s.now()); err != nil {
 			return err
 		}
@@ -213,11 +213,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			return err
 		}
 		out.ClaimID = claim.ID
-		made, err := within.proposeAll(ctx, claim, proposals)
+		out.Decisions, err = within.proposeUnkeyed(ctx, claim, proposals)
 		if err != nil {
 			return err
 		}
-		out.Decisions = len(made)
 		// The commitment per build, which is what the pending-upgrades screen
 		// reads. One row per build and fold rather than one per issue: a bump
 		// moves the source package, so what it covers is a join and everything

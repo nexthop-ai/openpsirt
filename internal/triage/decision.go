@@ -422,6 +422,22 @@ func (s *Store) propose(ctx context.Context, claim *Claim, p Proposal) (*Decisio
 // MySQL where the batched form is one statement per five hundred rows — the
 // same shape the scan apply already uses, and for the same reason.
 func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Proposal) ([]*Decision, error) {
+	return s.write(ctx, claim, proposals, database.InBatches[Decision])
+}
+
+// proposeUnkeyed writes what proposeAll writes and reads no identifier back,
+// for a writer that needs only how many rows it wrote. A promise to upgrade
+// writes a row at every place it covers, and no bound applies to how many.
+func (s *Store) proposeUnkeyed(ctx context.Context, claim *Claim, proposals []Proposal) (int, error) {
+	written, err := s.write(ctx, claim, proposals, database.InBatchesUnkeyed[Decision])
+	return len(written), err
+}
+
+// write is proposeAll with the insert named: whether the identifiers the
+// database assigned are read back is the one thing that differs between the
+// two.
+func (s *Store) write(ctx context.Context, claim *Claim, proposals []Proposal,
+	insert func(context.Context, bun.IDB, []Decision) error) ([]*Decision, error) {
 	// Here rather than at each entry point, because every path that writes a
 	// decision row reaches this one — a claim made at a finding, a bulk act, a
 	// re-affirmation, an extension carried to another issue, and a decision
@@ -459,7 +475,7 @@ func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Propos
 	if err := s.disclosedSince(ctx, rows); err != nil {
 		return nil, err
 	}
-	if err := database.InBatches(ctx, s.db, rows); err != nil {
+	if err := insert(ctx, s.db, rows); err != nil {
 		if database.IsDuplicate(err) {
 			// The unique index over the live key refused it, which is the only
 			// thing that could: two proposals arriving together both walk

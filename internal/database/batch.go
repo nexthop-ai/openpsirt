@@ -5,11 +5,16 @@ package database
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/schema"
 )
 
 // BatchSize is how many rows one statement carries.
@@ -25,12 +30,143 @@ import (
 // large enough that the round trips do not dominate.
 const BatchSize = 500
 
-// InBatches inserts rows a bounded number at a time.
+// InBatches inserts rows a bounded number at a time, and sets each row's
+// identifier from what the database assigned.
 func InBatches[T any](ctx context.Context, db bun.IDB, rows []T) error {
+	return inBatches(ctx, db, rows, true)
+}
+
+// InBatchesUnkeyed inserts rows a bounded number at a time, and reads nothing
+// back.
+//
+// For a writer with no use for the identifiers. Reading them back makes the
+// statement return a row for every row it writes, carrying the identifier and
+// each column left to its default.
+//
+// On PostgreSQL a batch is sent as one array a column, which the server
+// unpacks into rows, wherever every column the rows carry has an array type.
+// A list of rows is parsed a value at a time, and an array is parsed whole.
+// Measured on PostgreSQL 16 with one processor over a 1 ms, 100 Mbit link,
+// writing 291,500 decisions: 62 to 76 µs a row as a list of rows reading the
+// identifiers back, 53 to 55 µs as a list reading nothing, and 42 to 44 µs as
+// arrays.
+func InBatchesUnkeyed[T any](ctx context.Context, db bun.IDB, rows []T) error {
+	if typ := reflect.TypeFor[T](); db.Dialect().Name() == dialect.PG && typ.Kind() == reflect.Struct {
+		table := db.Dialect().Tables().Get(typ)
+		if columns := arrayColumns(table); columns != nil {
+			return asArrays(ctx, db, table, columns, rows)
+		}
+	}
+	return inBatches(ctx, db, rows, false)
+}
+
+// arrayColumn is one column of a row type, written as an array of its values.
+type arrayColumn struct {
+	field *schema.Field
+	// The array type the values are sent as. The server converts each
+	// element to the column's own type as it stores it.
+	array string
+}
+
+// arrayColumns is every column a row type writes, each with the array type
+// its values are sent as, or nil where any of them has none.
+//
+// A column the database numbers is left out, as a list of rows leaves it to
+// its default. A column with a default of its own, or one that stores a zero
+// value as null, is written as a list of rows, where a value can be left to
+// its default one row at a time.
+func arrayColumns(table *schema.Table) []arrayColumn {
+	columns := make([]arrayColumn, 0, len(table.Fields))
+	for _, field := range table.Fields {
+		if field.AutoIncrement {
+			continue
+		}
+		if field.SQLDefault != "" || field.NullZero {
+			return nil
+		}
+		array := arrayTypeOf(field.IndirectType)
+		if array == "" {
+			return nil
+		}
+		columns = append(columns, arrayColumn{field: field, array: array})
+	}
+	if len(columns) == 0 {
+		return nil
+	}
+	return columns
+}
+
+// arrayTypeOf is the array type a Go type's values are sent as, or empty for
+// a type that names how it is stored itself.
+func arrayTypeOf(typ reflect.Type) string {
+	if typ.Implements(valuerType) || reflect.PointerTo(typ).Implements(valuerType) {
+		return ""
+	}
+	if typ == timeType {
+		return "timestamptz[]"
+	}
+	switch typ.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint8, reflect.Uint16, reflect.Uint32:
+		return "bigint[]"
+	case reflect.String:
+		return "text[]"
+	case reflect.Bool:
+		return "boolean[]"
+	}
+	return ""
+}
+
+var (
+	valuerType = reflect.TypeFor[driver.Valuer]()
+	timeType   = reflect.TypeFor[time.Time]()
+)
+
+// asArrays inserts rows a bounded number at a time, each batch as one array a
+// column unpacked by the server.
+func asArrays[T any](ctx context.Context, db bun.IDB, table *schema.Table,
+	columns []arrayColumn, rows []T) error {
+
+	names := make([]string, len(columns))
+	arrays := make([]string, len(columns))
+	for i, column := range columns {
+		names[i] = string(column.field.SQLName)
+		arrays[i] = "?::" + column.array
+	}
+	query := "INSERT INTO " + string(table.SQLName) + " (" + strings.Join(names, ", ") +
+		") SELECT * FROM unnest(" + strings.Join(arrays, ", ") + ")"
+	for start := 0; start < len(rows); start += BatchSize {
+		end := min(start+BatchSize, len(rows))
+		values := make([]reflect.Value, len(columns))
+		for i, column := range columns {
+			values[i] = reflect.MakeSlice(reflect.SliceOf(column.field.StructField.Type), 0, end-start)
+		}
+		for n := start; n < end; n++ {
+			strct := reflect.ValueOf(&rows[n]).Elem()
+			for i, column := range columns {
+				values[i] = reflect.Append(values[i], column.field.Value(strct))
+			}
+		}
+		args := make([]any, len(columns))
+		for i := range values {
+			args[i] = pgdialect.Array(values[i].Interface())
+		}
+		if _, err := db.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("insert rows %d to %d: %w", start, end, err)
+		}
+	}
+	return nil
+}
+
+func inBatches[T any](ctx context.Context, db bun.IDB, rows []T, keyed bool) error {
 	for start := 0; start < len(rows); start += BatchSize {
 		end := min(start+BatchSize, len(rows))
 		batch := rows[start:end]
-		if _, err := db.NewInsert().Model(&batch).Exec(ctx); err != nil {
+		insert := db.NewInsert().Model(&batch)
+		if !keyed {
+			insert = insert.Returning("")
+		}
+		if _, err := insert.Exec(ctx); err != nil {
 			return fmt.Errorf("insert rows %d to %d: %w", start, end, err)
 		}
 	}
