@@ -107,18 +107,21 @@ func (v *Vulnerabilities) writeEstimates(ctx context.Context) error {
 				Set("likelihood_percentile_ppm = "+byID("likelihood_percentile_ppm"), percentile...).
 				Set("likelihood_on = ?", on).
 				Where("id IN (?)", bun.List(ids))
-			if on != nil {
-				update = update.Where("likelihood_ppm IS NULL OR likelihood_on IS NULL"+
-					" OR likelihood_on < ?", *on)
-			} else {
-				update = update.Where("likelihood_ppm IS NULL"+
-					" OR (likelihood_on IS NULL AND likelihood_ppm <> "+byID("likelihood_ppm")+")",
-					likelihood...)
-			}
-			if _, err := update.Exec(ctx); err != nil {
+			if _, err := newerEstimate(update, on, byID("likelihood_ppm"), likelihood...).Exec(ctx); err != nil {
 				return fmt.Errorf("record how likely %d issues are: %w", len(batch), err)
 			}
 		}
 	}
 	return nil
+}
+
+// newerEstimate is the condition under which a reported estimate replaces the
+// one held: the issue's own statement and a batch's carry the same one. The
+// likelihood is an expression, so a batch can give each issue its own.
+func newerEstimate(update *bun.UpdateQuery, on *time.Time, likelihood string, args ...any) *bun.UpdateQuery {
+	if on != nil {
+		return update.Where("likelihood_ppm IS NULL OR likelihood_on IS NULL OR likelihood_on < ?", *on)
+	}
+	return update.Where("likelihood_ppm IS NULL OR (likelihood_on IS NULL AND likelihood_ppm <> "+
+		likelihood+")", args...)
 }

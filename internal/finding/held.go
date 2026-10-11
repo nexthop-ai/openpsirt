@@ -52,9 +52,9 @@ type heldFinding struct {
 // statement per issue.
 type moving struct {
 	f Finding
-	// described is whether anything but the order and the clock moved: the
-	// fix, the match, and what answers the finding. Where nothing did, those
-	// columns hold what the update would write and are left out of it.
+	// described is whether the fix, the match, or what answers the finding
+	// moved. Where none did, those columns hold what the update would write
+	// and are left out of it.
 	described         bool
 	moved             bool
 	exploitationMoved bool
