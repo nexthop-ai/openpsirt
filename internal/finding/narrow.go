@@ -405,20 +405,26 @@ func (f Filter) ofRows() Filter {
 // Asked of a component, "exploited" holds for the whole component when one of
 // its issues is, and "has a fix" fails it when one of its issues has none — so
 // its counts stop being the list's. The groups the list keeps are chosen at
-// the list's own grain and joined in, and only the conditions on a row are
-// applied here. A filter with no condition over a group is applied as it is.
+// the list's own grain, and only the conditions on a row are applied here. A
+// filter with no condition over a group is applied as it is.
 //
-// The kept groups are grouped in one level here rather than the list's two.
-// The planner cannot estimate how many groups a condition over a group keeps,
-// and over two levels of grouping it guesses a tenth of what it guesses over
-// one: 186 groups where 7,742 are kept. Joined back to the finding rows on
-// that guess it read the kernel's 271,000 rows once per kept group, and did not
-// finish in two minutes where the one-level form hashes the join in 2 s.
+// Under a filter needing a decision, q is grouped on the component and the
+// issue among its keys, and its groups are restricted to the kept groups after
+// it has grouped (see amongKept). Under any other condition over a group, the
+// kept groups are joined to q's finding rows, grouped in one level: the planner
+// cannot estimate how many groups a condition over a group keeps, and over two
+// levels of grouping it guesses a tenth of what it guesses over one, 186 groups
+// where 7,742 are kept. Joined back to the finding rows on that guess it read
+// the kernel's 271,000 rows once per kept group, and did not finish in two
+// minutes where the one-level form hashes the join in 2 s.
 func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
 	if !f.asksOfGroups() {
 		return f.narrow(q)
+	}
+	if f.keepsAfterGrouping() {
+		return f.amongKept(db, f.ofRows().narrow(q), targets, visible)
 	}
 	kept := f.listed(db, targets, visible).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
@@ -429,24 +435,53 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 			` AND kept.fold = ck.fold_key`, kept))
 }
 
+// keepsAfterGrouping is whether asListed restricts its query's groups rather
+// than its finding rows, which it does under a filter needing a decision. Such
+// a query is grouped on the component and the issue among its keys.
+func (f Filter) keepsAfterGrouping() bool {
+	return f.asksOfGroups() && f.decidedIssues != nil
+}
+
+// amongKept restricts a statement grouped on the component and the issue
+// among its keys, read as "listed", to the groups whose issue and fold the
+// findings list keeps.
+//
+// The kept groups are the list's own two-level statement, asked as a
+// membership test of the statement's groups rather than joined to its finding
+// rows, and the fold is read from the component by its key. On PostgreSQL the
+// groups have no index to probe, so an estimate of 279 kept groups where 1,753
+// pass cannot become a walk of a component's rows once per group: that walk
+// took 185 s for the lapsed fix bundles. On MariaDB the membership test is
+// materialized once. A grouped table joined on its grouping keys is instead
+// worked out again for every row it is joined to: the one-level kept groups,
+// joined that way to the open places, had built the decision table again for
+// 10,572 places after 55 s for the components waiting, and gave no answer in
+// three minutes.
+func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
+	visible []access.Visibility) *bun.SelectQuery {
+
+	kept := f.listed(db, targets, visible).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn + ` AS "fold"`)
+	return db.NewSelect().
+		TableExpr(`(?) AS "listed"`, q).
+		ColumnExpr(`"listed".*`).
+		Join(`JOIN "component" AS "ck" ON ck.id = listed.component_id`).
+		Where(`(listed.vulnerability_id, ck.fold_key) IN (?)`, kept)
+}
+
 // listed is the groups the findings list holds under the filter, one issue at
 // one fold, for a statement to select its columns from.
 //
-// A filter that can pass with no decision, such as undecided, reads the
-// list's own two-level statement, which counts the decided places beside its
-// first level. Joined to every open place instead, the decision table is built
-// from every decision of the product, and MariaDB gave no answer in 985 s for
-// the component view of what is undecided among 425,680 open rows with 3,060
-// decisions, against 2.6 s in two levels.
-//
-// A filter needing a decision reads the one-level grouping, with the decision
-// table narrowed to the issues the decisions name (see decidedIssuesFor). In
-// two levels PostgreSQL estimates the groups such a condition keeps at a sixth
-// of those that pass, 279 where 1,753 pass, and joined back to the finding
-// rows on that estimate it read a component's rows once per kept group: 185 s
-// for the lapsed fix bundles against 1.2 s in one level.
+// A filter asking how far a group has been decided reads the list's own
+// two-level statement, which counts the decided places beside its first
+// level. Joined to every open place instead, the decision table is built from
+// every decision of the product, and MariaDB gave no answer in 985 s for the
+// component view of what is undecided among 425,680 open rows with 3,060
+// decisions, against 2.6 s in two levels. A filter needing a decision also
+// narrows both sides to the issues the decisions name (see decidedIssuesFor).
 func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
-	if f.asksDecided() && f.decidedIssues == nil {
+	if f.asksDecided() {
 		return f.folded(db, openRows(db, targets, visible), issueAndComponent).GroupExpr(GroupedOn)
 	}
 	return f.narrow(openGroups(db, targets, visible))

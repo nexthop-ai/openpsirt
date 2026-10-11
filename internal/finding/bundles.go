@@ -301,6 +301,14 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		ColumnExpr("f.fixed_in").
 		ColumnExpr("f.component_id").
 		ColumnExpr("f.target_id").
+		// The issue as well where the groups are restricted after grouping,
+		// which asks it of each group.
+		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
+			if filter.keepsAfterGrouping() {
+				return q.ColumnExpr("f.vulnerability_id").GroupExpr("f.vulnerability_id")
+			}
+			return q
+		}).
 		GroupExpr("f.component_id, f.target_id, f.fixed_in"), targets, visible)
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, under).

@@ -63,16 +63,45 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			}, 0)
 		decisions := triage.NewStore(db.DB)
 		promised := 0
-		for n := range 10 {
+		plan := func(n int, builds ...int64) {
+			t.Helper()
 			done, err := decisions.PlanUpgrade(ctx, triager, triage.Upgrade{
 				ProductID: product.ID, Component: fmt.Sprintf("package-%d", n), To: "9.9",
-				By: time.Now().UTC().AddDate(0, 0, 30), Builds: []int64{target.ID},
+				By: time.Now().UTC().AddDate(0, 0, 30), Builds: builds,
 				Reasoning: "Measuring the lists with decisions in them.",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 			promised += done.Decisions
+		}
+		newest := func() int64 {
+			t.Helper()
+			var id int64
+			if err := db.DB.NewSelect().TableExpr(`"decision" AS "de"`).
+				ColumnExpr("COALESCE(MAX(de.id), 0)").Scan(ctx, &id); err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		for n := range 5 {
+			plan(n, target.ID)
+		}
+		// Five promises lapse, so lapsed is a state something is in, and two
+		// cover every build of the product, so agreed is one too.
+		before := newest()
+		for n := 5; n < 10; n++ {
+			plan(n, target.ID)
+		}
+		if _, err := db.DB.NewUpdate().TableExpr(`"decision" AS "de"`).
+			Set("state = ?", "lapsed").Set("live_key = NULL").Set("ended_at = ?", time.Now().UTC()).
+			Where("de.id > ? AND de.id <= ?", before, newest()).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		kernelBuild := w.TargetFor(w.Branch, w.Internal)
+		for n := 10; n < 12; n++ {
+			plan(n, target.ID, kernelBuild.ID)
 		}
 		var kernel struct {
 			Issue      int64  `bun:"vulnerability_id"`
@@ -146,27 +175,43 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 
 		// The component and fix-bundle views keep the list's groups under the
 		// same conditions over a group, grouped at their own grain.
+		// Each is bounded rather than left to run, so a statement that runs
+		// away is reported as one and the measurement goes on.
+		bounded := func(read func(context.Context) (int, error)) string {
+			t.Helper()
+			within, cancel := context.WithTimeout(ctx, 3*time.Minute)
+			defer cancel()
+			at := time.Now()
+			n, err := read(within)
+			took := time.Since(at)
+			switch {
+			case within.Err() != nil:
+				return fmt.Sprintf("unfinished after %s", took.Round(time.Second))
+			case err != nil:
+				t.Fatal(err)
+			}
+			return fmt.Sprintf("%9s (%d)", took.Round(time.Millisecond), n)
+		}
 		for _, one := range []struct {
 			name   string
 			filter finding.Filter
 		}{
 			{"undecided", finding.Filter{States: []finding.ClaimStanding{finding.StandingUndecided}}},
 			{"waiting", finding.Filter{States: []finding.ClaimStanding{finding.StandingWaiting}}},
+			{"lapsed", finding.Filter{States: []finding.ClaimStanding{finding.StandingLapsed}}},
+			{"agreed", finding.Filter{States: []finding.ClaimStanding{finding.StandingAgreed}}},
+			{"upgrade needed", finding.Filter{Outcomes: []string{string(triage.UpgradeNeeded)}}},
 			{"planned", finding.Filter{Planned: finding.PlannedOnly}},
 		} {
-			at := time.Now()
-			_, components, err := store.ComponentGroups(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
-			if err != nil {
-				t.Fatal(err)
-			}
-			componentsTook := time.Since(at)
-			at = time.Now()
-			_, bundles, err := store.Bundles(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Logf("%-20s components %9s (%d) · fix bundles %9s (%d)", one.name,
-				componentsTook.Round(time.Millisecond), components, time.Since(at).Round(time.Millisecond), bundles)
+			components := bounded(func(ctx context.Context) (int, error) {
+				_, n, err := store.ComponentGroups(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+				return n, err
+			})
+			bundles := bounded(func(ctx context.Context) (int, error) {
+				_, n, err := store.Bundles(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+				return n, err
+			})
+			t.Logf("%-20s components %s · fix bundles %s", one.name, components, bundles)
 		}
 
 		approver := access.NewPerson(person.ID+2, "an approver", false, map[int64][]access.Role{
