@@ -616,8 +616,16 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	// Whether the issue is on each binary, one column per binary, so each
 	// binary's own count rides the same pass. Read in a statement of its own
 	// it read the places again: 47 ms on PostgreSQL and 219 ms on SQLite for
-	// the kernel.
-	for j, id := range ids {
+	// the kernel. Past binaryColumns the statement would carry more columns
+	// than an engine takes, and the count is read on its own.
+	columns, bound := ids, binaryColumns
+	if s.binaryColumns > 0 {
+		bound = s.binaryColumns
+	}
+	if len(columns) > bound {
+		columns = nil
+	}
+	for j, id := range columns {
 		perIssue = perIssue.ColumnExpr(`MAX(CASE WHEN "pf".component_id = ? THEN 1 END) AS ?`,
 			id, bun.Ident(fmt.Sprint("on_", j)))
 	}
@@ -640,7 +648,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		exploited     []int
 		exploitedHere []int
 		promised      []sql.NullInt64
-		onBinary      = make([][]int, len(ids))
+		onBinary      = make([][]int, len(columns))
 	)
 	into := []any{&targetOf, &foldAt, &fixedIn, &severalOn, &band, &issues, &places, &dueAt,
 		&exploited, &exploitedHere, &promised}
@@ -662,7 +670,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`MAX("pi".exploited) AS "exploited"`).
 		ColumnExpr(`MAX("pi".exploited_here) AS "exploited_here"`).
 		ColumnExpr(`MAX("pi".promise) AS "promise"`)
-	for j := range ids {
+	for j := range columns {
 		column := bun.Ident(fmt.Sprint("on_", j))
 		q = q.ColumnExpr(`COUNT("pi".?) AS ?`, column, column)
 		into = append(into, &onBinary[j])
@@ -676,7 +684,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	open := map[foldIn]counted{}
 	bands := map[foldIn]map[string]int{}
 	fixes := map[foldIn]map[string]int{}
-	several := map[int64]bool{}
+	several := map[foldIn]map[int64]bool{}
 	standing := map[foldIn]int64{}
 	onEach := map[binaryIn]int{}
 	for i, target := range targetOf {
@@ -701,7 +709,10 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 			fixes[key][fixedIn[i].String] += issues[i]
 		case severalOn[i].Valid:
 			sum.Fixable += issues[i]
-			several[severalOn[i].Int64] = true
+			if several[key] == nil {
+				several[key] = map[int64]bool{}
+			}
+			several[key][severalOn[i].Int64] = true
 		}
 		open[key] = sum
 		// A scanner's "unknown" and no rating at all are the same state, and
@@ -710,7 +721,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 			bands[key] = map[string]int{}
 		}
 		bands[key][BandOf(band[i])] += issues[i]
-		for j, id := range ids {
+		for j, id := range columns {
 			if n := onBinary[j][i]; n > 0 {
 				onEach[binaryIn{target, id}] += n
 			}
@@ -745,8 +756,57 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	if err != nil {
 		return openFolds{}, err
 	}
+	if columns == nil {
+		if onEach, err = s.issuesOnEach(ctx, targets, visible, ids); err != nil {
+			return openFolds{}, err
+		}
+	}
 	return openFolds{counted: open, bands: bands, upgrades: upgrades, promised: standingPromises,
 		onEach: onEach}, nil
+}
+
+// binaryColumns is the most binaries whose counts ride the pass over the
+// places as columns of their own. PostgreSQL refuses a statement selecting
+// more than 1,664 columns, and MariaDB and SQLite fail not far above that; a
+// source package's binaries in one image number a handful.
+const binaryColumns = 512
+
+// issuesOnEach is the distinct issues open on each binary, per build, read in a
+// statement of its own.
+func (s *Store) issuesOnEach(ctx context.Context, targets []int64, visible []access.Visibility,
+	ids []int64) (map[binaryIn]int, error) {
+
+	// Grouped to one row per issue before counting, which groups in memory
+	// where a distinct count over the places sorts them.
+	perIssue := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where("f.component_id IN (?)", bun.List(ids)).
+		GroupExpr("f.target_id, f.component_id, f.vulnerability_id")
+	var rows []struct {
+		TargetID    int64 `bun:"target_id"`
+		ComponentID int64 `bun:"component_id"`
+		Issues      int   `bun:"issues"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`(?) AS "oi"`, perIssue).
+		ColumnExpr(`"oi".target_id AS "target_id"`).
+		ColumnExpr(`"oi".component_id AS "component_id"`).
+		ColumnExpr(`COUNT(*) AS "issues"`).
+		GroupExpr(`"oi".target_id, "oi".component_id`).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read what is open on each binary: %w", err)
+	}
+	out := make(map[binaryIn]int, len(rows))
+	for _, row := range rows {
+		out[binaryIn{row.TargetID, row.ComponentID}] = row.Issues
+	}
+	return out, nil
 }
 
 // promisesNamed is the date and the version of the promise each key names.
@@ -788,17 +848,23 @@ func (s *Store) promisesNamed(ctx context.Context, standing map[foldIn]int64) (m
 }
 
 // severalFixes adds to where each fold could go the issues whose binaries
-// name more than one fix, one entry per issue holding every version any of
-// them names.
+// name more than one fix there, one entry per issue holding every version any
+// of them names.
 //
 // Read by issue, and only where there are any: a fold's binaries are one
 // source package at one version and almost always agree.
 func (s *Store) severalFixes(ctx context.Context, targets []int64, visible []access.Visibility,
-	held heldBy, several map[int64]bool, per map[foldIn][]namedFix) error {
+	held heldBy, several map[foldIn]map[int64]bool, per map[foldIn][]namedFix) error {
 
-	issues := make([]int64, 0, len(several))
-	for id := range several {
-		issues = append(issues, id)
+	var issues []int64
+	asked := map[int64]bool{}
+	for _, ids := range several {
+		for id := range ids {
+			if !asked[id] {
+				asked[id] = true
+				issues = append(issues, id)
+			}
+		}
 	}
 	sort.Slice(issues, func(i, j int) bool { return issues[i] < issues[j] })
 	var rows []struct {
@@ -833,6 +899,12 @@ func (s *Store) severalFixes(ctx context.Context, targets []int64, visible []acc
 	named := map[issueIn][]string{}
 	for _, row := range rows {
 		one := issueIn{foldIn{row.TargetID, held[row.ComponentID].fold}, row.Issue}
+		// The issues are read by identifier alone, so the rows include
+		// builds and folds where its binaries agree, and those are counted
+		// under their one fix already.
+		if !several[one.key][one.issue] {
+			continue
+		}
 		if _, seen := named[one]; !seen {
 			order = append(order, one)
 		}

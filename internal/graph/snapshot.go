@@ -815,9 +815,9 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 // findings, where the pass takes 0.24 s.
 //
 // The pass groups the places to one row per issue on a component before
-// counting them. A distinct count over the places sorts all of them: on the
-// bench kernel's build, 325,389 open places, the walk one step up from the
-// kernel takes 103 ms counted distinct and 42 ms grouped first.
+// counting them. A distinct count over the places sorts all of them: over the
+// bench kernel's build, 325,389 open places, the pass takes 103 ms counted
+// distinct and 42 ms grouped first.
 //
 // Where the components the query reaches are known, the pass is over theirs
 // alone.

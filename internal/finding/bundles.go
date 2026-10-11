@@ -741,8 +741,8 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 // namedFix is one issue and every version its fix names, or a set of issues
 // that all name one fix.
 //
-// Entries with one key are one issue, counted once however many of them there
-// are. Issues is how many issues an entry stands for, and zero is one.
+// Entries sharing a key are counted once however many there are, as the
+// issues the entry stands for. Issues is that number, and zero is one.
 type namedFix struct {
 	issue    int64
 	issues   int

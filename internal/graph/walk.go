@@ -109,7 +109,7 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // every start reaching a large component carries that component's issues
 // again: the bench kernel's 45 parents make 302,269 rows to sort and count for
 // 270 answers, 345 ms on PostgreSQL, where the two statements return 5,331 and
-// 10,769 rows in 100 ms. The second walks nothing: walked again to restrict
+// 10,769 rows. The second walks nothing: walked again to restrict
 // the findings, it repeated the first statement's work, and SQLite read every
 // node in the database to match the walk's — 343 ms for the issues beneath
 // the measurement kernel's 34 consumers, against 208 ms named as values. On

@@ -129,7 +129,9 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T) {
 	// The places are counted under the one fix an issue names across its
 	// source package. An issue whose binaries disagree names two, and is
-	// counted under each of them once, and once in what is fixable.
+	// counted under each of them once, and once in what is fixable. In
+	// another build, where its binaries agree, it is counted under its one
+	// fix and nowhere else.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib, gnutls := builtFrom("libcurl4t64", "8.5.0-2"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
@@ -152,14 +154,38 @@ func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T)
 			t.Fatal(err)
 		}
 
+		other := f.anotherBranch(t, "next")
+		f.shippedTo(t, other, graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{root, swss, lib},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: lib}},
+		})
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
+			fixed("CVE-2026-71", lib, "8.5.0-4"),
+			fixed("CVE-2026-73", lib, "8.5.0-4"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
 		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(builds) != 1 {
-			t.Fatalf("%d entries, want the one source package in the one build", len(builds))
+		if len(builds) != 2 {
+			t.Fatalf("%d entries, want the one source package in each of two builds", len(builds))
 		}
-		got := builds[0]
+		var got, there finding.PerBuild
+		for _, one := range builds {
+			if one.TargetID == other {
+				there = one
+			} else {
+				got = one
+			}
+		}
+		agreed := []finding.Candidate{{To: "8.5.0-4", FixedHere: 2, Reached: 2, Ordered: true}}
+		if there.Issues != 2 || len(there.Upgrades) != 1 || there.Upgrades[0] != agreed[0] {
+			t.Errorf("where its binaries agree, %d issues and %+v, want 2 and %+v", there.Issues, there.Upgrades, agreed)
+		}
 		if got.Issues != 2 || got.Fixable != 2 || got.BySeverity["high"] != 2 {
 			t.Errorf("%d issues, %d fixable, bands %v, want 2, 2 and 2 high", got.Issues, got.Fixable, got.BySeverity)
 		}
@@ -347,6 +373,51 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 		}
 		if fixes != 1 {
 			t.Errorf("%d reads of where it could go, want 1", fixes)
+		}
+	})
+}
+
+func TestEachBinarysCountIsTheSameReadInThePassOrOnItsOwn(t *testing.T) {
+	// Each binary's count rides the pass over the places as a column of its
+	// own, up to a bound past which it is read in a statement of its own. The
+	// two give one answer, checked against binaries carrying different counts.
+	each(t, func(t *testing.T, f *fixture) {
+		lib, gnutls := builtFrom("libcurl4t64", "8.5.0-2"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{root, swss, lib, gnutls},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls},
+			},
+		})
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-71", lib), found("CVE-2026-73", lib), found("CVE-2026-71", gnutls),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		perBinary := func(store *finding.Store) map[string]int {
+			t.Helper()
+			builds, err := store.AcrossBuilds(t.Context(), f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(builds) != 1 {
+				t.Fatalf("%d entries, want the one source package in the one build", len(builds))
+			}
+			out := map[string]int{}
+			for _, one := range builds[0].Packages {
+				out[one.Name] = one.Issues
+			}
+			return out
+		}
+		want := map[string]int{"libcurl4t64": 2, "libcurl3t64-gnutls": 1}
+		for name, store := range map[string]*finding.Store{
+			"in the pass": f.store, "on its own": finding.NewStoreCountingApart(f.db.DB, 1),
+		} {
+			if got := perBinary(store); len(got) != len(want) ||
+				got["libcurl4t64"] != want["libcurl4t64"] || got["libcurl3t64-gnutls"] != want["libcurl3t64-gnutls"] {
+				t.Errorf("each binary's count read %s is %v, want %v", name, got, want)
+			}
 		}
 	})
 }

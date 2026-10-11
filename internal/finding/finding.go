@@ -530,6 +530,10 @@ type Store struct {
 	// name, or zero for the shipped number. Carried on the store so a test can
 	// bring it down to a fixture rather than building a fixture up to it.
 	reach int
+	// binaryColumns is how many binaries' counts ride the pass over a source
+	// package's places, or zero for the shipped number. Carried on the store
+	// so a test can bring it down to a fixture.
+	binaryColumns int
 	// afterReadingReport runs between a judgment reading the report and
 	// writing to it, so a test can put another writer in that window. The
 	// window is the whole of what the condition on the write is for, and
