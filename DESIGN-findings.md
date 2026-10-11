@@ -1712,7 +1712,8 @@ the list itself pages through.
 
 | Rule | |
 |---|---|
-| It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
+| It rides on the page | Counted after the grouping and before the limit, as a window count over the grouped statement, so the number and the rows cannot describe different sets |
+| The window sits outside the grouping | The findings list and the list across products narrow their groups with a `HAVING` the filter builds, and count in a statement over the grouped one. Asking what differs between builds puts a distinct count in that `HAVING`, and a window beside it loses rows on MariaDB (`DESIGN-database.md` § Silently wrong query shapes) |
 | The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source count as two where the page draws one, and the figure changes with the page being read |
 | A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
 | A total is asked alone with a limit of zero | The by-component view, the fix bundles and the review queue answer `limit=0` with the total and no rows, read through the same grouping and none of the page's decoration. A view's count on the button beside it, and a badge polled once a minute, are that question |

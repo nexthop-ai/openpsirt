@@ -232,15 +232,23 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Urgency         int64  `bun:"urgency"`
 		Total           int    `bun:"total"`
 	}
+	// Read through paged, as the per-product page is, because the filter
+	// decides what the HAVING holds. The product is in the tie-break: two rows
+	// equal on the sorted column must not swap between pages, and across
+	// products one issue in one component can be a row in a dozen products.
+	key, sorted := pagedOrder(filter, "product_id", "vulnerability_id", "fold")
 	page := grouped().
 		ColumnExpr(`f.product_id AS "product_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
 		ColumnExpr(overParts.places() + ` AS "places"`).
-		ColumnExpr(overParts.peak() + ` AS "urgency"`).
-		ColumnExpr(`COUNT(*) OVER () AS "total"`)
-	if err := page.OrderExpr(sortedAcross(filter)).
+		ColumnExpr(overParts.peak() + ` AS "urgency"`)
+	if key != "" {
+		page = page.ColumnExpr(key + ` AS "sort_key"`)
+	}
+	if err := paged(s.db, page, "product_id", "vulnerability_id", "fold", "component_id",
+		"places", "urgency").OrderExpr(sorted).
 		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open anywhere: %w", err)
 	}
@@ -425,13 +433,3 @@ var ratedAt = rankCase(rating.BandExpr, 0)
 // Zero for anything that is not a band, which is what makes the sentinel for
 // "no line" compare below every rating.
 var lineAt = rankCase("COALESCE(NULLIF(p.triage_floor, ''), ?)", 0)
-
-// sortedAcross is the ORDER BY the cross-product list is paged with.
-//
-// The same allowlist and the same expressions as the per-product list, with
-// the product added to the tie-break: two rows equal on the sorted column must
-// not swap between pages, and across products the pair that was enough is not
-// — one issue in one component can be a row in a dozen products.
-func sortedAcross(filter Filter) string {
-	return orderedBy(filter, ByUrgency) + ", f.product_id, f.vulnerability_id, " + FoldedOn
-}

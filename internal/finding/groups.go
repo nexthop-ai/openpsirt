@@ -631,12 +631,8 @@ type groupHead struct {
 	// measured in and the unit the disposition register expands to.
 	//
 	// The packages and the consumers — the numbers a reader is
-	// shown — are counted in the second statement rather than here. They are
-	// COUNT(DISTINCT), and MariaDB answers a query with no rows at all when a
-	// COUNT(DISTINCT) sits beside a window function, silently: no error,
-	// an empty page, and a total from the other statement that says there was
-	// something. This one carries the window function that counts the whole
-	// filtered set, so the distinct counts go where there is none.
+	// shown — are counted in the second statement rather than here, over the
+	// page's groups alone rather than over every group the filter admits.
 	Places  int   `bun:"places"`
 	Urgency int64 `bun:"urgency"`
 	// The two exploitation signals, each read from its own flag. The urgency
@@ -736,18 +732,16 @@ type decorated struct {
 // The total rides on the page. It is counted through the same filter as the
 // page — a total that ignores the narrowing is worse than no total: it reports
 // how much there is to decide about, which is the figure people quote, while
-// the list beside it shows something else. A second statement makes the same
-// grouping over the same rows to count what the first has just grouped;
-// `COUNT(*) OVER ()` is the number of rows the grouping produced after the
-// HAVING clauses and before the limit, which is exactly that, on all four
-// engines (window functions are in each of them), for the cost of nothing.
-// Where the page comes back empty — an offset past the end — there is no row
-// to carry it and it is counted separately.
+// the list beside it shows something else. The page is read through paged,
+// whose window count is the number of groups the HAVING clauses admit, before
+// the limit. Where the page comes back empty — an offset past the end — there
+// is no row to carry it and it is counted separately.
 func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Visibility,
 	limit, offset int, filter Filter) ([]groupHead, int, error) {
 
 	var heads []groupHead
-	page := s.foldGroups(targets, visible, filter).
+	key, sorted := pagedOrder(filter, "vulnerability_id", "fold")
+	grouped := s.foldGroups(targets, visible, filter).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
@@ -757,28 +751,25 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// decision appears is the worst of what it covers.
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
-		ColumnExpr(`COUNT(*) OVER () AS "total"`)
+		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`)
+	if key != "" {
+		grouped = grouped.ColumnExpr(key + ` AS "sort_key"`)
+	}
 	// The issue is joined only where the order needs it, and after the
 	// grouping: one row per issue and component, rather than a lookup behind
 	// every open place in the selection for a sort almost nobody asks for.
 	if by, known := order[filter.SortBy]; known && by.issue {
-		page = page.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`)
+		grouped = grouped.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`)
 	}
-	page = page.
+	page := paged(s.db, grouped, "vulnerability_id", "fold", "component_id", "places",
+		"urgency", "exploited", "exploited_here").
 		// Ordered by urgency unless somebody asked otherwise. Urgency
 		// rather than how widespread something is: sorting by place
 		// count puts whatever ships in the most places at the top,
 		// which on a real image is the kernel — everywhere, and not
 		// therefore the thing to look at first. What somebody with an
 		// hour needs at the top is what is being exploited.
-		//
-		// The expression comes from the allowlist and never from the
-		// request, and the tie-break is always the same pair so that
-		// paging is stable: two rows equal on the sorted column must
-		// not swap between pages, or a page boundary drops one and
-		// repeats another.
-		OrderExpr(sortedBy(filter)).
+		OrderExpr(sorted).
 		Limit(limit).Offset(offset)
 	if err := page.Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open: %w", err)
@@ -817,6 +808,27 @@ func (s *Store) countGroups(ctx context.Context, grouped *bun.SelectQuery) (int,
 	return s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, grouped.ColumnExpr("f.vulnerability_id")).
 		Count(ctx)
+}
+
+// paged reads a grouped statement as a page, each row carrying as "total"
+// the number of rows the grouping produces after its HAVING clauses and
+// before the caller's limit. columns are the grouped statement's own column
+// names, read through the derived table; the caller orders, limits and
+// offsets the result over those names.
+//
+// The window count sits in the statement over the grouping rather than in the
+// grouping itself. MariaDB evaluates a HAVING clause wrongly in a grouped
+// statement over a join that also carries a window function and a
+// COUNT(DISTINCT): it drops groups the clause admits and keeps groups it
+// refuses, with no error (DESIGN-database.md § Silently wrong query shapes).
+// The findings filter decides what the HAVING holds, so a page it narrows is
+// never read with the window beside it.
+func paged(db bun.IDB, grouped *bun.SelectQuery, columns ...string) *bun.SelectQuery {
+	q := db.NewSelect().TableExpr(`(?) AS "paged"`, grouped)
+	for _, name := range columns {
+		q = q.ColumnExpr(`"paged"."` + name + `"`)
+	}
+	return q.ColumnExpr(`COUNT(*) OVER () AS "total"`)
 }
 
 // openRows is open findings in these builds that the reader may see, read as

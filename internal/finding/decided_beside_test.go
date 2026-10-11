@@ -203,17 +203,17 @@ func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 
 		// CVE-2026-2 is in the first build only, so it differs between them;
 		// agreed at its one place, it is the one group both conditions keep.
-		// The total rather than the page, which one engine answers empty.
 		f.decidedAt(t, f.somebodyElse(t), f.placesOf(t, "CVE-2026-2")[swss.Name],
 			"approved", libnl.Version, swss.Version, "only-here")
-		_, total, err = f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
+		groups, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
 			DiffersBetweenBuilds: true, States: []finding.ClaimStanding{finding.StandingAgreed},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if total != 1 {
-			t.Errorf("agreed and in the first build alone: %d groups, want 1", total)
+		if total != 1 || len(groups) != 1 || groups[0].Vulnerability != "CVE-2026-2" {
+			t.Errorf("agreed and in the first build alone: total %d and a page of %+v, want CVE-2026-2",
+				total, groups)
 		}
 	})
 }
