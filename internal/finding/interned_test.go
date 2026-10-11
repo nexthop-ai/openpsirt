@@ -57,17 +57,10 @@ func reportsIn(r *rand.Rand, year int) []finding.Named {
 			named.Identifier = fmt.Sprintf("CVE-%d-%d", year, 1000+k)
 			named.Aliases = []string{fmt.Sprintf("GHSA-%d-%d", year, k)}
 		}
-		// Distinct names: a report naming one name twice is refused by the
-		// unique index on names whichever way it is interned.
-		given := map[string]bool{named.Identifier: true}
-		for _, alias := range named.Aliases {
-			given[alias] = true
-		}
+		// A name drawn here can repeat the identifier or an alias already
+		// given, which a report is free to do and which is one name.
 		for range r.Intn(3) * r.Intn(2) {
-			if alias := name(); !given[alias] {
-				given[alias] = true
-				named.Aliases = append(named.Aliases, alias)
-			}
+			named.Aliases = append(named.Aliases, name())
 		}
 		if r.Intn(2) == 0 {
 			named.Likelihood = []float64{0.01, 0.2, 0.5}[r.Intn(3)]
