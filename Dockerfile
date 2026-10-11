@@ -146,7 +146,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # finding means — counts are only comparable between products measured the same
 # way — so "whatever was latest at build time" is not good enough.
 FROM ${ALPINE_IMAGE} AS scanner
-ARG GRYPE_VERSION=0.119.0
+ARG GRYPE_VERSION=0.120.1
 # Redeclared without a value, which is how a stage receives the architecture
 # the build is for. Given a default it takes the default: measured, a build
 # for linux/arm64 ran `case "amd64"`, fetched the amd64 archive, verified it
@@ -155,8 +155,8 @@ ARG GRYPE_VERSION=0.119.0
 ARG TARGETARCH
 RUN apk add --no-cache curl ca-certificates \
  && case "${TARGETARCH}" in \
-      amd64) expected=3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b ;; \
-      arm64) expected=29f0ec7c549ddb0e2b6a0ca714851f7399438afc399b80c12808e065edc9a8f8 ;; \
+      amd64) expected=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d ;; \
+      arm64) expected=29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514 ;; \
       *) echo "no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
  && curl -fsSL -o /tmp/grype.tar.gz \
