@@ -118,6 +118,8 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		}{
 			{"no filter", finding.Filter{}},
 			{"undecided", finding.Filter{States: []finding.ClaimStanding{finding.StandingUndecided}}},
+			{"differs, undecided", finding.Filter{DiffersBetweenBuilds: true,
+				States: []finding.ClaimStanding{finding.StandingUndecided}}},
 			{"unassigned", finding.Filter{Assigned: []string{"nobody"}}},
 			{"the list's defaults", finding.Filter{
 				Workable: finding.Working([]string{finding.OnBranch}, []string{finding.InSupport}),

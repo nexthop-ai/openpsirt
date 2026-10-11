@@ -39,17 +39,19 @@ const (
 	BySeverity SortKey = "severity"
 )
 
-// order is the expression each key sorts by, and whether it needs the issue
-// joined. Keyed by the constant rather than by a string a caller supplies:
-// what reaches the statement is this map's value, never its lookup.
+// order is the expression each key sorts by, whether it needs the issue
+// joined, and whether the expression is the name of a column every grouped
+// page selects. Keyed by the constant rather than by a string a caller
+// supplies: what reaches the statement is this map's value, never its lookup.
 var order = map[SortKey]struct {
-	expr  string
-	issue bool
+	expr   string
+	issue  bool
+	column bool
 }{
-	ByUrgency:    {expr: "urgency"},
+	ByUrgency:    {expr: "urgency", column: true},
 	ByAge:        {expr: "MIN(f.opened_at)"},
 	ByDeadline:   {expr: "MIN(f.due_at)"},
-	ByPlaces:     {expr: "places"},
+	ByPlaces:     {expr: "places", column: true},
 	ByLikelihood: {expr: "MAX(COALESCE(v.likelihood_ppm, 0))", issue: true},
 	BySeverity:   {expr: "MAX(COALESCE(v.score_centi, 0))", issue: true},
 }
@@ -109,21 +111,32 @@ func SortKeys() []SortKey {
 	return []SortKey{ByUrgency, ByAge, ByDeadline, ByPlaces, ByLikelihood, BySeverity}
 }
 
-// sortedBy is the ORDER BY the list is paged with.
+// pagedOrder is the ORDER BY a grouped page is read in through paged, and
+// the expression the grouped statement selects as "sort_key" for it to order
+// by. The expression is empty where the key is a column the page selects
+// under the key's own name.
 //
 // Built from the allowlist alone. The only thing a caller decides is which of
 // the fixed keys and which direction, and neither reaches the statement as
 // text: the key selects a stored expression, and the direction selects one of
 // two words written here.
-func sortedBy(filter Filter) string {
-	sorted := orderedBy(filter, ByUrgency)
-	// Always the same tie-break, so that paging is stable: two rows equal on
-	// the sorted column must not swap between pages, which drops one row and
-	// repeats another across a boundary.
-	//
-	// The fold rather than a component, because that is what the rows are
-	// grouped by — MySQL refuses an ordering on a column the grouping does not
-	// determine, and it is right to: a tie-break on a column that varies
-	// within a row is not a tie-break at all.
-	return sorted + ", " + GroupedOn
+//
+// The tie-break is the columns the page is grouped on, always the same ones,
+// so that paging is stable: two rows equal on the sorted column must not swap
+// between pages, which drops one row and repeats another across a boundary.
+func pagedOrder(filter Filter, tieBreak ...string) (key, sorted string) {
+	by, known := order[filter.SortBy]
+	if !known {
+		by = order[ByUrgency]
+	}
+	column := `"paged"."sort_key"`
+	key = by.expr
+	if by.column {
+		column, key = `"paged"."`+by.expr+`"`, ""
+	}
+	sorted = directed(column, filter.SortBy == ByDeadline, filter.Ascending)
+	for _, name := range tieBreak {
+		sorted += `, "paged"."` + name + `"`
+	}
+	return key, sorted
 }
