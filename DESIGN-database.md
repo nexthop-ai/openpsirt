@@ -1050,8 +1050,9 @@ The indexes on the finding, decision and notification tables that serve the hott
 | Who is being told | Kind, cleared, person | The notify sweep's read of who holds an open condition of each kind, once per kind. Kind and an open row are the prefix on all four engines, the null included, and MySQL and MariaDB group the people from the index without sorting them. With 152,859 open conditions over 204 people, without the index and with it: PostgreSQL 46 ms and 0.33 ms a read, averaged over every kind; the kind holding every row 106 ms and 15 ms on MySQL, 22 ms and 17 ms on MariaDB, 36 ms and 12 ms on SQLite; all 28 kinds once 2.9 s and 18 ms on MySQL. `DESIGN-notifications.md` § Delivery has the sweep |
 
 The measurements are PostgreSQL 16 with one processor, run on one database at a
-time. The widest of these keys is about 190 bytes on MySQL and MariaDB, far
-inside the 3,072 their row format allows, and eleven columns, inside MySQL's
+time, except where a row names another engine. The widest of these keys is the
+notification index's, about 780 bytes on MySQL and MariaDB, far inside the 3,072
+their row format allows. The grouping index has eleven columns, inside MySQL's
 sixteen.
 
 What the two wider indexes add to a write is within the noise: copying 375,843
