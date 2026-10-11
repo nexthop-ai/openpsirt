@@ -47,8 +47,8 @@ func InBatches[T any](ctx context.Context, db bun.IDB, rows []T) error {
 // unpacks into rows, wherever every column the rows carry has an array type.
 // A list of rows is parsed a value at a time, and an array is parsed whole.
 // Measured on PostgreSQL 16 with one processor over a 1 ms, 100 Mbit link,
-// writing 291,500 decisions: 62 to 76 µs a row as a list of rows reading the
-// identifiers back, 53 to 55 µs as a list reading nothing, and 42 to 44 µs as
+// writing 291,500 decisions: 66 to 82 µs a row as a list of rows reading the
+// identifiers back, 55 µs as a list reading nothing, and 42 to 43 µs as
 // arrays.
 func InBatchesUnkeyed[T any](ctx context.Context, db bun.IDB, rows []T) error {
 	if typ := reflect.TypeFor[T](); db.Dialect().Name() == dialect.PG && typ.Kind() == reflect.Struct {

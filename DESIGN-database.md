@@ -85,7 +85,7 @@ Engine-specific code is confined to these places:
 |---|---|
 | Schema migrations | Data-definition language differs |
 | The migration lock | Every engine spells advisory locking differently |
-| Connection setup | Driver-specific settings, PostgreSQL's statements sent unprepared among them (§ Statement preparation) |
+| Connection setup | Driver-specific settings, how PostgreSQL's statements are sent among them (§ Statement preparation) |
 | Recognizing what an engine is telling us | All three drivers carry an error type of their own, SQLite included. Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT DO NOTHING` and the other two `ON DUPLICATE KEY UPDATE` setting the key to itself. Not `INSERT IGNORE`, which on those two also turns a value too wide for its column, a dangling reference and a missing value into warnings, and writes the row cut to fit or skips it while reporting success. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
@@ -950,17 +950,32 @@ is set. A value below a second reaps no faster.
 
 | Rule | |
 |---|---|
-| A PostgreSQL statement is sent unprepared, parsed and run in one round trip | The query builder writes every value into the statement text, so no two statements share a text and a prepared one is never run again |
+| A PostgreSQL statement is parsed as the unnamed statement, described, and run | Nothing of it is kept on either side, and the description is what lets results come back in the server's binary encoding |
+| Results come back binary | A moment read as text carries the session's time zone in its offset and its date style in its shape. A session fourteen hours east dates a late-evening moment a day late, and a date style naming the month first is not read at all |
 | MySQL and MariaDB are sent the text alone | Their driver prepares only a statement carrying parameters, and the builder sends none |
 
-The PostgreSQL driver's default prepares every statement, keeps the last 512
-on the connection, and the server holds each of them parsed for as long as the
-connection lives. After writing the 291,500 decisions of one upgrade plan in
-statements of 500 rows, the server process behind the connection held 2,957 MB
-with them prepared and kept, and 2 MB unprepared.
+The query builder writes every value into the statement text, so no two
+statements share a text and a cache of statements never answers from itself.
+Each mode the PostgreSQL driver offers, measured on PostgreSQL 16 with one
+processor over a 1 ms, 100 Mbit link, on the bench planning an upgrade over a
+kernel at 291,500 places:
+
+| Mode | Results | Kept per connection after the plan | The plan | Trend | Findings list | Home, all at once |
+|---|---|---|---|---|---|---|
+| Prepare and keep the last 512 | Binary | 2,957 MB in the server | — | — | — | — |
+| Prepare and keep the last 16 | Binary | 88 MB in the server | 17.1 to 21.9 s | 0.14 s | 0.16 s | 0.99 s |
+| Keep the last 512 descriptions | Binary | 87 MB in the driver | 20.3 to 23.4 s | 0.14 s | 0.11 s | 1.05 s |
+| Describe, then run | Binary | 3 MB in the server | 20.4 to 22.1 s | 0.15 s | 0.13 s | 1.05 s |
+| Run without a description | Text | 3 MB in the server | 20.2 to 21.6 s | 0.16 s | 0.11 s | 1.02 s |
+
+Describing costs one round trip a statement, which is the findings list's
+extra 20 ms. Planning over the kernel of the measurement fixture takes 9.8 s
+run without a description and 10.0 s described first.
 
 A test asks each server how many statements it holds prepared for one
-connection, before and after a query and an insert on it.
+connection, before and after a query and an insert on it. Another stores a
+moment and reads it back on sessions set fourteen hours east and to a date
+style naming the month first.
 
 ## Bulk inserts
 
@@ -977,10 +992,10 @@ with one processor over a 1 ms, 100 Mbit link:
 | Statements | A row |
 |---|---|
 | A list of rows, prepared and kept, identifiers read back | 93 µs |
-| A list of rows, unprepared, identifiers read back | 62 to 76 µs |
-| A list of rows, unprepared, nothing read back | 53 to 55 µs |
-| Arrays, nothing read back | 42 to 44 µs |
-| Arrays, on the table without its four foreign keys | 17 µs |
+| A list of rows, described, identifiers read back | 66 to 82 µs |
+| A list of rows, described, nothing read back | 55 µs |
+| Arrays, nothing read back | 42 to 43 µs |
+| Arrays, on the table without its four foreign keys | 17 to 20 µs |
 
 PostgreSQL checks each foreign key with a query per row written, and those
 checks are the rest of the cost. MySQL and MariaDB check a foreign key inside

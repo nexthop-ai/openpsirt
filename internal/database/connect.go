@@ -344,13 +344,15 @@ func Query(sqldb *sql.DB, e Engine) (*bun.DB, error) {
 
 // openPool opens the pool every connection is drawn from.
 //
-// A PostgreSQL statement is sent unprepared, parsed and run in one round trip.
-// The query builder writes every value into the statement text, so no two
-// statements share a text and a cache of prepared statements never answers
-// from itself. The driver's default prepares each one and keeps the last 512
-// on the connection, and the server holds each of those parsed: after one
-// upgrade plan wrote 291,500 decisions in batches of 500, the server process
-// behind that connection held 2,957 MB, against 2 MB unprepared.
+// A PostgreSQL statement is parsed as the unnamed statement, described, and
+// run, and nothing of it is kept on either side. The query builder writes
+// every value into the statement text, so no two statements share a text and
+// a cache of statements never answers from itself: kept by the server, the
+// driver's last 512 on one connection held 2,957 MB after one upgrade plan,
+// and kept by the driver, its last 512 descriptions held 87 MB of statement
+// text. Describing first is what lets results come back in the server's
+// binary encoding, which carries neither the session's time zone nor its date
+// style; a statement run without a description reads every result as text.
 func openPool(e Engine, driver, dsn string) (*sql.DB, error) {
 	if e != Postgres {
 		return sql.Open(driver, dsn)
@@ -359,7 +361,7 @@ func openPool(e Engine, driver, dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	config.DefaultQueryExecMode = pgx.QueryExecModeExec
+	config.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
 	return stdlib.OpenDB(*config), nil
 }
 
