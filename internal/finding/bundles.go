@@ -738,9 +738,14 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 	return out, nil
 }
 
-// namedFix is one issue and every version its fix names.
+// namedFix is one issue and every version its fix names, or a set of issues
+// that all name one fix.
+//
+// Entries with one key are one issue, counted once however many of them there
+// are. Issues is how many issues an entry stands for, and zero is one.
 type namedFix struct {
 	issue    int64
+	issues   int
 	versions []string
 }
 
@@ -757,6 +762,15 @@ func versionsIn(fixedIn string) []string {
 		}
 	}
 	return out
+}
+
+// total is how many issues the entries a candidate reaches stand for.
+func total(entries map[int64]int) int {
+	n := 0
+	for _, issues := range entries {
+		n += issues
+	}
+	return n
 }
 
 // candidatesFrom turns what the findings name into the versions a build could
@@ -794,19 +808,19 @@ func candidatesFrom(found []namedFix, scheme vercmp.Scheme) []Candidate {
 	}
 	out := make([]Candidate, 0, len(versions))
 	for _, candidate := range versions {
-		here, reached := map[int64]bool{}, map[int64]bool{}
+		here, reached := map[int64]int{}, map[int64]int{}
 		for _, one := range found {
 			for _, v := range one.versions {
 				if v == candidate {
-					here[one.issue] = true
+					here[one.issue] = max(one.issues, 1)
 				}
 				if vercmp.Reaches(scheme, candidate, v) {
-					reached[one.issue] = true
+					reached[one.issue] = max(one.issues, 1)
 				}
 			}
 		}
 		out = append(out, Candidate{
-			To: candidate, FixedHere: len(here), Reached: len(reached), Ordered: ordered,
+			To: candidate, FixedHere: total(here), Reached: total(reached), Ordered: ordered,
 		})
 	}
 

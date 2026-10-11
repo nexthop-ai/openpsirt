@@ -126,6 +126,59 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 	})
 }
 
+func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T) {
+	// The places are counted under the one fix an issue names across its
+	// source package. An issue whose binaries disagree names two, and is
+	// counted under each of them once, and once in what is fixable.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib, gnutls := builtFrom("libcurl4t64", "8.5.0-2"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{root, swss, lib, gnutls},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls},
+			},
+		})
+		fixed := func(id string, on graph.Described, fixedIn string) finding.Reported {
+			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: on,
+				FixState: finding.FixedUpstream, FixedIn: fixedIn}
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			fixed("CVE-2026-71", lib, "8.5.0-3"),
+			fixed("CVE-2026-71", gnutls, "8.5.0-4"),
+			fixed("CVE-2026-73", lib, "8.5.0-3"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 {
+			t.Fatalf("%d entries, want the one source package in the one build", len(builds))
+		}
+		got := builds[0]
+		if got.Issues != 2 || got.Fixable != 2 || got.BySeverity["high"] != 2 {
+			t.Errorf("%d issues, %d fixable, bands %v, want 2, 2 and 2 high", got.Issues, got.Fixable, got.BySeverity)
+		}
+		want := []finding.Candidate{
+			{To: "8.5.0-4", FixedHere: 1, Reached: 2, Ordered: true},
+			{To: "8.5.0-3", FixedHere: 2, Reached: 2, Ordered: true},
+		}
+		if len(got.Upgrades) != len(want) {
+			t.Fatalf("where it could go is %+v, want %+v", got.Upgrades, want)
+		}
+		for i := range want {
+			if got.Upgrades[i] != want[i] {
+				t.Errorf("where it could go is %+v, want %+v", got.Upgrades, want)
+				break
+			}
+		}
+	})
+}
+
 func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T) {
 	// The product a decision is correlated by is the scope's, bound once. Two
 	// products shipping one component carry the same issue at the same place
@@ -217,19 +270,55 @@ func (r *returned) AfterQuery(_ context.Context, event *bun.QueryEvent) {
 	r.rows = append(r.rows, n)
 }
 
-func TestASourcePackagesFindingsAreReadByComponentAndOnePerIssue(t *testing.T) {
+func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testing.T) {
 	// Every statement over the findings names the source package's component
 	// rows as values, rather than joining the fold key to restrict them: an
 	// estimate for an average component is wrong for a kernel by three orders
-	// of magnitude. And where it could go is read one row per issue on each
-	// component, because one row per place is the size of the kernel.
+	// of magnitude. The counts, each binary's count, where it could go and
+	// what was promised are one pass over the places, and come back one row
+	// per fix and rating rather than one per issue, because one per issue is
+	// the size of the kernel.
 	each(t, func(t *testing.T, f *fixture) {
-		f.curlTwice(t)
+		ctx := t.Context()
+		lib, gnutls := builtFrom("libcurl4t64", "8.5.0-2"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{root, swss, lib, gnutls},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls},
+			},
+		})
+		var reported []finding.Reported
+		for _, on := range []graph.Described{lib, gnutls} {
+			for _, id := range []string{"CVE-2026-71", "CVE-2026-72", "CVE-2026-73", "CVE-2026-74"} {
+				if on == gnutls && id > "CVE-2026-72" {
+					break
+				}
+				reported = append(reported, finding.Reported{
+					Issue: finding.Named{Identifier: id, Severity: "high"}, Component: on,
+					FixState: finding.FixedUpstream, FixedIn: "8.5.0-3",
+				})
+			}
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+			t.Fatal(err)
+		}
 		seen := &returned{}
 		f.db.AddQueryHook(seen)
-		if _, err := f.store.AcrossBuilds(t.Context(), f.holding(t, access.PublicTriage),
-			f.wholeProduct(), "curl"); err != nil {
+		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
+		if err != nil {
 			t.Fatal(err)
+		}
+		if len(builds) != 1 || builds[0].Issues != 4 || len(builds[0].Upgrades) != 1 ||
+			builds[0].Upgrades[0].FixedHere != 4 {
+			t.Fatalf("read %+v, want four issues under one fix", builds)
+		}
+		// Each binary's own count is read in the same pass, so it is checked
+		// here against binaries carrying different counts.
+		for _, one := range builds[0].Packages {
+			if want := map[string]int{lib.Name: 4, gnutls.Name: 2}[one.Name]; one.Issues != want {
+				t.Errorf("%s carries %d issues, want %d", one.Name, one.Issues, want)
+			}
 		}
 
 		seen.mu.Lock()
@@ -246,15 +335,15 @@ func TestASourcePackagesFindingsAreReadByComponentAndOnePerIssue(t *testing.T) {
 			}
 			if strings.Contains(statement, `f.fixed_in AS "fixed_in"`) {
 				fixes++
-				// Six places, four issues on a component, three of them with
-				// a version to move to.
-				if rows[i] != 3 {
-					t.Errorf("where it could go read %d rows, want 3, one per issue on each component", rows[i])
+				// Six places, four issues on one binary and two of them on
+				// the other, every one rated high and fixed in one version.
+				if rows[i] != 1 {
+					t.Errorf("the counts read %d rows, want 1, one per fix and rating", rows[i])
 				}
 			}
 		}
-		if checked == 0 {
-			t.Fatal("no statement over the findings was seen, so this checked nothing")
+		if checked != 1 {
+			t.Errorf("%d statements over the findings, want everything in one pass", checked)
 		}
 		if fixes != 1 {
 			t.Errorf("%d reads of where it could go, want 1", fixes)
