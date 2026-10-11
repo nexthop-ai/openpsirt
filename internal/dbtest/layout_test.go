@@ -109,6 +109,12 @@ func TestAMeasurementReloadsIntoTheLayoutAFreshLoadLeaves(t *testing.T) {
 				"cannot tell the two apart", deleted.pages, first.pages)
 		}
 
+		// Deleted first, so the table is empty and its dead rows are not: a
+		// measurement's emptying that passed over an empty table would leave
+		// them, and the reload would take more pages.
+		if err := clear(ctx, db); err != nil {
+			t.Fatal(err)
+		}
 		if err := fresh(ctx, db); err != nil {
 			t.Fatal(err)
 		}
