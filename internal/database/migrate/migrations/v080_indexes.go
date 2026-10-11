@@ -22,14 +22,16 @@ func findingV080(t *columnTypes) []string {
 	statements = withIndex(statements, "finding_open_idx",
 		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at", "due_at")`)
 
-	// The grouping columns, and then when each finding opened and why it
-	// closed. The backlog trend reads only those beside the issue and the
-	// build, so it is answered from the index without the table. Measured on
-	// PostgreSQL with one processor over 375,843 findings, with these two
-	// columns and without them: 578 pages read and 16,500, the trend grouped in
-	// the database 88 ms and 172 ms, and the index 4.6 MB and 4.2 MB.
+	// The grouping columns, then when each finding opened and why it closed,
+	// then who holds it. The backlog trend reads only the first two beside the
+	// issue and the build, so it is answered from the index without the
+	// table. Measured on PostgreSQL with one processor over 375,843 findings,
+	// with those two columns and without them: 578 pages read and 16,500, the
+	// trend grouped in the database 88 ms and 172 ms, and the index 4.6 MB and
+	// 4.2 MB. The holder is read by every list asking who holds a group, and
+	// last because nothing narrows on it through this index.
 	statements = withIndex(statements, "finding_group_idx",
-		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here", "opened_at", "closed_because")`)
+		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here", "opened_at", "closed_because", "assigned_to")`)
 	return statements
 }
 

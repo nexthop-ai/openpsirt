@@ -414,7 +414,7 @@ row moves. § Indexes says what each index serves.
 
 | Table | Gains | Every engine |
 |---|---|---|
-| `finding` | What is open in a build indexed with its deadline, and the grouping index carrying when a finding opened and why it closed | Each index dropped and made again by the release's statement, where the table stands. SQLite included: an index is made there like anywhere else, and a rebuild would copy every row to change none |
+| `finding` | What is open in a build indexed with its deadline, and the grouping index carrying when a finding opened, why it closed and who holds it | Each index dropped and made again by the release's statement, where the table stands. SQLite included: an index is made there like anywhere else, and a rebuild would copy every row to change none |
 | `decision` | An index on the state and the claim, and one on the state and the product | Made where the table stands |
 | `finding`, on PostgreSQL alone | Vacuumed after a fiftieth of it changes and analyzed after a hundredth | A storage setting on the table |
 

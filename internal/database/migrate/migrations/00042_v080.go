@@ -31,7 +31,7 @@ func upV080(ctx context.Context, sqldb *sql.DB) error {
 // this changes.
 //
 //   - What is open in a build is indexed with its deadline, and the grouping
-//     index carries when a finding opened and why it closed.
+//     index carries when a finding opened, why it closed and who holds it.
 //   - Decisions are indexed by state, with their claim and with their
 //     product.
 //   - On PostgreSQL, the finding table is vacuumed after a fiftieth of it
