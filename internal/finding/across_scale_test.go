@@ -176,11 +176,16 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		// The component and fix-bundle views keep the list's groups under the
 		// same conditions over a group, grouped at their own grain.
 		// Each is bounded rather than left to run, so a statement that runs
-		// away is reported as one and the measurement goes on. A statement
-		// abandoned at the bound is stopped on the server before the next is
-		// timed, which is otherwise timed beside it.
+		// away is reported as having no answer within the bound. MySQL and
+		// MariaDB keep running a statement whose client is gone, and a reading
+		// taken beside it is not a reading of its filter, so the readings after
+		// one past the bound are reported as not measured.
+		abandoned := false
 		bounded := func(read func(context.Context) (int, error)) string {
 			t.Helper()
+			if abandoned {
+				return "not measured: a statement past the bound may still be running"
+			}
 			within, cancel := context.WithTimeout(ctx, 3*time.Minute)
 			defer cancel()
 			at := time.Now()
@@ -188,8 +193,8 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			took := time.Since(at)
 			switch {
 			case within.Err() != nil:
-				dbtest.StopAbandoned(t, db)
-				return fmt.Sprintf("unfinished after %s", took.Round(time.Second))
+				abandoned = true
+				return fmt.Sprintf("no answer within %s", took.Round(time.Second))
 			case err != nil:
 				t.Fatal(err)
 			}
