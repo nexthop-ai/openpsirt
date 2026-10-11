@@ -175,13 +175,44 @@ func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQu
 		Join(DecisionIssue).
 		Join(`CROSS JOIN `+source, args...).
 		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
-		// The component and the consumer, for the versions: a live claim is
-		// about the place at the versions it was keyed on.
-		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Where(coversHere)
+		Where(coversAsked)
 }
+
+// coversAsked is coversHere with each version compared inside an EXISTS on
+// the component's key, rather than read from a component joined beside the
+// match.
+//
+// A planner estimates the match between a decision and a place as the product
+// of two equalities that are not independent, and where the places are
+// narrowed to the decided issues PostgreSQL estimates it at one row. Against
+// that estimate a scan of a small component table costs the same as a lookup
+// by key, so a joined component is scanned whole once per decided place:
+// 1,570,516 rows read and discarded for 4,081 decided places, 290 ms of a
+// 433 ms list with 3,673 decisions and 737 components. An EXISTS has no join
+// order. PostgreSQL asks it through the component's key where it expects few
+// decided places, and hashes the components once where it expects many and
+// they fit in memory; the other engines look the component up by its key.
+//
+// The comparisons are KeyMatches' own, moved inside the EXISTS. A place with no
+// consumer holds the empty version, which is what ConsumerUpstreamExpr makes
+// of a consumer that is not there, so it is compared as such rather than
+// looked up.
+var coversAsked = func() string {
+	component := "COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr
+	consumer := "COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr
+	covers := strings.NewReplacer(
+		component, `EXISTS (SELECT 1 FROM "component" AS "c"
+			WHERE c.id = f2.component_id AND `+component+`)`,
+		consumer, `((f2.consumer_id IS NULL AND COALESCE(de.consumer_upstream_version, '') = '')
+			OR EXISTS (SELECT 1 FROM "component" AS "uc"
+			WHERE uc.id = f2.consumer_id AND `+consumer+`))`,
+	).Replace(coversHere)
+	if strings.Count(covers, "EXISTS") != 2 {
+		panic("finding: KeyMatches no longer compares the versions coversAsked moves")
+	}
+	return covers
+}()
 
 // placesDecided is how many of a group's places decisionsAtPlaces marks in one
 // state, under the state's own alias. A place no decision covers has no row

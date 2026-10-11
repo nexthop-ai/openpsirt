@@ -259,3 +259,77 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 		}
 	})
 }
+
+func TestADecisionKeyedOnAConsumerVersionCoversNoPlaceWithoutAConsumer(t *testing.T) {
+	// A place with no consumer holds the empty consumer version. A live
+	// decision keyed on no consumer version covers it, and one keyed on a
+	// consumer version says nothing about it. Asked of the list's own
+	// statement, the state filter and the product's totals, which compare the
+	// versions without reading a consumer that is not there.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, graph.Snapshot{
+			Root: root, Components: []graph.Described{libnl},
+			Dependencies: []graph.Dependency{{Parent: root, Child: libnl}},
+		})
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		at := map[int64]finding.Finding{}
+		for _, row := range f.open(t) {
+			if row.ConsumerID != nil {
+				t.Fatalf("the fixture put %s under a consumer, so this checks nothing", row.PlaceIdentity)
+			}
+			at[row.VulnerabilityID] = row
+		}
+		keyed, unkeyed := at[f.issueID(t, "CVE-2026-1")], at[f.issueID(t, "CVE-2026-2")]
+		by := f.somebodyElse(t)
+		f.decidedAt(t, by, keyed, "approved", libnl.Version, "1.0", "keyed-on-a-consumer")
+		f.decidedAt(t, by, unkeyed, "approved", libnl.Version, "", "keyed-on-none")
+
+		reader := f.holding(t, access.PublicRead)
+		groups, _, err := f.store.Groups(ctx, reader, f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		states := map[string]finding.ClaimStanding{}
+		for _, group := range groups {
+			states[group.Vulnerability] = group.State
+		}
+		if states["CVE-2026-1"] != finding.StandingUndecided || states["CVE-2026-2"] != finding.StandingAgreed {
+			t.Errorf("the rows read %v, want CVE-2026-1 undecided and CVE-2026-2 agreed", states)
+		}
+		for _, state := range []finding.ClaimStanding{finding.StandingUndecided, finding.StandingAgreed} {
+			want := map[finding.ClaimStanding]string{
+				finding.StandingUndecided: "CVE-2026-1", finding.StandingAgreed: "CVE-2026-2",
+			}[state]
+			filter := finding.Filter{States: []finding.ClaimStanding{state}}
+			for what, read := range map[string]func() ([]finding.Group, int, error){
+				"one product": func() ([]finding.Group, int, error) {
+					return f.store.Groups(ctx, reader, f.scope, 50, 0, filter)
+				},
+				"every product": func() ([]finding.Group, int, error) {
+					return f.store.Anywhere(ctx, reader, 50, 0, filter)
+				},
+			} {
+				kept, total, err := read()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if total != 1 || len(kept) != 1 || kept[0].Vulnerability != want {
+					t.Errorf("%s, %s: kept %d %+v, want %s alone", what, state, total, kept, want)
+				}
+			}
+		}
+		_, whole, err := f.store.HowItStands(ctx, reader, f.productID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if whole.Open != 2 || whole.Undecided != 1 || whole.Agreed != 1 {
+			t.Errorf("the product: open %d, undecided %d, agreed %d; want 2, 1, 1",
+				whole.Open, whole.Undecided, whole.Agreed)
+		}
+	})
+}
