@@ -39,7 +39,8 @@ func StatementsV070(engine database.Engine) map[string][]string {
 func StatementsV080(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
-		"finding":  findingV080(t),
-		"decision": decisionV080(t),
+		"finding":      findingV080(t),
+		"decision":     decisionV080(t),
+		"notification": notificationV080(t),
 	}
 }

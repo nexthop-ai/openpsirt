@@ -32,8 +32,9 @@ func upV080(ctx context.Context, sqldb *sql.DB) error {
 //
 //   - What is open in a build is indexed with its deadline, and the grouping
 //     index carries when a finding opened, why it closed and who holds it.
-//   - Decisions are indexed by state, with their claim and with their
-//     product.
+//   - Decisions are indexed by state, with their claim.
+//   - Notifications are indexed by kind, with whether they are open and
+//     whom they are to.
 //   - On PostgreSQL, the finding table is vacuumed after a fiftieth of it
 //     changes and analyzed after a hundredth, rather than a fifth and a
 //     tenth.
@@ -50,6 +51,10 @@ func upgradeV080(ctx context.Context, tx bun.Tx) error {
 	}
 	if err := u.index(decisionV080(t), "decision",
 		"decision_state_claim_idx"); err != nil {
+		return err
+	}
+	if err := u.index(notificationV080(t), "notification",
+		"notification_kind_open_idx"); err != nil {
 		return err
 	}
 	if u.engine != database.Postgres {

@@ -419,7 +419,8 @@ row moves. § Indexes says what each index serves.
 | Table | Gains | Every engine |
 |---|---|---|
 | `finding` | What is open in a build indexed with its deadline, and the grouping index carrying when a finding opened, why it closed and who holds it | Each index dropped and made again by the release's statement, where the table stands. SQLite included: an index is made there like anywhere else, and a rebuild would copy every row to change none |
-| `decision` | An index on the state and the claim, and one on the state and the product | Made where the table stands |
+| `decision` | An index on the state and the claim | Made where the table stands |
+| `notification` | An index on the kind, whether a row is open, and the person | Made where the table stands |
 | `finding`, on PostgreSQL alone | Vacuumed after a fiftieth of it changes and analyzed after a hundredth | A storage setting on the table |
 
 | Rule | |
@@ -1038,18 +1039,19 @@ where that is deliberate rather than a compromise, since the engines do not
 disagree about which columns an index is on, and reading index metadata is
 spelled four different ways.
 
-The indexes on the finding and decision tables that serve the hottest reads:
+The indexes on the finding, decision and notification tables that serve the hottest reads:
 
 | Index | Columns | Serves |
 |---|---|---|
 | What is open in a build | Build, closed, deadline | The deadline report for one build, as a range at the end of the prefix: 256 ms a page through the deployment-wide deadline index, 205 ms through this one, for a build of 183,788 open findings |
 | Deadlines running out | Closed, the build's claim, deadline | The deadline report across the deployment, which names no build: 248 ms through it, 343 to 392 ms without it |
-| Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
+| Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason, holder | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
 | Decisions waiting, by claim | State, claim | The review queue's page and its count, with 33,150 decisions waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
+| Who is being told | Kind, cleared, person | The notify sweep's read of who holds an open condition of each kind, once per kind. Kind and an open row are the prefix on all four engines, the null included, and MySQL and MariaDB group the people from the index without sorting them. With 152,859 open conditions over 204 people, without the index and with it: PostgreSQL 46 ms and 0.33 ms a read, averaged over every kind; the kind holding every row 106 ms and 15 ms on MySQL, 22 ms and 17 ms on MariaDB, 36 ms and 12 ms on SQLite; all 28 kinds once 2.9 s and 18 ms on MySQL. `DESIGN-notifications.md` § Delivery has the sweep |
 
 The measurements are PostgreSQL 16 with one processor, run on one database at a
 time. The widest of these keys is about 190 bytes on MySQL and MariaDB, far
-inside the 3,072 their row format allows, and ten columns, inside MySQL's
+inside the 3,072 their row format allows, and eleven columns, inside MySQL's
 sixteen.
 
 What the two wider indexes add to a write is within the noise: copying 375,843

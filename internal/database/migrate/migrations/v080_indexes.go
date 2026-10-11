@@ -68,3 +68,27 @@ func withIndex(statements []string, name, stmt string) []string {
 	}
 	panic(fmt.Sprintf("the declaration being changed makes no index %s", name))
 }
+
+// notificationV080 is v0.8.0's declaration of the notification table, and the
+// indexes it makes.
+//
+// The baseline's, with an index leading with a notification's kind. Derived
+// from the baseline's declaration, which v0.5.0's record of its schema holds.
+func notificationV080(t *columnTypes) []string {
+	made, indexes, err := pick(notificationBaseline(t), "notification")
+	if err != nil {
+		panic(err)
+	}
+	statements := append([]string{made}, indexes...)
+	return append(statements,
+		// Who holds an open condition of one kind. Every sweep asks it once per
+		// kind, and the other indexes on the table lead with the person, so
+		// without this one each asking reads the whole table. The kind and the
+		// open rows are the prefix on all four engines, and the person last
+		// answers the read from the index alone. Measured with 152,859 open
+		// conditions over 204 people, without it and with it: 46 ms and
+		// 0.33 ms a read on PostgreSQL, averaged over every kind, and every
+		// kind once 2.9 s and 18 ms on MySQL.
+		`CREATE INDEX "notification_kind_open_idx" ON "notification" ("kind", "cleared_at", "person_id")`,
+	)
+}

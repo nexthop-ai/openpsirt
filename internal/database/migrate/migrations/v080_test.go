@@ -16,8 +16,8 @@ import (
 // with.
 const v080 = 42
 
-// A v0.7.0 database is upgraded, and its finding and decision tables carry the
-// indexes v0.8.0 declares.
+// A v0.7.0 database is upgraded, and its finding, decision and notification
+// tables carry the indexes v0.8.0 declares.
 func TestAV070DatabaseUpgradesToV080(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -26,8 +26,8 @@ func TestAV070DatabaseUpgradesToV080(t *testing.T) {
 		dbtest.MigrateTo(t, db, v080)
 
 		declared := migrations.StatementsV080(db.Server.Engine)
-		if len(declared) != 2 {
-			t.Errorf("v0.8.0 declares %d tables, want 2", len(declared))
+		if len(declared) != 3 {
+			t.Errorf("v0.8.0 declares %d tables, want 3", len(declared))
 		}
 		declarationsAreBuilt(t, ctx, db, declared)
 	})
@@ -50,6 +50,7 @@ func TestTheV080UpgradeRunsAgainOverIndexesItMade(t *testing.T) {
 			drop,
 			`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at", "due_at")`,
 			`CREATE INDEX "decision_state_claim_idx" ON "decision" ("state", "claim_id")`,
+			`CREATE INDEX "notification_kind_open_idx" ON "notification" ("kind", "cleared_at", "person_id")`,
 		} {
 			if _, err := db.ExecContext(ctx, stmt); err != nil {
 				t.Fatalf("make what a stopped upgrade left: %v\n%s", err, stmt)
