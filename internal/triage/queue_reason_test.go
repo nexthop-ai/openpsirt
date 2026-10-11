@@ -328,6 +328,13 @@ func TestAnExpiredDeferralWithARowTheReaderMayNotDecideIsNotOfferedToThem(t *tes
 		if got := f.listed(t, insider, expired); len(got) != 2 {
 			t.Errorf("somebody deciding at both visibilities is offered %v, want both claims", got)
 		}
+		// The count is the length of the list it stands for.
+		if _, n, err := f.store.Queue(ctx, outsider, expired, 0, 0); err != nil || n != 1 {
+			t.Errorf("the expired deferrals counted for a disclosed decider are %d (%v), want 1", n, err)
+		}
+		if _, n, err := f.store.Queue(ctx, insider, expired, 0, 0); err != nil || n != 2 {
+			t.Errorf("the expired deferrals counted for somebody deciding both are %d (%v), want 2", n, err)
+		}
 		if count, err := f.store.WaitingIn(ctx, outsider, f.product); err != nil || count != 0 {
 			t.Errorf("the approval count beside the product is %d (%v), want 0", count, err)
 		}

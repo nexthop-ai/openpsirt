@@ -6,7 +6,6 @@ package triage_test
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -14,8 +13,8 @@ import (
 
 // Every count the review queue gives is the number of claims its list holds:
 // a claim with several rows is one, and a claim with any row out of the
-// reader's reach is none. The approval count, the page's total, the number
-// beside a product and an expired deferral's count are each asked.
+// reader's reach is none. The approval count, the page's total and the number
+// beside a product are each asked.
 func TestAQueueCountIsTheWholeClaimsTheReaderMayActOn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -68,47 +67,6 @@ func TestAQueueCountIsTheWholeClaimsTheReaderMayActOn(t *testing.T) {
 		}
 		if len(page) != 1 || page[0].Claim.ID != slices.Max(want) {
 			t.Errorf("a page of one holds %d claims, want the newest, %d", len(page), slices.Max(want))
-		}
-
-		// An expired deferral asks for a new decision, of whoever may decide
-		// every row of it.
-		defers := func(places ...triage.Place) int64 {
-			t.Helper()
-			soon := time.Now().UTC().Add(24 * time.Hour)
-			var proposals []triage.Proposal
-			for _, at := range places {
-				proposals = append(proposals, triage.Proposal{
-					Place: at, Outcome: triage.Deferred, Reasoning: "Not this sprint.",
-					DeferredUntil: &soon, By: insider.ID,
-				})
-			}
-			recorded, err := f.store.ProposeMany(ctx, insider, proposals)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := f.db.DB.NewUpdate().Table("claim").
-				Set("deferred_until = ?", time.Now().UTC().Add(-time.Hour)).
-				Where("id = ?", recorded[0].ClaimID).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-			return recorded[0].ClaimID
-		}
-		defers(f.placeIn(f.product, "deferred-a", access.Private),
-			f.placeIn(f.product, "deferred-b", access.Public))
-		disclosed := defers(f.placeIn(f.product, "deferred-c", access.Public),
-			f.placeIn(f.product, "deferred-d", access.Public))
-		decider := f.holding(t, "public-decider", map[int64][]access.Role{
-			f.product: {access.PublicRead, access.PublicTriage},
-		})
-		expired := triage.QueueFilter{Reason: triage.DeferralExpired, ProductID: f.product}
-		if _, n, err := f.store.Queue(ctx, decider, expired, 0, 0); err != nil || n != 1 {
-			t.Errorf("the expired deferrals counted for a disclosed decider are %d (%v), want 1", n, err)
-		}
-		if got := f.listed(t, decider, expired); len(got) != 1 || got[0] != disclosed {
-			t.Errorf("the expired deferrals listed for a disclosed decider are %v, want %d", got, disclosed)
-		}
-		if _, n, err := f.store.Queue(ctx, insider, expired, 0, 0); err != nil || n != 2 {
-			t.Errorf("the expired deferrals counted for somebody deciding both are %d (%v), want 2", n, err)
 		}
 	})
 }
