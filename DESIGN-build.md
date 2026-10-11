@@ -147,7 +147,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make engines-clean` | Drops the test databases no running test holds, on every configured server. See § Test databases |
-| `make measure` | Measurements rather than gates. Behind a build tag |
+| `make measure` | Measurements rather than gates. Behind a build tag. Each starts from tables laid out as a fresh load leaves them, and prints the layout beside its timings. See § Measurement databases |
 | `make sbom-shape` | The reader over a full-size inventory, decompressed from a committed fixture. Inside `check` |
 
 ## Gate tiers
@@ -419,7 +419,7 @@ in parallel.
 | Engine | What a test gets | Emptied between tests |
 |---|---|---|
 | SQLite | A copy of a template migrated once per run and kept in the temporary directory, and a connection of its own | Not needed — each test holds its own file |
-| The three servers | A database the binary leases on the server for as long as it runs, through one pool every test in the binary shares | Before every test, by deleting from the tables that hold rows |
+| The three servers | A database the binary leases on the server for as long as it runs, through one pool every test in the binary shares | Before every test, by deleting from the tables that hold rows. A measurement truncates every table instead: see § Measurement databases |
 
 The pool on a server is shared because a PostgreSQL connection is a process on
 the server that starts knowing nothing of the schema. Its first statement over
@@ -642,6 +642,50 @@ directory — says so and runs alone.
 
 Together: one minute fifteen against warm servers and two minutes forty-five
 against cold ones, from four minutes four seconds.
+
+### Measurement databases
+
+A measurement binary empties a server database by truncating every table, where
+the rest of the suite deletes from the tables that hold rows. The `measure` build
+tag selects it. A measurement then times plans chosen over tables laid out as a
+load into a newly migrated database leaves them, which is the layout closest to
+a deployment's.
+
+| Engine | A table loaded again after a delete | Emptied for a measurement |
+|---|---|---|
+| PostgreSQL | Fills the space the deleted rows left, wherever it sits: more pages, and an order the identifiers no longer follow | One `TRUNCATE` naming every table |
+| MySQL, MariaDB | The clustered index takes a number of pages that varies with how far the server has purged the deleted rows | `TRUNCATE TABLE` per table, with foreign key checks suspended on that one connection and restored before it returns to the pool |
+| SQLite | Not reached: each test copies a migrated file | The ordinary way |
+
+The `finding` table after two measurements, each run twice over a reused slot
+database and twice with truncation, one engine at a time:
+
+| Measurement, engine | Deleted, then reloaded | Truncated, then reloaded | A newly built database |
+|---|---|---|---|
+| The list across products, PostgreSQL | 20,900 pages, correlation of `id` −0.38 and of `vulnerability_id` −0.32; then 12,697 pages, 1.00 and 0.68 | 12,697 pages, 1.00 and 0.68, then 0.67 | Correlation 1.00 and 0.67 |
+| A fix bundle page, PostgreSQL | 20,900 and 18,867 pages | 6,169 and 6,170 pages | — |
+| A fix bundle page, MySQL | 3,078 and 3,014 pages, 30.6 s and 31.4 s | 2,854 pages, 14.5 s, both runs | 2,854 pages, 15.1 s |
+| A fix bundle page, MariaDB | 2,886 and 2,823 pages, 25.0 s and 24.7 s | 2,854 pages, 11.3 s and 10.6 s | 2,854 pages, 11.3 s |
+| The list across products, MySQL and MariaDB | 5,802 pages, and once 5,834 on MariaDB | 5,802 pages | — |
+
+The deleted runs on PostgreSQL disagree with each other because autovacuum
+decides when the deleted space becomes free, and that is a race with the next
+load. The plan the planner picks moves with the layout: in the list across
+products, a plan taking 32 to 104 s was chosen over a newly built database in
+four runs of four and over a reused one in none of six.
+
+| Rule | Why |
+|---|---|
+| Truncation is for measurements alone | It costs 96 ms on PostgreSQL, 232 ms on MySQL and 47 ms on MariaDB for a database already empty, against 1 to 4 ms for the ordinary emptying, and the ordinary emptying runs before every test in the suite |
+| Every table is truncated, whether or not it holds rows | Slot databases are shared with the rest of the suite, so a table empty now may have been filled and deleted by another package's binary |
+| The layout of `finding` is printed beside the timings | Two runs reading different layouts are two different measurements, and the output says which one each was |
+| A table with no statistics is refused rather than printed | No pages and no correlation read the same as an empty table |
+
+| Engine | Printed with the refreshed statistics |
+|---|---|
+| PostgreSQL | The table's pages, and the correlation of every column that leads an index |
+| MySQL, MariaDB | The clustered index's pages. InnoDB keeps rows in primary key order, so it holds no correlation to print |
+| SQLite | Nothing: no earlier test's layout reaches a copied file |
 
 ## Commit durability
 

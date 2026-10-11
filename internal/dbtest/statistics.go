@@ -4,6 +4,9 @@
 package dbtest
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -24,6 +27,9 @@ import (
 //
 // SQLite gathers statistics only when asked, and a deployment asks after every
 // scan applies, so it is asked the same way here.
+//
+// It then prints the layout of the finding table on a server, which is what
+// the plans being timed were chosen over.
 func SettleStatistics(t *testing.T, db *database.DB) {
 	t.Helper()
 	ctx := t.Context()
@@ -33,30 +39,10 @@ func SettleStatistics(t *testing.T, db *database.DB) {
 		if err := database.RefreshStatistics(ctx, db); err != nil {
 			t.Fatal(err)
 		}
-	case database.Postgres:
-		for _, table := range tables {
-			if _, err := db.ExecContext(ctx, "ANALYZE ?", bun.Ident(table)); err != nil {
-				t.Fatalf("refresh the statistics of %s: %v", table, err)
-			}
-		}
 	default:
-		// MySQL and MariaDB answer with a row per table rather than an error,
-		// so the answer is read: a table the server could not analyze says so
-		// there.
 		for _, table := range tables {
-			var rows []struct {
-				Table   string `bun:"Table"`
-				Op      string `bun:"Op"`
-				Kind    string `bun:"Msg_type"`
-				Message string `bun:"Msg_text"`
-			}
-			if err := db.NewRaw("ANALYZE TABLE ?", bun.Ident(table)).Scan(ctx, &rows); err != nil {
-				t.Fatalf("refresh the statistics of %s: %v", table, err)
-			}
-			for _, row := range rows {
-				if row.Kind == "error" {
-					t.Fatalf("refresh the statistics of %s: %s", table, row.Message)
-				}
+			if err := analyze(ctx, db, table); err != nil {
+				t.Fatal(err)
 			}
 		}
 	}
@@ -65,4 +51,43 @@ func SettleStatistics(t *testing.T, db *database.DB) {
 	}
 	t.Logf("statistics refreshed on %s over %d tables in %s", db.Server.Engine, len(tables),
 		time.Since(started).Round(time.Millisecond))
+
+	// The layout a plan was chosen over, printed beside the timings that
+	// plan produced. Two runs reading different layouts are two different
+	// measurements, and this is where that shows.
+	l, err := readLayout(ctx, db, measured)
+	if errors.Is(err, errNoLayout) {
+		return
+	}
+	if err != nil {
+		t.Fatalf("read the layout a measurement runs over: %v", err)
+	}
+	t.Logf("layout on %s of %s", db.Server.Engine, l)
+}
+
+// analyze refreshes the statistics of one table on a server.
+func analyze(ctx context.Context, db *database.DB, table string) error {
+	if db.Server.Engine == database.Postgres {
+		if _, err := db.ExecContext(ctx, "ANALYZE ?", bun.Ident(table)); err != nil {
+			return fmt.Errorf("refresh the statistics of %s: %w", table, err)
+		}
+		return nil
+	}
+	// MySQL and MariaDB answer with a row per table rather than an error, so
+	// the answer is read: a table the server could not analyze says so there.
+	var rows []struct {
+		Table   string `bun:"Table"`
+		Op      string `bun:"Op"`
+		Kind    string `bun:"Msg_type"`
+		Message string `bun:"Msg_text"`
+	}
+	if err := db.NewRaw("ANALYZE TABLE ?", bun.Ident(table)).Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("refresh the statistics of %s: %w", table, err)
+	}
+	for _, row := range rows {
+		if row.Kind == "error" {
+			return fmt.Errorf("refresh the statistics of %s: %s", table, row.Message)
+		}
+	}
+	return nil
 }

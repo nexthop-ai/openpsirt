@@ -317,8 +317,14 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 			// The package's one database on this server holds whatever the
 			// previous test, or the previous run, left: the per-test copy
 			// SQLite takes has no counterpart on a server. So it is emptied
-			// before every test, and seeded again where there is a seed.
-			if err := clear(t.Context(), db); err != nil {
+			// before every test, and seeded again where there is a seed. A
+			// measurement empties it to the layout a fresh load leaves,
+			// because the plan it times depends on that layout.
+			empty := clear
+			if measuring {
+				empty = fresh
+			}
+			if err := empty(t.Context(), db); err != nil {
 				t.Fatalf("empty the %s database for this test: %v", c.name, err)
 			}
 			var made any
