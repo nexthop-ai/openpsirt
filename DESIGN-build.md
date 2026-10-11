@@ -1081,4 +1081,4 @@ generated address rather than at the organization's.
 | Checkouts of two schemas running at once drop each other's free databases | Only a binary creating a database drops another schema's, so each drop costs the other checkout one build, not one per binary |
 | The clean trusts the slot lock alone | A database somebody uses without holding its slot's lock — one made by hand, or by a harness that names databases another way — is dropped while in use |
 | A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
-| `README.md` and `docs/index.md` are compared, from their highlights to the end of their deployment section, with link targets set aside | Neither can include the other, and the same list maintained twice drifts. Each links to the other pages by its own path |
+| `README.md` and `docs/index.md` are compared, from their first section to the end of their deployment section, with link targets set aside | Neither can include the other, and the same list maintained twice drifts. Each links to the other pages by its own path |
