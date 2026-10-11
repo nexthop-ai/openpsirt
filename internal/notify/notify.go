@@ -16,6 +16,8 @@ package notify
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -466,6 +468,8 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 
 		now := s.now()
 		held := make(map[string]bool, len(open))
+		var ended []int64
+		var moved []restated
 		for _, row := range open {
 			held[row.About] = true
 			if still, yes := wanted[row.About]; yes {
@@ -478,83 +482,59 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 				// the reads narrow by both, and a queue that held only
 				// disclosed work when the condition opened may hold
 				// undisclosed work under the same key now.
-				if row.Body == still.Body && row.Link == still.Link &&
-					row.Private == still.Private &&
-					sameID(row.ProductID, still.ProductID) &&
-					sameID(row.VulnerabilityID, still.VulnerabilityID) &&
-					sameID(row.TeamID, still.TeamID) {
-					continue
-				}
-				if _, err := tx.NewUpdate().Model((*Notification)(nil)).
-					Set("body = ?", still.Body).
-					Set("link = ?", still.Link).
-					Set("private = ?", still.Private).
-					Set("product_id = ?", still.ProductID).
-					Set("vulnerability_id = ?", still.VulnerabilityID).
-					Set("team_id = ?", still.TeamID).
-					Where("id = ?", row.ID).Exec(ctx); err != nil {
-					return fmt.Errorf("say what a standing condition says now: %w", err)
+				if row.Body != still.Body || row.Link != still.Link ||
+					row.Private != still.Private ||
+					!sameID(row.ProductID, still.ProductID) ||
+					!sameID(row.VulnerabilityID, still.VulnerabilityID) ||
+					!sameID(row.TeamID, still.TeamID) {
+					moved = append(moved, restated{id: row.ID, now: still})
 				}
 				continue
 			}
 			// It stopped being true. The row is kept and marked rather than
 			// deleted, so "this cleared" stays answerable and a condition that
 			// returns is a new row rather than an edit of an old one.
-			if _, err := tx.NewUpdate().Model((*Notification)(nil)).
-				Set("cleared_at = ?", now).
-				Set("about_open = NULL").
-				Where("id = ?", row.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("clear a condition that ended: %w", err)
-			}
-			cleared++
+			ended = append(ended, row.ID)
 		}
 
+		if err := database.IDsInBatches(ctx, ended, func(ctx context.Context, ids []int64) error {
+			_, err := tx.NewUpdate().Model((*Notification)(nil)).
+				Set(`"cleared_at" = ?`, now).
+				Set(`"about_open" = NULL`).
+				Where(`"id" IN (?)`, bun.List(ids)).Exec(ctx)
+			return err
+		}); err != nil {
+			return fmt.Errorf("clear the conditions that ended: %w", err)
+		}
+		cleared = len(ended)
+
+		if err := restate(ctx, tx, moved); err != nil {
+			return fmt.Errorf("say what the standing conditions say now: %w", err)
+		}
+
+		// In the order of what they are about, so the same list opens the
+		// same rows in the same order whichever way the map was walked.
+		var fresh []Notification
 		for about, h := range wanted {
 			if held[about] {
 				continue
 			}
 			key := about
-			row := &Notification{
+			fresh = append(fresh, Notification{
 				PersonID: personID, Kind: kind, Lifetime: Condition,
 				About: about, AboutOpen: &key,
 				Body: h.Body, Link: h.Link, Private: h.Private,
 				ProductID: h.ProductID, VulnerabilityID: h.VulnerabilityID, TeamID: h.TeamID,
 				CreatedAt: now,
-			}
-			// Each insert stands on its own savepoint, because carrying on
-			// after a failed write is not something every engine allows.
-			//
-			// Another process getting there first is the ordinary case rather
-			// than a fault: a deployment runs more than one of these — the
-			// chart ships two replicas and every one sweeps — so two saying
-			// the same true thing at the same moment is expected, the unique
-			// index is what makes it one row, and a duplicate is not
-			// retryable, so aborting the sweep would leave every
-			// administrator after this one told nothing.
-			//
-			// But on PostgreSQL a refused statement poisons the whole
-			// transaction: everything after it fails and the commit turns
-			// itself into a rollback. Simply continuing therefore threw away
-			// the clears made above and reported counts for work that had not
-			// happened — and it did so only on that one engine, which is why
-			// this is a savepoint rather than a bare `continue`. `SAVEPOINT`
-			// is plain SQL that all four engines take, so this stays engine
-			// agnostic.
-			sp, err := tx.BeginTx(ctx, nil)
+			})
+		}
+		slices.SortFunc(fresh, func(a, b Notification) int { return strings.Compare(a.About, b.About) })
+		for start := 0; start < len(fresh); start += database.BatchSize {
+			n, err := openBatch(ctx, tx, fresh[start:min(start+database.BatchSize, len(fresh))])
+			opened += n
 			if err != nil {
-				return fmt.Errorf("hold a point to open a condition from: %w", err)
+				return err
 			}
-			if _, err := sp.NewInsert().Model(row).Exec(ctx); err != nil {
-				_ = sp.Rollback()
-				if database.IsDuplicate(err) {
-					continue
-				}
-				return fmt.Errorf("open a condition that became true: %w", err)
-			}
-			if err := sp.Commit(); err != nil {
-				return fmt.Errorf("keep a condition that was opened: %w", err)
-			}
-			opened++
 		}
 		return nil
 	})
@@ -562,6 +542,118 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 		return 0, 0, err
 	}
 	return opened, cleared, nil
+}
+
+// restated is a standing condition and what it says now.
+type restated struct {
+	id  int64
+	now Holds
+}
+
+// restate rewrites what standing conditions say, a bounded number of rows a
+// statement.
+//
+// Each column is set by a CASE over the row's identifier, so one statement
+// carries a different sentence for every row it names. Each CASE falls back
+// to the column itself: no row reaches that branch, because the statement
+// names only the rows it has a value for, and it gives the expression the
+// column's type where every value it carries is a null.
+func restate(ctx context.Context, tx bun.IDB, moved []restated) error {
+	for start := 0; start < len(moved); start += database.BatchSize {
+		batch := moved[start:min(start+database.BatchSize, len(moved))]
+		ids := make([]int64, len(batch))
+		for i, m := range batch {
+			ids[i] = m.id
+		}
+		update := tx.NewUpdate().Model((*Notification)(nil))
+		for _, column := range []struct {
+			name  string
+			value func(Holds) any
+		}{
+			{"body", func(h Holds) any { return h.Body }},
+			{"link", func(h Holds) any { return h.Link }},
+			{"private", func(h Holds) any { return h.Private }},
+			{"product_id", func(h Holds) any { return h.ProductID }},
+			{"vulnerability_id", func(h Holds) any { return h.VulnerabilityID }},
+			{"team_id", func(h Holds) any { return h.TeamID }},
+		} {
+			var said strings.Builder
+			args := make([]any, 0, 2*len(batch)+2)
+			said.WriteString(`? = CASE "id"`)
+			args = append(args, bun.Ident(column.name))
+			for _, m := range batch {
+				said.WriteString(" WHEN ? THEN ?")
+				args = append(args, m.id, column.value(m.now))
+			}
+			said.WriteString(" ELSE ? END")
+			args = append(args, bun.Ident(column.name))
+			update = update.Set(said.String(), args...)
+		}
+		if _, err := update.Where(`"id" IN (?)`, bun.List(ids)).Exec(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// openBatch opens conditions in one statement, and reports how many it
+// opened.
+//
+// The statement stands on its own savepoint, because carrying on after a
+// failed write is not something every engine allows. On PostgreSQL a refused
+// statement poisons the whole transaction: everything after it fails and the
+// commit turns itself into a rollback, which throws away the clears made
+// before it and reports counts for work that did not happen. `SAVEPOINT` is
+// plain SQL that all four engines take, so this stays engine agnostic.
+//
+// Another process getting there first is the ordinary case rather than a
+// fault: a deployment runs more than one of these — the chart ships two
+// replicas and every one sweeps — so two saying the same true thing at the
+// same moment is expected, and the unique index is what makes it one row. A
+// duplicate is not retryable, so aborting the sweep would leave everybody
+// after this person told nothing. A batch refused for a duplicate is opened
+// again one row at a time, each on a savepoint of its own, and the row
+// somebody else opened is left to them.
+func openBatch(ctx context.Context, tx bun.IDB, rows []Notification) (int, error) {
+	sp, err := tx.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("hold a point to open conditions from: %w", err)
+	}
+	if err := database.InBatchesUnkeyed(ctx, sp, rows); err != nil {
+		_ = sp.Rollback()
+		if !database.IsDuplicate(err) {
+			return 0, fmt.Errorf("open the conditions that became true: %w", err)
+		}
+		return openEach(ctx, tx, rows)
+	}
+	if err := sp.Commit(); err != nil {
+		return 0, fmt.Errorf("keep the conditions that were opened: %w", err)
+	}
+	return len(rows), nil
+}
+
+// openEach opens conditions a row at a time, leaving alone any another
+// process opened first.
+func openEach(ctx context.Context, tx bun.IDB, rows []Notification) (int, error) {
+	opened := 0
+	for i := range rows {
+		sp, err := tx.BeginTx(ctx, nil)
+		if err != nil {
+			return opened, fmt.Errorf("hold a point to open a condition from: %w", err)
+		}
+		if _, err := sp.NewInsert().Model(&rows[i]).Returning("").Exec(ctx); err != nil {
+			_ = sp.Rollback()
+			if database.IsDuplicate(err) {
+				continue
+			}
+			return opened, fmt.Errorf("open a condition that became true: %w", err)
+		}
+		if err := sp.Commit(); err != nil {
+			return opened, fmt.Errorf("keep a condition that was opened: %w", err)
+		}
+		opened++
+	}
+	return opened, nil
 }
 
 // sameID reports whether two optional identifiers name the same thing.
