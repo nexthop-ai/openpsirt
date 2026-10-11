@@ -23,7 +23,7 @@ through triage to a verified fix and a published advisory.
 | | |
 |---|---|
 | Built for products | A finding is one component at one place in one build you ship, so a judgment holds exactly where it was made |
-| Built for scale | One switch image carries 335,021 findings. Fix bundles group them by the upgrade that closes them, and one act answers a bundle |
+| Built for scale | One real product image carries 335,021 findings. Fix bundles group them by the upgrade that closes them, and one act answers a bundle |
 | Built for audit | Every dismissal has a written reason, a second person's approval and an append-only history |
 | Built for disclosure | CSAF 2.0 advisories, a CSAF provider directory, and an OpenVEX document for every build |
 | Built to be yours | Apache 2.0. It runs on your infrastructure, on PostgreSQL, MySQL, MariaDB or SQLite, with or without a network |
