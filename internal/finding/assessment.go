@@ -486,7 +486,7 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 
 	// Everything below the flags, packed by the same function that packs it
 	// at ingest.
-	_, err = reranking(tx, productID, inForce.rest()).
+	_, err = reranking(tx, productID, "?", int64(inForce.rest())).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Exec(ctx)
 	if err != nil {
@@ -503,19 +503,19 @@ func (r Rating) rest() Rank {
 
 // reranking writes the order onto one product's open findings: the flags each
 // row carries, and the rest of the order as worked out from that product's
-// rating. The caller names which issues.
+// rating. The caller names which issues, and gives the rest as an expression
+// over the row's columns, so one statement can carry a value per issue.
 //
 // The flags are per finding, so they stay in the statement, and every one of
 // them is read here: this is the one statement the packed number is written
 // again by, whichever signal moved.
-func reranking(tx bun.IDB, productID int64, rest Rank) *bun.UpdateQuery {
+func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.UpdateQuery {
 	return tx.NewUpdate().
 		Model((*Finding)(nil)).
 		Set("urgency = (CASE WHEN urgency_exploited_here THEN ? ELSE 0 END)"+
 			" + (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
-			" + (CASE WHEN urgency_shipped THEN ? ELSE 0 END) + ?",
-			int64(exploitedHereBand), int64(exploitedBand),
-			int64(shippedBand), int64(rest)).
+			" + (CASE WHEN urgency_shipped THEN ? ELSE 0 END) + "+rest,
+			append([]any{int64(exploitedHereBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
 		Where("closed_at IS NULL").
 		// This product's findings alone. The number being written was worked
 		// out from this product's rating, and writing it over another

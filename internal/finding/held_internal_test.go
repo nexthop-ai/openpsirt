@@ -15,11 +15,12 @@ import (
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 )
 
-// Two findings share an update statement only where every value it writes is
-// the same, and differ in their key wherever one value differs. A column the
-// update writes and the key leaves out would hand one finding another's
-// values; a column the update does not write and the key holds only splits a
-// statement in two.
+// Two findings share an update statement only where every value it writes to
+// every row is the same, and differ in their key wherever one value differs.
+// A column the update writes and the key leaves out would hand one finding
+// another's values; a column the update does not write and the key holds only
+// splits a statement in two. The order is the one column written from each
+// row's own value, so findings differing in it share a statement.
 func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) {
 	on := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	later := on.Add(time.Hour)
@@ -36,31 +37,32 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 	// Each case changes the one column it names and nothing else.
 	cases := []struct {
 		column string
-		// gate is the flag the update writes the column under, or empty
-		// where it writes it always.
+		// gate is the flag the update writes the column under, or perRow
+		// where it writes it from each row's own value.
 		gate   string
 		change func(m *moving)
 	}{
-		{"fix_state", "", func(m *moving) { m.f.FixState = "" }},
-		{"fixed_in", "", func(m *moving) { m.f.FixedIn = "2.0" }},
-		{"fixed_at", "", func(m *moving) { m.f.FixedAt = &later }},
-		{"matched", "", func(m *moving) { m.f.Matched = "upstream" }},
-		{"matched_from", "", func(m *moving) { m.f.MatchedFrom = "c" }},
-		{"matched_in", "", func(m *moving) { m.f.MatchedIn = "d" }},
-		{"matched_range", "", func(m *moving) { m.f.MatchedRange = "< 2.0" }},
-		{"suppressed_by", "", func(m *moving) { m.f.SuppressedBy = &two }},
-		{"suppressed_by", "", func(m *moving) { m.f.SuppressedBy = nil }},
-		{"stated_by", "", func(m *moving) { m.f.StatedBy = &two }},
-		{"stated_by", "", func(m *moving) { m.f.StatedBy = nil }},
-		{"claimed_by", "", func(m *moving) { m.f.ClaimedBy = &two }},
-		{"claimed_by", "", func(m *moving) { m.f.ClaimedBy = nil }},
-		{"urgency", "moved", func(m *moving) { m.f.Urgency = 20 }},
+		{"fix_state", "described", func(m *moving) { m.f.FixState = "" }},
+		{"fixed_in", "described", func(m *moving) { m.f.FixedIn = "2.0" }},
+		{"fixed_at", "described", func(m *moving) { m.f.FixedAt = &later }},
+		{"matched", "described", func(m *moving) { m.f.Matched = "upstream" }},
+		{"matched_from", "described", func(m *moving) { m.f.MatchedFrom = "c" }},
+		{"matched_in", "described", func(m *moving) { m.f.MatchedIn = "d" }},
+		{"matched_range", "described", func(m *moving) { m.f.MatchedRange = "< 2.0" }},
+		{"suppressed_by", "described", func(m *moving) { m.f.SuppressedBy = &two }},
+		{"suppressed_by", "described", func(m *moving) { m.f.SuppressedBy = nil }},
+		{"stated_by", "described", func(m *moving) { m.f.StatedBy = &two }},
+		{"stated_by", "described", func(m *moving) { m.f.StatedBy = nil }},
+		{"claimed_by", "described", func(m *moving) { m.f.ClaimedBy = &two }},
+		{"claimed_by", "described", func(m *moving) { m.f.ClaimedBy = nil }},
+		{"urgency", "perRow", func(m *moving) { m.f.Urgency = 20 }},
 		{"urgency_exploited", "moved", func(m *moving) { m.f.RankExploited = true }},
 		{"urgency_shipped", "moved", func(m *moving) { m.f.RankShipped = true }},
 		{"exploited_learned_at", "exploitationMoved", func(m *moving) { m.learned = &later }},
 		{"due_at", "clockMoved", func(m *moving) { m.f.DueAt = &later }},
 	}
 	flags := map[string]func(m *moving, on bool){
+		"described":         func(m *moving, on bool) { m.described = on },
 		"moved":             func(m *moving, on bool) { m.moved = on },
 		"exploitationMoved": func(m *moving, on bool) { m.exploitationMoved = on },
 		"clockMoved":        func(m *moving, on bool) { m.clockMoved = on },
@@ -69,14 +71,18 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 	for _, c := range cases {
 		covered[c.column] = true
 		for _, written := range []bool{true, false} {
-			if c.gate == "" && !written {
+			a, b := base(), base()
+			if c.gate == "perRow" {
+				flags["moved"](&a, written)
+				flags["moved"](&b, written)
+				c.change(&b)
+				if a.key() != b.key() {
+					t.Errorf("%s, written per row, split the statement", c.column)
+				}
 				continue
 			}
-			a, b := base(), base()
-			if c.gate != "" {
-				flags[c.gate](&a, written)
-				flags[c.gate](&b, written)
-			}
+			flags[c.gate](&a, written)
+			flags[c.gate](&b, written)
 			c.change(&b)
 			if differ := a.key() != b.key(); differ != written {
 				t.Errorf("%s under %q set %v: keys differ %v, want %v", c.column, c.gate, written, differ, written)
@@ -91,7 +97,8 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 	for _, set := range flags {
 		set(&all, true)
 	}
-	statement := all.update(db, on).Where("1 = 1").String()
+	all.add(1, all.f.Urgency)
+	statement := all.update(db, on, 0, 1).String()
 	var written []string
 	for _, m := range regexp.MustCompile(`(?:SET |, )"?([a-z_]+)"? = `).FindAllStringSubmatch(statement, -1) {
 		if m[1] != "last_changed_at" {

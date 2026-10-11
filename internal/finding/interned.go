@@ -218,6 +218,10 @@ func plain(name string) bool {
 // none. Every comparison here leans toward issuing the statement: a statement
 // issued that matches nothing costs a round trip, and one skipped that would
 // have matched loses a write.
+//
+// The estimate is the exception. A feed moves it for nearly every issue on the
+// same day, so a newer one is queued and written with the rest of the run's in
+// a statement per batch, before anything reads the rows again.
 func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRecord) (int64, error) {
 	named, names, err := prepared(named)
 	if err != nil {
@@ -232,6 +236,11 @@ func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRec
 		}
 	}
 	if !answered {
+		// Resolving alone reads the rows the estimates waiting to be written
+		// are about.
+		if err := v.writeEstimates(ctx); err != nil {
+			return 0, err
+		}
 		merged := len(v.absorbed)
 		id, err := v.one(ctx, named)
 		if err != nil {
@@ -256,7 +265,11 @@ func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRec
 	}
 	ratings := held.ratings[id]
 	if unranked(row, ratings, named) {
-		moved, err := v.rank(ctx, id, named)
+		newer, err := v.estimateHeld(ctx, row, named)
+		if err != nil {
+			return 0, err
+		}
+		moved, err := v.raise(ctx, id, named, newer)
 		if err != nil {
 			return 0, err
 		}

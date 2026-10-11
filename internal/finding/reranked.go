@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -120,14 +121,11 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 		return err
 	}
 
-	// One statement per product and value of the order, over every issue it
-	// is the value for.
-	type order struct {
-		productID int64
-		rest      Rank
-	}
-	byOrder := map[order][]int64{}
-	var orders []order
+	// One statement per product and batch of issues, each issue taking its
+	// own value of the order by a CASE over the issue inside the statement.
+	// The likelihood is close to unique to an issue, so a statement per value
+	// of the order is a statement per issue.
+	byProduct := map[int64][]ordered{}
 	for _, id := range issues {
 		issue := signals[id]
 		for _, productID := range holding[id] {
@@ -136,25 +134,28 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 				Assessed:   rated[RatedKey{ProductID: productID, VulnerabilityID: id}],
 				ScoreCenti: issue.ScoreCenti, LikelihoodPPM: issue.Likelihood,
 			}
-			key := order{productID, inForce.rest()}
-			if _, held := byOrder[key]; !held {
-				orders = append(orders, key)
-			}
-			byOrder[key] = append(byOrder[key], id)
+			byProduct[productID] = append(byProduct[productID], ordered{id, inForce.rest()})
 		}
 	}
-	for _, key := range orders {
-		err := database.IDsInBatches(ctx, byOrder[key], func(ctx context.Context, batch []int64) error {
-			q := reranking(tx, key.productID, key.rest).
-				Where("vulnerability_id IN (?)", bun.List(batch))
+	for _, productID := range products {
+		each := byProduct[productID]
+		for first := 0; first < len(each); first += database.BatchSize {
+			batch := each[first:min(first+database.BatchSize, len(each))]
+			ids := make([]int64, len(batch))
+			rests := make([]any, 0, 2*len(batch))
+			for i, one := range batch {
+				ids[i] = one.issue
+				rests = append(rests, one.issue, int64(one.rest))
+			}
+			q := reranking(tx, productID,
+				"CASE vulnerability_id"+strings.Repeat(" WHEN ? THEN ?", len(batch))+" END", rests...).
+				Where("vulnerability_id IN (?)", bun.List(ids))
 			if scanned != 0 {
 				q = q.Where("NOT (target_id = ? AND kind = ?)", scanned, Vulnerable)
 			}
-			_, err := q.Exec(ctx)
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("move these issues in the order: %w", err)
+			if _, err := q.Exec(ctx); err != nil {
+				return fmt.Errorf("move these issues in the order: %w", err)
+			}
 		}
 	}
 
@@ -173,6 +174,12 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 		}
 	}
 	return nil
+}
+
+// ordered is the rest of the order one issue takes in one product.
+type ordered struct {
+	issue int64
+	rest  Rank
 }
 
 // signal is what one issue carries that the order is worked out from.

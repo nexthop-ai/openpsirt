@@ -246,6 +246,8 @@ A scan's reports are interned together:
 | The last copy is skipped where nothing since the first resolved to the same issue or merged one | The first copy recorded every name the report carries on that issue, and nothing else has moved it, so the last would write nothing |
 | What is on record about a run of reports is read together | One statement per kind of record — names, filed names, issues, ratings, weaknesses, references — for a few hundred reports at a time |
 | A part of a report is written only where what was read says the statement would match a row | Each is the statement the report alone issues, with the same condition. Everything a rescan of unchanged data would issue matches nothing |
+| A newer estimate is written with the run's others, a statement per day and batch of issues | A feed moves the estimate of nearly every issue on the same day, each to a value of its own. Each issue's value is chosen by its identifier inside the statement, under the condition its own statement carries, and the batch is written before anything reads the rows again: the next run of reports and a report resolved alone |
+| Whether a queued estimate moved is answered from the read | The read agrees with the statement's condition wherever both days are the start of a day in UTC. Where either is not, the issue's own statement is issued and its matched rows answer |
 | A report the read cannot answer for is resolved alone, from the database | One whose names reach no issue or more than one, one naming a better-known name than its issue is filed under, one naming a name outside plain ASCII, and one reaching an issue or a name an earlier report in the run wrote. Creating, merging and renaming an issue happen on that path alone |
 | Comparisons lean toward writing | A statement issued that matches nothing costs a round trip, and one skipped that would have matched loses a write. Names compare without regard to case, which is never narrower than an engine's comparison, and a day compares only where both sides are the start of a day in UTC |
 | The description and the advisory are written only where the row holds a gap | Spaces alone count as a gap, because MySQL and MariaDB compare them equal to the empty string |
@@ -257,7 +259,8 @@ rows, names, merges and moved issues after every round.
 Measured on one image whose 11,435 reports name 7,643 issues, rescanned with
 nothing changed: interned together, 570 statements and no issue row rewritten;
 a report at a time, 114,339 statements and 11,435 issue rows rewritten with
-what they held.
+what they held. Rescanned the day a feed moved 7,640 estimates: 46 statements
+writing them, against 7,652 an issue at a time.
 
 The score carries where it came from. Which scoring system it is on, who
 published it and whether it is the primary rating or a secondary one, filled
@@ -1007,15 +1010,29 @@ change" is counted by.
 |---|---|
 | One writer at a time, per target | Recording what a run found begins by taking the target row. Two runs in flight would both read the same open findings, compute the same difference and write it, leaving two open rows for one finding. An ordinary update is a lock every supported engine honors. The test runs two overlapping applications and was checked by removing the hold, which reproduces the double-open on all three server engines |
 | A finding that is already open still moves | A fix appears, upstream declines to fix it, the build answers it. A run compares what it found against what is recorded and updates the parts that can move, stamping when they moved. Only those parts are compared: everything else is what makes it that finding |
-| Findings that moved to the same values are one write | Grouped by every value the update writes, the columns it leaves alone excepted, so each row receives exactly what it would alone |
+| Findings that moved to the same values are one write | Grouped by every value the update writes to every row it names, the columns it leaves alone excepted, so each row receives exactly what it would alone |
+| The order is written from each finding's own value | Chosen by the finding's identifier inside the statement. The likelihood is close to unique to an issue, so grouping by the order is a statement per issue |
+| The fix, the match and what answers a finding are written only where one of them moved | Where none did, the row already holds what the update would write, and grouping by them splits a statement by every issue and component |
 | An open finding is read in the columns the comparison uses | Every open row of the build is read on every scan, and the rest of the row is nothing the comparison asks |
 | What closed before at a place is read as its latest row | One row per issue, component and consumer, and one per issue and place name. A place whose version moves gathers a closed row at every move |
 | The intervals are the change record | Every node, edge, finding and claim records the run that opened it and the run that closed it, so asking what changed between two points is a query over those. There is no second table duplicating them |
 
 Measured on one image of 324,508 open findings, rescanned the day a likelihood
-feed moved every issue: grouped by the values written, 7,562 update statements
-and no row re-ranked a second time; a finding at a time, 324,508 updates and
-324,508 rows re-ranked again after them.
+feed moved every issue: 651 update statements of 500 rows, against 7,556
+grouped by every value including the order and 324,508 a finding at a time.
+No row is re-ranked a second time.
+
+The same day on every engine, as `make measure` takes it: 7,600 issues moved,
+each at three places in the scanned build and three in a tag. The application
+is 367 statements, against 23,074 with a statement per issue for each of the
+estimate, the scanned build's order and the tag's order.
+
+| Engine | A statement per issue | A statement per batch |
+|---|---:|---:|
+| SQLite | 2.7 s | 1.3 s |
+| PostgreSQL | 6.7 to 7.8 s | 1.8 s |
+| MySQL | 6 min 47 s | 2.3 s |
+| MariaDB | 5 min 20 s | 1.9 s |
 
 ## Closure reasons
 
@@ -1457,7 +1474,12 @@ bottom of the list, until somebody rescanned that tag, which for a tag is never.
 | The moment it was learned is kept on the row | Nothing else holds it, so every later recount had to guess and fell back to the opening — which moved the deadline back to a date already in the past, on any assessment, agreement or withdrawal that touched the issue, with nothing logged |
 | It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
 | The scanned build's own scanner findings are left out of the rewrite | Applying the scan has just ranked every one of them from the same ratings, read in the same transaction. A finding recorded by hand in that build is rewritten, because the scan reads none. The exploited clock still reaches them: a listing day moving earlier re-clocks a row the scan found already exploited and left alone |
-| One statement per product and value of the order | Issues whose rest of the order comes out the same in one product share it. The issues, their products and those products' ratings are each read once for all of them |
+| One statement per product and batch of issues | Each issue's rest of the order is chosen by the issue inside the statement, so a feed moving every issue's likelihood to a value of its own is not a statement per issue. The issues, their products and those products' ratings are each read once for all of them |
+
+Measured on one image of 324,508 open findings, rescanned the day a likelihood
+feed moved every issue, with another build of the product holding 43,220 open
+findings of the same issues: 16 statements, against 1,955 with a statement per
+value of the order.
 
 Five signals, in this order:
 

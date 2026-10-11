@@ -7,6 +7,7 @@ package finding
 // the ones that moved.
 
 import (
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -44,21 +45,32 @@ type heldFinding struct {
 // written to.
 //
 // Findings whose updates write the same values are one statement over their
-// identifiers. An issue's likelihood moving rewrites the order of every place
-// it sits, and those places share almost everything an update writes.
+// identifiers. The order is the exception: it is written from each finding's
+// own value, chosen by identifier inside the statement. An issue's likelihood
+// moving rewrites the order of every place it sits, and the likelihood is
+// close to unique to the issue, so a statement per value of the order is a
+// statement per issue.
 type moving struct {
-	f                 Finding
+	f Finding
+	// described is whether anything but the order and the clock moved: the
+	// fix, the match, and what answers the finding. Where nothing did, those
+	// columns hold what the update would write and are left out of it.
+	described         bool
 	moved             bool
 	exploitationMoved bool
 	learned           *time.Time
 	clockMoved        bool
 	ids               []int64
+	// urgencies is the order each of ids takes, where moved.
+	urgencies []int64
 }
 
-// changeKey is every value an update writes, in a form that compares.
+// changeKey is every value an update writes to every row it names, in a form
+// that compares.
 //
 // A column the update leaves alone is zero here, so findings differing only
-// in a value nobody writes share a statement.
+// in a value nobody writes share a statement. The order is written per row
+// and is not here.
 type changeKey struct {
 	fixState                             FixState
 	fixedIn                              string
@@ -66,8 +78,8 @@ type changeKey struct {
 	matched                              Matched
 	matchedFrom, matchedIn, matchedRange string
 	suppressedBy, statedBy, claimedBy    reference
+	described                            bool
 	moved                                bool
-	urgency                              int64
 	rankExploited, rankShipped           bool
 	exploitationMoved                    bool
 	learned                              string
@@ -100,17 +112,20 @@ func instantOf(t *time.Time) string {
 
 func (m moving) key() changeKey {
 	k := changeKey{
-		fixState: m.f.FixState, fixedIn: m.f.FixedIn, fixedAt: instantOf(m.f.FixedAt),
-		matched: m.f.Matched, matchedFrom: m.f.MatchedFrom, matchedIn: m.f.MatchedIn,
-		matchedRange: m.f.MatchedRange,
-		suppressedBy: referenceOf(m.f.SuppressedBy), statedBy: referenceOf(m.f.StatedBy),
-		claimedBy:         referenceOf(m.f.ClaimedBy),
+		described:         m.described,
 		moved:             m.moved,
 		exploitationMoved: m.exploitationMoved,
 		clockMoved:        m.clockMoved,
 	}
+	if m.described {
+		k.fixState, k.fixedIn, k.fixedAt = m.f.FixState, m.f.FixedIn, instantOf(m.f.FixedAt)
+		k.matched, k.matchedFrom, k.matchedIn = m.f.Matched, m.f.MatchedFrom, m.f.MatchedIn
+		k.matchedRange = m.f.MatchedRange
+		k.suppressedBy, k.statedBy = referenceOf(m.f.SuppressedBy), referenceOf(m.f.StatedBy)
+		k.claimedBy = referenceOf(m.f.ClaimedBy)
+	}
 	if m.moved {
-		k.urgency, k.rankExploited, k.rankShipped = m.f.Urgency, m.f.RankExploited, m.f.RankShipped
+		k.rankExploited, k.rankShipped = m.f.RankExploited, m.f.RankShipped
 	}
 	if m.exploitationMoved {
 		k.learned = instantOf(m.learned)
@@ -121,25 +136,46 @@ func (m moving) key() changeKey {
 	return k
 }
 
-// update is the statement writing this change, without the rows it is
-// written to.
-func (m moving) update(tx bun.IDB, now time.Time) *bun.UpdateQuery {
+// add names one more finding this change is written to, with the order it
+// takes.
+func (m *moving) add(id int64, urgency int64) {
+	m.ids = append(m.ids, id)
+	m.urgencies = append(m.urgencies, urgency)
+}
+
+// update is the statement writing this change to the findings from first up
+// to last.
+//
+// The order is a CASE over the identifier, which no assignment in the list
+// writes, so the engines that read a value already assigned earlier in the
+// list read the same thing as the ones that do not. The ELSE names the column
+// and nothing reaches it, because the statement names only the findings the
+// CASE does.
+func (m moving) update(tx bun.IDB, now time.Time, first, last int) *bun.UpdateQuery {
 	f := m.f
 	update := tx.NewUpdate().Model((*Finding)(nil)).
-		Set("fix_state = ?", f.FixState).
-		Set("fixed_in = ?", f.FixedIn).
-		Set("fixed_at = ?", f.FixedAt).
-		Set("matched = ?", f.Matched).
-		Set("matched_from = ?", f.MatchedFrom).
-		Set("matched_in = ?", f.MatchedIn).
-		Set("matched_range = ?", f.MatchedRange).
-		Set("suppressed_by = ?", f.SuppressedBy).
-		Set("stated_by = ?", f.StatedBy).
-		Set("claimed_by = ?", f.ClaimedBy).
 		Set("last_changed_at = ?", now)
-	if m.moved {
+	if m.described {
 		update = update.
-			Set("urgency = ?", f.Urgency).
+			Set("fix_state = ?", f.FixState).
+			Set("fixed_in = ?", f.FixedIn).
+			Set("fixed_at = ?", f.FixedAt).
+			Set("matched = ?", f.Matched).
+			Set("matched_from = ?", f.MatchedFrom).
+			Set("matched_in = ?", f.MatchedIn).
+			Set("matched_range = ?", f.MatchedRange).
+			Set("suppressed_by = ?", f.SuppressedBy).
+			Set("stated_by = ?", f.StatedBy).
+			Set("claimed_by = ?", f.ClaimedBy)
+	}
+	if m.moved {
+		urgencies := make([]any, 0, 2*(last-first))
+		for i := first; i < last; i++ {
+			urgencies = append(urgencies, m.ids[i], m.urgencies[i])
+		}
+		update = update.
+			Set("urgency = CASE id"+strings.Repeat(" WHEN ? THEN ?", last-first)+" ELSE urgency END",
+				urgencies...).
 			Set("urgency_exploited = ?", f.RankExploited).
 			Set("urgency_shipped = ?", f.RankShipped)
 	}
@@ -151,5 +187,5 @@ func (m moving) update(tx bun.IDB, now time.Time) *bun.UpdateQuery {
 	if m.clockMoved {
 		update = update.Set("due_at = ?", f.DueAt)
 	}
-	return update
+	return update.Where("id IN (?)", bun.List(m.ids[first:last]))
 }

@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -284,6 +285,140 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 		}
 		if n == 0 {
 			t.Fatal("nothing read what closed before, so this checked nothing")
+		}
+	})
+}
+
+func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *testing.T) {
+	// A feed moving the likelihood moves it for nearly every issue, each to a
+	// value of its own, and with it the order of every place each issue sits.
+	// The estimates, the scanned build's order and every other build's order
+	// are each written a statement per batch, every row taking its own value
+	// by its identifier inside the statement. A value handed to the wrong
+	// row shows as an issue holding another's estimate, or as two builds
+	// ordering one issue differently.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		yesterday := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+		today := yesterday.AddDate(0, 0, 1)
+		dated := []string{"CVE-2026-DAY-1", "CVE-2026-DAY-2", "CVE-2026-DAY-3", "CVE-2026-DAY-4"}
+		undated := []string{"CVE-2026-UNDATED-1", "CVE-2026-UNDATED-2"}
+		likelihoodOf := func(i int, moved bool) float64 {
+			if moved {
+				return 0.5 - 0.05*float64(i)
+			}
+			return 0.01 * float64(i+1)
+		}
+		report := func(moved bool) []finding.Reported {
+			on := &yesterday
+			if moved {
+				on = &today
+			}
+			var out []finding.Reported
+			for i, id := range dated {
+				r := found(id, libnl)
+				r.Issue.Likelihood, r.Issue.LikelihoodOn = likelihoodOf(i, moved), on
+				// Every other one without a percentile, so a batch carries
+				// both a number and nothing.
+				if i%2 == 0 {
+					r.Issue.LikelihoodPercentile = 0.5 + likelihoodOf(i, moved)
+				}
+				out = append(out, r)
+			}
+			// Undated and without a percentile, so one batch carries
+			// nothing at all for it.
+			for i, id := range undated {
+				r := found(id, libnl)
+				r.Issue.Likelihood = likelihoodOf(len(dated)+i, moved)
+				out = append(out, r)
+			}
+			return out
+		}
+		tag := f.anotherBuild(t, "24.06")
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), report(false)); err != nil {
+			t.Fatal(err)
+		}
+		f.shippedTo(t, tag, twoConsumers())
+		if _, err := f.store.Apply(ctx, tag, f.runOn(t, tag), report(false)); err != nil {
+			t.Fatal(err)
+		}
+
+		asked := &matchedStatements{}
+		f.db.AddQueryHook(asked)
+		applied, err := f.store.Apply(ctx, f.target, f.run(t), report(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		all := append(append([]string(nil), dated...), undated...)
+		// Every issue at the two places libnl sits.
+		if want := 2 * len(all); applied.Updated != want {
+			t.Fatalf("updated %d findings, want %d", applied.Updated, want)
+		}
+		estimates, estimated := asked.matching(`UPDATE "vulnerability" AS "vu" SET likelihood_ppm = `)
+		ordered, orderedRows := asked.matching(`UPDATE "finding" AS "f" SET last_changed_at = `)
+		reranked, rerankedRows := asked.matching(`UPDATE "finding" AS "f" SET urgency = (CASE WHEN`)
+		// One statement for the dated estimates and one for the undated.
+		if estimates != 2 || estimated != int64(len(all)) {
+			t.Errorf("the estimates were %d statements matching %d issues, want 2 matching %d",
+				estimates, estimated, len(all))
+		}
+		if ordered != 1 || orderedRows != int64(2*len(all)) {
+			t.Errorf("the scanned build's order was %d statements matching %d findings, want 1 matching %d",
+				ordered, orderedRows, 2*len(all))
+		}
+		if reranked != 1 || rerankedRows != int64(2*len(all)) {
+			t.Errorf("the tag's order was %d statements matching %d findings, want 1 matching %d",
+				reranked, rerankedRows, 2*len(all))
+		}
+
+		var rows []finding.Vulnerability
+		if err := f.db.DB.NewSelect().Model(&rows).
+			Where("vu.identifier LIKE ?", "CVE-2026-%DATED-%").
+			WhereOr("vu.identifier LIKE ?", "CVE-2026-DAY-%").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != len(all) {
+			t.Fatalf("read %d issues, want %d", len(rows), len(all))
+		}
+		held := map[string]finding.Vulnerability{}
+		for _, row := range rows {
+			held[row.Identifier] = row
+		}
+		for i, id := range all {
+			row := held[id]
+			want := int(likelihoodOf(i, true)*1_000_000 + 0.5)
+			if row.LikelihoodPPM == nil || *row.LikelihoodPPM != want {
+				t.Errorf("%s holds a likelihood of %s, want %d", id, deref(row.LikelihoodPPM), want)
+			}
+			wantPercentile := "none"
+			if i < len(dated) && i%2 == 0 {
+				wantPercentile = fmt.Sprint(int((0.5+likelihoodOf(i, true))*1_000_000 + 0.5))
+			}
+			if got := deref(row.LikelihoodPercentilePPM); got != wantPercentile {
+				t.Errorf("%s holds a percentile of %s, want %s", id, got, wantPercentile)
+			}
+			wantDay := "none"
+			if i < len(dated) {
+				wantDay = day(&today)
+			}
+			if got := day(row.LikelihoodOn); got != wantDay {
+				t.Errorf("%s holds an estimate for %s, want %s", id, got, wantDay)
+			}
+		}
+		// Falling likelihoods at one severity: each issue below the one
+		// before it, and the tag ordering each as the scanned build does.
+		var above int64
+		for i, id := range all {
+			scanned, onTag := f.urgencyIn(t, f.target, id), f.urgencyIn(t, tag, id)
+			if scanned != onTag {
+				t.Errorf("%s sits at %d on the scanned build and %d on the tag", id, scanned, onTag)
+			}
+			if i > 0 && scanned >= above {
+				t.Errorf("%s sits at %d, at or above %s at %d, with a lower likelihood",
+					id, scanned, all[i-1], above)
+			}
+			above = scanned
 		}
 	})
 }

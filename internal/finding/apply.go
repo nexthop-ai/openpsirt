@@ -480,26 +480,26 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			// withdrawn stops it — and a row written under an earlier rule
 			// carries an answer nothing else corrects.
 			clockMoved := !sameDate(already.DueAt, f.DueAt)
-			if same(already, f) && !moved && !clockMoved {
+			described := !same(already, f)
+			if !described && !moved && !clockMoved {
 				continue
 			}
-			change := moving{f: f, moved: moved, exploitationMoved: exploitationMoved,
-				learned: learned, clockMoved: clockMoved}
+			change := moving{f: f, described: described, moved: moved,
+				exploitationMoved: exploitationMoved, learned: learned, clockMoved: clockMoved}
 			group, grouped := updates[change.key()]
 			if !grouped {
 				group = &change
 				updates[change.key()] = group
 			}
-			group.ids = append(group.ids, already.ID)
+			group.add(already.ID, f.Urgency)
 			applied.Updated++
 		}
 		for _, group := range updates {
-			err := database.IDsInBatches(ctx, group.ids, func(ctx context.Context, batch []int64) error {
-				_, err := group.update(tx, now).Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
-				return fmt.Errorf("update %d findings that moved: %w", len(group.ids), err)
+			for first := 0; first < len(group.ids); first += database.BatchSize {
+				last := min(first+database.BatchSize, len(group.ids))
+				if _, err := group.update(tx, now, first, last).Exec(ctx); err != nil {
+					return fmt.Errorf("update %d findings that moved: %w", len(group.ids), err)
+				}
 			}
 		}
 		// The subject each moved-from finding was about.
