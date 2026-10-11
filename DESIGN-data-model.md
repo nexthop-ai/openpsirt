@@ -612,7 +612,8 @@ exist is a property of the producer's graph.
 Recursive traversal is portable across all four engines. Every walk is one
 `WITH RECURSIVE` statement: upward from the components on a page, downward from a
 component for the set beneath it, and downward from a row of the tree's children
-for the distinct issues under each. The walk upward carries how far it has come
+for the components under each, whose open issues are united per row in the
+application. The walk upward carries how far it has come
 and is bounded at sixty-four steps. The walks down carry no depth: the union
 adds a component once, which ends a cycle, and carrying a depth keeps a
 component once per path to it. A component more than sixty-four steps below the

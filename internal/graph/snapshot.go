@@ -779,7 +779,8 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// one of the 37 containers below that. A tree whose first screen
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
-		OrderExpr("CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, c.name")
+		// The identifier last, so two components of one name keep one order.
+		OrderExpr("CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, c.name, c.id")
 }
 
 // openIssuesJoin adds how many issues are open against each component "c" in
@@ -800,14 +801,21 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 // per row: 0.30 s for the root's thirty children against 0.09 s as one grouped
 // pass, and 17.1 s for a search for "li" on a switch image of 297,881 open
 // findings, where the pass takes 0.24 s.
+//
+// The pass groups the places to one row per issue on a component before
+// counting them. A distinct count over the places sorts all of them: on the
+// bench kernel's build, 325,389 open places, the walk one step up from the
+// kernel takes 103 ms counted distinct and 42 ms grouped first.
 func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 	targetID int64) *bun.SelectQuery {
 
 	return query.
-		Join(`LEFT JOIN (SELECT f.component_id AS "cid", COUNT(DISTINCT f.vulnerability_id) AS "n"
-			FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-			GROUP BY f.component_id) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
+		Join(`LEFT JOIN (SELECT g.cid AS "cid", COUNT(*) AS "n"
+			FROM (SELECT f.component_id AS "cid", f.vulnerability_id AS "vid"
+			      FROM "finding" AS "f"
+			      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
+			      GROUP BY f.component_id, f.vulnerability_id) AS "g"
+			GROUP BY g.cid) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
 		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`)
 }
 
@@ -1063,7 +1071,9 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		OrderExpr(`"findings" DESC, c.name`).
+		// The identifier last, because a build ships one name at more than
+		// one version and the limit cuts by this order.
+		OrderExpr(`"findings" DESC, c.name, c.id`).
 		Limit(limit).
 		Scan(ctx, &rows)
 	if err != nil {

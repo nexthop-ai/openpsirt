@@ -729,15 +729,23 @@ builds. Every read behind the page's rows is shaped by that size.
 | Where it could go is read as one row per issue and fix on each component, carrying identifiers and the fix alone | That is 13,938 rows for the kernel. One row per place is 274,068, each carrying the fold key and the package identifier, which takes 5 s on a 100 Mbit link. The fold and the ecosystem are the component's, already read |
 | What has been promised is correlated by the product the scope names, bound once | Every build on the page is in that product |
 | Each binary's own issue count groups to one row per issue before counting | A distinct count over the places sorts them: 150 ms against 80 ms on the bench kernel |
+| A component's own open count in the tree groups to one row per issue before counting | It is counted for every component in the build and joined. Counted distinct, the build's 325,389 places are sorted: the step above the bench kernel takes 103 ms counted distinct and 42 ms grouped first |
+| What is beneath each neighbor is the union, per neighbor, of the issues on the components it reaches, taken in the application | Each of the kernel's 45 parents reaches the kernel, so joined in the database the kernel's issues arrive once per parent: 302,269 rows sorted for 270 answers, 345 ms. The walk and the issues on what it reaches are 5,331 and 10,769 rows, 100 ms |
+| Rows of one name at one rank are ordered by the component's identifier | A build ships one name at more than one version, and without it two such rows trade places between plans |
 
-| The page's own read, for the kernel | Alone | Four at once |
+| The page's reads, for the kernel | Alone | Four at once |
 |---|---:|---:|
-| Bench image, PostgreSQL 16, one processor, 1 ms and 100 Mbit to the server | 0.61 s | 2.2 s |
+| The component read, bench image, PostgreSQL 16, one processor, 1 ms and 100 Mbit to the server | 0.61 s | 2.4 s |
+| Where it sits in the build, the same bench | 0.21 s | 0.58 s |
+| The whole screen: the component read, then where it sits and the twelve weeks side by side | 0.90 s | 3.3 s |
 | The same build's findings list, for comparison | 0.11 s | 0.29 s |
 
 On the measurement fixture's kernel of 204,000 places, with statistics settled,
 the read takes 0.38 s on PostgreSQL, 0.59 s on SQLite, 0.61 s on MySQL and
 0.45 s on MariaDB, against 0.09 s to 0.28 s for that build's findings list.
+Where it sits in the build, with its 34 consumers above it, takes 0.24 s on
+PostgreSQL, 0.68 s on SQLite, 0.53 s on MySQL and 0.34 s on MariaDB, against
+0.75 s to 0.87 s joined in the database.
 
 ## The finding screen
 
@@ -981,10 +989,12 @@ across it and everything under it, each component counted once however many ways
 it is reached. A finding is one issue at one place, and a library at thirty-six
 places with two issues is seventy-two rows — which is what a parent reads if it
 counts findings, where somebody who drilled down one path is looking at one
-place and expects two. One recursive statement for the row's whole set of
+place and expects two. One recursive walk for the row's whole set of
 children: 0.08 s for the root's thirty children on the full-size image, and
 0.19 s for the walk under 2,140 children of a real product of 12,147
-components. The walk records which components each child reaches and not how
+components. The walk answers which components each child reaches, a second
+statement over the same walk answers the issues open on those components once
+per component, and the union per child is taken in the application. The walk records which components each child reaches and not how
 far, because recording the distance keeps a component once per path to it:
 1,612,405 rows for those 43,904 pairs, and 9.0 s.
 

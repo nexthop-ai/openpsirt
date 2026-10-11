@@ -167,6 +167,66 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 	})
 }
 
+func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		// A container holds two libraries carrying the same issue, and one of
+		// them carries a second. The container reads two beneath, not three,
+		// and each library reads what is on it.
+		box, one, two := at("container", "1"), at("libone", "1.0"), at("libtwo", "1.0")
+		snap := graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{box, one, two},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: box}, {Parent: box, Child: one}, {Parent: box, Child: two},
+			},
+		}
+		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		findings := finding.NewStore(f.db.DB)
+		run, err := findings.Begin(t.Context(), finding.Run{
+			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			DatabaseVersion: "2026-08-28", RanHere: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		reported := func(id string, component graph.Described) finding.Reported {
+			return finding.Reported{
+				Issue:     finding.Named{Identifier: id, Severity: "high"},
+				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
+			}
+		}
+		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+			reported("CVE-2026-1", one), reported("CVE-2026-1", two), reported("CVE-2026-2", two),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if top == nil || top.Beneath != 2 || top.BeneathBy["high"] != 2 {
+			t.Fatalf("the root reads %+v beneath, wanted 2 distinct issues, both high", top)
+		}
+		if len(kids) != 1 || kids[0].Beneath != 2 {
+			t.Fatalf("the container reads %+v, wanted 2 distinct issues beneath it", kids)
+		}
+		_, below, err := f.store.Around(t.Context(), everyone(f), f.targetID, box.Name, graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]int{}
+		for _, row := range below {
+			got[row.Name] = row.Beneath
+		}
+		if got[one.Name] != 1 || got[two.Name] != 2 {
+			t.Errorf("the libraries read %v beneath, wanted libone 1 and libtwo 2", got)
+		}
+	})
+}
+
 func TestADocumentInALoopIsWalkedOnceAndStops(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		// a depends on b, b on a, and the product on a. Every walk has to

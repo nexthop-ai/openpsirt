@@ -85,14 +85,14 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // the same two statements take 0.018 s and 0.08 s.
 
 // beneath counts the distinct issues open under each of these components,
-// including on it, in one statement.
+// including on it.
 //
 // Worked out when the tree is read rather than stored after a scan. Storing it
-// was the first attempt and it is the wrong shape: the number is derived from
-// findings, and findings move between scans — something dismissed, something
-// assigned, a rating reconsidered. A stored total is right at the moment a
-// scan ends and drifts from the screen beside it thereafter, which is a screen
-// quoting yesterday's answer with nothing saying so.
+// is the wrong shape: the number is derived from findings, and findings move
+// between scans — something dismissed, something assigned, a rating
+// reconsidered. A stored total is right at the moment a scan ends and drifts
+// from the screen beside it thereafter, which is a screen quoting yesterday's
+// answer with nothing saying so.
 //
 // Distinct issues, not finding rows. A finding is one issue at one place, and
 // a library at thirty-six places with two issues is seventy-two rows — which
@@ -100,16 +100,21 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // down one path is looking at one place and expects two. The issues open
 // against a component are the same at every place it sits, so counting them
 // once per component answers per path without a walk per path. And counted
-// over distinct components, not summed along edges: a library
-// reached by twenty containers is one thing inside each of them. The
-// statement says exactly that: the subtree as a set of components, joined to
-// the distinct (component, issue) pairs open in the build, counted per start.
-// And by severity, in the same statement. A node saying five thousand
-// beneath it says nothing about whether any of it matters, which is what
-// somebody deciding where to descend is asking. An issue has one rating, so
-// the bands partition the distinct issues and their counts sum back to the
-// total — one query answers both, and two queries would be two chances for the
-// number and its parts to disagree.
+// over distinct components, not summed along edges: a library reached by
+// twenty containers is one thing inside each of them.
+//
+// Two statements over one walk: which components each start reaches, and the
+// issues open on the components reached, each once per component. The union
+// per start is taken here. Joined in the database, every start reaching a
+// large component carries that component's issues again: the bench kernel's
+// 45 parents make 302,269 rows to sort and count for 270 answers, 345 ms on
+// PostgreSQL, where the two statements return 5,331 and 10,769 rows in 100 ms.
+//
+// And by severity. A node saying five thousand beneath it says nothing about
+// whether any of it matters, which is what somebody deciding where to descend
+// is asking. An issue has one rating, so the bands partition the distinct
+// issues; the total is summed from them by the caller, so the number and its
+// parts cannot disagree.
 func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	visible []access.Visibility, of []int64, adopt adoption) (map[int64]map[string]int, error) {
 
@@ -119,12 +124,12 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	}
 	// Every start is walked from itself. An adoption walks the adopted
 	// components as though from the one adopting them, so the adopter's count
-	// is its own subtree and theirs as one set, in the same statement as
-	// everything else being counted.
+	// is its own subtree and theirs as one set, in the same walk as everything
+	// else being counted.
 	seeds := `SELECT n.id AS "start", n.id AS "node"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
-	args := []any{targetID, bun.List(of)}
+	walkArgs := []any{targetID, bun.List(of)}
 	if len(adopt.IDs) > 0 {
 		seeds += `
 		UNION ALL
@@ -133,55 +138,92 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		JOIN "graph_node" AS "n" ON n.target_id = bn.target_id
 		WHERE bn.target_id = ? AND bn.closed_scan_id IS NULL AND bn.component_id = ?
 		  AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
-		args = append(args, targetID, adopt.By, bun.List(adopt.IDs))
+		walkArgs = append(walkArgs, targetID, adopt.By, bun.List(adopt.IDs))
 	}
-	args = append(args, targetID, productID, targetID, bun.List(visible))
-	var rows []struct {
-		ComponentID int64  `bun:"component_id"`
-		Band        string `bun:"band"`
-		Issues      int    `bun:"issues"`
-	}
+	walkArgs = append(walkArgs, targetID)
 	// No depth in the rows. With one, the union keeps a node once per depth
 	// it is reached at, and a node reached along many paths is walked again
 	// from each: 1,612,405 rows for 43,904 pairs under one real product's
 	// root, 9.0 s against 0.19 s. Without one, a pair already reached is not
 	// added again, which is also what ends a cycle.
-	err := s.db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT "seed"."start", "seed"."node" FROM (`+seeds+`) AS "seed"
+	walk := `WITH RECURSIVE "down" AS (
+		SELECT "seed"."start", "seed"."node" FROM (` + seeds + `) AS "seed"
 		UNION
 		SELECT d.start, e.child_id
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
 		  AND e.parent_id <> e.child_id
 	)
-	SELECT sn.component_id AS "component_id", p.band AS "band",
-	       COUNT(DISTINCT p.vulnerability_id) AS "issues"
-	FROM (SELECT DISTINCT d.start, d.node FROM "down" AS "d") AS "w"
-	JOIN "graph_node" AS "sn" ON sn.id = w.start
-	JOIN "graph_node" AS "n" ON n.id = w.node
-	JOIN (SELECT f.component_id AS "component_id", f.vulnerability_id AS "vulnerability_id",
-	             `+rating.EffectiveExpr+` AS "band"
-	      FROM "finding" AS "f"
-	      JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id
-	      `+rating.Here+`
-	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-	      GROUP BY f.component_id, f.vulnerability_id, `+rating.EffectiveExpr+`) AS "p"
-	  ON p.component_id = n.component_id
-	GROUP BY sn.component_id, p.band`, args...).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("count what is open beneath each component: %w", err)
+	`
+
+	var reached []struct {
+		Start   int64 `bun:"start"`
+		Reached int64 `bun:"reached"`
 	}
-	for _, row := range rows {
-		// The word as the data has it. Folding a rating nobody recognizes into
-		// one word is the reader's question and is done where the answer is
-		// shaped: this package cannot import the one that says which words are
-		// real without a cycle, and a second copy of that list here is the
-		// thing that list exists to prevent.
-		if totals[row.ComponentID] == nil {
-			totals[row.ComponentID] = map[string]int{}
+	err := s.db.NewRaw(walk+`SELECT DISTINCT sn.component_id AS "start", n.component_id AS "reached"
+	FROM "down" AS "d"
+	JOIN "graph_node" AS "sn" ON sn.id = d.start
+	JOIN "graph_node" AS "n" ON n.id = d.node`, walkArgs...).
+		Scan(ctx, &reached)
+	if err != nil {
+		return nil, fmt.Errorf("walk beneath each component: %w", err)
+	}
+
+	// The places are grouped to one row per issue on a component before the
+	// rating is joined, and only on the components the walk reaches.
+	var open []struct {
+		ComponentID     int64  `bun:"component_id"`
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Band            string `bun:"band"`
+	}
+	issueArgs := append(append([]any{}, walkArgs...), targetID, bun.List(visible), productID)
+	err = s.db.NewRaw(walk+`SELECT g.component_id AS "component_id", g.vulnerability_id AS "vulnerability_id",
+	       `+rating.EffectiveExpr+` AS "band"
+	FROM (SELECT f.component_id AS "component_id", f.vulnerability_id AS "vulnerability_id"
+	      FROM "finding" AS "f"
+	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
+	        AND f.component_id IN (SELECT n.component_id
+	                               FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node)
+	      GROUP BY f.component_id, f.vulnerability_id) AS "g"
+	JOIN "vulnerability" AS "v" ON v.id = g.vulnerability_id
+	`+rating.Here, issueArgs...).
+		Scan(ctx, &open)
+	if err != nil {
+		return nil, fmt.Errorf("read what is open beneath each component: %w", err)
+	}
+
+	type issue struct {
+		id   int64
+		band string
+	}
+	on := map[int64][]issue{}
+	for _, row := range open {
+		on[row.ComponentID] = append(on[row.ComponentID], issue{row.VulnerabilityID, row.Band})
+	}
+	under := map[int64][]int64{}
+	for _, row := range reached {
+		under[row.Start] = append(under[row.Start], row.Reached)
+	}
+	for start, components := range under {
+		seen := map[issue]bool{}
+		for _, c := range components {
+			for _, one := range on[c] {
+				if seen[one] {
+					continue
+				}
+				seen[one] = true
+				// The word as the data has it. Folding a rating nobody
+				// recognizes into one word is the reader's question and is
+				// done where the answer is shaped: this package cannot import
+				// the one that says which words are real without a cycle, and
+				// a second copy of that list here is the thing that list
+				// exists to prevent.
+				if totals[start] == nil {
+					totals[start] = map[string]int{}
+				}
+				totals[start][one.band]++
+			}
 		}
-		totals[row.ComponentID][row.Band] += row.Issues
 	}
 	return totals, nil
 }
