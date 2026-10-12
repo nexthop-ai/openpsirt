@@ -1,0 +1,4 @@
+# The migrations v0.8.0 tagged, and the digest of each file below its license header.
+last 42
+61c4efbbb81a3d38a029df98b84a9ec715e74241152fa56abc219b6f0fecbd2c  00042_v080.go
+dd3c73117264a800fcb0dd03765ef701a48cff8729eee4b7cd8c62cdf06d5a27  v080_indexes.go
