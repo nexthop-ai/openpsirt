@@ -226,13 +226,30 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		logger.Error("could not refresh the planner's statistics", "error", err)
 	}
 
+	handler, beside, err := prepare(ctx, cfg, logger, db)
+	if err != nil {
+		return err
+	}
+	return serve(cfg, logger, handler, beside)
+}
+
+// prepare is everything a start does after the schema is in place and before
+// the server listens: the administrators and group mappings named in
+// configuration, the sign-in providers, the stores, the queue and the passes.
+//
+// Apart from run so that each refusal it makes is reachable by a test with a
+// database and a configuration in hand, rather than only by starting the
+// program.
+func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
+	db *database.DB) (http.Handler, passes, error) {
+
 	// Named administrators are granted at every start, which is what makes
 	// this the way back in rather than a one-time setup step.
 	// Each one named or no longer named is recorded in the administrative
 	// trail, against configuration.
 	unnamed, err := trail.NameAdministrators(ctx, db.DB, cfg.BootstrapAdmins)
 	if err != nil {
-		return startupFailed(err, "granting the administrators named in configuration", cfg)
+		return nil, passes{}, startupFailed(err, "granting the administrators named in configuration", cfg)
 	}
 	if len(cfg.BootstrapAdmins) > 0 {
 		logger.Info("administrators granted from configuration", "count", len(cfg.BootstrapAdmins))
@@ -257,14 +274,14 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	mapped, mode, err := trail.MapGroups(ctx, db.DB, cfg.GroupRoles)
 	switch {
 	case errors.Is(err, access.ErrNobodyAdministers) && len(cfg.GroupRoles) > 0:
-		return fmt.Errorf("nobody can administer this deployment: OPENPSIRT_GROUP_ROLES maps no " +
+		return nil, passes{}, fmt.Errorf("nobody can administer this deployment: OPENPSIRT_GROUP_ROLES maps no " +
 			"group to admin, and OPENPSIRT_BOOTSTRAP_ADMINS names nobody who can. Map a group to " +
 			"admin or name somebody there, and start again")
 	case errors.Is(err, access.ErrNobodyAdministers):
-		return fmt.Errorf("nobody can administer this deployment: nobody holds administration, " +
+		return nil, passes{}, fmt.Errorf("nobody can administer this deployment: nobody holds administration, " +
 			"and OPENPSIRT_BOOTSTRAP_ADMINS names nobody who can. Name somebody there and start again")
 	case err != nil:
-		return startupFailed(err, "applying the group mappings named in configuration", cfg)
+		return nil, passes{}, startupFailed(err, "applying the group mappings named in configuration", cfg)
 	}
 	for _, mapping := range cfg.GroupRoles {
 		logger.Info("group mapped", "mapping", mapping.String(), "grants", mapping.Grants)
@@ -282,7 +299,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	// only the person trying to sign in ever sees.
 	providers, err := signInProviders(ctx, cfg, logger)
 	if err != nil {
-		return err
+		return nil, passes{}, err
 	}
 	// One provider at a time is a rule across time, not only at one instant
 	// (REQ-41). A deployment pointed at a second provider reads identifiers
@@ -292,17 +309,10 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	// bound to. Nothing at sign-in time can tell that from an ordinary
 	// arrival, which is why it is refused here.
 	if err := onlyTheBoundProvider(ctx, rights, providers); err != nil {
-		return err
+		return nil, passes{}, err
 	}
-	if len(providers) > 0 && cfg.BaseURL == "" {
-		// A provider sends people back to an address, and it compares that
-		// address against what it was registered with. Deriving it from
-		// whatever a request claims its host is would make the address depend
-		// on the request — so it is stated, and a deployment that configured a
-		// provider without stating it stops here rather than at somebody's
-		// first sign-in.
-		return errors.New("OPENPSIRT_BASE_URL has to name the address people reach this on, " +
-			"because a provider is configured")
+	if err := returnsTo(providers, cfg.BaseURL); err != nil {
+		return nil, passes{}, err
 	}
 
 	// The store for files hanging off an issue. Nothing configured is the
@@ -310,7 +320,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	logger.Info("checking the attachment store")
 	files, err := attachmentStore(ctx, cfg, logger)
 	if err != nil {
-		return err
+		return nil, passes{}, err
 	}
 
 	// Where the advisories that have gone out are written for somebody else
@@ -319,7 +329,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	logger.Info("checking the published advisory directory store")
 	published, err := directoryStore(ctx, cfg, logger)
 	if err != nil {
-		return err
+		return nil, passes{}, err
 	}
 
 	// An API-only build serves no page and says so once; a binary whose
@@ -333,7 +343,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		logger.Info("serving the API only", "why", err)
 		pages = nil
 	case err != nil:
-		return fmt.Errorf("the interface built into this binary could not be read: %w", err)
+		return nil, passes{}, fmt.Errorf("the interface built into this binary could not be read: %w", err)
 	}
 
 	queueing := queue.DefaultOptions()
@@ -346,7 +356,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	queueing.MaxHold = cfg.QueueMaxHold
 	queueing.Backoff = cfg.QueueBackoff
 	if err := queueing.Check(); err != nil {
-		return err
+		return nil, passes{}, err
 	}
 	// The ceiling on one hold is what cuts a long scan off, and it is the only
 	// bound here that can: the claim is renewed for as long as the scan runs,
@@ -355,7 +365,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	// with nothing saying why, so the two are compared where both are in hand
 	// rather than left to a documentation row.
 	if queueing.MaxHold > 0 && cfg.ScannerTimeout >= queueing.MaxHold {
-		return fmt.Errorf(
+		return nil, passes{}, fmt.Errorf(
 			"OPENPSIRT_SCANNER_TIMEOUT is %s, which is not below the %s a worker may hold "+
 				"one job for — a scan allowed to run that long is killed before it finishes",
 			cfg.ScannerTimeout, queueing.MaxHold)
@@ -512,13 +522,28 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		logger.Warn("a store for published advisories is configured and nothing is " +
 			"written to it: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE")
 	}
-	return serve(cfg, logger, handler, passes{
+	return handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing,
 		undertaker: undertaker, publish: writer, suppliers: suppliers,
 		branches: branches,
 		records:  records,
-	})
+	}, nil
+}
+
+// returnsTo refuses a provider with no address to send people back to.
+//
+// A provider sends people back to an address, and it compares that address
+// against what it was registered with. Deriving it from whatever a request
+// claims its host is would make the address depend on the request — so it is
+// stated, and a deployment that configured a provider without stating it stops
+// here rather than at somebody's first sign-in.
+func returnsTo(providers map[string]signin.Provider, baseURL string) error {
+	if len(providers) > 0 && baseURL == "" {
+		return errors.New("OPENPSIRT_BASE_URL has to name the address people reach this on, " +
+			"because a provider is configured")
+	}
+	return nil
 }
 
 // publishesAs is the identity this deployment publishes under, and where what

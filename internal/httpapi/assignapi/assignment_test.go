@@ -164,7 +164,8 @@ func TestTheAssignerRightAloneHandsNobodyAnything(t *testing.T) {
 	//
 	// The refusal is enforced twice — at the endpoint and again in the
 	// store — so this assertion only moves when both go. The store's own
-	// half is broken and watched in internal/finding.
+	// half is broken and watched in internal/finding, and the endpoint's in
+	// TestSomebodyWhoMayNotTriageIsToldNothingAboutWhoHasAnAccount.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom" +
@@ -192,6 +193,26 @@ func TestTheAssignerRightAloneHandsNobodyAnything(t *testing.T) {
 			if each.MayTriage {
 				t.Errorf("%s is offered triage to somebody holding only the assigner role", each.Product)
 			}
+		}
+	})
+}
+
+func TestSomebodyWhoMayNotTriageIsToldNothingAboutWhoHasAnAccount(t *testing.T) {
+	// The endpoint refuses before the name in the body is looked up. Looked
+	// up first, a name nobody holds answers "nobody here is called that" and
+	// a name somebody holds answers what the store refuses with: a directory
+	// of the organization, to somebody who may only read the product.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		held := httpapitest.AsPerson(t, r, "dispatcher", http.MethodPut, at, `{"person":"reader"}`)
+		nobody := httpapitest.AsPerson(t, r, "dispatcher", http.MethodPut, at,
+			`{"person":"nobody-has-this-name"}`)
+		httpapitest.RefusedWith(t, nobody, http.StatusNotFound)
+		if held.Code != nobody.Code || held.Body.String() != nobody.Body.String() {
+			t.Errorf("a name somebody holds answers %d %s and a name nobody holds %d %s",
+				held.Code, held.Body.String(), nobody.Code, nobody.Body.String())
 		}
 	})
 }

@@ -702,3 +702,33 @@ func declareProduct(t *testing.T, f *fixture, name string) int64 {
 	}
 	return product.ID
 }
+
+func TestSomebodyWhoLeftIsRefusedByTheirGroupsAndTheirRolesAreLeftAsTheyWere(t *testing.T) {
+	// Deactivation is a standing fact about the account, unchanged by the
+	// groups somebody arrives with: they are refused before anything is
+	// written, and their record of what they held is not rewritten.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bind(t, f, access.Mapping{Group: "platform", Grants: string(access.PublicRead), Product: "sonic"})
+		bind(t, f, access.Mapping{Group: "security", Grants: string(access.PrivateTriage), Product: "sonic"})
+		arriving := access.Arrival{ViaProxy: true, Username: "someone"}
+		admitted, err := f.store.AdmitByGroups(ctx, arriving, []string{"platform"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Deactivate(ctx, admitted.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := f.store.AdmitByGroups(ctx, arriving, []string{"security"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody who left was admitted by their groups: %v", err)
+		}
+		held, err := f.store.Grants(ctx, admitted.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 1 || held[0].Role != access.PublicRead {
+			t.Errorf("turning somebody who left away rewrote what they held: %+v", held)
+		}
+	})
+}
