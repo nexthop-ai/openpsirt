@@ -925,6 +925,13 @@ halves against the same `ALLOWED_LICENSES`, passed in rather than repeated, and
 dev dependencies are unrestricted on both sides because a build tool binds
 whoever builds rather than whoever installs.
 
+A development dependency the interface's source imports is in the bundle, so
+the npm half refuses one: an import or re-export that is not type-only, a
+dynamic import, or a stylesheet `@import` naming a package the lockfile marks
+for development. Tests and the test harness are not shipped and are not read.
+A package the bundle carries is declared a dependency, where its license is
+checked.
+
 | Exception | Why |
 |---|---|
 | `@fontsource/*` under OFL-1.1 | The license fonts are published under. What it withholds is selling the fonts on their own, which is not something a shipped application does |

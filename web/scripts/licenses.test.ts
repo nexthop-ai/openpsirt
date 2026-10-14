@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { excepts, packageAt, satisfies } from "./licenses.mjs";
+import { excepts, licenseVerdict, packageAt, satisfies, shippedImports } from "./licenses.mjs";
 
 // The interface ships inside the binary, so a copyleft dependency there is the
 // installer's problem.
@@ -104,5 +104,61 @@ describe("which package an exception names", () => {
     expect(excepts("@fontsource/", "x/@fontsource/inter")).toBe(true);
     expect(excepts("@fontsource/", "@fontsourcery/inter")).toBe(false);
     expect(excepts("@fontsource/", "fontsource")).toBe(false);
+  });
+});
+
+describe("the verdict over a lockfile", () => {
+  const packages = {
+    "": { name: "web" },
+    "node_modules/kept": { license: "MIT" },
+    "node_modules/copyleft": { license: "GPL-3.0-only" },
+    "node_modules/tool": { license: "GPL-3.0-only", dev: true },
+    "node_modules/@fonts/serif": { license: "OFL-1.1" },
+  };
+  const verdict = () =>
+    licenseVerdict(packages, permissive, [{ prefix: "@fonts/", license: "OFL-1.1" }]) as {
+      refused: string[];
+      excepted: string[];
+      checked: number;
+    };
+
+  it("refuses a shipped package outside the allowlist", () => {
+    expect(verdict().refused).toEqual(["copyleft is GPL-3.0-only"]);
+  });
+
+  it("admits a package by exception and leaves a development one alone", () => {
+    expect(verdict().excepted).toEqual(["@fonts/serif (OFL-1.1)"]);
+    expect(verdict().checked).toBe(3);
+  });
+});
+
+describe("a development dependency in the bundle", () => {
+  const packages = {
+    "node_modules/shipped": { license: "MIT" },
+    "node_modules/@build/tool": { license: "GPL-3.0-only", dev: true },
+    "node_modules/styles": { license: "MIT", devOptional: true },
+  };
+  const found = (files: Record<string, string>) => shippedImports(files, packages) as string[];
+
+  it("is reported where the source imports it", () => {
+    expect(
+      found({
+        "ui/a.tsx": `import { x } from "@build/tool/inner";`,
+        "index.css": `@import "styles";`,
+      }),
+    ).toEqual([
+      "@build/tool is imported by src/ui/a.tsx but is a development dependency",
+      "styles is imported by src/index.css but is a development dependency",
+    ]);
+  });
+
+  it("is not reported where only a test, the harness or a type import names it", () => {
+    expect(
+      found({
+        "ui/a.test.tsx": `import { x } from "@build/tool";`,
+        "test/mount.tsx": `import { x } from "@build/tool";`,
+        "ui/b.ts": `import type { X } from "@build/tool"; import { y } from "shipped"; import "./c";`,
+      }),
+    ).toEqual([]);
   });
 });

@@ -13,13 +13,16 @@
 //
 // Development dependencies are unrestricted, as they are on the Go side.
 // Vite, ESLint and the type checker are not in the bundle, and a build tool's
-// license binds whoever builds rather than whoever installs.
-import { readFile } from "node:fs/promises";
+// license binds whoever builds rather than whoever installs. What makes that
+// true is that the interface's source imports none of them, so that is checked
+// too: a development dependency imported by the source is in the bundle.
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import ts from "typescript";
+import { parse, sourceFiles, SRC, WEB } from "./parsed.mjs";
 
-const here = import.meta.dirname;
-const lockfile = path.join(here, "..", "package-lock.json");
+const lockfile = path.join(WEB, "package-lock.json");
 
 // The allowlist is the Makefile's, passed in rather than repeated here. A
 // policy written in two files is a policy that differs in one of them, which
@@ -132,6 +135,94 @@ export function satisfies(expression, against = allowed) {
   return position === tokens.length && result;
 }
 
+// licenseVerdict holds every shipped package of a lockfile's `packages` to the
+// allowlist and the exceptions. It returns the packages refused and the ones
+// admitted by exception, each as a line naming the package and its license,
+// and how many packages were checked.
+export function licenseVerdict(packages, against = allowed, admitted = exceptions) {
+  const refused = [];
+  const excepted = [];
+  let checked = 0;
+  for (const [location, entry] of Object.entries(packages)) {
+    // The root package is this repository, and dev dependencies do not ship.
+    if (!location || entry.dev || entry.devOptional) continue;
+    checked++;
+
+    const name = location.replace(/^node_modules\//, "").replace(/\/node_modules\//g, "/");
+    const license = entry.license;
+
+    if (!license) {
+      refused.push(`${name} declares no license`);
+      continue;
+    }
+    if (satisfies(license, against)) continue;
+
+    const exception = admitted.find((e) => excepts(e.prefix, name) && e.license === license);
+    if (exception) {
+      excepted.push(`${name} (${license})`);
+      continue;
+    }
+    refused.push(`${name} is ${license}`);
+  }
+  return { refused: refused.sort(), excepted, checked };
+}
+
+// The package a bare import specifier names: "@scope/name" or "name", without
+// any path inside it. A relative path, an absolute one and a builtin scheme
+// name no package.
+function packageNamed(specifier) {
+  if (/^(\.|\/|[a-z]+:)/.test(specifier)) return "";
+  const parts = specifier.split("/");
+  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+}
+
+// Every specifier a file imports at run time: an import or re-export that is
+// not type-only and a dynamic import in TypeScript, and an `@import` in a
+// stylesheet.
+function importsOf(file, text) {
+  if (file.endsWith(".css")) {
+    return [...text.matchAll(/@import\s+(?:url\()?["']([^"']+)["']/g)].map((m) => m[1]);
+  }
+  const out = [];
+  const visit = (node) => {
+    if (
+      (ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly) ||
+      (ts.isExportDeclaration(node) && node.moduleSpecifier && !node.isTypeOnly)
+    ) {
+      if (ts.isStringLiteral(node.moduleSpecifier)) out.push(node.moduleSpecifier.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments[0] &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      out.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parse(text, file));
+  return out;
+}
+
+// shippedImports is every development dependency the shipped source imports,
+// as a line naming the package and the file. It takes the source as
+// { path relative to src/: text } and a lockfile's `packages`. Tests and the
+// test harness under src/test/ are not shipped and are not read.
+export function shippedImports(files, packages) {
+  const found = [];
+  for (const [file, text] of Object.entries(files)) {
+    if (file.includes(".test.") || file.split(/[\\/]/)[0] === "test") continue;
+    for (const specifier of importsOf(file, text)) {
+      const name = packageNamed(specifier);
+      const entry = name && packages[`node_modules/${name}`];
+      if (entry && (entry.dev || entry.devOptional)) {
+        found.push(`${name} is imported by src/${file} but is a development dependency`);
+      }
+    }
+  }
+  return [...new Set(found)].sort();
+}
+
 // What to say where no shipped dependency was read, or nothing where some
 // were. A lockfile whose every entry is marked for development, or one that
 // moved, refuses no license for the reason that it examined none.
@@ -152,37 +243,27 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     console.error("no allowlist given. The list lives in the Makefile; run `make licenses`.");
     process.exit(2);
   }
-  const lock = JSON.parse(await readFile(lockfile, "utf8"));
-
-  const refused = [];
-  const excepted = [];
-  let checked = 0;
-
-  for (const [location, entry] of Object.entries(lock.packages)) {
-    // The root package is this repository, and dev dependencies do not ship.
-    if (!location || entry.dev || entry.devOptional) continue;
-    checked++;
-
-    const name = location.replace(/^node_modules\//, "").replace(/\/node_modules\//g, "/");
-    const license = entry.license;
-
-    if (!license) {
-      refused.push(`${name} declares no license`);
-      continue;
-    }
-    if (satisfies(license)) continue;
-
-    const exception = exceptions.find((e) => excepts(e.prefix, name) && e.license === license);
-    if (exception) {
-      excepted.push(`${name} (${license})`);
-      continue;
-    }
-    refused.push(`${name} is ${license}`);
-  }
+  const lock = JSON.parse(readFileSync(lockfile, "utf8"));
+  const { refused, excepted, checked } = licenseVerdict(lock.packages);
+  const source = Object.fromEntries(
+    sourceFiles({ ext: [".ts", ".tsx", ".css"] }).map((file) => [
+      path.relative(SRC, file),
+      readFileSync(file, "utf8"),
+    ]),
+  );
+  const imported = shippedImports(source, lock.packages);
 
   const nothing = checkedNothing(checked);
   if (nothing) {
     console.error(nothing);
+    process.exit(1);
+  }
+  if (imported.length > 0) {
+    for (const line of imported) console.error(line);
+    console.error(
+      `\n${imported.length} development dependenc${imported.length === 1 ? "y is" : "ies are"} ` +
+        `in the bundle. Move each to dependencies, where its license is checked.`,
+    );
     process.exit(1);
   }
   if (refused.length === 0) {
@@ -192,7 +273,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     );
     process.exit(0);
   }
-  for (const line of refused.sort()) console.error(line);
+  for (const line of refused) console.error(line);
   console.error(
     `\n${refused.length} shipped dependency license(s) outside the allowlist. ` +
       `Either the dependency goes, or the exception is written down with a reason.`,
