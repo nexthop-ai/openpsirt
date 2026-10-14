@@ -338,6 +338,56 @@ func Narrow() { fmt.Println() }
 			0,
 			"",
 		},
+		{
+			"a method's comment naming another method of its receiver",
+			`package p
+
+type Store struct{}
+
+// Close releases the store.
+func (s *Store) Open() {}
+
+func (s *Store) Close() {}
+`,
+			inPackage("Store", "Store.Open", "Store.Close"),
+			1,
+			"",
+		},
+		{
+			"a method's comment on its own method",
+			`package p
+
+type Store struct{}
+
+// Close releases the store.
+func (s *Store) Close() {}
+`,
+			inPackage("Store", "Store.Close"),
+			0,
+			"",
+		},
+		{
+			// A method of another type, or one a function's comment opens
+			// with, is a word to them.
+			"a comment opening with a method of another type",
+			`package p
+
+type Store struct{}
+
+type Runner struct{}
+
+// Run the store's checks.
+func (s *Store) Check() {}
+
+// Run the store's checks once.
+func checkAll() {}
+
+func (r Runner) Run() {}
+`,
+			inPackage("Store", "Runner", "Store.Check", "checkAll", "Runner.Run"),
+			0,
+			"",
+		},
 	} {
 		file := c.file
 		if file == "" {
@@ -378,6 +428,9 @@ func (Record) Close() {}
 		if declared[unwanted] {
 			t.Errorf("%s is a field, a local or a method and was counted as a symbol", unwanted)
 		}
+	}
+	if !declared["Record.Close"] {
+		t.Error("Close is a method of Record and was not counted under it")
 	}
 }
 

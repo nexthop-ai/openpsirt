@@ -149,11 +149,16 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 		if block.test {
 			continue
 		}
-		// A comment naming some other symbol entirely is the accident. One
-		// naming nothing the tree declares is prose that happens to open with
-		// a word, and is left alone.
-		if !declared[named] {
+		// A comment naming some other symbol entirely is the accident: one the
+		// package declares, or for a method another method of its receiver.
+		// One naming nothing the tree declares is prose that happens to open
+		// with a word, and is left alone.
+		method := block.recv != "" && declared[block.recv+"."+named]
+		if !declared[named] && !method {
 			continue
+		}
+		if method {
+			named = block.recv + "." + named
 		}
 		bad = append(bad, fmt.Sprintf("%s:%d: the comment above %s describes %s",
 			path, fset.Position(block.doc.Pos()).Line, strings.Join(block.names, ", "), named))
@@ -329,11 +334,14 @@ func aTest(path string, fn *ast.FuncDecl) bool {
 // block is one doc comment and the names the declaration under it declares.
 //
 // A test's own name is a sentence rather than a symbol, so the convention does
-// not apply to it and its comment opens with whatever the test is about.
+// not apply to it and its comment opens with whatever the test is about. A
+// method's comment can name another method of its receiver, which is a symbol
+// to it and to nothing else.
 type block struct {
 	doc   *ast.CommentGroup
 	names []string
 	test  bool
+	recv  string
 }
 
 // documented is every doc comment in a file with what it sits on.
@@ -352,7 +360,8 @@ func documented(path string, file *ast.File) []block {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
 			if d.Doc != nil && len(d.Doc.List) > 0 {
-				blocks = append(blocks, block{doc: d.Doc, names: []string{d.Name.Name}, test: aTest(path, d)})
+				blocks = append(blocks, block{doc: d.Doc, names: []string{d.Name.Name}, test: aTest(path, d),
+					recv: receiver(d)})
 			}
 		case *ast.GenDecl:
 			var all []string
@@ -376,12 +385,14 @@ func documented(path string, file *ast.File) []block {
 	return blocks
 }
 
-// declares adds every name one file declares at package level to the set.
+// declares adds every name one file declares at package level to the set,
+// and every method under its receiver's type, as T.Close.
 //
-// Package level only. A method, a local variable and a struct field are named
-// for what they do or hold on one type, in one function or in one record, and half the ordinary English
-// words in this tree are one of those somewhere — reading them as symbols is
-// what turns the check into noise.
+// Package level only. A local variable and a struct field are named for what
+// they hold in one function or one record, and half the ordinary English words
+// in this tree are one of those somewhere — reading them as symbols is what
+// turns the check into noise. A method is named for what it does on one type,
+// so it is a symbol only to another method of that type.
 func declares(source []byte, into map[string]bool) {
 	file, err := parser.ParseFile(token.NewFileSet(), "", source, parser.SkipObjectResolution)
 	if err != nil {
@@ -392,6 +403,8 @@ func declares(source []byte, into map[string]bool) {
 		case *ast.FuncDecl:
 			if d.Recv == nil {
 				into[d.Name.Name] = true
+			} else if recv := receiver(d); recv != "" {
+				into[recv+"."+d.Name.Name] = true
 			}
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {
@@ -406,6 +419,28 @@ func declares(source []byte, into map[string]bool) {
 			}
 		}
 	}
+}
+
+// receiver is the name of the type a method is declared on, or empty for a
+// function.
+func receiver(fn *ast.FuncDecl) string {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return ""
+	}
+	expr := fn.Recv.List[0].Type
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	switch e := expr.(type) {
+	case *ast.IndexExpr:
+		expr = e.X
+	case *ast.IndexListExpr:
+		expr = e.X
+	}
+	if id, ok := expr.(*ast.Ident); ok {
+		return id.Name
+	}
+	return ""
 }
 
 func slicesContains(all []string, want string) bool {
