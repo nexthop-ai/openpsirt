@@ -600,9 +600,10 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 		if hidden != nil {
 			t.Errorf("a reporter's address was readable from another product: %+v", hidden)
 		}
-		// And they cannot answer the reporter either.
-		if err := f.store.Acknowledge(ctx, stranger, issue); err != nil {
-			t.Fatal(err)
+		// And they cannot answer the reporter either: to them there is no
+		// report to answer.
+		if err := f.store.Acknowledge(ctx, stranger, issue); !errors.Is(err, finding.ErrNoSuchReport) {
+			t.Errorf("answering a report somebody cannot read was told %v, want no such report", err)
 		}
 		again, err := f.store.ReportFor(ctx, who, issue)
 		if err != nil {
@@ -786,6 +787,70 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}); err != nil {
 			t.Errorf("recording one place under a cap of one was refused: %v", err)
+		}
+	})
+}
+
+// Two issues reported in two products and merged carry a report each. Each
+// product reads and answers its own, whichever was received first.
+func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		other := f.productOf(t, elsewhere)
+		person, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		both := access.NewPerson(person.ID, "somebody@example.com", false, map[int64][]access.Role{
+			f.productID: {access.PublicTriage, access.PrivateTriage},
+			other:       {access.PublicTriage, access.PrivateTriage},
+		}, 0)
+		entered := func(target int64, contact string) string {
+			t.Helper()
+			rows, _, err := f.store.Enter(ctx, both, finding.Entering{
+				TargetIDs: []int64{target}, Component: swss.Name, Severity: "high",
+				Summary: "The management socket accepts a request nobody authenticated.",
+				Told:    finding.Told{ReportedBy: "A. Researcher", Contact: contact},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var name string
+			if err := f.db.DB.NewSelect().TableExpr(`"vulnerability"`).Column("identifier").
+				Where("id = ?", rows[0].VulnerabilityID).Scan(ctx, &name); err != nil {
+				t.Fatal(err)
+			}
+			return name
+		}
+		first := entered(f.target, "first@example.org")
+		second := entered(elsewhere, "second@example.org")
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: first, Aliases: []string{second}},
+		}); err != nil {
+			t.Fatalf("merge the two: %v", err)
+		}
+		kept := f.issueID(t, first)
+
+		there := access.NewPerson(person.ID, "somebody@example.com", false, map[int64][]access.Role{
+			other: {access.PublicTriage, access.PrivateTriage},
+		}, 0)
+		told, err := f.store.ReportFor(ctx, there, kept)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if told == nil || told.Contact != "second@example.org" {
+			t.Fatalf("the second product reads %+v, want its own report", told)
+		}
+		if err := f.store.Acknowledge(ctx, there, kept); err != nil {
+			t.Fatal(err)
+		}
+		if told, err = f.store.ReportFor(ctx, there, kept); err != nil {
+			t.Fatal(err)
+		} else if told.AcknowledgedAt == nil {
+			t.Error("the second product answered its reporter and nothing was recorded")
 		}
 	})
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 )
 
@@ -143,25 +142,27 @@ func (t Told) When() *time.Time {
 //
 // A report the subject may not reach and no report at all answer alike, so
 // asking is not a way to find out that one exists.
+//
+// The issue's report is filed under it or under an issue that merged into it,
+// and the one answered is the first received that the subject may read. Two
+// issues merged from two products each carry their own report, and the
+// second product's is its own to read and answer.
 func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
 	vulnerabilityID int64) (*FlawReport, error) {
 
-	row := new(FlawReport)
-	err := s.db.NewSelect().Model(row).
-		// The issue's report, filed under it or under an issue that merged into
-		// it. The one received first where each name had one.
+	// Every report under the issue's names, which is one per name at most.
+	var rows []FlawReport
+	if err := s.db.NewSelect().Model(&rows).
 		Where(FiledUnder(filed.Issue), vulnerabilityID).
-		OrderExpr("id").Limit(1).Scan(ctx)
-	switch {
-	case database.IsNoRows(err):
-		return nil, nil
-	case err != nil:
+		OrderExpr("id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who told us: %w", err)
 	}
-	if err := mayReadReports(subject, row.ProductID); err != nil {
-		return nil, nil
+	for i := range rows {
+		if mayReadReports(subject, rows[i].ProductID) == nil {
+			return &rows[i], nil
+		}
 	}
-	return row, nil
+	return nil, nil
 }
 
 // Acknowledge records that somebody answered the reporter.
@@ -185,7 +186,7 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject,
 		return err
 	}
 	if told == nil {
-		return nil
+		return ErrNoSuchReport
 	}
 	// Answering is working the report, which reading it does not grant.
 	if err := mayHandle(subject, told.ProductID); err != nil {
